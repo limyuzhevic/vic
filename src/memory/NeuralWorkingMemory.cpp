@@ -2,11 +2,20 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <unordered_map>
 
 namespace nlm {
 
 struct NeuralWorkingMemory::Impl {
     Brain* brain;
+    
+    // Efficient lookup maps for faster access
+    std::unordered_map<NeuronId, size_t> neuronToIndexMap;
+    std::unordered_map<uint64_t, float> activationCache;
+    
+    // Performance optimization flags
+    bool needIndexRebuild = false;
+    size_t lastRebuildStep = 0;
     
     // Maintenance connections (recurrent)
     std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
@@ -15,6 +24,26 @@ struct NeuralWorkingMemory::Impl {
     std::vector<SimulationStep> traceAges;
     
     Impl() : brain(nullptr) {}
+    
+    // Efficient index rebuilding
+    void rebuildIndexMap() {
+        neuronToIndexMap.clear();
+        for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+            neuronToIndexMap[memoryNeurons_[i]] = i;
+        }
+        needIndexRebuild = false;
+        lastRebuildStep = memoryTimestamps_.empty() ? 0 : memoryTimestamps_.back();
+    }
+    
+    // Cached activation lookup
+    float getCachedActivation(NeuronId neuron) const {
+        auto it = activationCache.find(neuron.value);
+        return (it != activationCache.end()) ? it->second : 0.0f;
+    }
+    
+    void updateCache(NeuronId neuron, float activation) {
+        activationCache[neuron.value] = activation;
+    }
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
@@ -30,11 +59,20 @@ NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
+    
+    // Build efficient lookup map
+    pImpl->rebuildIndexMap();
+    
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
+    
+    // Ensure index map is up to date
+    if (pImpl->needIndexRebuild) {
+        pImpl->rebuildIndexMap();
+    }
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -42,6 +80,9 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     for (size_t i = 0; i < neuronsNeeded; ++i) {
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
+        
+        // Update cache
+        pImpl->updateCache(neuron, activation);
         
         // Set neuron activation
         if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
@@ -54,33 +95,57 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         }
         
         // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
+        auto it = pImpl->neuronToIndexMap.find(neuron);
+        if (it != pImpl->neuronToIndexMap.end()) {
+            size_t idx = it->second;
+            memoryActivations_[idx] = activation;
         } else {
+            // Add new neuron to memory
+            memoryNeurons_.push_back(neuron);
             memoryActivations_.push_back(activation);
             memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+            pImpl->rebuildIndexMap(); // Update index map
         }
     }
     
-    // Create maintenance connections if needed
+    // Create maintenance connections if needed (use efficient lookup)
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        NeuronId fromNeuron = memoryNeurons_[i-1];
+        NeuronId toNeuron = memoryNeurons_[i];
+        
+        // Check if connection already exists using efficient lookup
+        bool connectionExists = false;
+        for (const auto& conn : pImpl->maintenanceSynapses) {
+            if (conn.first == fromNeuron && conn.second == toNeuron) {
+                connectionExists = true;
+                break;
+            }
+        }
+        
+        if (!connectionExists) {
+            createRecurrentConnection(fromNeuron, toNeuron, strength * 0.5f);
+        }
     }
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
-    // Find or add this neuron to memory
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    // Find or add this neuron to memory using efficient lookup
+    auto it = pImpl->neuronToIndexMap.find(neuron);
     
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
+    if (it != pImpl->neuronToIndexMap.end()) {
+        size_t idx = it->second;
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
+        // Update cache
+        pImpl->updateCache(neuron, activation);
     } else if (memoryNeurons_.size() < capacity_) {
+        // Add new neuron to memory
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        // Update lookup map
+        pImpl->neuronToIndexMap[neuron] = memoryNeurons_.size() - 1;
+        pImpl->updateCache(neuron, activation);
     }
     
     // Inject current to maintain activation
@@ -101,13 +166,15 @@ std::vector<float> NeuralWorkingMemory::retrieve() const {
 }
 
 bool NeuralWorkingMemory::contains(NeuronId neuron) const {
-    return std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end();
+    // Use efficient lookup map for O(1) access
+    return pImpl->neuronToIndexMap.find(neuron) != pImpl->neuronToIndexMap.end();
 }
 
 float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
+    // Use efficient lookup map for O(1) access
+    auto it = pImpl->neuronToIndexMap.find(neuron);
+    if (it != pImpl->neuronToIndexMap.end()) {
+        size_t idx = it->second;
         return memoryActivations_[idx];
     }
     return 0.0f;
@@ -115,6 +182,11 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
+    
+    // Ensure index map is up to date
+    if (pImpl->needIndexRebuild) {
+        pImpl->rebuildIndexMap();
+    }
     
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
@@ -134,6 +206,8 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
             }
             
             memoryActivations_[i] = activation;
+            // Update cache
+            pImpl->updateCache(neuron, activation);
         }
     }
     
@@ -150,6 +224,10 @@ void NeuralWorkingMemory::clear() {
     memoryTimestamps_.clear();
     activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
+    
+    // Rebuild index map and clear cache
+    pImpl->rebuildIndexMap();
+    pImpl->activationCache.clear();
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
@@ -238,10 +316,21 @@ void NeuralWorkingMemory::decayWeakTraces() {
     
     // Remove weak traces (in reverse order to maintain indices)
     for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+        NeuronId neuron = memoryNeurons_[*it];
+        
+        // Remove from lookup map
+        pImpl->neuronToIndexMap.erase(neuron);
+        
+        // Remove from cache
+        pImpl->activationCache.erase(neuron.value);
+        
         memoryNeurons_.erase(memoryNeurons_.begin() + *it);
         memoryActivations_.erase(memoryActivations_.begin() + *it);
         memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
     }
+    
+    // Mark for index rebuild
+    pImpl->needIndexRebuild = true;
 }
 
 // AttentionalSelection Implementation

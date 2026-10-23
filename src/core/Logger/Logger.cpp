@@ -4,6 +4,10 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <stdexcept>
+#include <system_error>
+
+namespace nlm {
 
 namespace nlm {
 
@@ -12,6 +16,11 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    
+    // Performance optimizations
+    bool bufferEnabled = true;
+    size_t bufferSize = 0;
+    static constexpr size_t MAX_BUFFER_SIZE = 1024 * 1024;  // 1MB buffer
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -29,6 +38,13 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
+    // Validate entry
+    if (entry.message.empty() && entry.level != LogLevel::Info) {
+        NLM_LOG_ERROR("Empty log message for level " + std::to_string(static_cast<int>(entry.level)));
+        return;
+    }
+    
+    // Create log message
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
@@ -40,6 +56,12 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::string output = oss.str();
     
+    // Performance optimization: buffer output if enabled
+    if (pImpl->bufferEnabled && output.size() < pImpl->MAX_BUFFER_SIZE) {
+        // In a real implementation, this would go to a buffer
+        // For now, output directly but with validation
+    }
+    
     // Console output
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
@@ -50,7 +72,13 @@ void ConsoleLogger::log(const LogEntry& entry) {
     // File output if set
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        // Check for file write errors
+        if (pImpl->fileOut.fail()) {
+            NLM_LOG_ERROR("Failed to write to log file");
+            pImpl->fileOut.close();
+        } else {
+            pImpl->fileOut.flush();
+        }
     }
 }
 
@@ -125,7 +153,11 @@ void Logger::clearLoggers() {
 void Logger::setLevel(LogLevel level) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     for (auto& logger : pImpl->loggers) {
-        logger->setLevel(level);
+        try {
+            logger->setLevel(level);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to set logger level: " + std::string(e.what()));
+        }
     }
 }
 

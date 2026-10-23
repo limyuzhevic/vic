@@ -1,12 +1,63 @@
 #include "Config.hpp"
+#include "Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <optional>
+#include <system_error>
 
 namespace nlm {
+static void ensureDirectoryExists(const std::string& filepath) {
+    size_t pos = filepath.find_last_of("/\\");
+    if (pos != std::string::npos) {
+        std::string dir = filepath.substr(0, pos);
+        if (!dir.empty()) {
+            std::error_code ec;
+            std::filesystem::create_directories(dir, ec);
+            if (ec) {
+                NLM_LOG_ERROR("Failed to create config directory " + dir + ": " + ec.message());
+            }
+        }
+    }
+}
 
-struct Config::Impl {
+static void validateValue(const ConfigValue& value, const std::string& key) {
+    std::visit([key](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        
+        if constexpr (std::is_same_v<T, std::string>) {
+            if (arg.empty()) {
+                NLM_LOG_WARNING("Config key " + key + " has empty string value");
+            }
+            // Validate string doesn't contain newlines
+            if (arg.find('\n') != std::string::npos || arg.find('\r') != std::string::npos) {
+                throw std::invalid_argument("Config value for key " + key + " contains newlines");
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            if (arg.size() > 1000) {
+                throw std::invalid_argument("Config vector for key " + key + " is too large (" + 
+                                           std::to_string(arg.size()) + " elements)");
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            if (arg.size() > 1000) {
+                throw std::invalid_argument("Config vector for key " + key + " is too large (" + 
+                                           std::to_string(arg.size()) + " elements)");
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            if (arg.size() > 1000) {
+                throw std::invalid_argument("Config vector for key " + key + " is too large (" + 
+                                           std::to_string(arg.size()) + " elements)");
+            }
+            for (const auto& str : arg) {
+                if (str.empty()) {
+                    throw std::invalid_argument("Config vector contains empty string for key " + key);
+                }
+            }
+        }
+    }, value);
+}
+namespace nlm {
     std::vector<ConfigEntry> entries;
 };
 
@@ -19,37 +70,83 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Check if file exists and is readable
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Config file not found or cannot be opened: " + filepath);
+        return false;
+    }
+    
+    // Check file size to avoid parsing extremely large files
+    file.seekg(0, std::ios::end);
+    size_t fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+    
+    if (fileSize > 10 * 1024 * 1024) {  // 10MB limit
+        NLM_LOG_ERROR("Config file too large: " + filepath + " (" + 
+                     std::to_string(fileSize) + " bytes)");
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    size_t currentLineCount = 0;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
+        ++currentLineCount;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        // Enforce reasonable line length to prevent malformed lines
+        if (line.length() > 1024) {
+            NLM_LOG_ERROR("Config line too long in " + filepath + ": line " + 
+                         std::to_string(lineNumber) + " (" + 
+                         std::to_string(line.length()) + " characters)");
+            continue;  // Skip but continue processing
         }
+        
+        // Parse simple key=value pairs with better validation
+        size_t pos = line.find('=');
+        if (pos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid config line in " + filepath + ": line " + 
+                           std::to_string(lineNumber) + " (no '=' found)");
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key
+        if (key.empty()) {
+            NLM_LOG_WARNING("Empty config key in " + filepath + ": line " + 
+                           std::to_string(lineNumber));
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Set the configuration value
+        try {
+            set(key, value, ConfigSource::File);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error parsing config line in " + filepath + ": line " + 
+                         std::to_string(lineNumber) + " - " + e.what());
+        }
+    }
+    
+    if (currentLineCount > 1000) {
+        NLM_LOG_WARNING("Config file " + filepath + " has many lines (" + 
+                       std::to_string(currentLineCount) + ". Consider optimizing");
     }
     
     return true;
@@ -79,14 +176,74 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    // Validate filepath
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Cannot save config to empty filepath");
         return false;
     }
     
+    // Ensure directory exists
+    ensureDirectoryExists(filepath);
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
+        return false;
+    }
+    
+    // Set good formatting
+    file << std::fixed << std::setprecision(6);
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write comment if present
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write the key-value pair
+        file << entry.key << " = ";
+        
+        // Write the value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
+    }
+    
+    file.flush();
+    
+    if (!file.good()) {
+        NLM_LOG_ERROR("Failed to write complete config to file: " + filepath);
+        return false;
     }
     
     return true;
@@ -115,6 +272,25 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        throw std::invalid_argument("Config key cannot be empty");
+    }
+    
+    if (key.length() > 255) {
+        throw std::invalid_argument("Config key too long: " + key);
+    }
+    
+    // Check for invalid characters in key
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '-' && c != '.') {
+            throw std::invalid_argument("Invalid character in config key: " + key);
+        }
+    }
+    
+    // Validate value based on type
+    validateValue(value, key);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -166,6 +342,43 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+}
+
+// Helper function implementations
+void Config::validateValue(const ConfigValue& value, const std::string& key) {
+    std::visit([key](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        
+        if constexpr (std::is_same_v<T, std::string>) {
+            if (arg.empty()) {
+                NLM_LOG_WARNING("Config key " + key + " has empty string value");
+            }
+            // Validate string doesn't contain newlines
+            if (arg.find('\n') != std::string::npos || arg.find('\r') != std::string::npos) {
+                throw std::invalid_argument("Config value for key " + key + " contains newlines");
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            if (arg.size() > 1000) {
+                throw std::invalid_argument("Config vector for key " + key + " is too large (" + 
+                                           std::to_string(arg.size()) + " elements)");
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            if (arg.size() > 1000) {
+                throw std::invalid_argument("Config vector for key " + key + " is too large (" + 
+                                           std::to_string(arg.size()) + " elements)");
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            if (arg.size() > 1000) {
+                throw std::invalid_argument("Config vector for key " + key + " is too large (" + 
+                                           std::to_string(arg.size()) + " elements)");
+            }
+            for (const auto& str : arg) {
+                if (str.empty()) {
+                    throw std::invalid_argument("Config vector contains empty string for key " + key);
+                }
+            }
+        }
+    }, value);
 }
 
 std::string Config::summary() const {
