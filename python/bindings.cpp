@@ -2,9 +2,11 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/iostream.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <iostream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -12,9 +14,19 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
+#include "../src/sensory/Perception.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/Memory.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/experiments/Phase6IntegratedExperiment.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -141,6 +153,125 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wall", WorldObjectType::Wall)
         .value("Marker", WorldObjectType::Marker)
         .export_values();
+
+    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
+        .value("MoveForward", ActionType::MoveForward)
+        .value("MoveBackward", ActionType::MoveBackward)
+        .value("MoveLeft", ActionType::MoveLeft)
+        .value("MoveRight", ActionType::MoveRight)
+        .value("TurnLeft", ActionType::TurnLeft)
+        .value("TurnRight", ActionType::TurnRight)
+        .value("Look", ActionType::Look)
+        .value("LookUp", ActionType::LookUp)
+        .value("LookDown", ActionType::LookDown)
+        .value("Interact", ActionType::Interact)
+        .value("Eat", ActionType::Eat)
+        .value("Drink", ActionType::Drink)
+        .value("Rest", ActionType::Rest)
+        .value("Wait", ActionType::Wait)
+        .value("Custom", ActionType::Custom)
+        .export_values();
+
+    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
+        .value("MoveForward", MotorCommand::MoveForward)
+        .value("MoveBackward", MotorCommand::MoveBackward)
+        .value("TurnLeft", MotorCommand::TurnLeft)
+        .value("TurnRight", MotorCommand::TurnRight)
+        .value("LookLeft", MotorCommand::LookLeft)
+        .value("LookRight", MotorCommand::LookRight)
+        .value("Interact", MotorCommand::Interact)
+        .value("Wait", MotorCommand::Wait)
+        .export_values();
+
+    // Vision sensory input
+    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
+             py::arg("channels") = 3)
+        .def("setData", [](Vision& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"))
+        .def("getWidth", &Vision::getWidth)
+        .def("getHeight", &Vision::getHeight)
+        .def("getChannels", &Vision::getChannels);
+
+    // Audio sensory input
+    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
+        .def("setData", [](Audio& self, const std::vector<float>& data) {
+            self.setData(data);
+        }, py::arg("data"))
+        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
+        .def("getSampleRate", &Audio::getSampleRate)
+        .def("getNumSamples", &Audio::getNumSamples);
+
+    // Internal signals sensory input
+    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
+        .def(py::init<>())
+        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
+        .def("clearSignals", &InternalSignals::clearSignals);
+
+    // Working memory system
+    py::class_<WorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory system)pbdoc")
+        .def(py::init<>())
+        .def("store", &WorkingMemory::store, py::arg("neuron"), py::arg("value"))
+        .def("retrieve", &WorkingMemory::retrieve, py::arg("neuron"))
+        .def("contains", &WorkingMemory::contains, py::arg("neuron"))
+        .def("clear", &WorkingMemory::clear)
+        .def("getCapacity", &WorkingMemory::getCapacity)
+        .def("getCurrentSize", &WorkingMemory::getCurrentSize)
+        .def("decay", &WorkingMemory::decay, py::arg("decayRate"));
+
+    // Episodic memory system
+    py::class_<EpisodicMemoryItem>(m, "EpisodicMemoryItem", R"pbdoc(Episodic memory item)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("timestamp", &EpisodicMemoryItem::timestamp)
+        .def_readwrite("neurons", &EpisodicMemoryItem::neurons)
+        .def_readwrite("values", &EpisodicMemoryItem::values)
+        .def_readwrite("metadata", &EpisodicMemoryItem::metadata);
+
+    py::class_<EpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory system)pbdoc")
+        .def(py::init<>())
+        .def("storeEpisode", &EpisodicMemory::storeEpisode, py::arg("episode"))
+        .def("retrieveEpisode", &EpisodicMemory::retrieveEpisode, py::arg("index"))
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount)
+        .def("getRecentEpisodes", &EpisodicMemory::getRecentEpisodes, py::arg("count"))
+        .def("clear", &EpisodicMemory::clear)
+        .def("consolidate", &EpisodicMemory::consolidate, py::arg("relevanceThreshold"));
+
+    // Semantic memory system
+    py::class_<SemanticMemory>(m, "SemanticMemory", R"pbdoc(Semantic memory system)pbdoc")
+        .def(py::init<>())
+        .def("storeFact", &SemanticMemory::storeFact, py::arg("key"), py::arg("value"))
+        .def("retrieveFact", &SemanticMemory::retrieveFact, py::arg("key"))
+        .def("hasFact", &SemanticMemory::hasFact, py::arg("key"))
+        .def("getAllFacts", &SemanticMemory::getAllFacts)
+        .def("clear", &SemanticMemory::clear);
+
+    // Procedural memory system
+    py::class_<Skill>(m, "Skill", R"pbdoc(Procedural skill)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("name", &Skill::name)
+        .def_readwrite("neuralPattern", &Skill::neuralPattern)
+        .def_readwrite("proficiency", &Skill::proficiency);
+
+    py::class_<ProceduralMemory>(m, "ProceduralMemory", R"pbdoc(Procedural memory system)pbdoc")
+        .def(py::init<>())
+        .def("learnSkill", &ProceduralMemory::learnSkill, py::arg("name"), py::arg("pattern"))
+        .def("getSkill", &ProceduralMemory::getSkill, py::arg("name"))
+        .def("getAllSkills", &ProceduralMemory::getAllSkills)
+        .def("updateProficiency", &ProceduralMemory::updateProficiency, py::arg("name"), py::arg("delta"))
+        .def("clear", &ProceduralMemory::clear);
+
+    // Associative memory system
+    py::class_<AssociativeMemory>(m, "AssociativeMemory", R"pbdoc(Associative memory system)pbdoc")
+        .def(py::init<>())
+        .def("associate", &AssociativeMemory::associate, py::arg("a"), py::arg("b"), py::arg("strength"))
+        .def("getAssociations", &AssociativeMemory::getAssociations, py::arg("neuron"))
+        .def("getAssociationStrength", &AssociativeMemory::getAssociationStrength, py::arg("a"), py::arg("b"))
+        .def("updateAssociation", &AssociativeMemory::updateAssociation, py::arg("a"), py::arg("b"), py::arg("delta"))
+        .def("clear", &AssociativeMemory::clear);
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
@@ -416,6 +547,44 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Helper types and factories
+    py::class_<SelfModel>(m, "SelfModel", R"pbdoc(Self-model of the agent's internal representation)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SelfModel::initialize, py::arg("brain"))
+        .def("recordSelfAction", &SelfModel::recordSelfAction, py::arg("action"), py::arg("beforeState"), py::arg("afterState"))
+        .def("predictActionConsequence", &SelfModel::predictActionConsequence, py::arg("action"), py::arg("currentState"))
+        .def("getSelfModelConfidence", &SelfModel::getSelfModelConfidence, py::arg("action"))
+        .def("getBodyAwareness", &SelfModel::getBodyAwareness)
+        .def("clear", &SelfModel::clear);
+
+    py::class_<SocialLearning>(m, "SocialLearning", R"pbdoc(Social learning system)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SocialLearning::initialize, py::arg("brain"))
+        .def("observeAgentAction", &SocialLearning::observeAgentAction, py::arg("observedAction"), py::arg("observerState"), py::arg("resultingState"))
+        .def("canImitate", &SocialLearning::canImitate, py::arg("observedAction"))
+        .def("getImitationAction", &SocialLearning::getImitationAction, py::arg("currentState"))
+        .def("learnCommunicationSignal", &SocialLearning::learnCommunicationSignal, py::arg("signalPattern"), py::arg("signalReward"))
+        .def("detectSignal", &SocialLearning::detectSignal, py::arg("neuralPattern"))
+        .def("getSignalPattern", &SocialLearning::getSignalPattern)
+        .def("getSignalMeaning", &SocialLearning::getSignalMeaning)
+        .def("updateSocialKnowledge", &SocialLearning::updateSocialKnowledge, py::arg("interactionReward"))
+        .def("clear", &SocialLearning::clear);
+
+    // Spike system binding
+    py::class_<SpikeSystem>(m, "SpikeSystem", R"pbdoc(Spike system for neural dynamics)pbdoc")
+        .def("getTotalSpikeCount", &SpikeSystem::getTotalSpikeCount)
+        .def("getMostActiveNeurons", &SpikeSystem::getMostActiveNeurons, py::arg("count"))
+        .def("getFiringNeuronCount", &SpikeSystem::getFiringNeuronCount);
+
+    // Phase 6 Experiment Integration
+    py::class_<Phase6IntegratedExperiment>(m, "Phase6IntegratedExperiment", R"pbdoc(Phase 6 integration experiment)pbdoc")
+        .def(py::init<>())
+        .def("runIntegrationExperiment", &Phase6IntegratedExperiment::runIntegrationExperiment)
+        .def("getIntegrationScore", &Phase6IntegratedExperiment::getIntegrationScore)
+        .def("saveExperimentState", &Phase6IntegratedExperiment::saveExperimentState, py::arg("filepath"))
+        .def("loadExperimentState", &Phase6IntegratedExperiment::loadExperimentState, py::arg("filepath"));
+
+    // Invalid ID constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

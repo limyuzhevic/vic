@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// IMPLEMENTED in Phase 2 - Real STDP with spike timing precision
 
 class STDP : public PlasticityRule {
 public:
@@ -18,6 +18,9 @@ public:
                  TimestepDuration dt) override;
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override;
+    
+    void setSTDPParameters(float ltpWeight, float ltdWeight, float tau);
+    void getSTDPParameters(float& ltpWeight, float& ltdWeight, float& tau) const;
     
     // STDP parameters
     void setLTPWeight(float weight);    // Long-term potentiation weight

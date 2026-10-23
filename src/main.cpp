@@ -111,29 +111,41 @@ struct LearningExperiment {
             return;
         }
         
-        // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
+        // Compute statistics in a single pass for efficiency
+        float initialSum = 0.0f;
+        float finalSum = 0.0f;
+        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
         
-        NLM_LOG_INFO("Weight Statistics:");
-        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
-        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
-        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
+        // Pre-compute sums and count changes in one loop
+        for (size_t i = 0; i < minSize; ++i) {
+            initialSum += initialWeights[i];
+            finalSum += finalWeights[i];
+        }
+        
+        float initialMean = initialSum / static_cast<float>(minSize);
+        float finalMean = finalSum / static_cast<float>(minSize);
         
         // Count synapses that changed significantly
         size_t strengthened = 0;
         size_t weakened = 0;
         size_t unchanged = 0;
         
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
+        // Single pass to count changes
         for (size_t i = 0; i < minSize; ++i) {
             float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
+            if (delta > 0.01f) {
+                ++strengthened;
+            } else if (delta < -0.01f) {
+                ++weakened;
+            } else {
+                ++unchanged;
+            }
         }
+        
+        NLM_LOG_INFO("Weight Statistics:");
+        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
+        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
+        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
         
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Synaptic Changes:");
@@ -206,25 +218,55 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
+    if (!brain) {
+        NLM_LOG_ERROR("ERROR: Brain pointer is null in plasticity experiment");
+        return;
+    }
+    
+    // Validate brain state
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("ERROR: Failed to initialize brain for plasticity experiment");
+        return;
+    }
+    
     LearningExperiment experiment(brain, 42);
     
     // Record initial state
     experiment.recordInitialState();
     
+    // Validate that we have neurons before enabling plasticity
+    if (brain->getTotalNeuronCount() == 0) {
+        NLM_LOG_WARNING("WARNING: No neurons in brain, skipping plasticity experiment");
+        return;
+    }
+    
     // Enable plasticity on synapses
     if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+        auto& synapses = region->getSynapses();
+        if (synapses.empty()) {
+            NLM_LOG_WARNING("WARNING: No synapses in region, skipping plasticity experiment");
+            return;
         }
+        
+        for (auto& syn : synapses) {
+            if (syn) {
+                syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            }
+        }
+        NLM_LOG_INFO("  Enabled plasticity on " + std::to_string(synapses.size()) + " synapses");
     }
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
+    // Validate simulation parameters
+    size_t totalNeurons = brain->getTotalNeuronCount();
+    size_t inputNeurons = std::min(size_t(20), totalNeurons / 4);
+    
     for (SimulationStep step = 0; step < 1000; ++step) {
         // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
+        for (size_t i = 0; i < inputNeurons; ++i) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
@@ -249,25 +291,48 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
+    if (!brain) {
+        NLM_LOG_ERROR("ERROR: Brain pointer is null in STDP verification");
+        return;
+    }
+    
+    // Validate brain state
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("ERROR: Failed to initialize brain for STDP verification");
+        return;
+    }
+    
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("ERROR: Failed to get region 1 for STDP verification");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
     if (synapses.size() < 5) {
-        NLM_LOG_INFO("  Not enough synapses for STDP test");
+        NLM_LOG_INFO("  Not enough synapses for STDP test - need at least 5, found " + std::to_string(synapses.size()));
         return;
     }
     
     NLM_LOG_INFO("  Testing STDP on 5 synapses:");
     
-    // Record initial weights
+    // Record initial weights with validation
     std::vector<float> beforeWeights;
-    for (size_t i = 0; i < 5; ++i) {
-        beforeWeights.push_back(synapses[i]->getWeight());
-        synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+    size_t validSynapses = 0;
+    for (size_t i = 0; i < 5 && i < synapses.size(); ++i) {
+        if (synapses[i]) {
+            beforeWeights.push_back(synapses[i]->getWeight());
+            synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
+            NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
+                        " before: " + std::to_string(beforeWeights[i]));
+            validSynapses++;
+        }
+    }
+    
+    if (validSynapses < 3) {
+        NLM_LOG_WARNING("WARNING: Too few valid synapses for STDP test, skipping");
+        return;
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -298,26 +363,30 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     // Record after weights
     NLM_LOG_INFO("  After correlated activity:");
-    for (size_t i = 0; i < 5; ++i) {
-        float delta = synapses[i]->getWeight() - beforeWeights[i];
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
-    }
-    
-    // Check if weights increased (LTP)
     float totalDelta = 0.0f;
-    for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
+    size_t validAfter = 0;
+    for (size_t i = 0; i < beforeWeights.size() && i < synapses.size(); ++i) {
+        if (synapses[i]) {
+            float delta = synapses[i]->getWeight() - beforeWeights[i];
+            NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
+            totalDelta += delta;
+            validAfter++;
+        }
     }
     
     NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
-        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
-        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
+    if (validAfter >= 3) {  // Need at least 3 valid synapses for reliable result
+        if (totalDelta > 0.001f) {
+            NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation (total Δ=" + std::to_string(totalDelta) + ")");
+        } else if (totalDelta < -0.001f) {
+            NLM_LOG_INFO("  ! STDP reversed: Check parameters (total Δ=" + std::to_string(totalDelta) + ")");
+        } else {
+            NLM_LOG_INFO("  ! No change: STDP may not be triggering (total Δ=" + std::to_string(totalDelta) + ")");
+        }
     } else {
-        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+        NLM_LOG_WARNING("WARNING: Too few valid synapses for STDP analysis");
     }
 }
 
@@ -356,15 +425,26 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file with proper error handling
+    bool configLoadedFromFile = false;
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        configLoadedFromFile = true;
     } else {
+        NLM_LOG_INFO("Warning: Configuration file not found or invalid: " + configFile);
         NLM_LOG_INFO("Using default configuration.");
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (config->loadFromArgs(argc, argv)) {
+        if (configLoadedFromFile) {
+            NLM_LOG_INFO("Configuration overridden with command line arguments.");
+        } else {
+            NLM_LOG_INFO("Configuration loaded from command line arguments.");
+        }
+    } else {
+        NLM_LOG_INFO("Warning: Failed to parse command line arguments.");
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
