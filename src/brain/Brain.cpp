@@ -11,7 +11,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
+#include "../prediction/NeuralPrediction.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
@@ -22,11 +22,11 @@
 
 namespace nlm {
 
-struct Brain::Impl {
-    std::shared_ptr<Config> config;
-    std::unique_ptr<RandomGenerator> rng;
-    std::vector<std::unique_ptr<NeuralRegion>> regions;
-    std::vector<InterRegionConnection> interRegionConnections;
+    // ========== CURRENT STATE ==========
+    std::vector<float> currentSensoryState;
+    std::vector<float> lastSensoryState;
+    
+    SimulationStep lastStep;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -34,7 +34,7 @@ struct Brain::Impl {
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<NeuralPrediction> predictionSystem;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
@@ -92,6 +92,7 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , lastStep(0)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -114,7 +115,7 @@ struct Brain::Impl {
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
+        predictionSystem = std::make_unique<NeuralPrediction>();
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -232,32 +233,58 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    }
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    }
+    
+    if (pImpl->dopamine) {
+        pImpl->dopamine->initialize(this);
+    }
+    
+    // Initialize prediction system
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->initialize(this);
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -511,8 +538,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Record current sensory state for learning (with one-step delay)
+        if (!pImpl->currentSensoryState.empty()) {
+            pImpl->predictionSystem->recordSensoryState(pImpl->currentSensoryState, currentStep - 1);
+        }
+        
+        // Generate prediction for next timestep
+        std::vector<float> prediction = pImpl->predictionSystem->generatePrediction(currentStep);
+        
+        // Update prediction system with actual observation
+        float predictionError = 0.0f;
+        if (!prediction.empty()) {
+            // Simple prediction error calculation
+            float sumError = 0.0f;
+            for (size_t i = 0; i < prediction.size(); ++i) {
+                // For prediction error, we compare predicted vs actual
+                // For now, use the current sensory state as actual
+                float actual = i < pImpl->currentSensoryState.size() ? 
+                             pImpl->currentSensoryState[i] : 0.0f;
+                sumError += std::abs(actual - prediction[i]);
+            }
+            predictionError = sumError / std::max(prediction.size(), 1UL);
+            
+            // Update prediction system with observation
+            pImpl->predictionSystem->updateWithObservation(pImpl->currentSensoryState, currentStep);
+            
+            // Use prediction error for neuromodulation
+            if (pImpl->predictionError) {
+                pImpl->predictionError->computeError(prediction, pImpl->currentSensoryState);
+                float modulation = pImpl->predictionError->getError();
+                // Apply neuromodulation to learning rate
+                if (modulation > 0.0f) {
+                    pImpl->curiosity->update(modulation, 0.0f, pImpl->timestep);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -533,7 +593,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
+    if (currentStep % 100 == 0 && pImpl->structuralPlasticity) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
@@ -548,7 +608,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        }
         
         // Development affects plasticity rates
         auto* sp = pImpl->structuralPlasticity;
@@ -594,6 +656,10 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     
     const auto& values = input.getData();
     if (values.empty()) return;
+    
+    // Update current sensory state for prediction system
+    pImpl->lastSensoryState = pImpl->currentSensoryState;
+    pImpl->currentSensoryState = std::vector<float>(values.begin(), values.end());
     
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
@@ -1017,11 +1083,11 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+    // ========== PREDICTION SYSTEM ACCESSOR ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
-}
+    NeuralPrediction* Brain::getPredictionSystem() {
+        return pImpl->predictionSystem.get();
+    }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========
 
