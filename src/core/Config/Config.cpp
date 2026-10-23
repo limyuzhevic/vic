@@ -4,7 +4,8 @@
 #include <algorithm>
 #include <filesystem>
 
-namespace nlm {
+// Include Logger for logging support
+#include "../../core/Logger/Logger.hpp"
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -63,9 +64,15 @@ bool Config::loadFromArgs(int argc, char** argv) {
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                // Extract key (between "--" and "=")
+                if (pos > 2) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    set(key, value, ConfigSource::CommandLine);
+                } else {
+                    // Empty key after --, ignore
+                    NLM_LOG_WARNING("Invalid command line argument format: '" + arg + "'. Key missing.");
+                }
             }
         }
         // Handle -key value format

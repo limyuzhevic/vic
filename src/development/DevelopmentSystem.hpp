@@ -40,11 +40,8 @@ public:
     bool isCriticalPeriod() const;
     float getCriticalPeriodProgress() const;
     
-    // Get developmental age (in simulation time)
-    double getDevelopmentalAge() const { return age_; }
-    
-    // Set developmental age
-    void setDevelopmentalAge(double age) { age_ = age; }
+    // Reset development state
+    void reset();
     
 private:
     struct Impl;

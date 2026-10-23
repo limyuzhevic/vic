@@ -116,4 +116,15 @@ float DevelopmentSystem::getCriticalPeriodProgress() const {
     return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
 }
 
+// Reset development state
+void DevelopmentSystem::reset() {
+    age_ = 0.0;
+    if (pImpl) {
+        pImpl->stageAge = 0.0;
+        pImpl->stepsInCurrentStage = 0;
+        pImpl->stage = DevelopmentalStage::Initial;
+    }
+    NLM_LOG_INFO("Development system reset");
+}
+
 } // namespace nlm

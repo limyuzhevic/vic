@@ -133,12 +133,12 @@ struct Brain::Impl {
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        float tau = config->getOr<float>("stdp_time_constant", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        float synaptogenesisRate = config->getOr<float>("development_synaptogenesis_rate", 0.0001f);
+        float pruningRate = config->getOr<float>("development_pruning_rate", 0.00001f);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
@@ -232,32 +232,81 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize working memory - pointer is null");
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize episodic memory - pointer is null");
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize associative memory - pointer is null");
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
+    if (!pImpl->predictionSystem) {
+        NLM_LOG_ERROR("Failed to initialize prediction system - pointer is null");
+    }
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize planner - pointer is null");
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize concept formation - pointer is null");
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize attention system - pointer is null");
+    }
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Initialize development system
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize development system - pointer is null");
+    }
+    
+    // Initialize neuromodulation systems
+    if (pImpl->dopamine) {
+        pImpl->dopamine->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize dopamine - pointer is null");
+    }
+    
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize novelty detector - pointer is null");
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    } else {
+        NLM_LOG_ERROR("Failed to initialize curiosity system - pointer is null");
+    }
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -506,13 +555,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Integrate with associative memory
+            if (pImpl->associativeMemory) {
+                pImpl->associativeMemory->associateFromExperience(episode);
+            }
         }
     }
     
-    // ========== STEP 8: Update prediction system ==========
+// ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current brain state
+        // TODO: Connect prediction system to sensory input
+        // For now, just clear history periodically
+        if (currentStep % 1000 == 0) {
+            pImpl->predictionSystem->clearHistory();
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,12 +586,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Extract current brain state for concept formation
+        std::vector<float> currentState;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    currentState.push_back(neuron->getState().membranePotential);
+                }
+            }
+        }
+        
+        // Update concept formation with current brain state
+        // For now, just process a simple pattern
+        if (!currentState.empty()) {
+            pImpl->conceptFormation->updateConcept(0, currentState, 0.1f);
+        }
+    }
+    
+    // ========== STEP 10b: Neural planner ==========
+    if (pImpl->planner) {
+        // Plan action based on current brain state and neuromodulation levels
+        std::vector<float> currentState;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    currentState.push_back(neuron->getState().membranePotential);
+                }
+            }
+        }
+        
+        // Get target reward from dopamine level if available
+        float targetReward = 0.5f; // Default
+        if (pImpl->dopamine) {
+            targetReward = pImpl->dopamine->getLevel();
+        }
+        
+        // Plan action (though this would normally be called from outside)
+        // For now, just call it to maintain system state
+        pImpl->planner->planAction(currentState, targetReward);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
+    if (currentStep % 100 == 0 && pImpl->structuralPlasticity) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
@@ -548,31 +643,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        if (pImpl->developmentSystem) {
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            // Development affects plasticity rates
+            auto* sp = pImpl->structuralPlasticity;
+            if (sp) {
+                DevelopmentalStage stage = pImpl->developmentalStage;
+                float plasticityMod = 1.0f;
+                
+                switch (stage) {
+                    case DevelopmentalStage::Initial:
+                        plasticityMod = 1.0f;  // High plasticity
+                        break;
+                    case DevelopmentalStage::CriticalPeriod:
+                        plasticityMod = 0.8f;
+                        break;
+                    case DevelopmentalStage::Maturation:
+                        plasticityMod = 0.5f;
+                        break;
+                    case DevelopmentalStage::Adult:
+                        plasticityMod = 0.2f;  // Stable
+                        break;
+                }
+                
+                sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+                sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        } else {
+            NLM_LOG_WARNING("Development system is null, skipping development effects");
         }
     }
     
@@ -721,8 +820,12 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     float modulation = signal.getLevel();
     
     // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    if (pImpl->stdp) {
+        pImpl->stdp->setLTPWeight(0.01f * modulation);
+        pImpl->stdp->setLTDWeight(0.012f * modulation);
+    } else {
+        NLM_LOG_WARNING("STDP system is null, skipping neuromodulation effects");
+    }
 }
 
 void Brain::updatePlasticity() {
@@ -749,14 +852,26 @@ void Brain::reset() {
         region->reset();
     }
     
-    pImpl->spikeSystem->reset();
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    }
+    
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    
     if (pImpl->attention) pImpl->attention->reset();
+    
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->reset();
+    }
+    
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->reset();
+    }
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -1092,18 +1207,106 @@ void Brain::logStatus() const {
     // Memory system status
     if (pImpl->workingMemory) {
         NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+    } else {
+        NLM_LOG_WARNING("Working memory system not available");
     }
+    
     if (pImpl->episodicMemory) {
         NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    } else {
+        NLM_LOG_WARNING("Episodic memory system not available");
+    }
+    
+    if (pImpl->associativeMemory) {
+        NLM_LOG_INFO("Associative memory patterns: " + std::to_string(pImpl->associativeMemory->getPatternCount()));
+    } else {
+        NLM_LOG_WARNING("Associative memory system not available");
+    }
+    
+    // Prediction system status
+    if (pImpl->predictionSystem) {
+        NLM_LOG_INFO("Prediction system: active");
+    } else {
+        NLM_LOG_WARNING("Prediction system not available");
+    }
+    
+    // Cognition system status
+    if (pImpl->planner) {
+        NLM_LOG_INFO("Planner: active");
+    } else {
+        NLM_LOG_WARNING("Planner system not available");
+    }
+    
+    if (pImpl->conceptFormation) {
+        NLM_LOG_INFO("Concept formation: active");
+    } else {
+        NLM_LOG_WARNING("Concept formation system not available");
+    }
+    
+    if (pImpl->attention) {
+        NLM_LOG_INFO("Attention system: active");
+    } else {
+        NLM_LOG_WARNING("Attention system not available");
+    }
+    
+    if (pImpl->developmentSystem) {
+        NLM_LOG_INFO("Development system: stage " + std::string(pImpl->developmentSystem->getStageName()));
+    } else {
+        NLM_LOG_WARNING("Development system not available");
     }
     
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    } else {
+        NLM_LOG_WARNING("Dopamine system not available");
+    }
+    
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    } else {
+        NLM_LOG_WARNING("Curiosity system not available");
+    }
+    
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty detection: active");
+    } else {
+        NLM_LOG_WARNING("Novelty system not available");
+    }
+    
+    if (pImpl->predictionError) {
+        NLM_LOG_INFO("Prediction error signal: active");
+    } else {
+        NLM_LOG_WARNING("Prediction error system not available");
+    }
+    
+    // Plasticity system status
+    if (pImpl->stdp) {
+        NLM_LOG_INFO("STDP plasticity: active");
+    } else {
+        NLM_LOG_WARNING("STDP system not available");
+    }
+    
+    if (pImpl->hebbian) {
+        NLM_LOG_INFO("Hebbian plasticity: active");
+    } else {
+        NLM_LOG_WARNING("Hebbian system not available");
+    }
+    
+    if (pImpl->structuralPlasticity) {
+        NLM_LOG_INFO("Structural plasticity: active");
+    } else {
+        NLM_LOG_WARNING("Structural plasticity system not available");
+    }
+    
+    if (pImpl->spikeSystem) {
+        NLM_LOG_INFO("Spike system: active");
+    } else {
+        NLM_LOG_WARNING("Spike system not available");
     }
     
     // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    NLM_LOG_INFO("Developmental stage: " + std::string(pImpl->developmentSystem ? pImpl->developmentSystem->getStageName() : "Unknown"));
     
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
