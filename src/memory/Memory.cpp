@@ -187,9 +187,26 @@ Skill* ProceduralMemory::getSkill(const std::string& name) {
     return nullptr;
 }
 
+const Skill* ProceduralMemory::getSkill(const std::string& name) const {
+    for (const auto& skill : pImpl->skills) {
+        if (skill.name == name) {
+            return &skill;
+        }
+    }
+    return nullptr;
+}
+
 std::vector<Skill*> ProceduralMemory::getAllSkills() {
     std::vector<Skill*> result;
     for (auto& skill : pImpl->skills) {
+        result.push_back(&skill);
+    }
+    return result;
+}
+
+std::vector<const Skill*> ProceduralMemory::getAllSkills() const {
+    std::vector<const Skill*> result;
+    for (const auto& skill : pImpl->skills) {
         result.push_back(&skill);
     }
     return result;
@@ -202,6 +219,36 @@ void ProceduralMemory::updateProficiency(const std::string& name, float delta) {
             return;
         }
     }
+}
+
+void ProceduralMemory::decayAllSkills() {
+    for (auto& skill : pImpl->skills) {
+        skill.proficiency *= (1.0f - pImpl->globalProficiencyDecayRate);
+    }
+}
+
+std::vector<std::string> ProceduralMemory::getSkillNames() const {
+    std::vector<std::string> names;
+    for (const auto& skill : pImpl->skills) {
+        names.push_back(skill.name);
+    }
+    return names;
+}
+
+float ProceduralMemory::getGlobalProficiencyDecayRate() const {
+    return pImpl->globalProficiencyDecayRate;
+}
+
+void ProceduralMemory::setGlobalProficiencyDecayRate(float rate) {
+    pImpl->globalProficiencyDecayRate = std::max(0.0f, std::min(1.0f, rate));
+}
+
+float ProceduralMemory::getLearningRate() const {
+    return pImpl->learningRate;
+}
+
+void ProceduralMemory::setLearningRate(float rate) {
+    pImpl->learningRate = std::max(0.0f, std::min(1.0f, rate));
 }
 
 void ProceduralMemory::clear() {

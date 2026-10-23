@@ -125,42 +125,59 @@ public:
     bool isNovel(const std::vector<float>& pattern,
                  float similarityThreshold = 0.7f) const;
 
-    // Get concept for a given pattern
-    size_t findConceptForPattern(const std::vector<float>& pattern) const;
+    // Update concept space with new neural activity pattern
+    // This is a simplified version - in full implementation would do proper concept formation
+    void updateConceptSpace(const std::vector<float>& neuralActivity) {
+        // For now, this is a placeholder
+        // In full implementation, this would:
+        // 1. Compare new activity to existing concept prototypes
+        // 2. Update prototypes if concept has changed
+        // 3. Create new concepts if pattern is novel
+        // 4. Track concept stability
+        
+        if (neuralActivity.empty()) return;
+        
+        // Simple concept maintenance
+        size_t currentConceptCount = concepts_.size();
+        if (currentConceptCount == 0) {
+            // Create initial concept
+            createConcept(neuralActivity, std::vector<float>(), 0.5f);
+        } else {
+            // Update existing concepts with new data
+            for (size_t i = 0; i < currentConceptCount; ++i) {
+                updateConcept(i, neuralActivity, std::vector<float>(), 0.5f);
+            }
+        }
+    }
 
-    // Clear all concepts
-    void clear();
+    }
 
-    // Get generalization ability (can concept handle variations?)
-    float getGeneralizationAbility(size_t conceptId) const;
+// Update concept with new instance
+void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
+                  const std::vector<float>& features, float reward);
 
-    // Set parameters
-    void setFormationThreshold(float t) { formationThreshold_ = t; }
-    void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+// Compute similarity between two patterns
+float computeSimilarity(const std::vector<float>& a,
+                      const std::vector<float>& b) const;
 
-private:
-    // Create new concept from pattern
-    size_t createConcept(const std::vector<float>& pattern,
-                        const std::vector<float>& features,
-                        float reward);
+// Check if pattern is novel (doesn't belong to any existing concept)
+bool isNovel(const std::vector<float>& pattern,
+             float similarityThreshold = 0.7f) const;
 
-    // Update concept prototype using Hebbian averaging
-    void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
+// Get concept for a given pattern
+size_t findConceptForPattern(const std::vector<float>& pattern) const;
 
-    // Check if concept is stable enough to be considered "discovered"
-    bool isConceptStable(size_t conceptId) const;
+struct Impl;
+std::unique_ptr<Impl> pImpl;
 
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+Brain* brain_;
+std::vector<DiscoveredConcept> concepts_;
+size_t nextConceptId_;
 
-    Brain* brain_;
-    std::vector<DiscoveredConcept> concepts_;
-    size_t nextConceptId_;
-    
-    // Parameters
-    float formationThreshold_;  // Similarity threshold for forming new concept
-    float stabilityThreshold_;   // Stability needed to be considered stable
-    size_t stabilityWindow_;    // How many observations to consider for stability
+// Parameters
+float formationThreshold_;  // Similarity threshold for forming new concept
+float stabilityThreshold_;   // Stability needed to be considered stable
+size_t stabilityWindow_;    // How many observations to consider for stability
 };
 
 // SpatialRepresentation: Learns spatial relationships from experience

@@ -36,6 +36,18 @@ public:
     // Get plasticity modifier for current stage
     float getPlasticityModifier() const;
     
+    // Get memory consolidation modifier for current stage
+    float getMemoryConsolidationModifier() const;
+    
+    // Get attention modulator for current stage
+    float getAttentionModulator() const;
+    
+    // Get neural excitability modifier for current stage
+    float getNeuralExcitabilityModifier() const;
+    
+    // Get learning rate modifier for current stage
+    float getLearningRateModifier() const;
+    
     // Get critical period info
     bool isCriticalPeriod() const;
     float getCriticalPeriodProgress() const;
@@ -45,6 +57,12 @@ public:
     
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
+    
+    // Record replay event for developmental effects
+    void recordReplayEvent(const class EpisodicMemoryItem& episode);
+    
+    // Apply developmental effects to brain
+    void applyDevelopmentalEffects(Brain* brain, TimestepDuration dt);
     
 private:
     struct Impl;
