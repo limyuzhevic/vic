@@ -187,15 +187,109 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // ========== ADVANCED FEATURES FOR POWER USERS ==========
     
-    // Logging
-    void logStatus() const;
+    // Performance monitoring and profiling
+    void enableProfiling(bool enable);
+    bool isProfilingEnabled() const;
+    void startProfiling();
+    void stopProfiling();
+    std::string getProfilingReport() const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-} // namespace nlm
+    // Performance metrics and statistics
+    void enablePerformanceMetrics(bool enable);
+    bool isPerformanceMetricsEnabled() const;
+    void recordPerformanceMetric(double value);
+    double getAveragePerformance() const;
+    double getMinPerformance() const;
+    double getMaxPerformance() const;
+    
+    // Memory management
+    void enableMemoryTracking(bool enable);
+    bool isMemoryTrackingEnabled() const;
+    void recordMemoryUsage(size_t bytes);
+    size_t getPeakMemoryUsage() const;
+    double getAverageMemoryUsage() const;
+    
+    // Real-time monitoring
+    void enableRealTimeMonitoring(bool enable);
+    bool isRealTimeMonitoringEnabled() const;
+    std::string getRealTimeStats() const;
+    
+    // Advanced plasticity control
+    void enableHebbianPlasticity(bool enable);
+    bool isHebbianPlasticityEnabled() const;
+    void enableSTDPPlasticity(bool enable);
+    bool isSTDPPlasticityEnabled() const;
+    void enableStructuralPlasticity(bool enable);
+    bool isStructuralPlasticityEnabled() const;
+    void setHebbianLearningRate(float rate);
+    void setSTDPParameters(float ltpWeight, float ltdWeight, float tau);
+    
+    // Memory system configuration
+    void setWorkingMemoryCapacity(size_t capacity);
+    void setEpisodicMemoryCapacity(size_t capacity);
+    void setAssociativeMemoryCapacity(size_t capacity);
+    void setMemoryConsolidationThreshold(float threshold);
+    void setMemoryReplayInterval(float interval);
+    
+    // Advanced simulation control
+    void enableEventDrivenSimulation(bool enable);
+    bool isEventDrivenSimulationEnabled() const;
+    void enableParallelProcessing(bool enable, int threadCount = 0);
+    bool isParallelProcessingEnabled() const;
+    int getThreadCount() const;
+    
+    // Data export/import
+    void enableDataExport(bool enable);
+    bool isDataExportEnabled() const;
+    void setDataExportPath(const std::string& path);
+    void setDataFormat(const std::string& format);
+    bool exportData(const std::string& filename) const;
+    bool importData(const std::string& filename);
+    
+    // Simulation control
+    void pauseSimulation(bool pause);
+    bool isSimulationPaused() const;
+    void setMaxSteps(size_t maxSteps);
+    size_t getRemainingSteps() const;
+    
+    // Power user control methods
+    void enableAllAdvancedFeatures(bool enable);
+    void configureForPerformanceMode();
+    void configureForAccuracyMode();
+    void configureForBalancedMode();
+    std::string getAdvancedConfiguration() const;
+    void applyAdvancedConfiguration(const std::string& config);
+    
+    // Benchmarking and testing
+    void runBenchmark(int iterations, size_t stepsPerIter);
+    std::string getBenchmarkReport() const;
+    void resetBenchmarkStats();
+    
+    // Memory optimization
+    void optimizeMemoryUsage();
+    void compactMemory();
+    size_t getEstimatedMemoryUsage() const;
+    
+    // Advanced analytics
+    std::string analyzeLearningProgress() const;
+    std::string analyzeMemoryEfficiency() const;
+    std::string analyzePlasticityEffectiveness() const;
+    
+    // Configuration and tuning
+    void tuneForEnvironment(const std::string& environmentType);
+    void enableEnvironmentSpecificOptimizations();
+    std::string getEnvironmentSpecificConfig() const;
+    
+    // Emergency controls
+    void emergencyStop();
+    void resetToDefaults();
+    bool isInEmergencyState() const;
+    
+    // Debug and diagnostic tools
+    void enableDebugMode(bool enable);
+    bool isDebugModeEnabled() const;
+    std::string getSystemDiagnostics() const;
+    std::vector<std::string> getSystemWarnings() const;
+    bool validateSystemState() const;

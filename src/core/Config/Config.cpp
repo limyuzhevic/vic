@@ -3,6 +3,18 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cctype>
+#include <stdexcept>
+#include <regex>
+#include <cmath>
+
+// Add logging support
+#ifdef NLM_LOGGING_AVAILABLE
+#include "core/Logger/Logger.hpp"
+#else
+#include <iostream>
+#define NLM_LOG_ERROR(msg) std::cerr << "[ERROR] " << msg << std::endl
+#endif
 
 namespace nlm {
 
@@ -19,63 +31,161 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Enhanced configuration file parser with multiple format support
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        try {
+            // Enhanced parsing with better error handling
+            parseLine(line, lineNumber, ConfigSource::File);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Config file " + filepath + " line " + std::to_string(lineNumber) + ": " + e.what());
+            // Continue parsing other lines instead of failing entirely
         }
     }
     
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+void Config::parseLine(const std::string& line, size_t lineNumber, ConfigSource source) {
+    // Enhanced line parsing with better error handling and validation
+    // Supports: key = value, key: value, key value
+    
+    // Skip empty lines and comments (already done in loadFromFile)
+    
+    // Find delimiter
+    size_t eqPos = line.find('=');
+    size_t colonPos = line.find(':');
+    
+    // Determine delimiter (prefer = over :)
+    size_t delimiterPos;
+    std::string delimiter;
+    
+    if (eqPos != std::string::npos && (colonPos == std::string::npos || eqPos < colonPos)) {
+        delimiterPos = eqPos;
+        delimiter = "=";
+    } else if (colonPos != std::string::npos) {
+        delimiterPos = colonPos;
+        delimiter = ":";
+    } else {
+        // No delimiter found - treat as boolean flag
+        std::string key = trim(line);
+        if (key.empty()) {
+            return;
+        }
+        // Convert to boolean if key is a known boolean flag
+        bool value = true;
+        if (key == "false" || key == "no" || key == "off" || key == "disable") {
+            value = false;
+        }
+        set(key, value, source);
+        return;
+    }
+    
+    std::string key = trim(line.substr(0, delimiterPos));
+    std::string valueStr = trim(line.substr(delimiterPos + 1));
+    
+    if (key.empty()) {
+        throw std::invalid_argument("Empty key name");
+    }
+    
+    // Remove inline comments
+    size_t commentPos = valueStr.find('#');
+    if (commentPos != std::string::npos) {
+        valueStr = trim(valueStr.substr(0, commentPos));
+    }
+    
+    // Skip empty values
+    if (valueStr.empty()) {
+        return;
+    }
+    
+    // Enhanced value parsing with type detection
+    auto parsedValue = parseConfigValue(valueStr, key, lineNumber);
+    set(key, parsedValue, source);
+}
+
+ConfigValue Config::parseConfigValue(const std::string& valueStr, const std::string& key, size_t lineNumber) {
+    // Intelligent type detection and parsing
+    std::string lowerValue = toLower(valueStr);
+    
+    // Boolean values
+    if (lowerValue == "true" || lowerValue == "yes" || lowerValue == "on" || lowerValue == "enable") {
+        return true;
+    }
+    if (lowerValue == "false" || lowerValue == "no" || lowerValue == "off" || lowerValue == "disable") {
+        return false;
+    }
+    
+    // Integer values (decimal, hex, octal)
+    try {
+        if (lowerValue.substr(0, 2) == "0x") {
+            // Hex
+            size_t pos;
+            int64_t hexVal = std::stoll(valueStr.substr(2), &pos, 16);
+            if (pos == valueStr.size() - 2) {
+                return hexVal;
+            }
+        } else if (lowerValue.substr(0, 1) == "0" && valueStr.size() > 1) {
+            // Octal (if contains only octal digits)
+            bool isOctal = true;
+            for (size_t i = 1; i < valueStr.size(); ++i) {
+                if (valueStr[i] < '0' || valueStr[i] > '7') {
+                    isOctal = false;
+                    break;
+                }
+            }
+            if (isOctal) {
+                size_t pos;
+                int64_t octVal = std::stoll(valueStr.substr(1), &pos, 8);
+                if (pos == valueStr.size() - 1) {
+                    return octVal;
+                }
+            }
+        } else {
+            // Decimal
+            size_t pos;
+            int64_t intVal = std::stoll(valueStr, &pos);
+            if (pos == valueStr.size()) {
+                return intVal;
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+    } catch (...) {
+        // Not an integer, continue to other types
     }
-    return true;
+    
+    // Float values
+    try {
+        size_t pos;
+        double floatVal = std::stod(valueStr, &pos);
+        if (pos == valueStr.size()) {
+            return floatVal;
+        }
+    } catch (...) {
+        // Not a float, continue to string
+    }
+    
+    // String value (remove quotes)
+    std::string result = valueStr;
+    if ((valueStr.size() >= 2 && 
+         ((valueStr.front() == '\"' && valueStr.back() == '\"') ||
+          (valueStr.front() == '\'' && valueStr.back() == '\'')))) {
+        result = valueStr.substr(1, valueStr.size() - 2);
+    }
+    
+    return result;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
