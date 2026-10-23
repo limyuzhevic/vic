@@ -90,6 +90,7 @@ add_library(nlm_core STATIC
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/Types>
 )
 
 # Agent system (body, sensory percept, agent-brain interface)
