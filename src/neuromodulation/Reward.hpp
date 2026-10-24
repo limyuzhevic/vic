@@ -23,7 +23,7 @@ public:
     void reset();
     
     // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
+    // Phase 2 completed - Real reward computation implemented in Reward.cpp
     float computeReward(const class Observation& observation) const;
     
     // Reward history

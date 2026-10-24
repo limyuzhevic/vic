@@ -14,20 +14,20 @@ public:
     ~StructuralPlasticity();
     
     // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
+    // Phase 2 completed - Real synapse creation implemented in StructuralPlasticity.cpp
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
                            SynapticWeight weight);
     
     // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
+    // Phase 2 completed - Real synapse removal implemented in StructuralPlasticity.cpp
     bool removeSynapse(Brain* brain, SynapseId synapse);
     
     // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
+    // Phase 2 completed - Real neuron creation implemented in StructuralPlasticity.cpp
     NeuronId createNeuron(Brain* brain, NeuronType type);
     
     // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
+    // Phase 2 completed - Real neuron removal implemented in StructuralPlasticity.cpp
     bool removeNeuron(Brain* brain, NeuronId neuron);
     
     // Get creation rate

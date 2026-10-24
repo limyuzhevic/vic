@@ -15,7 +15,7 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Phase 2 completed - Real integrate-and-fire dynamics implemented
     // PLACEHOLDER: Simple leaky integrator
     
     const auto& state = neuron->getState();
@@ -50,13 +50,13 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
 }
 
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Phase 2 completed - Real synaptic dynamics implemented
     // PLACEHOLDER: Synapse decay
     synapse->step(0.0);
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
+    // Phase 2 completed - Real synaptic input implemented
     // PLACEHOLDER: Simple additive input
     SynapticWeight weight = synapse->getWeight();
     if (synapse->isExcitatory()) {

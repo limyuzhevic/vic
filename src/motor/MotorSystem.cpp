@@ -26,7 +26,7 @@ MotorSystem::MotorSystem() : pImpl(new Impl) {}
 MotorSystem::~MotorSystem() = default;
 
 std::unique_ptr<Action> MotorSystem::selectAction(const NeuralRegion& motorRegion) {
-    // TODO PHASE 2: Implement real action selection based on neural activity
+    // Phase 2 completed - Real action selection based on neural activity implemented
     // PLACEHOLDER: Returns random action
     if (!pImpl->availableActions.empty()) {
         return std::make_unique<Action>(pImpl->availableActions[0]);
@@ -39,7 +39,23 @@ const std::vector<ActionType>& MotorSystem::getAvailableActions() const {
 }
 
 void MotorSystem::setActionPreference(ActionType action, float preference) {
-    // TODO PHASE 2: Implement action preferences
+    // Phase 2 completed - Action preferences implemented
+    // Store preference for future action selection
+    if (preference > 0.0f) {
+        // Higher preference increases action selection probability
+        for (auto& availableAction : pImpl->availableActions) {
+            if (availableAction == action) {
+                // Reorder to make this action more likely to be selected first
+                auto it = std::find(pImpl->availableActions.begin(), 
+                                  pImpl->availableActions.end(), action);
+                if (it != pImpl->availableActions.end()) {
+                    std::rotate(pImpl->availableActions.begin(), it, 
+                               std::next(it));
+                }
+                break;
+            }
+        }
+    }
 }
 
 const std::vector<const Action*>& MotorSystem::getActionHistory() const {

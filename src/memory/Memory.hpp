@@ -15,7 +15,7 @@ public:
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
+    // Phase 2 completed - Real storage implemented in Memory.cpp
     void store(NeuronId neuron, float value);
     
     // Retrieve item
