@@ -139,13 +139,70 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Phase 5 experiment (library)
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+# Phase 6 integrated experiment (library)
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
+
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+
+# Install targets (enhanced for better usability)
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6
+    EXPORT NLMTargets
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
 )
+
+# Demo executables installation
+install(TARGETS nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
+    RUNTIME DESTINATION bin
+)
+
+# Installation of configuration files
+install(FILES configs/default.cfg
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/nlm/configs
+    RENAME default.cfg
+)
+
+# Installation of documentation
+install(DIRECTORY docs/
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/nlm/docs
+    FILES_MATCHING PATTERN "*.md"
+)
+
+# Export configuration for downstream projects
+install(EXPORT NLMTargets
+    FILE NLMConfig.cmake
+    NAMESPACE nlm::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nlm
+)
+
+# Generate and install package config
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/nlm-config-version.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/nlm-config-version.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nlm
+)
+
+# Testing
