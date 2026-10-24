@@ -121,11 +121,42 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# CLI20 library (header-only C++20 CLI parser)
+# Available at: https://github.com/CLI20-dev/cli20
+
+# Option to use CLI20 modules
+if(CXX_CLI20_ENABLE_MODULE)
+    # Use module version
+    target_link_libraries(nlm_core PUBLIC cli20::module)
+else()
+    # Use header-only version
+    target_include_directories(nlm_core PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/cli20/include>
+        $<INSTALL_INTERFACE:include>
+    )
+    target_compile_features(nlm_core PUBLIC cxx_std_20)
+endif()
+
+# Copy CLI20 headers to source tree (simplified approach)
+# In production, CLI20 would be fetched via FetchContent
+
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# CLI execution entry point (simplified version)
+add_executable(nlm_cli
+    src/cli/NLMCLIMain.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent)
+
+# Alternative CLI implementation
+add_executable(nlm_cli_simple
+    src/cli/NLMCLI.cpp
+)
+target_link_libraries(nlm_cli_simple PUBLIC nlm_core nlm_agent)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -147,5 +178,15 @@ add_subdirectory(tests)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# CLI-specific install (future)
+install(TARGETS nlm_cli nlm_cli_simple
+    RUNTIME DESTINATION bin
+)
+
+# CLI-specific install (future)
+install(TARGETS nlm_cli
     RUNTIME DESTINATION bin
 )
