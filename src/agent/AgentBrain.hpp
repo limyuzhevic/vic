@@ -1,10 +1,5 @@
-#pragma once
-
-#include "AgentBody.hpp"
-#include "SensoryPercept.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include <memory>
+#include "agent/AdvancedAgentFeatures.hpp"
+#include "../sensory/SensoryPercept.hpp"
 #include <vector>
 
 namespace nlm {
