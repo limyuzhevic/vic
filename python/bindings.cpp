@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -351,7 +352,38 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Pythonic methods for better usability
+        .def("__repr__", [](const Brain& brain) {
+            std::stringstream ss;
+            ss << "<Brain neurons=" << brain.getTotalNeuronCount()
+               << " synapses=" << brain.getTotalSynapseCount()
+               << " region_count=" << brain.getRegionCount() << ">";
+            return ss.str();
+        })
+        
+        // Statistics helper
+        .def("getStats", [](const Brain& brain) {
+            py::dict stats;
+            stats["total_neurons"] = brain.getTotalNeuronCount();
+            stats["total_synapses"] = brain.getTotalSynapseCount();
+            stats["region_count"] = brain.getRegionCount();
+            stats["firing_neurons"] = brain.getFiringNeuronCount();
+            stats["avg_firing_rate"] = brain.getAverageFiringRate();
+            stats["e_i_ratio"] = brain.getExcitationInhibitionRatio();
+            stats["total_spikes"] = brain.getTotalSpikeCount();
+            stats["evolutionary_stage"] = static_cast<int>(brain.getDevelopmentalStage());
+            return stats;
+        }, "Get brain statistics as a Python dictionary")
+        
+        // Context manager support for safe resource management
+        .def("__enter__", [](Brain& brain) {
+            return &brain;
+        })
+        .def("__exit__", [](Brain&, const py::object&) {
+            // Nothing to clean up - Brain manages its own resources
+        });
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,7 +430,41 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Pythonic features
+        .def("__repr__", [](const AgentBrain& agent) {
+            auto* brain = agent.getBrain();
+            if (brain) {
+                return "<AgentBrain connected to " + std::to_string(brain->getTotalNeuronCount()) + " neurons>";
+            }
+            return "<AgentBrain (no brain connected)>";
+        })
+        
+        .def("getStats", [](AgentBrain& agent) {
+            py::dict stats;
+            auto* brain = agent.getBrain();
+            if (brain) {
+                stats["connected_neurons"] = brain->getTotalNeuronCount();
+                stats["connected_regions"] = brain->getRegionCount();
+                stats["reward_modulation"] = agent.isRewardModulationEnabled();
+                stats["structural_plasticity"] = agent.isStructuralPlasticityEnabled();
+                stats["development_enabled"] = agent.isDevelopmentEnabled();
+                stats["curiosity_enabled"] = agent.isCuriosityEnabled();
+            }
+            stats["curiosity_level"] = agent.getCuriosityLevel();
+            stats["novelty_level"] = agent.getNoveltyLevel();
+            stats["prediction_error"] = agent.getPredictionError();
+            return stats;
+        }, "Get agent statistics as a Python dictionary")
+        
+        // Context manager support
+        .def("__enter__", [](AgentBrain& agent) {
+            return &agent;
+        })
+        .def("__exit__", [](AgentBrain&, const py::object&) {
+            // Nothing to clean up - AgentBrain manages its own resources
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +482,64 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Version information
+    m.attr("__version__") = "0.1.0";
+    m.attr("PHASE_VERSION") = "Phase 6: Final Integration";
+
+    // Constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    
+    // Documentation
+    m.doc() = R"pbdoc(
+        NLM (熙然) - Neural Learning Machine Python Bindings
+        ================================================
+        
+        A Python binding for the NLM C++ neural simulation framework.
+        
+        This module provides:
+        - Brain simulation with spiking neurons
+        - Memory systems (working, episodic, associative)
+        - Neuromodulation (dopamine, curiosity, novelty)
+        - Prediction and planning systems
+        - Cognitive functions (attention, concept formation)
+        - Developmental processes
+        - Agent-world interaction
+        
+        The implementation is based on Phase 6: Final Integration,
+        featuring all major brain systems working together as a
+        coherent artificial brain.
+        
+        Key features:
+        - Leaky Integrate-and-Fire (LIF) neuron dynamics
+        - Event-driven spike propagation with synaptic delays
+        - Multiple plasticity mechanisms (STDP, Hebbian, structural)
+        - Memory consolidation and replay
+        - Developmental plasticity modulation
+        - Reward-based neuromodulation
+        
+        Example usage:
+        
+        ```python
+        import pynlm
+        
+        # Create a brain
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run simulation
+        for step in range(100):
+            brain.step(step)
+        
+        print(f"Total neurons: {brain.getTotalNeuronCount()}")
+        print(f"Total spikes: {brain.getTotalSpikeCount()}")
+        ```
+        
+        See the documentation in HOW_TO_USE.md and easy_usage.md for
+        comprehensive tutorials and examples.
+    )pbdoc";
 
 } // namespace nlm

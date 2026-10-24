@@ -33,12 +33,16 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "pytest-cov>=4.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+
+[project.scripts]
+pynlm-benchmark = "python.benchmark:main"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -53,5 +57,22 @@ cmake.args = [
 NLM_SOURCE_DIR = "src"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = [".", "python"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["pynlm"]
+
+[tool.coverage.report]
+exclude_lines = [
+    pragma: no cover",
+    def __repr__",
+    raise AssertionError",
+    raise NotImplementedError",
+]
+
+# Configure scikit-build to include Python tests
+tool.build-backend = "scikit_build_core.build"
