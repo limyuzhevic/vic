@@ -55,6 +55,17 @@ void PredictionSystem::clearHistory() {
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+    // This would learn from sensory observations to improve predictions
+    // For now, just record the observation for error calculation
+    const auto& data = observation.getData();
+    
+    if (!data.empty()) {
+        // Add to error history for learning
+        pImpl->errorHistory.push_back(0.0f); // Will be updated when actual observed
+        
+        // Update confidence based on observation
+        pImpl->confidence = std::min(1.0f, pImpl->confidence + 0.01f);
+    }
 }
 
 } // namespace nlm

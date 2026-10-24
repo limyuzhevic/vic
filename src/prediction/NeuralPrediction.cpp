@@ -415,12 +415,27 @@ float ActionConsequencePredictor::getConsequenceConfidence(ActionType action,
 }
 
 void ActionConsequencePredictor::updatePrediction(ActionType action,
-                                                 const std::vector<float>& predicted,
-                                                 const std::vector<float>& actual,
-                                                 float reward) {
-    // This would update the internal model
-    // For now, just record the new experience
+                                                     const std::vector<float>& predicted,
+                                                     const std::vector<float>& actual,
+                                                     float reward) {
+    // Update the internal predictive model based on experience
     recordExperience(action, predicted, actual, reward);
+    
+    // Apply reward-modulated plasticity to synapses
+    if (brain_) {
+        for (const auto& region : brain_->getRegions()) {
+            for (auto* syn : region->getSynapses()) {
+                float eligibility = syn->getEligibilityTrace();
+                
+                if (std::abs(eligibility) > 0.001f) {
+                    // Reward modulation: reinforce successful predictions
+                    float delta = eligibility * reward * 0.1f;
+                    syn->addToWeight(delta);
+                    syn->decayEligibilityTrace(0.1f);
+                }
+            }
+        }
+    }
 }
 
 float ActionConsequencePredictor::getActionQuality(ActionType action) const {

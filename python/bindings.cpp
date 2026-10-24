@@ -98,6 +98,13 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Aging", DevelopmentalStage::Aging)
         .export_values();
 
+    py::enum_<ConfigSource>(m, "ConfigSource", R"pbdoc(Configuration source enumeration)pbdoc")
+        .value("Default", nlm::ConfigSource::Default)
+        .value("File", nlm::ConfigSource::File)
+        .value("CommandLine", nlm::ConfigSource::CommandLine)
+        .value("Runtime", nlm::ConfigSource::Runtime)
+        .export_values();
+
     py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
         .value("Resting", FiringState::Resting)
         .value("Active", FiringState::Active)
@@ -416,10 +423,216 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Create a simple experiment setup with default configuration
+    m.def("createSimpleExperiment", []() -> std::tuple<std::shared_ptr<Config>, std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = std::make_shared<Config>();
+        
+        // Set up configuration for a balanced experiment
+        config->set("simulation_timestep", 0.001, nlm::ConfigSource::Default);
+        config->set("neuron_count", 1000, nlm::ConfigSource::Default);
+        config->set("region_count", 1, nlm::ConfigSource::Default);
+        config->set("connection_probability", 0.1f, nlm::ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(100, 100, 16, 16);
+        world->setAgentStart(50.0f, 50.0f);
+        
+        auto agentBrain = std::make_shared<AgentBrain>(brain);
+        agentBrain->initialize(*world);
+        
+        return std::make_tuple(config, brain, world, agentBrain);
+    }, "Create a complete simple experiment setup with configured brain and agent");
+    
+    // Train a brain with sensory input and reward signals
+    m.def("trainBrain", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent,
+                         std::shared_ptr<SimpleWorld> world, int steps) -> std::map<std::string, float> {
+        if (!brain || !agent || !world) {
+            throw std::invalid_argument("All parameters must be valid");
+        }
+        
+        std::map<std::string, float> metrics;
+        metrics["initial_spikes"] = static_cast<float>(brain->getTotalSpikeCount());
+        metrics["initial_neurons"] = static_cast<float>(brain->getTotalNeuronCount());
+        
+        // Run training simulation
+        for (int step = 0; step < steps; ++step) {
+            // Get sensory percept
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Apply reward modulation based on world feedback
+            float reward = world->getSensoryPercept().getInternal().size() > 0 ? 
+                           0.1f * step : 0.0f;  // Simple reward model
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update world
+            world->update(0.001);
+            
+            // Advance brain
+            brain->step(step, step * 0.001);
+            
+            // Update development periodically
+            agent->updateDevelopment(0.001);
+            
+            // Log progress every 100 steps
+            if (step % 100 == 0) {
+                metrics["max_spikes_seen"] = std::max(metrics["max_spikes_seen"], 
+                                                     static_cast<float>(brain->getTotalSpikeCount()));
+            }
+        }
+        
+        metrics["final_spikes"] = static_cast<float>(brain->getTotalSpikeCount());
+        metrics["spike_increase"] = metrics["final_spikes"] - metrics["initial_spikes"];
+        metrics["spike_rate"] = metrics["spike_increase"] / steps;
+        
+        return metrics;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("steps") = 1000,
+         "Train a brain with sensory input and reward signals, returning training metrics");
+    
+    // Evaluate brain performance on a task
+    m.def("evaluateBrain", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent,
+                            std::shared_ptr<SimpleWorld> world, int evaluationSteps) -> std::map<std::string, float> {
+        if (!brain || !agent || !world) {
+            throw std::invalid_argument("All parameters must be valid");
+        }
+        
+        // Reset for clean evaluation
+        brain->reset();
+        brain->initialize();
+        agent->reset();
+        
+        std::map<std::string, float> metrics;
+        metrics["evaluation_spikes"] = 0.0f;
+        metrics["successful_actions"] = 0.0f;
+        metrics["total_action_attempts"] = 0.0f;
+        
+        // Run evaluation
+        for (int step = 0; step < evaluationSteps; ++step) {
+            // Get current percept and action
+            auto percept = world->getSensoryPercept();
+            auto action = agent->decodeMotorCommand();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Apply action to world
+            world->applyMotorCommand(action, step * 0.001);
+            
+            // Get feedback and apply reward
+            float reward = world->getSensoryPercept().getInternal().size() > 0 ? 
+                           0.5f : 0.0f;  // Binary reward for success
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Advance simulation
+            brain->step(step, step * 0.001);
+            world->update(0.001);
+            
+            // Track metrics
+            metrics["evaluation_spikes"] += static_cast<float>(brain->getFiringNeuronCount());
+            metrics["total_action_attempts"] += 1.0f;
+            
+            if (reward > 0.0f) {
+                metrics["successful_actions"] += 1.0f;
+            }
+        }
+        
+        // Calculate performance metrics
+        metrics["spike_count"] = metrics["evaluation_spikes"] / evaluationSteps;
+        metrics["success_rate"] = metrics["successful_actions"] / metrics["total_action_attempts"];
+        metrics["average_firing_rate"] = metrics["spike_count"] / world->getWidth() / world->getHeight();
+        
+        return metrics;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("evaluationSteps") = 500,
+         "Evaluate brain performance on a task, returning performance metrics");
+    
+    // Create configuration preset for specific use cases
+    m.def("createConfigPreset", [](std::string presetName) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        if (presetName == "exploration") {
+            // High exploration settings
+            config->set("neuron_count", 2000, nlm::ConfigSource::Default);
+            config->set("connection_probability", 0.05f, nlm::ConfigSource::Default);
+            config->set("random_seed", static_cast<int64_t>(123), nlm::ConfigSource::Default);
+            config->set("simulation_timestep", 0.0005f, nlm::ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.0002f, nlm::ConfigSource::Default);
+            
+        } else if (presetName == "production") {
+            // High performance, stable settings
+            config->set("neuron_count", 500, nlm::ConfigSource::Default);
+            config->set("connection_probability", 0.15f, nlm::ConfigSource::Default);
+            config->set("random_seed", static_cast<int64_t>(456), nlm::ConfigSource::Default);
+            config->set("simulation_timestep", 0.001f, nlm::ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.00005f, nlm::ConfigSource::Default);
+            
+        } else if (presetName == "balanced") {
+            // Balanced settings for general research
+            config->set("neuron_count", 1000, nlm::ConfigSource::Default);
+            config->set("connection_probability", 0.1f, nlm::ConfigSource::Default);
+            config->set("random_seed", static_cast<int64_t>(789), nlm::ConfigSource::Default);
+            config->set("simulation_timestep", 0.001f, nlm::ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.0001f, nlm::ConfigSource::Default);
+            
+        } else {
+            throw std::invalid_argument("Unknown preset name: " + presetName + ". "
+                                       "Available presets: exploration, production, balanced");
+        }
+        
+        return config;
+    }, py::arg("presetName"),
+         "Create a configuration preset for specific use cases. "
+         "Available presets: 'exploration', 'production', 'balanced'");
+    
+    // Load configuration from preset file
+    m.def("loadConfigPreset", [](std::string presetName) -> std::shared_ptr<Config> {
+        std::string configFile = "configs/" + presetName + ".cfg";
+        
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(configFile)) {
+            throw std::runtime_error("Failed to load configuration preset from: " + configFile);
+        }
+        
+        return config;
+    }, py::arg("presetName"),
+         "Load a configuration preset from file. "
+         "Available presets: 'exploration', 'production', 'balanced'. "
+         "Files are located in the configs/ directory.");
+    
+    // Get available preset names
+    m.def("getAvailablePresets", []() {
+        return std::vector<std::string>{"exploration", "production", "balanced"};
+    }, "Get list of available configuration preset names");
+    
+    // Get demo configuration names
+    m.def("getAvailableDemos", []() {
+        return std::vector<std::string>{"sleep_demo"};
+    }, "Get list of available demo configuration names");
+    
+    // Load demo configuration
+    m.def("loadDemoConfig", [](std::string demoName) -> std::shared_ptr<Config> {
+        std::string configFile = "configs/" + demoName + ".cfg";
+        
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(configFile)) {
+            throw std::runtime_error("Failed to load demo configuration from: " + configFile);
+        }
+        
+        return config;
+    }, py::arg("demoName"),
+         "Load a demo configuration from file. "
+         "Available demos: 'sleep_demo'. "
+         "Files are located in the configs/ directory.");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
-
-} // namespace nlm
