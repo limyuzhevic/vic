@@ -21,7 +21,7 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+# Updated core library with new manager files
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
@@ -29,6 +29,14 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    # Brain managers
+    src/brain/BrainInitialization.cpp
+    src/brain/BrainMemoryManager.cpp
+    src/brain/BrainCognitionManager.cpp
+    src/brain/BrainNeuromodulationManager.cpp
+    src/brain/BrainDevelopmentManager.cpp
+    src/brain/BrainPlasticityManager.cpp
+    src/brain/BrainSimulationLoop.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
