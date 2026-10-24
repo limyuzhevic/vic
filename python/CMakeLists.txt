@@ -17,6 +17,7 @@ set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
+    ${NLM_SOURCE_DIR}/core/Config/ConfigValidation.cpp
     ${NLM_SOURCE_DIR}/core/Random/Random.cpp
     ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
     ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
@@ -54,6 +55,7 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
     ${NLM_SOURCE_DIR}/environment/Environment.cpp
     ${NLM_SOURCE_DIR}/environment/Observation.cpp
+    ${NLM_SOURCE_DIR}/environment/Action.cpp
     ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
     ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
     ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
@@ -63,10 +65,12 @@ set(NLM_CORE_SOURCES
 set(NLM_AGENT_SOURCES
     ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
     ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBody.cpp
 )
 
 set(NLM_WORLD_SOURCES
     ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
+    ${NLM_SOURCE_DIR}/world/Observation.cpp
 )
 
 add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
@@ -87,7 +91,8 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+# Enhanced Python bindings with research-grade features
+pybind11_add_module(pynlm bindings_enhanced.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 

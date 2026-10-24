@@ -5,11 +5,13 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <functional>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+class ConfigValidator;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -29,6 +31,17 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Validation result
+struct ValidationResult {
+    bool valid;
+    std::string errorMessage;
+    std::vector<std::string> warnings;
+    
+    ValidationResult(bool v = true, const std::string& error = "", 
+                     const std::vector<std::string>& warnings = {}) 
+        : valid(v), errorMessage(error), warnings(warnings) {}
 };
 
 // Configuration entry
@@ -93,9 +106,18 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validateWith(ConfigValidator& validator) const;
+    ValidationResult validateWith(ConfigValidator& validator) const;
+    std::string validateAndGetErrors(ConfigValidator& validator) const;
+    
+    // Get the internal validator for advanced usage
+    std::shared_ptr<ConfigValidator> getValidator() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    mutable std::shared_ptr<ConfigValidator> validator_;
     
     // Internal helpers
     static std::string trim(const std::string& str);

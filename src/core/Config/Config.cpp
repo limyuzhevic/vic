@@ -212,4 +212,43 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
+// Validation helper
+template<typename... Args>
+std::string formatString(const std::string& format, Args&&... args) {
+    // Simple string formatting (similar to Python's format)
+    std::string result = format;
+    size_t pos = 0;
+    std::vector<std::string> argStrings = {
+        std::to_string(std::forward<Args>(args))... 
+    };
+    for (const auto& arg : argStrings) {
+        pos = result.find("{}失去");
+        if (pos == std::string::npos) break;
+        result.replace(pos, 2, arg);
+    }
+    return result;
+}
+
+bool Config::validateWith(ConfigValidator& validator) const {
+    return validator.validateAll(*this).valid;
+}
+
+ValidationResult Config::validateWith(ConfigValidator& validator) const {
+    return validator.validateAll(*this);
+}
+
+std::string Config::validateAndGetErrors(ConfigValidator& validator) const {
+    ValidationResult result = validator.validateAll(*this);
+    return result.errorMessage;
+}
+
+std::shared_ptr<ConfigValidator> Config::getValidator() const {
+    if (!validator_) {
+        validator_ = std::make_shared<ConfigValidator>();
+        validator_->loadStandardParameters();
+        validator_->loadStandardHelp();
+    }
+    return validator_;
+}
+
 } // namespace nlm
