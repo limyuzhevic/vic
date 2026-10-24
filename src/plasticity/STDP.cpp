@@ -1,3 +1,5 @@
+# STDP.cpp implementation
+
 #include "STDP.hpp"
 #include "../../brain/Synapse.hpp"
 #include <cmath>
