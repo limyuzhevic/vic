@@ -61,8 +61,19 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     size_t firingCount = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
+        // Safety check: ensure brain has regions
+        if (brain->getRegionCount() == 0) {
+            NLM_LOG_ERROR("Brain has no regions - aborting experiment");
+            break;
+        }
+        
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        auto* region = brain->getRegion(brain->getRegionIds()[0]);
+        if (!region) {
+            NLM_LOG_ERROR("Failed to get first region for observation");
+            break;
+        }
+        SensoryPercept percept = world.observe(region);
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +85,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        world.applyAction(region, cmd);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = world.computeReward(region);
         totalReward += reward;
         
         // Apply reward modulation
@@ -88,15 +99,20 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             agent.updateDevelopment(0.001);
         }
         
-        // Collect metrics
-        totalFiringRate += brain->getAverageFiringRate();
+        // Collect metrics with safety checks
+        float firingRate = brain->getAverageFiringRate();
+        if (!std::isfinite(firingRate) || firingRate < 0.0f) {
+            firingRate = 0.0f;  // Clamp invalid values
+        }
+        totalFiringRate += firingRate;
+        
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
         // Periodic status
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+                        " | Firing: " + std::to_string(firingRate) +
                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
                             brain->getWorkingMemory()->getActiveTraces() : 0));
         }
