@@ -3,14 +3,104 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <regex>
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+// Add error handling for configuration
+    bool hasErrors() const {
+        return !pImpl->errorMessages.empty();
+    }
+    
+    const std::vector<std::string>& getErrorMessages() const {
+        return pImpl->errorMessages;
+    }
+    
+    void clearErrors() {
+        pImpl->errorMessages.clear();
+    }
+    
+    void addError(const std::string& message) {
+        pImpl->errorMessages.push_back(message);
+    }
+    
+    // Validation
+    bool validateAll() const {
+        clearErrors();
+        bool allValid = true;
+        
+        for (const auto& entry : pImpl->entries) {
+            // Check key format
+            if (!isValidKeyFormat(entry.key)) {
+                addError("Invalid key format: '" + entry.key + "'. Keys must contain only alphanumeric characters, underscores, and hyphens.");
+                allValid = false;
+            }
+            
+            // Check if key is known
+            if (!isValidKey(entry.key)) {
+                addError("Unknown configuration key: '" + entry.key + "'. Known keys: " + getKnownKeysString());
+                allValid = false;
+            }
+            
+            // Validate value against known rules
+            if (!validateValue(entry.key, entry.value)) {
+                addError("Invalid value for key '" + entry.key + "': " + formatValue(entry.value) + ". " + 
+                        "Expected: " + getDescription(entry.key));
+                allValid = false;
+            }
+        }
+        
+        // Validate required relationships
+        if (has("neuron_count") && has("region_count")) {
+            auto neuronCount = getOr<int64_t>("neuron_count", 0);
+            auto regionCount = getOr<int64_t>("region_count", 0);
+            if (regionCount > neuronCount) {
+                addError("Invalid configuration: region_count (" + std::to_string(regionCount) + 
+                        ") cannot be greater than neuron_count (" + std::to_string(neuronCount) + ").");
+                allValid = false;
+            }
+        }
+        
+        return allValid;
+    }
+    
+    std::string getKnownKeysString() const {
+        std::ostringstream oss;
+        size_t count = 0;
+        for (const auto& pair : CONFIG_DESCRIPTIONS) {
+            if (count++ > 0) oss << ", ";
+            oss << pair.first;
+        }
+        return oss.str();
+    }
+    
+    // Set strict validation mode
+    void setStrictValidation(bool strict) {
+        pImpl->strictValidation = strict;
+        if (strict) {
+            validateAll();
+        }
+    }
+    
+    bool getStrictValidation() const {
+        return pImpl->strictValidation;
+    }
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->strictValidation = false;  // Default to non-strict mode
+}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->strictValidation = false;  // Default to non-strict mode
+}
 
 Config::~Config() = default;
 
@@ -206,10 +296,72 @@ template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::validate() const {
+    return pImpl->validateAll();
+}
 
-} // namespace nlm
+bool Config::hasErrors() const {
+    return pImpl->hasErrors();
+}
+
+const std::vector<std::string>& Config::getErrorMessages() const {
+    return pImpl->getErrorMessages();
+}
+
+void Config::clearErrors() {
+    pImpl->clearErrors();
+}
+
+void Config::addError(const std::string& message) {
+    pImpl->addError(message);
+}
+
+std::string Config::getValidationSummary() const {
+    if (pImpl->hasErrors()) {
+        std::ostringstream oss;
+        oss << "Configuration validation FAILED with " << pImpl->getErrorMessages().size() << " error(s):\n";
+        for (const auto& error : pImpl->getErrorMessages()) {
+            oss << "  ERROR: " << error << "\n";
+        }
+        return oss.str();
+    } else {
+        return "Configuration validation PASSED. All " + std::to_string(pImpl->entries.size()) + 
+               " configuration entries are valid.";
+    }
+}
+
+void Config::setStrictValidation(bool strict) {
+    pImpl->setStrictValidation(strict);
+}
+
+bool Config::getStrictValidation() const {
+    return pImpl->getStrictValidation();
+}
+
+bool Config::validateKeyFormat(const std::string& key) {
+    return isValidKeyFormat(key);
+}
+
+bool Config::isValidKey(const std::string& key) {
+    return ::nlm::isValidKey(key);
+}
+
+std::string Config::getKeyDescription(const std::string& key) {
+    return ::nlm::getDescription(key);
+}
+
+std::vector<std::string> Config::getKnownKeys() {
+    std::vector<std::string> keys;
+    for (const auto& pair : CONFIG_DESCRIPTIONS) {
+        keys.push_back(pair.first);
+    }
+    return keys;
+}
+
+std::string Config::formatValue(const ConfigValue& value) {
+    return ::nlm::formatValue(value);
+}
+
+std::string Config::getKnownKeysString() {
+    return ::nlm::getKnownKeysString();
+}

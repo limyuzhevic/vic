@@ -93,6 +93,28 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation and error handling
+    bool validate() const;
+    bool hasErrors() const;
+    const std::vector<std::string>& getErrorMessages() const;
+    void clearErrors();
+    void addError(const std::string& message);
+    std::string getValidationSummary() const;
+    
+    // Strict validation mode
+    void setStrictValidation(bool strict);
+    bool getStrictValidation() const;
+    
+    // Configuration validation
+    static bool validateKeyFormat(const std::string& key);
+    static bool isValidKey(const std::string& key);
+    static std::string getKeyDescription(const std::string& key);
+    static std::vector<std::string> getKnownKeys();
+    
+    // Error reporting
+    static std::string formatValue(const ConfigValue& value);
+    static std::string getKnownKeysString();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
