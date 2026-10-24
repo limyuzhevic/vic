@@ -56,19 +56,39 @@ struct LearningExperiment {
     std::vector<float> initialWeights;
     std::vector<float> finalWeights;
     std::vector<NeuronId> mostActiveNeurons;
+    bool initialized;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0), initialized(false) {
+        if (!b) {
+            NLM_LOG_ERROR("LearningExperiment constructor: Invalid brain pointer");
+            return;
+        }
+        initialized = true;
+    }
+    
+    bool isValid() const {
+        return brain != nullptr && initialized;
+    }
     
     void recordInitialState() {
+        if (!isValid()) {
+            NLM_LOG_ERROR("LearningExperiment::recordInitialState: Experiment not properly initialized");
+            return;
+        }
+        
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
         // Record initial weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+                if (syn) {
+                    initialWeights.push_back(syn->getWeight());
+                }
             }
+        } else {
+            NLM_LOG_WARNING("LearningExperiment::recordInitialState: Could not get first brain region");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -77,20 +97,36 @@ struct LearningExperiment {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARNING("LearningExperiment::recordInitialState: No weights recorded (empty region or synapses)");
         }
     }
     
     void recordFinalState() {
+        if (!isValid()) {
+            NLM_LOG_ERROR("LearningExperiment::recordFinalState: Experiment not properly initialized");
+            return;
+        }
+        
         finalWeights.clear();
         
         // Record final weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+                if (syn) {
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
+        } else {
+            NLM_LOG_WARNING("LearningExperiment::recordFinalState: Could not get first brain region");
         }
         
-        mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
+        // Get most active neurons with error checking
+        if (auto* spikeSystem = brain->getSpikeSystem()) {
+            mostActiveNeurons = spikeSystem->getMostActiveNeurons(10);
+        } else {
+            NLM_LOG_WARNING("LearningExperiment::recordFinalState: Could not get spike system");
+        }
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
@@ -98,6 +134,8 @@ struct LearningExperiment {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+        } else {
+            NLM_LOG_WARNING("LearningExperiment::recordFinalState: No weights recorded (empty region or synapses)");
         }
     }
     
@@ -106,8 +144,18 @@ struct LearningExperiment {
         NLM_LOG_INFO("=== Learning Experiment Results ===");
         NLM_LOG_INFO("");
         
-        if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+        if (!isValid()) {
+            NLM_LOG_ERROR("LearningExperiment::computeStatistics: Experiment not properly initialized");
+            return;
+        }
+        
+        if (initialWeights.empty()) {
+            NLM_LOG_INFO("ERROR: No initial weights recorded");
+            return;
+        }
+        
+        if (finalWeights.empty()) {
+            NLM_LOG_INFO("ERROR: No final weights recorded");
             return;
         }
         
@@ -128,11 +176,15 @@ struct LearningExperiment {
         size_t unchanged = 0;
         
         size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
+        if (minSize > 0) {
+            for (size_t i = 0; i < minSize; ++i) {
+                float delta = finalWeights[i] - initialWeights[i];
+                if (delta > 0.01f) ++strengthened;
+                else if (delta < -0.01f) ++weakened;
+                else ++unchanged;
+            }
+        } else {
+            NLM_LOG_WARNING("LearningExperiment::computeStatistics: Cannot compare weights - mismatched size or empty data");
         }
         
         NLM_LOG_INFO("");

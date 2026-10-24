@@ -60,6 +60,8 @@ public:
     Brain& operator=(const Brain&) = delete;
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
+    Brain(Brain&&) noexcept;
+    Brain& operator=(Brain&&) noexcept;
     
     // Initialize brain with configuration
     bool initialize();
@@ -195,7 +197,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
