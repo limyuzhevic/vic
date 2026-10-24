@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <mutex>
 
 namespace nlm {
 
@@ -103,11 +104,19 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-};
+    
+    // Get global minimum log level
+    LogLevel getGlobalLevel() const {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        // Return the minimum level among all loggers
+        LogLevel minLevel = LogLevel::Critical; // Start with highest
+        for (const auto& logger : pImpl->loggers) {
+            if (logger->getLevel() < minLevel) {
+                minLevel = logger->getLevel();
+            }
+        }
+        return minLevel;
+    }
 
 // Convenience macro for file/line/function info
 #define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)

@@ -84,15 +84,21 @@ public:
     // Remove key
     void remove(const std::string& key);
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Validate configuration values
+    bool validate() const;
     
-    // Clear all
-    void clear();
+    // Get configuration statistics
+    size_t getEntryCount() const { return pImpl->entries.size(); }
     
-    // Get configuration summary
-    std::string summary() const;
+    // Get all configuration keys
+    std::vector<std::string> getAllKeys() const { return getKeys(); }
     
+    // Check if configuration has values
+    bool isEmpty() const { return pImpl->entries.empty(); }
+    
+    // Log configuration summary to global logger
+    void logConfigSummary() const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

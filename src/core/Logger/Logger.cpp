@@ -168,11 +168,14 @@ void Logger::critical(const std::string& message, const std::string& file, int l
 
 bool Logger::isEnabled(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
+    
+    // A level is enabled if at least one logger supports it
+    for (const auto& logger : pImpl->loggers) {
         if (logger->getLevel() <= level) {
             return true;
         }
     }
+    
     return false;
 }
 
@@ -182,8 +185,17 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    std::lock_guard<std::mutex> lock(getGlobal().pImpl->mutex);
+    
+    // Clear existing loggers and add the new ones from the provided logger
+    getGlobal().clearLoggers();
+    
+    if (logger) {
+        // Add all loggers from the provided logger to global
+        for (const auto& loggerPtr : logger->pImpl->loggers) {
+            getGlobal().addLogger(loggerPtr);
+        }
+    }
 }
 
 // LogStream implementation
