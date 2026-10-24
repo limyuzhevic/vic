@@ -351,7 +351,10 @@ int main(int argc, char** argv) {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
-                configFile = argv[++i];
+                // Store the next argument, don't use ++i here since we're in a for loop
+                configFile = argv[i + 1];
+                // Skip the config value argument
+                i++;
             }
         }
     }

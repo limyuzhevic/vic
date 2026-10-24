@@ -420,6 +420,299 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Enhanced factory methods with better error handling and presets
+    m.def("createBrainForLearning", [](int neuronCount, float learningRate) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neuronCount);
+        config->set("plasticity.stdp.learning_rate", learningRate);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuron_count") = 1000, py::arg("learning_rate") = 0.001,
+       R"pbdoc(Create a brain configured for learning with specified neuron count and learning rate.)pbdoc");
+
+    m.def("createBrainForCognition", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 2000);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.hebbian.strength", 0.02);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.initial_stage", "CriticalPeriod");
+        return std::make_shared<Brain>(config);
+    }, R"pbdoc(Create a brain configured for cognitive tasks with attention, memory, and planning.)pbdoc");
+
+    m.def("run_agent_episode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                 std::shared_ptr<AgentBrain> agent, int numSteps, float timestep = 0.1) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("All brain, world, and agent parameters must be provided and non-null.");
+        }
+        
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        agent->initialize(world);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(timestep);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::make_tuple(brain, agent, world);
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+       py::arg("num_steps") = 1000, py::arg("timestep") = 0.1,
+       R"pbdoc(Run a complete agent episode with automatic learning system setup.
+       
+       This is a high-level convenience method that handles the entire simulation
+       loop for an agent in a world. It enables all learning systems and runs
+       the complete perception-action cycle.
+       
+       Args:
+           brain: Brain object for neural computation
+           world: SimpleWorld object containing the environment
+           agent: AgentBrain object connecting brain to world
+           num_steps: Number of simulation steps to run
+           timestep: Time step duration in seconds (default: 0.1)
+       
+       Returns:
+           tuple: (brain, agent, world) after simulation completion
+       
+       Raises:
+           RuntimeError: If any required parameter is None or invalid
+       
+       Examples:
+           >>> import pynlm
+           >>> brain = pynlm.createBrain(pynlm.createDefaultConfig())
+           >>> world = pynlm.createSimpleWorld()
+           >>> agent = pynlm.createAgentBrain(brain)
+           >>> brain, agent, world = pynlm.run_agent_episode(brain, world, agent, 500)
+       )pbdoc");
+
+    m.def("run_simulation_loop", [](std::shared_ptr<Brain> brain, int numSteps, bool logProgress = false) {
+        if (!brain) {
+            throw std::runtime_error("Brain parameter must be provided and non-null.");
+        }
+        
+        brain->initialize();
+        for (int step = 0; step < numSteps; ++step) {
+            brain->step(step);
+            if (logProgress && step % 100 == 0) {
+                std::cout << "Step " << step << ": " << brain->getFiringNeuronCount() 
+                          << " neurons firing, " << brain->getAverageFiringRate() << " Hz avg rate" << std::endl;
+            }
+        }
+        return brain;
+    }, py::arg("brain"), py::arg("num_steps") = 1000, py::arg("log_progress") = false,
+       R"pbdoc(Run a simple simulation loop with optional progress logging.
+       
+       This is a convenience wrapper for the common pattern of running
+       multiple simulation steps on a brain.
+       
+       Args:
+           brain: Brain object to simulate
+           num_steps: Number of simulation steps to run
+           log_progress: If True, log progress every 100 steps
+       
+       Returns:
+           Brain: The brain object after simulation (for method chaining)
+       
+       Examples:
+           >>> import pynlm
+           >>> brain = pynlm.createBrain(pynlm.createDefaultConfig())
+           >>> brain = pynlm.run_simulation_loop(brain, 500, log_progress=True)
+       )pbdoc");
+
+    // Enhanced configuration presets
+    m.def("get_config_preset", [](const std::string& presetName) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        if (presetName == "simple_learning") {
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.synapse_density", 0.1);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.001);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.hebbian.strength", 0.01);
+            config->set("plasticity.structural.enable", false);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+            config->set("development.initial_stage", "CriticalPeriod");
+            config->set("development.enable_structural_plasticity", false);
+            
+        } else if (presetName == "complex_cognition") {
+            config->set("brain.neuron_count", 3000);
+            config->set("brain.synapse_density", 0.15);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.001);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.hebbian.strength", 0.02);
+            config->set("plasticity.structural.enable", true);
+            config->set("plasticity.structural.growth_rate", 0.05);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+            config->set("neuromod.dopamine.scale", 1.5);
+            config->set("development.initial_stage", "Maturation");
+            config->set("development.enable_structural_plasticity", true);
+            
+        } else if (presetName == "development") {
+            config->set("brain.neuron_count", 2000);
+            config->set("brain.synapse_density", 0.12);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.002);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.hebbian.strength", 0.015);
+            config->set("plasticity.structural.enable", true);
+            config->set("plasticity.structural.growth_rate", 0.1);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+            config->set("neuromod.dopamine.scale", 0.8);
+            config->set("development.initial_stage", "CriticalPeriod");
+            config->set("development.enable_structural_plasticity", true);
+            config->set("development.development_rate", 1.0);
+            
+        } else if (presetName == "fast_simulation") {
+            config->set("brain.neuron_count", 500);
+            config->set("brain.synapse_density", 0.05);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.0005);
+            config->set("plasticity.hebbian.enable", false);
+            config->set("plasticity.structural.enable", false);
+            config->set("neuromod.curiosity.enable", false);
+            config->set("neuromod.novelty.enable", false);
+            config->set("development.initial_stage", "Adult");
+            config->set("development.enable_structural_plasticity", false);
+            config->set("performance.optimization_level", 3);
+            
+        } else {
+            throw std::runtime_error("Unknown configuration preset: " + presetName + 
+                                   ". Available presets: simple_learning, complex_cognition, development, fast_simulation");
+        }
+        
+        return config;
+    }, py::arg("preset_name"),
+       R"pbdoc(Get a pre-configured brain configuration for common use cases.
+       
+       Args:
+           preset_name: Name of the preset configuration. Available options:
+               - "simple_learning": Basic learning and pattern recognition (1000 neurons)
+               - "complex_cognition": Advanced cognitive tasks (3000 neurons, structural plasticity)
+               - "development": Developmental learning with high plasticity (2000 neurons)
+               - "fast_simulation": Optimized for speed and real-time performance (500 neurons)
+       
+       Returns:
+           Config: Pre-configured configuration object ready to use with createBrain()
+       
+       Raises:
+           RuntimeError: If preset_name is not recognized
+       
+       Examples:
+           >>> import pynlm
+           >>> config = pynlm.get_config_preset("simple_learning")
+           >>> brain = pynlm.createBrain(config)
+           >>> brain.initialize()
+       )pbdoc");
+
+    m.def("createBrainWithPreset", [](const std::string& presetName) -> std::shared_ptr<Brain> {
+        auto config = get_config_preset(presetName);
+        return std::make_shared<Brain>(config);
+    }, py::arg("preset_name"),
+       R"pbdoc(Create a brain using a preset configuration.
+       
+       This is a convenience wrapper around get_config_preset() and createBrain()
+       that combines preset selection with brain creation in one call.
+       
+       Args:
+           preset_name: Name of the preset configuration
+       
+       Returns:
+           Brain: Configured and initialized brain ready for simulation
+       
+       Examples:
+           >>> import pynlm
+           >>> brain = pynlm.createBrainWithPreset("simple_learning")
+           >>> brain.initialize()
+       )pbdoc");
+
+    // Enhanced error handling for type conversions
+    m.def("safe_step", [](std::shared_ptr<Brain> brain, int step) {
+        if (!brain) {
+            throw std::runtime_error("Brain object cannot be None. Create a brain first.");
+        }
+        if (step < 0) {
+            throw std::runtime_error("Step number must be non-negative.");
+        }
+        brain->step(step);
+    }, py::arg("brain"), py::arg("step"),
+       R"pbdoc(Safely perform a simulation step with input validation.
+       
+       This is a Pythonic wrapper around brain.step() that includes input validation
+       and clear error messages.
+       
+       Args:
+           brain: Brain object to simulate
+           step: Step number (must be non-negative)
+       
+       Raises:
+           RuntimeError: If brain is None or step is negative
+       
+        Examples:
+            >>> import pynlm
+            >>> brain = pynlm.createBrain(pynlm.createDefaultConfig())
+            >>> brain.initialize()
+            >>> for i in range(10):
+            ...     pynlm.safe_step(brain, i)  # Safe with validation
+        )pbdoc");
+
+    m.def("format_stats", [](const Brain& self) {
+        std::stringstream ss;
+        ss << "=== NLM Brain Statistics ===\\n";
+        ss << "Neurons: " << self.getTotalNeuronCount() << "\\n";
+        ss << "Synapses: " << self.getTotalSynapseCount() << "\\n";
+        ss << "Active Neurons: " << self.getActiveNeuronCount() << "\\n";
+        ss << "Firing Neurons: " << self.getFiringNeuronCount() << "\\n";
+        ss << "Average Firing Rate: " << std::fixed << std::setprecision(1) 
+           << self.getAverageFiringRate() << " Hz\\n";
+        ss << "Total Spikes: " << self.getTotalSpikeCount() << "\\n";
+        ss << "E/I Ratio: " << std::fixed << std::setprecision(3) 
+           << self.getExcitationInhibitionRatio() << "\\n";
+        ss << "Development Stage: " << static_cast<int>(self.getDevelopmentalStage()) << "\\n";
+        ss << "===========================";
+        return ss.str();
+    }, "Format brain statistics as a readable string.\n\nReturns:\n    str: Formatted string with key brain statistics in a human-readable format.\n\nExamples:\n    >>> import pynlm\n    >>> print(brain.format_stats())
+    === NLM Brain Statistics ===\n    Neurons: 1000\n    Synapses: 50000\n    Active Neurons: 45\n    Firing Neurons: 67\n    Average Firing Rate: 3.2 Hz\n    Total Spikes: 1234\n    E/I Ratio: 1.234\n    Development Stage: 3\n    ============================\n")
+
+    m.def("export_data", [](const Brain& self, const std::string& format = "csv") {
+        if (format == "csv") {
+            std::stringstream ss;
+            ss << "metric,value\\n";
+            ss << "total_neurons," << self.getTotalNeuronCount() << "\\n";
+            ss << "total_synapses," << self.getTotalSynapseCount() << "\\n";
+            ss << "firing_neurons," << self.getFiringNeuronCount() << "\\n";
+            ss << "average_firing_rate," << self.getAverageFiringRate() << "\\n";
+            ss << "e_i_ratio," << self.getExcitationInhibitionRatio() << "\\n";
+            ss << "total_spikes," << self.getTotalSpikeCount() << "\\n";
+            ss << "development_stage," << static_cast<int>(self.getDevelopmentalStage()) << "\\n";
+            return ss.str();
+        } else if (format == "json") {
+            std::stringstream ss;
+            ss << "{\\\"total_neurons\\\":" << self.getTotalNeuronCount() << ",\\\"";
+            ss << "total_synapses\\\":" << self.getTotalSynapseCount() << ",\\\"";
+            ss << "firing_neurons\\\":" << self.getFiringNeuronCount() << ",\\\"";
+            ss << "average_firing_rate\\\":" << self.getAverageFiringRate() << ",\\\"";
+            ss << "e_i_ratio\\\":" << self.getExcitationInhibitionRatio() << ",\\\"";
+            ss << "total_spikes\\\":" << self.getTotalSpikeCount() << ",\\\"";
+            ss << "development_stage\\\":" << static_cast<int>(self.getDevelopmentalStage()) << "\"}";
+            return ss.str();
+        }
+        throw std::runtime_error("Unsupported export format: " + format + ". Use 'csv' or 'json'.");
+    }, py::arg("format") = "csv", "Export brain data in various formats.\n\nArgs:\n    format: Output format. Options:\n        - \"csv\": Comma-separated values format (default)\n        - \"json\": JSON format\n\nReturns:\n    str: Brain data in the specified format.\n\nRaises:\n    RuntimeError: If format is not supported\n\nExamples:\n    >>> import pynlm\n    >>> csv_data = brain.export_data(\"csv\")\n    >>> json_data = brain.export_data(\"json\")\n    >>> print(csv_data)\n    metric,value\n    total_neurons,1000\n    total_synapses,50000\n    firing_neurons,67\n    average_firing_rate,3.2\n    ...\n")
 }
 
 } // namespace nlm

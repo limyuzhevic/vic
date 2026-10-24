@@ -1,4 +1,5 @@
 #include "NeuralRegion.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <stdexcept>
 
@@ -58,17 +59,25 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (!id.isValid()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    size_t idx = id.index();
+    if (idx == 0 || idx > pImpl->populations.size()) {
+        return nullptr;
+    }
+    return pImpl->populations[idx - 1].get();
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    if (!id.isValid()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    size_t idx = id.index();
+    if (idx == 0 || idx > pImpl->populations.size()) {
+        return nullptr;
+    }
+    return pImpl->populations[idx - 1].get();
 }
 
 size_t NeuralRegion::getPopulationCount() const {
@@ -286,12 +295,12 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
             // Add synapse
             SynapseId synId = addSynapse(preNeuron->getId(), postNeuron->getId(), weight, 1);
             
-            // Initialize random properties
-            if (Synapse* syn = getSynapse(synId)) {
-                syn->setType(synType);
-                syn->initializeRandom(rng);
-            }
-        }
+    // Initialize random properties
+    if (Synapse* syn = getSynapse(synId)) {
+        syn->setType(synType);
+        syn->initializeRandom(rng);
+    } else {
+        NLM_LOG_ERROR("Failed to get synapse " + std::to_string(synId.index()) + " after creation");
     }
 }
 
