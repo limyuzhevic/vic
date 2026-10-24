@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <sstream>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -18,6 +20,135 @@
 
 namespace py = pybind11;
 namespace nlm {
+
+// Custom exception hierarchy for NLM Python bindings
+class NLMError : public std::runtime_error {
+public:
+    explicit NLMError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigurationError : public NLMError {
+public:
+    explicit ConfigurationError(const std::string& message) : NLMError("Configuration error: " + message) {}
+};
+
+class SimulationError : public NLMError {
+public:
+    explicit SimulationError(const std::string& message) : NLMError("Simulation error: " + message) {}
+};
+
+class ResourceError : public NLMError {
+public:
+    explicit ResourceError(const std::string& message) : NLMError("Resource error: " + message) {}
+};
+
+// Helper function to convert C++ exceptions to Python exceptions
+inline void registerNLMExceptions(py::module_& m) {
+    m.def("register_nlm_exceptions", []() {
+        py::register_exception_translator([](std::exception_ptr p) {
+            try {
+                if (p) std::rethrow_exception(p);
+            } catch (const NLMError& e) {
+                PyErr_SetString(PyExc_RuntimeError, e.what());
+            } catch (const ConfigurationError& e) {
+                PyErr_SetString(PyExc_ValueError, e.what());
+            } catch (const SimulationError& e) {
+                PyErr_SetString(PyExc_RuntimeError, e.what());
+            } catch (const ResourceError& e) {
+                PyErr_SetString(PyExc_RuntimeError, e.what());
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, e.what());
+            } catch (...) {
+                PyErr_SetString(PyExc_RuntimeError, "Unknown error occurred");
+            }
+        });
+    });
+}
+
+// Convenience function for creating standard configurations
+inline std::shared_ptr<Config> createStandardConfig(const std::string& configType = "default") {
+    auto config = std::make_shared<Config>();
+    
+    if (configType == "minimal") {
+        config->set("brain.neuron_count", 100, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.05, ConfigSource::Default);
+    } else if (configType == "standard") {
+        config->set("brain.neuron_count", 1000, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+    } else if (configType == "advanced") {
+        config->set("brain.neuron_count", 5000, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.15, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.001, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.5, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("brain.development.enabled", true, ConfigSource::Default);
+    }
+    
+    config->set("random_seed", 42, ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("region_count", 1, ConfigSource::Default);
+    
+    return config;
+}
+
+// Convenience function for running complete agent simulations
+inline void runCompleteAgentSimulation(
+    const std::string& configType = "standard",
+    int numSteps = 1000,
+    bool enableRewardModulation = true,
+    bool enableCuriosity = true,
+    bool enableDevelopment = true,
+    bool enableStructuralPlasticity = true
+) {
+    auto config = createStandardConfig(configType);
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    
+    auto world = std::make_shared<SimpleWorld>();
+    world->configure(20, 20, 8, 8);
+    world->reset();
+    
+    auto agent = std::make_shared<AgentBrain>(brain);
+    agent->initialize(world);
+    
+    if (enableRewardModulation) agent->enableRewardModulation(true);
+    if (enableCuriosity) agent->enableCuriosity(true);
+    if (enableDevelopment) agent->enableDevelopment(true);
+    if (enableStructuralPlasticity) agent->enableStructuralPlasticity(true);
+    
+    for (int step = 0; step < numSteps; ++step) {
+        world->update(0.1);
+        
+        auto percept = world->getSensoryPercept();
+        agent->processSensoryInput(percept);
+        
+        brain->step(step, step * 0.1);
+        
+        auto action = agent->decodeMotorCommand();
+        world->applyMotorCommand(action, world->getSimulationTime());
+        
+        // Apply reward modulation based on world state
+        float reward = 0.0f;
+        if (percept.getInternal().empty()) {
+            reward = 0.0f;
+        } else {
+            reward = percept.getInternal()[0];
+        }
+        
+        agent->applyRewardModulation(reward, 0.0f);
+        agent->updateDevelopment(0.1);
+    }
+    
+    brain->reset();
+}
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -400,6 +531,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Convenience functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -415,6 +547,23 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Utility functions
+    m.def("createStandardConfig", &createStandardConfig,
+          py::arg("config_type") = "default",
+          "Create a standard configuration with preset parameters");
+
+    m.def("runCompleteAgentSimulation", &runCompleteAgentSimulation,
+          py::arg("config_type") = "standard",
+          py::arg("num_steps") = 1000,
+          py::arg("enable_reward_modulation") = true,
+          py::arg("enable_curiosity") = true,
+          py::arg("enable_development") = true,
+          py::arg("enable_structural_plasticity") = true,
+          "Run a complete agent simulation with all features enabled");
+
+    m.def("register_nlm_exceptions", &registerNLMExceptions,
+          "Register NLM exception translators for proper error handling");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

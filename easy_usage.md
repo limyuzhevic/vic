@@ -1,4 +1,4 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Easy Usage Guide for Beginners (Enhanced)
 
 ## What is NLM?
 
@@ -69,6 +69,90 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 3: Enhanced Usage with New Features
+
+```python
+import pynlm
+
+# Create a standard brain with all features enabled
+config = pynlm.createStandardConfig("standard")
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable proper error handling
+pynlm.register_nlm_exceptions()
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+print("Running enhanced simulation with all features...")
+
+# Run for 200 steps
+for step in range(200):
+    world.update(0.1)
+    
+    # Process sensory input
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Brain thinks
+    brain.step(step)
+    
+    # Get action
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply learning
+    if percept.getInternal():
+        reward = percept.getInternal()[0]
+        agent.applyRewardModulation(reward, 0.0)
+    
+    # Update development
+    agent.updateDevelopment(0.1)
+    
+    # Log progress every 50 steps
+    if step % 50 == 0:
+        print(f"Step {step}:")
+        print(f"  Firing: {brain.getFiringNeuronCount()} neurons")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Development: {brain.getDevelopmentalStage()}")
+
+print("Enhanced simulation complete!")
+print(f"Final stats - Spikes: {brain.getTotalSpikeCount()}, "
+      f"Firing: {brain.getFiringNeuronCount()}")
+```
+
+### Example 4: Complete Agent Simulation (New Convenience Function)
+
+```python
+import pynlm
+
+# Run a complete agent simulation with all features enabled in one line!
+print("Running complete agent simulation...")
+pynlm.runCompleteAgentSimulation(
+    config_type="standard",
+    num_steps=500,
+    enable_reward_modulation=True,
+    enable_curiosity=True,
+    enable_development=True,
+    enable_structural_plasticity=True
+)
+
+print("Complete simulation finished!")
 ```
 
 ---
