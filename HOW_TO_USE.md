@@ -184,6 +184,29 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
+### Advanced Configuration
+
+#### Custom Configurations
+
+```python
+import pynlm
+
+# Create configuration from preset
+config = pynlm.createPresetConfig("development")
+
+# Modify configuration
+config.set("brain.neuron_count", 800)
+config.set("plasticity.structural.enable", True)
+config.set("neuromod.curiosity.enable", True)
+
+# Save configuration
+config.saveToFile("my_config.cfg")
+
+# Load configuration
+config2 = pynlm.createDefaultConfig()
+config2.loadFromFile("my_config.cfg")
+```
+
 ### Complete Agent Example
 
 ```python
@@ -254,6 +277,275 @@ def run_agent_simulation(num_steps=1000):
 
 # Run the simulation
 run_agent_simulation(1000)
+```
+
+### Advanced Training Examples
+
+#### High-Level Training Functions
+
+```python
+import pynlm
+
+def run_advanced_training(num_episodes=100, verbose=False):
+    """Run advanced training with monitoring and metrics."""
+    
+    # Setup with development preset
+    brain = pynlm.createBrain(pynlm.createPresetConfig("development"))
+    world = pynlm.createSimpleWorld()
+    world.configure(width=25, height=25, visionWidth=12, visionHeight=12)
+    agent = pynlm.createAgentBrain(brain)
+    
+    # Initialize
+    world.reset()
+    agent.initialize(world)
+    
+    # Enable learning systems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Track performance
+    monitor = pynlm.TrainingMonitor()
+    profiler = pynlm.Profiler()
+    
+    # Run training episodes
+    for episode in range(num_episodes):
+        profiler.start("episode")
+        
+        # Run single episode
+        episode_metrics = pynlm.runTrainingEpisode(
+            brain, world, agent, 
+            maxSteps=1500, 
+            verbose=verbose
+        )
+        
+        profiler.record("episode", episode_metrics.get("total_reward", 0.0))
+        monitor.recordEpisode(episode_metrics)
+        
+        if verbose:
+            print(f"Episode {episode}: Reward = {episode_metrics['total_reward']:.2f}, "
+                  f"Firing Rate = {episode_metrics['avg_firing_rate']:.2f}")
+    
+    # Generate final report
+    status_report = monitor.getStatusReport()
+    performance_profile = profiler.report()
+    
+    return {
+        "metrics": status_report,
+        "performance": performance_profile,
+        "brain_stats": {
+            "total_neurons": brain.getTotalNeuronCount(),
+            "total_synapses": brain.getTotalSynapseCount(),
+            "firing_rate": brain.getAverageFiringRate(),
+            "total_spikes": brain.getTotalSpikeCount()
+        }
+    }
+
+# Run advanced training
+results = run_advanced_training(num_episodes=100, verbose=True)
+print(results["brain_stats"])
+```
+
+#### Real-time Monitoring
+
+```python
+import pynlm
+import time
+
+def run_real_time_simulation(duration_seconds=300, timestep=0.1):
+    """Run simulation with real-time monitoring and visualization."""
+    
+    # Setup
+    config = pynlm.createPresetConfig("standard")
+    brain = pynlm.createBrain(config)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=40, height=40, visionWidth=16, visionHeight=16)
+    agent = pynlm.createAgentBrain(brain)
+    
+    world.reset()
+    agent.initialize(world)
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    start_time = time.time()
+    last_stats_time = start_time
+    
+    print("=== Real-time NLM Simulation ===")
+    print(f"Duration: {duration_seconds} seconds")
+    print(f"Timestep: {timestep}")
+    print("Press Ctrl+C to stop early")
+    print()
+    
+    while time.time() - start_time < duration_seconds:
+        current_time = time.time()
+        
+        # Update world
+        world.update(timestep)
+        
+        # Get perception
+        percept = world.getSensoryPercept()
+        
+        # Process and act
+        agent.processSensoryInput(percept)
+        brain.step(current_time)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, current_time)
+        
+        # Apply reward modulation
+        reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+        agent.applyRewardModulation(reward, agent.getPredictionError())
+        
+        # Print real-time stats every 5 seconds
+        if current_time - last_stats_time >= 5.0:
+            print(f"Time: {current_time - start_time:.1f}s | "
+                  f"Firing: {brain.getFiringNeuronCount()} | "
+                  f"Spikes: {brain.getTotalSpikeCount()} | "
+                  f"Curiosity: {agent.getCuriosityLevel():.3f} | "
+                  f"Novelty: {agent.getNoveltyLevel():.3f}")
+            
+            # Generate brain activity visualization
+            visualization = pynlm.visualizeBrainActivity(brain)
+            print(visualization)
+            
+            last_stats_time = current_time
+    
+    total_time = time.time() - start_time
+    print(f"\n=== Simulation Complete ===")
+    print(f"Total duration: {total_time:.1f} seconds")
+    print(f"Average steps per second: {brain.getTotalSpikeCount() / total_time:.1f}")
+    
+    return {
+        "total_spikes": brain.getTotalSpikeCount(),
+        "avg_firing_rate": brain.getAverageFiringRate(),
+        "duration": total_time
+    }
+
+# Run real-time simulation (uncomment to use)
+# results = run_real_time_simulation(duration_seconds=60)
+```
+
+### Experiment Management
+
+#### Experiment Runner
+
+```python
+import pynlm
+from typing import Dict, List, Any
+
+class NLMTrainingExperiment:
+    """Manage complex NLM training experiments with multiple conditions."""
+    
+    def __init__(self, name: str, config_preset: str = "standard"):
+        self.name = name
+        self.config_preset = config_preset
+        self.results: List[Dict[str, Any]] = []
+    
+    def run_condition(self, condition_name: str, 
+                     overrides: Dict[str, Any] = None,
+                     num_episodes: int = 20) -> Dict[str, Any]:
+        """Run a single experimental condition."""
+        
+        # Setup
+        config = pynlm.createPresetConfig(self.config_preset)
+        
+        # Apply condition-specific overrides
+        if overrides:
+            for key, value in overrides.items():
+                config.set(key, value)
+        
+        brain = pynlm.createBrain(config)
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionWidth=8)
+        agent = pynlm.createAgentBrain(brain)
+        
+        world.reset()
+        agent.initialize(world)
+        
+        # Enable relevant subsystems based on condition
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(overrides.get("enable_curiosity", True) if overrides else True)
+        
+        # Run training
+        metrics = pynlm.runTraining(
+            brain, world, agent,
+            numEpisodes=num_episodes,
+            verbose=False
+        )
+        
+        # Store results
+        result = {
+            "condition": condition_name,
+            "metrics": metrics,
+            "config": config.summary()
+        }
+        self.results.append(result)
+        
+        return result
+    
+    def compare_conditions(self, conditions: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Compare results across multiple conditions."""
+        comparison = {"conditions": [], "summary": {}}
+        
+        for condition in conditions:
+            result = self.run_condition(**condition)
+            comparison["conditions"].append(result)
+        
+        # Calculate comparisons
+        if len(comparison["conditions"]) >= 2:
+            for i in range(len(comparison["conditions"]) - 1):
+                cond1 = comparison["conditions"][i]
+                cond2 = comparison["conditions"][i + 1]
+                
+                comparison["summary"][f"{cond1['condition']}_vs_{cond2['condition']}"] = {
+                    "reward_difference": cond2["metrics"]["total_reward"] - cond1["metrics"]["total_reward"],
+                    "performance_ratio": cond2["metrics"]["avg_reward_per_step"] / cond1["metrics"]["avg_reward_per_step"]
+                }
+        
+        return comparison
+    
+    def save_results(self, filepath: str):
+        """Save experiment results to file."""
+        import json
+        
+        # Convert to JSON-serializable format
+        json_data = {
+            "experiment_name": self.name,
+            "conditions": []
+        }
+        
+        for result in self.results:
+            json_data["conditions"].append({
+                "name": result["condition"],
+                "metrics": result["metrics"],
+                "config": result["config"]
+            })
+        
+        with open(filepath, 'w') as f:
+            json.dump(json_data, f, indent=2)
+    
+    def get_summary_report(self) -> str:
+        """Generate a summary report of all conditions."""
+        report = f"=== Experiment: {self.name} ===\n\n"
+        
+        for i, result in enumerate(self.results):
+            report += f"Condition {i+1}: {result['condition']}\n"
+            report += f"  Total Reward: {result['metrics']['total_reward']:.2f}\n"
+            report += f"  Average Firing Rate: {result['metrics']['avg_firing_rate']:.2f}\n"
+            report += f"  Max Curiosity: {result['metrics']['max_curiosity']:.3f}\n"
+            report += f"  Steps Completed: {result['metrics']['steps_completed']}\n\n"
+        
+        return report
+
+# Example usage
+experiment = NLMTrainingExperiment("Curiosity_Analysis")
+
+# Run different conditions
+experiment.run_condition("No_Curiosity", {"enable_curiosity": False})
+experiment.run_condition("High_Curiosity", {"enable_curiosity": True})
+
+print(experiment.get_summary_report())
+experiment.save_results("experiment_results.json")
 ```
 
 ### Key Classes and Methods
