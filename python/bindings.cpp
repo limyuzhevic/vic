@@ -2,6 +2,12 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/iostream.h>
+#include <pybind11/operators.h>
+#include <pybind11/buffer_info.h>
+#include <pybind11/pytypes.h>
+#include <pybind11/json.h>
+#include <pybind11/complex.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -19,15 +25,106 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom exception classes for better error handling
+class NLMException : public std::runtime_error {
+public:
+    NLMException(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigurationError : public NLMException {
+public:
+    ConfigurationError(const std::string& message) : NLMException("Configuration Error: " + message) {}
+};
+
+class BrainInitializationError : public NLMException {
+public:
+    BrainInitializationError(const std::string& message) : NLMException("Brain Initialization Error: " + message) {}
+};
+
+class SimulationError : public NLMException {
+public:
+    SimulationError(const std::string& message) : NLMException("Simulation Error: " + message) {}
+};
+
+class MemoryError : public NLMException {
+public:
+    MemoryError(const std::string& message) : NLMException("Memory Error: " + message) {}
+};
+
+class ValidationError : public NLMException {
+public:
+    ValidationError(const std::string& message) : NLMException("Validation Error: " + message) {}
+};
+
+} // namespace nlm
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        This enhanced Python API provides:
+        - Pythonic interfaces for all NLM components
+        - Comprehensive error handling with specific exception types
+        - Context managers for automatic resource cleanup
+        - Convenience methods for common operations
+        - Performance monitoring tools
+        - Batch processing capabilities
+        - Enhanced serialization support
+        
+        Key Features:
+        * Brain simulation with real spiking neurons
+        * Integrated memory systems (working, episodic, associative)
+        * Neuromodulation (dopamine, curiosity, novelty detection)
+        * Cognitive systems (planning, concept formation, attention)
+        * Developmental stages and maturation
+        * World simulation and agent interfaces
+        * Checkpoint save/load and replay capabilities
+        
+        Usage Examples:
+        ```python
+        import pynlm
+        
+        # Create and initialize a brain
+        config = pynlm.create_default_config()
+        brain = pynlm.create_brain(config)
+        brain.initialize()
+        
+        # Run simulation with monitoring
+        for step in range(1000):
+            brain.step(step)
+            if step % 100 == 0:
+                stats = brain.get_performance_stats()
+                print(f"Step {step}: {stats}")
+        
+        # Create agent with world integration
+        world = pynlm.create_simple_world()
+        agent = pynlm.create_agent_brain(brain)
+        agent.initialize(world)
+        ```
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Register custom exception classes for Python
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const nlm::NLMException& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const std::runtime_error& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (...) {
+            PyErr_SetString(PyExc_RuntimeError, "Unknown error occurred");
+        }
+    });
+
+    // Register custom exception classes
+    py::register_exception<nlm::NLMException>(m, "NLMException");
+    py::register_exception<nlm::ConfigurationError>(m, "ConfigurationError");
+    py::register_exception<nlm::BrainInitializationError>(m, "BrainInitializationError");
+    py::register_exception<nlm::SimulationError>(m, "SimulationError");
+    py::register_exception<nlm::MemoryError>(m, "MemoryError");
+    py::register_exception<nlm::ValidationError>(m, "ValidationError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -142,7 +239,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
@@ -160,9 +257,43 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("getOr", static_cast<T (*)(Config&, const std::string&, const T&)>(&Config::getOr<T>), py::arg("key"), py::arg("defaultValue"),
+             "Get value with default, try different types")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    // Factory functions for easy creation
+    m.def("create_default_config", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("create_brain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("create_simple_world", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("create_agent_brain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Convenience function for version info
+    m.attr("__version__") = "6.0.0 (Final Integration)";
+    m.attr("__doc__") = "NLM (Neural Learning Machine) - Complete Artificial Brain System";
+
+    // Exception registration
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const std::runtime_error& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (...) {
+            PyErr_SetString(PyExc_RuntimeError, "Unknown error occurred");
+        }
+    });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

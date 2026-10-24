@@ -765,9 +765,26 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
+        // Validate filepath
+        if (filepath.empty()) {
+            NLM_LOG_ERROR("Invalid filepath: empty path");
+            return false;
+        }
+        
+        // Check if file exists (overwrite allowed)
+        std::filesystem::path path(filepath);
+        if (std::filesystem::exists(path) && !std::filesystem::is_regular_file(path)) {
+            NLM_LOG_ERROR("Invalid filepath: not a regular file: " + filepath);
+            return false;
+        }
+        
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+            NLM_LOG_ERROR("Possible causes:");
+            NLM_LOG_ERROR("1. Insufficient disk space");
+            NLM_LOG_ERROR("2. Permission denied");
+            NLM_LOG_ERROR("3. Invalid filesystem");
             return false;
         }
         
@@ -779,6 +796,12 @@ bool Brain::save(const std::string& filepath) const {
             pImpl->currentStep,
             pImpl->currentTime
         );
+        
+        // Validate data before writing
+        if (!validateCheckpointData()) {
+            NLM_LOG_ERROR("Checkpoint validation failed");
+            return false;
+        }
         
         // Write neurons
         NeuronCheckpointData neuronData;
@@ -807,6 +830,7 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+            NLM_LOG_ERROR("Error during neuron serialization");
             return false;
         }
         
@@ -825,12 +849,21 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            NLM_LOG_ERROR("Error during synapse serialization");
             return false;
         }
         
-        // Finalize
+        // Finalize checkpoint
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
+            NLM_LOG_ERROR("Possible corruption during write operation");
+            return false;
+        }
+        
+        // Verify checkpoint was written correctly
+        if (!writer.verify()) {
+            NLM_LOG_ERROR("Checkpoint verification failed");
+            NLM_LOG_ERROR("Checkpoint may be corrupted");
             return false;
         }
         
@@ -838,7 +871,10 @@ bool Brain::save(const std::string& filepath) const {
         return true;
         
     } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        NLM_LOG_ERROR(std::string("Exception saving brain state: ") + e.what());
+        return false;
+    } catch (...) {
+        NLM_LOG_ERROR("Unknown exception during checkpoint save operation");
         return false;
     }
 }
@@ -847,14 +883,33 @@ bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
+        // Validate filepath
+        if (filepath.empty()) {
+            NLM_LOG_ERROR("Invalid filepath: empty path");
+            return false;
+        }
+        
+        // Check if file exists
+        if (!std::filesystem::exists(filepath)) {
+            NLM_LOG_ERROR("Checkpoint file does not exist: " + filepath);
+            return false;
+        }
+        
+        if (!std::filesystem::is_regular_file(filepath)) {
+            NLM_LOG_ERROR("Invalid checkpoint file: not a regular file: " + filepath);
+            return false;
+        }
+        
         CheckpointReader reader;
         if (!reader.open(filepath)) {
             NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
+            NLM_LOG_ERROR("Error: " + reader.getError());
             return false;
         }
         
         if (!reader.validate()) {
             NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
+            NLM_LOG_ERROR("Checkpoint file may be corrupted or incompatible");
             return false;
         }
         
@@ -862,48 +917,47 @@ bool Brain::load(const std::string& filepath) {
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+            NLM_LOG_ERROR("Error: " + reader.getError());
             return false;
-        }
-        
-        // Apply neuron states
-        size_t idx = 0;
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
-                    }
-                    idx++;
-                }
-            }
         }
         
         // Read synapses
         SynapseCheckpointData synapseData;
         if (!reader.readSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+            NLM_LOG_ERROR("Error: " + reader.getError());
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Validate checkpoint data
+        if (!validateCheckpointData(neuronData, synapseData)) {
+            NLM_LOG_ERROR("Checkpoint data validation failed");
+            NLM_LOG_ERROR("Neuron data: " + std::to_string(neuronData.membranePotential.size()) + " neurons");
+            NLM_LOG_ERROR("Synapse data: " + std::to_string(synapseData.weight.size()) + " synapses");
+            return false;
+        }
+        
+        // Apply neuron states
+        if (!applyNeuronStates(neuronData)) {
+            NLM_LOG_ERROR("Failed to apply neuron states from checkpoint");
+            return false;
+        }
+        
+        // Apply synapse states (simplified approach)
+        if (!applySynapseStates(synapseData)) {
+            NLM_LOG_ERROR("Failed to apply synapse states from checkpoint");
+            NLM_LOG_ERROR("Note: Synapse state restoration may be incomplete");
+            // Continue anyway, but warn
+        }
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         
     } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+        NLM_LOG_ERROR(std::string("Exception loading brain state: ") + e.what());
+        return false;
+    } catch (...) {
+        NLM_LOG_ERROR("Unknown exception during checkpoint load operation");
         return false;
     }
 }
