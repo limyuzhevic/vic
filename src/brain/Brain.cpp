@@ -505,14 +505,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store action if available
+            if (pImpl->agentBrain) {
+                episode.action = pImpl->agentBrain->getLastAction();
+            }
+            
+            // Store sensory state - integrate with sensory processing
+            if (pImpl->sensoryNeurons.size() > 0) {
+                episode.sensoryState.resize(pImpl->sensoryNeurons.size());
+                for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+                    float potential = pImpl->sensoryNeurons[i]->getState().membranePotential;
+                    episode.sensoryState[i] = (potential + 70.0f) / 140.0f;  // Normalize from [-70, 70] to [0, 1]
+                }
+            }
+            
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Update prediction system with new sensory state if available
+            if (pImpl->predictionSystem && !episode.sensoryState.empty()) {
+                // Compute prediction error for this sensory state
+                pImpl->predictionSystem->updateWithState(episode.sensoryState, episode.reward);
+            }
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with working memory content
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get current working memory pattern
+            std::vector<float> workingMemoryPattern = pImpl->workingMemory->retrieve();
+            
+            // Use working memory to update predictions
+            pImpl->predictionSystem->updateWithWorkingMemory(workingMemoryPattern);
+            
+            // Get prediction error and update neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (pImpl->predictionError) {
+                pImpl->predictionError->setLevel(predictionError);
+            }
+        }
+        
+        // Update curiosity based on prediction error
+        if (pImpl->curiosity) {
+            float predictionError = pImpl->predictionSystem ? pImpl->predictionSystem->getPredictionError() : 0.0f;
+            pImpl->curiosity->updateWithPredictionError(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +561,41 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Apply attention to winners for memory consolidation
+            std::vector<NeuronId> winners = pImpl->attention->getWinners();
+            for (const auto& winner : winners) {
+                if (pImpl->workingMemory->contains(winner)) {
+                    pImpl->workingMemory->strengthenMemory(1.1f);  // Boost winner
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get working memory pattern as concept candidate
+            std::vector<float> pattern = pImpl->workingMemory->retrieve();
+            
+            // Form concepts from patterns
+            pImpl->conceptFormation->updateConcept(pattern, currentTime);
+        }
+    }
+    
+    // ========== STEP 10: Update concept formation ==========
+    if (pImpl->conceptFormation) {
+        // Process current neural activity patterns to form concepts
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get working memory pattern as concept candidate
+            std::vector<float> pattern = pImpl->workingMemory->retrieve();
+            
+            // Present experience to concept formation system
+            // Use current time as step identifier, and dopaminergic level as reward
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            pImpl->conceptFormation->presentExperience(pattern, pattern, reward, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
