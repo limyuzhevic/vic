@@ -82,6 +82,46 @@ make -j4
 
 This runs a comprehensive integration test verifying all brain systems are connected.
 
+### Python API Usage
+```python
+import pynlm
+
+# Create basic brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(100):
+    brain.step(step)
+
+print("Simulation complete!")
+```
+
+### Advanced Python Features
+NLM includes an enhanced Python API with advanced features:
+
+```python
+# Create specialized configurations
+research_config = pynlm.createResearchConfig(neuron_count=2000, region_count=8)
+performance_config = pynlm.createPerformanceConfig(neuron_count=500)
+
+# Enhanced agent with memory systems
+brain = pynlm.createBrain(performance_config)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Get agent state summary
+state = agent.get_state_summary()
+print(f"Neuromodulation: {state['neuromodulation_level']}")
+```
+
+For detailed documentation, see `ADVANCED_USAGE.md`.
+
 ## Project Structure
 
 ```
