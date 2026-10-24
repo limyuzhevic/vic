@@ -29,46 +29,131 @@ That's it! NLM simulates all of this.
 ```python
 import pynlm
 
-# Step 1: Make a brain
+# One line to create a virtual brain
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
 
-# Step 2: Turn it on
+# Initialize it
 brain.initialize()
 
-# Step 3: Make it think for 100 steps
-for i in range(100):
-    brain.step(i)  # One step of thinking
+# Make it active
+brain.step(0)
 
-print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain with Learning
 
 ```python
 import pynlm
+import time
 
-# Create everything
+# Setup
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
 
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
+# Enable learning capabilities
 agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
 
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+# Run simulation
+for step in range(100):
+    brain.step(step)
+    
+    # Show progress
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"  Firing rate: {brain.getAverageFiringRate():.2f}")
+        print(f"  Development: {brain.getDevelopmentalStage()}")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
 
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+print("Simulation complete!")
+```
+
+### Example 3: Complete Agent in World
+
+```python
+import pynlm
+import random
+
+class SimpleTraining:
+    def __init__(self):
+        # Create brain
+        config = pynlm.createDefaultConfig()
+        config.set("brain.neuron_count", 500)
+        config.set("brain.connection_probability", 0.05)
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Create agent
+        agent = pynlm.createAgentBrain(brain)
+        
+        # Create world
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        world.setAgentStart(10.0, 10.0)
+        
+        # Initialize agent
+        agent.initialize(world)
+        
+        # Enable all learning
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        
+        self.brain = brain
+        self.agent = agent
+        self.world = world
+        self.steps = 0
+    
+    def run_episode(self, max_steps=1000):
+        print(f"Running episode {self.steps + 1}")
+        
+        for step in range(max_steps):
+            # Update world
+            self.world.update(0.1)
+            
+            # Get sensory input
+            percept = self.world.getSensoryPercept()
+            
+            # Process in brain
+            self.agent.processSensoryInput(percept)
+            self.brain.step(step)
+            
+            # Get action
+            action = self.agent.decodeMotorCommand()
+            self.world.applyMotorCommand(action, self.world.getSimulationTime())
+            
+            # Get reward
+            reward = self.world.getSensoryPercept().getInternal()[0] if \
+                    self.world.getSensoryPercept().getInternal() else 0.0
+            
+            # Apply learning
+            self.agent.applyRewardModulation(reward, 0.0)
+            self.agent.updateDevelopment(0.1)
+            
+            # Print stats
+            if step % 100 == 0:
+                print(f"  Step {step}:")
+                print(f"    Neurons firing: {self.brain.getFiringNeuronCount()}")
+                print(f"    Firing rate: {self.brain.getAverageFiringRate():.2f}")
+                print(f"    Reward: {reward:.2f}")
+                print(f"    Curiosity: {self.agent.getCuriosityLevel():.3f}")
+                print(f"    Development: {self.brain.getDevelopmentalStage()}")
+        
+        self.steps += 1
+        return step
+
+# Run training
+print("Starting NLM Brain Training...")
+trainer = SimpleTraining()
+trainer.run_episode()
+print("Training complete!")
+```
 ```
 
 ---
@@ -106,34 +191,7 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ## Common Patterns
 
-### Pattern 1: Run a Simulation
-
-```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
-
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
-```
-
-### Pattern 2: Get Brain Stats
+### Pattern 1: Get Brain Stats
 
 ```python
 # Just add these inside your loop:
@@ -143,7 +201,84 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 2: Enable Brain Features
+
+```python
+# These are all optional:
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableStructuralPlasticity(True)  # Grow new connections
+agent.enableDevelopment(True)           # Brain matures over time
+agent.enableCuriosity(True)             # Explore new things
+```
+
+### Pattern 3: Enable Advanced Learning
+
+```python
+# Enable sophisticated learning capabilities:
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableCuriosity(True)             # Explore novel stimuli
+agent.enableStructuralPlasticity(True)  # Grow new connections
+agent.enableDevelopment(True)           # Brain matures over time
+agent.enablePrediction(True)            # Learn action consequences
+agent.enableAttention(True)             # Focus on important stimuli
+```
+
+### Pattern 4: Complete Simulation Loop
+
+```python
+def run_complete_simulation(brain, world, agent, num_steps):
+    """Run a complete agent simulation with all learning enabled."""
+    
+    # Main simulation loop
+    for step in range(num_steps):
+        # 1. Update environment
+        world.update(0.1)
+        
+        # 2. Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # 3. Process sensory information
+        agent.processSensoryInput(percept)
+        
+        # 4. Run brain computation
+        brain.step(step)
+        
+        # 5. Get motor commands
+        action = agent.decodeMotorCommand()
+        
+        # 6. Execute actions in world
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # 7. Apply learning
+        reward = world.getSensoryPercept().getInternal()[0] if \
+                world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        agent.updateDevelopment(0.1)
+        
+        # 8. Print diagnostics
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Firing rate: {brain.getAverageFiringRate():.2f}")
+            print(f"  Reward: {reward:.2f}")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Development: {brain.getDevelopmentalStage()}")
+
+# Run the simulation
+run_complete_simulation(brain, world, agent, 1000)
+```
+
+### Pattern 1: Get Brain Stats
+
+```python
+# Just add these inside your loop:
+print("Neurons firing:", brain.getFiringNeuronCount())
+print("Total spikes:", brain.getTotalSpikeCount())
+print("Avg firing rate:", brain.getAverageFiringRate())
+print("Development stage:", brain.getDevelopmentalStage())
+```
+
+### Pattern 2: Enable Brain Features
 
 ```python
 # These are all optional:

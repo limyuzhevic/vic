@@ -73,6 +73,50 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+## Building with Python Support
+
+The project includes Python bindings. To build with Python support:
+
+```bash
+# Install Python dependencies
+pip install scikit-build-core pybind11 pytest numpy
+
+# Configure CMake to find Python
+cmake .. -DPython_EXECUTABLE=$(which python)
+
+# Build everything including Python module
+make -j4
+```
+
+## Building Examples
+
+Build all demo executables:
+```bash
+cd build
+make nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
+```
+
+Build just the Python module:
+```bash
+cd build
+make pynlm
+```
+
+## Building with Custom Options
+
+To enable specific features:
+
+```bash
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug \
+         -DNLM_ENABLE_PERF_OPTIMIZATIONS=ON \
+         -DNLM_ENABLE_VISUALIZATION=ON \
+         -DNLM_ENABLE_CHECKPOINTING=ON \
+         -DNLM_ENABLE_REPLAY=ON
+
+make -j4
+```
+
 ## Running
 
 ### Phase 6 Demo (Integration Test)

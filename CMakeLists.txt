@@ -15,11 +15,56 @@ endif()
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Build options
+option(NLM_ENABLE_PERF_OPTIMIZATIONS "Enable performance optimizations (SIMD, parallelization)" ON)
+option(NLM_ENABLE_VISUALIZATION "Enable visualization support" OFF)
+option(NLM_ENABLE_CHECKPOINTING "Enable checkpoint save/load functionality" ON)
+option(NLM_ENABLE_REPLAY "Enable episodic memory replay" ON)
+option(NLM_ENABLE_DETAILED_LOGGING "Enable detailed logging for debugging" OFF)
+option(NLM_BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
+option(NLM_BUILD_PYTHON_BINDINGS "Build Python bindings" ON)
+option(NLM_BUILD_TESTS "Build test suite" ON)
+option(NLM_BUILD_EXPERIMENTS "Build experiment executables" ON)
+
+# Performance optimizations
+if(NLM_ENABLE_PERF_OPTIMIZATIONS)
+    add_definitions(-DNLM_PERF_OPTIMIZED)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3")
+    
+    # Performance libraries
+    find_package(Threads REQUIRED)
+    
+    # Link performance libraries
+    target_link_libraries(nlm_core PUBLIC Threads::Threads)
+endif()
+
+# Python bindings
+if(NLM_BUILD_PYTHON_BINDINGS)
+    find_package(pybind11 REQUIRED)
+    
+    pybind11_add_module(pynlm
+        python/bindings.cpp
+    )
+    
+    target_include_directories(pynlm PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${pybind11_INCLUDE_DIR}
+    )
+    
+    target_link_libraries(pynlm PRIVATE nlm_core)
+    
+    # Install Python module
+    install(TARGETS pynlm
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+    )
+endif()
 
 # Core library
 add_library(nlm_core STATIC
@@ -87,6 +132,12 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
+# Apply performance optimizations to core library
+if(NLM_ENABLE_PERF_OPTIMIZATIONS)
+    target_compile_options(nlm_core PRIVATE -march=native -O3 -flto)
+    set_target_properties(nlm_core PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
@@ -139,9 +190,25 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable (integration test)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world)
+
 # Testing
-enable_testing()
-add_subdirectory(tests)
+if(NLM_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+# Experiments
+if(NLM_BUILD_EXPERIMENTS)
+    add_executable(nlm_phase6_demo
+        src/experiments/Phase6Demo.cpp
+    )
+    target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world)
+endif()
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
@@ -149,3 +216,15 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Add build summary
+include(CMakePrintHelpers)
+message(STATUS "NLM Build Configuration:")
+message(STATUS "  C++ Standard: C++20")
+message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Performance optimizations: ${NLM_ENABLE_PERF_OPTIMIZATIONS}")
+message(STATUS "  Visualization support: ${NLM_ENABLE_VISUALIZATION}")
+message(STATUS "  Checkpointing: ${NLM_ENABLE_CHECKPOINTING}")
+message(STATUS "  Python bindings: ${NLM_BUILD_PYTHON_BINDINGS}")
+message(STATUS "  Test suite: ${NLM_BUILD_TESTS}")
+message(STATUS "  Experiments: ${NLM_BUILD_EXPERIMENTS}")

@@ -416,6 +416,46 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Helper function for quick simulation setup
+    m.def("quick_simulation", [](uint64_t neuronCount, uint64_t maxSteps) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", 1);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        for (uint64_t step = 0; step < maxSteps; ++step) {
+            brain->step(step);
+        }
+        
+        return std::make_tuple(brain, agent);
+    }, py::arg("neuronCount") = 1000, py::arg("maxSteps") = 1000,
+       "Quick helper for running a simple simulation. Returns (brain, agent)");
+
+    // Create comprehensive example configuration
+    m.def("createComprehensiveConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 2000);
+        config->set("region_count", 3);
+        config->set("connection_probability", 0.1);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.01f);
+        config->set("stdp_tau", 20.0f);
+        config->set("synaptogenesis_rate", 0.0001f);
+        config->set("pruning_rate", 0.00001f);
+        config->set("plasticity_hebbian_enable", true);
+        config->set("plasticity_stdp_enable", true);
+        config->set("plasticity_structural_enable", true);
+        config->set("neuromod_curiosity_enable", true);
+        config->set("neuromod_novelty_enable", true);
+        config->set("neuromod_dopamine_scale", 1.0f);
+        config->set("development_maturation_rate", 0.01f);
+        return config;
+    }, "Create a comprehensive configuration with all features enabled");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
