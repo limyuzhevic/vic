@@ -384,21 +384,25 @@ PYBIND11_MODULE(pynlm, m) {
              "Get prediction error")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+ .def("getBrain", &AgentBrain::getBrain,
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+             py::arg("enable"), "Enable/disable reward modulation")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+             py::arg("enable"), "Enable/disable structural plasticity")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+             py::arg("enable"), "Enable/disable development")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             py::arg("enable"), "Enable/disable curiosity")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -416,10 +420,137 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // ==================== ADVANCED UTILITY FUNCTIONS ====================
+
+    m.def("run_agent_simulation", [](std::shared_ptr<Brain> brain,
+                                   std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent,
+                                   size_t num_steps) {
+        for (size_t step = 0; step < num_steps; ++step) {
+            world->update(0.1);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(step);
+            world->applyMotorCommand(agent->decodeMotorCommand(), world->getSimulationTime());
+        }
+        return std::make_tuple(
+            world->getAgentBody().energy,
+            brain->getAverageFiringRate(),
+            agent->getNeuromodulationLevel()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"),
+       "Run a complete agent simulation loop for the given number of steps");
+
+    m.def("create_enhanced_config", [](const std::string& brain_type,
+                                      size_t neuron_count,
+                                      float connection_probability,
+                                      float stdp_ltp_weight,
+                                      float stdp_ltd_weight) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.type", brain_type);
+        config->set("brain.neuron_count", neuron_count);
+        config->set("brain.connection_probability", connection_probability);
+        config->set("plasticity.stdp.ltp_weight", stdp_ltp_weight);
+        config->set("plasticity.stdp.ltd_weight", stdp_ltd_weight);
+        config->set("neuromodulation.curiosity.enabled", true);
+        config->set("neuromodulation.novelty.enabled", true);
+        config->set("development.enabled", true);
+        return config;
+    }, py::arg("brain_type"), py::arg("neuron_count"), 
+       py::arg("connection_probability"), py::arg("stdp_ltp_weight"), 
+       py::arg("stdp_ltd_weight"),
+       "Create an enhanced configuration with advanced settings");
+
+    m.def("validate_config", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> errors;
+        
+        if (config->has("brain.neuron_count")) {
+            auto neuron_count = config->get<size_t>("brain.neuron_count");
+            if (neuron_count < 10) errors.push_back("neuron_count too small (< 10)");
+            if (neuron_count > 100000) errors.push_back("neuron_count too large (> 100000)");
+        }
+        
+        if (config->has("brain.connection_probability")) {
+            auto prob = config->get<float>("brain.connection_probability");
+            if (prob < 0.0f || prob > 1.0f) errors.push_back("connection_probability must be in range [0.0, 1.0]");
+        }
+        
+        return errors;
+    }, py::arg("config"), "Validate configuration and return list of errors");
+
+    m.def("export_config_to_dict", [](const std::shared_ptr<Config>& config) {
+        py::dict result;
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            if (config->has(key)) {
+                result[key] = config->summary();
+            }
+        }
+        return result;
+    }, py::arg("config"), "Export configuration as Python dictionary");
+
+    m.def("import_config_from_dict", [](py::dict config_dict) {
+        auto config = std::make_shared<Config>();
+        
+        if (config_dict.contains("brain.neuron_count")) {
+            config->set("brain.neuron_count", 
+                       py::cast<size_t>(config_dict["brain.neuron_count"]));
+        }
+        
+        if (config_dict.contains("brain.connection_probability")) {
+            config->set("brain.connection_probability", 
+                       py::cast<float>(config_dict["brain.connection_probability"]));
+        }
+        
+        if (config_dict.contains("brain.type")) {
+            config->set("brain.type", 
+                       py::cast<std::string>(config_dict["brain.type"]));
+        }
+        
+        return config;
+    }, py::arg("config_dict"), "Import configuration from Python dictionary");
+
+    m.def("create_preset_config", [](const std::string& preset_name) {
+        auto config = std::make_shared<Config>();
+        
+        if (preset_name == "small") {
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.connection_probability", 0.1f);
+            config->set("brain.region_count", 2);
+            config->set("simulation_timestep", 0.001);
+        }
+        else if (preset_name == "medium") {
+            config->set("brain.neuron_count", 10000);
+            config->set("brain.connection_probability", 0.05f);
+            config->set("brain.region_count", 5);
+            config->set("simulation_timestep", 0.001);
+        }
+        else if (preset_name == "large") {
+            config->set("brain.neuron_count", 100000);
+            config->set("brain.connection_probability", 0.01f);
+            config->set("brain.region_count", 20);
+            config->set("simulation_timestep", 0.0001);
+        }
+        else if (preset_name == "experimental") {
+            config->set("brain.neuron_count", 5000);
+            config->set("brain.connection_probability", 0.2f);
+            config->set("brain.region_count", 3);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("neuromodulation.curiosity.enable", true);
+            config->set("neuromodulation.novelty.enable", true);
+            config->set("development.enabled", true);
+        }
+        
+        return config;
+    }, py::arg("preset_name"), "Create a preset configuration (small, medium, large, experimental)");
 
 } // namespace nlm
