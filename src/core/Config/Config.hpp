@@ -93,13 +93,17 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Helper functions
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
+    // JSON support
+    bool loadFromJSON(const std::string& filepath);
+    void parseJSONKeyValue(const std::string& pair);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
 
 } // namespace nlm

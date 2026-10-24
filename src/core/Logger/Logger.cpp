@@ -102,7 +102,7 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
-// Logger class implementation
+// Logger implementation
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
