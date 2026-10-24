@@ -19,40 +19,34 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    std::string extension = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
     }
     
-    return true;
+    bool success = false;
+    
+    if (extension == "json" || extension == "JSON" || extension == "json5") {
+        success = loadFromJSON(filepath);
+    } else if (extension == "yaml" || extension == "yml" || extension == "YAML" || extension == "YML") {
+        success = loadFromYAML(filepath);
+    } else {
+        // Fallback to simple key=value format for backward compatibility
+        success = loadFromSimpleFormat(filepath);
+    }
+    
+    // Validate configuration after loading
+    if (success) {
+        validateConfiguration();
+    }
+    
+    return success;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,12 +78,21 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Determine file format from extension
+    std::string extension = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
     }
     
-    return true;
+    if (extension == "json" || extension == "JSON" || extension == "json5") {
+        return saveToJSON(filepath);
+    } else if (extension == "yaml" || extension == "yml" || extension == "YAML" || extension == "YML") {
+        return saveToYAML(filepath);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        return saveToSimpleFormat(filepath);
+    }
 }
 
 template<typename T>
@@ -197,19 +200,358 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+bool Config::loadFromJSON(const std::string& filepath) {
+#ifdef HAVE_NLOHMANN_JSON
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
+            parseJSONValue(key, *it, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("JSON parsing error in " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+#else
+    NLM_LOG_ERROR("JSON parsing not available - nlohmann-json library not found");
+    return false;
+#endif
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::loadFromYAML(const std::string& filepath) {
+#ifdef HAVE_YAML_CPP
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        YAML::Node yamlData = YAML::LoadFile(filepath);
+        
+        for (auto it = yamlData.begin(); it != yamlData.end(); ++it) {
+            std::string key = it->first.as<std::string>();
+            parseJSONValue(key, nlohmann::json(*it), ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("YAML parsing error in " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+#else
+    NLM_LOG_ERROR("YAML parsing not available - yaml-cpp library not found");
+    return false;
+#endif
+}
 
-} // namespace nlm
+bool Config::validateConfiguration() {
+    // Validate required keys
+    std::vector<std::string> requiredKeys = {
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count",
+        "region_count"
+    };
+    
+    if (!validateRequiredKeys(requiredKeys)) {
+        NLM_LOG_WARNING("Configuration missing some recommended keys");
+    }
+    
+    // Validate individual keys
+    for (const auto& entry : pImpl->entries) {
+        if (!validateKeyFormat(entry.key)) {
+            NLM_LOG_WARNING("Invalid key format: " + entry.key);
+        }
+        
+        if (!validateValueRanges(entry)) {
+            NLM_LOG_WARNING("Invalid value range for key: " + entry.key);
+        }
+    }
+    
+    return true;
+}
+
+void Config::parseJSONValue(const std::string& key, const nlohmann::json& jsonValue, ConfigSource source) {
+    ConfigValue configValue;
+    
+    if (jsonToConfigValue(jsonValue, configValue)) {
+        set(key, configValue, source);
+    } else {
+        NLM_LOG_WARNING("Could not parse JSON value for key: " + key);
+    }
+}
+
+bool Config::jsonToConfigValue(const nlohmann::json& jsonValue, ConfigValue& configValue) {
+    if (jsonValue.is_number_integer()) {
+        // Try int64_t first, then int
+        try {
+            configValue = jsonValue.get<int64_t>();
+            return true;
+        } catch (...) {
+            try {
+                configValue = jsonValue.get<int>();
+                return true;
+            } catch (...) {
+                return false;
+            }
+        }
+    } else if (jsonValue.is_number_float()) {
+        configValue = jsonValue.get<double>();
+        return true;
+    } else if (jsonValue.is_boolean()) {
+        configValue = jsonValue.get<bool>();
+        return true;
+    } else if (jsonValue.is_string()) {
+        configValue = jsonValue.get<std::string>();
+        return true;
+    } else if (jsonValue.is_array()) {
+        // Try to infer array type
+        if (!jsonValue.empty()) {
+            bool allInt = std::all_of(jsonValue.begin(), jsonValue.end(), 
+                                    [](const nlohmann::json& v) { return v.is_number_integer(); });
+            if (allInt) {
+                std::vector<int64_t> intArray;
+                for (const auto& v : jsonValue) {
+                    intArray.push_back(v.get<int64_t>());
+                }
+                configValue = intArray;
+                return true;
+            }
+            
+            bool allFloat = std::all_of(jsonValue.begin(), jsonValue.end(), 
+                                      [](const nlohmann::json& v) { return v.is_number_float(); });
+            if (allFloat) {
+                std::vector<double> floatArray;
+                for (const auto& v : jsonValue) {
+                    floatArray.push_back(v.get<double>());
+                }
+                configValue = floatArray;
+                return true;
+            }
+            
+            bool allString = std::all_of(jsonValue.begin(), jsonValue.end(), 
+                                        [](const nlohmann::json& v) { return v.is_string(); });
+            if (allString) {
+                std::vector<std::string> stringArray;
+                for (const auto& v : jsonValue) {
+                    stringArray.push_back(v.get<std::string>());
+                }
+                configValue = stringArray;
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+bool Config::yamlToConfigValue(const YAML::Node& yamlValue, ConfigValue& configValue) {
+    if (yamlValue.IsScalar()) {
+        if (yamlValue.IsInt()) {
+            configValue = yamlValue.as<int64_t>();
+            return true;
+        } else if (yamlValue.IsFloat()) {
+            configValue = yamlValue.as<double>();
+            return true;
+        } else if (yamlValue.IsBool()) {
+            configValue = yamlValue.as<bool>();
+            return true;
+        } else if (yamlValue.IsSequence()) {
+            // Check array type
+            std::vector<int64_t> intArray;
+            std::vector<double> floatArray;
+            std::vector<std::string> stringArray;
+            
+            bool isInt = true, isFloat = true, isString = true;
+            
+            for (const auto& item : yamlValue) {
+                if (item.IsInt()) {
+                    intArray.push_back(item.as<int64_t>());
+                } else if (item.IsFloat()) {
+                    isInt = false;
+                    floatArray.push_back(item.as<double>());
+                } else if (item.IsScalar()) {
+                    std::string str = item.as<std::string>();
+                    // Check if it's numeric
+                    try {
+                        int64_t intVal = std::stoll(str);
+                        floatArray.push_back(static_cast<double>(intVal));
+                        isInt = false;
+                        isString = false;
+                    } catch (...) {
+                        try {
+                            double floatVal = std::stod(str);
+                            floatArray.push_back(floatVal);
+                            isInt = false;
+                            isString = false;
+                        } catch (...) {
+                            stringArray.push_back(str);
+                            isInt = false;
+                            isFloat = false;
+                        }
+                    }
+                } else {
+                    isInt = isFloat = isString = false;
+                    break;
+                }
+            }
+            
+            if (isInt && !intArray.empty()) {
+                configValue = intArray;
+                return true;
+            } else if (isFloat && !floatArray.empty()) {
+                configValue = floatArray;
+                return true;
+            } else if (isString && !stringArray.empty()) {
+                configValue = stringArray;
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+bool Config::validateRequiredKeys(const std::vector<std::string>& requiredKeys) {
+    bool allFound = true;
+    for (const std::string& key : requiredKeys) {
+        if (!has(key)) {
+            NLM_LOG_WARNING("Missing required configuration key: " + key);
+            allFound = false;
+        }
+    }
+    return allFound;
+}
+
+bool Config::validateKeyFormat(const std::string& key) {
+    // Check for valid key characters
+    if (key.empty()) {
+        return false;
+    }
+    
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '-' && c != '.') {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::validateValueRanges(const ConfigEntry& entry) {
+    // Validate specific ranges for known keys
+    if (entry.key == "random_seed") {
+        auto value = std::get_if<int64_t>(&entry.value);
+        if (value) {
+            return *value >= 0 && *value < UINT64_MAX;
+        }
+    } else if (entry.key == "simulation_timestep") {
+        auto value = std::get_if<double>(&entry.value);
+        if (value) {
+            return *value > 0.0 && *value < 1.0; // Reasonable timestep range
+        }
+    } else if (entry.key == "neuron_count") {
+        auto value = std::get_if<int64_t>(&entry.value);
+        if (value) {
+            return *value > 0 && *value <= 1000000; // Reasonable neuron count
+        }
+    } else if (entry.key == "region_count") {
+        auto value = std::get_if<int64_t>(&entry.value);
+        if (value) {
+            return *value > 0 && *value <= 1000; // Reasonable region count
+        }
+    } else if (entry.key == "connection_probability") {
+        auto value = std::get_if<double>(&entry.value);
+        if (value) {
+            return *value >= 0.0 && *value <= 1.0; // Probability range
+        }
+    }
+    
+    return true; // Unknown keys are considered valid
+}
+
+std::string Config::jsonEscape(const std::string& str) {
+    std::string result;
+    for (char c : str) {
+        switch (c) {
+            case '\"': result += "\\\""; break;
+            case '\\': result += "\\\\"; break;
+            case '\b': result += "\\b"; break;
+            case '\f': result += "\\f"; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 32) {
+                    result += "\\u" + std::to_string(static_cast<int>(c));
+                } else {
+                    result += c;
+                }
+        }
+    }
+    return result;
+}
+
+std::string Config::doubleToString(double value) {
+    std::ostringstream oss;
+    oss << value;
+    return oss.str();
+}
+
+std::string Config::intToString(int64_t value) {
+    std::ostringstream oss;
+    oss << value;
+    return oss.str();
+}
+
+std::string Config::boolToString(bool value) {
+    return value ? "true" : "false";
+}
+
+// Define helper functions for template instantiations
+void Config::defineHelperFunctions() {
+    // Define helper functions for template instantiations
+}

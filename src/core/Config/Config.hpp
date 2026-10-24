@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
+#include <sstream>
 
 namespace nlm {
 
@@ -61,7 +63,7 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,6 +95,18 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Load from simple key=value format (backward compatibility)
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    // Load from JSON format
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML format
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Validate configuration
+    bool validateConfiguration();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +114,24 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string jsonEscape(const std::string& str);
+    static std::string doubleToString(double value);
+    static std::string intToString(int64_t value);
+    static std::string boolToString(bool value);
+    
+    // JSON parsing helpers
+    static void parseJSONValue(const std::string& key, const nlohmann::json& jsonValue, ConfigSource source);
+    static bool jsonToConfigValue(const nlohmann::json& jsonValue, ConfigValue& configValue);
+    
+    // YAML parsing helpers
+    static bool yamlToConfigValue(const YAML::Node& yamlValue, ConfigValue& configValue);
+    
+    // Configuration validation
+    static bool validateRequiredKeys(const std::vector<std::string>& requiredKeys);
+    static bool validateKeyFormat(const std::string& key);
+    static bool validateValueRanges(const ConfigEntry& entry);
 };
+
+} // namespace nlm
 
 } // namespace nlm

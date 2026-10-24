@@ -5,6 +5,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <utility>
+#include <iterator>
+#include <stdexcept>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,15 +22,67 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom Python exceptions
+class NLMRuntimeError : public std::runtime_error {
+public:
+    explicit NLMRuntimeError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class NLMConfigError : public NLMRuntimeError {
+public:
+    explicit NLMConfigError(const std::string& msg) : NLMRuntimeError("Configuration error: " + msg) {}
+};
+
+class NLMBrainError : public NLMRuntimeError {
+public:
+    explicit NLMBrainError(const std::string& msg) : NLMRuntimeError("Brain error: " + msg) {}
+};
+
+class NLMWorldError : public NLMRuntimeError {
+public:
+    explicit NLMWorldError(const std::string& msg) : NLMRuntimeError("World error: " + msg) {}
+};
+
+class NLMPerceptError : public NLMRuntimeError {
+public:
+    explicit NLMPerceptError(const std::string& msg) : NLMRuntimeError("Percept error: " + msg) {}
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Features:
+        - Pythonic context managers for resource management
+        - Enhanced error handling with specific exceptions
+        - Generator-based simulation loops
+        - Configuration presets for common scenarios
+        - Integration examples and utilities
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Register custom exceptions
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const NLMRuntimeError& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const NLMConfigError& e) {
+            PyErr_SetString(PyExc_ValueError, e.what());
+        } catch (const NLMBrainError& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const NLMWorldError& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const NLMPerceptError& e) {
+            PyErr_SetString(PyExc_ValueError, e.what());
+        } catch (const std::runtime_error& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (...) {
+            PyErr_SetString(PyExc_RuntimeError, "Unknown NLM error occurred");
+        }
+    });
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -142,20 +197,70 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+// Enhanced Config class with Pythonic features
+    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON file (supports .json, .yaml, .yml)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
+        .def("loadFromJSON", &Config::loadFromJSON, py::arg("filepath"),
+             "Load configuration from JSON file")
+        .def("loadFromYAML", &Config::loadFromYAML, py::arg("filepath"),
+             "Load configuration from YAML file")
+        .def("loadFromSimple", &Config::loadFromSimpleFormat, py::arg("filepath"),
+             "Load configuration from simple key=value format (backward compatibility)")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to file (JSON format for .json, YAML for .yaml/.yml)")
+        .def("saveToJSON", &Config::saveToJSON, py::arg("filepath"),
+             "Save configuration to JSON file")
+        .def("saveToYAML", &Config::saveToYAML, py::arg("filepath"),
+             "Save configuration to YAML file")
+        .def("saveToSimple", &Config::saveToSimpleFormat, py::arg("filepath"),
+             "Save configuration to simple key=value format")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("get", &Config::get<std::string>, py::arg("key"),
+             "Get configuration value as string (returns None if not found)")
+        .def("get_int", [](const Config& self, const std::string& key, std::optional<int> defaultValue) {
+            auto val = self.get<int>(key);
+            return val.has_value() ? val.value() : (defaultValue ? *defaultValue : 0);
+        }, py::arg("key"), py::arg("defaultValue") = std::nullopt,
+             "Get configuration value as integer (returns default if not found)")
+        .def("get_float", [](const Config& self, const std::string& key, std::optional<double> defaultValue) {
+            auto val = self.get<double>(key);
+            return val.has_value() ? val.value() : (defaultValue ? *defaultValue : 0.0);
+        }, py::arg("key"), py::arg("defaultValue") = std::nullopt,
+             "Get configuration value as float (returns default if not found)")
+        .def("get_bool", [](const Config& self, const std::string& key, std::optional<bool> defaultValue) {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : (defaultValue ? *defaultValue : false);
+        }, py::arg("key"), py::arg("defaultValue") = std::nullopt,
+             "Get configuration value as boolean (returns default if not found)")
+        .def("get_or", &Config::getOr<std::string>, py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value, or default if not found")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value as string")
+        .def("set_int", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value as integer")
+        .def("set_float", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value as float")
+        .def("set_bool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value as boolean")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
@@ -400,26 +505,201 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Add Pythonic context managers and utilities
+    
+    // Context manager for Brain simulation
+    py::class_<BrainSimulationContext>(m, "BrainSimulationContext", R"pbdoc(Context manager for brain simulation)")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("__enter__", [](BrainSimulationContext& self) {
+            self.brain->initialize();
+            return &self.brain;
+        })
+        .def("__exit__", [](BrainSimulationContext& self, py::args) {
+            self.brain->reset();
+        });
+    
+    // Context manager for World simulation
+    py::class_<WorldSimulationContext>(m, "WorldSimulationContext", R"pbdoc(Context manager for world simulation)")
+        .def(py::init<std::shared_ptr<SimpleWorld>>(), py::arg("world"))
+        .def("__enter__", [](WorldSimulationContext& self) {
+            self.world->reset();
+            return &self.world;
+        })
+        .def("__exit__", [](WorldSimulationContext& self, py::args) {
+            self.world->reset();
+        });
+    
+    // Utility functions
+    m.def("createSimulationLoop", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                      std::shared_ptr<AgentBrain> agent, size_t steps) {
+        return py::make_generator([brain, world, agent, steps]() mutable {
+            for (size_t step = 0; step < steps; ++step) {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step);
+                auto action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                co_yield step;
+            }
+        });
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+        "Create a generator-based simulation loop");
+    
+    // Configuration presets
+    m.def("createDefaultConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set default values for Phase 2/6
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        
+        // STDP parameters
+        config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        
+        // Structural plasticity parameters
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        
+        return config;
+    }, "Create a default configuration optimized for NLM Phase 6");
+    
+    m.def("createExplorationConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Exploration-focused configuration
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.05, ConfigSource::Default);
+        
+        // Strong neuromodulation for exploration
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        
+        // High plasticity for learning
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.002f, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.synaptogenesis_rate", 0.0005f, ConfigSource::Default);
+        
+        return config;
+    }, "Create an exploration-focused configuration");
+    
+    m.def("createMemoryConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Memory-intensive configuration
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(1500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+        config->set("connection_probability", 0.08, ConfigSource::Default);
+        
+        // Strong memory systems
+        config->set("memory.working.capacity", 500, ConfigSource::Default);
+        config->set("memory.episodic.max_episodes", 2000, ConfigSource::Default);
+        config->set("memory.associative.capacity", 1000, ConfigSource::Default);
+        
+        // Development for memory consolidation
+        config->set("development.enable", true, ConfigSource::Default);
+        config->set("development.stage", static_cast<int>(DevelopmentalStage::CriticalPeriod), ConfigSource::Default);
+        
+        return config;
+    }, "Create a memory-focused configuration");
+    
+    m.def("createMinimalConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Minimal configuration for testing
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.2, ConfigSource::Default);
+        
+        return config;
+    }, "Create a minimal configuration for testing");
+    
+    // Simulation utilities
+    m.def("runBrainTest", [](std::shared_ptr<Brain> brain, size_t steps) {
+        brain->initialize();
+        
+        size_t initialSpikes = brain->getTotalSpikeCount();
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        
+        size_t finalSpikes = brain->getTotalSpikeCount();
+        size_t spikesGenerated = finalSpikes - initialSpikes;
+        
+        brain->reset();
+        
+        return std::make_tuple(spikesGenerated, brain->getAverageFiringRate());
+    }, py::arg("brain"), py::arg("steps"),
+        "Run a simple brain test and return (spikes_generated, average_firing_rate)");
+    
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, size_t steps) {
+        brain->initialize();
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        brain->reset();
+        
+        return std::make_tuple(
+            steps,
+            duration.count(),
+            steps * 1000.0 / duration.count(),  // steps per second
+            brain->getTotalSpikeCount()
+        );
+    }, py::arg("brain"), py::arg("steps"),
+        "Benchmark brain performance and return (steps, duration_ms, steps_per_second, total_spikes)");
+    
+    // Error handling utilities
+    m.def("safe_brain_operation", [](std::shared_ptr<Brain> brain, std::function<void()> operation) {
+        try {
+            operation();
+            return true;
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Operation failed: ") + e.what());
+            return false;
+        }
+    }, py::arg("brain"), py::arg("operation"),
+        "Safely execute a brain operation and return success status");
+    
+    // Version and metadata
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Research Team";
+    m.attr("__description__") = "Python bindings for NLM (Neural Learning Machine) - Phase 6: Final Integration";
+    
+    // Error types for user code
+    py::class_<NLMRuntimeError>(m, "NLMRuntimeError", py::module_local())
+        .def(py::init<const std::string&>());
+        
+    py::class_<NLMConfigError>(m, "NLMConfigError", py::module_local())
+        .def(py::init<const std::string&>());
+        
+    py::class_<NLMBrainError>(m, "NLMBrainError", py::module_local())
+        .def(py::init<const std::string&>());
+        
+    py::class_<NLMWorldError>(m, "NLMWorldError", py::module_local())
+        .def(py::init<const std::string&>());
+        
+    py::class_<NLMPerceptError>(m, "NLMPerceptError", py::module_local())
+        .def(py::init<const std::string&>());
 }
 
 } // namespace nlm

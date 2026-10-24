@@ -2,6 +2,23 @@
 requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
 build-backend = "scikit_build_core.build"
 
+[project.optional-dependencies]
+all = [
+    "nlohmann-json>=3.11.0",
+    "pyyaml>=6.0",
+    "python-json-logger>=2.0.7",
+    "tabulate>=0.9.0",
+]
+
+dev = [
+    "pytest>=7.0",
+    "numpy>=1.20",
+    "nlohmann-json>=3.11.0",
+    "pyyaml>=6.0",
+    "python-json-logger>=2.0.7",
+    "tabulate>=0.9.0",
+]
+
 [project]
 name = "pynlm"
 version = "0.1.0"
