@@ -42,13 +42,59 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Using New Convenience Methods
+
+```python
+import pynlm
+
+# Create configuration and use new convenience methods
+config = pynlm.createDefaultConfig()
+
+# Set configuration using type-safe methods
+config.set("brain.neuron_count", 1000)
+config.set("brain.synapse_density", 0.1)
+config.set("neuromod.dopamine.scale", 1.5)
+
+# Get configuration values using new convenience methods
+neuron_count = config.getInt("brain.neuron_count")
+synapse_density = config.getFloat("brain.synapse_density", 0.05)
+dopamine_scale = config.getFloat("neuromod.dopamine.scale", 1.0)
+
+print(f"Brain configured with {neuron_count} neurons")
+print(f"Synapse density: {synapse_density}")
+print(f"Dopamine scale: {dopamine_scale}")
+
+# Create brain and use new Brain convenience methods
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Get neuron count by type
+excitatory = brain.getNeuronCountByType(pynlm.NeuronType.Excitatory)
+inhibitory = brain.getNeuronCountByType(pynlm.NeuronType.Inhibitory)
+sensory = brain.getNeuronCountByType(pynlm.NeuronType.Sensory)
+
+print(f"Neuron types - Excitatory: {excitatory}, Inhibitory: {inhibitory}, Sensory: {sensory}")
+
+# Get comprehensive brain statistics
+brain_stats = brain.getBrainStats()
+print(f"Total spikes: {brain_stats['total_spikes']}")
+print(f"Firing rate: {brain_stats['firing_rate']:.4f}")
+```
+
+### Example 2: Brain in a Simple World (Enhanced)
 
 ```python
 import pynlm
 
 # Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+config = pynlm.createDefaultConfig()
+
+# Configure using new convenience methods
+config.set("brain.neuron_count", 800)
+config.set("neuromod.dopamine.scale", 1.2)
+config.set("neuromod.curiosity.enable", True)
+
+brain = pynlm.createBrain(config)
 brain.initialize()
 
 world = pynlm.createSimpleWorld()
@@ -57,6 +103,11 @@ world.reset()
 
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
+
+# Enable learning systems
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableCuriosity(True)
 
 # Run for 50 steps
 for step in range(50):
@@ -69,6 +120,13 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+
+# Get comprehensive statistics using new convenience methods
+brain_stats = brain.getBrainStats()
+print(f"Brain statistics - Total spikes: {brain_stats['total_spikes']}, Firing rate: {brain_stats['firing_rate']:.4f}")
+
+agent_stats = agent.getAgentStats()
+print(f"Agent statistics - Curiosity: {agent_stats['curiosity']:.3f}, Novelty: {agent_stats['novelty']:.3f}")
 ```
 
 ---
@@ -141,6 +199,16 @@ print("Neurons firing:", brain.getFiringNeuronCount())
 print("Total spikes:", brain.getTotalSpikeCount())
 print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
+
+# Using new convenience methods:
+print("Excitatory neurons:", brain.getNeuronCountByType(pynlm.NeuronType.Excitatory))
+print("Inhibitory neurons:", brain.getNeuronCountByType(pynlm.NeuronType.Inhibitory))
+
+# Get comprehensive brain statistics
+brain_stats = brain.getBrainStats()
+print("Comprehensive stats:")
+for key, value in brain_stats.items():
+    print(f"  {key}: {value}")
 ```
 
 ### Pattern 3: Enable Brain Features
@@ -197,13 +265,19 @@ for i in range(10):
 print("Silent brain test done!")
 ```
 
-### Project 2: Brain Watching a World
+### Project 2: Brain Watching a World (Enhanced)
 
 ```python
 import pynlm
 
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Setup with enhanced configuration
+config = pynlm.createDefaultConfig()
+
+# Configure using new convenience methods
+config.set("brain.neuron_count", 600)
+config.set("neuromod.curiosity.enable", True)
+
+brain = pynlm.createBrain(config)
 brain.initialize()
 world = pynlm.createSimpleWorld()
 world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
@@ -218,16 +292,34 @@ for i in range(30):
     brain.step(i)
     
 print("Watched world for 30 steps")
+
+# Use new convenience methods to get statistics
+brain_stats = brain.getBrainStats()
+print("Brain statistics:")
+for key, value in brain_stats.items():
+    print(f"  {key}: {value}")
+
+# Get neuron type analysis
+print(f"Excitatory neurons: {brain.getNeuronCountByType(pynlm.NeuronType.Excitatory)}")
+print(f"Inhibitory neurons: {brain.getNeuronCountByType(pynlm.NeuronType.Inhibitory)}")
+
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent (Enhanced)
 
 ```python
 import pynlm
 
-# Setup
+# Setup with enhanced configuration
 config = pynlm.createDefaultConfig()
+
+# Configure using new convenience methods
+config.set("brain.neuron_count", 1000)
+config.set("neuromod.dopamine.scale", 1.5)
+config.set("neuromod.curiosity.enable", True)
+config.set("neuromod.novelty.enable", True)
+
 brain = pynlm.createBrain(config)
 brain.initialize()
 world = pynlm.createSimpleWorld()
@@ -236,9 +328,10 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
+# Enable learning with agent convenience methods
 agent.enableRewardModulation(True)
 agent.enableCuriosity(True)
+agent.enableStructuralPlasticity(True)
 
 # Run agent
 for step in range(100):
@@ -249,14 +342,65 @@ for step in range(100):
     world.applyMotorCommand(action, world.getSimulationTime())
     
     if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        # Use new convenience methods for statistics
+        brain_stats = brain.getBrainStats()
+        agent_stats = agent.getAgentStats()
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing, "
+              f"Curiosity={agent_stats['curiosity']:.3f}, "
+              f"Novelty={agent_stats['novelty']:.3f}")
 
 print("Agent simulation complete!")
+
+# Final comprehensive statistics using new convenience methods
+print("\nFinal comprehensive statistics:")
+brain_stats = brain.getBrainStats()
+for key, value in brain_stats.items():
+    if isinstance(value, float):
+        print(f"  Brain {key}: {value:.4f}")
+    else:
+        print(f"  Brain {key}: {value}")
+
+agent_stats = agent.getAgentStats()
+for key, value in agent_stats.items():
+    if isinstance(value, float):
+        print(f"  Agent {key}: {value:.4f}")
+    elif isinstance(value, dict):
+        print(f"  Agent {key}:")
+        for subkey, subvalue in value.items():
+            print(f"    {subkey}: {subvalue}")
+    else:
+        print(f"  Agent {key}: {value}")
 ```
 
 ---
 
 ## Quick Reference
+
+### New Convenience Methods
+
+#### Config Class
+| Method | Description | Example |
+|--------|-------------|---------|
+| `getInt(key, default)` | Get integer value safely | `config.getInt("brain.neuron_count", 1000)` |
+| `getFloat(key, default)` | Get float value safely | `config.getFloat("brain.synapse_density", 0.1)` |
+| `getBool(key, default)` | Get boolean value safely | `config.getBool("neuromod.curiosity.enable", True)` |
+| `getString(key, default)` | Get string value safely | `config.getString("config.name", "default")` |
+
+#### Brain Class
+| Method | Description | Example |
+|--------|-------------|---------|
+| `getNeuronCountByType(type)` | Count neurons by type | `brain.getNeuronCountByType(pynlm.NeuronType.Excitatory)` |
+| `getBrainStats()` | Get comprehensive brain statistics | `stats = brain.getBrainStats()` |
+
+#### AgentBrain Class
+| Method | Description | Example |
+|--------|-------------|---------|
+| `getAgentStats()` | Get comprehensive agent statistics | `stats = agent.getAgentStats()` |
+| `getActionRecommendation(context)` | Get action recommendation based on brain state | `rec = agent.getActionRecommendation()` |
+| `enableAllSystems()` | Enable all agent systems at once | `agent.enableAllSystems()` |
+| `disableAllSystems()` | Disable all agent systems at once | `agent.disableAllSystems()` |
+
+### Standard Methods (Unchanged)
 
 | What you want | Code |
 |--------------|------|

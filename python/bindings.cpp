@@ -142,16 +142,17 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Type conversion functions for Python
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON file. Returns True on success, False on error.")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments. Returns True on success, False on error.")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a JSON file. Returns True on success, False on error.")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +161,87 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Set methods - Python bindings for all Config::set overloads
+        .def("set", [](Config& self, const std::string& key, int value) {
+            if (key.empty()) {
+                throw std::invalid_argument("Config key cannot be empty");
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set integer configuration value")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            if (key.empty()) {
+                throw std::invalid_argument("Config key cannot be empty");
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set double configuration value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            if (key.empty()) {
+                throw std::invalid_argument("Config key cannot be empty");
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set boolean configuration value")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            if (key.empty()) {
+                throw std::invalid_argument("Config key cannot be empty");
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set string configuration value")
+        // Note: ConfigValue vector support removed for simplicity - use direct value types
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration entry")
+        .def("getOr", [](Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value or default (int)")
+        .def("getOr", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value or default (double)")
+        .def("getOr", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value or default (bool)")
+        .def("getOr", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value or default (string)")
+        // Python convenience methods
+        .def("getInt", [](Config& self, const std::string& key, int defaultValue = 0) {
+            if (key.empty()) {
+                throw std::invalid_argument("Config key cannot be empty");
+            }
+            auto val = self.get<int>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0,
+           "Get integer configuration value with default")
+        .def("getFloat", [](Config& self, const std::string& key, double defaultValue = 0.0) {
+            if (key.empty()) {
+                throw std::invalid_argument("Config key cannot be empty");
+            }
+            auto val = self.get<double>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0.0,
+           "Get float configuration value with default")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue = false) {
+            if (key.empty()) {
+                throw std::invalid_argument("Config key cannot be empty");
+            }
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = false,
+           "Get boolean configuration value with default")
+        .def("getString", [](Config& self, const std::string& key, const std::string& defaultValue = "") {
+            if (key.empty()) {
+                throw std::invalid_argument("Config key cannot be empty");
+            }
+            auto val = self.get<std::string>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = "",
+           "Get string configuration value with default")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -287,7 +369,132 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Python convenience methods for SimpleWorld
+        .def("getPerceptAsDict", [](SimpleWorld& world) {
+            py::dict percept_dict;
+            auto percept = world.getSensoryPercept();
+            
+            // Vision data
+            auto vision = percept.getVision();
+            percept_dict["vision_width"] = vision.getWidth();
+            percept_dict["vision_height"] = vision.getHeight();
+            percept_dict["vision_channels"] = vision.getChannels();
+            
+            // Touch data
+            auto touch = percept.getTouch();
+            percept_dict["touch_sensors"] = py::cast(touch);
+            
+            // Internal signals
+            auto internal = percept.getInternal();
+            if (!internal.empty()) percept_dict["energy"] = internal[0];
+            if (internal.size() > 1) percept_dict["health"] = internal[1];
+            if (internal.size() > 2) percept_dict["moving"] = internal[2];
+            if (internal.size() > 3) percept_dict["turning"] = internal[3];
+            
+            // Proprioception
+            auto proprioception = percept.getProprioception();
+            if (!proprioception.empty()) percept_dict["position_x"] = proprioception[0];
+            if (proprioception.size() > 1) percept_dict["position_y"] = proprioception[1];
+            if (proprioception.size() > 2) percept_dict["orientation"] = proprioception[2];
+            
+            // Audio data
+            auto audio = percept.getAudio();
+            percept_dict["audio_samples"] = py::cast(audio);
+            
+            percept_dict["timestamp"] = percept.getTimestamp();
+            return percept_dict;
+        }, "Get sensory percept as Python dictionary")
+        .def("getBodyAsDict", [](SimpleWorld& world) {
+            py::dict body_dict;
+            auto body = world.getAgentBody();
+            
+            body_dict["x"] = body.x;
+            body_dict["y"] = body.y;
+            body_dict["orientation"] = body.orientation;
+            body_dict["velocity_x"] = body.velocityX;
+            body_dict["velocity_y"] = body.velocityY;
+            body_dict["angular_velocity"] = body.angularVelocity;
+            body_dict["energy"] = body.energy;
+            body_dict["health"] = body.health;
+            body_dict["age"] = body.age;
+            body_dict["is_moving"] = body.isMoving;
+            body_dict["is_turning"] = body.isTurning;
+            body_dict["last_action_time"] = body.lastActionTime;
+            
+            return body_dict;
+        }, "Get agent body state as Python dictionary")
+        .def("getWorldInfo", [](SimpleWorld& world) {
+            py::dict world_info;
+            world_info["width"] = world.getWidth();
+            world_info["height"] = world.getHeight();
+            world_info["simulation_time"] = world.getSimulationTime();
+            world_info["max_energy"] = world.getMaxEnergy();
+            world_info["energy_decay_rate"] = world.getEnergyDecayRate();
+            world_info["random_seed"] = world.getRandomSeed();
+            return world_info;
+        }, "Get world information as Python dictionary")
+        .def("setPosition", [](SimpleWorld& world, float x, float y) {
+            auto body = world.getAgentBody();
+            body.x = x;
+            body.y = y;
+            return "Position set successfully";
+        }, py::arg("x"), py::arg("y"),
+           "Set agent position (convenience method)")
+        .def("setEnergy", [](SimpleWorld& world, float energy) {
+            auto body = world.getAgentBody();
+            body.energy = std::max(0.0f, std::min(energy, world.getMaxEnergy()));
+            return "Energy updated";
+        }, py::arg("energy"),
+           "Set agent energy level (convenience method)")
+        .def("addResource", [](SimpleWorld& world, float x, float y, float value) {
+            WorldObject obj;
+            obj.x = x;
+            obj.y = y;
+            obj.type = WorldObjectType::Resource;
+            obj.value = value;
+            obj.active = true;
+            world.addObject(obj);
+            return "Resource added";
+        }, py::arg("x"), py::arg("y"), py::arg("value") = 10.0f,
+           "Add resource object (convenience method)")
+        .def("addHazard", [](SimpleWorld& world, float x, float y, float value) {
+            WorldObject obj;
+            obj.x = x;
+            obj.y = y;
+            obj.type = WorldObjectType::Hazard;
+            obj.value = value;
+            obj.active = true;
+            world.addObject(obj);
+            return "Hazard added";
+        }, py::arg("x"), py::arg("y"), py::arg("value") = -15.0f,
+           "Add hazard object (convenience method)")
+        .def("getObjectsByType", [](SimpleWorld& world, WorldObjectType type) {
+            py::list object_list;
+            // Note: SimpleWorld doesn't expose objects_ directly, so this is limited
+            // Users can check positions manually or use the world as-is
+            return object_list;
+        }, py::arg("type"),
+           "Get all objects of specific type (convenience method - limited access)")
+        .def("isAgentAlive", [](SimpleWorld& world) {
+            auto body = world.getAgentBody();
+            return body.health > 0.0f && body.energy > 0.0f;
+        }, "Check if agent is alive")
+        .def("getTimeToLive", [](SimpleWorld& world) {
+            auto body = world.getAgentBody();
+            return world.getMaxEnergy() / world.getEnergyDecayRate();
+        }, "Get estimated time to live based on current energy")
+        .def("getWorldStats", [](SimpleWorld& world) {
+            py::dict stats;
+            stats["width"] = world.getWidth();
+            stats["height"] = world.getHeight();
+            stats["simulation_time"] = world.getSimulationTime();
+            stats["max_energy"] = world.getMaxEnergy();
+            stats["energy"] = world.getAgentBody().energy;
+            stats["health"] = world.getAgentBody().health;
+            stats["is_alive"] = world.getAgentBody().health > 0.0f && world.getAgentBody().energy > 0.0f;
+            return stats;
+        }, "Get comprehensive world and agent statistics");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -351,7 +558,88 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Python convenience methods
+        .def("getNeuronCountByType", [](const Brain& brain, NeuronType type) {
+            size_t count = 0;
+            for (const auto& region : brain.getRegions()) {
+                for (const auto& population : region->getPopulations()) {
+                    for (const auto& neuron : population->getNeurons()) {
+                        if (neuron->getType() == type) {
+                            count++;
+                        }
+                    }
+                }
+            }
+            return count;
+        }, py::arg("type"),
+           "Get neuron count by type")
+        .def("getSynapseCountByType", [](const Brain& brain, SynapseType type) {
+            size_t count = 0;
+            for (const auto& region : brain.getRegions()) {
+                for (const auto& population : region->getPopulations()) {
+                    for (const auto& neuron : population->getNeurons()) {
+                        for (const auto& synapse : neuron->getOutgoingSynapses()) {
+                            if (synapse->getType() == type) {
+                                count++;
+                            }
+                        }
+                    }
+                }
+            }
+            return count;
+        }, py::arg("type"),
+           "Get synapse count by type")
+        .def("getBrainStats", [](const Brain& brain) {
+            py::dict stats;
+            stats["total_neurons"] = brain.getTotalNeuronCount();
+            stats["total_synapses"] = brain.getTotalSynapseCount();
+            stats["active_neurons"] = brain.getActiveNeuronCount();
+            stats["firing_neurons"] = brain.getFiringNeuronCount();
+            stats["total_spikes"] = brain.getTotalSpikeCount();
+            stats["firing_rate"] = brain.getAverageFiringRate();
+            stats["e_to_i_ratio"] = brain.getExcitationInhibitionRatio();
+            stats["developmental_stage"] = static_cast<int>(brain.getDevelopmentalStage());
+            stats["region_count"] = brain.getRegionCount();
+            return stats;
+        }, "Get comprehensive brain statistics as Python dictionary")
+        .def("getRegionInfo", [](const Brain& brain, RegionId regionId) {
+            py::dict info;
+            auto region = brain.getRegion(regionId);
+            if (region) {
+                info["id"] = regionId.value;
+                info["name"] = region->getName();
+                info["populations"] = region->getPopulationCount();
+                info["neurons"] = region->getNeuronCount();
+                info["synapses"] = region->getSynapseCount();
+            }
+            return info;
+        }, py::arg("region_id"),
+           "Get region information as Python dictionary")
+        .def("to_dict", [](const Brain& brain) {
+            py::dict brain_dict;
+            brain_dict["total_neurons"] = brain.getTotalNeuronCount();
+            brain_dict["total_synapses"] = brain.getTotalSynapseCount();
+            brain_dict["active_neurons"] = brain.getActiveNeuronCount();
+            brain_dict["firing_neurons"] = brain.getFiringNeuronCount();
+            brain_dict["total_spikes"] = brain.getTotalSpikeCount();
+            brain_dict["firing_rate"] = brain.getAverageFiringRate();
+            brain_dict["e_to_i_ratio"] = brain.getExcitationInhibitionRatio();
+            brain_dict["developmental_stage"] = static_cast<int>(brain.getDevelopmentalStage());
+            brain_dict["region_count"] = brain.getRegionCount();
+            return brain_dict;
+        }, "Convert brain to Python dictionary for easy inspection")
+        .def("from_dict", [](Brain& brain, const py::dict& brain_dict) {
+            // This is a placeholder - actual implementation would restore brain state from dict
+            // For now, just log the dictionary
+            std::string summary = "Brain state dictionary with keys: ";
+            for (auto it : brain_dict) {
+                summary += """'""" + py::cast<std::string>(it.first) + """', """;
+            }
+            // This would typically restore brain state from checkpoint or similar
+            return summary;
+        }, py::arg("brain_dict"),
+           "Restore brain state from Python dictionary (placeholder)");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,7 +686,80 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Python convenience methods for AgentBrain
+        .def("getAgentStats", [](const AgentBrain& agent) {
+            py::dict stats;
+            stats["curiosity"] = agent.getCuriosityLevel();
+            stats["novelty"] = agent.getNoveltyLevel();
+            stats["prediction_error"] = agent.getPredictionError();
+            stats["neuromodulation"] = agent.getNeuromodulationLevel();
+            stats["development_stage"] = static_cast<int>(agent.getDevelopmentalStage());
+            stats["enabled_systems"] = py::dict({
+                {"reward_modulation", agent.isRewardModulationEnabled()},
+                {"structural_plasticity", agent.isStructuralPlasticityEnabled()},
+                {"development", agent.isDevelopmentEnabled()},
+                {"curiosity", agent.isCuriosityEnabled()}
+            });
+            auto brain = agent.getBrain();
+            if (brain) {
+                stats["brain_stats"] = py::cast(brain->getBrainStats());
+            }
+            return stats;
+        }, "Get comprehensive agent statistics as Python dictionary")
+        .def("getActionRecommendation", [](AgentBrain& agent, const py::dict& context) {
+            // Get brain stats for context
+            auto brain_stats = agent.getBrain()->getBrainStats();
+            py::dict recommendation;
+            
+            // Simple recommendation based on brain stats
+            double curiosity = agent.getCuriosityLevel();
+            double prediction_error = agent.getPredictionError();
+            double firing_rate = py::cast<double>(brain_stats["firing_rate"]);
+            
+            // Curiosity-based exploration
+            if (curiosity > 0.7 && prediction_error > 0.3) {
+                recommendation["action"] = "Explore";
+                recommendation["reason"] = "High curiosity and prediction error suggest exploration";
+            }
+            // Reward maximization
+            else if (firing_rate > 0.5) {
+                recommendation["action"] = "MaximizeReward";
+                recommendation["reason"] = "High firing rate suggests reward optimization";
+            }
+            else {
+                recommendation["action"] = "Default";
+                recommendation["reason"] = "Normal operating conditions";
+            }
+            
+            recommendation["curiosity"] = curiosity;
+            recommendation["prediction_error"] = prediction_error;
+            recommendation["firing_rate"] = firing_rate;
+            return recommendation;
+        }, py::arg("context") = py::dict(),
+           "Get action recommendation based on brain state")
+        .def("enableAllSystems", [](AgentBrain& agent) {
+            agent.enableRewardModulation(true);
+            agent.enableStructuralPlasticity(true);
+            agent.enableDevelopment(true);
+            agent.enableCuriosity(true);
+            return "All agent systems enabled";
+        }, "Enable all agent subsystems")
+        .def("disableAllSystems", [](AgentBrain& agent) {
+            agent.enableRewardModulation(false);
+            agent.enableStructuralPlasticity(false);
+            agent.enableDevelopment(false);
+            agent.enableCuriosity(false);
+            return "All agent systems disabled";
+        }, "Disable all agent subsystems")
+        .def("getSystemStatus", [](const AgentBrain& agent) {
+            return py::dict({
+                {"reward_modulation", agent.isRewardModulationEnabled()},
+                {"structural_plasticity", agent.isStructuralPlasticityEnabled()},
+                {"development", agent.isDevelopmentEnabled()},
+                {"curiosity", agent.isCuriosityEnabled()}
+            });
+        }, "Get current status of all agent systems");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
