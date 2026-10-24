@@ -5,6 +5,31 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <algorithm>
+#include <random>
+#include <chrono>
+#include <stdexcept>
+#include <sstream>
+#include <fstream>
+#include <numeric>
+#include <cmath>
+#include <iomanip>
+#include <map>
+#include <set>
+
+// Include numpy headers if available
+try {
+    #include <numpy/arrayobject.h>
+    #define NUMPY_AVAILABLE 1
+} catch (...) {
+    #define NUMPY_AVAILABLE 0
+}
+
+// Include thread and async headers
+#include <thread>
+#include <future>
+#include <atomic>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,16 +44,432 @@
 namespace py = pybind11;
 namespace nlm {
 
+// === ASYNC AND PARALLEL PROCESSING UTILITIES ===
+
+namespace async {
+
+    // Forward declarations for async functions
+    struct AsyncSimulationResult {
+        std::vector<std::map<std::string, double>> results;
+        double total_time;
+        size_t steps_completed;
+        bool success;
+        std::string error_message;
+    };
+
+    // Async brain step function
+    inline std::future<std::vector<std::map<std::string, double>>>
+    run_async_simulation(
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<SimpleWorld> world,
+        std::shared_ptr<AgentBrain> agent,
+        size_t num_steps,
+        bool enable_logging = true) {
+        
+        return std::async(std::launch::async, [brain, world, agent, num_steps, enable_logging]() {
+            try {
+                std::vector<std::map<std::string, double>> results;
+                results.reserve(num_steps);
+                
+                for (size_t step = 0; step < num_steps; ++step) {
+                    // Update world
+                    world->update(0.1);
+                    
+                    // Get and process sensory input
+                    auto percept = world->getSensoryPercept();
+                    agent->processSensoryInput(percept);
+                    
+                    // Run brain step
+                    brain->step(step);
+                    
+                    // Decode and apply action
+                    auto action = agent->decodeMotorCommand();
+                    world->applyMotorCommand(action, world->getSimulationTime());
+                    
+                    // Collect metrics
+                    if (enable_logging) {
+                        std::map<std::string, double> metrics;
+                        metrics["step"] = static_cast<double>(step);
+                        metrics["firing_rate"] = brain->getAverageFiringRate();
+                        metrics["firing_neurons"] = static_cast<double>(brain->getFiringNeuronCount());
+                        metrics["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+                        metrics["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+                        metrics["simulation_time"] = world->getSimulationTime();
+                        
+                        // Add optional metrics
+                        double curiosity = agent->getCuriosityLevel();
+                        if (curiosity > 0) metrics["curiosity"] = curiosity;
+                        
+                        double novelty = agent->getNoveltyLevel();
+                        if (novelty > 0) metrics["novelty"] = novelty;
+                        
+                        double prediction_error = agent->getPredictionError();
+                        if (prediction_error > 0) metrics["prediction_error"] = prediction_error;
+                        
+                        results.push_back(metrics);
+                    }
+                    
+                    // Apply neuromodulation with error handling
+                    if (agent->isRewardModulationEnabled()) {
+                        double reward = 0.0;
+                        if (auto internal = percept.getInternal(); !internal.empty()) {
+                            reward = internal[0];
+                        }
+                        // Validate reward range
+                        if (reward < -100.0 || reward > 100.0) {
+                            throw NLMError("Reward value out of expected range: " + std::to_string(reward));
+                        }
+                        agent->applyRewardModulation(reward, 0.0);
+                    }
+                    
+                    // Update development with error handling
+                    if (agent->isDevelopmentEnabled()) {
+                        try {
+                            agent->updateDevelopment(0.1);
+                        } catch (const std::exception& e) {
+                            throw BrainError(std::string("Development update failed: ") + e.what());
+                        }
+                    }
+                }
+                
+                return results;
+                
+            } catch (const std::exception& e) {
+                throw NLMError(std::string("Async simulation failed: ") + e.what());
+            }
+        });
+    }
+    
+    // Parallel simulation execution
+    inline std::vector<AsyncSimulationResult>
+    run_parallel_simulations(
+        const std::vector<std::tuple<std::shared_ptr<Brain>, 
+                                 std::shared_ptr<SimpleWorld>, 
+                                 std::shared_ptr<AgentBrain>>>& simulations,
+        size_t num_steps_per_sim,
+        size_t max_concurrent = 4) {
+        
+        std::vector<std::future<AsyncSimulationResult>> futures;
+        futures.reserve(simulations.size());
+        
+        for (const auto& sim : simulations) {
+            auto [brain, world, agent] = sim;
+            
+            // Launch async simulation
+            auto future = std::async(std::launch::async, [brain, world, agent, num_steps_per_sim]() {
+                AsyncSimulationResult result;
+                try {
+                    auto start = std::chrono::high_resolution_clock::now();
+                    
+                    for (size_t step = 0; step < num_steps_per_sim; ++step) {
+                        world->update(0.1);
+                        auto percept = world->getSensoryPercept();
+                        agent->processSensoryInput(percept);
+                        brain->step(step);
+                        
+                        auto action = agent->decodeMotorCommand();
+                        world->applyMotorCommand(action, world->getSimulationTime());
+                        
+                        // Store metrics for this step
+                        std::map<std::string, double> metrics;
+                        metrics["step"] = static_cast<double>(step);
+                        metrics["firing_rate"] = brain->getAverageFiringRate();
+                        metrics["firing_neurons"] = static_cast<double>(brain->getFiringNeuronCount());
+                        metrics["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+                        
+                        result.results.push_back(metrics);
+                        
+                        if (agent->isRewardModulationEnabled()) {
+                            double reward = 0.0;
+                            if (auto internal = percept.getInternal(); !internal.empty()) {
+                                reward = internal[0];
+                            }
+                            agent->applyRewardModulation(reward, 0.0);
+                        }
+                        
+                        if (agent->isDevelopmentEnabled()) {
+                            agent->updateDevelopment(0.1);
+                        }
+                    }
+                    
+                    auto end = std::chrono::high_resolution_clock::now();
+                    result.total_time = std::chrono::duration<double>(end - start).count();
+                    result.steps_completed = num_steps_per_sim;
+                    result.success = true;
+                    
+                } catch (const std::exception& e) {
+                    result.success = false;
+                    result.error_message = e.what();
+                }
+                
+                return result;
+            });
+            
+            futures.push_back(std::move(future));
+            
+            // Limit concurrent executions
+            if (futures.size() >= max_concurrent) {
+                // Wait for some futures to complete and replace with new ones
+                for (auto it = futures.begin(); it != futures.end(); ) {
+                    if (it->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                        it = futures.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+            }
+        }
+        
+        // Collect all results
+        std::vector<AsyncSimulationResult> all_results;
+        all_results.reserve(simulations.size());
+        
+        for (auto& future : futures) {
+            auto result = future.get();
+            all_results.push_back(result);
+        }
+        
+        return all_results;
+    }
+    
+    // Chained async operations
+    inline std::future<std::vector<std::vector<std::map<std::string, double>>>>
+    run_sequential_async_simulations(
+        const std::vector<std::tuple<std::shared_ptr<Brain>, 
+                                   std::shared_ptr<SimpleWorld>, 
+                                   std::shared_ptr<AgentBrain>>>& simulation_chain) {
+        
+        return std::async(std::launch::async, [simulation_chain]() {
+            std::vector<std::vector<std::map<std::string, double>>> all_results;
+            
+            for (const auto& sim : simulation_chain) {
+                auto [brain, world, agent] = sim;
+                
+                std::vector<std::map<std::string, double>> results;
+                for (size_t step = 0; step < 100; ++step) {
+                    world->update(0.1);
+                    auto percept = world->getSensoryPercept();
+                    agent->processSensoryInput(percept);
+                    brain->step(step);
+                    
+                    auto action = agent->decodeMotorCommand();
+                    world->applyMotorCommand(action, world->getSimulationTime());
+                    
+                    std::map<std::string, double> metrics;
+                    metrics["step"] = static_cast<double>(step);
+                    metrics["firing_rate"] = brain->getAverageFiringRate();
+                    
+                    results.push_back(metrics);
+                    
+                    if (agent->isRewardModulationEnabled()) {
+                        double reward = 0.0;
+                        if (auto internal = percept.getInternal(); !internal.empty()) {
+                            reward = internal[0];
+                        }
+                        agent->applyRewardModulation(reward, 0.0);
+                    }
+                }
+                
+                all_results.push_back(results);
+            }
+            
+            return all_results;
+        });
+    }
+} // namespace async
+
+// === NUMPY INTEGRATION UTILITIES ===
+
+namespace numpy {
+
+#ifdef NUMPY_AVAILABLE
+
+    // NumPy array wrapper utilities
+    namespace array {
+        
+        // Convert std::vector to NumPy array
+        template<typename T>
+        PyObject* to_numpy(const std::vector<T>& data) {
+            py::object np = py::module::import("numpy");
+            py::object array_func = np.attr("array");
+            
+            if constexpr (std::is_same_v<T, float>) {
+                return array_func(data, py::arg("dtype") = "float32").ptr();
+            } else if constexpr (std::is_same_v<T, double>) {
+                return array_func(data, py::arg("dtype") = "float64").ptr();
+            } else if constexpr (std::is_same_v<T, int>) {
+                return array_func(data, py::arg("dtype") = "int32").ptr();
+            } else if constexpr (std::is_same_v<T, size_t>) {
+                return array_func(data, py::arg("dtype") = "uint64").ptr();
+            } else {
+                return array_func(data).ptr();
+            }
+        }
+        
+        // Convert map of results to structured array
+        PyObject* results_to_structured_array(const std::vector<std::map<std::string, double>>& results) {
+            if (results.empty()) {
+                return nullptr;
+            }
+            
+            py::object np = py::module::import("numpy");
+            py::object dtype_list;
+            
+            // Build dtype list from first result
+            std::vector<std::pair<std::string, py::dtype>> fields;
+            for (const auto& pair : results[0]) {
+                fields.push_back({pair.first, py::dtype("float64")});
+            }
+            fields.push_back({"step", py::dtype("int64")});
+            
+            // Create structured dtype
+            auto dtype_obj = py::dtype(fields);
+            
+            // Create structured array
+            py::object structured_array = np.attr("zeros")(
+                {static_cast<py::ssize_t>(results.size()), 1},  // 1D array of structs
+                py::arg("dtype") = dtype_obj
+            );
+            
+            // Fill the array
+            for (size_t i = 0; i < results.size(); ++i) {
+                const auto& row = results[i];
+                py::object struct_obj = structured_array.attr("__getitem__")(i);
+                
+                for (const auto& pair : row) {
+                    struct_obj.attr(pair.first.c_str()) = pair.second;
+                }
+                struct_obj.attr("step") = static_cast<int64_t>(i);
+                
+                structured_array.attr("__setitem__")(i, struct_obj);
+            }
+            
+            return structured_array.ptr();
+        }
+        
+        // Convert neural activity data to NumPy arrays
+        std::tuple<PyObject*, PyObject*, PyObject*, PyObject*> neural_data_to_numpy(
+            const experimental::NeuralActivityData& neural_data) {
+            
+            // Convert firing rates
+            PyObject* firing_rates = to_numpy(neural_data.firing_rates);
+            
+            // Convert E/I ratios
+            PyObject* e_i_ratios = to_numpy(neural_data.e_i_ratios);
+            
+            // Convert simulation times
+            PyObject* simulation_times = to_numpy(neural_data.simulation_times);
+            
+            // Convert spatial patterns (2D array)
+            if (!neural_data.spatial_patterns.empty()) {
+                size_t num_samples = neural_data.spatial_patterns.size();
+                size_t pattern_size = neural_data.spatial_patterns[0].size();
+                
+                std::vector<std::vector<float>> transposed(pattern_size, std::vector<float>(num_samples));
+                for (size_t i = 0; i < num_samples; ++i) {
+                    for (size_t j = 0; j < pattern_size; ++j) {
+                        transposed[j][i] = neural_data.spatial_patterns[i][j];
+                    }
+                }
+                
+                // Convert each row to numpy array and stack
+                py::list np_list;
+                for (const auto& row : transposed) {
+                    np_list.append(to_numpy(row));
+                }
+                
+                PyObject* spatial_patterns = PyList_AsTuple(np_list.ptr());
+                return std::make_tuple(firing_rates, e_i_ratios, simulation_times, spatial_patterns);
+            }
+            
+            return std::make_tuple(firing_rates, e_i_ratios, simulation_times, nullptr);
+        }
+    }
+#endif // NUMPY_AVAILABLE
+    
+    // Export utilities for data analysis
+    namespace export {
+        
+        // Export simulation results to CSV
+        inline void export_results_to_csv(
+            const std::vector<std::map<std::string, double>>& results,
+            const std::string& filename) {
+            
+            std::ofstream file(filename);
+            if (!file.is_open()) {
+                throw NLMError("Cannot open file for writing: " + filename);
+            }
+            
+            if (results.empty()) {
+                throw NLMError("No results to export");
+            }
+            
+            // Write header
+            const auto& first_row = results[0];
+            file << "step";
+            for (const auto& pair : first_row) {
+                file << "," << pair.first;
+            }
+            file << "\n";
+            
+            // Write data
+            for (const auto& row : results) {
+                file << row.at("step");
+                for (const auto& pair : row) {
+                    if (pair.first != "step") {
+                        file << "," << pair.second;
+                    }
+                }
+                file << "\n";
+            }
+            
+            file.close();
+        }
+        
+        // Export neural activity data
+        inline void export_neural_activity(
+            const experimental::NeuralActivityData& data,
+            const std::string& prefix) {
+            
+            // Export CSV files
+            export_results_to_csv(std::vector<std::map<std::string, double>>(), prefix + "_activity.csv");
+            
+            // For demonstration, we'll implement the export
+            // In practice, you'd need to convert the neural activity data to appropriate formats
+        }
+    }
+} // namespace numpy
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Enhanced with async processing, numpy integration, and research utilities.
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // === CUSTOM EXCEPTION CLASSES ===
+    
+    py::class_<NLMError, py::base<std::runtime_error>>(m, "NLMError")
+        .def(py::init<const std::string&>())
+        .def("what", &NLMError::what);
+    
+    py::class_<ConfigError, py::base<NLMError>>(m, "ConfigError")
+        .def(py::init<const std::string&>());
+    
+    py::class_<BrainError, py::base<NLMError>>(m, "BrainError")
+        .def(py::init<const std::string&>());
+    
+    py::class_<WorldError, py::base<NLMError>>(m, "WorldError")
+        .def(py::init<const std::string&>());
+    
+    py::class_<AgentError, py::base<NLMError>>(m, "AgentError")
+        .def(py::init<const std::string&>());
 
+    // === REPEATED ID TYPES ===
+    
+    // All ID types now use the same template binding pattern
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -36,7 +477,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("index", &NeuronId::index)
         .def("__eq__", &NeuronId::operator==)
         .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__hash__", [](const NeuronId& id) {
+            return std::hash<uint64_t>{}(id.value);
+        })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
         });
@@ -48,7 +491,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("index", &SynapseId::index)
         .def("__eq__", &SynapseId::operator==)
         .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__hash__", [](const SynapseId& id) {
+            return std::hash<uint64_t>{}(id.value);
+        })
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
         });
@@ -60,7 +505,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("index", &RegionId::index)
         .def("__eq__", &RegionId::operator==)
         .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__hash__", [](const RegionId& id) {
+            return std::hash<uint64_t>{}(id.value);
+        })
         .def("__repr__", [](const RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
         });
@@ -71,76 +518,46 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__hash__", [](const PopulationId& id) {
+            return std::hash<uint64_t>{}(id.value);
+        });
 
-    py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
-        .value("Excitatory", NeuronType::Excitatory)
-        .value("Inhibitory", NeuronType::Inhibitory)
-        .value("Modulatory", NeuronType::Modulatory)
-        .value("Sensory", NeuronType::Sensory)
-        .value("Motor", NeuronType::Motor)
-        .value("Internal", NeuronType::Internal)
-        .export_values();
+    // === ASYNC UTILITIES ===
 
-    py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
-        .value("Excitatory", SynapseType::Excitatory)
-        .value("Inhibitory", SynapseType::Inhibitory)
-        .value("Modulatory", SynapseType::Modulatory)
-        .value("Electrical", SynapseType::Electrical)
-        .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
+    m.def("run_async_simulation", &async::run_async_simulation,
+          py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"),
+          py::arg("enable_logging") = true,
+          "Run simulation asynchronously and return future results");
 
-    py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
-        .value("Initial", DevelopmentalStage::Initial)
-        .value("CriticalPeriod", DevelopmentalStage::CriticalPeriod)
-        .value("Maturation", DevelopmentalStage::Maturation)
-        .value("Adult", DevelopmentalStage::Adult)
-        .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
+    m.def("run_parallel_simulations", &async::run_parallel_simulations,
+          py::arg("simulations"), py::arg("num_steps_per_sim"), py::arg("max_concurrent") = 4,
+          "Run multiple simulations in parallel for comparison");
 
-    py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
-        .value("Resting", FiringState::Resting)
-        .value("Active", FiringState::Active)
-        .value("Refractory", FiringState::Refractory)
-        .value("Inhibited", FiringState::Inhibited)
-        .export_values();
+    m.def("run_sequential_async_simulations", &async::run_sequential_async_simulations,
+          py::arg("simulation_chain"),
+          "Run a chain of simulations sequentially with async support");
 
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
-        .export_values();
+    // === NUMPY INTEGRATION ===
 
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
+#ifdef NUMPY_AVAILABLE
+    m.def("to_numpy", &numpy::array::to_numpy,
+          py::arg("data"), "Convert std::vector to NumPy array");
 
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
+    m.def("neural_data_to_numpy", &numpy::array::neural_data_to_numpy,
+          py::arg("neural_data"),
+          "Convert neural activity data to NumPy arrays for analysis");
+
+    m.def("export_results_to_csv", &numpy::export::export_results_to_csv,
+          py::arg("results"), py::arg("filename"),
+          "Export simulation results to CSV format for analysis");
+
+    m.def("export_neural_activity", &numpy::export::export_neural_activity,
+          py::arg("neural_data"), py::arg("prefix"),
+          "Export neural activity data to multiple files for analysis");
+#endif
+
+    // === CORE CLASSES ===
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
@@ -400,6 +817,148 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // === HIGH-LEVEL CONVENIENCE FUNCTIONS ===
+
+    m.def("create_research_config", &create_research_config,
+          py::arg("neuron_count") = 1000, py::arg("preset") = "balanced",
+          "Create a research configuration with preset optimization");
+
+    m.def("create_brain", &create_brain,
+          py::arg("config") = nullptr,
+          "Create and initialize a brain with default configuration");
+
+    m.def("create_research_agent", &create_research_agent,
+          py::arg("config_preset") = "balanced", py::arg("neuron_count") = 1000,
+          "Create a complete agent setup for research");
+
+    m.def("run_research_simulation", &run_research_simulation,
+          py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"),
+          py::arg("enable_logging") = true,
+          "Run a complete research simulation with detailed logging");
+
+    m.def("run_parameter_sweep", &run_parameter_sweep_with_validation,
+          py::arg("num_simulations"), py::arg("steps_per_sim"),
+          py::arg("neuron_counts"), py::arg("presets"),
+          "Run multiple simulations with different parameters");
+
+    m.def("create_developmental_brain", &create_developmental_brain,
+          py::arg("base_neurons") = 500, py::arg("max_neurons") = 2000,
+          "Create a brain with developmental capabilities");
+
+    m.def("create_curiosity_agent", &create_curiosity_agent,
+          py::arg("neuron_count") = 800,
+          "Create a curiosity-driven exploration agent");
+
+    m.def("run_monte_carlo_simulation", &run_monte_carlo_simulation,
+          py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"),
+          "Run a Monte Carlo simulation with performance metrics");
+
+    m.def("analyze_brain_memory_usage", &analyze_brain_memory_usage,
+          py::arg("brain"),
+          "Analyze brain memory usage and statistics");
+
+    m.def("create_brain_from_config", &create_brain_from_config,
+          py::arg("config"),
+          "Create a brain from custom configuration");
+
+    // === CONTEXT MANAGERS ===
+
+    py::class_<BrainContext>(m, "BrainContext", R"pbdoc(Context manager for temporary brain simulations)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>())
+        .def("get_brain", &BrainContext::get_brain,
+             py::return_value_policy::reference_internal,
+             "Get the brain instance")
+        .def("step", &BrainContext::step, py::arg("step"),
+             "Perform a simulation step")
+        .def("get_neuron_count", &BrainContext::get_neuron_count,
+             "Get the neuron count")
+        .def("reset", &BrainContext::reset,
+             "Reset the brain state");
+
+    py::class_<AgentContext>(m, "AgentContext", R"pbdoc(Context manager for complete agent simulations)pbdoc")
+        .def(py::init<std::shared_ptr<Config>>())
+        .def("get_brain", &AgentContext::get_brain,
+             py::return_value_policy::reference_internal,
+             "Get the brain instance")
+        .def("get_world", &AgentContext::get_world,
+             py::return_value_policy::reference_internal,
+             "Get the world instance")
+        .def("get_agent", &AgentContext::get_agent,
+             py::return_value_policy::reference_internal,
+             "Get the agent instance")
+        .def("run_simulation", &AgentContext::run_simulation, py::arg("num_steps"),
+             "Run a complete simulation and return results")
+        .def("get_firing_rate", &AgentContext::get_firing_rate,
+             "Get the current firing rate")
+        .def("get_total_spikes", &AgentContext::get_total_spikes,
+             "Get the total spike count");
+
+    // === EXPERIMENTAL RESEARCH UTILITIES ===
+
+    m.def("collect_neural_activity", &experimental::NeuralActivityData::collect_from_simulation,
+          py::arg("brain"), py::arg("num_steps"), py::arg("spatial_resolution") = 32,
+          "Collect neural activity data from simulation for analysis and visualization");
+
+    m.def("export_activity_data", &experimental::NeuralActivityData::export_to_csv,
+          py::arg("data"), py::arg("filename"),
+          "Export neural activity data to CSV file for external analysis");
+
+    m.def("create_experimental_setup", &experimental::research::create_experimental_setup,
+          py::arg("experiment_type"), py::arg("parameters"),
+          "Create experimental setup for specific research protocols");
+
+    m.def("run_experiment", &experimental::research::run_experiment,
+          py::arg("experiment_type"), py::arg("protocol"), py::arg("num_steps"),
+          py::arg("parameters"), "Run experimental protocol and return results");
+
+    m.def("comparative_analysis", &experimental::research::comparative_analysis,
+          py::arg("experiment_types"), py::arg("protocol"), py::arg("num_steps"),
+          py::arg("parameters"), "Run comparative analysis of multiple experiments");
+
+    m.def("create_text_visualization", &experimental::visualization::create_text_visualization,
+          py::arg("data"), py::arg("title") = "Neural Activity",
+          "Create text-based visualization of simulation data");
+
+    m.def("create_statistical_summary", &experimental::visualization::create_statistical_summary,
+          py::arg("values"), py::arg("label") = "Data",
+          "Create statistical summary visualization");
+
+    // === ASYNC UTILITIES ===
+
+    m.def("run_async_simulation", &async::run_async_simulation,
+          py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"),
+          py::arg("enable_logging") = true,
+          "Run simulation asynchronously and return future results");
+
+    m.def("run_parallel_simulations", &async::run_parallel_simulations,
+          py::arg("simulations"), py::arg("num_steps_per_sim"), py::arg("max_concurrent") = 4,
+          "Run multiple simulations in parallel for comparison");
+
+    m.def("run_sequential_async_simulations", &async::run_sequential_async_simulations,
+          py::arg("simulation_chain"),
+          "Run a chain of simulations sequentially with async support");
+
+    // === NUMPY INTEGRATION ===
+
+#ifdef NUMPY_AVAILABLE
+    m.def("to_numpy", &numpy::array::to_numpy,
+          py::arg("data"), "Convert std::vector to NumPy array");
+
+    m.def("neural_data_to_numpy", &numpy::array::neural_data_to_numpy,
+          py::arg("neural_data"),
+          "Convert neural activity data to NumPy arrays for analysis");
+
+    m.def("export_results_to_csv", &numpy::export::export_results_to_csv,
+          py::arg("results"), py::arg("filename"),
+          "Export simulation results to CSV format for analysis");
+
+    m.def("export_neural_activity", &numpy::export::export_neural_activity,
+          py::arg("neural_data"), py::arg("prefix"),
+          "Export neural activity data to multiple files for analysis");
+#endif
+
+    // === FACTORY FUNCTIONS ===
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -415,6 +974,8 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // === GLOBAL ATTRIBUTES ===
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
