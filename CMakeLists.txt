@@ -121,11 +121,20 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable (Phase 2 demo)
 add_executable(nlm
     src/main.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
+
+# Enhanced CLI executable
+add_executable(nlm_cli
+    src/main_cli.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+
+# Create alias for backwards compatibility
+set_target_properties(nlm_cli PROPERTIES OUTPUT_NAME "nlm")
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
