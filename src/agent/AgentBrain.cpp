@@ -1,5 +1,9 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../brain/Brain.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../core/Types/Types.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -334,17 +338,142 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::storeExperience(const SensoryPercept& percept, const MotorCommand& action,
+                              float reward, SimulationStep step, Timestamp time) {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    // Use the brain's episodic memory to store the experience
+    brain_->getEpisodicMemory()->storeEpisode(convertPerceptToEpisodicItem(percept, action, reward, step));
+    
+    NLM_LOG_DEBUG("Stored experience in episodic memory (step " + std::to_string(step) + 
+                  ", reward " + std::to_string(reward) + ", action " + std::to_string(static_cast<int>(action)) + ")");
+}
+
+nlm::EpisodicMemoryItem AgentBrain::convertPerceptToEpisodicItem(const SensoryPercept& percept, 
+                                                              const MotorCommand& action,
+                                                              float reward, SimulationStep step) {
+    nlm::EpisodicMemoryItem episode;
+    episode.timestamp = step;
+    
+    // Store sensory state as flattened array
+    episode.sensoryState.clear();
+    const auto& vision = percept.getVision();
+    episode.sensoryState.insert(episode.sensoryState.end(), vision.begin(), vision.end());
+    
+    const auto& touch = percept.getTouch();
+    episode.sensoryState.insert(episode.sensoryState.end(), touch.begin(), touch.end());
+    
+    const auto& intern = percept.getInternal();
+    episode.sensoryState.insert(episode.sensoryState.end(), intern.begin(), intern.end());
+    
+    // Add proprioception data if available
+    const auto& proprio = percept.getProprioception();
+    episode.sensoryState.insert(episode.sensoryState.end(), proprio.begin(), proprio.end());
+    
+    // Store position info (would need to be passed from world)
+    // For now, default to (0,0) 
+    episode.positionX = 0;
+    episode.positionY = 0;
+    episode.orientation = 0;
+    
+    // Store action
+    episode.action = action;
+    
+    // Store internal state
+    episode.reward = reward;
+    episode.energy = 1.0f;  // Simplified energy estimate
+    episode.novelty = noveltyLevel_;
+    
+    // Capture resulting state (would need to be computed after action execution)
+    // For now, same as initial state
+    episode.resultingSensoryState = episode.sensoryState;
+    episode.resultingReward = reward;
+    
+    // Store neural activity pattern
+    if (brain_->getWorkingMemory()) {
+        auto workingMem = brain_->getWorkingMemory();
+        auto memoryNeurons = workingMem->getMemoryNeurons();
+        episode.activeNeurons = memoryNeurons;
+        
+        // Capture activations
+        for (NeuronId id : memoryNeurons) {
+            float activation = 0.0f;
+            // Find neuron and get its activation level
+            for (const auto& region : brain_->getRegions()) {
+                for (auto& pop : region->getPopulations()) {
+                    for (Neuron* n : pop->getNeurons()) {
+                        if (n->getId() == id) {
+                            activation = std::abs(n->getState().membranePotential - n->getState().restingPotential) / 20.0f;
+                            episode.neuronActivations.push_back(activation);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    episode.age = 0;
+    
+    return episode;
+}
+
+void AgentBrain::replayExperiences(size_t count) {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Get episodes for replay
+    auto episodesToReplay = brain_->getEpisodicMemory()->getEpisodesForReplay(count);
+    
+    // Replay each episode for memory consolidation
+    for (const auto* episode : episodesToReplay) {
+        // Replay the episode by reactivating the neural patterns
+        brain_->getEpisodicMemory()->replayEpisode(episode);
+        
+        // Update developmental state based on replay
+        updateDevelopment(0.1);  // Small timestep for replay
+    }
+    
+    NLM_LOG_DEBUG("Replayed " + std::to_string(episodesToReplay.size()) + " experiences for consolidation");
+}
+
+void AgentBrain::updateWorkingMemory(const SensoryPercept& percept) {
+    if (!brain_ || !brain_->getWorkingMemory()) return;
+    
+    // Convert sensory percept to working memory representation
+    std::vector<float> sensoryPattern;
+    
+    // Add vision pattern (flatten vision data)
+    const auto& vision = percept.getVision();
+    sensoryPattern.insert(sensoryPattern.end(), vision.begin(), vision.end());
+    
+    // Add touch pattern
+    const auto& touch = percept.getTouch();
+    sensoryPattern.insert(sensoryPattern.end(), touch.begin(), touch.end());
+    
+    // Add internal signals
+    const auto& intern = percept.getInternal();
+    sensoryPattern.insert(sensoryPattern.end(), intern.begin(), intern.end());
+    
+    // Update working memory with new sensory input
+    brain_->getWorkingMemory()->update(sensoryPattern);
+}
+
+std::vector<const EpisodicMemoryItem*> AgentBrain::getRecentExperiences(size_t count) const {
+    std::vector<const EpisodicMemoryItem*> experiences;
+    
+    if (brain_ && brain_->getEpisodicMemory()) {
+        // Get recent episodes from episodic memory
+        // Note: This would need to be implemented in EpisodicMemory
+        auto recentEpisodes = brain_->getEpisodicMemory()->getEpisodesForReplay(count);
+        experiences = recentEpisodes;
+    }
+    
+    return experiences;
+}
+
+bool AgentBrain::shouldStoreExperience(float novelty, float predictionError) const {
+    // Store experience if there's significant novelty or prediction error
+    return (novelty > 0.3f) || (std::abs(predictionError) > 0.5f);
 }
 
 } // namespace nlm

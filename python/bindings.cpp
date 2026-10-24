@@ -422,4 +422,228 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
 
+// Higher-level convenience functions for Python users
+namespace nlm {
+
+// Create a brain with common default settings
+std::shared_ptr<Brain> createBrainWithDefaults() {
+    auto config = std::make_shared<Config>();
+    config->set("neuron_count", 500, ConfigSource::Default);
+    config->set("region_count", 2, ConfigSource::Default);
+    config->set("connection_probability", 0.1, ConfigSource::Default);
+    config->set("plasticity_learning_rate", 0.01, ConfigSource::Default);
+    config->set("random_seed", 42, ConfigSource::Default);
+    
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    return brain;
+}
+
+// Create a simple brain with custom parameters
+std::shared_ptr<Brain> createBrainCustom(int neuronCount, double connectionProb) {
+    auto config = std::make_shared<Config>();
+    config->set("neuron_count", neuronCount, ConfigSource::Default);
+    config->set("region_count", 1, ConfigSource::Default);
+    config->set("connection_probability", connectionProb, ConfigSource::Default);
+    config->set("plasticity_learning_rate", 0.01, ConfigSource::Default);
+    
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    return brain;
+}
+
+// Create a brain suitable for agent control
+std::shared_ptr<Brain> createAgentBrain() {
+    auto config = std::make_shared<Config>();
+    config->set("neuron_count", 1000, ConfigSource::Default);
+    config->set("region_count", 4, ConfigSource::Default);
+    config->set("connection_probability", 0.05, ConfigSource::Default);
+    config->set("plasticity_learning_rate", 0.02, ConfigSource::Default);
+    config->set("random_seed", 123, ConfigSource::Default);
+    
+    auto brain = std::make_shared<Brain>(config);
+    brain->initialize();
+    return brain;
+}
+
+// Get comprehensive brain statistics
+py::dict getBrainStats(std::shared_ptr<Brain> brain) {
+    py::dict stats;
+    
+    if (brain) {
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["region_count"] = brain->getRegionCount();
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // Get config summary
+        auto config = brain->getConfig();
+        if (config) {
+            stats["config_keys"] = config->getKeys();
+            stats["config_summary"] = config->summary();
+        }
+    }
+    
+    return stats;
+}
+
+// Run a simple learning experiment
+struct LearningResult {
+    double initial_firing_rate;
+    double final_firing_rate;
+    double learning_progress;
+    std::vector<float> final_weights;
+    bool learning_detected;
+};
+
+LearningResult runLearningExperiment(std::shared_ptr<Brain> brain, int steps = 100) {
+    LearningResult result;
+    
+    if (!brain) {
+        result.learning_detected = false;
+        return result;
+    }
+    
+    // Record initial state
+    result.initial_firing_rate = brain->getAverageFiringRate();
+    
+    // Enable plasticity for learning
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (auto& syn : region->getSynapses()) {
+            syn->enablePlasticity(true, true, false);
+        }
+    }
+    
+    // Run learning steps
+    for (SimulationStep step = 0; step < steps; ++step) {
+        // Inject some input pattern
+        brain->injectCurrentToNeurons(NeuronType::Sensory, 20.0f);
+        brain->step(step, step * 0.001);
+    }
+    
+    // Record final state
+    result.final_firing_rate = brain->getAverageFiringRate();
+    result.learning_progress = result.final_firing_rate - result.initial_firing_rate;
+    result.learning_detected = (std::abs(result.learning_progress) > 0.001);
+    
+    // Record final weights
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (const auto& syn : region->getSynapses()) {
+            result.final_weights.push_back(syn->getWeight());
+        }
+    }
+    
+    return result;
+}
+
+// Create world with common settings
+std::shared_ptr<SimpleWorld> createWorld(int width = 20, int height = 20, 
+                                         int visionWidth = 7, int visionHeight = 7) {
+    auto world = std::make_shared<SimpleWorld>();
+    world->configure(width, height, visionWidth, visionHeight);
+    return world;
+}
+
+// Create agent brain with world
+std::shared_ptr<AgentBrain> createAgentBrainWithWorld(std::shared_ptr<Brain> brain, 
+                                                     std::shared_ptr<SimpleWorld> world) {
+    auto agentBrain = std::make_shared<AgentBrain>(brain);
+    agentBrain->initialize(world);
+    return agentBrain;
+}
+
 } // namespace nlm
+
+void addConvenienceFunctions(py::module_ &m) {
+    // Create brain convenience functions
+    m.def("createBrainWithDefaults", &nlm::createBrainWithDefaults,
+          "Create a brain with common default settings");
+    
+    m.def("createBrainCustom", &nlm::createBrainCustom,
+          py::arg("neuron_count"), py::arg("connection_prob") = 0.1,
+          "Create a brain with custom parameters");
+    
+    m.def("createAgentBrain", &nlm::createAgentBrain,
+          "Create a brain suitable for agent control");
+    
+    // Statistics and monitoring
+    m.def("getBrainStats", &nlm::getBrainStats,
+          py::arg("brain"),
+          "Get comprehensive brain statistics");
+    
+    // Brain status as dictionary
+    m.def("getBrainStatus", [](std::shared_ptr<Brain> brain) {
+        py::dict status;
+        
+        if (!brain) return status;
+        
+        // Basic brain properties
+        status["total_neurons"] = brain->getTotalNeuronCount();
+        status["total_synapses"] = brain->getTotalSynapseCount();
+        status["active_neurons"] = brain->getActiveNeuronCount();
+        status["firing_neurons"] = brain->getFiringNeuronCount();
+        status["total_spikes"] = brain->getTotalSpikeCount();
+        status["average_firing_rate"] = brain->getAverageFiringRate();
+        status["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        status["region_count"] = brain->getRegionCount();
+        status["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // Memory system status
+        if (brain->getWorkingMemory()) {
+            auto workingMem = brain->getWorkingMemory();
+            status["working_memory_capacity"] = workingMem->getCapacity();
+            status["working_memory_usage"] = workingMem->getUsage();
+            status["working_memory_active"] = workingMem->isActive();
+        } else {
+            status["working_memory"] = py::none();
+        }
+        
+        if (brain->getEpisodicMemory()) {
+            auto episodicMem = brain->getEpisodicMemory();
+            status["episodic_memory_count"] = episodicMem->getEpisodeCount();
+            status["episodic_memory_recent"] = episodicMem->getRecentEpisodes(5).size();
+            status["episodic_memory_enabled"] = episodicMem->isReplayEnabled();
+        } else {
+            status["episodic_memory"] = py::none();
+        }
+        
+        // Brain simulation state
+        status["simulation_step"] = brain->getTotalSpikeCount();  // Simplified - could add step counter
+        status["simulation_time"] = 0.0;  // Would need access to brain state
+        
+        return status;
+    }, py::arg("brain"), "Get comprehensive brain status as a dictionary");
+    
+    // Learning experiment results
+    py::class_<nlm::LearningResult>(m, "LearningResult")
+        .def(py::init<>())
+        .def_readwrite("initial_firing_rate", &nlm::LearningResult::initial_firing_rate)
+        .def_readwrite("final_firing_rate", &nlm::LearningResult::final_firing_rate)
+        .def_readwrite("learning_progress", &nlm::LearningResult::learning_progress)
+        .def_readwrite("final_weights", &nlm::LearningResult::final_weights)
+        .def_readwrite("learning_detected", &nlm::LearningResult::learning_detected);
+    
+    m.def("runLearningExperiment", &nlm::runLearningExperiment,
+          py::arg("brain"), py::arg("steps") = 100,
+          "Run a simple learning experiment and return results");
+    
+    // Learning experiments
+    m.def("runLearningExperiment", &nlm::runLearningExperiment,
+          py::arg("brain"), py::arg("steps") = 100,
+          "Run a simple learning experiment and return results");
+    
+    // World creation
+    m.def("createWorld", &nlm::createWorld,
+          py::arg("width") = 20, py::arg("height") = 20,
+          py::arg("vision_width") = 7, py::arg("vision_height") = 7,
+          "Create a simple world with specified dimensions");
+    
+    m.def("createAgentBrainWithWorld", &nlm::createAgentBrainWithWorld,
+          py::arg("brain"), py::arg("world"),
+          "Create an agent brain with an associated world");
+}

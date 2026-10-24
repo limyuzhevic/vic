@@ -61,8 +61,12 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON if extension .json, otherwise key=value)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Internal helpers (JSON only)
+    bool loadFromJsonFile(const std::string& filepath);
+    bool saveToJsonFile(const std::string& filepath) const;
     
     // Get values
     template<typename T>

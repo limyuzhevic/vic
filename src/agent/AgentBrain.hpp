@@ -49,14 +49,21 @@ public:
     // Get novelty level
     float getNoveltyLevel() const;
     
-    // Get prediction error
-    float getPredictionError() const;
+    // Store experience in episodic memory
+    void storeExperience(const SensoryPercept& percept, const MotorCommand& action, 
+                        float reward, SimulationStep step, Timestamp time);
     
-    // Reset agent for new episode
-    void reset();
+    // Replay stored experiences for memory consolidation
+    void replayExperiences(size_t count = 5);
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Update working memory with current sensory input
+    void updateWorkingMemory(const SensoryPercept& percept);
+    
+    // Get most recent experiences for analysis
+    std::vector<const EpisodicMemoryItem*> getRecentExperiences(size_t count) const;
+    
+    // Check if working memory is ready to store a new experience
+    bool shouldStoreExperience(float novelty, float predictionError) const;
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
