@@ -170,19 +170,13 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    class BrainIntegrationCoordinator;
+
+    // ========== INTEGRATION COORDINATOR ==========
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Central integration coordinator for all brain systems
+    BrainIntegrationCoordinator* getIntegrationCoordinator();
+    const BrainIntegrationCoordinator* getIntegrationCoordinator() const;
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

@@ -77,6 +77,7 @@ struct Brain::Impl {
     
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
+    std::unique_ptr<BrainIntegrationCoordinator> integrationCoordinator;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -149,8 +150,9 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Initialize integration coordinator
+        integrationCoordinator = std::make_unique<BrainIntegrationCoordinator>(this);
+        integrationCoordinator->initialize();
     }
     
     DevelopmentalStage developmentalStage;
@@ -582,9 +584,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
+    }
+    
     // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
+    }
+    
+    // ========== STEP 16: Integration coordination ==========
+    // Use integration coordinator to process complete brain step
+    if (pImpl->integrationCoordinator) {
+        pImpl->integrationCoordinator->processStep(currentStep, currentTime);
+        NLM_LOG_INFO("Brain integration coordinator processed step " + std::to_string(currentStep));
+    } else {
+        NLM_LOG_WARNING("Integration coordinator not available - using legacy brain loop");
     }
 }
 
@@ -1113,5 +1126,15 @@ void Brain::logStatus() const {
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
 }
+
+BrainIntegrationCoordinator* Brain::getIntegrationCoordinator() {
+    return pImpl->integrationCoordinator.get();
+}
+
+const BrainIntegrationCoordinator* Brain::getIntegrationCoordinator() const {
+    return pImpl->integrationCoordinator.get();
+}
+
+} // namespace nlm
 
 } // namespace nlm

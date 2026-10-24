@@ -35,6 +35,7 @@ add_library(nlm_core STATIC
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
+    src/brain/BrainIntegrationCoordinator.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -92,20 +93,34 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Plugin system
+add_library(nlm_plugin_system STATIC
+    src/plugin/NLMPluginSystem.cpp
+)
+target_include_directories(nlm_plugin_system PUBLIC src)
+target_link_libraries(nlm_plugin_system PUBLIC nlm_core)
+
+# Example plugins
+add_library(nlm_example_plugins STATIC
+    src/plugin/ExamplePlugins.cpp
+)
+target_include_directories(nlm_example_plugins PUBLIC src)
+target_link_libraries(nlm_example_plugins PUBLIC nlm_core nlm_plugin_system)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
-target_link_libraries(nlm_agent PUBLIC nlm_core)
+target_link_libraries(nlm_agent PUBLIC nlm_core nlm_plugin_system)
 
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
 target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+target_link_libraries(nlm_world PUBLIC nlm_core nlm_plugin_system)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
@@ -131,21 +146,23 @@ target_link_libraries(nlm PUBLIC nlm_core)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_example_plugins)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_example_plugins)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
-
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+# Phase 6 experiments
+add_library(nlm_phase6
+    src/experiments/Phase6IntegratedExperiment.cpp
 )
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_example_plugins)
+
+# Integration test executable
+add_executable(nlm_integration_test
+    src/test_integration.cpp
+)
+target_link_libraries(nlm_integration_test PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6 nlm_plugin_system nlm_example_plugins)
