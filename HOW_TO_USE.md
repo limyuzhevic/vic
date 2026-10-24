@@ -531,3 +531,4 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- **`easy_usage_enhanced.md`** - Enhanced usage guide with new features and convenience methods
