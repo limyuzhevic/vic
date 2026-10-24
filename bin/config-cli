@@ -1,0 +1,557 @@
+#!/usr/bin/env bash
+
+# NLM Configuration CLI Tool
+# Provides command-line interface for configuration management
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Color definitions
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $*"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $*"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $*"
+}
+
+log_header() {
+    echo -e "${BLUE}=== $* ===${NC}"
+}
+
+# Help function
+show_help() {
+    log_header "NLM Configuration CLI"
+    echo "Usage: config-cli <command> [options]"
+    echo ""
+    echo "Commands:"
+    echo "  get <key>                          Get configuration value"
+    echo "  set <key> <value>                  Set configuration value"
+    echo "  delete <key>                       Delete configuration key"
+    echo "  list                                List all configuration keys and values"
+    echo "  validate                            Validate configuration against schema"
+    echo "  schema                              Show configuration schema"
+    echo "  export <file>                      Export configuration to file"
+    echo "  import <file>                      Import configuration from file"
+    echo "  reset                               Reset to default configuration"
+    echo "  backup <file>                      Create backup of current configuration"
+    echo "  restore <file>                     Restore configuration from backup"
+    echo ""
+    echo "Global options:"
+    echo "  --config <file>                    Configuration file to use (default: configs/default.cfg)"
+    echo "  --quiet                             Suppress informational messages"
+    echo "  --verbose                           Enable verbose output"
+    echo ""
+    echo "File format options:"
+    echo "  --format <format>                  Output format (json, yaml, ini)"
+    echo ""
+    echo "Examples:"
+    echo "  config-cli get random_seed"
+    echo "  config-cli set neuron_count 1000"
+    echo "  config-cli list --format json"
+    echo "  config-cli export /tmp/config.json --format json"
+}
+
+# Configuration file handling
+CONFIG_FILE="configs/default.cfg"
+VERBOSE=false
+QUIET=false
+FORMAT="ini"
+
+# Parse command line arguments
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --config)
+                CONFIG_FILE="$2"
+                shift 2
+                ;;
+            --quiet)
+                QUIET=true
+                shift
+                ;;
+            --verbose)
+                VERBOSE=true
+                shift
+                ;;
+            --format)
+                FORMAT="$2"
+                shift 2
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+}
+
+# Initialize logging
+log_action() {
+    if [[ "$VERBOSE" == true ]]; then
+        echo -e "${BLUE}[ACTION]${NC} $*"
+    fi
+}
+
+# Load configuration
+load_config() {
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        log_error "Configuration file not found: $CONFIG_FILE"
+        log_info "Using default configuration."
+        return 1
+    fi
+    
+    log_action "Loading configuration from: $CONFIG_FILE"
+}
+
+# Get configuration value
+command_get() {
+    local key="$1"
+    
+    if [[ -z "$key" ]]; then
+        log_error "Missing key argument for get command"
+        exit 1
+    fi
+    
+    log_action "Getting configuration value for: $key"
+    
+    # Use C++ config tool if available, otherwise parse directly
+    if [[ -f "$PROJECT_ROOT/bin/config-cli-tool" ]]; then
+        "$PROJECT_ROOT/bin/config-cli-tool" get "$key" --config "$CONFIG_FILE"
+    else
+        # Fallback: parse config file directly
+        if [[ "$FORMAT" == "json" || "$FORMAT" == "yaml" ]]; then
+            log_warn "JSON/YAML parsing not implemented yet. Use C++ tool or format ini."
+        fi
+        
+        # Simple ini parsing
+        local value=""
+        local found=false
+        
+        while IFS= read -r line; do
+            line="${line%%#*}"  # Strip comments
+            line="${line//"\"/}"    # Remove quotes
+            
+            if [[ "$line" =~ ^$key[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+                value="${BASH_REMATCH[1]}"
+                found=true
+                break
+            fi
+        done < "$CONFIG_FILE"
+        
+        if [[ "$found" == true ]]; then
+            echo "$value"
+        else
+            log_warn "Key '$key' not found in configuration"
+            echo ""
+        fi
+    fi
+}
+
+# Set configuration value
+command_set() {
+    local key="$1"
+    local value="$2"
+    
+    if [[ -z "$key" || -z "$value" ]]; then
+        log_error "Missing key or value argument for set command"
+        exit 1
+    fi
+    
+    log_action "Setting configuration: $key = $value"
+    
+    if [[ -f "$PROJECT_ROOT/bin/config-cli-tool" ]]; then
+        "$PROJECT_ROOT/bin/config-cli-tool" set "$key" "$value" --config "$CONFIG_FILE"
+    else
+        # Fallback: append to config file
+        local temp_file="$(mktemp)"
+        
+        if [[ ! -f "$CONFIG_FILE" ]]; then
+            cp "$PROJECT_ROOT/configs/default.cfg" "$temp_file" 2>/dev/null || touch "$temp_file"
+        else
+            cp "$CONFIG_FILE" "$temp_file"
+        fi
+        
+        # Remove existing key
+        sed -i "/^$key[[:space:]]*=/d" "$temp_file"
+        
+        # Add new key
+        echo "$key = $value" >> "$temp_file"
+        
+        mv "$temp_file" "$CONFIG_FILE"
+        
+        log_info "Configuration updated: $key = $value"
+    fi
+}
+
+# Delete configuration key
+command_delete() {
+    local key="$1"
+    
+    if [[ -z "$key" ]]; then
+        log_error "Missing key argument for delete command"
+        exit 1
+    fi
+    
+    log_action "Deleting configuration key: $key"
+    
+    if [[ -f "$PROJECT_ROOT/bin/config-cli-tool" ]]; then
+        "$PROJECT_ROOT/bin/config-cli-tool" delete "$key" --config "$CONFIG_FILE"
+    else
+        local temp_file="$(mktemp)"
+        cp "$CONFIG_FILE" "$temp_file"
+        
+        sed -i "/^$key[[:space:]]*=/d" "$temp_file"
+        
+        mv "$temp_file" "$CONFIG_FILE"
+        
+        log_info "Configuration key deleted: $key"
+    fi
+}
+
+# List configuration
+command_list() {
+    log_action "Listing configuration"
+    
+    if [[ -f "$PROJECT_ROOT/bin/config-cli-tool" ]]; then
+        "$PROJECT_ROOT/bin/config-cli-tool" list --config "$CONFIG_FILE" --format "$FORMAT"
+    else
+        # Simple ini parsing
+        if [[ "$FORMAT" == "json" ]]; then
+            echo "{"
+            local first=true
+            while IFS= read -r line; do
+                line="${line%%#*}"  # Strip comments
+                line="${line//"\"/}"    # Remove quotes
+                
+                if [[ "$line" =~ ^([^=]+)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+                    local key="${BASH_REMATCH[1]}"
+                    local value="${BASH_REMATCH[2]}"
+                    
+                    if [[ "$first" == true ]]; then
+                        first=false
+                    else
+                        echo ","
+                    fi
+                    
+                    echo -n "  \"$key\": \"$value\""
+                fi
+            done < "$CONFIG_FILE"
+            echo ""
+            echo "}"
+        elif [[ "$FORMAT" == "yaml" ]]; then
+            echo "configuration:"
+            while IFS= read -r line; do
+                line="${line%%#*}"  # Strip comments
+                line="${line//"\"/}"    # Remove quotes
+                
+                if [[ "$line" =~ ^([^=]+)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+                    local key="${BASH_REMATCH[1]}"
+                    local value="${BASH_REMATCH[2]}"
+                    
+                    echo "  $key: $value"
+                fi
+            done < "$CONFIG_FILE"
+        else
+            # Default ini format
+            echo "Configuration file: $CONFIG_FILE"
+            while IFS= read -r line; do
+                line="${line%%#*}"  # Strip comments
+                line="${line//"\"/}"    # Remove quotes
+                
+                if [[ "$line" =~ ^([^=]+)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+                    local key="${BASH_REMATCH[1]}"
+                    local value="${BASH_REMATCH[2]}"
+                    
+                    echo "  $key = $value"
+                fi
+            done < "$CONFIG_FILE"
+        fi
+    fi
+}
+
+# Validate configuration
+command_validate() {
+    log_action "Validating configuration"
+    
+    if [[ -f "$PROJECT_ROOT/bin/config-cli-tool" ]]; then
+        "$PROJECT_ROOT/bin/config-cli-tool" validate --config "$CONFIG_FILE"
+    else
+        # Simple validation
+        local errors=0
+        local warnings=0
+        
+        while IFS= read -r line; do
+            line="${line%%#*}"  # Strip comments
+            line="${line//"\"/}"    # Remove quotes
+            
+            if [[ "$line" =~ ^([^=]+)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+                local key="${BASH_REMATCH[1]}"
+                local value="${BASH_REMATCH[2]}"
+                
+                # Basic validation
+                if [[ -z "$value" ]]; then
+                    log_warn "Empty value for key: $key"
+                    ((warnings++))
+                fi
+            fi
+        done < "$CONFIG_FILE"
+        
+        if [[ $warnings -eq 0 ]]; then
+            log_info "Configuration validation passed"
+        else
+            log_info "Configuration validation completed with $warnings warning(s)"
+        fi
+    fi
+}
+
+# Show schema
+command_schema() {
+    log_action "Showing configuration schema"
+    
+    if [[ -f "$PROJECT_ROOT/bin/config-cli-tool" ]]; then
+        "$PROJECT_ROOT/bin/config-cli-tool" schema
+    else
+        echo "Configuration Schema (simplified):"
+        echo "  - random_seed (int64_t, default: 42)"
+        echo "  - simulation_timestep (double, default: 0.001)"
+        echo "  - neuron_count (int64_t, default: 1000)"
+        echo "  - region_count (int64_t, default: 2)"
+        echo "  - connection_probability (float, default: 0.1)"
+        echo "  - plasticity_learning_rate (double, default: 0.01)"
+        echo "  - stdp_ltp_weight (double, default: 0.01)"
+        echo "  - stdp_ltd_weight (double, default: 0.012)"
+        echo "  - stdp_time_constant (double, default: 20.0)"
+        echo "  - development_synaptogenesis_rate (double, default: 0.001)"
+        echo "  - development_pruning_rate (double, default: 0.0001)"
+        echo "  - dopamine_baseline (double, default: 0.1)"
+        echo "  - reward_discount_factor (double, default: 0.99)"
+        echo "  - environment_name (string, default: GridWorld)"
+        echo "  - environment_width (int64_t, default: 10)"
+        echo "  - environment_height (int64_t, default: 10)"
+        echo "  - log_level (string, default: INFO)"
+        echo "  - log_to_file (bool, default: false)"
+        echo "  - log_filename (string, default: nlm.log)"
+        echo "  - max_simulation_steps (int64_t, default: 10000)"
+        echo "  - simulation_time_limit (double, default: 0.0)"
+        echo "  - visualization_enabled (bool, default: false)"
+        echo "  - visualization_update_rate (double, default: 30.0)"
+    fi
+}
+
+# Export configuration
+command_export() {
+    local output_file="$1"
+    
+    if [[ -z "$output_file" ]]; then
+        log_error "Missing output file argument for export command"
+        exit 1
+    fi
+    
+    log_action "Exporting configuration to: $output_file (format: $FORMAT)"
+    
+    if [[ "$FORMAT" == "json" ]]; then
+        echo "{"
+        local first=true
+        while IFS= read -r line; do
+            line="${line%%#*}"  # Strip comments
+            line="${line//"\"/}"    # Remove quotes
+            
+            if [[ "$line" =~ ^([^=]+)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+                local key="${BASH_REMATCH[1]}"
+                local value="${BASH_REMATCH[2]}"
+                
+                if [[ "$first" == true ]]; then
+                    first=false
+                else
+                    echo ","
+                fi
+                
+                echo -n "  \"$key\": \"$value\""
+            fi
+        done < "$CONFIG_FILE"
+        echo ""
+        echo "}" > "$output_file"
+    elif [[ "$FORMAT" == "yaml" ]]; then
+        echo "configuration:" > "$output_file"
+        while IFS= read -r line; do
+            line="${line%%#*}"  # Strip comments
+            line="${line//"\"/}"    # Remove quotes
+            
+            if [[ "$line" =~ ^([^=]+)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
+                local key="${BASH_REMATCH[1]}"
+                local value="${BASH_REMATCH[2]}"
+                
+                echo "  $key: $value" >> "$output_file"
+            fi
+        done < "$CONFIG_FILE"
+    else
+        cp "$CONFIG_FILE" "$output_file"
+    fi
+    
+    log_info "Configuration exported to: $output_file"
+}
+
+# Import configuration
+command_import() {
+    local input_file="$1"
+    
+    if [[ -z "$input_file" ]]; then
+        log_error "Missing input file argument for import command"
+        exit 1
+    fi
+    
+    if [[ ! -f "$input_file" ]]; then
+        log_error "Input file not found: $input_file"
+        exit 1
+    fi
+    
+    log_action "Importing configuration from: $input_file"
+    
+    if [[ "$FORMAT" == "json" ]]; then
+        log_warn "JSON import not implemented yet. Using fallback parsing."
+        return 1
+    elif [[ "$FORMAT" == "yaml" ]]; then
+        log_warn "YAML import not implemented yet. Using fallback parsing."
+        return 1
+    else
+        # Simple ini format copy
+        cp "$input_file" "$CONFIG_FILE"
+        log_info "Configuration imported from: $input_file"
+    fi
+}
+
+# Reset configuration
+command_reset() {
+    log_action "Resetting configuration to defaults"
+    
+    if [[ -f "$PROJECT_ROOT/configs/default.cfg" ]]; then
+        cp "$PROJECT_ROOT/configs/default.cfg" "$CONFIG_FILE"
+        log_info "Configuration reset to defaults"
+    else
+        log_error "Default configuration file not found"
+        exit 1
+    fi
+}
+
+# Backup configuration
+command_backup() {
+    local backup_file="$1"
+    
+    if [[ -z "$backup_file" ]]; then
+        local timestamp="$(date +%Y%m%d_%H%M%S)"
+        backup_file="configs/backup_nlm_${timestamp}.cfg"
+    fi
+    
+    if [[ ! -d "$(dirname "$backup_file")" ]]; then
+        mkdir -p "$(dirname "$backup_file")"
+    fi
+    
+    log_action "Creating backup of configuration to: $backup_file"
+    
+    cp "$CONFIG_FILE" "$backup_file"
+    log_info "Configuration backup created: $backup_file"
+}
+
+# Restore configuration
+command_restore() {
+    local restore_file="$1"
+    
+    if [[ -z "$restore_file" ]]; then
+        log_error "Missing restore file argument for restore command"
+        exit 1
+    fi
+    
+    if [[ ! -f "$restore_file" ]]; then
+        log_error "Restore file not found: $restore_file"
+        exit 1
+    fi
+    
+    log_action "Restoring configuration from: $restore_file"
+    
+    cp "$restore_file" "$CONFIG_FILE"
+    log_info "Configuration restored from: $restore_file"
+}
+
+# Main function
+main() {
+    parse_args "$@"
+    
+    # Check if config file exists
+    if [[ ! -f "$CONFIG_FILE" && -x "$PROJECT_ROOT/bin/config-cli-tool" ]]; then
+        log_info "Using compiled configuration tool."
+    elif [[ ! -f "$CONFIG_FILE" ]]; then
+        log_info "Creating new configuration file..."
+        cp "$PROJECT_ROOT/configs/default.cfg" "$CONFIG_FILE" 2>/dev/null || touch "$CONFIG_FILE"
+    fi
+    
+    # Check command
+    local command="$1"
+    shift
+    
+    case "$command" in
+        get)
+            command_get "$@"
+            ;;
+        set)
+            command_set "$@"
+            ;;
+        delete)
+            command_delete "$@"
+            ;;
+        list)
+            command_list "$@"
+            ;;
+        validate)
+            command_validate "$@"
+            ;;
+        schema)
+            command_schema "$@"
+            ;;
+        export)
+            command_export "$@"
+            ;;
+        import)
+            command_import "$@"
+            ;;
+        reset)
+            command_reset "$@"
+            ;;
+        backup)
+            command_backup "$@"
+            ;;
+        restore)
+            command_restore "$@"
+            ;;
+        help|--help|-h)
+            show_help
+            ;;
+        "")
+            log_error "No command specified"
+            show_help
+            exit 1
+            ;;
+        *)
+            log_error "Unknown command: $command"
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+# Run main function
+main "$@"

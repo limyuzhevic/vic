@@ -1,8 +1,12 @@
 #include "Config.hpp"
+#include "ConfigSchema.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <iomanip>
+#include <limits>
 
 namespace nlm {
 
@@ -10,7 +14,10 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize schema and register default configuration
+    registerDefaultConfigSchema();
+}
 
 Config::~Config() = default;
 
@@ -19,16 +26,46 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    std::string extension = ".";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos);
+    }
+    
+    // Try JSON parser first
+    if (extension == ".json" || extension == ".JSON") {
+        return loadFromJSON(filepath);
+    } 
+    // Try YAML parser second
+    else if (extension == ".yaml" || extension == ".yml" || extension == ".YAML" || extension == ".YML") {
+        return loadFromYAML(filepath);
+    }
+    
+    // Fallback to simple key=value format
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        std::cerr << "ERROR: Failed to reopen configuration file for simple parsing: " << filepath << std::endl;
+        return false;
+    }
+    
     std::string line;
+    int lineNumber = 0;
+    int parsedLines = 0;
+    int errorLines = 0;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
+        parsedLines++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,11 +85,49 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate key
+            if (key.empty()) {
+                std::cerr << "WARNING: Line " << lineNumber << " has empty key" << std::endl;
+                errorLines++;
+                continue;
+            }
+            
+            // Set configuration value
             set(key, value, ConfigSource::File);
+        } else {
+            std::cerr << "WARNING: Line " << lineNumber << " is not a valid key=value pair: " << line << std::endl;
+            errorLines++;
         }
     }
     
-    return true;
+    // Report parsing results
+    if (errorLines > 0) {
+        std::cerr << "CONFIG PARSING SUMMARY:" << std::endl;
+        std::cerr << "  Total lines: " << lineNumber << std::endl;
+        std::cerr << "  Parsed successfully: " << (parsedLines - errorLines) << std::endl;
+        std::cerr << "  Errors/warnings: " << errorLines << std::endl;
+        std::cerr << "  Configuration entries: " << pImpl->entries.size() << std::endl;
+    }
+    
+    return errorLines <= parsedLines / 10; // Allow some errors but warn
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Placeholder for JSON implementation
+    // TODO: Implement proper JSON parser using a library like nlohmann/json
+    std::cerr << "ERROR: JSON config loading not yet implemented." << std::endl;
+    std::cerr << "       File: " << filepath << std::endl;
+    std::cerr << "       Using fallback format." << std::endl;
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // Placeholder for YAML implementation
+    // TODO: Implement proper YAML parser using a library like yaml-cpp
+    std::cerr << "ERROR: YAML config loading not yet implemented." << std::endl;
+    std::cerr << "       File: " << filepath << std::endl;
+    std::cerr << "       Using fallback format." << std::endl;
+    return loadFromSimpleFormat(filepath);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -86,7 +161,42 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Save the actual value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << arg[i];
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    file << "\"" << arg[i] << "\"";
+                    if (i < arg.size() - 1) file << ", ";
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -111,18 +221,43 @@ std::optional<T> Config::get(const std::string& key) const {
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (val.has_value()) {
+        // Validate the retrieved value against schema
+        if (!getGlobalConfigSchema().validate(key, val.value())) {
+            std::cerr << "Warning: Retrieved configuration value for key \"" 
+                      << key << "\" does not match schema definition" << std::endl;
+        }
+        return val.value();
+    }
+    return defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+    // Validate against schema if available
+    if (getGlobalConfigSchema().validate(key, value)) {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it != pImpl->entries.end()) {
+            it->value = value;
+            it->source = source;
+        } else {
+            pImpl->entries.emplace_back(key, value, source, "");
+        }
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // If schema validation fails, log warning but still set (for backward compatibility)
+        std::cerr << "Warning: Configuration value for key \"" << key 
+                  << "\" does not match schema definition" << std::endl;
+        
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it != pImpl->entries.end()) {
+            it->value = value;
+            it->source = source;
+        } else {
+            pImpl->entries.emplace_back(key, value, source, "");
+        }
     }
 }
 
@@ -171,6 +306,22 @@ void Config::clear() {
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Schema (" << getGlobalConfigSchema().getKeys().size() << " entries):\n";
+    
+    // Show schema entries
+    for (const auto& key : getGlobalConfigSchema().getKeys()) {
+        const auto* entry = getGlobalConfigSchema().getEntry(key);
+        if (entry) {
+            oss << "  " << key << " (" << entry->type << ")";
+            if (entry->required) oss << " [REQUIRED]";
+            oss << "\n";
+        }
+    }
+    
+    oss << "\n";
+    
+    // Show actual configuration values
+    oss << "Current Configuration:\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
@@ -183,6 +334,7 @@ std::string Config::summary() const {
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
+    
     return oss.str();
 }
 
@@ -193,13 +345,8 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
 // Explicit template instantiations
+
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;

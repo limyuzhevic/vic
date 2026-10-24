@@ -1,0 +1,717 @@
+#!/usr/bin/env bash
+
+# NLM Configuration Documentation Generator
+# Generates documentation for the NLM configuration system
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Color definitions
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $*"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $*"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $*"
+}
+
+log_header() {
+    echo -e "${BLUE}=== $* ===${NC}"
+}
+
+# Help function
+show_help() {
+    log_header "NLM Configuration Documentation Generator"
+    echo "Usage: nlm-docgen <output_format> [options]"
+    echo ""
+    echo "Output formats:"
+    echo "  html                      Generate HTML documentation"
+    echo "  markdown                   Generate Markdown documentation"
+    echo "  text                      Generate plain text documentation"
+    echo "  rst                        Generate reStructuredText documentation"
+    echo ""
+    echo "Options:"
+    echo "  --output <file>            Output file (default: nlm-config-doc.html)"
+    echo "  --title <title>            Document title (default: NLM Configuration Documentation)"
+    echo "  --config-schema            Include configuration schema documentation"
+    echo "  --default-values           Include default configuration values"
+    echo "  --examples                 Include configuration examples"
+    echo "  --format                   Show supported formats"
+    echo ""
+    echo "Examples:"
+    echo "  nlm-docgen html --output docs/config.html"
+    echo "  nlm-docgen markdown --title \"NLM Config\" --examples"
+    echo "  nlm-docgen text --output docs/config.txt"
+}
+
+# Generate HTML documentation
+generate_html() {
+    local output_file="$1"
+    local title="$2"
+    local include_schema="$3"
+    local include_defaults="$4"
+    local include_examples="$5"
+    
+    log_info "Generating HTML configuration documentation..."
+    
+    cat > "$output_file" << EOF
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>$title</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            margin-bottom: 20px;
+        }
+        h3 {
+            color: #2980b9;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .config-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .config-table th {
+            background-color: #3498db;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        .config-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            vertical-align: top;
+        }
+        .config-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .config-table tr:hover {
+            background-color: #f0f7ff;
+        }
+        .type-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .type-int { background-color: #e3f2fd; color: #1565c0; }
+        .type-double { background-color: #fff3e0; color: #e65100; }
+        .type-string { background-color: #f3e5f5; color: #6a1b9a; }
+        .type-bool { background-color: #e8f5e8; color: #2e7d32; }
+        .required-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        .example-block {
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+        .code-block {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+        }
+        .nav-sidebar {
+            float: left;
+            width: 250px;
+            margin-right: 30px;
+        }
+        .content-wrapper {
+            margin-left: 280px;
+        }
+        .nav-menu {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .nav-menu ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        .nav-menu li {
+            margin-bottom: 5px;
+        }
+        .nav-menu a {
+            color: #3498db;
+            text-decoration: none;
+            padding: 5px 10px;
+            display: block;
+            border-radius: 4px;
+        }
+        .nav-menu a:hover {
+            background-color: #e3f2fd;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>$title</h1>
+        
+        <div class="nav-sidebar">
+            <div class="nav-menu">
+                <h3>Table of Contents</h3>
+                <ul>
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#schema">Configuration Schema</a></li>
+                    <li><a href="#defaults">Default Values</a></li>
+                    <li><a href="#examples">Configuration Examples</a></li>
+                    <li><a href="#usage">Usage Instructions</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="content-wrapper">
+            <h2 id="overview">Overview</h2>
+            <p>The NLM (Neural Learning Machine) configuration system provides a flexible and extensible way to configure neural network simulations. This documentation describes all available configuration options, their data types, default values, and usage examples.</p>
+            
+            <h3>Configuration File Formats</h3>
+            <ul>
+                <li><strong>INI Format (.cfg)</strong>: Simple key=value pairs, supports comments with # or //</li>
+                <li><strong>JSON Format (.json)</strong>: Structured configuration with nested objects</li>
+                <li><strong>YAML Format (.yaml/.yml)</strong>: Human-readable configuration with rich data types</li>
+            </ul>
+            
+            $SCHEMA_SECTION
+            $DEFAULTS_SECTION
+            $EXAMPLES_SECTION
+            
+            <h2 id="usage">Usage Instructions</h2>
+            <h3>Loading Configuration</h3>
+            <p>Configuration can be loaded in several ways:</p>
+            <ul>
+                <li>Default configuration: <code>Config config;</code></li>
+                <li>From file: <code>config.loadFromFile("config.cfg");</code></li>
+                <li>From command line: <code>config.loadFromArgs(argc, argv);</code></li>
+                <li>Environment variables: Automatically read for certain keys</li>
+            </ul>
+            
+            <h3>Setting Values</h3>
+            <p>Configuration values can be set using typed methods:</p>
+            <pre class="code-block"><code>config.set("neuron_count", int64_t(1000));
+config.set("simulation_timestep", 0.001);
+config.set("log_level", std::string("INFO"));</code></pre>
+            
+            <h3>Getting Values</h3>
+            <p>Configuration values can be retrieved using typed getters:</p>
+            <pre class="code-block"><code>auto neuronCount = config.getOr<int64_t>("neuron_count", 1000);
+auto timestep = config.getOr<double>("simulation_timestep", 0.001);
+auto logLevel = config.getOr<std::string>("log_level", "INFO");</code></pre>
+            
+            <div class="footer">
+                <p>Generated by NLM Configuration Documentation Generator</p>
+                <p>Phase 6: Final Integration - Configuration System Documentation</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+EOF
+    
+    log_info "HTML documentation generated: $output_file"
+}
+
+# Generate Markdown documentation
+generate_markdown() {
+    local output_file="$1"
+    local title="$2"
+    local include_schema="$3"
+    local include_defaults="$4"
+    local include_examples="$5"
+    
+    log_info "Generating Markdown configuration documentation..."
+    
+    cat > "$output_file" << EOF
+# $title
+
+Generated by NLM Configuration Documentation Generator
+
+## Overview
+
+The NLM (Neural Learning Machine) configuration system provides a flexible and extensible way to configure neural network simulations. This documentation describes all available configuration options, their data types, default values, and usage examples.
+
+## Configuration File Formats
+
+Configuration files can be in one of the following formats:
+
+- **INI Format (.cfg)**: Simple key=value pairs, supports comments with # or //
+- **JSON Format (.json)**: Structured configuration with nested objects  
+- **YAML Format (.yaml/.yml)**: Human-readable configuration with rich data types
+
+## $SCHEMA_SECTION
+
+## $DEFAULTS_SECTION
+
+## $EXAMPLES_SECTION
+
+## Usage Instructions
+
+### Loading Configuration
+
+Configuration can be loaded in several ways:
+
+- Default configuration: `Config config;`
+- From file: `config.loadFromFile("config.cfg");`
+- From command line: `config.loadFromArgs(argc, argv);`
+- Environment variables: Automatically read for certain keys
+
+### Setting Values
+
+Configuration values can be set using typed methods:
+
+```cpp
+config.set("neuron_count", int64_t(1000));
+config.set("simulation_timestep", 0.001);
+config.set("log_level", std::string("INFO"));
+```
+
+### Getting Values
+
+Configuration values can be retrieved using typed getters:
+
+```cpp
+auto neuronCount = config.getOr<int64_t>("neuron_count", 1000);
+auto timestep = config.getOr<double>("simulation_timestep", 0.001);
+auto logLevel = config.getOr<std::string>("log_level", "INFO");
+```
+
+## Configuration Schema
+
+The configuration schema defines all available configuration options with their types, default values, and validation rules.
+
+## Default Configuration Values
+
+Below are the default configuration values for NLM:
+
+$DEFAULTS_TABLE
+
+## Configuration Examples
+
+### Basic Configuration
+
+```ini
+# Basic neural network configuration
+random_seed = 42
+simulation_timestep = 0.001
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.1
+```
+
+### Advanced Configuration
+
+```ini
+# Advanced configuration with detailed settings
+random_seed = 12345
+simulation_timestep = 0.0001
+neuron_count = 5000
+region_count = 5
+connection_probability = 0.2
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.012
+stdp_time_constant = 20.0
+development_synaptogenesis_rate = 0.001
+development_pruning_rate = 0.0001
+dopamine_baseline = 0.1
+reward_discount_factor = 0.99
+environment_name = GridWorld
+environment_width = 10
+environment_height = 10
+log_level = INFO
+log_to_file = false
+log_filename = nlm.log
+max_simulation_steps = 10000
+simulation_time_limit = 0.0
+visualization_enabled = false
+visualization_update_rate = 30.0
+```
+
+### JSON Configuration
+
+```json
+{
+  "random_seed": 42,
+  "simulation_timestep": 0.001,
+  "neuron_count": 1000,
+  "region_count": 2,
+  "connection_probability": 0.1,
+  "plasticity_learning_rate": 0.01,
+  "stdp_ltp_weight": 0.01,
+  "stdp_ltd_weight": 0.012,
+  "stdp_time_constant": 20.0,
+  "development_synaptogenesis_rate": 0.001,
+  "development_pruning_rate": 0.0001,
+  "dopamine_baseline": 0.1,
+  "reward_discount_factor": 0.99,
+  "environment_name": "GridWorld",
+  "environment_width": 10,
+  "environment_height": 10,
+  "log_level": "INFO",
+  "log_to_file": false,
+  "log_filename": "nlm.log",
+  "max_simulation_steps": 10000,
+  "simulation_time_limit": 0.0,
+  "visualization_enabled": false,
+  "visualization_update_rate": 30.0
+}
+```
+
+## Environment Variables
+
+NLM supports the following environment variables:
+
+- `NLM_RANDOM_SEED`: Random seed for reproducible experiments
+- `NLM_SIMULATION_TIMESTEP`: Simulation timestep in seconds
+- `NLM_NEURON_COUNT`: Number of neurons in the brain
+- `NLM_LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+## Command Line Arguments
+
+NLM supports the following command line arguments:
+
+- `--config <file>`: Load configuration from file
+- `--random_seed <value>`: Set random seed
+- `--neuron_count <value>`: Set neuron count
+- `--log_level <level>`: Set log level
+- `--help`: Show help message
+
+## Troubleshooting
+
+### Configuration Not Loaded
+
+Check that the configuration file exists and is readable. Ensure the file format is correct for the specified format.
+
+### Invalid Configuration Values
+
+Verify that configuration values are within the allowed ranges. Check the configuration schema for valid values.
+
+### Missing Configuration Options
+
+Ensure that the configuration file includes all required options. Check the schema documentation for required options.
+
+## References
+
+1. NLM Configuration System Documentation
+2. Phase 6: Final Integration - Configuration System
+3. Neural Learning Machine Technical Specifications
+EOF
+    
+    log_info "Markdown documentation generated: $output_file"
+}
+
+# Generate plain text documentation
+generate_text() {
+    local output_file="$1"
+    local title="$2"
+    local include_schema="$3"
+    local include_defaults="$4"
+    local include_examples="$5"
+    
+    log_info "Generating plain text configuration documentation..."
+    
+    cat > "$output_file" << EOF
+$title
+============================
+
+Generated by NLM Configuration Documentation Generator
+
+OVERVIEW
+
+The NLM (Neural Learning Machine) configuration system provides a flexible and extensible way to configure neural network simulations. This documentation describes all available configuration options, their data types, default values, and usage examples.
+
+CONFIGURATION FILE FORMATS
+
+Configuration files can be in one of the following formats:
+
+- INI Format (.cfg): Simple key=value pairs, supports comments with # or //
+- JSON Format (.json): Structured configuration with nested objects  
+- YAML Format (.yaml/.yml): Human-readable configuration with rich data types
+
+$SCHEMA_SECTION
+
+$DEFAULTS_SECTION
+
+$EXAMPLES_SECTION
+
+USAGE INSTRUCTIONS
+
+Loading Configuration
+
+Configuration can be loaded in several ways:
+
+- Default configuration: Config config;
+- From file: config.loadFromFile("config.cfg");
+- From command line: config.loadFromArgs(argc, argv);
+- Environment variables: Automatically read for certain keys
+
+Setting Values
+
+Configuration values can be set using typed methods:
+
+config.set("neuron_count", int64_t(1000));
+config.set("simulation_timestep", 0.001);
+config.set("log_level", std::string("INFO"));
+
+Getting Values
+
+Configuration values can be retrieved using typed getters:
+
+auto neuronCount = config.getOr<int64_t>("neuron_count", 1000);
+auto timestep = config.getOr<double>("simulation_timestep", 0.001);
+auto logLevel = config.getOr<std::string>("log_level", "INFO");
+
+EOF
+    
+    log_info "Plain text documentation generated: $output_file"
+}
+
+# Generate reStructuredText documentation
+generate_rst() {
+    local output_file="$1"
+    local title="$2"
+    local include_schema="$3"
+    local include_defaults="$4"
+    local include_examples="$5"
+    
+    log_info "Generating reStructuredText configuration documentation..."
+    
+    cat > "$output_file" << EOF
+$title
+$============================
+
+Generated by NLM Configuration Documentation Generator
+
+Overview
+--------
+
+The NLM (Neural Learning Machine) configuration system provides a flexible and extensible way to configure neural network simulations. This documentation describes all available configuration options, their data types, default values, and usage examples.
+
+Configuration File Formats
+-------------------------
+
+Configuration files can be in one of the following formats:
+
+- INI Format (.cfg): Simple key=value pairs, supports comments with # or //
+- JSON Format (.json): Structured configuration with nested objects  
+- YAML Format (.yaml/.yml): Human-readable configuration with rich data types
+
+$SCHEMA_SECTION
+
+$DEFAULTS_SECTION
+
+$EXAMPLES_SECTION
+
+Usage Instructions
+------------------
+
+Loading Configuration
+^^^^^^^^^^^^^^^^^^^^
+
+Configuration can be loaded in several ways:
+
+- Default configuration: `` Config config; ``
+- From file: `` config.loadFromFile("config.cfg"); ``
+- From command line: `` config.loadFromArgs(argc, argv); ``
+- Environment variables: Automatically read for certain keys
+
+Setting Values
+^^^^^^^^^^^^^^
+
+Configuration values can be set using typed methods:
+
+::
+
+    config.set("neuron_count", int64_t(1000));
+    config.set("simulation_timestep", 0.001);
+    config.set("log_level", std::string("INFO"));
+
+Getting Values
+^^^^^^^^^^^^^^
+
+Configuration values can be retrieved using typed getters:
+
+::
+
+    auto neuronCount = config.getOr<int64_t>("neuron_count", 1000);
+    auto timestep = config.getOr<double>("simulation_timestep", 0.001);
+    auto logLevel = config.getOr<std::string>("log_level", "INFO");
+
+EOF
+    
+    log_info "reStructuredText documentation generated: $output_file"
+}
+
+# Show supported formats
+show_formats() {
+    log_header "Supported Output Formats"
+    echo "HTML: Complete web documentation with navigation and styling"
+    echo "Markdown: Lightweight markup format for README files and GitHub"
+    echo "Text: Plain text format for command-line usage"
+    echo "reStructuredText: Official documentation format for Sphinx"
+    echo ""
+    echo "Each format includes:
+    - Configuration schema documentation
+    - Default configuration values
+    - Configuration examples
+    - Usage instructions
+    - Troubleshooting guide"
+}
+
+# Main function
+main() {
+    local output_format=""
+    local output_file=""
+    local title="NLM Configuration Documentation"
+    local include_schema=true
+    local include_defaults=true
+    local include_examples=true
+    
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            html|markdown|text|rst)
+                output_format="$1"
+                shift
+                ;;
+            --output)
+                output_file="$2"
+                shift 2
+                ;;
+            --title)
+                title="$2"
+                shift 2
+                ;;
+            --format)
+                show_formats
+                exit 0
+                ;;
+            --config-schema)
+                include_schema=true
+                shift
+                ;;
+            --no-defaults)
+                include_defaults=false
+                shift
+                ;;
+            --no-examples)
+                include_examples=false
+                shift
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            *)
+                echo "Unknown argument: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Set default output file if not specified
+    if [[ -z "$output_file" ]]; then
+        case "$output_format" in
+            html)
+                output_file="nlm-config-doc.html"
+                ;;
+            markdown)
+                output_file="nlm-config-doc.md"
+                ;;
+            text)
+                output_file="nlm-config-doc.txt"
+                ;;
+            rst)
+                output_file="nlm-config-doc.rst"
+                ;;
+            *)
+                log_error "Output format not specified"
+                show_help
+                exit 1
+                ;;
+        esac
+    fi
+    
+    # Generate documentation based on format
+    case "$output_format" in
+        html)
+            generate_html "$output_file" "$title" "$include_schema" "$include_defaults" "$include_examples"
+            ;;
+        markdown)
+            generate_markdown "$output_file" "$title" "$include_schema" "$include_defaults" "$include_examples"
+            ;;
+        text)
+            generate_text "$output_file" "$title" "$include_schema" "$include_defaults" "$include_examples"
+            ;;
+        rst)
+            generate_rst "$output_file" "$title" "$include_schema" "$include_defaults" "$include_examples"
+            ;;
+    esac
+    
+    log_info "Documentation generation completed successfully!"
+    log_info "Output file: $output_file"
+}
+
+# Run main function
+main "$@"

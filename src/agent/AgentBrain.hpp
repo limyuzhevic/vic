@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AgentBrainFactory.hpp"
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"

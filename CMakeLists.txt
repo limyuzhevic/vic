@@ -26,6 +26,7 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/ConfigSchema.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -96,6 +97,7 @@ target_include_directories(nlm_core PUBLIC
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
+    src/agent/AgentBrainFactory.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
@@ -142,6 +144,13 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Configuration test suite
+add_executable(nlm_config_tests
+    src/tests/ConfigTestSuite.cpp
+)
+target_link_libraries(nlm_config_tests PUBLIC nlm_core)
+add_test(NAME nlm_config_tests COMMAND nlm_config_tests)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
