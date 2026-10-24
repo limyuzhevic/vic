@@ -4,6 +4,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../core/Config/Config.hpp"
 #include <memory>
 #include <vector>
 
@@ -13,7 +14,7 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    AgentBrain(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config = nullptr);
     ~AgentBrain();
     
     // Initialize with world
@@ -69,6 +70,13 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Get configuration summary
+    std::string getConfigurationSummary() const;
+    
+    // Get advanced metrics
+    float getMotorActivityLevel() const;
+    float getSensoryProcessingLoad() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -77,6 +85,7 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    std::shared_ptr<Config> config_;  // Configuration storage
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -112,6 +121,34 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced metrics and statistics
+    float motorActivityLevel_;
+    float sensoryProcessingLoad_;
+    int64_t totalActionSelections_;
+    int64_t totalExploitationActions_;
+    int64_t totalExplorationActions_;
+    
+    // Configuration parameters
+    float motorActivityThreshold_;
+    float curiosityExplorationThreshold_;
+    float maxRandomActionChance_;
+    float dopamineClampMin_;
+    float dopamineClampMax_;
+    float developmentInitialPlasticity_;
+    float developmentCriticalPeriodPlasticity_;
+    float developmentMaturationPlasticity_;
+    float developmentAdultPlasticity_;
+    double developmentInitialAge_;
+    double developmentCriticalPeriodAge_;
+    double developmentMaturationAge_;
+    double developmentAdultAge_;
+    float eligibilityTraceThreshold_;
+    float eligibilityTraceDecay_;
+    float dopamineModulationWeight_;
+    std::string explorationStrategy_;
+    int maxRandomActions_;
+    int minActionRepeats_;
 };
 
 } // namespace nlm

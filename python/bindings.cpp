@@ -26,8 +26,95 @@ PYBIND11_MODULE(pynlm, m) {
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
+    
+    // Add version attribute
+    m.attr("__version__") = "0.1.0";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    
+    // Add debugging and monitoring utilities
+    m.def("getDebugInfo", []() {
+        py::dict info;
+        info["version"] = "0.1.0";
+        info["python_version"] = PY_VERSION_STRING;
+        return info;
+    }, "Get debugging information about the NLM Python bindings");
+    
+    // Add configuration validation utilities
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> errors;
+        // Basic validation checks
+        if (config->has("brain.neuron_count")) {
+            int64_t count = config->getOr<int64_t>("brain.neuron_count", 0);
+            if (count <= 0) {
+                errors.push_back("brain.neuron_count must be positive");
+            }
+        }
+        return errors;
+    }, py::arg("config"), "Validate configuration and return list of errors");
+    
+    // Add configuration summary method
+    m.def("getConfigSummary", [](const std::shared_ptr<Config>& config) {
+        std::string summary = config->summary();
+        return summary;
+    }, py::arg("config"), "Get a summary string of the configuration");
+    
+    // Add advanced agent configuration
+    m.def("createAdvancedAgentConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set up advanced agent configuration
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.1);
+        config->set("brain.connection_probability", 0.05);
+        config->set("brain.initial_weight_mean", 0.5);
+        config->set("brain.initial_weight_std", 0.1);
+        
+        // Enable all plasticity rules
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        // Configure neuromodulation
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0);
+        
+        // Configure development
+        config->set("development.enable", true);
+        config->set("development.initial_plasticity", 1.0);
+        config->set("development.adult_plasticity", 0.2);
+        
+        return config;
+    }, "Create an advanced agent configuration with all features enabled");
+    
+    // Add simulation monitoring
+    m.def("getSimulationMetrics", [](const std::shared_ptr<Brain>& brain) {
+        py::dict metrics;
+        metrics["neuron_count"] = brain->getTotalNeuronCount();
+        metrics["synapse_count"] = brain->getTotalSynapseCount();
+        metrics["active_neurons"] = brain->getActiveNeuronCount();
+        metrics["firing_neurons"] = brain->getFiringNeuronCount();
+        metrics["average_firing_rate"] = brain->getAverageFiringRate();
+        metrics["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        metrics["total_spike_count"] = brain->getTotalSpikeCount();
+        return metrics;
+    }, py::arg("brain"), "Get simulation metrics for a brain instance");
+    
+    // Add world monitoring
+    m.def("getWorldStatus", [](const std::shared_ptr<SimpleWorld>& world) {
+        py::dict status;
+        status["width"] = world->getWidth();
+        status["height"] = world->getHeight();
+        status["simulation_time"] = world->getSimulationTime();
+        status["max_energy"] = world->getMaxEnergy();
+        status["agent_body"] = py::dict({
+            {"x", world->getAgentBody().x},
+            {"y", world->getAgentBody().y},
+            {"orientation", world->getAgentBody().orientation}
+        });
+        return status;
+    }, py::arg("world"), "Get world status information");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
