@@ -2,16 +2,28 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
+#include "AgentCommand.hpp"
+#include "AdvancedAgentFeatures.hpp"
+#include "PerformanceOptimizations.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
+#include <unordered_map>
 
 namespace nlm {
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
+private:
+    AgentCommandHandler commandHandler_;
+    AdvancedAgentCommandHandler advancedCommandHandler_;
+    AgentFeatureFlags featureFlags_;
+    PerformanceMonitor performanceMonitor_;
+    bool performanceMonitoringEnabled_;
+    
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
@@ -70,15 +82,9 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
-    // Motor decoding: convert neural activity to motor command
-    MotorCommand decodeFromMotorNeurons();
-    
-    // Motor command selection with curiosity/exploration
-    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
-    
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Neuron groups
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
@@ -86,7 +92,6 @@ private:
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
@@ -112,6 +117,29 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Process command line
+    bool processCommand(const std::string& commandLine);
+    
+    // Command registration helper
+    void registerCommand(const std::string& name, std::shared_ptr<AgentCommand> command);
+    
+    // Advanced agent methods
+    bool processAdvancedCommand(const std::string& commandLine);
+    void enableFeature(const std::string& featureName);
+    void disableFeature(const std::string& featureName);
+    bool isFeatureEnabled(const std::string& featureName) const;
+    void registerAdvancedCommand(const std::string& name, std::shared_ptr<AgentCommand> command);
+    void setFeatureFlag(const std::string& featureName, float value);
+    float getFeatureFlag(const std::string& featureName) const;
+    
+    // Performance monitoring
+    void enablePerformanceMonitoring(bool enable);
+    std::string getPerformanceReport() const;
+    bool executeOptimizedCommand(const std::string& commandLine);
+    std::vector<bool> executeBatchCommands(const std::vector<std::string>& commandLines);
+    void clearCommandCache();
+    size_t getCommandCacheSize() const;
 };
 
 } // namespace nlm
