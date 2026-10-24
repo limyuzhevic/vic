@@ -266,28 +266,69 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure the world dimensions and sensory range")
+        .def("reset", &SimpleWorld::reset, "Reset world to initial state")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set agent's starting position")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update world state for a timestep")
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+             py::arg("cmd"), py::arg("currentTime"),
+             "Apply a motor command to the agent")
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::reference_internal,
+             "Get current sensory percept")
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+             py::return_value_policy::reference_internal,
+             "Get agent body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             "Add an object to the world")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove object at position")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if position is valid (not wall)")
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"),
+             py::return_value_policy::reference_internal,
+             "Get object at position (if any)")
+        .def("getWidth", &SimpleWorld::getWidth, "Get world width")
+        .def("getHeight", &SimpleWorld::getHeight, "Get world height")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy, "Get maximum energy")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+             "Set maximum energy")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate, "Get energy decay rate")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+             "Set energy decay rate")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime, "Get simulation time")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducibility")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed, "Get current random seed")
+        // Advanced world methods
+        .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
+             py::return_value_policy::reference_internal,
+             "Get sensory percept with vision, touch, internal signals, and proprioception")
+        .def("addResource", [](SimpleWorld& self, float x, float y, float value) {
+            WorldObject obj(x, y, WorldObjectType::Resource, value);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), py::arg("value"), "Add a resource object")
+        .def("addHazard", [](SimpleWorld& self, float x, float y, float damage) {
+            WorldObject obj(x, y, WorldObjectType::Hazard, damage);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), py::arg("damage"), "Add a hazard object")
+        .def("addWall", [](SimpleWorld& self, float x, float y, float radius = 0.5f) {
+            WorldObject obj(x, y, WorldObjectType::Wall, 0.0f, radius);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), py::arg("radius") = 0.5f, "Add a wall object");
+
+    // Convenience function to create a world with pre-configured settings
+    m.def("createWorld", [](size_t width, size_t height, size_t visionWidth, size_t visionHeight) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(static_cast<float>(width), static_cast<float>(height), 
+                        visionWidth, visionHeight);
+        return world;
+    }, py::arg("width") = 20, py::arg("height") = 20,
+       py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+       "Create and configure a new world with default settings");
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -361,44 +402,54 @@ PYBIND11_MODULE(pynlm, m) {
              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+         .def("processSensoryInput", &AgentBrain::processSensoryInput,
+              py::arg("percept"),
+              "Process sensory percept and inject into brain")
+         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+              "Decode brain motor activity into motor command")
+         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+              py::arg("reward"), py::arg("predictedReward"),
+              "Apply reward-based neuromodulation")
+         .def("updateDevelopment", &AgentBrain::updateDevelopment,
+              py::arg("timestep"),
+              "Update development system")
+         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+              "Get current developmental stage")
+         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+              "Get current neuromodulation level")
+         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+              "Get curiosity level")
+         .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+              "Get novelty level")
+         .def("getPredictionError", &AgentBrain::getPredictionError,
+              "Get prediction error")
+         .def("reset", &AgentBrain::reset,
+              "Reset agent for new episode")
+         .def("getBrain", &AgentBrain::getBrain,
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain")
+         // Advanced configuration and control
+         .def("enableRewardModulation", &AgentBrain::enableRewardModulation, py::arg("enable"),
+              "Enable or disable reward modulation subsystem")
+         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity, py::arg("enable"),
+              "Enable or disable structural plasticity (grow new connections)")
+         .def("enableDevelopment", &AgentBrain::enableDevelopment, py::arg("enable"),
+              "Enable or disable developmental changes over time")
+         .def("enableCuriosity", &AgentBrain::enableCuriosity, py::arg("enable"),
+              "Enable or disable curiosity-driven exploration")
+         // State checking
+         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+         // Advanced features for research
+         .def("getBrain", &AgentBrain::getBrain,
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain instance for advanced manipulation")
+         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+              "Get expected sensory input size from world")
+         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+              "Get expected motor output size for world commands")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
