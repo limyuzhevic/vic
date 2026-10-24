@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <sstream>
 
 namespace nlm {
 
@@ -29,6 +30,17 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Configuration validation error handling
+class ConfigValidationError : public std::runtime_error {
+public:
+    ConfigValidationError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigLoadError : public std::runtime_error {
+public:
+    ConfigLoadError(const std::string& message) : std::runtime_error(message) {}
 };
 
 // Configuration entry
@@ -93,6 +105,21 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    void validate() const;
+    bool isValid() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Configuration migration
+    void migrate();
+    
+    // Configuration backup and restore
+    bool backup(const std::string& filepath) const;
+    static Config restore(const std::string& filepath);
+    
+    // Compare configurations
+    static std::string diff(const Config& config1, const Config& config2);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +127,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string configValueToString(const ConfigValue& value);
 };
 
 } // namespace nlm

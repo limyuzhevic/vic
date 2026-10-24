@@ -1,3 +1,7 @@
+# CMake configuration for NLM (Neural Learning Machine)
+# Version 0.1.0
+# Supports Phase 2 real neural computation with extensibility for future phases
+
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
@@ -18,6 +22,12 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Find Python and pybind11
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
+
+# Try to find pybind11 (either installed or in the system)
+find_package(pybind11 CONFIG REQUIRED)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -26,6 +36,7 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/Validation.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -121,12 +132,6 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
-)
-target_link_libraries(nlm PUBLIC nlm_core)
-
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
@@ -139,13 +144,64 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Test executable (main test suite)
+add_executable(nlm_test
+    src/tests/test_main.cpp
+)
+target_link_libraries(nlm_test PUBLIC nlm_core)
+
+# Benchmark executable
+add_executable(benchmark
+    src/benchmark.cpp
+)
+target_link_libraries(benchmark PUBLIC nlm_core)
+
+# NLM Main Executable (Phase 2 neural computation)
+add_executable(nlm
+    src/main.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core)
+
+# NLM CLI Tool
+add_executable(nlm_cli
+    src/nlm_cli.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+
+# Python bindings module
+pybind11_add_module(pynlm
+    python/bindings.cpp
+)
+target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+
+# Python module install
+target_include_directories(pynlm PRIVATE ${Python_INCLUDE_DIRS})
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+# Install targets
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo nlm_test benchmark nlm_cli
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Install Python module
+install(TARGETS pynlm
+    LIBRARY DESTINATION ${Python_SITEARCH}
+    RUNTIME DESTINATION ${Python_SITEARCH}
+)
+
+# Create a target for building Python bindings
+add_custom_target(pynlm_bind
+    COMMENT "Building NLM Python bindings"
+    DEPENDS pynlm
 )

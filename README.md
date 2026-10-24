@@ -20,49 +20,36 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 2: REAL NEURAL COMPUTATION**
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+Phase 2 implements real spiking neural computation with:
 
-### Phase 6 Integration Achievements
+### Phase 2 Core Implementation
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+#### Neural Dynamics
+- Leaky Integrate-and-Fire (LIF) neuron dynamics
+- Event-driven spike propagation with synaptic delays
+- Realistic membrane potential dynamics
+- Refractory period simulation
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+#### Plasticity Mechanisms
+- Spike-Timing-Dependent Plasticity (STDP)
+  - Long-Term Potentiation (LTP) for pre-before-post spikes
+  - Long-Term Depression (LTD) for post-before-pre spikes
+- Hebbian learning rules
+- Structural plasticity (synaptogenesis and pruning)
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+#### Network Architecture
+- Multi-region brain structure
+- Heterogeneous neuron populations (excitatory, inhibitory, sensory, motor)
+- Random connectivity patterns with configurable probability
+- Synaptic weight initialization and dynamics
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
-
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+#### Learning and Adaptation
+- Experience-dependent synaptic changes
+- Activity-dependent plasticity
+- Network-level learning capabilities
+- Reproducible experiments with configurable random seeds
 
 ## Building
 
@@ -121,7 +108,7 @@ NLM/
 - Core types and configuration
 - Neural interfaces
 
-### Phase 2 (Complete)
+### Phase 2 (Current)
 - Real LIF neuron dynamics
 - Event-driven spike propagation
 - STDP and Hebbian plasticity
@@ -152,7 +139,7 @@ NLM/
 - Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
+### Phase 6 (In Progress - Planned)
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
 - Neuromodulation affects plasticity and dynamics
@@ -161,6 +148,31 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+
+## Current Focus: Phase 2 Integration
+
+NLM Phase 2 represents the foundation of real neural computation. It implements:
+
+**Core Neural Implementation:**
+- **LIF Neuron Dynamics**: Realistic neuron models with membrane potential, threshold, and refractory periods
+- **Event-Driven Computation**: Spike propagation with precise timing and synaptic delays
+- **Plasticity Rules**: Both STDP and Hebbian learning for synaptic adaptation
+- **Structural Plasticity**: Dynamic synapse formation and elimination
+
+**Current Capabilities:**
+- Simulate spiking neural networks with biologically plausible dynamics
+- Study learning mechanisms through STDP and Hebbian rules
+- Explore structural plasticity effects on network development
+- Reproduce experimental findings from neuroscience
+
+**Future Integration Path:**
+Phase 2 provides the foundation for integrating with:
+- Memory systems (Phase 3)
+- Neuromodulation (Phase 3, 4)
+- Prediction and cognition (Phase 4)
+- Advanced development and learning (Phase 5, 6)
+
+This modular approach allows systematic integration of increasingly complex brain systems while maintaining biological plausibility and computational tractability.
 
 ## Scientific Limitations
 
