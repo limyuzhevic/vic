@@ -64,34 +64,31 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonString);
+    
+    // Load from YAML string
+    bool loadFromYAML(const std::string& yamlString);
+    
+    // Save to JSON string
+    std::string saveToJSON() const;
+    
+    // Validate configuration
+    bool validate() const;
+    
+    // Get configuration with validation
     template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    std::optional<T> getValidated(const std::string& key, 
+                                  const std::function<bool(const T&)>& validator = nullptr) const;
     
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    // Check if all required keys are present
+    bool hasAllRequired(const std::vector<std::string>& requiredKeys) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Merge another configuration
+    void merge(const Config& other, ConfigSource source = ConfigSource::File);
     
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
-    void remove(const std::string& key);
-    
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Get configuration diff between two configs
+    std::vector<std::string> getDiff(const Config& other) const;
     
 private:
     struct Impl;
