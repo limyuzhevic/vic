@@ -74,6 +74,9 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Get brain reference (for accessing neurons)
+    Brain* getBrain() const { return brain_; }
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);

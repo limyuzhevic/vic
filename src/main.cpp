@@ -321,10 +321,43 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
+// Advanced Command Interface for Power Users
+void printAdvancedCommands() {
+    std::cout << "\n=== ADVANCED COMMANDS (Power Users) ===\n" << std::endl;
+    std::cout << "Config Advanced Options:" << std::endl;
+    std::cout << "  --brain.checkpoint=<file>      Load/save brain checkpoints" << std::endl;
+    std::cout << "  --brain.memory-size=<n>         Set working memory capacity" << std::endl;
+    std::cout << "  --brain.episodic-max=<n>        Set maximum episodic memory entries" << std::endl;
+    std::cout << "  --brain.prediction-enabled        Enable prediction system" << std::endl;
+    std::cout << "  --brain.planner-enabled          Enable neural planner" << std::endl;
+    std::cout << "  --brain.development-stage=<s>    Set developmental stage (Initial/CriticalPeriod/Maturation/Adult)" << std::endl;
+    std::cout << "\nSimulation Advanced Options:" << std::endl;
+    std::cout << "  --simulation.profile=<file>      Save simulation profile" << std::endl;
+    std::cout << "  --simulation.show-metrics        Display detailed simulation metrics" << std::endl;
+    std::cout << "  --simulation.verbose-mode        Enable verbose logging" << std::endl;
+    std::cout << "  --simulation.max-steps=<n>       Override maximum simulation steps" << std::endl;
+    std::cout << "\nNeuromodulation Advanced Options:" << std::endl;
+    std::cout << "  --neuromodulation.dopamine=<f>    Set dopamine baseline level" << std::endl;
+    std::cout << "  --neuromodulation.curiosity=<f>  Set curiosity level" << std::endl;
+    std::cout << "  --neuromodulation.novelty=<f>    Set novelty sensitivity" << std::endl;
+    std::cout << "\nMemory Advanced Options:" << std::endl;
+    std::cout << "  --memory.replay-interval=<n>     Set memory replay frequency" << std::endl;
+    std::cout << "  --memory.consolidation-interval=<n> Set memory consolidation frequency" << std::endl;
+    std::cout << "  --memory.clear=working|episodic|associative|all     Clear specific memory systems" << std::endl;
+    std::cout << "\nAdvanced Brain Operations:" << std::endl;
+    std::cout << "  --brain.reset                       Reset brain state and reinitialize" << std::endl;
+    std::cout << "  --brain.get-state                  Print detailed brain state" << std::endl;
+    std::cout << "  --brain.save-state=<file>          Save current brain state to file" << std::endl;
+    std::cout << "  --brain.load-state=<file>          Load brain state from file" << std::endl;
+    std::cout << "  --brain.get-memory=working|episodic|associative|all  Inspect memory contents" << std::endl;
+    std::cout << "\nResearch/Education Mode:" << std::endl;
+    std::cout << "  --research.mode                    Enable research mode with extra logging" << std::endl;
+    std::cout << "  --research.record-experiment      Record experiment data for analysis" << std::endl;
+    std::cout << "  --research.profile-export=<file>   Export neural profiles" << std::endl;
+}
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Print advanced commands help
+    printAdvancedCommands();
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();

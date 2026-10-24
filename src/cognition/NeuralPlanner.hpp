@@ -115,6 +115,9 @@ public:
     // Initialize with brain reference
     void initialize(Brain* brain);
 
+    // Get brain reference
+    Brain* getBrain() const { return brain_; }
+
     // Record that taking an action caused a specific sensory change
     void recordSelfAction(ActionType action,
                          const std::vector<float>& beforeState,

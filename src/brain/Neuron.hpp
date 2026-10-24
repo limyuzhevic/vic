@@ -87,11 +87,20 @@ public:
     void setFiringRate(FiringRate rate);
     
     // LIF neuron parameters
+    // Leaky Integrate-and-Fire (LIF) neuron dynamics implementation
+    // - Membrane potential integrates inputs and leaks toward resting potential
+    // - Threshold crossing triggers spike output
+    // - Refractory period prevents immediate spiking
+    // - Adaptation variable enables spike-frequency adaptation
     void setLeakConductance(MembranePotential conductance);
     MembranePotential getLeakConductance() const;
     uint32_t getRefractoryPeriod() const;
     void setRestingPotential(MembranePotential potential);
     MembranePotential getRestingPotential() const;
+    void setResetPotential(MembranePotential potential);
+    MembranePotential getResetPotential() const;
+    void setAdaptationVariable(float value);
+    float getAdaptationVariable() const;
     void setResetPotential(MembranePotential potential);
     
     // Spike detection

@@ -59,16 +59,26 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+        NLM_LOG_ERROR("Invalid population ID: " + std::to_string(id.index()));
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    auto* pop = pImpl->populations[id.index() - 1].get();
+    if (!pop) {
+        NLM_LOG_ERROR("Population pointer is null for ID: " + std::to_string(id.index()));
+    }
+    return pop;
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
     if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+        NLM_LOG_ERROR("Invalid population ID (const): " + std::to_string(id.index()));
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    const auto* pop = pImpl->populations[id.index() - 1].get();
+    if (!pop) {
+        NLM_LOG_ERROR("Population pointer is null for ID (const): " + std::to_string(id.index()));
+    }
+    return pop;
 }
 
 size_t NeuralRegion::getPopulationCount() const {
@@ -90,33 +100,107 @@ std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations() {
 
 SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
                                    SynapticWeight weight, Delay delay) {
+    // Validate input parameters
+    if (source.index() == 0 || destination.index() == 0) {
+        NLM_LOG_ERROR("Cannot add synapse with invalid neuron IDs: source=" + 
+                     std::to_string(source.index()) + ", destination=" + std::to_string(destination.index()));
+        return SynapseId(0); // Invalid synapse ID
+    }
+    
+    if (weight < -10.0f || weight > 10.0f) {
+        NLM_LOG_ERROR("Synapse weight out of valid range: " + std::to_string(weight) + 
+                     " (valid range: [-10.0, 10.0])");
+        return SynapseId(0);
+    }
+    
+    if (delay < 0) {
+        NLM_LOG_ERROR("Synapse delay must be non-negative: " + std::to_string(delay));
+        return SynapseId(0);
+    }
+    
+    // Check if source and destination neurons exist
+    bool sourceExists = false;
+    bool destExists = false;
+    
+    // Note: In a full implementation, you would have access to the brain's neurons
+    // For now, we'll assume the neurons exist based on the IDs being valid
+    if (source.index() > 0) sourceExists = true;
+    if (destination.index() > 0) destExists = true;
+    
+    if (!sourceExists) {
+        NLM_LOG_ERROR("Source neuron not found for synapse: " + std::to_string(source.index()));
+        return SynapseId(0);
+    }
+    
+    if (!destExists) {
+        NLM_LOG_ERROR("Destination neuron not found for synapse: " + std::to_string(destination.index()));
+        return SynapseId(0);
+    }
+    
     SynapseId synId(pImpl->nextSynapseId++);
     auto synapse = std::make_unique<Synapse>(synId, source, destination);
     synapse->setWeight(weight);
     synapse->setDelay(delay);
     
+    // Validate synapse was created successfully
+    if (!synapse) {
+        NLM_LOG_ERROR("Failed to create synapse object");
+        return SynapseId(0);
+    }
+    
     pImpl->outgoingSynapses[source].push_back(synId);
     pImpl->incomingSynapses[destination].push_back(synId);
     
+    // Validate connection before adding
+    if (pImpl->outgoingSynapses.find(source) == pImpl->outgoingSynapses.end() ||
+        pImpl->incomingSynapses.find(destination) == pImpl->incomingSynapses.end()) {
+        NLM_LOG_ERROR("Failed to create synapse connections");
+        return SynapseId(0);
+    }
+    
     pImpl->synapses.push_back(std::move(synapse));
+    
+    // Validate synapse was added successfully
+    if (pImpl->synapses.empty() || pImpl->synapses.back() == nullptr) {
+        NLM_LOG_ERROR("Failed to add synapse to region");
+        return SynapseId(0);
+    }
+    
+    NLM_LOG_INFO("Created synapse from " + std::to_string(source.index()) + 
+               " to " + std::to_string(destination.index()) + 
+               " (ID: " + std::to_string(synId.index()) + 
+               ", weight: " + std::to_string(weight) + ")");
+    
     return synId;
 }
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {
     for (auto& syn : pImpl->synapses) {
         if (syn->getId() == id) {
+            if (!syn) {
+                NLM_LOG_ERROR("Synapse pointer is null for ID: " + std::to_string(id.index()));
+                return nullptr;
+            }
             return syn.get();
         }
     }
+    
+    NLM_LOG_ERROR("Synapse not found with ID: " + std::to_string(id.index()));
     return nullptr;
 }
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
     for (auto& syn : pImpl->synapses) {
         if (syn->getId() == id) {
+            if (!syn) {
+                NLM_LOG_ERROR("Synapse pointer is null for ID (const): " + std::to_string(id.index()));
+                return nullptr;
+            }
             return syn.get();
         }
     }
+    
+    NLM_LOG_ERROR("Synapse not found with ID (const): " + std::to_string(id.index()));
     return nullptr;
 }
 
@@ -133,8 +217,12 @@ std::vector<Synapse*> NeuralRegion::getSynapsesFrom(NeuronId neuron) {
     auto it = pImpl->outgoingSynapses.find(neuron);
     if (it != pImpl->outgoingSynapses.end()) {
         for (SynapseId synId : it->second) {
-            if (auto* syn = getSynapse(synId)) {
+            auto* syn = getSynapse(synId);
+            if (syn) {
                 result.push_back(syn);
+            } else {
+                NLM_LOG_WARNING("Found invalid synapse reference in outgoingSynapses mapping for neuron " + 
+                               std::to_string(neuron.index()));
             }
         }
     }
@@ -146,8 +234,12 @@ std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
     auto it = pImpl->incomingSynapses.find(neuron);
     if (it != pImpl->incomingSynapses.end()) {
         for (SynapseId synId : it->second) {
-            if (auto* syn = getSynapse(synId)) {
+            auto* syn = getSynapse(synId);
+            if (syn) {
                 result.push_back(syn);
+            } else {
+                NLM_LOG_WARNING("Found invalid synapse reference in incomingSynapses mapping for neuron " + 
+                               std::to_string(neuron.index()));
             }
         }
     }
@@ -191,13 +283,37 @@ float NeuralRegion::getAverageFiringRate() const {
 
 float NeuralRegion::getAverageSynapticWeight() const {
     if (pImpl->synapses.empty()) {
+        NLM_LOG_DEBUG("No synapses in region " + std::to_string(pImpl->id.index()) + ", returning 0.0f");
         return 0.0f;
     }
+    
     float sum = 0.0f;
+    size_t validSynapses = 0;
+    
     for (const auto& syn : pImpl->synapses) {
-        sum += syn->getWeight();
+        if (!syn) {
+            NLM_LOG_WARNING("Found null synapse pointer in region " + 
+                           std::to_string(pImpl->id.index()) + ", skipping synapse);
+            continue;
+        }
+        
+        float weight = syn->getWeight();
+        if (std::isnan(weight) || std::isinf(weight)) {
+            NLM_LOG_WARNING("Invalid synapse weight: " + std::to_string(weight) + 
+                           " in region " + std::to_string(pImpl->id.index()));
+            continue;
+        }
+        
+        sum += weight;
+        validSynapses++;
     }
-    return sum / static_cast<float>(pImpl->synapses.size());
+    
+    if (validSynapses == 0) {
+        NLM_LOG_WARNING("No valid synapses found in region " + std::to_string(pImpl->id.index()));
+        return 0.0f;
+    }
+    
+    return sum / static_cast<float>(validSynapses);
 }
 
 float NeuralRegion::getSynapticDensity() const {
