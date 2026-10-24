@@ -38,6 +38,89 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Novelty detection integrated with sensory processing
 - All neuromodulators connected to plasticity rules
 
+## Enhanced Command Line Interface
+
+NLM now includes a comprehensive command-line interface for easy operation and automation:
+
+### NLM CLI Tool (`nlm_cli`)
+
+The `nlm_cli` executable provides:
+
+- **Demo Mode**: Run quick demonstrations with customizable parameters
+- **Experiment Mode**: Run experiments from configuration files
+- **Benchmark Mode**: Performance benchmarking with different configurations
+- **Config Commands**: Manage configuration files (load, save, list, info)
+
+**Basic Usage**:
+```bash
+# Run a quick demo
+nlm_cli demo --neuron_count=1000 --steps=200
+
+# Run an experiment
+nlm_cli experiment --file=configs/default.cfg
+
+# Run benchmarks
+nlm_cli benchmark --neuron_counts=100,500,1000 --repeats=3
+
+# Manage configurations
+nlm_cli config list
+nlm_cli config save myconfig.json
+nlm_cli config load myconfig.json
+```
+
+### NLM Demo Launcher (`nlm_launcher.py`)
+
+A Python-based launcher script that simplifies running different NLM demos:
+
+**Available Commands**:
+- `demo`: Run basic neural computation demo
+- `phase3`: Run Phase 3 demo (World interaction)
+- `phase4`: Run Phase 4 demo (Prediction and memory)
+- `phase6`: Run Phase 6 demo (Full integration)
+- `cli`: Run CLI demo (using the new nlm_cli tool)
+- `list`: List all available demos
+- `run-all`: Run all demos sequentially
+- `create-config`: Create a custom configuration file
+
+**Usage Examples**:
+```bash
+# Run a basic demo
+./nlm_launcher.py demo --neuron_count=1000
+
+# Run all demos
+./nlm_launcher.py run-all
+
+# Create a custom config file
+./nlm_launcher.py create-config myconfig --neuron_count=2000
+
+# Run Phase 6 integration demo
+./nlm_launcher.py phase6
+```
+
+### Key Improvements
+
+1. **Fixed Configuration Bugs**: Removed duplicate `dopamine_baseline` key from configs/default.cfg
+2. **Enhanced User Experience**: Easy-to-use launcher scripts with intuitive interfaces
+3. **Better Organization**: Clear separation between CLI tools and Python scripts
+4. **Improved Documentation**: Comprehensive help text and usage examples
+5. **Flexible Configuration**: Support for custom parameters and configuration files
+
+### Building the Enhanced NLM
+
+To use the new features, build the project with:
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+The following new executables will be created:
+- `nlm_cli`: Command-line interface tool
+- `nlm_phase6_demo`: Phase 6 integration demo (now with better organization)
+- All existing executables (nlm, nlm_phase3_demo, nlm_phase4_demo) are preserved
+
 #### Prediction System
 - Prediction system integrated into brain loop
 - Prediction error signals affect learning

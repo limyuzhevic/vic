@@ -139,6 +139,32 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Phase 6 demo executable
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# CLI tool executable
+add_executable(nlm_cli
+    src/nlm_cli.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+
+# Testing executable
+add_executable(nlm_test
+    tests/test_main.cpp
+    tests/test_config.cpp
+    tests/test_brain.cpp
+    tests/test_neuron.cpp
+    tests/test_synapse.cpp
+    tests/test_stdp.cpp
+    tests/test_random.cpp
+    tests/test_clock.cpp
+    tests/test_types.cpp
+)
+target_link_libraries(nlm_test PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
