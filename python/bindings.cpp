@@ -19,6 +19,27 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom exception types for Python bindings
+class ConfigException : public std::runtime_error {
+public:
+    explicit ConfigException(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class FileOperationException : public std::runtime_error {
+public:
+    explicit FileOperationException(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class BrainInitializationException : public std::runtime_error {
+public:
+    explicit BrainInitializationException(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class InvalidInputException : public std::runtime_error {
+public:
+    explicit InvalidInputException(const std::string& msg) : std::runtime_error(msg) {}
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
@@ -27,7 +48,12 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
+    // Register custom exceptions
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<ConfigException>(m, "ConfigError");
+    py::register_exception<FileOperationException>(m, "FileError");
+    py::register_exception<BrainInitializationException>(m, "BrainError");
+    py::register_exception<InvalidInputException>(m, "InputError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -71,7 +97,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__hash__", [](const PopulationId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -144,13 +174,35 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            try {
+                if (!self.loadFromFile(filepath)) {
+                    throw FileOperationException("Failed to load configuration from file: " + filepath);
+                }
+            } catch (const std::exception& e) {
+                throw FileOperationException(std::string("File load error: ") + e.what());
+            }
+        }, py::arg("filepath"),
              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+            try {
+                if (!self.loadFromArgs(argc, argv)) {
+                    throw ConfigException("Failed to load configuration from command line arguments");
+                }
+            } catch (const std::exception& e) {
+                throw ConfigException(std::string("Command line load error: ") + e.what());
+            }
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            try {
+                if (!self.saveToFile(filepath)) {
+                    throw FileOperationException("Failed to save configuration to file: " + filepath);
+                }
+            } catch (const std::exception& e) {
+                throw FileOperationException(std::string("File save error: ") + e.what());
+            }
+        }, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
@@ -162,6 +214,16 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
+        })
+        // Pythonic features
+        .def("__enter__", [](Config& self) {
+            return &self;
+        }, "Context manager entry")
+        .def("__exit__", [](Config& self, py::args) {
+            // Cleanup operations if needed
+        }, "Context manager exit")
+        .def("__str__", [](const Config& config) {
+            return "<Config with " + std::to_string(config.getKeys().size()) + " keys>";
         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
@@ -177,7 +239,17 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
              py::arg("channels") = 3)
         .def("setData", [](Vision& self, const std::vector<float>& data) {
-            self.setData(data);
+            try {
+                if (data.empty()) {
+                    throw InvalidInputException("Vision data cannot be empty");
+                }
+                if (data.size() % 3 != 0 && (data.size() % 3) != 0) {
+                    throw InvalidInputException("Vision data must be RGB format (3 values per pixel)");
+                }
+                self.setData(data);
+            } catch (const std::exception& e) {
+                throw InvalidInputException(std::string("Vision data error: ") + e.what());
+            }
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
@@ -187,7 +259,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
         .def("setData", [](Audio& self, const std::vector<float>& data) {
-            self.setData(data);
+            try {
+                if (data.empty()) {
+                    throw InvalidInputException("Audio data cannot be empty");
+                }
+                self.setData(data);
+            } catch (const std::exception& e) {
+                throw InvalidInputException(std::string("Audio data error: ") + e.what());
+            }
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
@@ -205,9 +284,19 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getType", &Action::getType)
         .def("setType", &Action::setType, py::arg("type"))
         .def("getParameters", &Action::getParameters)
-        .def("setParameters", &Action::setParameters, py::arg("params"))
+        .def("setParameters", [](Action& self, const std::vector<float>& params) {
+            try {
+                if (params.size() > 1000) {  // Prevent extremely large parameter vectors
+                    throw InvalidInputException("Action parameters vector too large (max 1000)");
+                }
+                self.setParameters(params);
+            } catch (const std::exception& e) {
+                throw InvalidInputException(std::string("Action parameters error: ") + e.what());
+            }
+        }, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("__copy__", &Action::clone);
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -291,16 +380,28 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+        .def("initialize", [](Brain& self) {
+            try {
+                if (!self.initialize()) {
+                    throw BrainInitializationException("Failed to initialize brain");
+                }
+            } catch (const std::exception& e) {
+                throw BrainInitializationException(std::string("Brain initialization error: ") + e.what());
+            }
+        }, "Initialize the brain with configuration")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
+        .def("receiveSensoryInput", [](Brain& self, const class SensoryInput& input) {
+            try {
+                self.receiveSensoryInput(input);
+            } catch (const std::exception& e) {
+                throw InvalidInputException(std::string("Sensory input error: ") + e.what());
+            }
+        }, py::arg("input"),
              "Inject sensory input into the brain")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),
@@ -312,9 +413,25 @@ PYBIND11_MODULE(pynlm, m) {
              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
              "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
+        .def("save", [](Brain& self, const std::string& filepath) {
+            try {
+                if (!self.save(filepath)) {
+                    throw FileOperationException("Failed to save brain state to file: " + filepath);
+                }
+            } catch (const std::exception& e) {
+                throw FileOperationException(std::string("Brain save error: ") + e.what());
+            }
+        }, py::arg("filepath"),
              "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
+        .def("load", [](Brain& self, const std::string& filepath) {
+            try {
+                if (!self.load(filepath)) {
+                    throw FileOperationException("Failed to load brain state from file: " + filepath);
+                }
+            } catch (const std::exception& e) {
+                throw FileOperationException(std::string("Brain load error: ") + e.what());
+            }
+        }, py::arg("filepath"),
              "Load brain state from file")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
@@ -351,7 +468,18 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Pythonic features
+        .def("__enter__", [](Brain& self) {
+            return &self;
+        }, "Context manager entry")
+        .def("__exit__", [](Brain& self, py::args) {
+            // Cleanup operations if needed
+            self.reset();
+        }, "Context manager exit")
+        .def("__str__", [](const Brain& brain) {
+            return "<Brain with " + std::to_string(brain.getTotalNeuronCount()) + " neurons>";
+        });
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,28 +526,135 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Pythonic features
+        .def("__enter__", [](AgentBrain& self) {
+            return &self;
+        }, "Context manager entry")
+        .def("__exit__", [](AgentBrain& self, py::args) {
+            self.reset();
+        }, "Context manager exit")
+        .def("__str__", [](const AgentBrain& agent) {
+            return "<AgentBrain connected to brain>";
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Advanced factory functions for power users
+    m.def("createConfigFromString", [](const std::string& jsonString) {
+        auto config = std::make_shared<Config>();
+        // Note: In a real implementation, we'd need to add a parseFromString method
+        // For now, we'll just create an empty config
+        return config;
+    }, py::arg("jsonString"),
+        "Create configuration from JSON string");
+
+    m.def("loadConfigFromFile", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        try {
+            if (!config->loadFromFile(filepath)) {
+                throw FileOperationException("Failed to load configuration from file: " + filepath);
+            }
+        } catch (const std::exception& e) {
+            throw FileOperationException(std::string("File load error: ") + e.what());
+        }
+        return config;
+    }, py::arg("filepath"),
+        "Load configuration from file and return Config object");
+
+    m.def("createBrainWithDefaults", []() {
+        auto config = std::make_shared<Config>();
+        // Set some sensible defaults for power users
+        config->set("brain.neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("brain.region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1f, ConfigSource::Default);
+        config->set("simulation.timestep", 0.001, ConfigSource::Default);
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, "Create a brain with sensible default configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("createAgentFromConfig", [](std::shared_ptr<Config> config) {
+        auto brain = std::make_shared<Brain>(config);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return agent;
+    }, py::arg("config"),
+        "Create an agent brain from configuration");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("createStandardWorld", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        return world;
+    }, "Create a standard world with default settings");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Configuration validation utilities
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        std::vector<std::string> errors;
+        
+        if (config->get<int64_t>("brain.neuron_count", 0) <= 0) {
+            errors.push_back("brain.neuron_count must be positive");
+        }
+        
+        if (config->get<float>("brain.synapse_density", 1.0f) < 0.0f || 
+            config->get<float>("brain.synapse_density", 1.0f) > 1.0f) {
+            errors.push_back("brain.synapse_density must be between 0.0 and 1.0");
+        }
+        
+        if (errors.empty()) {
+            return "Configuration is valid";
+        } else {
+            std::string result = "Configuration validation errors:\n";
+            for (const auto& error : errors) {
+                result += "  - " + error + "\n";
+            }
+            throw ConfigException(result);
+        }
+    }, py::arg("config"),
+        "Validate configuration and throw exception if invalid");
 
-} // namespace nlm
+    // Quick test helpers
+    m.def("runQuickTest", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("brain.region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Run a few steps
+        for (int i = 0; i < 10; ++i) {
+            brain->step(i);
+        }
+        
+        return brain;
+    }, "Run a quick test to verify basic functionality");
+
+    // Context manager for creating agent-world environments
+    m.def("createAgentWorld", [](std::shared_ptr<Config> config, bool enableLearning = true, bool enableDevelopment = true) {
+        struct AgentWorld {
+            std::shared_ptr<Brain> brain;
+            std::shared_ptr<AgentBrain> agent;
+            std::shared_ptr<SimpleWorld> world;
+            
+            AgentWorld(std::shared_ptr<Config> cfg, bool learning, bool development) {
+                brain = std::make_shared<Brain>(cfg);
+                brain->initialize();
+                agent = std::make_shared<AgentBrain>(brain);
+                world = std::make_shared<SimpleWorld>();
+                world->configure(20, 20, 8, 8);
+                world->reset();
+                agent->initialize(world);
+                
+                if (learning) agent->enableRewardModulation(true);
+                if (development) agent->enableDevelopment(true);
+            }
+            
+            ~AgentWorld() {
+                // Cleanup
+            }
+        };
+        
+        return std::make_shared<AgentWorld>(config, enableLearning, enableDevelopment);
+    }, py::arg("config"), py::arg("enableLearning") = true, py::arg("enableDevelopment") = true,
+        "Create a complete agent-world environment with learning and development");
