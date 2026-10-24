@@ -133,6 +133,76 @@ public:
      * Test replay system
      */
     bool testReplay();
+    
+    /**
+     * Connect prediction system to sensory processing
+     */
+    bool connectPredictionToSensory();
+    
+    /**
+     * Connect neural planner to action selection
+     */
+    bool connectPlannerToActionSelection();
+    
+    /**
+     * Connect concept formation to experience processing
+     */
+    bool connectConceptFormationToExperience();
+    
+    /**
+     * Connect neuromodulators to multiple brain systems
+     */
+    bool connectFullNeuromodulation();
+    
+    /**
+     * Test full integration with life history
+     */
+    bool testLifeHistoryIntegration();
+    
+    /**
+     * Test memory retention over time
+     */
+    bool testMemoryRetention();
+    
+    /**
+     * Test developmental progression
+     */
+    bool testDevelopmentalProgression();
+    
+    /**
+     * Test multi-system interaction
+     */
+    bool testMultiSystemInteraction();
+    
+    /**
+     * Save brain state to file (checkpointing)
+     */
+    bool save(const std::string& filepath) const;
+    
+    /**
+     * Load brain state from file
+     */
+    bool load(const std::string& filepath);
+    
+    /**
+     * Apply neuromodulatory signals
+     */
+    void applyNeuromodulation(const class Neuromodulator& signal);
+    
+    /**
+     * Update plasticity rules (called automatically in step)
+     */
+    void updatePlasticity();
+    
+    /**
+     * Apply developmental changes (called automatically in step)
+     */
+    void develop();
+    
+    /**
+     * Reset brain state
+     */
+    void reset();
 };
 
 } // namespace nlm

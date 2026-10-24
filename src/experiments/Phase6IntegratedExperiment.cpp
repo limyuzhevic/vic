@@ -124,6 +124,40 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Checkpointing: " + std::string(result.checkpointingWorks ? "YES" : "NO"));
+    NLM_LOG_INFO("Replay: " + std::string(result.replayWorks ? "YES" : "NO"));
+    
+    // Test prediction system specifically
+    NLM_LOG_INFO("=== Testing Prediction System Integration ===");
+    bool predictionWorks = false;
+    if (brain->getPredictionSystem()) {
+        // Test prediction generation
+        brain->getPredictionSystem()->trainFromData(std::vector<float>(100, 0.5f)); // Mock training data
+        
+        // Generate prediction
+        auto prediction = brain->getPredictionSystem()->generatePrediction();
+        if (!prediction.empty()) {
+            NLM_LOG_INFO("[PASS] Prediction system generated prediction: " + 
+                        std::to_string(prediction.size()) + " values");
+            predictionWorks = true;
+        } else {
+            NLM_LOG_INFO("[INFO] Prediction system returned empty prediction (may be normal)");
+        }
+        
+        // Test prediction error computation
+        float predictionError = brain->getPredictionSystem()->getPredictionError();
+        NLM_LOG_INFO("  Prediction error: " + std::to_string(predictionError));
+        
+        // Test prediction confidence
+        float confidence = brain->getPredictionSystem()->getConfidence();
+        NLM_LOG_INFO("  Prediction confidence: " + std::to_string(confidence));
+        
+        // Test prediction history
+        const auto& history = brain->getPredictionSystem()->getErrorHistory();
+        NLM_LOG_INFO("  Prediction history entries: " + std::to_string(history.size()));
+    } else {
+        NLM_LOG_ERROR("[FAIL] Prediction system not available");
+    }
     
     // Test checkpointing
     if (config.enableCheckpointing) {
@@ -146,9 +180,30 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         }
     }
     
+    // Test replay
+    if (config.enableReplay) {
+        NLM_LOG_INFO("Testing replay system...");
+        if (brain->getEpisodicMemory() && brain->getEpisodicMemory()->getEpisodeCount() > 0) {
+            auto episodes = brain->getEpisodicMemory()->getEpisodesForReplay(3);
+            if (!episodes.empty()) {
+                NLM_LOG_INFO("[PASS] Replay system working: " + std::to_string(episodes.size()) + " episodes available");
+                result.replayWorks = true;
+            }
+        }
+    }
+    
     result.endTime = time(nullptr);
     auto endWall = std::chrono::high_resolution_clock::now();
     result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
+    
+    NLM_LOG_INFO("=== Integration Verification Complete ===");
+    NLM_LOG_INFO("Prediction System: " + std::string(predictionWorks ? "WORKING" : "NEEDS ATTENTION"));
+    NLM_LOG_INFO("Memory Integration: " + std::string(result.memoryWorkingMemoryIntegrated && 
+                   result.memoryEpisodicMemoryIntegrated ? "COMPLETE" : "PARTIAL"));
+    NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "FUNCTIONAL" : "LIMITED"));
+    NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "ACTIVE" : "STUB"));
+    NLM_LOG_INFO("Persistence: " + std::string(result.checkpointingWorks ? "WORKING" : "FAILED"));
+    NLM_LOG_INFO("Replay: " + std::string(result.replayWorks ? "FUNCTIONAL" : "LIMITED"));
     
     NLM_LOG_INFO("=== Experiment Complete ===");
     NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));

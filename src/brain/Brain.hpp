@@ -137,6 +137,9 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
+    // Get current simulation step (for prediction system)
+    SimulationStep getCurrentStep() const;
+    
     // ========== MEMORY SYSTEMS ==========
     
     // Working memory - transient active information

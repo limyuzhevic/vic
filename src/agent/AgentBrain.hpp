@@ -4,6 +4,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
 #include <memory>
 #include <vector>
 
@@ -63,11 +64,16 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    void enablePlanning(bool enable) { planningEnabled_ = enable; }
     
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    bool isPlanningEnabled() const { return planningEnabled_; }
+    
+    // Get current exploration level
+    float getExplorationLevel() const { return curiosityExploration_; }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -76,7 +82,17 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Motor command selection with neural planning
+    MotorCommand selectWithPlanning(const std::vector<float>& currentState, 
+                                   MotorCommand defaultCmd);
+    
+    MotorCommand convertToMotorCommand(ActionType action);
+    std::string motorCommandToString(MotorCommand cmd);
+    
     std::shared_ptr<Brain> brain_;
+    
+    // Neural planner (Phase 6: cognitive planning)
+    std::shared_ptr<NeuralPlanner> neuralPlanner_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
@@ -85,6 +101,8 @@ private:
     std::vector<Neuron*> motorTurnRight_;
     std::vector<Neuron*> motorInteract_;
     std::vector<Neuron*> motorWait_;
+    std::vector<Neuron*> motorLookLeft_;
+    std::vector<Neuron*> motorLookRight_;
     
     // Sensory neuron groups
     std::vector<Neuron*> sensoryVision_;
@@ -108,6 +126,13 @@ private:
     bool structuralPlasticityEnabled_;
     bool developmentEnabled_;
     bool curiosityEnabled_;
+    bool planningEnabled_;
+    
+    // Exploration state for curiosity-based exploration
+    float curiosityExploration_;
+    float explorationThreshold_;
+    float explorationCooldown_;
+    float explorationCooldownTime_;
     
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;

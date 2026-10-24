@@ -9,9 +9,13 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
+#include "../prediction/NeuralPrediction.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
@@ -65,6 +69,9 @@ struct Brain::Impl {
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
     
+    // Track steps for prediction integration
+    SimulationStep brainStepCounter;
+    
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
@@ -113,8 +120,9 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
+    // Initialize prediction system with neural prediction capabilities
         predictionSystem = std::make_unique<PredictionSystem>();
+        predictionSystem->initialize(this);  // Initialize with brain reference
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -151,6 +159,9 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Initialize step counter
+        brainStepCounter = 0;
     }
     
     DevelopmentalStage developmentalStage;
@@ -511,8 +522,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        // Extract current sensory-like state from active neurons
+        std::vector<float> currentSensoryState;
+        
+        // Get active neuron states as "sensory" input for prediction
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                // Record neuron membrane potential as sensory-like state
+                // This creates a link between prediction and actual neural activity
+                currentSensoryState.push_back(
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+            }
+        }
+        
+        if (!currentSensoryState.empty()) {
+            // Use neural prediction to track sequence patterns
+            if (brainStepCounter % 100 == 0) {  // Every 100 steps
+                neuralPrediction_->recordSensoryState(currentSensoryState, currentStep);
+            }
+            
+            // Generate prediction based on learned sequences
+            auto prediction = neuralPrediction_->generatePrediction(currentStep);
+            
+            // Update with actual state to compute prediction error
+            float predictionError = neuralPrediction_->updateWithObservation(currentSensoryState, currentStep);
+            
+            // Use prediction error to modulate learning (dopamine-like effect)
+            float predictionModulation = std::min(1.0f, predictionError * 2.0f);
+            if (pImpl->dopamine) {
+                // Enhance dopamine based on prediction error
+                float currentDopamine = pImpl->dopamine->getLevel();
+                float enhancedDopamine = currentDopamine + predictionModulation * 0.1f;
+                pImpl->dopamine->setLevel(enhancedDopamine);
+            }
+            
+            // Prediction affects attention - high error increases attention
+            if (pImpl->attention) {
+                pImpl->attention->setInhibitionStrength(1.5f - predictionModulation * 0.5f);
+                pImpl->attention->setExcitationStrength(1.5f + predictionModulation * 0.5f);
+            }
+            
+            // Prediction affects working memory
+            if (pImpl->workingMemory) {
+                // Store prediction for working memory
+                pImpl->workingMemory->storeToNeuron(NeuronId(99999), predictionModulation / 10.0f);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -586,6 +642,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+    
+    // Increment step counter for prediction integration
+    pImpl->brainStepCounter++;
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -992,6 +1051,10 @@ size_t Brain::getActiveNeuronCount() const {
 
 size_t Brain::getFiringNeuronCount() const {
     return pImpl->totalSpikesThisStep;
+}
+
+SimulationStep Brain::getCurrentStep() const {
+    return pImpl->currentStep;
 }
 
 float Brain::getAverageFiringRate() const {
