@@ -56,6 +56,12 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // File rotation settings
+    void setFileRotation(bool enable, size_t maxSize = 10 * 1024 * 1024, int maxFiles = 5);
+    bool getFileRotation() const;
+    size_t getMaxFileSize() const;
+    int getMaxFiles() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
