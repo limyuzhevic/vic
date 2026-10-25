@@ -398,7 +398,158 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Advanced neuromodulation controls through the brain system
+        .def("updateNeuromodulation", [](AgentBrain& self, double timestep) {
+            // Update all neuromodulation systems in the brain
+            if (auto* brain = self.getBrain()) {
+                // This is a convenience method to trigger development update
+                self.updateDevelopment(timestep);
+            }
+        }, py::arg("timestep"), "Update all neuromodulation systems");
+
+    // Global convenience functions for advanced usage
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Python-friendly initialization function
+    m.def("initializeBrain", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Cannot initialize null brain");
+        }
+        brain->initialize();
+    }, py::arg("brain"), "Initialize brain (throws if brain is null)");
+
+    // Batch operations for efficiency
+    m.def("batchBrainStep", [](std::shared_ptr<Brain> brain, size_t startStep, size_t numSteps) {
+        if (!brain) {
+            throw std::runtime_error("Cannot step null brain");
+        }
+        for (size_t step = startStep; step < startStep + numSteps; ++step) {
+            brain->step(step);
+        }
+    }, py::arg("brain"), py::arg("startStep"), py::arg("numSteps"), 
+        "Perform multiple brain steps efficiently");
+
+    // Debug and logging tools
+    m.def("setBrainLogLevel", [](std::shared_ptr<Brain> brain, const std::string& levelStr) {
+        if (!brain) return;
+        LogLevel level;
+        if (levelStr == "debug") level = LogLevel::Debug;
+        else if (levelStr == "info") level = LogLevel::Info;
+        else if (levelStr == "warning") level = LogLevel::Warning;
+        else if (levelStr == "error") level = LogLevel::Error;
+        else if (levelStr == "critical") level = LogLevel::Critical;
+        else {
+            throw std::runtime_error("Invalid log level. Use: debug, info, warning, error, critical");
+        }
+        brain->getLogger()->setLevel(level);
+    }, py::arg("brain"), py::arg("levelStr"), 
+        "Set brain's log level (debug, info, warning, error, critical)");
+
+    m.def("brainLogStatus", [](std::shared_ptr<Brain> brain) {
+        if (!brain) return;
+        brain->logStatus();
+    }, py::arg("brain"), "Log comprehensive brain status and statistics");
+
+    // Development stage convenience
+    m.def("getBrainDevelopmentStage", [](std::shared_ptr<Brain> brain) {
+        if (!brain) return DevelopmentalStage::Initial;
+        return brain->getDevelopmentalStage();
+    }, py::arg("brain"), "Get current developmental stage");
+
+    m.def("setBrainDevelopmentStage", [](std::shared_ptr<Brain> brain, DevelopmentalStage stage) {
+        if (!brain) return;
+        brain->setDevelopmentalStage(stage);
+    }, py::arg("brain"), py::arg("stage"), "Set developmental stage");
+
+    m.def("advanceBrainDevelopment", [](std::shared_ptr<Brain> brain, double timestep) {
+        if (!brain) return;
+        brain->develop();
+    }, py::arg("brain"), py::arg("timestep"), "Advance brain development");
+
+    // Memory system access convenience
+    m.def("getWorkingMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralWorkingMemory> {
+        if (!brain) return nullptr;
+        return std::shared_ptr<NeuralWorkingMemory>(brain->getWorkingMemory());
+    }, py::arg("brain"), "Get working memory system (Python-managed pointer)");
+
+    m.def("getEpisodicMemory", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralEpisodicMemory> {
+        if (!brain) return nullptr;
+        return std::shared_ptr<NeuralEpisodicMemory>(brain->getEpisodicMemory());
+    }, py::arg("brain"), "Get episodic memory system (Python-managed pointer)");
+
+    m.def("getPredictionSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<PredictionSystem> {
+        if (!brain) return nullptr;
+        return std::shared_ptr<PredictionSystem>(brain->getPredictionSystem());
+    }, py::arg("brain"), "Get prediction system (Python-managed pointer)");
+
+    // Neuromodulation system access convenience
+    m.def("getDopamineSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<Dopamine> {
+        if (!brain) return nullptr;
+        return std::shared_ptr<Dopamine>(brain->getDopamine());
+    }, py::arg("brain"), "Get dopamine system (Python-managed pointer)");
+
+    m.def("getCuriositySystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<Curiosity> {
+        if (!brain) return nullptr;
+        return std::shared_ptr<Curiosity>(brain->getCuriosity());
+    }, py::arg("brain"), "Get curiosity system (Python-managed pointer)");
+
+    m.def("getPredictionErrorSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<PredictionError> {
+        if (!brain) return nullptr;
+        return std::shared_ptr<PredictionError>(brain->getPredictionErrorSignal());
+    }, py::arg("brain"), "Get prediction error system (Python-managed pointer)");
+
+    m.def("getNoveltySystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<Novelty> {
+        if (!brain) return nullptr;
+        return std::shared_ptr<Novelty>(brain->getNovelty());
+    }, py::arg("brain"), "Get novelty system (Python-managed pointer)");
+
+    // Cognition system access convenience
+    m.def("getPlanner", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<NeuralPlanner> {
+        if (!brain) return nullptr;
+        return std::shared_ptr<NeuralPlanner>(brain->getPlanner());
+    }, py::arg("brain"), "Get neural planner system (Python-managed pointer)");
+
+    m.def("getConceptFormation", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<ConceptFormation> {
+        if (!brain) return nullptr;
+        return std::shared_ptr<ConceptFormation>(brain->getConceptFormation());
+    }, py::arg("brain"), "Get concept formation system (Python-managed pointer)");
+
+    m.def("getAttention", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AttentionalSelection> {
+        if (!brain) return nullptr;
+        return std::shared_ptr<AttentionalSelection>(brain->getAttention());
+    }, py::arg("brain"), "Get attentional selection system (Python-managed pointer)");
+
+    // Development system access convenience
+    m.def("getDevelopmentSystem", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<DevelopmentSystem> {
+        if (!brain) return nullptr;
+        return std::shared_ptr<DevelopmentSystem>(brain->getDevelopmentSystem());
+    }, py::arg("brain"), "Get development system (Python-managed pointer)");
+
+    // Error checking and validation
+    m.def("validateBrain", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null - please create a valid brain first");
+        }
+        if (!brain->getConfig()) {
+            throw std::runtime_error("Brain has no configuration - call initialize() first");
+        }
+        return true;
+    }, py::arg("brain"), "Validate brain state (throws if invalid)");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
