@@ -44,6 +44,10 @@ struct ConfigEntry {
 };
 
 // Main configuration class
+// Manages NLM brain simulation settings with type-safe key-value pairs
+// Supports loading from files, command line, and runtime modifications
+// Enables structured configuration for all brain subsystems
+
 class Config {
 public:
     Config();
@@ -55,42 +59,44 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Configuration loading and saving
+    // Load configuration from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
+    // Load configuration from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save current configuration to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Configuration value management
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set configuration values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
+    // Configuration key management
+    // Check if key exists in configuration
     bool has(const std::string& key) const;
     
-    // Remove key
+    // Remove configuration key
     void remove(const std::string& key);
     
-    // Get all keys
+    // Get all configuration keys
     std::vector<std::string> getKeys() const;
     
-    // Clear all
+    // Clear all configuration
     void clear();
     
-    // Get configuration summary
+    // Get formatted configuration summary
     std::string summary() const;
     
 private:
