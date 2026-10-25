@@ -38,22 +38,22 @@ add_library(nlm_core STATIC
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
+    # Neural Dynamics subsystem (Phase 6 refactoring)
+    src/neural_dynamics/NeuralDynamics.cpp
     # Plasticity
     src/plasticity/PlasticityRule.cpp
     src/plasticity/Hebbian.cpp
     src/plasticity/STDP.cpp
     src/plasticity/StructuralPlasticity.cpp
+    # Plasticity system (Phase 6 refactoring)
+    src/plasticity_system/PlasticitySystem.cpp
     # Development
     src/development/DevelopmentSystem.cpp
     src/development/Synaptogenesis.cpp
     src/development/Pruning.cpp
     src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
+    # Development system (Phase 6 refactoring)
+    src/development_system/DevelopmentSystem.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
@@ -62,9 +62,13 @@ add_library(nlm_core STATIC
     src/memory/AssociativeMemory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    # Memory system (Phase 6 refactoring)
+    src/memory_system/MemorySystem.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    # Cognition system (Phase 6 refactoring)
+    src/cognition_system/CognitionSystem.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
@@ -89,6 +93,12 @@ add_library(nlm_core STATIC
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/neural_dynamics>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/memory_system>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/neuromodulation_system>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/plasticity_system>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/cognition_system>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/development_system>
     $<INSTALL_INTERFACE:include>
 )
 
