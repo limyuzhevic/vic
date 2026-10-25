@@ -1,0 +1,19 @@
+# NLM Python Package Dependencies
+
+# Core dependencies
+numpy>=1.20
+pybind11>=2.11.0
+scikit-build-core>=0.5.0
+
+# Testing dependencies (for development)
+pytest>=7.0
+
+# Optional dependencies for enhanced functionality
+# These can be installed separately if needed
+# scipy>=1.0.0
+# matplotlib>=3.0.0
+# pandas>=1.0.0
+
+# Documentation generation
+# sphinx>=4.0.0
+# sphinx-rtd-theme>=0.5.0
