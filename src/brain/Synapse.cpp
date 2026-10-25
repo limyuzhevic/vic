@@ -56,8 +56,10 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->type = SynapseType::Excitatory;
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
-    pImpl->shortTermDepression = 1.0f;
-    pImpl->shortTermFacilitation = 0.0f;
+    
+    // Initialize short-term plasticity state to baseline
+    pImpl->shortTermDepression = 1.0f;  // No depression initially
+    pImpl->shortTermFacilitation = 0.0f;  // No facilitation initially
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
 }

@@ -403,19 +403,53 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
+    
+    m.def("createConfigWithValues", [](std::unordered_map<std::string, std::string> values) {
+        auto config = std::make_shared<Config>();
+        for (const auto& pair : values) {
+            config->set(pair.first, pair.second, ConfigSource::Default);
+        }
+        return config;
+    }, py::arg("values"), "Create a configuration with custom values");
+    
+    m.def("createExperimentConfig", [](const std::string& experimentType) {
+        auto config = std::make_shared<Config>();
+        
+        // Configure based on experiment type
+        if (experimentType == "learning") {
+            config->set("neuron_count", "2000", ConfigSource::Default);
+            config->set("region_count", "3", ConfigSource::Default);
+            config->set("connection_probability", "0.15", ConfigSource::Default);
+            config->set("development_synaptogenesis_rate", "0.002", ConfigSource::Default);
+            config->set("development_pruning_rate", "0.0002", ConfigSource::Default);
+            config->set("stdp_ltp_weight", "0.03", ConfigSource::Default);
+            config->set("stdp_ltd_weight", "0.03", ConfigSource::Default);
+        } else if (experimentType == "structural") {
+            config->set("neuron_count", "1000", ConfigSource::Default);
+            config->set("region_count", "2", ConfigSource::Default);
+            config->set("connection_probability", "0.1", ConfigSource::Default);
+            config->set("development_synaptogenesis_rate", "0.005", ConfigSource::Default);
+            config->set("development_pruning_rate", "0.001", ConfigSource::Default);
+            config->set("structural_plasticity_enabled", "true", ConfigSource::Default);
+        } else if (experimentType == "cognitive") {
+            config->set("neuron_count", "3000", ConfigSource::Default);
+            config->set("region_count", "4", ConfigSource::Default);
+            config->set("connection_probability", "0.2", ConfigSource::Default);
+            config->set("planning_depth", "6", ConfigSource::Default);
+            config->set("concept_complexity", "high", ConfigSource::Default);
+        } else {
+            // Default configuration
+            config->set("neuron_count", "1000", ConfigSource::Default);
+            config->set("region_count", "2", ConfigSource::Default);
+            config->set("connection_probability", "0.1", ConfigSource::Default);
+        }
+        
+        config->set("random_seed", std::to_string(std::time(nullptr)), ConfigSource::Default);
+        config->set("simulation_timestep", "0.001", ConfigSource::Default);
+        
+        return config;
+    }, py::arg("experimentType"), "Create a specialized configuration for different experiment types");
+    
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

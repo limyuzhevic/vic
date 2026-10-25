@@ -340,6 +340,18 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
+    // Handle help and version options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version" || arg == "-v") {
+            printVersion();
+            return 0;
+        }
+    }
+    
     // Load configuration
     auto config = std::make_shared<Config>();
     
@@ -353,6 +365,26 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--neuron-count" && i + 1 < argc) {
+            config->set("neuron_count", parseInt64(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--region-count" && i + 1 < argc) {
+            config->set("region_count", parseInt64(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--connection-prob" && i + 1 < argc) {
+            config->set("connection_probability", parseFloat(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--random-seed" && i + 1 < argc) {
+            config->set("random_seed", parseInt64(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--simulation-timestep" && i + 1 < argc) {
+            config->set("simulation_timestep", parseDouble(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--stdp-ltp-weight" && i + 1 < argc) {
+            config->set("stdp_ltp_weight", parseFloat(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--stdp-ltd-weight" && i + 1 < argc) {
+            config->set("stdp_ltd_weight", parseFloat(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--stdp-time-constant" && i + 1 < argc) {
+            config->set("stdp_time_constant", parseFloat(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--synaptogenesis-rate" && i + 1 < argc) {
+            config->set("development_synaptogenesis_rate", parseFloat(argv[++i]), ConfigSource::CommandLine);
+        } else if (arg == "--pruning-rate" && i + 1 < argc) {
+            config->set("development_pruning_rate", parseFloat(argv[++i]), ConfigSource::CommandLine);
         }
     }
     
@@ -376,11 +408,11 @@ int main(int argc, char** argv) {
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_time_constant", 20.0f, ConfigSource::Default);
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set("development_synaptogenesis_rate", 0.001f, ConfigSource::Default);
+    config->set("development_pruning_rate", 0.0001f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -445,5 +477,92 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
     
+    // Display summary of performance metrics
+    NLM_LOG_INFO("=== Performance Summary ===");
+    NLM_LOG_INFO("Total simulation time: " + std::to_string(currentStep * 0.001) + " seconds");
+    NLM_LOG_INFO("Total spikes generated: " + std::to_string(brain->getTotalSpikeCount()));
+    NLM_LOG_INFO("Average firing rate: " + std::to_string(brain->getAverageFiringRate()) + " Hz");
+    NLM_LOG_INFO("Excitatory/Inhibitory ratio: " + std::to_string(brain->getExcitationInhibitionRatio()));
+    
     return 0;
+}
+
+    NLM_LOG_INFO("=== Performance Summary ===");
+    NLM_LOG_INFO("Total simulation time: " + std::to_string(currentStep * 0.001) + " seconds");
+    NLM_LOG_INFO("Total spikes generated: " + std::to_string(brain->getTotalSpikeCount()));
+    NLM_LOG_INFO("Average firing rate: " + std::to_string(brain->getAverageFiringRate()) + " Hz");
+    NLM_LOG_INFO("Excitatory/Inhibitory ratio: " + std::to_string(brain->getExcitationInhibitionRatio()));
+    
+    // Display development statistics
+    NLM_LOG_INFO("=== Development Statistics ===");
+    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(brain->getDevelopmentalStage())));
+    NLM_LOG_INFO("Developmental age: " + std::to_string(developmentalAge) + " time units");
+    
+    // Display neuromodulation statistics
+    NLM_LOG_INFO("=== Neuromodulation Statistics ===");
+    if (auto* dopamine = brain->getDopamine()) {
+        NLM_LOG_INFO("Dopamine level: " + std::to_string(dopamine->getLevel()));
+        NLM_LOG_INFO("Dopamine plasticity factor: " + std::to_string(dopamine->getPlasticityFactor()));
+    }
+    if (auto* curiosity = brain->getCuriosity()) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(curiosity->getLevel()));
+    }
+    
+    return 0;
+}
+
+// Enhanced command-line argument parsing for Phase 2
+double parseDouble(const std::string& str) {
+    std::istringstream iss(str);
+    double value;
+    iss >> value;
+    return value;
+}
+
+int64_t parseInt64(const std::string& str) {
+    std::istringstream iss(str);
+    int64_t value;
+    iss >> value;
+    return value;
+}
+
+float parseFloat(const std::string& str) {
+    std::istringstream iss(str);
+    float value;
+    iss >> value;
+    return value;
+}
+
+// Command-line help and version information
+void printHelp() {
+    printBanner();
+    std::cout << "\nNLM Phase 2 Real Neural Computation" << std::endl;
+    std::cout << "================================" << std::endl;
+    std::cout << "\nUsage: nlm [options]" << std::endl;
+    std::cout << "\nOptions:" << std::endl;
+    std::cout << "  --config=file.cfg      Load configuration from file" << std::endl;
+    std::cout << "  --neuron-count=N       Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region-count=N       Set number of regions (default: 1)" << std::endl;
+    std::cout << "  --connection-prob=P    Set connection probability (default: 0.15)" << std::endl;
+    std.    cout << "  --random-seed=N        Set random seed (default: 42)" << std::endl;
+    std::cout << "  --simulation-timestep=T Set simulation timestep (default: 0.001)" << std::endl;
+    std::cout << "  --stdp- LTP=W          Set STDP LTP weight (default: 0.02)" << std::endl;
+    std::cout << "  --stdp-LTD=W           Set STDP LTD weight (default: 0.015)" << std::endl;
+    std::cout << "  --stdp-tau=TAU         Set STDP time constant (default: 20.0)" << std::endl;
+    std::cout << "  --synaptogenesis=R     Set synaptogenesis rate (default: 0.001)" << std::endl;
+    std::cout << "  --pruning=R            Set pruning rate (default: 0.0001)" << std::endl;
+    std::cout << "  --help                 Show this help message" << std::endl;
+    std::cout << "  --version              Show version information" << std::endl;
+    std::cout << "\nExamples:" << std::endl;
+    std::cout << "  ./nlm --neuron-count=1000 --region-count=2" << std::endl;
+    std::cout << "  ./nlm --config=custom.cfg --random-seed=123" << std::endl;
+}
+
+void printVersion() {
+    printBanner();
+    std::cout << "\nNLM Phase 2 - Real Neural Computation" << std::endl;
+    std::cout << "Version: 0.1.0 (Phase 2)" << std::endl;
+    std::cout << "Build: Release with C++20" << std::endl;
+    std::cout << "Features: LIF neurons, STDP, Hebbian, structural plasticity" << std::endl;
+    std::cout << "\nFor more information, visit: https://github.com/nlm-project/nlm" << std::endl;
 }

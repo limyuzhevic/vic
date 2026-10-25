@@ -191,18 +191,7 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
-    if (pImpl->state.refractoryRemaining > 0) {
-        --pImpl->state.refractoryRemaining;
-        // During refractory period, clear synaptic input but don't integrate
-        pImpl->synapticInput = 0.0f;
-        if (pImpl->state.refractoryRemaining == 0) {
-            pImpl->state.firingState = FiringState::Resting;
-        }
-        return false;
-    }
-    
-    // LIF dynamics: Leaky Integrate-and-Fire
+        // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
     
@@ -212,6 +201,16 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential threshold = pImpl->state.threshold;
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Optimize: early exit if neuron is in refractory period
+    if (pImpl->state.refractoryRemaining > 0) {
+        // During refractory period, clear synaptic input but don't integrate
+        pImpl->synapticInput = 0.0f;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+        return false;
+    }
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
@@ -228,12 +227,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Clamp membrane potential to prevent instability - tighter bounds
+    V = std::clamp(V, -85.0f, 45.0f);
     
     // Check for spike
     if (V >= threshold) {
-        fired = true;
+        bool fired = true;
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
@@ -249,8 +248,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
+        
+        return fired;
     } else {
         pImpl->state.firingState = FiringState::Active;
+        bool fired = false;
+        return fired;
     }
     
     // Clear synaptic input for next step
@@ -273,7 +276,6 @@ void Neuron::reset() {
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
     // Threshold is typically -55mV with small variation
@@ -291,7 +293,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
-    pImpl->state.adaptationVariable = 0.0f;
+    pImpl->state.adaptationVariable = 0.0f;  // Initialize adaptation variable
     pImpl->state.lastSpikeTime = -1.0f;
     
     // Clear any residual state

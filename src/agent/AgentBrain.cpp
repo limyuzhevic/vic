@@ -347,4 +347,110 @@ void AgentBrain::reset() {
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
 
+// New advanced features - static member variables
+bool AgentBrain::predictionErrorEnabled_ = true;
+bool AgentBrain::noveltyDetectionEnabled_ = true;
+bool AgentBrain::goalDirectedLearningEnabled_ = false;
+float AgentBrain::learningRate_ = 0.01f;
+float AgentBrain::explorationRate_ = 0.1f;
+std::string AgentBrain::currentGoal_ = "";
+bool AgentBrain::goalAchieved_ = false;
+float AgentBrain::goalProgress_ = 0.0f;
+std::unordered_map<std::string, float> AgentBrain::goalRewards_;
+
+void AgentBrain::enablePredictionError(bool enable) {
+    predictionErrorEnabled_ = enable;
+    NLM_LOG_INFO("AgentBrain: Prediction error " + std::string(enable ? "enabled" : "disabled"));
+}
+
+void AgentBrain::enableNoveltyDetection(bool enable) {
+    noveltyDetectionEnabled_ = enable;
+    NLM_LOG_INFO("AgentBrain: Novelty detection " + std::string(enable ? "enabled" : "disabled"));
+}
+
+void AgentBrain::enableGoalDirectedLearning(bool enable) {
+    goalDirectedLearningEnabled_ = enable;
+    NLM_LOG_INFO("AgentBrain: Goal-directed learning " + std::string(enable ? "enabled" : "disabled"));
+}
+
+void AgentBrain::setLearningRate(float rate) {
+    learningRate_ = std::clamp(rate, 0.001f, 0.5f);
+    NLM_LOG_INFO("AgentBrain: Learning rate set to " + std::to_string(learningRate_));
+}
+
+void AgentBrain::setExplorationRate(float rate) {
+    explorationRate_ = std::clamp(rate, 0.0f, 1.0f);
+    NLM_LOG_INFO("AgentBrain: Exploration rate set to " + std::to_string(explorationRate_));
+}
+
+void AgentBrain::setGoal(const std::string& goal) {
+    currentGoal_ = goal;
+    goalAchieved_ = false;
+    goalProgress_ = 0.0f;
+    NLM_LOG_INFO("AgentBrain: Set goal - " + goal);
+}
+
+void AgentBrain::updateGoalProgress(float progress) {
+    if (goalDirectedLearningEnabled_ && !goalAchieved_) {
+        goalProgress_ = std::clamp(progress, 0.0f, 1.0f);
+        
+        // Check if goal achieved
+        if (goalProgress_ >= 1.0f) {
+            goalAchieved_ = true;
+            float reward = goalRewards_.count(currentGoal_) ? goalRewards_[currentGoal_] : 1.0f;
+            applyRewardModulation(reward, expectedReward_);
+            NLM_LOG_INFO("AgentBrain: Goal achieved - " + currentGoal_);
+        }
+    }
+}
+
+void AgentBrain::setGoalReward(const std::string& goal, float reward) {
+    goalRewards_[goal] = reward;
+}
+
+void AgentBrain::updateGoalDirectedLearning(double timestep) {
+    // Simple goal-directed learning mechanism
+    if (goalAchieved_) {
+        return;
+    }
+    
+    // Goal progress increases with appropriate actions
+    // This would integrate with action selection to guide behavior toward goals
+    goalProgress_ += learningRate_ * timestep * 0.1f;
+    goalProgress_ = std::clamp(goalProgress_, 0.0f, 1.0f);
+}
+
+void AgentBrain::update(double timestep) {
+    // Update core neuromodulation
+    if (dopamineLevel_ > 0.1f) {
+        curiosityLevel_ = std::min(1.0f, curiosityLevel_ + timestep * 0.05f);
+    } else {
+        curiosityLevel_ = std::max(0.0f, curiosityLevel_ - timestep * 0.02f);
+    }
+    
+    // Decay novelty
+    if (noveltyLevel_ > 0.0f) {
+        noveltyLevel_ *= (1.0f - timestep * sensoryNoveltyDecay_);
+    }
+    
+    // Update developmental state
+    updateDevelopment(timestep);
+    
+    // Update curiosity-driven exploration
+    if (curiosityEnabled_) {
+        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Update prediction error learning if enabled
+    if (predictionErrorEnabled_) {
+        predictionError_ *= (1.0f - timestep * 0.01f);
+    }
+    
+    // Update goal-directed learning if enabled
+    if (goalDirectedLearningEnabled_) {
+        updateGoalDirectedLearning(timestep);
+    }
+}
+
 } // namespace nlm
