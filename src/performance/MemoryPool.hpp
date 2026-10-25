@@ -181,7 +181,11 @@ void MemoryPool<T>::addBlock() {
         // Another thread already added a block, add to chain
         block->nextBlock = expected;
     } else {
-        block.release();
+        // Current block successfully swapped, now add to blocks vector
+        blocks_.push_back(std::move(block));
+        // Update currentBlock_ to point to the newly added block
+        currentBlock_.store(blocks_.back().get(), std::memory_order_release);
+        return; // Block already added to vector, don't add again
     }
     
     // Initialize free list for this block

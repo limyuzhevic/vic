@@ -6,6 +6,9 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <unordered_map>
+#include <mutex>
+#include <stacktrace>
 
 namespace nlm {
 
@@ -26,6 +29,18 @@ struct LogEntry {
     int line;
     std::string function;
     std::chrono::system_clock::time_point timestamp;
+    
+    // Performance timing information
+    std::chrono::duration<double> duration;
+    
+    // Memory information
+    size_t memoryAllocated = 0;
+    
+    // Thread information
+    std::thread::id threadId;
+    
+    // Event correlation ID
+    std::string correlationId;
 };
 
 // Logger interface
@@ -107,6 +122,124 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+};
+
+// Event types for debugging and profiling
+enum class DebugEventType {
+    TimelineStart,
+    TimelineEnd,
+    MemoryAllocation,
+    MemoryDeallocation,
+    FunctionCall,
+    FunctionReturn,
+    PerformanceSample,
+    Custom
+};
+
+// Debug event for tracking operations
+struct DebugEvent {
+    DebugEventType type;
+    std::string name;
+    std::chrono::system_clock::time_point timestamp;
+    std::string threadId;
+    std::chrono::duration<double> duration; // For start/end pairs
+    size_t memorySize; // For memory events
+    std::string file;
+    int line;
+    std::string context;
+    
+    DebugEvent() : type(DebugEventType::Custom), threadId("") {}
+};
+
+// Performance profiler for timing critical sections
+class PerformanceProfiler {
+public:
+    PerformanceProfiler(const std::string& name, bool enabled = true);
+    ~PerformanceProfiler();
+    
+    void start();
+    void stop();
+    double getDuration() const { return duration_; }
+    bool isActive() const { return active_; }
+    
+    // Static methods for convenience
+    static void profileSection(const std::string& name, std::function<void()> func);
+    static double measureTime(std::function<void()> func);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Memory tracker for detecting leaks and analyzing patterns
+class MemoryTracker {
+public:
+    MemoryTracker();
+    ~MemoryTracker();
+    
+    void trackAllocation(size_t size, const std::string& file, int line, const std::string& function);
+    void trackDeallocation(size_t size, const std::string& file, int line, const std::string& function);
+    
+    // Get memory statistics
+    size_t getTotalAllocated() const;
+    size_t getCurrentAllocated() const;
+    size_t getAllocationCount() const;
+    size_t getDeallocationCount() const;
+    
+    // Check for leaks
+    bool hasLeaks() const;
+    std::vector<std::string> getLeakInfo() const;
+    
+    // Clear statistics
+    void reset();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Timeline profiler for tracking event sequences
+class TimelineProfiler {
+public:
+    TimelineProfiler();
+    ~TimelineProfiler();
+    
+    void startEvent(const std::string& name, const std::string& context = "");
+    void endEvent(const std::string& name, const std::string& context = "");
+    
+    // Get timeline data
+    const std::vector<DebugEvent>& getEvents() const { return events_; }
+    
+    // Export timeline
+    std::string exportTimeline() const;
+    void saveToFile(const std::string& filepath) const;
+    
+    // Clear timeline
+    void clear();
+    
+    // Get duration of named event
+    double getEventDuration(const std::string& name) const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    std::vector<DebugEvent> events_;
+};
+
+// Stack trace capture for debugging crashes
+class StackTraceCapture {
+public:
+    static std::string captureCurrentStackTrace();
+    static std::string captureStackTrace(std::thread::id threadId = std::this_thread::get_id());
+    
+    // Get formatted stack trace
+    static std::string formatStackTrace(const std::string& trace);
+    
+    // Log stack trace with context
+    static void logStackTrace(LogLevel level, const std::string& context = "");
+    
+    // Check if stack trace is available
+    static bool isAvailable();
 };
 
 // Convenience macro for file/line/function info

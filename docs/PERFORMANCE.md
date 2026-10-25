@@ -1,217 +1,424 @@
-# NLM Performance Documentation
+# Performance Monitoring and Statistics
 
-## Phase 5 Performance Infrastructure
+This document describes the performance monitoring and statistics system in the NLM framework, including how to access and use performance data.
 
-### Overview
+## Overview
 
-Phase 5 introduces comprehensive performance optimizations enabling NLM to scale from thousands to millions of neurons. The performance infrastructure is designed with the following principles:
+The NLM framework includes comprehensive performance monitoring and statistics collection to help users understand system performance, identify bottlenecks, and optimize simulations.
 
-1. **Event-driven processing**: Only active neurons consume computation
-2. **Memory efficiency**: Pre-allocated pools and SoA layouts reduce overhead
-3. **Parallelism**: Multithreading for multi-core CPUs
-4. **SIMD vectorization**: Accelerate neural computations
-5. **Sparse connectivity**: Avoid O(N²) memory for large networks
+## Key Components
 
-### Performance Architecture
+### 1. PerformanceProfiler
 
+The `PerformanceProfiler` class allows users to measure the execution time of specific operations or code sections.
+
+**Usage:**
+```cpp
+#include "performance/Profiler.hpp"
+
+// Method 1: Object-based profiling
+PerformanceProfiler profiler("neural_step");
+profiler.start();
+// ... perform neural computation ...
+profiler.stop();
+
+// Method 2: One-shot profiling
+PerformanceProfiler::profileSection("simulation_loop", []() {
+    // ... simulation code ...
+});
+
+// Method 3: Time measurement
+double elapsed = PerformanceProfiler::measureTime([]() {
+    // ... code to measure ...
+});
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Performance Infrastructure                │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
-│  │  Event Queues  │  │  Memory Pools  │  │ SIMD Ops   │ │
-│  │  Ring buffers  │  │  Pre-allocated │  │ Vectorized │ │
-│  │  Time-bucketed │  │  Cache-aligned │  │ LIF update │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
-│                                                              │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
-│  │     Sparse      │  │   Parallel      │  │  Benchmark  │ │
-│  │  Connectivity   │  │   Processing   │  │  Framework  │ │
-│  │  Adjacency list │  │  Thread pools  │  │  Profiling  │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+
+**Output:** Automatic logging to the global logger with duration in milliseconds.
+
+### 2. MemoryTracker
+
+The `MemoryTracker` class provides detailed memory usage statistics and leak detection.
+
+**Usage:**
+```cpp
+#include "performance/MemoryTracker.hpp"
+
+MemoryTracker& tracker = MemoryTracker::getGlobal();
+
+// Track memory allocations
+void* ptr = malloc(size);
+tracker.trackAllocation(size, "file.cpp", 123, "function_name");
+
+// Check for memory leaks
+if (tracker.hasLeaks()) {
+    auto leaks = tracker.getLeakInfo();
+    // ... report leaks ...
+}
+
+// Get statistics
+std::cout << "Total allocated: " << tracker.getTotalAllocated() << " bytes" << std::endl;
+std::cout << "Current usage: " << tracker.getCurrentAllocated() << " bytes" << std::endl;
 ```
 
-## Components
+**Features:**
+- Automatic tracking of memory allocations
+- Leak detection and reporting
+- Per-allocation source tracking (file, line, function)
+- Cumulative statistics
 
-### 1. Event Queues (EventQueue.hpp)
+### 3. TimelineProfiler
 
-Lock-free SPSC ring buffer for immediate spikes:
-- Capacity: 16,384 spikes (configurable, power of 2)
-- Cache-aligned event structures (16 bytes)
-- O(1) push/pop operations
+The `TimelineProfiler` class records event sequences for timeline analysis and debugging.
 
-Time-bucketed delayed spike queue:
-- 1,024 time buckets (configurable)
-- Maximum delay: 100 steps
-- Efficient batch delivery
+**Usage:**
+```cpp
+#include "performance/TimelineProfiler.hpp"
 
-### 2. Memory Pools (MemoryPool.hpp)
+TimelineProfiler& timeline = TimelineProfiler::getGlobal();
 
-**NeuronPool**: Pre-allocated neuron storage with SoA layout
-- Membrane potentials: Contiguous float array
-- Refractory counters: Contiguous uint32 array
-- Firing states: Contiguous uint8 array
-- Cache line aligned (64 bytes)
+// Record timeline events
+timeline.startEvent("brain_initialization");
+// ... brain initialization ...
+timeline.endEvent("brain_initialization");
 
-**SynapsePool**: Compact synapse storage
-- Synapse records: Contiguous struct arrays
-- Adjacency lists for sparse connectivity
-- Free list for O(1) allocation/deallocation
+timeline.startEvent("simulation_phase_1");
+// ... first phase ...
+timeline.endEvent("simulation_phase_1", "completed successfully");
 
-### 3. Sparse Connectivity (SparseConnectivity.hpp)
+// Export timeline
+timeline.saveToFile("simulation_timeline.json");
+```
 
-Adjacency list representation:
-- Outgoing: source neuron → synapse indices
-- Incoming: destination neuron → synapse indices
-- Synapse records: Contiguous array
+**Features:**
+- Event timestamp recording
+- Context information
+- Thread-aware tracking
+- Export to JSON and file formats
 
-Benefits:
-- Avoids dense N×N matrix
-- Efficient O(k) lookup (k = synapses per neuron)
-- Scales to millions of neurons
+### 4. Statistics Collection
 
-### 4. Parallel Processing (ParallelProcessing.hpp)
+The framework includes automatic statistics collection for:
 
-ThreadPool: Lock-free task queue
-- Configurable thread count
-- Work-stealing support
-- Low overhead task submission
+#### Neural Network Statistics
+- **Neuron Counts**: Total, active, firing neurons
+- **Synapse Statistics**: Total synapses, excitatory/inhibitory ratio
+- **Activity Metrics**: Firing rates, spike counts
+- **Memory Usage**: Working memory traces, episodic memory episodes
 
-ParallelFor: Parallel loop execution
-- Static chunk partitioning
-- Grain size control
-- Reduction operations
+#### Simulation Statistics
+- **Performance**: Steps per second, real-time factor
+- **Accuracy**: Prediction errors, reward accumulation
+- **Resource Usage**: Memory consumption, CPU time
 
-ParallelNeuralProcessor: Neural-specific parallelization
-- Thread-local state accumulation
-- Synchronized aggregation
-- Cache-friendly data access
+## Accessing Performance Data
 
-### 5. SIMD Vectorization (SIMDVectorization.hpp)
+### Through the Advanced CLI
 
-VectorizedLIF: Batch LIF neuron updates
-- AVX-512: 16 neurons per iteration
-- AVX2: 8 neurons per iteration
-- SSE: 4 neurons per iteration
-- Scalar fallback
-
-VectorizedSTDP: Batch plasticity updates
-- Vectorized weight calculations
-- Reduced memory access
-
-## Benchmarking
-
-### Standard Benchmarks
-
-| Scale | Neurons | Synapses | Target Steps/sec |
-|-------|---------|----------|-----------------|
-| Micro | 1,000 | ~10,000 | 10,000+ |
-| Small | 10,000 | ~100,000 | 5,000+ |
-| Medium | 100,000 | ~1,000,000 | 1,000+ |
-| Large | 1,000,000 | ~10,000,000 | 100+ |
-
-### Performance Metrics
-
-**Simulation Performance**:
-- Neurons per second: Total neurons / wall-clock time
-- Spikes per second: Total spikes / wall-clock time
-- Real-time factor: simulated_time / wall_clock_time
-
-**Memory Usage**:
-- Neuron memory: sizeof(NeuronState) × neuron_count
-- Synapse memory: sizeof(SynapseRecord) × synapse_count
-- Event queue memory: Queue capacity × event_size
-
-### Measurement Commands
+The Advanced CLI provides commands to access performance data:
 
 ```bash
-# Build with performance flags
-cmake -DCMAKE_BUILD_TYPE=Release -DNLM_PERFORMANCE_ENABLED=ON ..
-make -j$(nproc)
+# Show memory statistics
+nlm> memory
 
-# Run benchmark
-./build/nlm --benchmark --neurons=10000 --steps=10000
+# Show timeline events  
+nlm> timeline
 
-# Run scaling experiment
-./build/nlm --scaling-benchmark
+# Run performance benchmark
+nlm> benchmark neural_computation
+
+# Show system status
+nlm> debug
 ```
 
-## Scaling Results
+### Through C++ API
 
-### Phase 5 Target Scales
+```cpp
+#include "performance/PerformanceMonitor.hpp"
 
+PerformanceMonitor& monitor = PerformanceMonitor::getGlobal();
+
+// Get current performance statistics
+auto stats = monitor.getCurrentStats();
+
+// Get performance history
+auto history = monitor.getPerformanceHistory(timePoint);
+
+// Reset statistics
+monitor.reset();
 ```
-Scale    Neurons    Synapses    Memory    Steps/sec
-──────────────────────────────────────────────────
-10k      10,000     ~100,000    ~10 MB    5,000+
-100k     100,000    ~1,000,000  ~100 MB   1,000+
-1M       1,000,000  ~10,000,000 ~1 GB     100+
+
+### Real-time Monitoring
+
+The framework supports real-time monitoring through log files and console output:
+
+```bash
+# Enable real-time logging
+nlm> debug start
+
+# Monitor memory usage in real-time
+# Check log files: nlm_memory.log
 ```
 
-### Scaling Behavior
+## Performance Analysis
 
-**Ideal scaling**: Double neurons → Half performance per neuron
-**Actual scaling**: Depends on:
-- Memory bandwidth saturation
-- Cache miss rates
-- Synchronization overhead
-- Event queue contention
+### 1. Neural Performance
 
-## Performance Optimization Guidelines
+Measure neural computation efficiency:
 
-### DO
+```cpp
+PerformanceProfiler neuralProfiler("neural_step");
+neuralProfiler.start();
+brain->step(step, time);
+neuralProfiler.stop();
 
-1. **Profile first**: Use perf/valgrind before optimizing
-2. **Measure impact**: Compare before/after benchmarks
-3. **Maintain correctness**: Verify numerical results
-4. **Document tradeoffs**: Note speed vs. precision costs
-5. **Keep it modular**: Easy to disable optimizations
+std::cout << "Neural step time: " << neuralProfiler.getDuration() * 1000 << " ms" << std::endl;
+```
 
-### DON'T
+### 2. Memory Efficiency
 
-1. **Optimize blindly**: Measure first, optimize second
-2. **Sacrifice correctness**: Numerical stability matters
-3. **Over-engineer**: Simple optimizations first
-4. **Ignore limits**: Some code is inherently serial
-5. **Assume scaling**: Test at target scale
+Track memory usage patterns:
 
-## Hardware Considerations
+```cpp
+MemoryTracker& tracker = MemoryTracker::getGlobal();
 
-### CPU Scaling
+// Simulate memory allocation
+std::vector<float> data(1000000, 0.0f);
+tracker.trackAllocation(data.size() * sizeof(float), __FILE__, __LINE__, __func__);
 
-- Single core: Baseline performance
-- Multi-core: Near-linear up to ~8 cores
-- NUMA: Local memory affinity matters
-- AVX-512: Significant boost for vectorized ops
+// Check for memory leaks
+if (tracker.hasLeaks()) {
+    std::cout << "Memory leak detected!" << std::endl;
+    auto leaks = tracker.getLeakInfo();
+    for (const auto& leak : leaks) {
+        std::cout << "  " << leak << std::endl;
+    }
+}
+```
 
-### Memory Scaling
+### 3. Simulation Performance
 
-- L3 cache: Critical for neural state access
-- Memory bandwidth: Limits update throughput
-- NUMA topology: Affects multi-socket scaling
+Track overall simulation efficiency:
 
-### GPU (Future)
+```cpp
+PerformanceProfiler simulationProfiler("full_simulation");
+simulationProfiler.start();
 
-Potential GPU targets:
-- Large-scale neuron updates
-- Synaptic plasticity
-- Event processing
-- Population statistics
+// Run complete simulation
+Phase6Config config;
+config.maxSteps = 10000;
+auto result = experiment.run(config);
 
-Not GPU candidates:
-- Small networks (< 10k neurons)
-- Sparse irregular updates
-- Complex branching logic
+simulationProfiler.stop();
 
-## Future Optimizations
+std::cout << "Simulation performance:" << std::endl;
+std::cout << "  Duration: " << simulationProfiler.getDuration() * 1000 << " ms" << std::endl;
+std::cout << "  Steps per second: " << config.maxSteps / simulationProfiler.getDuration() << std::endl;
+```
 
-Phase 6 and beyond may include:
+## Advanced Features
 
-1. **GPU acceleration**: CUDA/HIP for select operations
-2. **Distributed simulation**: Multi-machine scaling
-3. **FPGA acceleration**: Custom neural accelerators
-4. **Approximate computing**: Trading precision for speed
-5. **Adaptive load balancing**: Dynamic work distribution
+### Performance Alerts
+
+Configure automatic alerts for performance thresholds:
+
+```cpp
+#include "performance/PerformanceMonitor.hpp"
+
+PerformanceMonitor::getGlobal().setThreshold(
+    PerformanceMonitor::MetricType::MemoryUsage,
+    1024 * 1024 * 1024, // 1 GB
+    [](double value) {
+        // Alert callback for high memory usage
+        std::cout << "WARNING: Memory usage exceeded threshold!" << std::endl;
+    }
+);
+```
+
+### Custom Metrics
+
+Add custom performance metrics:
+
+```cpp
+struct CustomMetrics {
+    double neuralEfficiency;
+    double memoryEfficiency;
+    double simulationSpeed;
+};
+
+class CustomMetricCollector {
+public:
+    void collect(const CustomMetrics& metrics) {
+        PerformanceMonitor::getGlobal().recordMetric(
+            "custom_metrics",
+            std::chrono::system_clock::now(),
+            {metrics.neuralEfficiency, metrics.memoryEfficiency, metrics.simulationSpeed}
+        );
+    }
+};
+```
+
+## Integration with Other Tools
+
+### Logging Integration
+
+Performance data is automatically integrated with the logging system:
+
+```cpp
+// Performance data is logged to the global logger
+PerformanceProfiler profiler("operation");
+profiler.start();
+// ... operation ...
+profiler.stop();  // Logs automatically
+```
+
+### Checkpoint Integration
+
+Performance statistics are included in checkpoint metadata:
+
+```cpp
+CheckpointManager manager;
+manager.setPerformanceCallback([](const PerformanceStats& stats) {
+    // Store performance data with checkpoint
+    // Can be used for analysis and optimization
+});
+```
+
+## Configuration
+
+### Environment Variables
+
+Set performance monitoring configuration through environment variables:
+
+```bash
+export NLM_PERF_MONITORING=1        # Enable performance monitoring
+export NLM_PERF_LOG_LEVEL=DEBUG     # Set log level (DEBUG, INFO, WARNING, ERROR)
+export NLM_PERF_SAMPLE_INTERVAL=1.0 # Sampling interval in seconds
+```
+
+### Configuration File
+
+Configuration can be set in the NLM configuration file:
+
+```ini
+[performance]
+monitoring_enabled = true
+log_level = debug
+sample_interval = 1.0
+
+[profiler]
+enable_memory_tracking = true
+enable_timeline_profiling = true
+```
+
+## Best Practices
+
+### 1. Profile Early and Often
+
+Profile your application from the beginning:
+
+```cpp
+// In your main function
+PerformanceProfiler::profileSection("initialization", []() {
+    // ... initialization code ...
+});
+
+// During development
+PerformanceProfiler profiler("loop_analysis");
+for (int i = 0; i < iterations; ++i) {
+    profiler.start();
+    // ... computation ...
+    profiler.stop();
+}
+```
+
+### 2. Use Appropriate Time Units
+
+Use appropriate time units for different measurements:
+
+```cpp
+// For fast operations (milliseconds)
+PerformanceProfiler::measureTime([]() {
+    // ... fast operation ...
+});
+
+// For slow operations (seconds)
+PerformanceProfiler profiler("simulation");
+profiler.start();
+// ... simulation ...
+profiler.stop();
+```
+
+### 3. Profile Real Workloads
+
+Profile realistic workloads, not synthetic benchmarks:
+
+```cpp
+PerformanceProfiler profiler("real_simulation");
+profiler.start();
+brain->step(step, time);
+brain->applyAction(action);
+timeline.startEvent("sensor_processing");
+// ... process sensors ...
+timeline.endEvent("sensor_processing");
+profiler.stop();
+```
+
+### 4. Set Realistic Expectations
+
+Understand performance characteristics:
+
+```cpp
+// Neural network has inherent variability
+PerformanceProfiler profiler("neural_computation");
+profiler.start();
+for (int i = 0; i < num_neurons; ++i) {
+    // Each neuron has variable firing patterns
+    // This contributes to variability in execution time
+    neuron->updateState();
+}
+profiler.stop();
+
+// Multiple runs for statistical significance
+std::vector<double> times;
+for (int run = 0; run < num_runs; ++run) {
+    PerformanceProfiler run_profiler("run");
+    run_profiler.start();
+    // ... run simulation ...
+    run_profiler.stop();
+    times.push_back(run_profiler.getDuration());
+}
+
+// Calculate statistics
+double mean_time = std::accumulate(times.begin(), times.end(), 0.0) / times.size();
+double variance = 0.0;
+for (double t : times) {
+    variance += (t - mean_time) * (t - mean_time);
+}
+variance /= times.size();
+```
+
+## Conclusion
+
+The NLM performance monitoring and statistics system provides comprehensive tools for:
+
+1. **Performance Measurement**: Accurate timing of operations
+2. **Memory Analysis**: Leak detection and usage tracking
+3. **Timeline Analysis**: Event sequence recording
+4. **Real-time Monitoring**: Live performance monitoring
+5. **Statistical Analysis**: Data collection and analysis
+6. **Integration**: Seamless integration with other NLM features
+
+Use these tools to optimize your neural network simulations, identify performance bottlenecks, and ensure efficient resource usage.
+
+## References
+
+- [PerformanceProfiler Documentation](performance/Profiler.hpp)
+- [MemoryTracker Documentation](performance/MemoryTracker.hpp)
+- [TimelineProfiler Documentation](performance/TimelineProfiler.hpp)
+- [Performance Monitor API](performance/PerformanceMonitor.hpp)
+
+## See Also
+
+- [Advanced Command Line Interface](core/AdvancedCLI.cpp) - Access performance data through CLI
+- [Enhanced Checkpoint System](performance/CheckpointSystem.hpp) - Performance statistics in checkpoints
+- [Debug and Profiling Tools](core/Logger/Logger.hpp) - Advanced debugging capabilities

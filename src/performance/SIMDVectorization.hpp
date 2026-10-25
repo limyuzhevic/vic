@@ -298,15 +298,16 @@ inline void VectorizedStats::clamp(Array& arr, size_t count, float minVal, float
 // Vectorized LIF update implementation
 
 template<typename VArray, typename IArray, typename RArray, typename FArray>
-size_t VectorizedLIF::update(VArray& V_inout, const IArray& I, 
-                              RArray& refractoryRemaining,
-                              FArray& fired, size_t count) {
+size_t VectorizedLIF::update(VArray& V_inout, const IArray& I, RArray& refractoryRemaining,
+                    FArray& fired, size_t count) {
     size_t numFired = 0;
+    
+    // Early exit for empty input
+    if (count == 0) return 0;
     
     // Pre-compute constants
     float leakCoeff = dt / tau;  // (dt * 1000) factor handled in caller
     float inputCoeff = dt / C;
-    float expLeak = std::exp(-dt / tau);
     
 #if defined(NLM_SIMD_AVX512)
     __m512 vmRest = _mm512_set1_ps(V_rest);
@@ -315,57 +316,58 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
     __m512 vLeakCoeff = _mm512_set1_ps(leakCoeff);
     __m512 vInputCoeff = _mm512_set1_ps(inputCoeff);
     
-    size_t i = 0;
-    size_t vectorSize = count - (count % 16);
+    // Use unrolled processing for better cache locality and performance
+    const size_t vectorSize = (count / 16) * 16;  // Round down to multiple of 16
     
-    for (; i < vectorSize; i += 16) {
-        // Load membrane potentials
+    // Process 16 neurons at once using optimized SIMD operations
+    for (size_t i = 0; i < vectorSize; i += 16) {
+        // Load membrane potentials and synaptic inputs
         __m512 vV = _mm512_loadu_ps(&V_inout[i]);
         __m512 vI = _mm512_loadu_ps(&I[i]);
         
-        // Load refractory counters as float
+        // Load refractory counters
         alignas(64) float refractoryFloat[16];
         for (int j = 0; j < 16; ++j) {
             refractoryFloat[j] = static_cast<float>(refractoryRemaining[i + j]);
         }
         __m512 vRefractory = _mm512_load_ps(refractoryFloat);
         
-        // Create mask for neurons still in refractory
-        __m512 maskRefractory = _mm512_cmp_ps(vRefractory, _mm512_setzero_ps(), _CMP_GT_OQ);
+        // Check which neurons are in refractory (vRefractory > 0)
+        __m512 maskRefractory = _mm512_cmpgt_ps(vRefractory, _mm512_setzero_ps());
         
-        // Calculate leak term: (V_rest - V) / tau
-        __m512 vLeak = _mm512_mul_ps(_mm512_sub_ps(vmRest, vV), vLeakCoeff);
+        // Calculate membrane potential update: V = V + dt * ((V_rest - V)/tau + I/C)
+        __m512 vDeltaV = _mm512_mul_ps(_mm512_sub_ps(vmRest, vV), vLeakCoeff);
+        vDeltaV = _mm512_add_ps(vDeltaV, _mm512_mul_ps(vI, vInputCoeff));
+        vDeltaV = _mm512_mul_ps(vDeltaV, _mm512_set1_ps(1000.0f));  // Convert to mV
+        vV = _mm512_add_ps(vV, vDeltaV);
         
-        // Calculate input term: I / C
-        __m512 vInput = _mm512_mul_ps(vI, vInputCoeff);
-        
-        // Update V = V + dt * (leak + input)
-        __m512 vUpdate = _mm512_mul_ps(_mm512_add_ps(vLeak, vInput), _mm512_set1_ps(1000.0f));
-        vV = _mm512_add_ps(vV, vUpdate);
-        
-        // Apply refractory: V = V_rest during refractory
-        vV = _mm512_blend_ps(vV, vmRest, maskRefractory);
-        
-        // Decay refractory counters
-        vRefractory = _mm512_sub_ps(vRefractory, _mm512_set1_ps(1.0f));
-        
-        // Check for spikes: V >= threshold
-        __m512 maskSpike = _mm512_cmp_ps(vV, vmThresh, _CMP_GE_OQ);
-        
-        // Reset spiked neurons
-        vV = _mm512_blend_ps(vV, vmReset, maskSpike);
-        
-        // Store updated values
-        _mm512_storeu_ps(&V_inout[i], vV);
+        // Apply refractory: restore resting potential for refractory neurons
+        vV = _mm512_blendv_ps(vV, vmRest, maskRefractory);
         
         // Update refractory counters
+        vRefractory = _mm512_sub_ps(vRefractory, _mm512_set1_ps(1.0f));
+        
+        // Detect spikes
+        __m512 maskSpike = _mm512_cmpge_ps(vV, vmThresh);
+        
+        // Reset spiked neurons to reset potential
+        vV = _mm512_blendv_ps(vV, vmReset, maskSpike);
+        
+        // Update refractory counters for spiked neurons (reset to refractory decay)
+        __m512 maskSpikePositive = _mm512_and_ps(maskSpike, _mm512_set1_ps(1.0f));
+        vRefractory = _mm512_or_ps(_mm512_and_ps(maskSpike, _mm512_set1_ps(refractoryDecay)),
+                                   _mm512_andnot_ps(maskSpike, vRefractory));
+        
+        // Store results
+        _mm512_storeu_ps(&V_inout[i], vV);
+        
         alignas(64) float refractoryOut[16];
         _mm512_store_ps(refractoryOut, vRefractory);
         for (int j = 0; j < 16; ++j) {
             refractoryRemaining[i + j] = static_cast<uint32_t>(refractoryOut[j]);
         }
         
-        // Record fired neurons
+        // Record firing events
         alignas(64) uint32_t firedMask[16];
         _mm512_storeu_si512(firedMask, _mm512_castps_si32(maskSpike));
         for (int j = 0; j < 16; ++j) {
@@ -378,16 +380,16 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
         }
     }
     
-    // Handle remaining elements
-    for (; i < count; ++i) {
+    // Process remaining elements (not a multiple of 16)
+    for (size_t i = vectorSize; i < count; ++i) {
         if (refractoryRemaining[i] > 0) {
             refractoryRemaining[i]--;
             V_inout[i] = V_rest;
             fired[i] = 0;
         } else {
-            float leak = (V_rest - V_inout[i]) / tau;
-            float input = I[i] / C;
-            V_inout[i] += dt * 1000.0f * (leak + input);
+            float leak = (V_rest - V_inout[i]) * leakCoeff;
+            float input = I[i] * inputCoeff;
+            V_inout[i] += 1000.0f * (leak + input);
             
             if (V_inout[i] >= V_threshold) {
                 V_inout[i] = V_reset;
@@ -401,6 +403,181 @@ size_t VectorizedLIF::update(VArray& V_inout, const IArray& I,
     }
     
 #elif defined(NLM_SIMD_AVX2)
+    // AVX2 implementation with 8-wide vectors
+    __m256 vmRest = _mm256_set1_ps(V_rest);
+    __m256 vmReset = _mm256_set1_ps(V_reset);
+    __m256 vmThresh = _mm256_set1_ps(V_threshold);
+    __m256 vLeakCoeff = _mm256_set1_ps(leakCoeff);
+    __m256 vInputCoeff = _mm256_set1_ps(inputCoeff);
+    
+    const size_t vectorSize = (count / 8) * 8;
+    
+    for (size_t i = 0; i < vectorSize; i += 8) {
+        __m256 vV = _mm256_loadu_ps(&V_inout[i]);
+        __m256 vI = _mm256_loadu_ps(&I[i]);
+        
+        alignas(32) float refractoryFloat[8];
+        for (int j = 0; j < 8; ++j) {
+            refractoryFloat[j] = static_cast<float>(refractoryRemaining[i + j]);
+        }
+        __m256 vRefractory = _mm256_load_ps(refractoryFloat);
+        
+        __m256 maskRefractory = _mm256_cmpgt_ps(vRefractory, _mm256_setzero_ps());
+        
+        __m256 vDeltaV = _mm256_mul_ps(_mm256_sub_ps(vmRest, vV), vLeakCoeff);
+        vDeltaV = _mm256_add_ps(vDeltaV, _mm256_mul_ps(vI, vInputCoeff));
+        vDeltaV = _mm256_mul_ps(vDeltaV, _mm256_set1_ps(1000.0f));
+        vV = _mm256_add_ps(vV, vDeltaV);
+        
+        vV = _mm256_blendv_ps(vV, vmRest, maskRefractory);
+        
+        vRefractory = _mm256_sub_ps(vRefractory, _mm256_set1_ps(1.0f));
+        
+        __m256 maskSpike = _mm256_cmpge_ps(vV, vmThresh);
+        vV = _mm256_blendv_ps(vV, vmReset, maskSpike);
+        
+        __m256 maskSpikePositive = _mm256_and_ps(maskSpike, _mm256_set1_ps(1.0f));
+        vRefractory = _mm256_or_ps(_mm256_and_ps(maskSpike, _mm256_set1_ps(refractoryDecay)),
+                                   _mm256_andnot_ps(maskSpike, vRefractory));
+        
+        _mm256_storeu_ps(&V_inout[i], vV);
+        
+        alignas(32) float refractoryOut[8];
+        _mm256_store_ps(refractoryOut, vRefractory);
+        for (int j = 0; j < 8; ++j) {
+            refractoryRemaining[i + j] = static_cast<uint32_t>(refractoryOut[j]);
+        }
+        
+        alignas(32) uint32_t firedMask[8];
+        _mm256_storeu_si256(firedMask, _mm256_castps_si32(maskSpike));
+        for (int j = 0; j < 8; ++j) {
+            fired[i + j] = (firedMask[j] & 0x80000000) ? 1 : 0;
+            if (fired[i + j]) ++numFired;
+        }
+    }
+    
+    for (size_t i = vectorSize; i < count; ++i) {
+        if (refractoryRemaining[i] > 0) {
+            refractoryRemaining[i]--;
+            V_inout[i] = V_rest;
+            fired[i] = 0;
+        } else {
+            float leak = (V_rest - V_inout[i]) * leakCoeff;
+            float input = I[i] * inputCoeff;
+            V_inout[i] += 1000.0f * (leak + input);
+            
+            if (V_inout[i] >= V_threshold) {
+                V_inout[i] = V_reset;
+                refractoryRemaining[i] = static_cast<uint32_t>(refractoryDecay);
+                fired[i] = 1;
+                ++numFired;
+            } else {
+                fired[i] = 0;
+            }
+        }
+    }
+    
+#elif defined(NLM_SIMD_SSE)
+    // SSE implementation with 4-wide vectors
+    __m128 vmRest = _mm_set1_ps(V_rest);
+    __m128 vmReset = _mm_set1_ps(V_reset);
+    __m128 vmThresh = _mm_set1_ps(V_threshold);
+    __m128 vLeakCoeff = _mm_set1_ps(leakCoeff);
+    __m128 vInputCoeff = _mm_set1_ps(inputCoeff);
+    
+    const size_t vectorSize = (count / 4) * 4;
+    
+    for (size_t i = 0; i < vectorSize; i += 4) {
+        __m128 vV = _mm_loadu_ps(&V_inout[i]);
+        __m128 vI = _mm_loadu_ps(&I[i]);
+        
+        alignas(16) float refractoryFloat[4];
+        for (int j = 0; j < 4; ++j) {
+            refractoryFloat[j] = static_cast<float>(refractoryRemaining[i + j]);
+        }
+        __m128 vRefractory = _mm_load_ps(refractoryFloat);
+        
+        __m128 maskRefractory = _mm_cmpgt_ps(vRefractory, _mm_setzero_ps());
+        
+        __m128 vDeltaV = _mm_mul_ps(_mm_sub_ps(vmRest, vV), vLeakCoeff);
+        vDeltaV = _mm_add_ps(vDeltaV, _mm_mul_ps(vI, vInputCoeff));
+        vDeltaV = _mm_mul_ps(vDeltaV, _mm_set1_ps(1000.0f));
+        vV = _mm_add_ps(vV, vDeltaV);
+        
+        vV = _mm_blendv_ps(vV, vmRest, maskRefractory);
+        
+        vRefractory = _mm_sub_ps(vRefractory, _mm_set1_ps(1.0f));
+        
+        __m128 maskSpike = _mm_cmpge_ps(vV, vmThresh);
+        vV = _mm_blendv_ps(vV, vmReset, maskSpike);
+        
+        __m128 maskSpikePositive = _mm_and_ps(maskSpike, _mm_set1_ps(1.0f));
+        vRefractory = _mm_or_ps(_mm_and_ps(maskSpike, _mm_set1_ps(refractoryDecay)),
+                                _mm_andnot_ps(maskSpike, vRefractory));
+        
+        _mm_storeu_ps(&V_inout[i], vV);
+        
+        alignas(16) float refractoryOut[4];
+        _mm_store_ps(refractoryOut, vRefractory);
+        for (int j = 0; j < 4; ++j) {
+            refractoryRemaining[i + j] = static_cast<uint32_t>(refractoryOut[j]);
+        }
+        
+        alignas(16) uint32_t firedMask[4];
+        _mm_storeu_si128(firedMask, _mm_castps_si32(maskSpike));
+        for (int j = 0; j < 4; ++j) {
+            fired[i + j] = (firedMask[j] & 0x80000000) ? 1 : 0;
+            if (fired[i + j]) ++numFired;
+        }
+    }
+    
+    for (size_t i = vectorSize; i < count; ++i) {
+        if (refractoryRemaining[i] > 0) {
+            refractoryRemaining[i]--;
+            V_inout[i] = V_rest;
+            fired[i] = 0;
+        } else {
+            float leak = (V_rest - V_inout[i]) * leakCoeff;
+            float input = I[i] * inputCoeff;
+            V_inout[i] += 1000.0f * (leak + input);
+            
+            if (V_inout[i] >= V_threshold) {
+                V_inout[i] = V_reset;
+                refractoryRemaining[i] = static_cast<uint32_t>(refractoryDecay);
+                fired[i] = 1;
+                ++numFired;
+            } else {
+                fired[i] = 0;
+            }
+        }
+    }
+    
+#else
+    // Scalar fallback
+    for (size_t i = 0; i < count; ++i) {
+        if (refractoryRemaining[i] > 0) {
+            refractoryRemaining[i]--;
+            V_inout[i] = V_rest;
+            fired[i] = 0;
+        } else {
+            float leak = (V_rest - V_inout[i]) * leakCoeff;
+            float input = I[i] * inputCoeff;
+            V_inout[i] += 1000.0f * (leak + input);
+            
+            if (V_inout[i] >= V_threshold) {
+                V_inout[i] = V_reset;
+                refractoryRemaining[i] = static_cast<uint32_t>(refractoryDecay);
+                fired[i] = 1;
+                ++numFired;
+            } else {
+                fired[i] = 0;
+            }
+        }
+    }
+    #endif
+    
+    return numFired;
+}
     __m256 vmRest = _mm256_set1_ps(V_rest);
     __m256 vmReset = _mm256_set1_ps(V_reset);
     __m256 vmThresh = _mm256_set1_ps(V_threshold);
