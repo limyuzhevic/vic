@@ -73,6 +73,132 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+## Python Installation
+
+### Installation from Source
+
+```bash
+# Install build dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Build and install the enhanced Python bindings
+pip install -e .
+
+# Or install the basic bindings
+pip install ./dist/pynlm*.whl
+```
+
+### Available Python Modules
+
+The package provides two main Python modules:
+
+1. **`pynlm`** - Basic Python bindings (legacy)
+2. **`pynlm_enhanced`** - Enhanced bindings with context managers and better error handling
+3. **`pynlm_utils`** - Utility functions for simulation statistics and progress tracking
+
+### Quick Start with Enhanced Bindings
+
+```python
+import pynlm_enhanced as nlm
+import pynlm_utils as utils
+
+# Create and initialize brain using context manager
+with nlm.create_enhanced_brain() as brain:
+    # Your simulation code here
+    for step in range(100):
+        brain.step(step)
+        print(f"Step {step}: {brain.get_firing_neuron_count()} neurons firing")
+
+# Or create world with agent using context manager
+with nlm.create_enhanced_world() as world:
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    # Create agent
+    with nlm.create_enhanced_agent_brain(brain) as agent:
+        agent.initialize(world)
+        
+        # Run simulation with utilities
+        stats = utils.SimulationStats()
+        for step in range(1000):
+            world.update(0.1)
+            percept = world.get_sensory_percept()
+            agent.process_sensory_input(percept)
+            brain.step(step)
+            
+            action = agent.decode_motor_command()
+            world.apply_motor_command(action, world.get_simulation_time())
+            
+            stats.add_step_stats(
+                step,
+                brain.get_firing_neuron_count(),
+                brain.get_average_firing_rate(),
+                agent.get_curiosity_level(),
+                agent.get_novelty_level(),
+                agent.get_prediction_error(),
+                agent.get_neuromodulation_level(),
+                brain.get_developmental_stage(),
+                0.1  # estimated step time
+            )
+        
+        print(f"Simulation completed with {stats.get_total_steps()} steps")
+        print(f"Average firing rate: {stats.get_average_firing_rate():.2f}")
+        print(f"Max firing neurons: {stats.get_max_firing_neurons()}")
+```
+
+### Configuration Utilities
+
+```python
+import pynlm_utils as utils
+
+# Create configuration from statistics
+config = utils.config.create_from_stats(
+    neuron_count=1000,
+    connection_density=0.1,
+    v_threshold=-50.0,
+    v_rest=-70.0,
+    v_reset=-75.0,
+    tau_mem=20.0,
+    tau_ref=2.0
+)
+
+# Validate configuration
+if utils.config.validate(config):
+    print("Configuration is valid")
+else:
+    print("Configuration is invalid")
+
+# Convert to dictionary for debugging
+config_dict = utils.config.to_dict(config)
+```
+
+### Progress Tracking
+
+```python
+import pynlm_utils as utils
+
+# Create progress tracker
+tracker = utils.ProgressTracker(1000, "NLM Simulation")
+
+for step in range(1000):
+    # Your simulation code
+    tracker.update(step, f"Firing: {step * 10}")
+
+tracker.finish()
+```
+
+## Example Scripts
+
+Check out the `examples/` directory for comprehensive demonstration scripts:
+
+- `basic_brain_simulation.py` - Simple brain simulation
+- `agent_world_interaction.py` - Complete agent-world interaction
+- `visualization_demo.py` - Brain state visualization
+- `performance_benchmark.py` - Performance comparison
+- `advanced_features.py` - Advanced usage patterns
+
+See `examples/README.md` for detailed instructions.
+
 ## Running
 
 ### Phase 6 Demo (Integration Test)
