@@ -1,7 +1,8 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+// Include necessary headers for action planning
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 
 namespace nlm {
 
@@ -149,17 +150,98 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
 }
 
+// AgentBrain::decodeMotorCommand now uses NeuralPlanner for action selection
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
-    MotorCommand decoded = decodeFromMotorNeurons();
+    // Get current brain state for planning
+    std::vector<float> currentState;
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+    // Collect current neural activity for planning
+    // This represents the current world state from the brain's perspective
+    size_t maxNeuronsToCollect = std::min<size_t>(50, brain_->getTotalNeuronCount());
+    
+    for (const auto& region : brain_->getRegions()) {
+        for (const auto& pop : region->getPopulations()) {
+            for (size_t i = 0; i < maxNeuronsToCollect; ++i) {
+                if (i < pop->getTotalNeuronCount()) {
+                    auto* neuron = pop->getNeuron(NeuronId(i));
+                    if (neuron) {
+                        // Use membrane potential as state feature
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        currentState.push_back(activation);
+                    }
+                }
+            }
+        }
     }
     
-    return decoded;
+    // Fill remaining state if needed
+    while (currentState.size() < 100) {
+        currentState.push_back(0.0f);
+    }
+    
+    // Use NeuralPlanner to plan action
+    if (brain_->getPlanner()) {
+        // NeuralPlanner uses predictive models to plan multi-step actions
+        // It considers future consequences and rewards
+        ActionType plannedAction = brain_->getPlanner()->planAction(currentState);
+        
+        // Convert planned action to MotorCommand
+        MotorCommand motorCmd = actionToMotorCommand(plannedAction);
+        
+        // Apply curiosity-based exploration
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            motorCmd = selectWithCuriosity(motorCmd);
+        }
+        
+        return motorCmd;
+    } else {
+        // Fallback to simple motor neuron decoding if planner not available
+        MotorCommand decoded = decodeFromMotorNeurons();
+        
+        // Apply curiosity-based exploration
+        if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+            decoded = selectWithCuriosity(decoded);
+        }
+        
+        return decoded;
+    }
+}
+
+// Convert ActionType to MotorCommand
+MotorCommand AgentBrain::actionToMotorCommand(ActionType action) {
+    // Map ActionType to MotorCommand
+    // Note: Some ActionTypes don't have direct MotorCommand equivalents
+    switch (action) {
+        case ActionType::MoveForward:
+            return MotorCommand::MoveForward;
+        case ActionType::MoveBackward:
+            return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft:
+            return MotorCommand::TurnLeft;
+        case ActionType::TurnRight:
+            return MotorCommand::TurnRight;
+        case ActionType::Look:
+            return MotorCommand::Wait;  // Look action becomes Wait in MotorCommand
+        case ActionType::LookUp:
+            return MotorCommand::Wait;
+        case ActionType::LookDown:
+            return MotorCommand::Wait;
+        case ActionType::Interact:
+            return MotorCommand::Interact;
+        case ActionType::Eat:
+            return MotorCommand::Wait;
+        case ActionType::Drink:
+            return MotorCommand::Wait;
+        case ActionType::Rest:
+            return MotorCommand::Wait;
+        case ActionType::Wait:
+            return MotorCommand::Wait;
+        case ActionType::Custom:
+        default:
+            return MotorCommand::Wait;
+    }
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {

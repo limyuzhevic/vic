@@ -4,6 +4,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../motor/Action.hpp"
 #include <memory>
 #include <vector>
 
@@ -75,6 +76,9 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Action planning helper function
+    MotorCommand actionToMotorCommand(ActionType action);
     
     std::shared_ptr<Brain> brain_;
     
