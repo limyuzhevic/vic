@@ -107,6 +107,19 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Benchmark and utility libraries
+add_library(nlm_benchmark STATIC
+    src/benchmark/BenchmarkRunner.cpp
+)
+target_include_directories(nlm_benchmark PUBLIC src)
+target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+
+# Main executable
+add_executable(nlm
+    src/main.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core nlm_benchmark)
+
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
@@ -120,12 +133,6 @@ add_library(nlm_phase4 STATIC
 )
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
-
-# Main executable
-add_executable(nlm
-    src/main.cpp
-)
-target_link_libraries(nlm PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -144,7 +151,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_benchmark nlm_phase3_demo nlm_phase4_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include "nlohmann/json.hpp"
 
 namespace nlm {
 
@@ -19,40 +21,99 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check file extension
+    std::string ext = getFileExtension(filepath);
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    if (ext == "json") {
+        return loadFromJson(filepath);
+    } else if (ext == "yaml" || ext == "yml") {
+        return loadFromYaml(filepath);
+    } else {
+        // Try to parse as simple key=value format for backward compatibility
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        return true;
     }
-    
-    return true;
+}
+
+bool Config::loadFromJson(const std::string& filepath) {
+    try {
+        auto json = parseJsonFile(filepath);
+        
+        // Process JSON object recursively
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            processJsonValue(key, *it);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to load JSON configuration from " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYaml(const std::string& filepath) {
+    // YAML support would go here
+    // For now, fall back to JSON if YAML library is available
+    NLM_LOG_WARNING("YAML configuration loading not yet implemented, trying JSON...");
+    return loadFromJson(filepath);
+}
+
+void Config::processJsonValue(const std::string& key, const nlohmann::json& value) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), ConfigSource::File);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), ConfigSource::File);
+    } else if (value.is_number_unsigned()) {
+        set(key, static_cast<int64_t>(value.get<uint64_t>()), ConfigSource::File);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), ConfigSource::File);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), ConfigSource::File);
+    } else if (value.is_array()) {
+        // Process array
+        std::vector<std::string> arrayValues;
+        for (const auto& item : value) {
+            arrayValues.push_back(item.dump());
+        }
+        set(key, arrayValues, ConfigSource::File);
+    } else if (value.is_object()) {
+        // Nested object - flatten with dot notation or ignore for now
+        // For simplicity, we'll ignore nested objects
+        NLM_LOG_WARNING("Ignoring nested configuration object for key: " + key);
+    } else if (value.is_null()) {
+        // Treat null as empty string
+        set(key, "", ConfigSource::File);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,12 +145,54 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        nlohmann::json json;
+        
+        for (const auto& entry : pImpl->entries) {
+            json[entry.key] = configValueToJson(entry.value);
+        }
+        
+        file << json.dump(2); // Pretty print with 2-space indentation
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to save configuration to " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
+}
+
+nlohmann::json Config::configValueToJson(const ConfigValue& value) const {
+    return std::visit([](auto&& arg) -> nlohmann::json {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            return static_cast<int64_t>(arg);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            nlohmann::json arr = nlohmann::json::array();
+            for (const auto& item : arg) {
+                arr.push_back(item);
+            }
+            return arr;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            nlohmann::json arr = nlohmann::json::array();
+            for (const auto& item : arg) {
+                arr.push_back(item);
+            }
+            return arr;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            nlohmann::json arr = nlohmann::json::array();
+            for (const auto& item : arg) {
+                arr.push_back(item);
+            }
+            return arr;
+        } else {
+            return "";
+        }
+    }, value);
 }
 
 template<typename T>
@@ -206,10 +309,27 @@ template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+nlohmann::json parseJsonFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open file: " + filepath);
+    }
+    
+    try {
+        return nlohmann::json::parse(file);
+    } catch (const nlohmann::json::parse_error& e) {
+        throw std::runtime_error("JSON parse error in " + filepath + ": " + std::string(e.what()));
+    }
+}
+
+std::string getFileExtension(const std::string& filepath) {
+    size_t pos = filepath.find_last_of('.');
+    if (pos == std::string::npos) {
+        return "";
+    }
+    std::string ext = filepath.substr(pos + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    return ext;
+}
 
 } // namespace nlm
