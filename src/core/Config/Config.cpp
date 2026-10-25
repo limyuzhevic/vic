@@ -19,16 +19,20 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Phase 1: Enhanced file loading with better error handling and validation
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Config: Could not open file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
+    bool hasValidEntries = false;
+    
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +45,11 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            if (key.empty()) {
+                NLM_LOG_WARNING("Config: Empty key found at line " + std::to_string(lineNum));
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -48,11 +57,23 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Validate and set configuration entry
+            if (validateKey(key)) {
+                set(key, value, ConfigSource::File);
+                hasValidEntries = true;
+            } else {
+                NLM_LOG_WARNING("Config: Invalid key '" + key + "' at line " + std::to_string(lineNum));
+            }
+        } else {
+            NLM_LOG_WARNING("Config: Invalid format at line " + std::to_string(lineNum) + ": " + line);
         }
     }
     
-    return true;
+    if (!hasValidEntries) {
+        NLM_LOG_WARNING("Config: No valid entries loaded from " + filepath);
+    }
+    
+    return hasValidEntries;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -81,14 +102,51 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Config: Could not write to file: " + filepath);
         return false;
     }
     
+    file << "# NLM Configuration File - Generated automatically\n";
+    file << "# Edit this file to customize your neural simulation\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# " << entry.description << " (Source: " << getConfigSourceString(entry.source) << ")\n";
+        
+        // Format based on type
+        if (entry.type == ConfigType::Int) {
+            if (std::holds_alternative<int64_t>(entry.value)) {
+                file << entry.key << " = " << std::get<int64_t>(entry.value) << "\n";
+            }
+        } else if (entry.type == ConfigType::Float) {
+            if (std::holds_alternative<double>(entry.value)) {
+                file << entry.key << " = " << std::get<double>(entry.value) << "\n";
+            } else if (std::holds_alternative<float>(entry.value)) {
+                file << entry.key << " = " << std::get<float>(entry.value) << "\n";
+            }
+        } else if (entry.type == ConfigType::Bool) {
+            if (std::holds_alternative<bool>(entry.value)) {
+                bool val = std::get<bool>(entry.value);
+                file << entry.key << " = " << (val ? "true" : "false") << "\n";
+            }
+        } else if (entry.type == ConfigType::String) {
+            if (std::holds_alternative<std::string>(entry.value)) {
+                std::string str = std::get<std::string>(entry.value);
+                // Escape quotes if needed
+                bool needsQuotes = str.find('"') != std::string::npos || str.find('\n') != std::string::npos;
+                if (needsQuotes) {
+                    file << entry.key << " = \"" << str << "\"\n";
+                } else {
+                    file << entry.key << " = " << str << "\n";
+                }
+            }
+        } else {
+            file << entry.key << " = \"UNKNOWN_TYPE\"\n";
+        }
+        
+        file << "\n";
     }
     
+    NLM_LOG_INFO("Config: Saved configuration to " + filepath);
     return true;
 }
 
