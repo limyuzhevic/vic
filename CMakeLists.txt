@@ -29,6 +29,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/AdvancedConfig.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -83,8 +84,20 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/Phase3Experiment.cpp
+    src/experiments/Phase4Experiment.cpp
+    src/experiments/Phase5Experiment.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
+    src/experiments/Phase3Demo.cpp
+    src/experiments/Phase4Demo.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Performance
+    src/performance/PerformanceMonitor.cpp
+    # Tools
+    src/tools/AdvancedTools.cpp
+    # Testing
+    src/testing/AdvancedTestFramework.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -138,6 +151,70 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Integration demo executable (new)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+
+# Performance testing executable (new)
+add_executable(nlm_performance_test
+    src/performance/PerformanceTest.cpp
+)
+target_link_libraries(nlm_performance_test PUBLIC nlm_core)
+
+# Visualization executable (new)
+add_executable(nlm_visualizer
+    src/tools/VisualizationTool.cpp
+)
+target_link_libraries(nlm_visualizer PUBLIC nlm_core nlm_visualization)
+
+# Debugging executable (new)
+add_executable(nlm_debugger
+    src/tools/DebuggerTool.cpp
+)
+target_link_libraries(nlm_debugger PUBLIC nlm_core nlm_debugger)
+
+# Testing
+enable_testing()
+add_subdirectory(tests)
+
+# Install targets (future)
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6
+    nlm_phase3_demo nlm_phase4_demo nlm_phase6_demo
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# Phase 3 experiments
+add_library(nlm_phase3 STATIC
+    src/experiments/Phase3Experiment.cpp
+)
+target_include_directories(nlm_phase3 PUBLIC src)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 4 experiments
+add_library(nlm_phase4 STATIC
+    src/experiments/Phase4Experiment.cpp
+)
+target_include_directories(nlm_phase4 PUBLIC src)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
 
 # Testing
 enable_testing()
