@@ -66,8 +66,11 @@ struct LearningExperiment {
         
         // Record initial weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
+            const auto& synapses = region->getSynapses();
+            for (const auto& syn : synapses) {
+                if (syn) {
+                    initialWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -85,8 +88,11 @@ struct LearningExperiment {
         
         // Record final weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
+            const auto& synapses = region->getSynapses();
+            for (const auto& syn : synapses) {
+                if (syn) {
+                    finalWeights.push_back(syn->getWeight());
+                }
             }
         }
         
@@ -253,7 +259,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     if (!region) return;
     
     // Get first few synapses
-    auto& synapses = region->getSynapses();
+    const auto& synapses = region->getSynapses();
     if (synapses.size() < 5) {
         NLM_LOG_INFO("  Not enough synapses for STDP test");
         return;
@@ -263,11 +269,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     
     // Record initial weights
     std::vector<float> beforeWeights;
-    for (size_t i = 0; i < 5; ++i) {
+    for (size_t i = 0; i < 5 && synapses[i]; ++i) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                        " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
