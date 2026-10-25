@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "JsonParser.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,9 +20,48 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON format first (files ending with .json)
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+        return loadFromJson(filepath);
+    }
     
+    // Try to parse as JSON by checking if it starts with {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    char firstChar;
+    file >> firstChar;
+    file.seekg(0); // Reset to beginning
+    
+    if (firstChar == '{') {
+        return loadFromJson(filepath);
+    }
+    
+    // Fall back to simple key=value format for backward compatibility
+    return loadFromKeyValue(filepath);
+}
+
+bool Config::loadFromJson(const std::string& filepath) {
+    std::map<std::string, JsonParser::JsonValue> jsonData;
+    if (!JsonParser::parseFile(filepath, jsonData)) {
+        return false;
+    }
+    
+    clear(); // Clear existing entries
+    
+    for (const auto& pair : jsonData) {
+        // Convert JsonValue to ConfigValue
+        ConfigValue configValue = convertJsonToConfig(pair.second);
+        set(pair.first, configValue, ConfigSource::File);
+        // Note: JSON doesn't have descriptions, so we use empty string
+    }
+    
+    return true;
+}
+
+bool Config::loadFromKeyValue(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -55,6 +95,55 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+ConfigValue Config::convertJsonToConfig(const JsonParser::JsonValue& jsonValue) {
+    return std::visit([](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            return ConfigValue(arg);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return ConfigValue(arg);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return ConfigValue(arg);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return ConfigValue(arg);
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return ConfigValue(arg);
+        } else if constexpr (std::is_same_v<T, std::vector<JsonParser::JsonValue>>) {
+            // Convert JSON array to vector
+            std::vector<int> intVec;
+            std::vector<double> doubleVec;
+            std::vector<std::string> stringVec;
+            
+            for (const auto& item : arg) {
+                std::visit([&](auto&& itemArg) {
+                    using ItemT = std::decay_t<decltype(itemArg)>;
+                    if constexpr (std::is_same_v<ItemT, int>) {
+                        intVec.push_back(itemArg);
+                    } else if constexpr (std::is_same_v<ItemT, int64_t>) {
+                        intVec.push_back(static_cast<int>(itemArg));
+                    } else if constexpr (std::is_same_v<ItemT, double>) {
+                        doubleVec.push_back(itemArg);
+                    } else if constexpr (std::is_same_v<ItemT, bool>) {
+                        intVec.push_back(itemArg ? 1 : 0);
+                    } else if constexpr (std::is_same_v<ItemT, std::string>) {
+                        stringVec.push_back(itemArg);
+                    }
+                }, item.value);
+            }
+            
+            // Prefer the most specific type
+            if (!stringVec.empty()) {
+                return ConfigValue(stringVec);
+            } else if (!doubleVec.empty()) {
+                return ConfigValue(doubleVec);
+            } else {
+                return ConfigValue(intVec);
+            }
+        }
+        return ConfigValue(); // Fallback
+    }, jsonValue.value);
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -86,7 +175,39 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert the variant value to string representation
+        std::string valueStr;
+        std::visit([&valueStr](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote string values
+                valueStr = "\"" + arg + "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                valueStr = arg ? "true" : "false";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                // Serialize vector values
+                valueStr = "[";
+                bool first = true;
+                for (const auto& item : arg) {
+                    if (!first) valueStr += ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        valueStr += "\"" + std::to_string(item) + "\"";
+                    } else {
+                        valueStr += std::to_string(item);
+                    }
+                    first = false;
+                }
+                valueStr += "]";
+            } else {
+                // For basic types (int, int64_t, double, etc.)
+                valueStr = std::to_string(arg);
+            }
+        }, entry.value);
+        
+        file << entry.key << " = " << valueStr << "\n\n";
     }
     
     return true;

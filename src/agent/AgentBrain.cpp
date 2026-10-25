@@ -1,4 +1,5 @@
 #include "AgentBrain.hpp"
+#include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
@@ -19,7 +20,50 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , visionScaling_(1.0f)
+    , touchScaling_(1.0f)
+    , internalScaling_(1.0f)
+    , proprioceptionScaling_(1.0f)
+    , neuromodulationCuriosityScaling_(2.0f)
+    , neuromodulationPredictionErrorScaling_(0.5f)
+    , explorationChanceMultiplier_(0.3f)
+    , explorationCuriosityThreshold_(0.5f)
+    , plasticityDopamineEffect_(0.5f)
+    , plasticityDecayFactor_(0.9995f)
+    , initialPlasticityPhase_(60.0f)
+    , criticalPeriodPhase_(300.0f)
+    , maturationPhase_(900.0f)
+    , visionInputSize_(256)
+    , touchInputSize_(8)
+    , internalInputSize_(4)
+    , proprioceptionInputSize_(6)
+    , motorActivityThreshold_(0.5f)
 {
+    // Load configuration values from brain config if available
+    if (brain_) {
+        auto config = brain_->getConfig();
+        if (config) {
+            visionScaling_ = config->getOr<float>("vision_scaling_factor", 5.0f);
+            touchScaling_ = config->getOr<float>("touch_scaling_factor", 8.0f);
+            internalScaling_ = config->getOr<float>("internal_scaling_factor", 2.0f);
+            proprioceptionScaling_ = config->getOr<float>("proprioception_scaling_factor", 5.0f);
+            neuromodulationCuriosityScaling_ = config->getOr<float>("neuromodulation_curiosity_scaling", 2.0f);
+            neuromodulationPredictionErrorScaling_ = config->getOr<float>("neuromodulation_prediction_error_scaling", 0.5f);
+            explorationChanceMultiplier_ = config->getOr<float>("exploration_chance_multiplier", 0.3f);
+            explorationCuriosityThreshold_ = config->getOr<float>("exploration_curiosity_threshold", 0.5f);
+            plasticityDopamineEffect_ = config->getOr<float>("plasticity_dopamine_effect", 0.5f);
+            plasticityDecayFactor_ = config->getOr<float>("plasticity_decay_factor", 0.9995f);
+            initialPlasticityPhase_ = config->getOr<float>("initial_plasticity_phase", 60.0f);
+            criticalPeriodPhase_ = config->getOr<float>("critical_period_phase", 300.0f);
+            maturationPhase_ = config->getOr<float>("maturation_phase", 900.0f);
+            visionInputSize_ = config->getOr<size_t>("vision_input_size", 256);
+            touchInputSize_ = config->getOr<size_t>("touch_input_size", 8);
+            internalInputSize_ = config->getOr<size_t>("internal_input_size", 4);
+            proprioceptionInputSize_ = config->getOr<size_t>("proprioception_input_size", 6);
+            motorActivityThreshold_ = config->getOr<float>("motor_activity_threshold", 0.5f);
+        }
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -75,51 +119,53 @@ void AgentBrain::initialize(const SimpleWorld& world) {
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
+    // Vision + touch + internal + proprioception (based on configurable sizes)
+    return visionInputSize_ + touchInputSize_ + internalInputSize_ + proprioceptionInputSize_;
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+    // One motor neuron per action (based on configurable motor groups)
+    return 6;  // Still 6 motor groups, but this could be configurable too
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
     
-    // Vision input (256 values -> sensoryVision_ neurons)
+    // Vision input (based on configurable input size)
     const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+    for (size_t i = 0; i < sensoryVision_.size() && i < visionInputSize_; ++i) {
         if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
+            // Inject current proportional to vision intensity using configurable scaling
+            float current = vision[i] * visionScaling_;
             sensoryVision_[i]->injectCurrent(current);
         }
     }
     
-    // Touch input (8 values -> sensoryTouch_ neurons)
+    // Touch input (based on configurable input size)
     const auto& touch = percept.getTouch();
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+    for (size_t i = 0; i < sensoryTouch_.size() && i < touchInputSize_; ++i) {
         if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
+            float current = touch[i] * touchScaling_;
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
+    // Internal signals (based on configurable input size)
     const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+    for (size_t i = 0; i < sensoryInternal_.size() && i < internalInputSize_; ++i) {
         if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+            // Center and scale using configurable factors
+            float current = (intern[i] * internalScaling_ - 1.0f) * visionScaling_;
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
     
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
+    // Proprioception (based on configurable input size)
     const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprioceptionInputSize_; ++i) {
         if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+            // Center and scale using configurable factors
+            float current = (proprio[i] * proprioceptionScaling_ - 1.0f) * visionScaling_;
             sensoryProprioception_[i]->injectCurrent(current);
         }
     }
@@ -144,7 +190,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = noveltyLevel_ * neuromodulationCuriosityScaling_ + std::abs(predictionError_) * neuromodulationPredictionErrorScaling_;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -155,7 +201,7 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+    if (curiosityEnabled_ && curiosityLevel_ > explorationCuriosityThreshold_) {
         decoded = selectWithCuriosity(decoded);
     }
     
@@ -213,7 +259,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        float exploreChance = curiosityLevel_ * explorationChanceMultiplier_;  // Up to 30% random
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
@@ -268,7 +314,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Modulate plasticity based on dopamine
     // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    float plasticityFactor = plasticityDopamineEffect_ + plasticityDopamineEffect_ * dopamineLevel_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
@@ -286,13 +332,13 @@ void AgentBrain::updateDevelopment(double timestep) {
     
     // Simple developmental stages based on age
     // This is a biologically inspired approximation
-    if (developmentalAge_ < 60.0) {  // ~1 minute
+    if (developmentalAge_ < initialPlasticityPhase_) {  // Initial phase
         plasticityModifier_ = 1.0f;  // High plasticity
         brain_->setDevelopmentalStage(DevelopmentalStage::Initial);
-    } else if (developmentalAge_ < 300.0) {  // ~5 minutes
+    } else if (developmentalAge_ < criticalPeriodPhase_) {  // Critical period
         plasticityModifier_ = 0.8f;
         brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
-    } else if (developmentalAge_ < 900.0) {  // ~15 minutes
+    } else if (developmentalAge_ < maturationPhase_) {  // Maturation
         plasticityModifier_ = 0.5f;
         brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
     } else {
@@ -304,9 +350,18 @@ void AgentBrain::updateDevelopment(double timestep) {
     if (structuralPlasticityEnabled_) {
         auto* sp = brain_->getStructuralPlasticity();
         if (sp) {
-            // Higher synaptogenesis in early development
-            float synRate = 0.0001f * plasticityModifier_;
-            float pruneRate = 0.00001f * (2.0f - plasticityModifier_);
+            // Get config values for synaptogenesis and pruning rates
+            auto config = brain_->getConfig();
+            float synRate = 0.0001f;  // Default
+            float pruneRate = 0.00001f;  // Default
+            
+            if (config) {
+                synRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+                pruneRate = config->getOr<float>("pruning_rate", 0.00001f);
+            }
+            
+            synRate = synRate * plasticityModifier_;
+            pruneRate = pruneRate * (2.0f - plasticityModifier_);
             sp->setSynaptogenesisRate(synRate);
             sp->setPruningRate(pruneRate);
         }

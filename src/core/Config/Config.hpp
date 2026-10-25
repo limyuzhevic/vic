@@ -6,6 +6,11 @@
 #include <variant>
 #include <optional>
 
+// Forward declaration for JsonParser
+namespace nlm {
+    class JsonParser;
+}
+
 namespace nlm {
 
 // Forward declarations
@@ -57,6 +62,11 @@ public:
     
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Internal load methods
+    bool loadFromJson(const std::string& filepath);
+    bool loadFromKeyValue(const std::string& filepath);
+    ConfigValue convertJsonToConfig(const JsonParser::JsonValue& jsonValue);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);

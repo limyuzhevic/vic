@@ -9,6 +9,9 @@
 
 namespace nlm {
 
+// Forward declarations
+class Config;
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
@@ -112,6 +115,26 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Configuration values
+    float visionScaling_;
+    float touchScaling_;
+    float internalScaling_;
+    float proprioceptionScaling_;
+    float neuromodulationCuriosityScaling_;
+    float neuromodulationPredictionErrorScaling_;
+    float explorationChanceMultiplier_;
+    float explorationCuriosityThreshold_;
+    float plasticityDopamineEffect_;
+    float plasticityDecayFactor_;
+    float initialPlasticityPhase_;
+    float criticalPeriodPhase_;
+    float maturationPhase_;
+    size_t visionInputSize_;
+    size_t touchInputSize_;
+    size_t internalInputSize_;
+    size_t proprioceptionInputSize_;
+    float motorActivityThreshold_;
 };
 
 } // namespace nlm
