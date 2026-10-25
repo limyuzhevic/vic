@@ -40,6 +40,9 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
     ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Acetylcholine.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Norepinephrine.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Serotonin.cpp
     ${NLM_SOURCE_DIR}/memory/Memory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
