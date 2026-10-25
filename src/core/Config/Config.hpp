@@ -87,11 +87,28 @@ public:
     // Get all keys
     std::vector<std::string> getKeys() const;
     
-    // Clear all
-    void clear();
+    // Configuration validation and error handling
+    bool validateConfiguration() const;
+    std::vector<std::string> validateConfigurationDetailed() const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Validate specific configuration values
+    bool validateNeuronCount(size_t neuronCount) const;
+    bool validateRegionCount(size_t regionCount) const;
+    bool validateConnectionProbability(float probability) const;
+    bool validateTimestep(double timestep) const;
+    bool validatePositiveValue(double value, double tolerance = 1e-6) const;
+    
+    // Configuration information
+    struct ConfigurationInfo {
+        std::string key;
+        std::string type;
+        std::string description;
+        std::string defaultValue;
+        bool required;
+        std::string validationError;
+    };
+    
+    static std::vector<ConfigurationInfo> getConfigurationSchema();
     
 private:
     struct Impl;

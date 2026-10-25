@@ -149,6 +149,28 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
 }
 
+// Define constants for better code maintainability
+namespace {
+    constexpr float DEFAULT_VISION_SCALE = 1.0f;
+    constexpr float DEFAULT_MOTOR_SCALE = 1.0f;
+    constexpr float DEFAULT_EXPLORATION_THRESHOLD = 0.3f;
+    constexpr float DEFAULT_REWARD_DECAY = 0.95f;
+    constexpr float DEFAULT_REWARD_LEARNING_RATE = 0.05f;
+    constexpr float DEFAULT_NEUROMODULATION_SENSITIVITY = 1.0f;
+    constexpr float DEFAULT_DEVELOPMENT_RATE = 0.1f;
+    
+    constexpr size_t MAX_RANDOM_MOTOR_COMMANDS = 8;
+    constexpr float MIN_EXPLORATION_CHANCE = 0.0f;
+    constexpr float MAX_EXPLORATION_CHANCE = 0.3f;
+    constexpr float MIN_EXPLORATION_LEVEL = 0.0f;
+    constexpr float MAX_EXPLORATION_LEVEL = 1.0f;
+    
+    constexpr float MIN_ACTIVITY_THRESHOLD = 0.0f;
+    constexpr float MAX_ACTIVITY_THRESHOLD = 1.0f;
+    constexpr float MIN_NEUROMODULATION_LEVEL = 0.0f;
+    constexpr float MAX_NEUROMODULATION_LEVEL = 1.0f;
+}
+
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
@@ -345,6 +367,49 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Add the convenience methods implementations
+
+// Configuration validation
+bool AgentBrain::validateConfiguration() const {
+    bool valid = true;
+    
+    if (brain_) {
+        // Validate brain configuration
+        if (brain_->getTotalNeuronCount() == 0) {
+            NLM_LOG_WARNING("Brain has zero neurons");
+            valid = false;
+        }
+        
+        if (brain_->getTotalSynapseCount() == 0) {
+            NLM_LOG_WARNING("Brain has zero synapses");
+            valid = false;
+        }
+    }
+    
+    return valid;
+}
+
+// Get default configuration
+std::shared_ptr<Config> AgentBrain::createDefaultConfig() {
+    auto config = std::make_shared<Config>();
+    
+    // Set default values
+    config->set("neuron_count", 1000);
+    config->set("region_count", 1);
+    config->set("connection_probability", 0.1f);
+    config->set("simulation_timestep", 0.001);
+    config->set("random_seed", 42);
+    config->set("stdp_ltp_weight", 0.01f);
+    config->set("stdp_ltd_weight", 0.012f);
+    config->set("stdp_tau", 20.0f);
+    config->set("synaptogenesis_rate", 0.0001f);
+    config->set("pruning_rate", 0.00001f);
+    config->set("replay_interval", 100);
+    config->set("consolidation_interval", 1000);
+    
+    return config;
 }
 
 } // namespace nlm

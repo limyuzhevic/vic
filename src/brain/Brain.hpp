@@ -187,6 +187,26 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
+    // ========== INITIALIZATION HELPERS ==========
+    
+    // Initialize core brain components (random generator, spike system, etc.)
+    bool initializeCoreComponents(size_t regionCount);
+    
+    // Create neural regions with appropriate populations
+    bool createNeuralRegions(size_t regionCount, size_t neuronCount);
+    
+    // Initialize connectivity between neurons
+    bool initializeConnectivity(size_t regionCount, float connectionProbability);
+    
+    // Initialize all integrated systems
+    bool initializeIntegratedSystems(size_t neuronCount);
+    
+    // Configure the checkpoint system
+    void configureCheckpointSystem();
+    
+    // Log brain statistics for monitoring
+    void logBrainStatistics();
+    
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
