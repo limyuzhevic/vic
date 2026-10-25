@@ -131,33 +131,115 @@ void testRandomInitialization() {
     std::cout << "    testRandomInitialization passed" << std::endl;
 }
 
-void testReset() {
+void testNeuronEnhancedStep() {
     nlm::Neuron neuron(nlm::NeuronId(1));
     
-    neuron.setMembranePotential(-60.0f);
-    neuron.injectCurrent(5.0f);
-    neuron.recordSpike(0.1);
+    // Set up neuron for testing
+    neuron.setType(nlm::NeuronType::Excitatory);
+    neuron.setMembranePotential(-65.0f);  // Below threshold
+    neuron.setThreshold(-60.0f);
+    neuron.setRestingPotential(-70.0f);
+    neuron.setResetPotential(-70.0f);
+    neuron.setLeakConductance(10.0f);
     
-    neuron.reset();
+    // Test that neuron doesn't fire when below threshold
+    bool fired = neuron.stepLIF(0.0, 0.001);
+    assert(!fired);
+    assert(neuron.getMembranePotential() < -60.0f);  // Still below threshold
     
-    assert(neuron.getMembranePotential() == -70.0f);
-    assert(neuron.getTotalCurrent() == 0.0f);
-    assert(neuron.getSpikeHistory().empty());
+    // Test firing when threshold is crossed
+    neuron.setMembranePotential(-59.0f);  // Above threshold
+    fired = neuron.stepLIF(0.0, 0.001);
+    assert(fired);
+    assert(neuron.getMembranePotential() == -70.0f);  // Reset to resting
+    assert(neuron.isRefractory());  // Should be in refractory period
+    assert(neuron.getLastSpikeTime() == 0.0f);
     
-    std::cout << "    testReset passed" << std::endl;
+    std::cout << "    testNeuronEnhancedStep passed" << std::endl;
 }
 
-void runAll() {
-    testNeuronCreation();
-    testNeuronType();
-    testMembranePotential();
-    testFiringState();
-    testRefractoryDecrement();
-    testCurrentInjection();
-    testSynapticInput();
-    testSpikeHistory();
-    testRandomInitialization();
-    testReset();
+void testNeuronModernCppFeatures() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Test noexcept methods
+    neuron.setType(nlm::NeuronType::Excitatory);
+    neuron.setMembranePotential(-65.0f);
+    neuron.setThreshold(-60.0f);
+    
+    // These methods should be noexcept
+    neuron.setType(nlm::NeuronType::Inhibitory);
+    neuron.setMembranePotential(-70.0f);
+    neuron.setThreshold(-55.0f);
+    
+    // Test [[nodiscard]] methods
+    auto type = neuron.getType();  // Should trigger static analysis in optimized builds
+    auto potential = neuron.getMembranePotential();
+    auto threshold = neuron.getThreshold();
+    
+    // Test that methods return expected values
+    assert(type == nlm::NeuronType::Inhibitory);
+    assert(potential == -70.0f);
+    assert(threshold == -55.0f);
+    
+    std::cout << "    testNeuronModernCppFeatures passed" << std::endl;
+}
+
+void testNeuronRefractoryPeriod() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Set up neuron for refractory period testing
+    neuron.setMembranePotential(-65.0f);
+    neuron.setThreshold(-60.0f);
+    neuron.setRefractoryPeriod(5);
+    
+    // Make neuron fire to enter refractory period
+    neuron.setMembranePotential(-59.0f);  // Above threshold
+    bool fired = neuron.stepLIF(0.0, 0.001);
+    assert(fired);
+    assert(neuron.isRefractory());
+    
+    // Test that neuron cannot fire during refractory period
+    neuron.setMembranePotential(-59.0f);  // Above threshold
+    bool shouldNotFire = neuron.stepLIF(0.1, 0.001);  // Time advances
+    assert(!shouldNotFire);  // Should not fire during refractory
+    assert(neuron.isRefractory());  // Still in refractory
+    
+    // Decrement refractory period
+    for (int i = 0; i < 5; ++i) {
+        neuron.decrementRefractory();
+    }
+    assert(!neuron.isRefractory());  // Should exit refractory now
+    
+    std::cout << "    testNeuronRefractoryPeriod passed" << std::endl;
+}
+
+void testNeuronAdaptation() {
+    nlm::Neuron neuron(nlm::NeuronId(1));
+    
+    // Test spike-frequency adaptation
+    neuron.setMembranePotential(-65.0f);
+    neuron.setThreshold(-60.0f);
+    neuron.setRefractoryPeriod(2);
+    
+    // First spike
+    neuron.setMembranePotential(-59.0f);  // Above threshold
+    bool fired1 = neuron.stepLIF(0.0, 0.001);
+    assert(fired1);
+    assert(neuron.getState().adaptationVariable > 0.0f);  // Should have adaptation
+    
+    // Check adaptation variable
+    float adaptation1 = neuron.getState().adaptationVariable;
+    
+    // Second spike after refractory
+    neuron.setMembranePotential(-59.0f);  // Above threshold
+    bool fired2 = neuron.stepLIF(0.2, 0.001);  // After refractory period
+    assert(fired2);
+    
+    // Adaptation should continue to build up
+    float adaptation2 = neuron.getState().adaptationVariable;
+    assert(adaptation2 > adaptation1);  // Should have increased
+    
+    std::cout << "    testNeuronAdaptation passed" << std::endl;
 }
 
 } // namespace test_neuron

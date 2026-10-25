@@ -10,7 +10,7 @@ class Neuron;
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
 
-class Synapse {
+class Synapse final {
 public:
     // Create synapse with IDs
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
@@ -21,68 +21,68 @@ public:
     Synapse(const Synapse&) = delete;
     Synapse& operator=(const Synapse&) = delete;
     Synapse(Synapse&&) noexcept;
-    Synapse& operator=(Synapse&&) noexcept;
+    Synapse& operator=(Synapse&&) noexcept = default;
     
     // Identity
-    SynapseId getId() const;
+    [[nodiscard]] SynapseId getId() const noexcept;
     
     // Connection
-    NeuronId getSourceNeuron() const;
-    NeuronId getDestinationNeuron() const;
+    [[nodiscard]] NeuronId getSourceNeuron() const noexcept;
+    [[nodiscard]] NeuronId getDestinationNeuron() const noexcept;
     
     // Weight
-    SynapticWeight getWeight() const;
-    void setWeight(SynapticWeight weight);
-    void addToWeight(SynapticWeight delta);
+    [[nodiscard]] SynapticWeight getWeight() const noexcept;
+    void setWeight([[maybe_unused]] SynapticWeight weight) noexcept;
+    void addToWeight([[maybe_unused]] SynapticWeight delta) noexcept;
     
     // Delay (in simulation steps)
-    Delay getDelay() const;
-    void setDelay(Delay delay);
+    [[nodiscard]] Delay getDelay() const noexcept;
+    void setDelay([[maybe_unused]] Delay delay) noexcept;
     
     // Type
-    SynapseType getType() const;
-    void setType(SynapseType type);
+    [[nodiscard]] SynapseType getType() const noexcept;
+    void setType([[maybe_unused]] SynapseType type) noexcept;
     
     // Excitatory/Inhibitory
-    bool isExcitatory() const;
-    bool isInhibitory() const;
+    [[nodiscard]] bool isExcitatory() const noexcept;
+    [[nodiscard]] bool isInhibitory() const noexcept;
     
     // Activity history for plasticity
-    void recordPreSpike(Timestamp timestamp);
-    void recordPostSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getPreSpikeHistory() const;
-    const std::vector<Timestamp>& getPostSpikeHistory() const;
-    void clearHistory();
+    void recordPreSpike([[maybe_unused]] Timestamp timestamp) noexcept;
+    void recordPostSpike([[maybe_unused]] Timestamp timestamp) noexcept;
+    [[nodiscard]] const std::vector<Timestamp>& getPreSpikeHistory() const noexcept;
+    [[nodiscard]] const std::vector<Timestamp>& getPostSpikeHistory() const noexcept;
+    void clearHistory() noexcept;
     
     // Plasticity flags
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
+    [[nodiscard]] const PlasticityFlags& getPlasticityFlags() const noexcept;
+    [[nodiscard]] PlasticityFlags& getPlasticityFlags() noexcept;
     
     // Enable/disable plasticity rules
-    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    void enablePlasticity([[maybe_unused]] bool hebbian, [[maybe_unused]] bool stdp, [[maybe_unused]] bool rewardModulated) noexcept;
     
     // Eligibility trace (for reward-modulated learning)
-    float getEligibilityTrace() const;
-    void setEligibilityTrace(float trace);
-    void decayEligibilityTrace(float decayRate);
+    [[nodiscard]] float getEligibilityTrace() const noexcept;
+    void setEligibilityTrace([[maybe_unused]] float trace) noexcept;
+    void decayEligibilityTrace([[maybe_unused]] float decayRate) noexcept;
     
     // Synaptic efficacy (use-dependent modulation)
-    float getEfficacy() const;
-    void setEfficacy(float efficacy);
+    [[nodiscard]] float getEfficacy() const noexcept;
+    void setEfficacy([[maybe_unused]] float efficacy) noexcept;
     
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
+    void step([[maybe_unused]] Timestamp currentTime) noexcept;
     
     // Reset to initial state
-    void reset();
+    void reset() noexcept;
     
     // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
+    void initializeRandom([[maybe_unused]] class RandomGenerator& rng) noexcept;
     
 private:
     struct Impl;
-    Impl* pImpl;
+    [[maybe_unused]] Impl* pImpl;
 };
 
 } // namespace nlm

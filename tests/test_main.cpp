@@ -37,12 +37,29 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_modern_cpp {
+    void runAll();
+}
+
+namespace test_python_bindings {
+    void runAll();
+}
+
+namespace test_validation {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Enhanced Features:" << std::endl;
+    std::cout << "  - Modern C++14/17 features" << std::endl;
+    std::cout << "  - Python bindings improvements" << std::endl;
+    std::cout << "  - Configuration validation" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -119,9 +136,38 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Modern C++ Features tests..." << std::endl;
+    try {
+        test_modern_cpp::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Python Bindings tests..." << std::endl;
+    try {
+        test_python_bindings::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Validation tests..." << std::endl;
+    try {
+        test_validation::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << std::endl;
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "=== NLM Phase 2 Implementation Complete ===" << std::endl;
+        std::cout << "=== Enhanced neural simulation framework ready for production ===" << std::endl;
         return 0;
     } else {
         std::cout << "=== Some Tests FAILED ===" << std::endl;

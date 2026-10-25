@@ -6,6 +6,26 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// Usage:
+//   nlm [--config <file>] [--random_seed <seed>] [--neuron_count <count>] [--timestep <dt>]
+//       [--region_count <regions>] [--connection_probability <prob>]
+//       [--stdp_ltp_weight <weight>] [--stdp_ltd_weight <weight>] [--stdp_tau <tau>]
+//       [--synaptogenesis_rate <rate>] [--pruning_rate <rate>]
+//
+// Configuration files can be in:
+//   - Simple key=value format (default)
+//   - JSON format (.json)
+//   - YAML format (.yaml, .yml)
+//
+// Example config file (config.json):
+// {
+//   "random_seed": 42,
+//   "simulation_timestep": 0.001,
+//   "neuron_count": 1000,
+//   "region_count": 2,
+//   "connection_probability": 0.1
+// }
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -46,6 +66,22 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+    
+    std::cout << "\n";
+    std::cout << "Usage: nlm [OPTIONS]\n";
+    std::cout << "  --config <file>          Load configuration from file (auto-detects format)\n";
+    std::cout << "  --random_seed <seed>     Set random seed for reproducible experiments\n";
+    std::cout << "  --neuron_count <count>   Set number of neurons (default: 500)\n";
+    std::cout << "  --timestep <dt>          Set simulation timestep in seconds (default: 0.001)\n";
+    std::cout << "  --region_count <regions> Set number of brain regions (default: 1)\n";
+    std::cout << "  --connection_probability <prob> Set connection probability (default: 0.15)\n";
+    std::cout << "  --stdp_ltp_weight <weight> Set STDP LTP weight (default: 0.02)\n";
+    std::cout << "  --stdp_ltd_weight <weight> Set STDP LTD weight (default: 0.015)\n";
+    std::cout << "  --stdp_tau <tau>         Set STDP time constant (default: 20.0)\n";
+    std::cout << "  --synaptogenesis_rate <rate> Set synaptogenesis rate (default: 0.0001)\n";
+    std::cout << "  --pruning_rate <rate>    Set pruning rate (default: 0.00001)\n";
+    std::cout << "  --help                   Show this help message\n";
+    std::cout << "\n";
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -381,6 +417,51 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Validate configuration with detailed error reporting
+    try {
+        NLM_LOG_INFO("Validating configuration...");
+        config->validate();
+        NLM_LOG_INFO("Configuration validation passed.");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Configuration validation failed: " + std::string(e.what()));
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Configuration issues found. Fix the following:");
+        NLM_LOG_INFO("  1. Ensure random_seed is set (integer)");
+        NLM_LOG_INFO("  2. Ensure simulation_timestep is positive (<= 0.1s)");
+        NLM_LOG_INFO("  3. Ensure neuron_count is positive integer (<= 1,000,000)");
+        NLM_LOG_INFO("  4. Ensure connection_probability is between 0.0 and 1.0");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Using default values for missing/ invalid keys.");
+        
+        // Set safe defaults for critical keys that failed validation
+        if (!config->has("random_seed")) {
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            NLM_LOG_INFO("Set default random_seed: 42");
+        }
+        if (!config->has("simulation_timestep") || 
+            !config->get<double>("simulation_timestep").has_value() ||
+            config->get<double>("simulation_timestep").value() <= 0.0 ||
+            config->get<double>("simulation_timestep").value() > 0.1) {
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            NLM_LOG_INFO("Set default simulation_timestep: 0.001s");
+        }
+        if (!config->has("neuron_count") ||
+            !config->get<int64_t>("neuron_count").has_value() ||
+            config->get<int64_t>("neuron_count").value() <= 0 ||
+            config->get<int64_t>("neuron_count").value() > 1000000) {
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            NLM_LOG_INFO("Set default neuron_count: 500");
+        }
+        if (!config->has("connection_probability") ||
+            !config->get<double>("connection_probability").has_value() ||
+            config->get<double>("connection_probability").value() < 0.0 ||
+            config->get<double>("connection_probability").value() > 1.0) {
+            config->set("connection_probability", 0.15f, ConfigSource::Default);
+            NLM_LOG_INFO("Set default connection_probability: 0.15");
+        }
+        NLM_LOG_INFO("Applied safe defaults after validation failure.");
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");

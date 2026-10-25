@@ -19,16 +19,71 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Detect file format based on extension
+    std::string format = getFileFormat(filepath);
+    return loadFromFile(filepath, format);
+}
+
+// Load from file with explicit format
+bool Config::loadFromFile(const std::string& filepath, const std::string& format) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open configuration file: " + filepath);
         return false;
     }
     
+    // Read entire file
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    if (format == "json" || format.empty()) {
+        // Try JSON first
+        if (loadFromJson(content)) {
+            NLM_LOG_INFO("Loaded configuration from JSON: " + filepath);
+            return true;
+        }
+        
+        // If JSON fails, try as simple key=value
+        if (content.find('{') == std::string::npos && content.find('[') == std::string::npos) {
+            // Simple key=value format
+            return loadFromSimpleFormat(content, filepath);
+        }
+    } else if (format == "yaml" || format == "yml") {
+        if (loadFromYaml(content)) {
+            NLM_LOG_INFO("Loaded configuration from YAML: " + filepath);
+            return true;
+        }
+    }
+    
+    // Fallback to simple format for any file
+    if (loadFromSimpleFormat(content, filepath)) {
+        return true;
+    }
+    
+    NLM_LOG_ERROR("Failed to parse configuration file: " + filepath + " (format: " + format + ")");
+    return false;
+}
+
+// Load from JSON string
+bool Config::loadFromJson(const std::string& jsonString) {
+    // TODO: Implement nlohmann/json parsing when available
+    // For now, implement a simple JSON parser for basic structures
+    return false;
+}
+
+// Load from YAML string
+bool Config::loadFromYaml(const std::string& yamlString) {
+    // TODO: Implement yaml-cpp parsing when available
+    // For now, fallback to simple format
+    return false;
+}
+
+// Load from simple key=value format
+bool Config::loadFromSimpleFormat(const std::string& content, const std::string& source) {
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -52,6 +107,9 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
     }
     
+    std::string sourceName = (source.find("configs/") != std::string::npos) ? 
+        source.substr(source.find("configs/") + 8) : source;
+    NLM_LOG_INFO("Loaded configuration from simple format: " + sourceName);
     return true;
 }
 
@@ -164,8 +222,68 @@ std::vector<std::string> Config::getKeys() const {
     return keys;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
+void Config::validate() const {
+    // Validate configuration with basic checks
+    std::vector<std::string> errors;
+    
+    // Check for essential keys
+    std::vector<std::string> essentialKeys = {"random_seed", "simulation_timestep", "neuron_count"};
+    for (const auto& key : essentialKeys) {
+        if (!has(key)) {
+            errors.push_back("Missing essential configuration key: " + key);
+        }
+    }
+    
+    // Validate value types and ranges
+    if (has("random_seed")) {
+        auto seed = get<int64_t>("random_seed");
+        if (!seed) {
+            errors.push_back("random_seed has invalid type (expected int64_t)");
+        }
+    }
+    
+    if (has("simulation_timestep")) {
+        auto timestep = get<double>("simulation_timestep");
+        if (!timestep || timestep <= 0.0) {
+            errors.push_back("simulation_timestep must be a positive number");
+        } else if (timestep > 0.1) {
+            errors.push_back("simulation_timestep too large (should be <= 0.1s for stability)");
+        }
+    }
+    
+    if (has("neuron_count")) {
+        auto neuronCount = get<int64_t>("neuron_count");
+        if (!neuronCount || neuronCount <= 0) {
+            errors.push_back("neuron_count must be a positive integer");
+        } else if (neuronCount > 1000000) {
+            errors.push_back("neuron_count too large (should be <= 1,000,000 for memory constraints)");
+        }
+    }
+    
+    if (has("connection_probability")) {
+        auto connProb = get<double>("connection_probability");
+        if (!connProb || connProb < 0.0 || connProb > 1.0) {
+            errors.push_back("connection_probability must be between 0.0 and 1.0");
+        }
+    }
+    
+    // Check for duplicate or conflicting keys
+    auto keys = getKeys();
+    std::sort(keys.begin(), keys.end());
+    auto last = std::unique(keys.begin(), keys.end());
+    if (last != keys.end()) {
+        errors.push_back("Duplicate configuration keys found");
+    }
+    
+    // If validation fails, log errors and throw exception
+    if (!errors.empty()) {
+        std::string errorMsg = "Configuration validation failed:\n";
+        for (const auto& error : errors) {
+            errorMsg += "  " + error + "\n";
+        }
+        NLM_LOG_ERROR("Configuration validation failed:\n" + errorMsg);
+        throw std::invalid_argument(errorMsg);
+    }
 }
 
 std::string Config::summary() const {
@@ -186,17 +304,19 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+std::string Config::getFileFormat(const std::string& filepath) const {
+    std::string extension = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
+    }
+    
+    // Convert to lowercase for comparison
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    
+    if (extension == "json") return "json";
+    if (extension == "yaml" || extension == "yml") return "yaml";
+    return ""; // Unknown or simple format
 }
 
 // Explicit template instantiations

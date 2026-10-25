@@ -142,14 +142,24 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    // Enhanced Config class with better error handling and convenience methods
+    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Advanced configuration class with validation and type-safe access)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", py::overload_cast<const std::string&>(&Config::loadFromFile),
+             py::arg("filepath"),
+             "Load configuration from file (auto-detects JSON/YAML/simple format)")
+        .def("loadFromFileWithFormat", [](Config& self, const std::string& filepath, const std::string& format) {
+            return self.loadFromFile(filepath, format);
+        }, py::arg("filepath"), py::arg("format"),
+             "Load configuration from file with explicit format (json/yaml/simple)")
+        .def("loadFromJson", &Config::loadFromJson, py::arg("jsonString"),
+             "Load configuration from JSON string")
+        .def("loadFromYaml", &Config::loadFromYaml, py::arg("yamlString"),
+             "Load configuration from YAML string")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+             "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -160,8 +170,183 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Enhanced type-safe getters with better error handling
+        .def("getString", [](const Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (!val) {
+                throw py::key_error("Configuration key not found: " + key);
+            }
+            return *val;
+        }, py::arg("key"),
+             "Get string value (raises KeyError if not found)")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            auto val = self.get<int64_t>(key);
+            if (!val) {
+                throw py::key_error("Configuration key not found: " + key);
+            }
+            return *val;
+        }, py::arg("key"),
+             "Get int value (raises KeyError if not found)")
+        .def("getFloat", [](const Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (!val) {
+                throw py::key_error("Configuration key not found: " + key);
+            }
+            return *val;
+        }, py::arg("key"),
+             "Get float value (raises KeyError if not found)")
+        .def("getBool", [](const Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (!val) {
+                throw py::key_error("Configuration key not found: " + key);
+            }
+            return *val;
+        }, py::arg("key"),
+             "Get bool value (raises KeyError if not found)")
+        // Convenience setters with validation
+        .def("setString", py::overload_cast<const std::string&, const std::string&, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"),
+             "Set string configuration value")
+        .def("setInt", py::overload_cast<const std::string&, int64_t, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"),
+             "Set int configuration value")
+        .def("setFloat", py::overload_cast<const std::string&, double, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"),
+             "Set float configuration value")
+        .def("setBool", py::overload_cast<const std::string&, bool, ConfigSource>(&Config::set),
+             py::arg("key"), py::arg("value"),
+             "Set bool configuration value")
+        // Enhanced getOr methods for safe access with defaults
+        .def("getOrString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get string value with default fallback")
+        .def("getOrInt", [](const Config& self, const std::string& key, int64_t defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get int value with default fallback")
+        .def("getOrFloat", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get float value with default fallback")
+        .def("getOrBool", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get bool value with default fallback")
+        // Configuration validation and validation methods
+        .def("validate", [](Config& self, bool checkRequired = true, bool checkTypes = true) {
+            std::vector<std::string> errors;
+            
+            if (checkRequired) {
+                std::vector<std::string> requiredKeys = {"random_seed", "simulation_timestep", "neuron_count"};
+                for (const auto& key : requiredKeys) {
+                    if (!self.has(key)) {
+                        errors.push_back("Missing required configuration key: " + key);
+                    }
+                }
+            }
+            
+            if (checkTypes) {
+                // Validate type consistency
+                if (self.has("random_seed")) {
+                    auto seed = self.get<int64_t>("random_seed");
+                    if (!seed) {
+                        errors.push_back("random_seed has invalid type (expected int64_t)");
+                    }
+                }
+                if (self.has("simulation_timestep")) {
+                    auto timestep = self.get<double>("simulation_timestep");
+                    if (!timestep || timestep <= 0.0) {
+                        errors.push_back("simulation_timestep must be a positive number");
+                    }
+                }
+            }
+            
+            if (!errors.empty()) {
+                std::string errorMsg = "Configuration validation failed:\n";
+                for (const auto& error : errors) {
+                    errorMsg += "  " + error + "\n";
+                }
+                throw py::value_error(errorMsg);
+            }
+            
+            return true;
+        }, py::arg("checkRequired" = true), py::arg("checkTypes" = true),
+             "Validate configuration with optional required key and type checking")
+        // Batch operations for efficiency
+        .def("batchSet", [](Config& self, const py::dict& values) {
+            for (auto it : values) {
+                std::string key = py::cast<std::string>(it.first);
+                py::object value = it.second;
+                
+                if (value.is(py::type::of<int64_t>())) {
+                    self.set(key, py::cast<int64_t>(value), ConfigSource::Runtime);
+                } else if (value.is(py::type::of<double>())) {
+                    self.set(key, py::cast<double>(value), ConfigSource::Runtime);
+                } else if (value.is(py::type::of<bool>())) {
+                    self.set(key, py::cast<bool>(value), ConfigSource::Runtime);
+                } else {
+                    self.set(key, py::cast<std::string>(value), ConfigSource::Runtime);
+                }
+            }
+            return true;
+        }, py::arg("values"),
+             "Batch set multiple configuration values from a dictionary")
+        .def("batchGet", [](const Config& self, const py::list& keys) {
+            py::dict result;
+            for (auto it : keys) {
+                std::string key = py::cast<std::string>(it);
+                auto val = self.get<std::string>(key);
+                if (val) {
+                    result[key.c_str()] = *val;
+                }
+            }
+            return result;
+        }, py::arg("keys"),
+             "Batch get multiple configuration values as a dictionary")
+        // Factory methods for common configurations
+        .def_static("createBrainConfig", []() {
+            auto config = std::make_shared<Config>();
+            // Set reasonable defaults for typical brain simulation
+            config->set("random_seed", int64_t(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", int64_t(1000), ConfigSource::Default);
+            config->set("region_count", int64_t(2), ConfigSource::Default);
+            config->set("connection_probability", 0.1f, ConfigSource::Default);
+            config->set("plasticity_learning_rate", 0.01, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.01, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.012, ConfigSource::Default);
+            config->set("stdp_time_constant", 20.0, ConfigSource::Default);
+            return config;
+        }, "Create a brain configuration with sensible defaults")
+        .def_static("createPhase2Config", []() {
+            auto config = std::make_shared<Config>();
+            // Configuration optimized for Phase 2 experiments
+            config->set("random_seed", int64_t(12345), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", int64_t(500), ConfigSource::Default);  // Smaller for testing
+            config->set("region_count", int64_t(1), ConfigSource::Default);
+            config->set("connection_probability", 0.15f, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+            config->set("stdp_tau", 20.0f, ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+            config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+            return config;
+        }, "Create configuration optimized for Phase 2 experiments")
+        .def_static("createMinimalConfig", []() {
+            auto config = std::make_shared<Config>();
+            // Minimal configuration for testing
+            config->set("random_seed", int64_t(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", int64_t(100), ConfigSource::Default);
+            config->set("region_count", int64_t(1), ConfigSource::Default);
+            config->set("connection_probability", 0.05f, ConfigSource::Default);
+            return config;
+        }, "Create minimal configuration for testing")
         .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
+            return "<NLM.Config: " + std::to_string(cfg.getKeys().size()) + 
+                   " keys, " + cfg.summary() + ">";
         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
