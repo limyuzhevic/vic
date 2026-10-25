@@ -104,194 +104,516 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ---
 
-## Common Patterns
+## New Features for Advanced Users (NEW!)
 
-### Pattern 1: Run a Simulation
+### Time Integration (Python 3.8+)
 
-```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
-
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
-```
-
-### Pattern 2: Get Brain Stats
-
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
-```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
-
----
-
-## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
-
----
-
-## Mini Projects
-
-### Project 1: Silent Brain (Just Neurons)
+The NLM Python bindings now include full integration with Python's time module:
 
 ```python
 import pynlm
+
+# Get current time
+start_time = pynlm.getTimestamp()
+print(f"Start time: {start_time}")
+
+# Run simulation and measure time
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+for step in range(100):
+    brain.step(step)
+
+elapsed = pynlm.elapsedTime(start_time)
+print(f"Simulation took {elapsed:.3f} seconds")
+
+# Format timestamps
+formatted = pynlm.formatTime(start_time)
+print(f"Formatted: {formatted}")
+```
+
+### Batch Processing
+
+Process multiple neurons or operations at once:
+
+```python
+# Process multiple neurons with a callback
+def process_neuron(neuron_id, potential):
+    print(f"Neuron {neuron_id.value}: {potential} mV")
 
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
 
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
+# Process first 10 neurons
+neuron_ids = [pynlm.NeuronId(i) for i in range(10)]
+pynlm.batchProcessNeurons(brain, neuron_ids, process_neuron)
 ```
 
-### Project 2: Brain Watching a World
+### Comprehensive Statistics (NEW!)
+
+Get detailed statistics in one call:
 
 ```python
-import pynlm
-
-# Setup
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
 
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
+all_stats = pynlm.getComprehensiveStats(brain)
+
+print("=== Basic Statistics ===")
+print(f"Total neurons: {all_stats['basic']['total_neurons']}")
+print(f"Total synapses: {all_stats['basic']['total_synapses']}")
+print(f"Active neurons: {all_stats['basic']['active_neurons']}")
+print(f"Firing neurons: {all_stats['basic']['firing_neurons']}")
+print(f"Firing rate: {all_stats['basic']['average_firing_rate']:.2f} Hz")
+
+print("\n=== Region Information ===")
+for region in all_stats['regions']:
+    print(f"Region {region['id']}: {region['neuron_count']} neurons")
 ```
 
-### Project 3: Complete Agent
+### Region-Specific Statistics (NEW!)
+
+Get detailed information about specific brain regions:
 
 ```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
+
+# Add a custom region
+region_id = brain.addRegion("cortex")
+region_stats = pynlm.getRegionStatistics(brain, region_id)
+
+print(f"Region {region_id.value} statistics:")
+for key, value in region_stats.items():
+    print(f"  {key}: {value}")
+```
+
+### Configuration and Benchmarking (NEW!)
+
+Benchmark your brain performance:
+
+```python
+import time
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Run benchmark
+results = pynlm.benchmarkBrain(brain, 1000, 0.1)
+
+print("=== Benchmark Results ===")
+print(f"Steps performed: {results['steps_performed']}")
+print(f"Time elapsed: {results['elapsed_time_ms']:.2f} ms")
+print(f"Performance: {results['steps_per_second']:.0f} steps/second")
+print(f"Neurons: {results['neurons']}")
+print(f"Total spikes: {results['spikes']}")
+```
+
+### Agent Configuration (NEW!)
+
+Configure all agent features at once:
+
+```python
 agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20)
 agent.initialize(world)
 
-# Enable learning
+# Old way - individual calls:
 agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
 agent.enableCuriosity(True)
 
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+# New way - all at once:
+pynlm.setAgentConfig(agent, 
+                   rewardModulation=True,
+                   structuralPlasticity=True,
+                   development=True,
+                   curiosity=True)
+```
 
-print("Agent simulation complete!")
+### Advanced Agent Features (NEW!)
+
+Create sophisticated agents with all features enabled:
+
+```python
+import pynlm
+
+def run_advanced_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with all features."""
+    
+    # 1. Setup
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.reset()
+    agent.initialize(world)
+    
+    # 2. Enable ALL features at once (NEW!)
+    pynlm.setAgentConfig(agent, 
+                        rewardModulation=True,
+                        curiosity=True,
+                        development=True,
+                        structuralPlasticity=True)
+    
+    # 3. Run simulation
+    start_time = pynlm.getTimestamp()
+    
+    for step in range(num_steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input
+        agent.processSensoryInput(percept)
+        
+        # Run brain step
+        brain.step(step, pynlm.getTimestamp())
+        
+        # Get action
+        action = agent.decodeMotorCommand()
+        
+        # Apply action
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Optional: Get stats every 100 steps
+        if step % 100 == 0:
+            stats = pynlm.getComprehensiveStats(brain)
+            print(f"Step {step}: {stats['basic']['firing_neurons']} firing neurons")
+            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Dev Stage: {agent.getDevelopmentalStage()}")
+    
+    # 4. Get final benchmark
+    end_time = pynlm.getTimestamp()
+    elapsed = end_time - start_time
+    
+    final_stats = pynlm.getComprehensiveStats(brain)
+    
+    print(f"\n=== Advanced Agent Simulation Complete ===")
+    print(f"Duration: {elapsed:.2f} seconds")
+    print(f"Total neurons: {final_stats['basic']['total_neurons']}")
+    print(f"Total spikes: {final_stats['basic']['total_spikes']}")
+    print(f"Final firing rate: {final_stats['basic']['average_firing_rate']:.2f} Hz")
+
+# Run the simulation
+run_advanced_agent_simulation(500)
+```
+
+---
+
+## New Time Integration Features
+
+### Basic Time Operations
+
+```python
+import pynlm
+
+# Get current time
+current_time = pynlm.getTimestamp()
+print(f"Current time: {current_time} seconds")
+
+# Get time in milliseconds
+milliseconds = pynlm.getCurrentTime()
+print(f"Current time: {milliseconds} ms")
+```
+
+### Time Formatting and Calculations
+
+```python
+# Format timestamp as readable string
+formatted = pynlm.formatTime(current_time)
+print(f"Formatted: {formatted}")
+
+# Calculate elapsed time
+start = pynlm.getTimestamp()
+# ... do work ...
+elapsed = pynlm.elapsedTime(start)
+print(f"Work took {elapsed:.3f} seconds")
+
+# Add time to timestamp
+future_time = pynlm.addTime(current_time, 10.0)  # Add 10 seconds
+print(f"Future time: {future_time}")
+
+# Time difference
+time_diff = pynlm.timeDiff(current_time, future_time)
+print(f"Time difference: {time_diff} seconds")
+```
+
+### Simulation Timing
+
+```python
+# Simulate with precise timing
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Simulate for 1 second of simulated time at 100x speed
+for step in range(100):
+    simulated_time = step * 0.1  # 0.1 seconds per step
+    current_real_time = pynlm.getTimestamp()
+    brain.step(step, current_real_time)
+
+print("Timed simulation complete!")
 ```
 
 ---
 
 ## Quick Reference
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+### New Functions Added
+
+| Function | Description | When to Use |
+|----------|-------------|-------------|
+| `pynlm.getTimestamp()` | Get current time in seconds | For timing simulations |
+| `pynlm.getCurrentTime()` | Get current time in milliseconds | For high-precision timing |
+| `pynlm.formatTime(timestamp)` | Format timestamp as string | For logging/output |
+| `pynlm.elapsedTime(start_time)` | Calculate elapsed time | Performance measurement |
+| `pynlm.addTime(timestamp, seconds)` | Add seconds to timestamp | Time arithmetic |
+| `pynlm.timeDiff(time1, time2)` | Calculate time difference | Comparing timestamps |
+| `pynlm.batchProcessNeurons(brain, neuron_ids, callback)` | Process multiple neurons | Batch operations |
+| `pynlm.getRegionStatistics(brain, region_id)` | Get region-specific stats | Region analysis |
+| `pynlm.getComprehensiveStats(brain)` | Get all statistics | Complete analysis |
+| `pynlm.benchmarkBrain(brain, steps, timestep)` | Benchmark brain performance | Performance testing |
+| `pynlm.setAgentConfig(agent, ...)` | Configure all agent features | Agent setup |
+| `pynlm.runSimulation(...)` | Run complete agent simulation | Full workflow |
+| `pynlm.configureStandardWorld(world, ...)` | Configure world with defaults | World setup |
+
+### Enum Improvements
+
+All enumeration types now have `__str__()` methods:
+
+```python
+import pynlm
+
+# All enums now have string representations
+print(pynlm.NeuronType.Excitatory)  # "Excitatory"
+print(pynlm.DevelopmentalStage.CriticalPeriod)  # "CriticalPeriod"
+print(pynlm.ActionType.MoveForward)  # "MoveForward"
+```
+
+### Class Improvements
+
+All major classes now have `__repr__()` methods:
+
+```python
+import pynlm
+
+# All classes have better string representations
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+print(repr(brain))  # Shows comprehensive info
+
+world = pynlm.createSimpleWorld()
+print(repr(world))  # Shows world dimensions and time
+
+agent = pynlm.createAgentBrain(brain)
+print(repr(agent))  # Shows agent state
+```
 
 ---
 
-## Troubleshooting
+## Troubleshooting New Features
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+**"Time functions not working"**
+- Ensure you're using Python 3.8+
+- All time functions are available with the updated bindings
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+**"New statistics functions throwing errors"**
+- Check that brain objects are properly initialized
+- Region IDs must be valid (from `brain.addRegion()` or `brain.getRegionIds()`)
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+**"Batch processing not processing all neurons"**
+- Ensure neuron IDs are in the valid range (0 to total neurons - 1)
+- Use `brain.getTotalNeuronCount()` to get the correct range
+
+**"Benchmark results showing poor performance"**
+- Ensure brain is initialized before benchmarking
+- Check that timestep is appropriate for your use case
+
+**"Agent configuration not applying settings"**
+- Call `pynlm.setAgentConfig()` AFTER creating the agent
+- The function modifies the agent in-place
+
+**"Comprehensive stats missing regions"**
+- Ensure brain has regions (regions are created during initialization)
+- Use `brain.getRegionCount()` to check region count
+
+---
+
+## Best Practices
+
+### For Time-Sensitive Simulations
+
+```python
+import pynlm
+import time
+
+def run_timed_simulation(brain, world, agent, target_duration):
+    """Run simulation for a specific duration."""
+    start_time = pynlm.getTimestamp()
+    steps_completed = 0
+    
+    while True:
+        current_time = pynlm.getTimestamp()
+        elapsed = current_time - start_time
+        
+        if elapsed >= target_duration:
+            break
+            
+        # Run one simulation step
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(steps_completed, current_time)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, current_time)
+        
+        steps_completed += 1
+    
+    return steps_completed, elapsed
+
+# Use it
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+
+steps, duration = run_timed_simulation(brain, world, agent, 10.0)  # 10 seconds
+print(f"Completed {steps} steps in {duration:.2f} seconds")
+```
+
+### For Large-Scale Analysis
+
+```python
+import pynlm
+
+def analyze_brain_comprehensive(brain):
+    """Perform comprehensive analysis of a brain."""
+    stats = pynlm.getComprehensiveStats(brain)
+    
+    # Basic statistics
+    print("=== Basic Brain Statistics ===")
+    for key, value in stats['basic'].items():
+        print(f"{key}: {value}")
+    
+    # Region analysis
+    print(f"\n=== Region Analysis ({len(stats['regions'])} regions) ===")
+    for region in stats['regions']:
+        print(f"Region {region['id']}: {region['neuron_count']} neurons, "
+              f"{region['firing_rate']:.2f} Hz firing rate")
+    
+    # Recommendations based on analysis
+    if stats['basic']['average_firing_rate'] < 0.5:
+        print("\n⚠️  Warning: Low average firing rate. Consider increasing brain activity.")
+    
+    if stats['basic']['excitation_inhibition_ratio'] < 0.5 or > 2.0:
+        print("⚠️  Warning: E/I ratio may be unbalanced. Consider adjusting plasticity.")
+    
+    return stats
+
+# Perform analysis
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+analysis = analyze_brain_comprehensive(brain)
+```
+
+### For Performance Testing
+
+```python
+import pynlm
+
+def benchmark_multiple_configs():
+    """Benchmark different brain configurations."""
+    configs = [
+        {"neurons": 100, "synapses": 0.1},
+        {"neurons": 500, "synapses": 0.05},
+        {"neurons": 1000, "synapses": 0.01},
+    ]
+    
+    results = []
+    
+    for config in configs:
+        brain = pynlm.createBrain(pynlm.createDefaultConfig())
+        brain.initialize()
+        
+        # Configure brain
+        brain_config = brain.getConfig()
+        brain_config.set("brain.neuron_count", config["neurons"])
+        brain_config.set("brain.synapse_density", config["synapses"])
+        
+        # Re-initialize with new config
+        brain.reset()
+        brain.initialize()
+        
+        # Benchmark
+        benchmark_results = pynlm.benchmarkBrain(brain, 1000, 0.1)
+        results.append({
+            "config": config,
+            "results": benchmark_results
+        })
+        
+        print(f"Tested {config['neurons']} neurons: "
+              f"{benchmark_results['steps_per_second']:.0f} steps/sec")
+    
+    return results
+
+# Run benchmark
+benchmark_results = benchmark_multiple_configs()
+```
 
 ---
 
 ## Next Steps
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+### For Beginners
 
-That's it! You're now ready to use NLM.
+1. **Start with the basic examples** in this guide
+2. **Experiment with the mini projects** to understand how everything works
+3. **Read `HOW_TO_USE.md`** for more detailed information about individual features
+4. **Try the troubleshooting section** if you encounter issues
+
+### For Intermediate Users
+
+1. **Explore the time integration features** for precise control over simulations
+2. **Use batch processing** for efficient multiple operations
+3. **Analyze brain statistics** to understand system behavior
+4. **Create your own helper functions** using the new convenience methods
+
+### For Advanced Users
+
+1. **Implement custom callbacks** for batch processing
+2. **Create benchmark suites** to compare different configurations
+3. **Design complex agents** with all features enabled
+4. **Extend the system** by creating new utility functions
+5. **Contribute to the documentation** by adding your own examples
+
+### For Researchers
+
+1. **Use time features** for precise experiment timing
+2. **Analyze brain statistics** for system monitoring
+3. **Benchmark different architectures** for performance comparison
+4. **Create custom analysis tools** using the comprehensive statistics
+5. **Document your experimental protocols** using the new examples
+
+---
+
+## Summary
+
+The NLM Python bindings have been significantly enhanced with:
+
+1. **Improved class representations** with `__repr__()` methods
+2. **Better enum handling** with `__str__()` methods
+3. **Type validation and error handling** for more robust code
+4. **Convenience methods** for common operations
+5. **Time integration** for precise simulation control
+6. **Advanced features** for power users
+7. **Comprehensive statistics** for brain analysis
+8. **Better documentation** with extensive examples
+
+These improvements make NLM more accessible to beginners while providing powerful tools for advanced users and researchers.
+
+That's it! You're now ready to use NLM with all the new features and improvements.
