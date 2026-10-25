@@ -121,6 +121,15 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+// Include Phase 6 integration tests
+#include "tests/Phase6IntegrationTests.hpp"
+
+void runIntegrationTests() {
+    std::cout << "\n=== Running Phase 6 Integration Tests ===" << std::endl;
+    integration_tests::runAllIntegrationTests();
+    std::cout << "\n=== Integration Tests Complete ===" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +138,12 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    
+    // Run integration tests
+    runIntegrationTests();
 }
+
+} // namespace test_brain
+
 
 } // namespace test_brain

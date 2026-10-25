@@ -200,18 +200,28 @@ void Synapse::step(Timestamp currentTime) {
     TimestepDuration dt = 0.001;  // 1ms timestep
     
     // Decay short-term facilitation (Tsodyks-Markram model)
+    // Only decay if there was a pre-synaptic spike
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
+    // Decay short-term depression (recovery toward baseline)
+    // Depression decays back to 1.0 over time, unless there are recent spikes
+    float timeSincePost = 0.0f;
+    if (pImpl->lastPostSpikeTime >= 0.0f) {
+        timeSincePost = static_cast<float>(currentTime - pImpl->lastPostSpikeTime);
+    }
+    float timeSincePreForDepression = 0.0f;
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        timeSincePreForDepression = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+    }
+    
+    // Use the most recent spike time for depression recovery
+    float timeSinceActivity = std::max(timeSincePost, timeSincePreForDepression);
+    
+    // Recovery from depression toward 1.0 (Tsodyks-Markram recovery)
+    if (timeSinceActivity > 0.0f) {
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     

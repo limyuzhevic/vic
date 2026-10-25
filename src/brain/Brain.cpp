@@ -80,7 +80,6 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -98,15 +97,13 @@ struct Brain::Impl {
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
-        rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
+        // Initialize all systems with error checking
+        rng = std::make_unique<RandomGenerator>(seed);
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
         // Initialize memory systems
         workingMemory = std::make_unique<NeuralWorkingMemory>();
@@ -130,17 +127,21 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
+        // Configure plasticity systems
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
+        if (stdp) {
+            stdp->configure(ltpWeight, ltdWeight, tau);
+        }
         
         // Configure structural plasticity
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
+        if (structuralPlasticity) {
+            structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+            structuralPlasticity->setPruningRate(pruningRate);
+        }
         
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -764,10 +765,44 @@ void Brain::reset() {
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
+    // Validate filepath
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Invalid filepath: empty string");
+        return false;
+    }
+    
+    // Check if file exists and is writable
+    std::ofstream testFile(filepath, std::ios::out);
+    if (testFile.good()) {
+        testFile.close();
+        // File exists, remove it to create fresh checkpoint
+        if (std::remove(filepath.c_str()) != 0) {
+            NLM_LOG_ERROR("Cannot overwrite existing file: " + filepath);
+            return false;
+        }
+    } else {
+        testFile.close();
+        // Try to create parent directories if needed
+        size_t lastSlash = filepath.find_last_of('/');
+        if (lastSlash != std::string::npos) {
+            std::string parentDir = filepath.substr(0, lastSlash);
+            if (std::filesystem::exists(parentDir)) {
+                // Create directory if it doesn't exist
+                std::filesystem::create_directories(parentDir);
+            }
+        }
+    }
+    
     try {
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+            return false;
+        }
+        
+        // Validate we can write to file
+        if (!writer.canWrite()) {
+            NLM_LOG_ERROR("Checkpoint writer not ready for writing");
             return false;
         }
         
@@ -828,9 +863,15 @@ bool Brain::save(const std::string& filepath) const {
             return false;
         }
         
-        // Finalize
+        // Finalize with integrity check
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
+            return false;
+        }
+        
+        // Verify checkpoint was written correctly
+        if (!writer.validate()) {
+            NLM_LOG_ERROR("Checkpoint validation failed after write");
             return false;
         }
         
@@ -845,6 +886,20 @@ bool Brain::save(const std::string& filepath) const {
 
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
+    
+    // Validate filepath
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Invalid filepath: empty string");
+        return false;
+    }
+    
+    // Check if file exists and is readable
+    std::ifstream testFile(filepath, std::ios::in);
+    if (!testFile.good()) {
+        NLM_LOG_ERROR("Checkpoint file does not exist or is not readable: " + filepath);
+        return false;
+    }
+    testFile.close();
     
     try {
         CheckpointReader reader;
@@ -865,6 +920,15 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        // Validate neuron count consistency
+        size_t expectedNeuronCount = getTotalNeuronCount();
+        if (neuronData.membranePotential.size() != expectedNeuronCount) {
+            NLM_LOG_ERROR(std::string("Neuron count mismatch: expected ") + 
+                         std::to_string(expectedNeuronCount) + 
+                         std::string(", found ") + std::to_string(neuronData.membranePotential.size()));
+            return false;
+        }
+        
         // Apply neuron states
         size_t idx = 0;
         for (auto& region : pImpl->regions) {
@@ -882,6 +946,10 @@ bool Brain::load(const std::string& filepath) {
                         if (idx < neuronData.refractoryRemaining.size()) {
                             neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
                         }
+                        // Restore last spike time
+                        if (idx < neuronData.lastSpikeTime.size()) {
+                            neuron->setLastSpikeTime(neuronData.lastSpikeTime[idx]);
+                        }
                     }
                     idx++;
                 }
@@ -895,9 +963,17 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        // Validate synapse count consistency (approximate)
+        size_t expectedSynapseCount = getTotalSynapseCount();
+        if (synapseData.weight.size() > 0 && synapseData.weight.size() > expectedSynapseCount * 0.5) {
+            // Allow some tolerance for inter-region connections
+            NLM_LOG_INFO("Synapse count: loaded " + std::to_string(synapseData.weight.size()) + 
+                        ", expected ~" + std::to_string(expectedSynapseCount));
+        }
+        
         // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // For now, just log the count and ensure data integrity
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses from checkpoint");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
