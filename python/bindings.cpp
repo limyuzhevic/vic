@@ -289,16 +289,21 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+    py::class_<Brain>(m, "Brain", R"pbdoc(
+        Central neural simulation brain class. Manages spiking neural networks
+        with integrated memory, prediction, cognition, and neuromodulation systems.
+        Coordinates all aspects of neural computation and learning.
+    )pbdoc")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"),
+             R"pbdoc(Create a new Brain with configuration)pbdoc")
         .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+             R"pbdoc(Initialize the brain with configuration)pbdoc")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+             R"pbdoc(Advance simulation by one time step with default timing)pbdoc")
+        .def("stepWithTime", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
+             R"pbdoc(Advance simulation by one time step with explicit timing)pbdoc")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
@@ -347,11 +352,62 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             R"pbdoc(Log comprehensive brain status and statistics)pbdoc")
+        
+        // Convenience methods for common operations
+        .def("enablePlasticity", &Brain::enablePlasticity, py::arg("hebbian"), py::arg("stdp"), py::arg("rewardModulated"),
+             R"pbdoc(Enable plasticity rules on all synapses)pbdoc")
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation, py::arg("signal"),
+             R"pbdoc(Apply neuromodulatory signal to influence neural processing)pbdoc")
+        .def("getMostActiveNeurons", [](const std::shared_ptr<Brain>& self, size_t count) {
+            return self->getSpikeSystem()->getMostActiveNeurons(count);
+        }, py::arg("count"),
+             R"pbdoc(Get list of most active neurons)pbdoc")
+        .def("getRecentSpikeTimes", [](const std::shared_ptr<Brain>& self) {
+            return self->getSpikeSystem()->getRecentSpikeTimes();
+        }, R"pbdoc(Get recent spike times)pbdoc")
+        .def("getNeuronStates", [](const std::shared_ptr<Brain>& self) {
+            std::vector<NeuronState> states;
+            for (const auto& region : self->getRegions()) {
+                for (const auto& neuron : region->getAllNeurons()) {
+                    states.push_back(neuron->getState());
+                }
+            }
+            return states;
+        }, R"pbdoc(Get states of all neurons in the brain)pbdoc")
+        .def("getSynapseWeights", [](const std::shared_ptr<Brain>& self) {
+            std::vector<float> weights;
+            for (const auto& region : self->getRegions()) {
+                for (const auto& synapse : region->getSynapses()) {
+                    weights.push_back(synapse->getWeight());
+                }
+            }
+            return weights;
+        }, R"pbdoc(Get weights of all synapses in the brain)pbdoc")
+        .def("getConnectionMatrix", [](const std::shared_ptr<Brain>& self) {
+            std::vector<std::vector<float>> matrix;
+            for (const auto& region : self->getRegions()) {
+                std::vector<float> row;
+                for (const auto& synapse : region->getSynapses()) {
+                    row.push_back(synapse->getWeight());
+                }
+                matrix.push_back(row);
+            }
+            return matrix;
+        }, R"pbdoc(Get connectivity matrix)pbdoc")
+        .def("isHealthy", [](const std::shared_ptr<Brain>& self) {
+            return self->getTotalSpikeCount() > 0 &&
+                   self->getExcitationInhibitionRatio() > 0.0f &&
+                   !self->getPendingSpikeEventCount();
+        }, R"pbdoc(Check if brain is in healthy operational state)pbdoc")
+        .def("initializeFromConfig", [](std::shared_ptr<Brain>& self, std::shared_ptr<Config> config) {
+            config->setSeed(42); // Default seed for reproducibility
+            if (!self->initialize()) {
+                throw std::runtime_error("Brain initialization failed");
+            }
+        }, py::arg("config"),
+             R"pbdoc(Initialize brain with configuration)pbdoc")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

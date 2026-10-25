@@ -61,10 +61,11 @@ struct LearningExperiment {
         : brain(b), seed(s), initialSynapseCount(0) {}
     
     void recordInitialState() {
+        // Record initial network state before learning begins
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
-        // Record initial weights from first region
+        // Record initial weights from first region for plasticity analysis
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
@@ -74,6 +75,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("Initial state recorded:");
         NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
         if (!initialWeights.empty()) {
+            // Calculate mean synaptic weight to establish baseline
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
@@ -81,20 +83,23 @@ struct LearningExperiment {
     }
     
     void recordFinalState() {
+        // Record final network state after learning experiment
         finalWeights.clear();
         
-        // Record final weights from first region
+        // Record final weights from first region for plasticity analysis
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
             }
         }
         
+        // Get most active neurons during the experiment (top 10)
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
         if (!finalWeights.empty()) {
+            // Calculate final mean synaptic weight
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
@@ -111,7 +116,7 @@ struct LearningExperiment {
             return;
         }
         
-        // Compute weight changes
+        // Compute weight changes through experience
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
         float initialMean = initialSum / initialWeights.size();
@@ -122,7 +127,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
         NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
         
-        // Count synapses that changed significantly
+        // Count synapses that changed significantly through learning
         size_t strengthened = 0;
         size_t weakened = 0;
         size_t unchanged = 0;
@@ -130,9 +135,9 @@ struct LearningExperiment {
         size_t minSize = std::min(initialWeights.size(), finalWeights.size());
         for (size_t i = 0; i < minSize; ++i) {
             float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
+            if (delta > 0.01f) ++strengthened;  // Significant strengthening (>1% change)
+            else if (delta < -0.01f) ++weakened;  // Significant weakening (<-1% change)
+            else ++unchanged;  // No significant change
         }
         
         NLM_LOG_INFO("");
@@ -146,7 +151,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
         NLM_LOG_INFO("  Most active neurons recorded: " + std::to_string(mostActiveNeurons.size()));
         
-        // Determine if learning occurred
+        // Determine if learning occurred based on multiple criteria
         bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
                                 (strengthened > 0 || weakened > 0);
         
@@ -163,37 +168,44 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
-    // Inject current into a few neurons and see if spikes propagate
+    // Get access to the first brain region for testing
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_INFO("  ERROR: No brain region found");
+        return;
+    }
     
+    // Get all neurons from the region to test connectivity
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
         NLM_LOG_INFO("  No neurons found!");
         return;
     }
     
-    // Get initial spike count
+    // Get initial spike count to calculate net activity
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
+    // Inject strong current into first 10 neurons to test spike initiation
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input to trigger spikes
     }
     
-    // Run a few steps
+    // Run simulation for 50 time steps to allow spike propagation
+    NLM_LOG_INFO("  Running simulation for 50 steps...");
     for (SimulationStep step = 0; step < 50; ++step) {
         brain->step(step, step * 0.001);
     }
     
+    // Calculate how many new spikes were generated
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
     NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
     
     if (spikes > 0) {
-        NLM_LOG_INFO("  ✓ Spikes propagate through network");
+        NLM_LOG_INFO("  ✓ Spikes propagate through network successfully");
     } else {
-        NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
+        NLM_LOG_INFO("  ! No spikes detected - checking neuron parameters...");
+        // Debug: Check first 3 neurons' membrane potential and threshold
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
             NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
                         " V=" + std::to_string(neurons[i]->getMembranePotential()) +
@@ -206,31 +218,35 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
+    // Initialize learning experiment with brain's seed for reproducibility
     LearningExperiment experiment(brain, 42);
     
-    // Record initial state
+    // Record initial network state before learning begins
     experiment.recordInitialState();
     
-    // Enable plasticity on synapses
+    // Enable synaptic plasticity mechanisms
     if (auto* region = brain->getRegion(RegionId(1))) {
+        // Enable both Hebbian and STDP plasticity while keeping structural plasticity disabled
         for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            syn->enablePlasticity(true, true, false);  // Hebbian=true, STDP=true, Structural=false
         }
     }
     
-    // Apply repeated input pattern to stimulate learning
+    // Apply repeated input patterns to stimulate learning over extended period
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
+    // Run learning simulation for 1000 time steps
     for (SimulationStep step = 0; step < 1000; ++step) {
-        // Create input pattern - inject current into sensory neurons
+        // Create input pattern - inject current into sensory neurons to create stimulation
         for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
+        // Advance neural dynamics
         brain->step(step, step * 0.001);
         
-        // Log progress every 100 steps
+        // Log progress every 100 steps for monitoring learning dynamics
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
@@ -238,10 +254,10 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         }
     }
     
-    // Record final state
+    // Record final network state after learning experience
     experiment.recordFinalState();
     
-    // Compute and display statistics
+    // Compute and display comprehensive learning statistics
     experiment.computeStatistics();
 }
 

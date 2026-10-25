@@ -220,7 +220,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + dt * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -273,8 +273,8 @@ void Neuron::reset() {
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    // Membrane potential starts very close to resting potential (typically within 1mV)
+    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-1.0f, 1.0f);
     
     // Threshold is typically -55mV with small variation
     pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
