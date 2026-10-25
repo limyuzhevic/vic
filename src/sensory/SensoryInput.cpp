@@ -28,6 +28,10 @@ Vision::Vision(size_t width, size_t height, size_t channels)
 
 Vision::~Vision() = default;
 
+InputType Vision::getInputType() const {
+    return InputType::Vision;
+}
+
 const char* Vision::getType() const {
     return "Vision";
 }
@@ -58,9 +62,15 @@ void Vision::setData(float* data, size_t size) {
     }
 }
 
-size_t Vision::getWidth() const { return pImpl->width; }
-size_t Vision::getHeight() const { return pImpl->height; }
-size_t Vision::getChannels() const { return pImpl->channels; }
+float Vision::getIntensity() const {
+    if (pImpl->data.empty()) return 0.0f;
+    
+    float maxAbs = 0.0f;
+    for (float value : pImpl->data) {
+        maxAbs = std::max(maxAbs, std::abs(value));
+    }
+    return maxAbs;
+}
 
 struct Audio::Impl {
     size_t sampleRate;
@@ -76,6 +86,10 @@ Audio::Audio(size_t sampleRate, size_t numSamples)
     : pImpl(new Impl(sampleRate, numSamples)) {}
 
 Audio::~Audio() = default;
+
+InputType Audio::getInputType() const {
+    return InputType::Audio;
+}
 
 const char* Audio::getType() const {
     return "Audio";
@@ -105,8 +119,15 @@ void Audio::setSampleRate(size_t rate) {
     pImpl->sampleRate = rate;
 }
 
-size_t Audio::getSampleRate() const { return pImpl->sampleRate; }
-size_t Audio::getNumSamples() const { return pImpl->numSamples; }
+float Audio::getIntensity() const {
+    if (pImpl->data.empty()) return 0.0f;
+    
+    float maxAbs = 0.0f;
+    for (float value : pImpl->data) {
+        maxAbs = std::max(maxAbs, std::abs(value));
+    }
+    return maxAbs;
+}
 
 struct InternalSignals::Impl {
     std::vector<float> signals;
@@ -117,6 +138,10 @@ struct InternalSignals::Impl {
 InternalSignals::InternalSignals() : pImpl(new Impl) {}
 
 InternalSignals::~InternalSignals() = default;
+
+InputType InternalSignals::getInputType() const {
+    return InputType::InternalSignals;
+}
 
 const char* InternalSignals::getType() const {
     return "InternalSignals";
@@ -142,8 +167,14 @@ void InternalSignals::addSignal(float value) {
     pImpl->signals.push_back(value);
 }
 
-void InternalSignals::clearSignals() {
-    pImpl->signals.clear();
+float InternalSignals::getIntensity() const {
+    if (pImpl->signals.empty()) return 0.0f;
+    
+    float maxAbs = 0.0f;
+    for (float value : pImpl->signals) {
+        maxAbs = std::max(maxAbs, std::abs(value));
+    }
+    return maxAbs;
 }
 
 } // namespace nlm

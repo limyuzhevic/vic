@@ -6,6 +6,19 @@
 
 namespace nlm {
 
+// Input types for reward computation
+enum class InputType {
+    Food,
+    Water,
+    Threat,
+    Mate,
+    Sleep,
+    Vision,
+    Audio,
+    InternalSignals,
+    Unknown
+};
+
 // Base class for all sensory input
 class SensoryInput {
 public:
@@ -13,13 +26,16 @@ public:
     virtual ~SensoryInput() = default;
     
     // Get input type
-    virtual const char* getType() const = 0;
+    virtual InputType getInputType() const = 0;
+    
+    // Get input type as string for compatibility
+    const char* getType() const;
     
     // Get raw data as vector
     virtual const std::vector<float>& getData() const = 0;
     
-    // Get dimensionality
-    virtual size_t getDimensions() const = 0;
+    // Get sensory intensity (magnitude of input)
+    virtual float getIntensity() const = 0;
     
     // Get timestamp
     double getTimestamp() const;
@@ -39,6 +55,7 @@ public:
     explicit Vision(size_t width, size_t height, size_t channels = 3);
     ~Vision() override;
     
+    InputType getInputType() const override;
     const char* getType() const override;
     const std::vector<float>& getData() const override;
     size_t getDimensions() const override;
@@ -65,6 +82,7 @@ public:
     explicit Audio(size_t sampleRate, size_t numSamples);
     ~Audio() override;
     
+    InputType getInputType() const override;
     const char* getType() const override;
     const std::vector<float>& getData() const override;
     size_t getDimensions() const override;
@@ -88,6 +106,7 @@ public:
     InternalSignals();
     ~InternalSignals() override;
     
+    InputType getInputType() const override;
     const char* getType() const override;
     const std::vector<float>& getData() const override;
     size_t getDimensions() const override;
