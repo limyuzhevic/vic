@@ -190,6 +190,13 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Integration methods for Phase 6
+    void integrateSensoryWithWorkingMemory();
+    void updatePredictionSystem();
+    void updateConceptFormation();
+    void updatePlanning();
+    void enhanceDopamineEffects();
+    
     // Logging
     void logStatus() const;
     
