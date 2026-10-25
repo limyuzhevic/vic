@@ -19,16 +19,80 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Simple JSON parser for basic NLM config format
+    // Format: {"key1": "value1", "key2": 42, "key3": true, "key4": 3.14}
+    if (!content.empty() && content.front() == '{' && content.back() == '}') {
+        // Parse JSON format
+        size_t pos = 1;
+        while (pos < content.size() - 1) {
+            // Find next key-value pair
+            size_t keyStart = content.find('"', pos);
+            if (keyStart == std::string::npos) break;
+            
+            size_t keyEnd = content.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+            
+            size_t valueStart = content.find(':', keyEnd);
+            if (valueStart == std::string::npos) break;
+            
+            size_t valueEnd = content.find(',', valueStart);
+            if (valueEnd == std::string::npos) {
+                valueEnd = content.find('}', valueStart);
+            }
+            
+            if (valueEnd == std::string::npos) break;
+            
+            std::string valueStr = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+            
+            // Trim whitespace
+            key = trim(key);
+            valueStr = trim(valueStr);
+            
+            // Parse value based on type
+            ConfigValue configValue;
+            if (valueStr.front() == '"' && valueStr.back() == '"') {
+                // String value
+                std::string value = valueStr.substr(1, valueStr.size() - 2);
+                set(key, value, ConfigSource::File);
+            } else if (valueStr == "true" || valueStr == "false") {
+                // Boolean value
+                bool value = (valueStr == "true");
+                set(key, value, ConfigSource::File);
+            } else {
+                // Try numeric values
+                try {
+                    if (valueStr.find('.') != std::string::npos) {
+                        double value = std::stod(valueStr);
+                        set(key, value, ConfigSource::File);
+                    } else {
+                        int64_t value = std::stoll(valueStr);
+                        set(key, value, ConfigSource::File);
+                    }
+                } catch (...) {
+                    // Skip unparsable values
+                }
+            }
+            
+            pos = valueEnd + 1;
+        }
+        return true;
+    }
+    
+    // Fall back to simple key=value format
+    std::ifstream file2(filepath);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(file2, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -86,7 +150,25 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Escape quotes and newlines in string values
+                std::string escaped = entry.key;
+                std::replace(escaped.begin(), escaped.end(), '\\', '\\\\');
+                std::replace(escaped.begin(), escaped.end(), '"', '\\"');
+                std::replace(escaped.begin(), escaped.end(), '\n', '\\n');
+                file << entry.key << " = \"" << escaped << "\"\n";
+            } else if constexpr (std::is_same_v<T, int>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << entry.key << " = " << std::setprecision(6) << arg << "\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            }
+        }, entry.value);
     }
     
     return true;

@@ -77,13 +77,13 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     
     for (auto& exp : experiments) {
         // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
         auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
         brain->initialize();
         
-        // Would also create fresh environment here
+        // Create fresh environment (clone the template)
+        auto environment = environmentTemplate->clone();
         
-        if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
+        if (runExperiment(exp, brain, environment, maxSteps)) {
             results.push_back(exp);
         }
     }
@@ -113,8 +113,29 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "Experiment Results\n";
+    file << "==================\n\n";
+    
+    for (const auto& experiment : pImpl->experiments) {
+        file << "Experiment: " << experiment->getName() << "\n";
+        file << "Seed: " << experiment->getSeed() << "\n";
+        file << "Start Step: " << experiment->getStartStep() << "\n";
+        file << "End Step: " << experiment->getEndStep() << "\n";
+        
+        // Record summary statistics
+        file << "Neurons Final: " << experiment->getMetric("final_neuron_count") << "\n";
+        file << "Synapses Final: " << experiment->getMetric("final_synapse_count") << "\n";
+        file << "Spikes Generated: " << experiment->getMetric("total_spikes") << "\n";
+        file << "Total Reward: " << experiment->getMetric("total_reward") << "\n";
+        file << "\n";
+    }
+    
+    return true;
 }
 
 } // namespace nlm
