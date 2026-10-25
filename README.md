@@ -20,49 +20,26 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 2: REAL NEURAL COMPUTATION**
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+Phase 2 implements real spiking neural computation with:
+- Leaky Integrate-and-Fire (LIF) neurons
+- Event-driven spike propagation with synaptic delays
+- STDP and Hebbian plasticity
+- Structural plasticity (synaptogenesis/pruning)
 
-### Phase 6 Integration Achievements
+### Phase 2 Achievements
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+#### Core Neural Computation
+- Real LIF neuron dynamics
+- Event-driven spike propagation with delays
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
-
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
-
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
-
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+#### Learning and Development
+- Measurable synaptic changes through experience
+- Network activity-dependent synaptic modification
+- Developmental stages affecting plasticity rates
 
 ## Building
 
@@ -75,12 +52,70 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Phase 2 Demo
 ```bash
-./nlm_phase6_demo
+./nlm
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs a comprehensive demonstration of Phase 2 neural computation features.
+
+## Python Bindings
+
+NLM provides Python bindings through the `pynlm` module for easier scripting and experimentation.
+
+### Installation
+
+```bash
+# Install from source
+cd /path/to/nlm
+pip install .
+
+# Or install in development mode
+pip install -e .
+```
+
+### Quick Start
+
+```python
+import pynlm
+
+# Create a default configuration
+config = pynlm.createDefaultConfig()
+
+# Create and initialize the brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+
+# Run simulation
+for i in range(100):
+    brain.step(i)
+    
+print("Simulation complete!")
+```
+
+### Advanced Usage
+
+```python
+import pynlm
+
+# Create a simple agent with world
+result = pynlm.createReadyAgent(
+    width=20,
+    height=20,
+    enableRewardModulation=True,
+    enableCuriosity=True
+)
+
+brain = result["brain"]
+world = result["world"]
+agent = result["agent"]
+
+# Run an episode
+pynlm.runSimpleEpisode(brain, world, agent, 500)
+```
 
 ## Project Structure
 
@@ -88,30 +123,27 @@ This runs a comprehensive integration test verifying all brain systems are conne
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── python/                    # Python bindings
+│   ├── bindings.cpp
+│   └── CMakeLists.txt
+├── src/                       # C++ source code
+│   ├── core/                 # Core utilities
+│   ├── brain/                # Neural components
+│   ├── dynamics/             # Neural dynamics
+│   ├── plasticity/           # Plasticity rules
+│   ├── development/          # Developmental system
+│   ├── neuromodulation/      # Neuromodulators
+│   ├── memory/              # Memory systems
+│   ├── prediction/          # Prediction systems
+│   ├── cognition/           # Cognitive mechanisms
+│   ├── sensory/             # Sensory processing
+│   ├── motor/               # Motor system
+│   ├── environment/         # Environment interface
+│   ├── experiments/         # Experiment framework
+│   └── visualization/       # Visualization
+├── tests/                    # Test suite
+├── configs/                  # Configuration files
+└── docs/                     # Documentation
 ```
 
 ## Phase Summary
@@ -121,46 +153,21 @@ NLM/
 - Core types and configuration
 - Neural interfaces
 
-### Phase 2 (Complete)
+### Phase 2 (Complete - Real Neural Computation)
 - Real LIF neuron dynamics
 - Event-driven spike propagation
 - STDP and Hebbian plasticity
 - Structural plasticity
 
-### Phase 3 (Complete)
+### Phase 3 (Planned)
 - World interaction loop
 - Sensory input and motor output
 - Reward prediction error
-- Developmental stages
-- Novelty and curiosity
 
-### Phase 4 (Complete)
+### Phase 4 (Planned)
 - Neural prediction system
 - Working memory
 - Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
 
 ## Scientific Limitations
 
@@ -172,20 +179,6 @@ NLM is a research project investigating computational brain-like systems. We mak
 - No detailed cortical architecture
 - No claim of consciousness, intelligence, or human-like cognition
 - Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
 
 ## Architecture Philosophy
 
@@ -228,3 +221,14 @@ MIT
 ## Authors
 
 Research project — See docs for scientific background.
+
+## Contact
+
+For questions about using NLM, please refer to the documentation in the `docs/` directory or consult the project repository.
+
+## Version Information
+
+- **NLM Version**: Phase 2.0
+- **Python Bindings**: `pynlm` module
+- **Python Binding Version**: 0.1.0
+- **C++ API**: Compatible with C++20
