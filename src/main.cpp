@@ -25,8 +25,284 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <sstream>
+#include <ctime>
 
 using namespace nlm;
+
+// Forward declarations
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
+void printBanner();
+
+// Command-line argument parsing helper
+struct CLIArgs {
+    std::string configFile = "configs/default.cfg";
+    std::string logFile = "";
+    std::string logLevel = "Info";
+    std::string demoMode = "all"; // all, basic, learning, stdp
+    bool enableProgress = false;
+    bool enableVerbose = false;
+    bool saveCheckpoint = false;
+    std::string checkpointFile = "checkpoint.bin";
+    int timestep = 1000;
+    double timestepMs = 0.001;
+};
+
+CLIArgs parseCLIArgs(int argc, char** argv);
+
+void printHeader(const CLIArgs& args);
+void setupLogging(const CLIArgs& args);
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
+void runCustomTimestepDemo(std::shared_ptr<Brain> brain, int timestep, double timestepMs);
+void runStandardDemo(std::shared_ptr<Brain> brain, const CLIArgs& args);
+void logPerformanceStats(const CLIArgs& args, std::chrono::steady_clock::time_point start);
+
+// Command-line argument parsing helper
+struct CLIArgs {
+    std::string configFile = "configs/default.cfg";
+    std::string logFile = "";
+    std::string logLevel = "Info";
+    std::string demoMode = "all"; // all, basic, learning, stdp
+    bool enableProgress = false;
+    bool enableVerbose = false;
+    bool saveCheckpoint = false;
+    std::string checkpointFile = "checkpoint.bin";
+    int timestep = 1000;
+    double timestepMs = 0.001;
+};
+
+CLIArgs parseCLIArgs(int argc, char** argv) {
+    CLIArgs args;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "NLM Phase 2 Demo - Neural Learning Machine\n\n"
+                     << "Usage: nlm [options]\n\n"
+                     << "Options:\n"
+                     << "  --help, -h              Show this help message\n"
+                     << "  --config FILE, -c FILE   Load configuration from file\n"
+                     << "  --log-file FILE, -l FILE  Log output to file (in addition to console)\n"
+                     << "  --log-level LEVEL, -L LEVEL  Set log level (Debug, Info, Warning, Error, Critical)\n"
+                     << "  --demo MODE, -d MODE      Demo mode (all, basic, learning, stdp)\n"
+                     << "  --progress, -p           Enable progress reporting\n"
+                     << "  --verbose, -v            Enable verbose output\n"
+                     << "  --save-checkpoint, -s    Save brain checkpoint at end\n"
+                     << "  --checkpoint FILE, -C FILE Checkpoint file path\n"
+                     << "  --timestep N, -t N        Number of simulation steps (default: 1000)\n"
+                     << "  --timestep-ms MS, -T MS   Simulation timestep in milliseconds\n"
+                     << "  --version, -V            Show version information\n\n"
+                     << "Demo modes:\n"
+                     << "  all      Run all tests (default)\n"
+                     << "  basic    Basic connectivity test only\n"
+                     << "  learning Learning experiment only\n"
+                     << "  stdp     STDP verification only\n"
+                     << "  custom   Use custom timestep for all tests\n\n"
+                     << "Examples:\n"
+                     << "  nlm --demo learning --timestep 5000\n"
+                     << "  nlm --config custom.cfg --log-level Debug\n"
+                     << "  nlm --save-checkpoint --progress\n";
+            std::exit(0);
+        }
+        else if (arg == "--version" || arg == "-V") {
+            std::cout << "NLM Phase 2 Demo v2.0.0\n";
+            std::cout << "An experimental artificial developmental brain.\n";
+            std::cout << "Phase 2: Real Neural Computation with LIF neurons, STDP, and Hebbian plasticity.\n";
+            std::exit(0);
+        }
+        else if (arg.find("--config=") == 0 || arg.find("-c=") == 0) {
+            size_t pos = arg.find('=');
+            args.configFile = arg.substr(pos + 1);
+        }
+        else if (arg.find("--config") == 0 && arg.length() > 8 && arg[8] == ' ') {
+            args.configFile = arg.substr(9);
+        }
+        else if (arg.find("--log-file=") == 0 || arg.find("-l=") == 0) {
+            size_t pos = arg.find('=');
+            args.logFile = arg.substr(pos + 1);
+        }
+        else if (arg.find("--log-level=") == 0 || arg.find("-L=") == 0) {
+            size_t pos = arg.find('=');
+            args.logLevel = arg.substr(pos + 1);
+        }
+        else if (arg.find("--demo=") == 0 || arg.find("-d=") == 0) {
+            size_t pos = arg.find('=');
+            args.demoMode = arg.substr(pos + 1);
+        }
+        else if (arg == "--progress" || arg == "-p") {
+            args.enableProgress = true;
+        }
+        else if (arg == "--verbose" || arg == "-v") {
+            args.enableVerbose = true;
+        }
+        else if (arg == "--save-checkpoint" || arg == "-s") {
+            args.saveCheckpoint = true;
+        }
+        else if (arg.find("--checkpoint=") == 0 || arg.find("-C=") == 0) {
+            size_t pos = arg.find('=');
+            args.checkpointFile = arg.substr(pos + 1);
+        }
+        else if (arg.find("--timestep=") == 0 || arg.find("-t=") == 0) {
+            size_t pos = arg.find('=');
+            args.timestep = std::stoi(arg.substr(pos + 1));
+        }
+        else if (arg.find("--timestep-ms=") == 0 || arg.find("-T=") == 0) {
+            size_t pos = arg.find('=');
+            args.timestepMs = std::stod(arg.substr(pos + 1));
+        }
+        else if (arg == "--demo-basic" || arg == "-db") {
+            args.demoMode = "basic";
+        }
+        else if (arg == "--demo-learning" || arg == "-dl") {
+            args.demoMode = "learning";
+        }
+        else if (arg == "--demo-stdp" || arg == "-ds") {
+            args.demoMode = "stdp";
+        }
+        else if (arg == "--demo-custom" || arg == "-dc") {
+            args.demoMode = "custom";
+        }
+        else if (arg.find("--config") == 0 && arg.length() > 8 && i + 1 < argc) {
+            args.configFile = argv[++i];
+        }
+        else if (arg.find("--log-file") == 0 && arg.length() > 9 && i + 1 < argc) {
+            args.logFile = argv[++i];
+        }
+        else if (arg.find("--checkpoint") == 0 && arg.length() > 10 && i + 1 < argc) {
+            args.checkpointFile = argv[++i];
+        }
+    }
+    
+    return args;
+}
+
+void printHeader(const CLIArgs& args) {
+    printBanner();
+    
+    std::cout << "\nNLM Phase 2 Demo - Neural Learning Machine\n";
+    std::cout << std::string(60, '=') << "\n";
+    std::cout << "Demo Mode: " << args.demoMode << "\n";
+    std::cout << "Configuration File: " << args.configFile << "\n";
+    std::cout << "Simulation Steps: " << args.timestep << "\n";
+    std::cout << "Timestep Duration: " << args.timestepMs * 1000.0 << " ms\n";
+    
+    if (args.enableProgress) {
+        std::cout << "Progress Reporting: Enabled\n";
+    }
+    if (args.enableVerbose) {
+        std::cout << "Verbose Mode: Enabled\n";
+    }
+    if (args.saveCheckpoint) {
+        std::cout << "Checkpoint Saving: Enabled -> " << args.checkpointFile << "\n";
+    }
+    
+    std::cout << std::string(60, '=') << "\n\n";
+}
+
+void setupLogging(const CLIArgs& args) {
+    // Convert log level string to enum
+    LogLevel logLevel = LogLevel::Info;
+    std::string levelStr = args.logLevel;
+    std::transform(levelStr.begin(), levelStr.end(), levelStr.begin(), ::tolower);
+    
+    if (levelStr == "debug") logLevel = LogLevel::Debug;
+    else if (levelStr == "warning") logLevel = LogLevel::Warning;
+    else if (levelStr == "error") logLevel = LogLevel::Error;
+    else if (levelStr == "critical") logLevel = LogLevel::Critical;
+    
+    // Initialize logger
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
+    logger->addLogger(consoleLogger);
+    
+    if (!args.logFile.empty()) {
+        auto fileLogger = std::make_shared<FileLogger>(args.logFile, logLevel);
+        logger->addLogger(fileLogger);
+    }
+    
+    Logger::setGlobal(logger);
+    NLM_LOG_INFO("Logging initialized - Level: " + args.logLevel);
+    if (!args.logFile.empty()) {
+        NLM_LOG_INFO("Log file: " + args.logFile);
+    }
+}
+
+void runCustomTimestepDemo(std::shared_ptr<Brain> brain, int timestep, double timestepMs) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Custom Timestep Demo ===");
+    
+    // Custom timestep for learning experiment
+    brain->reset();
+    brain->initialize();
+    
+    NLM_LOG_INFO("Applying repeated input patterns with custom timestep:");
+    NLM_LOG_INFO("  Steps: " << timestep << ", Duration: " << timestepMs << "s per step");
+    
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) {
+        NLM_LOG_ERROR("No brain region found!");
+        return;
+    }
+    
+    // Enable plasticity
+    for (auto& syn : region->getSynapses()) {
+        syn->enablePlasticity(true, true, false);
+    }
+    
+    // Apply input pattern with custom timestep
+    for (SimulationStep step = 0; step < timestep; ++step) {
+        // Create input pattern
+        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
+            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+        }
+        
+        brain->step(step, step * timestepMs);
+        
+        if (step % 100 == 0 && args.enableProgress) {
+            NLM_LOG_INFO("  Step " << step << 
+                        " | Spikes: " << brain->getTotalSpikeCount() << 
+                        " | Firing: " << brain->getFiringNeuronCount());
+        }
+    }
+    
+    NLM_LOG_INFO("Custom timestep demo completed.");
+    NLM_LOG_INFO("  Final spike count: " << brain->getTotalSpikeCount());
+    NLM_LOG_INFO("  Final firing neurons: " << brain->getFiringNeuronCount());
+}
+
+void runStandardDemo(std::shared_ptr<Brain> brain, const CLIArgs& args) {
+    // Test 1: Basic connectivity
+    runBasicConnectivityTest(brain);
+    
+    // Reset for plasticity experiment
+    brain->reset();
+    brain->initialize();
+    
+    // Test 2: Plasticity learning experiment
+    runPlasticityExperiment(brain);
+    
+    // Reset and run STDP verification
+    brain->reset();
+    brain->initialize();
+    runStdpVerification(brain);
+}
+
+void logPerformanceStats(const CLIArgs& args, std::chrono::steady_clock::time_point start) {
+    auto end = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Performance Statistics ===");
+    NLM_LOG_INFO("Total execution time: " << duration.count() << " ms");
+    NLM_LOG_INFO("Steps per second: " << (args.timestep / (duration.count() / 1000.0)));
+    NLM_LOG_INFO("Timestep resolution: " << args.timestepMs * 1000.0 << " ms");
+}
 
 void printBanner() {
     std::cout << R"(
@@ -322,51 +598,34 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    auto start = std::chrono::steady_clock::now();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Parse command line arguments
+    CLIArgs args = parseCLIArgs(argc, argv);
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
+    // Print header information
+    printHeader(args);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    // Setup logging based on CLI arguments
+    setupLogging(args);
     
     // Load configuration
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+    std::string configFile = args.configFile;
+    if (!configFile.empty()) {
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_INFO("Using default configuration (file not found: " + configFile + ")");
         }
-    }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 (if not overridden by config or args)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -392,11 +651,6 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
     // Initialize brain
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
@@ -409,25 +663,51 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run demo based on mode
+    if (args.demoMode == "basic") {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Basic Connectivity Demo ===");
+        runBasicConnectivityTest(brain);
+    }
+    else if (args.demoMode == "learning") {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Learning Plasticity Demo ===");
+        runPlasticityExperiment(brain);
+    }
+    else if (args.demoMode == "stdp") {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== STDP Verification Demo ===");
+        runStdpVerification(brain);
+    }
+    else if (args.demoMode == "custom") {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Custom Timestep Demo ===");
+        runCustomTimestepDemo(brain, args.timestep, args.timestepMs);
+    }
+    else { // default to "all"
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Full Phase 2 Integration Demo ===");
+        runStandardDemo(brain, args);
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Save checkpoint if requested
+    if (args.saveCheckpoint) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Saving checkpoint to: " + args.checkpointFile);
+        if (brain->save(args.checkpointFile)) {
+            NLM_LOG_INFO("Checkpoint saved successfully!");
+        } else {
+            NLM_LOG_WARNING("Failed to save checkpoint!");
+        }
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
+    
+    // Log performance statistics
+    logPerformanceStats(args, start);
     
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");

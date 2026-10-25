@@ -162,6 +162,13 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
+        })
+        // Context manager support for Config
+        .def("__enter__", [](std::shared_ptr<Config> self) {
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<Config> self, py::args) {
+            self->clear();
         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
@@ -398,7 +405,26 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Context manager support for AgentBrain
+        .def("__enter__", [](std::shared_ptr<AgentBrain> self, std::shared_ptr<SimpleWorld> world) {
+            self->initialize(world);
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<AgentBrain> self, py::args) {
+            self->reset();
+        });
+    
+    // Add context manager support for AgentBrain
+    py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrainContext")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("__enter__", [](std::shared_ptr<AgentBrain> self, std::shared_ptr<SimpleWorld> world) {
+            self->initialize(world);
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<AgentBrain> self, py::args) {
+            self->reset();
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -415,6 +441,38 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Helper function to create a complete agent setup
+    m.def("createAgentSetup", [](std::shared_ptr<Config> config, 
+                              std::shared_ptr<SimpleWorld> world) -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<AgentBrain>, std::shared_ptr<SimpleWorld>> {
+        auto brain = std::make_shared<Brain>(config);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        return std::make_tuple(brain, agent, world);
+    }, py::arg("config"), py::arg("world"), "Create a complete agent setup with brain and agent");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("runAgentSimulation", [](std::shared_ptr<Brain> brain,
+                                  std::shared_ptr<AgentBrain> agent,
+                                  std::shared_ptr<SimpleWorld> world,
+                                  int num_steps) {
+        for (int step = 0; step < num_steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            auto reward = percept->getInternal() && !percept->getInternal()->empty() 
+                         ? percept->getInternal()->front() : 0.0f;
+            agent->applyRewardModulation(reward, 0.0);
+        }
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("num_steps"),
+       "Run a complete agent simulation for specified number of steps");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
