@@ -69,6 +69,43 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced access for debugging and research
+    // Motor neuron groups access
+    const std::vector<Neuron*>& getMotorNeurons() const { return motorForward_; }
+    const std::vector<Neuron*>& getSensoryNeurons() const { return sensoryVision_; }
+    
+    // Neuromodulation state access
+    struct NeuromodulatorLevels {
+        float dopamine;
+        float novelty;
+        float curiosity;
+        float predictionError;
+        float expectedReward;
+    };
+    NeuromodulatorLevels getNeuromodulatorLevels() const {
+        NeuromodulatorLevels levels;
+        levels.dopamine = dopamineLevel_;
+        levels.novelty = noveltyLevel_;
+        levels.curiosity = curiosityLevel_;
+        levels.predictionError = predictionError_;
+        levels.expectedReward = expectedReward_;
+        return levels;
+    }
+    void setNeuromodulatorLevel(float level, const std::string& type);
+    
+    // Development state access
+    struct DevelopmentState {
+        double age;
+        float plasticityModifier;
+    };
+    DevelopmentState getDevelopmentState() const {
+        DevelopmentState state;
+        state.age = developmentalAge_;
+        state.plasticityModifier = plasticityModifier_;
+        return state;
+    }
+    void setDevelopmentState(double age, float plasticityModifier);
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();

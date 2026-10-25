@@ -152,8 +152,58 @@ PYBIND11_MODULE(pynlm, m) {
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        .def("get", py::overload_cast<const std::string&, int>(&Config::get), py::arg("key"),
+             "Get configuration value as int")
+        .def("get", py::overload_cast<const std::string&, int64_t>(&Config::get), py::arg("key"),
+             "Get configuration value as int64_t")
+        .def("get", py::overload_cast<const std::string&, double>(&Config::get), py::arg("key"),
+             "Get configuration value as double")
+        .def("get", py::overload_cast<const std::string&, bool>(&Config::get), py::arg("key"),
+             "Get configuration value as bool")
+        .def("get", py::overload_cast<const std::string&, std::string>(&Config::get), py::arg("key"),
+             "Get configuration value as string")
+        .def("get", py::overload_cast<const std::string&, std::vector<int>>(&Config::get), py::arg("key"),
+             "Get configuration value as vector<int>")
+        .def("get", py::overload_cast<const std::string&, std::vector<double>>(&Config::get), py::arg("key"),
+             "Get configuration value as vector<double>")
+        .def("get", py::overload_cast<const std::string&, std::vector<std::string>>(&Config::get), py::arg("key"),
+             "Get configuration value as vector<string>")
+        .def("getOr", py::overload_cast<const std::string&, int>(&Config::getOr), py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (int)")
+        .def("getOr", py::overload_cast<const std::string&, int64_t>(&Config::getOr), py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (int64_t)")
+        .def("getOr", py::overload_cast<const std::string&, double>(&Config::getOr), py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (double)")
+        .def("getOr", py::overload_cast<const std::string&, bool>(&Config::getOr), py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (bool)")
+        .def("getOr", py::overload_cast<const std::string&, std::string>(&Config::getOr), py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (string)")
+        .def("getOr", py::overload_cast<const std::string&, std::vector<int>>(&Config::getOr), py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (vector<int>)")
+        .def("getOr", py::overload_cast<const std::string&, std::vector<double>>(&Config::getOr), py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (vector<double>)")
+        .def("getOr", py::overload_cast<const std::string&, std::vector<std::string>>(&Config::getOr), py::arg("key"), py::arg("defaultValue"),
+             "Get configuration value with default (vector<string>)")
+        .def("set", py::overload_cast<const std::string&, const std::string&, ConfigSource>(&Config::set), py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value from string")
+        .def("set", py::overload_cast<const std::string&, int, ConfigSource>(&Config::set), py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value from int")
+        .def("set", py::overload_cast<const std::string&, int64_t, ConfigSource>(&Config::set), py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value from int64_t")
+        .def("set", py::overload_cast<const std::string&, double, ConfigSource>(&Config::set), py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value from double")
+        .def("set", py::overload_cast<const std::string&, bool, ConfigSource>(&Config::set), py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value from bool")
+        .def("set", py::overload_cast<const std::string&, std::vector<int>, ConfigSource>(&Config::set), py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value from vector<int>")
+        .def("set", py::overload_cast<const std::string&, std::vector<double>, ConfigSource>(&Config::set), py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value from vector<double>")
+        .def("set", py::overload_cast<const std::string&, std::vector<std::string>, ConfigSource>(&Config::set), py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             "Set configuration value from vector<string>")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -342,6 +392,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -351,7 +403,89 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Plasticity system access
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        
+        // Memory systems
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        
+        // Prediction system
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        
+        // Cognition systems
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        
+        // Development system
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        
+        // Neuromodulation systems
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error neuromodulator")
+        
+        // Random generator
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random generator")
+        
+        // Inter-region connection management
+        .def("addInterRegionConnection", &Brain::addInterRegionConnection,
+             py::arg("source"), py::arg("target"), py::arg("weight") = 0.0f, py::arg("delay") = 1,
+             "Add inter-region connection")
+        .def("removeInterRegionConnection", &Brain::removeInterRegionConnection,
+             py::arg("source"), py::arg("target"),
+             "Remove inter-region connection")
+        
+        // Update systems
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+             py::arg("signal"),
+             "Apply neuromodulatory signal")
+        .def("updatePlasticity", &Brain::updatePlasticity,
+             "Update plasticity rules")
+        .def("develop", &Brain::develop,
+             "Apply developmental changes");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -387,6 +521,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        
+        // Configuration methods
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -398,7 +534,27 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Advanced internal access for debugging and research
+        .def("getMotorNeurons", &AgentBrain::getMotorNeurons,
+             py::return_value_policy::reference_internal,
+             "Get motor neuron groups (research/debug use)")
+        .def("getSensoryNeurons", &AgentBrain::getSensoryNeurons,
+             py::return_value_policy::reference_internal,
+             "Get sensory neuron groups (research/debug use)")
+        .def("getNeuromodulatorLevels", &AgentBrain::getNeuromodulatorLevels,
+             py::return_value_policy::copy,
+             "Get current neuromodulator levels")
+        .def("setNeuromodulatorLevel", &AgentBrain::setNeuromodulatorLevel,
+             py::arg("level"), py::arg("type"),
+             "Set neuromodulator level (research/debug use)")
+        .def("getDevelopmentState", &AgentBrain::getDevelopmentState,
+             py::return_value_policy::copy,
+             "Get development system state")
+        .def("setDevelopmentState", &AgentBrain::setDevelopmentState,
+             py::arg("age"), py::arg("plasticityModifier"),
+             "Set development system state (research/debug use)");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
