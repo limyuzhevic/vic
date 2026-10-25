@@ -15,6 +15,9 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../plasticity/RewardModulatedSTDP.hpp"
+#include "../plasticity/TripletSTDP.hpp"
+#include "../core/Constants.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>

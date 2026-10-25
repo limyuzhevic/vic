@@ -19,9 +19,9 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                     const std::vector<Timestamp>& preSpikes,
+                     const std::vector<Timestamp>& postSpikes,
+                     TimestepDuration dt) {
     /*
      * Real Hebbian learning implementation
      * 
@@ -49,28 +49,38 @@ void Hebbian::update(Synapse* synapse,
      *   - Assumes stationary statistics
      */
     
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+    // Validate input parameters
+    if (!synapse || !isFinite(dt) || preSpikes.empty() || postSpikes.empty()) {
+        NLM_LOG_WARNING("Hebbian::update called with invalid parameters");
+        return;
+    }
+    
+    // Ensure dt is positive (simulation timestep)
+    if (dt <= 0.0) {
+        NLM_LOG_WARNING("Hebbian::update called with invalid timestep: " + std::to_string(dt));
         return;
     }
     
     // Count correlated spike pairs (simplified covariance)
     size_t correlationCount = 0;
+    
     for (Timestamp preTime : preSpikes) {
         for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
+            float timeDiff = static_cast<float>(postTime - preTime);
+            
             // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
+            // Using correlation window constant from nlm namespace
+            if (std::abs(timeDiff) < nlm::HEBBIAN_CORRELATION_WINDOW) {
                 ++correlationCount;
             }
         }
     }
     
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
+    // Calculate weight change based on correlation with bounds
     float delta = pImpl->learningRate * static_cast<float>(correlationCount);
     
-    // Apply with bounds
-    if (std::abs(delta) > 1e-6f) {
+    // Apply with bounds and numerical stability
+    if (std::abs(delta) > nlm::NUMERICAL_EPSILON) {
         applyWeightChange(synapse, delta);
     }
 }

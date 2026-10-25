@@ -27,7 +27,7 @@ void HebbianRule::update(Synapse* synapse,
     // TODO PHASE 2: Implement real Hebbian learning
     // PLACEHOLDER: Simple correlated firing increases weight
     
-    if (preSpikes.empty() || postSpikes.empty()) {
+    if (preSpikes.empty() || postSpikes.empty() || !synapse) {
         return;
     }
     
