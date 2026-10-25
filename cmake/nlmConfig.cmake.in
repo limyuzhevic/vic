@@ -1,0 +1,45 @@
+# CMake configuration for NLM project
+# This file is used by CMake to generate package configuration
+
+# Package version check
+include(CMakeFindDependencyMacro)
+
+# Find dependencies (if any)
+# find_dependency(some_dependency)
+
+# Include the exported targets
+include("${CMAKE_CURRENT_LIST_DIR}/nlmTargets.cmake")
+
+# Provide NLM-specific variables for downstream projects
+
+# NLM include directory
+set(NLM_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/../../include")
+
+# NLM library paths
+set(NLM_LIBRARY_PATHS "${CMAKE_CURRENT_LIST_DIR}/../../lib")
+
+# NLM version
+set(NLM_VERSION ${PROJECT_VERSION})
+
+# Function to create a simple test program
+function(add_nlm_test name source)
+    add_executable(${name} ${source})
+    target_link_libraries(${name} PRIVATE nlm::core)
+    add_test(NAME ${name} COMMAND ${name})
+endfunction()
+
+# Macro to set up a target with NLM conventions
+macro(nlm_target target_name)
+    set_target_properties(${target_name} PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        POSITION_INDEPENDENT_CODE ON
+    )
+    
+    if(MSVC)
+        target_compile_options(${target_name} PRIVATE /W4 /WX)
+    else()
+        target_compile_options(${target_name} PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endmacro()

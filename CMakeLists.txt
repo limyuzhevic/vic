@@ -143,9 +143,13 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
+# CPack configuration
+set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Neural Learning Machine - Experimental Artificial Brain")
+set(CPACK_PACKAGE_VENDOR "NLM Project")
+set(CPACK_PACKAGE_CONTACT "info@nlm-project.org")
+set(CPACK_PACKAGE_DESCRIPTION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
+set(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE)
+
+include(CPack)

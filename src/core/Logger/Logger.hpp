@@ -6,6 +6,9 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <mutex>
+#include <thread>
+#include <filesystem>
 
 namespace nlm {
 
@@ -53,7 +56,7 @@ public:
     bool getUseColors() const;
     
     // Set output file (in addition to console)
-    void setOutputFile(const std::string& filepath);
+    void setOutputFile(const std::string& filepath, size_t maxSizeMB = 10, bool enableRotation = true);
     void closeOutputFile();
     
 private:
@@ -103,7 +106,7 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

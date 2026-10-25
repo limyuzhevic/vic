@@ -48,6 +48,152 @@ void printBanner() {
     )" << std::endl;
 }
 
+// Print help information
+void printHelp() {
+    printBanner();
+    
+    std::cout << "Usage: nlm [options]\n\n";
+    std::cout << "NLM (Neural Learning Machine) - Phase 2: Real Neural Computation\n\n";
+    
+    std::cout << "Basic Options:\n";
+    std::cout << "  --config=<file>      Load configuration from file (JSON, YAML, or key=value format)\n";
+    std::cout << "  --help, -h           Show this help message\n";
+    std::cout << "  --version            Show version information\n";
+    std::cout << "\n";
+    
+    std::cout << "Configuration Options:\n";
+    std::cout << "  --key=value           Set configuration value\n";
+    std::cout << "  -key value            Set configuration value (alternative format)\n";
+    std::cout << "  --list                List all configuration keys and values\n";
+    std::cout << "  --validate            Validate current configuration\n";
+    std::cout << "\n";
+    
+    std::cout << "Experiment Options:\n";
+    std::cout << "  --run_test=<n>       Run specific test (1, 2, or 3)\n";
+    std::cout << "  --num_steps=<n>      Number of simulation steps\n";
+    std::cout << "  --step_duration=<t>  Duration of each simulation step\n";
+    std::cout << "\n";
+    
+    std::cout << "Advanced Options:\n";
+    std::cout << "  --enable_plasticity=<bool> Enable synaptic plasticity (default: true)\n";
+    std::cout << "  --enable_structural_plasticity=<bool> Enable structural plasticity (default: true)\n";
+    std::cout << "  --stdp_ltp_weight=<w> STDP LTP weight\n";
+    std::cout << "  --stdp_ltd_weight=<w> STDP LTD weight\n";
+    std::cout << "  --stdp_tau=<t>       STDP time constant\n";
+    std::cout << "  --synaptogenesis_rate=<r> Synaptogenesis rate\n";
+    std::cout << "  --pruning_rate=<r>   Pruning rate\n";
+    std::cout << "\n";
+    
+    std::cout << "Output Options:\n";
+    std::cout << "  --output_mode=<mode> Output mode (quiet, normal, verbose, debug)\n";
+    std::cout << "  --output_file=<file> Save experiment results to file\n";
+    std::cout << "\n";
+    
+    std::cout << "Example Usage:\n";
+    std::cout << "  nlm --config=my_config.json --neuron_count=1000 --run_test=1\n";
+    std::cout << "  nlm --config=experiments.cfg --run_test=2 --num_steps=5000 --output_file=results.txt\n";
+    std::cout << "  nlm --log_level=Debug --log_colors=false --enable_plasticity=true\n";
+}
+
+// Print version information
+void printVersion() {
+    std::cout << "NLM Phase 2: Real Neural Computation\n";
+    std::cout << "Version: 0.1.0\n";
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << "\n";
+    std::cout << "Author: NLM Project\n";
+    std::cout << "License: MIT\n";
+}
+
+// Parse and validate command line arguments
+bool parseCommandLineArgs(int argc, char** argv, Config& config, bool& runTest1, bool& runTest2, bool& runTest3, bool& validateOnly) {
+    bool success = true;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --help and -h
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            exit(0);
+        }
+        
+        // Handle --version
+        else if (arg == "--version") {
+            printVersion();
+            exit(0);
+        }
+        
+        // Handle --list
+        else if (arg == "--list") {
+            config.printConfigurationList();
+            exit(0);
+        }
+        
+        // Handle --validate
+        else if (arg == "--validate") {
+            validateOnly = true;
+        }
+        
+        // Handle experiment options
+        else if (arg.substr(0, 11) == "--run_test=") {
+            std::string value = arg.substr(11);
+            try {
+                int testNum = std::stoi(value);
+                if (testNum == 1) {
+                    runTest1 = true;
+                } else if (testNum == 2) {
+                    runTest2 = true;
+                } else if (testNum == 3) {
+                    runTest3 = true;
+                } else {
+                    NLM_LOG_WARNING("Invalid test number: " + value + ". Valid tests are 1, 2, or 3.");
+                    success = false;
+                }
+            } catch (const std::exception& e) {
+                NLM_LOG_WARNING("Invalid test number format: " + value + ". " + std::string(e.what()));
+                success = false;
+            }
+        }
+        
+        // Handle other options
+        else {
+            // Parse --key=value format
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos && arg[0] == '-') {
+                std::string key = arg.substr(1, pos - 1);
+                std::string value = arg.substr(pos + 1);
+                config.set(key, value, ConfigSource::CommandLine);
+            }
+            // Parse -key value format
+            else if (arg[0] == '-' && i + 1 < argc && argv[i + 1][0] != '-') {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
+                config.set(key, value, ConfigSource::CommandLine);
+            }
+            // Pass through to config->loadFromArgs for unrecognized options
+            else if (!config.loadFromArgs(i, &argv[i])) {
+                success = false;
+            }
+        }
+    }
+    
+    return success;
+}
+
+// Print configuration help and validation
+void printConfigurationHelpAndValidation(const Config& config) {
+    std::cout << "=== NLM Configuration ===\n\n";
+    
+    std::cout << "Current Configuration Summary:\n";
+    std::cout << config.summary() << "\n";
+    
+    if (!config.validateConfiguration()) {
+        std::cout << "WARNING: Configuration validation failed. Please check the configuration.\n\n";
+    }
+    
+    std::cout << "For more information, use --help.\n";
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -363,7 +509,18 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Parse and validate command line arguments
+    bool runTest1 = true;  // Default: run test 1
+    bool runTest2 = true;  // Default: run test 2
+    bool runTest3 = true;  // Default: run test 3
+    bool validateOnly = false;
+    
+    if (!parseCommandLineArgs(argc, argv, *config, runTest1, runTest2, runTest3, validateOnly)) {
+        NLM_LOG_ERROR("Command line argument parsing failed.");
+        return 1;
+    }
+    
+    // Override with command line args (legacy support)
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
@@ -382,6 +539,20 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Validate configuration if requested
+    if (validateOnly) {
+        printConfigurationHelpAndValidation(*config);
+        NLM_LOG_INFO("Configuration validation completed.");
+        return 0;
+    }
+    
+    // Check if any test is disabled via command line
+    bool anyTestEnabled = runTest1 || runTest2 || runTest3;
+    if (!anyTestEnabled) {
+        NLM_LOG_ERROR("No tests enabled. Please specify at least one test to run using --run_test=<n>.");
+        return 1;
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -391,6 +562,12 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
+    
+    // Log which tests will be run
+    NLM_LOG_INFO("Tests to run:");
+    if (runTest1) NLM_LOG_INFO("  Test 1: Basic Neural Connectivity");
+    if (runTest2) NLM_LOG_INFO("  Test 2: Plasticity Learning Experiment");
+    if (runTest3) NLM_LOG_INFO("  Test 3: STDP Verification");
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -409,20 +586,36 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run tests based on command line options
+    if (runTest1) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running Test 1: Basic Neural Connectivity ===");
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for next test
+        brain->reset();
+        brain->initialize();
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    if (runTest2) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running Test 2: Plasticity Learning Experiment ===");
+        runPlasticityExperiment(brain);
+        
+        // Reset brain for next test
+        brain->reset();
+        brain->initialize();
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (runTest3) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("=== Running Test 3: STDP Verification ===");
+        runStdpVerification(brain);
+        
+        // Reset brain for next test
+        brain->reset();
+        brain->initialize();
+    }
     
     // Final brain status
     NLM_LOG_INFO("");

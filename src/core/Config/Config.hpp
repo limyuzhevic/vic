@@ -43,19 +43,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
-class Config {
-public:
-    Config();
-    ~Config();
-    
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
-    
-    // Load from file (JSON format)
+// Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +81,49 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration format detection
+    bool isJSONString(const std::string& content) const;
+    bool isYAMLString(const std::string& content) const;
+    
+    // Format-specific loaders
+    bool loadFromJSON(const std::string& jsonContent);
+    bool loadFromYAML(const std::string& yamlContent);
+    bool loadFromSimpleFormat(const std::string& content);
+    
+    // Format-specific savers (optional)
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
+    
+    // Command line argument management
+    void clearCommandLineArgs();
+    
+    // Configuration validation
+    bool validateConfigKey(const std::string& key) const;
+    bool validateConfigValue(const std::string& key, const std::string& value) const;
+    bool validateConfiguration() const;
+    
+    // Help and information
+    void printConfigurationHelp() const;
+    void printConfigurationList() const;
+    
+    // Utility
+    std::string getCurrentTimestamp() const;
+    
+    // Explicit template instantiations
+    template std::optional<int> Config::get<int>(const std::string&) const;
+    template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+    template std::optional<double> Config::get<double>(const std::string&) const;
+    template std::optional<bool> Config::get<bool>(const std::string&) const;
+    template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+    
+    template int Config::getOr<int>(const std::string&, const int&) const;
+    template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+    template double Config::getOr<double>(const std::string&, const double&) const;
+    template bool Config::getOr<bool>(const std::string&, const bool&) const;
+    template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+    
+    friend class Brain;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -101,5 +132,3 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
-
-} // namespace nlm
