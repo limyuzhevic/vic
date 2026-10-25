@@ -54,6 +54,19 @@ public:
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
     
+    // Compute reward from agent state
+    float computeReward(const AgentBody* agent) const {
+        if (!agent) return 0.0f;
+        return agent->energy / maxEnergy_;  // Normalized energy level
+    }
+    
+    // Get observation (for integration experiment compatibility)
+    SensoryPercept observe(const Brain* brain) const {
+        // For now, just return the current sensory percept
+        // This method is used for integration testing
+        return sensory_;
+    }
+    
     // Add object to world
     void addObject(const WorldObject& obj);
     
