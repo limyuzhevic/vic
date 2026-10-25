@@ -424,6 +424,67 @@ int main(int argc, char** argv) {
     brain->initialize();
     runStdpVerification(brain);
     
+// Log configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("");
+    
+    // Show configuration stats
+    NLM_LOG_INFO("Configuration Statistics:");
+    NLM_LOG_INFO("  Total entries: " + std::to_string(config->getStats().totalEntries));
+    
+    // Log validation
+    if (!config->validate()) {
+        NLM_LOG_WARNING("Configuration validation completed with warnings");
+    } else {
+        NLM_LOG_INFO("Configuration validation passed");
+    }
+    
+    // Show configuration summary for debugging
+    if (config->has("log_level")) {
+        auto logLevel = config->getOr<std::string>("log_level", "");
+        if (logLevel == "debug") {
+            NLM_LOG_DEBUG("Full configuration: " + config->summary());
+        }
+    }
+    
+    // Initialize simulation clock
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    SimulationClock clock(timestep);
+    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    
+    // Initialize brain
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Initializing NLM Brain...");
+    auto brain = std::make_shared<Brain>(config);
+    
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain!");
+        return 1;
+    }
+    
+    brain->logStatus();
+    
+    // Run Test 1: Basic connectivity
+    runBasicConnectivityTest(brain);
+    
+    // Reset brain for plasticity experiment
+    brain->reset();
+    brain->initialize();
+    
+    // Run Test 2: Plasticity learning experiment
+    runPlasticityExperiment(brain);
+    
+    // Reset and run Test 3: STDP verification
+    brain->reset();
+    brain->initialize();
+    runStdpVerification(brain);
+    
     // Final brain status
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
@@ -444,6 +505,16 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
+    
+    // Save final configuration to file
+    if (config->has("save_config")) {
+        std::string outputFile = config->getOr<std::string>("save_config", "nlm_final_config.cfg");
+        if (config->saveToFile(outputFile)) {
+            NLM_LOG_INFO("Final configuration saved to: " + outputFile);
+        } else {
+            NLM_LOG_ERROR("Failed to save final configuration to: " + outputFile);
+        }
+    }
     
     return 0;
 }

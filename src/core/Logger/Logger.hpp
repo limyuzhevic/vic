@@ -6,6 +6,8 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <unordered_map>
+#include <filesystem>
 
 namespace nlm {
 
@@ -35,6 +37,23 @@ public:
     virtual void log(const LogEntry& entry) = 0;
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;
+    
+    // Enable/disable colored output
+    virtual void setUseColors(bool useColors) {}
+    virtual bool getUseColors() const { return false; }
+    
+    // Set output file for log rotation
+    virtual void setOutputFile(const std::string& filepath) {}
+    virtual void closeOutputFile() {}
+    
+    // Configure log rotation
+    virtual void enableLogRotation(bool enable) {}
+    virtual void setMaxFileSize(size_t maxSize) {}
+    virtual void setTimestampFormat(const std::string& format) {}
+    
+    // Configure log filtering
+    virtual void setLevelFilter(LogLevel level, bool enabled) {}
+    virtual bool getLevelFilter(LogLevel level) const { return true; }
 };
 
 // Console logger implementation
@@ -49,12 +68,21 @@ public:
     LogLevel getLevel() const override;
     
     // Enable/disable colors
-    void setUseColors(bool useColors);
-    bool getUseColors() const;
+    void setUseColors(bool useColors) override;
+    bool getUseColors() const override;
     
     // Set output file (in addition to console)
-    void setOutputFile(const std::string& filepath);
-    void closeOutputFile();
+    void setOutputFile(const std::string& filepath) override;
+    void closeOutputFile() override;
+    
+    // Configure log rotation
+    void enableLogRotation(bool enable);
+    void setMaxFileSize(size_t maxSize);
+    void setTimestampFormat(const std::string& format);
+    
+    // Configure log filtering
+    void setLevelFilter(LogLevel level, bool enabled) override;
+    bool getLevelFilter(LogLevel level) const override;
     
 private:
     struct Impl;
@@ -103,7 +131,11 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
+    // Configure global logger settings
+    static void configureGlobalLogger(LogLevel level, bool useColors = true);
+    static void addGlobalLogFile(const std::string& filepath, bool enableRotation = false);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -128,6 +160,28 @@ public:
         return *this;
     }
     
+    template<typename T>
+    LogStream& operator<<(const std::vector<T>& values) {
+        oss_ << "[";
+        for (size_t i = 0; i < values.size(); ++i) {
+            if (i > 0) oss_ << ", ";
+            oss_ << values[i];
+        }
+        oss_ << "]";
+        return *this;
+    }
+    
+    template<typename T>
+    LogStream& operator<<(const std::unordered_map<std::string, T>& map) {
+        oss_ << "{";
+        for (auto it = map.begin(); it != map.end(); ++it) {
+            if (it != map.begin()) oss_ << ", ";
+            oss_ << it->first << ": " << it->second;
+        }
+        oss_ << "}";
+        return *this;
+    }
+    
 private:
     LogLevel level_;
     std::ostringstream oss_;
@@ -139,3 +193,8 @@ private:
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
 
 } // namespace nlm
+
+// Structured logging macros
+#define NLM_LOG_OBJECT(obj) NLM_LOG_STREAM(nlm::LogLevel::Info) << obj
+#define NLM_LOG_VECTOR(vec) NLM_LOG_STREAM(nlm::LogLevel::Info) << vec
+#define NLM_LOG_MAP(map) NLM_LOG_STREAM(nlm::LogLevel::Info) << map
