@@ -5,8 +5,13 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
+#include <sstream>
 
 namespace nlm {
+
+// Include JSON library
+#include <nlohmann/json.hpp>
 
 // Forward declarations
 class Config;
@@ -15,11 +20,15 @@ class Config;
 using ConfigValue = std::variant<
     int,
     int64_t,
+    uint64_t,
     double,
     bool,
     std::string,
     std::vector<int>,
+    std::vector<int64_t>,
+    std::vector<uint64_t>,
     std::vector<double>,
+    std::vector<bool>,
     std::vector<std::string>
 >;
 
@@ -55,7 +64,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -75,6 +84,8 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, uint64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
@@ -93,6 +104,10 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +115,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parsers
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromSimpleFormat(const std::string& filepath);
+    void parseJSONRecursive(const nlohmann::json& json, const std::string& prefix);
 };
 
 } // namespace nlm

@@ -193,9 +193,59 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== REFACTORED STEP METHODS ==========
+    
+    // Step 1: Process pending delayed spike events (deliver synaptic input)
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Step 2: Update all neuron membrane potentials (LIF dynamics)
+    void updateNeuronsLIF(Timestamp currentTime);
+    
+    // Step 3: Detect spikes and schedule outgoing spike events
+    void detectAndQueueSpikes(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Step 4: Process immediate spikes (from step 3)
+    void processSpikes(SimulationStep currentStep);
+    
+    // Step 5: Update working memory (maintenance and competition)
+    void updateWorkingMemory();
+    
+    // Step 6: Apply neuromodulation effects on neural excitability
+    void updateNeuromodulation();
+    
+    // Step 7: Apply plasticity rules (STDP and Hebbian)
+    void updatePlasticity(Timestamp currentTime);
+    
+    // Step 8: Update episodic memory with current experience
+    void updateEpisodicMemory(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Step 9: Update prediction system
+    void updatePredictionSystem();
+    
+    // Step 10: Update attention system
+    void updateAttentionSystem();
+    
+    // Step 11: Update concept formation
+    void updateConceptFormation();
+    
+    // Step 12: Apply structural plasticity (synaptogenesis, pruning)
+    void updateStructuralPlasticity(SimulationStep currentStep);
+    
+    // Step 13: Replay important memories (during rest or periodically)
+    void replayMemories(SimulationStep currentStep);
+    
+    // Step 14: Apply development effects
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    
+    // Step 15: Periodic memory consolidation
+    void consolidateMemories(SimulationStep currentStep);
+    
+    // Step 16: Checkpoint management
+    void updateCheckpointManager(SimulationStep currentStep, Timestamp currentTime);
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
