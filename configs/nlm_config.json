@@ -1,0 +1,194 @@
+// NLM Configuration File
+// JSON format configuration for NLM (Neural Learning Machine)
+// This file provides structured configuration for all NLM systems
+
+{
+  // Simulation parameters
+  "simulation": {
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    "max_simulation_steps": 10000,
+    "simulation_time_limit": 0.0
+  },
+
+  // Brain parameters
+  "brain": {
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "spike_threshold": -55.0,
+    "resting_potential": -70.0,
+    "reset_potential": -70.0
+  },
+
+  // Plasticity settings
+  "plasticity": {
+    "plasticity_learning_rate": 0.01,
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012,
+    "stdp_time_constant": 20.0,
+    "hebbian_learning_rate": 0.005,
+    "synaptogenesis_rate": 0.001,
+    "pruning_rate": 0.0001,
+    "structural_plasticity_enabled": true
+  },
+
+  // Development settings
+  "development": {
+    "enable_development": true,
+    "developmental_stage_duration": 300.0,
+    "plasticity_modifier_high": 1.0,
+    "plasticity_modifier_critical": 0.8,
+    "plasticity_modifier_maturation": 0.5,
+    "plasticity_modifier_adult": 0.2,
+    "early_plasticity_multiplier": 2.0,
+    "late_plasticity_multiplier": 0.5
+  },
+
+  // Neuromodulation settings
+  "neuromodulation": {
+    "dopamine_baseline": 0.1,
+    "dopamine_gain": 1.0,
+    "dopamine_decay": 0.95,
+    "novelty_detection_threshold": 0.5,
+    "curiosity_base_rate": 0.1,
+    "curiosity_sensitivity": 0.8,
+    "prediction_error_decay": 0.9,
+    "reward_modulation_enabled": true,
+    "structural_plasticity_modulated": true,
+    "development_enabled": true,
+    "curiosity_enabled": true
+  },
+
+  // Reward and learning settings
+  "reward": {
+    "reward_discount_factor": 0.99,
+    "reward_prediction_enabled": true,
+    "reward_exploration_bonus": 0.1,
+    "reward_foraging_efficiency": 0.5,
+    "reward_memory_decay": 0.9
+  },
+
+  // Environment settings
+  "environment": {
+    "name": "GridWorld",
+    "width": 10,
+    "height": 10,
+    "vision_width": 16,
+    "vision_height": 16,
+    "agent_start_energy": 100.0,
+    "agent_energy_decay": 0.01,
+    "food_energy": 10.0,
+    "obstacle_penalty": -1.0
+  },
+
+  // Memory systems settings
+  "memory": {
+    "working_memory_capacity": 1000,
+    "working_memory_decay": 0.95,
+    "episodic_memory_capacity": 10000,
+    "episodic_memory_compression": true,
+    "associative_memory_threshold": 0.7,
+    "procedural_memory_learning_rate": 0.01,
+    "memory_replay_enabled": true,
+    "memory_consolidation_enabled": true,
+    "memory_replay_frequency": 0.1
+  },
+
+  // Prediction system settings
+  "prediction": {
+    "prediction_window": 10,
+    "prediction_confidence_threshold": 0.8,
+    "prediction_error_threshold": 0.5,
+    "prediction_learning_rate": 0.01,
+    "sensory_prediction_enabled": true,
+    "action_prediction_enabled": true,
+    "internal_prediction_enabled": true
+  },
+
+  // Cognition settings
+  "cognition": {
+    "planning_horizon": 5,
+    "planning_confidence_threshold": 0.7,
+    "concept_formation_threshold": 0.8,
+    "attention_selection_threshold": 0.6,
+    "neural_planner_enabled": true,
+    "concept_formation_enabled": true,
+    "attentional_selection_enabled": true,
+    "social_learning_enabled": true,
+    "continual_learning_enabled": true
+  },
+
+  // Logging settings
+  "logging": {
+    "level": "INFO",
+    "log_to_file": false,
+    "log_filename": "nlm.log",
+    "log_file_rotation": true,
+    "log_file_size_limit_mb": 100,
+    "log_console_enabled": true,
+    "log_timestamp_enabled": true,
+    "log_thread_id_enabled": true
+  },
+
+  // Visualization settings
+  "visualization": {
+    "enabled": false,
+    "update_rate": 30.0,
+    "neural_activity": true,
+    "memory_traces": true,
+    "behavior_plot": true,
+    "environment_map": true,
+    "save_frames": false,
+    "frame_rate": 30,
+    "output_directory": "./visualizations"
+  },
+
+  // Checkpoint and persistence settings
+  "checkpoint": {
+    "enabled": true,
+    "path": "./checkpoint.bin",
+    "save_frequency": 1000,
+    "compression_enabled": true,
+    "checkpoint_retention": 10,
+    "load_latest": true
+  },
+
+  // Performance settings
+  "performance": {
+    "enable_simd": true,
+    "enable_threading": true,
+    "thread_count": 4,
+    "use_memory_pools": true,
+    "event_queue_size": 10000,
+    "optimization_level": "aggressive"
+  },
+
+  // Agent configuration
+  "agent": {
+    "motor_neurons_per_action": 6,
+    "sensory_neurons_per_modality": 20,
+    "action_selection_threshold": 0.5,
+    "exploration_curiosity_threshold": 0.3,
+    "exploitation_confidence_threshold": 0.8,
+    "action_history_length": 100,
+    "behavior_adaptation_rate": 0.1
+  },
+
+  // Experiment configuration
+  "experiment": {
+    "default_num_episodes": 5,
+    "default_steps_per_episode": 200,
+    "enable_metrics_collection": true,
+    "metrics_history_length": 1000,
+    "experiment_seed": 42,
+    "randomization_enabled": true
+  }
+}
+
+// Configuration source precedence
+// Command line arguments > File > Runtime overrides > Defaults
+
+// Configuration parameter descriptions
+// Each parameter has a specific function in the NLM system
+// See documentation for detailed parameter explanations
