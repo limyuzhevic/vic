@@ -144,16 +144,65 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.loadFromFile(filepath);
+            } catch (const std::exception& e) {
+                py::print("Error loading config file: ", e.what());
+                return false;
+            }
+        }, py::arg("filepath"), "Load configuration from a file with error handling")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+            try {
+                return self.loadFromArgs(argc, argv);
+            } catch (const std::exception& e) {
+                py::print("Error loading config from args: ", e.what());
+                return false;
+            }
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+           "Load configuration from command line arguments with error handling")
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.saveToFile(filepath);
+            } catch (const std::exception& e) {
+                py::print("Error saving config file: ", e.what());
+                return false;
+            }
+        }, py::arg("filepath"), "Save configuration to a file with error handling")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val.has_value()) {
+                return py::cast(val.value());
+            }
+            return py::none();
+        }, py::arg("key"), "Get configuration value (returns None if not found)")
+        .def("getInt", [](Config& self, const std::string& key, int defaultValue = 0) {
+            auto val = self.get<int>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0, "Get integer configuration value with default")
+        .def("getFloat", [](Config& self, const std::string& key, float defaultValue = 0.0f) {
+            auto val = self.get<float>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0.0f, "Get float configuration value with default")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue = false) {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = false, "Get boolean configuration value with default")
+        .def("set", [](Config& self, const std::string& key, const py::object& value) {
+            if (py::isinstance<py::str>(value)) {
+                self.set(key, value.cast<std::string>(), ConfigSource::Python);
+            } else if (py::isinstance<py::int_>(value)) {
+                self.set(key, value.cast<int>(), ConfigSource::Python);
+            } else if (py::isinstance<py::float_>(value)) {
+                self.set(key, value.cast<float>(), ConfigSource::Python);
+            } else if (py::isinstance<py::bool_>(value)) {
+                self.set(key, value.cast<bool>(), ConfigSource::Python);
+            } else {
+                throw py::type_error("Unsupported Python type for configuration value");
+            }
+        }, py::arg("key"), py::arg("value"), "Set configuration value from Python object")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -351,7 +400,62 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Convenience methods
+        .def("runSimulation", [](Brain& self, int steps, float timestep = 0.001f) {
+            for (int i = 0; i < steps; ++i) {
+                self.step(i, i * timestep);
+            }
+            return self.getTotalSpikeCount();
+        }, py::arg("steps"), py::arg("timestep") = 0.001f,
+         "Run simulation for given steps and return total spike count")
+        .def("getActivityStats", [](Brain& self) {
+            return py::make_tuple(
+                self.getTotalNeuronCount(),
+                self.getActiveNeuronCount(),
+                self.getFiringNeuronCount(),
+                self.getAverageFiringRate(),
+                self.getTotalSpikeCount()
+            );
+        }, "Get comprehensive activity statistics as a tuple")
+        .def("createSensoryInput", [](Brain& self, const std::string& type, 
+                                    const std::vector<float>& data) {
+            if (type == "vision") {
+                auto input = std::make_shared<Vision>();
+                input->configure(data.size() > 0 ? std::sqrt(data.size()) : 1,
+                                data.size() > 0 ? std::sqrt(data.size()) : 1,
+                                data.size() > 0 ? 3 : 1);
+                if (!data.empty()) {
+                    input->setData(data);
+                }
+                return input;
+            } else if (type == "audio") {
+                auto input = std::make_shared<Audio>();
+                input->configure(data.size(), data.size());
+                if (!data.empty()) {
+                    input->setData(data);
+                }
+                return input;
+            } else {
+                auto input = std::make_shared<InternalSignals>();
+                for (float val : data) {
+                    input->addSignal(val);
+                }
+                return input;
+            }
+        }, py::arg("type"), py::arg("data"),
+         "Create sensory input of specified type with data")
+        .def("getBrainInfo", [](Brain& self) {
+            std::ostringstream oss;
+            oss << "Brain Info:" << std::endl;
+            oss << "  Total Neurons: " << self.getTotalNeuronCount() << std::endl;
+            oss << "  Total Synapses: " << self.getTotalSynapseCount() << std::endl;
+            oss << "  Active Neurons: " << self.getActiveNeuronCount() << std::endl;
+            oss << "  Firing Neurons: " << self.getFiringNeuronCount() << std::endl;
+            oss << "  Total Spikes: " << self.getTotalSpikeCount() << std::endl;
+            oss << "  Stage: " << static_cast<int>(self.getDevelopmentalStage());
+            return oss.str();
+        }, "Get brain information as string")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -399,6 +503,28 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+}
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

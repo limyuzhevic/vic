@@ -113,6 +113,10 @@ Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
+    if (!logger) {
+        throw std::invalid_argument("Logger::addLogger: Cannot add null logger");
+    }
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->loggers.push_back(logger);
 }
@@ -125,7 +129,9 @@ void Logger::clearLoggers() {
 void Logger::setLevel(LogLevel level) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     for (auto& logger : pImpl->loggers) {
-        logger->setLevel(level);
+        if (logger) {
+            logger->setLevel(level);
+        }
     }
 }
 
@@ -142,7 +148,9 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.timestamp = std::chrono::system_clock::now();
     
     for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+        if (logger) {
+            logger->log(entry);
+        }
     }
 }
 
