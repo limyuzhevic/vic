@@ -1,35 +1,49 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <unordered_map>
+#include <optional>
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for main systems
 class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
+
+// Memory system forward declarations
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+
+// Prediction system forward declaration
 class PredictionSystem;
+
+// Cognition system forward declarations
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
+
+// Development system forward declaration
 class DevelopmentSystem;
+
+// Neuromodulation system forward declarations
 class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
 
-// Inter-regional connection (long-range connectivity)
+// Plasticity system forward declarations
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+
+// Core data structures
 struct InterRegionConnection {
     RegionId sourceRegion;
     RegionId targetRegion;
@@ -47,6 +61,16 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+//
+// This is the Phase 6 integrated artificial brain, containing all subsystems:
+// - Memory systems (working, episodic, associative)
+// - Neuromodulation (dopamine, curiosity, novelty, prediction error)
+// - Prediction system for sensory prediction and error computation
+// - Cognition systems (neural planner, concept formation, attention)
+// - Development system with stage-based plasticity modulation
+// - Structural plasticity (synaptogenesis, pruning)
+// - Checkpoint system for persistence
+// - Replay and consolidation for memory strengthening
 
 class Brain {
 public:
@@ -80,6 +104,8 @@ public:
     // Inject current into all neurons of a specific type
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
+    // ===== ACCESSOR METHODS FOR INTEGRATED SYSTEMS =====
+    
     // Spike system access
     SpikeSystem* getSpikeSystem();
     const SpikeSystem* getSpikeSystem() const;
@@ -89,10 +115,61 @@ public:
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
     
+    // ===== MEMORY SYSTEM ACCESSORS =====
+    
+    // Working memory - transient active information
+    NeuralWorkingMemory* getWorkingMemory();
+    
+    // Episodic memory - experience storage
+    NeuralEpisodicMemory* getEpisodicMemory();
+    
+    // Associative memory - pattern associations
+    NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // ===== PREDICTION SYSTEM ACCESSOR =====
+    
+    // Prediction system for sensory prediction and error computation
+    PredictionSystem* getPredictionSystem();
+    
+    // ===== COGNITION SYSTEM ACCESSORS =====
+    
+    // Neural planner for action planning
+    NeuralPlanner* getPlanner();
+    
+    // Concept formation for pattern discovery
+    ConceptFormation* getConceptFormation();
+    
+    // Attentional selection for focus
+    AttentionalSelection* getAttention();
+    
+    // ===== DEVELOPMENT SYSTEM =====
+    
+    // Development system for stage-based plasticity
+    DevelopmentSystem* getDevelopmentSystem();
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    
+    // ===== NEUROMODULATION SYSTEMS =====
+    
+    // Neuromodulators for learning and behavior
+    Dopamine* getDopamine();
+    Curiosity* getCuriosity();
+    Novelty* getNovelty();
+    PredictionError* getPredictionErrorSignal();
+    
+    // ===== STATISTICS AND METRICS =====
+    
     // Statistics
     float getExcitationInhibitionRatio() const;
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
+    
+    // Global statistics
+    size_t getTotalNeuronCount() const;
+    size_t getTotalSynapseCount() const;
+    size_t getActiveNeuronCount() const;
+    size_t getFiringNeuronCount() const;
+    float getAverageFiringRate() const;
     
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
@@ -115,7 +192,8 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
-    // Region management
+    // ===== REGION MANAGEMENT =====
+    
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
     const NeuralRegion* getRegion(RegionId id) const;
@@ -130,69 +208,19 @@ public:
                                   float weight = 0.0f, Delay delay = 1);
     void removeInterRegionConnection(RegionId source, RegionId target);
     
-    // Global statistics
-    size_t getTotalNeuronCount() const;
-    size_t getTotalSynapseCount() const;
-    size_t getActiveNeuronCount() const;
-    size_t getFiringNeuronCount() const;
-    float getAverageFiringRate() const;
+    // ===== BRAIN STATE ACCESSORS =====
     
-    // ========== MEMORY SYSTEMS ==========
-    
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
-    
-    // ========== PREDICTION SYSTEM ==========
-    
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
-    
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
-    
-    // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
     RandomGenerator* getRandomGenerator();
     
-    // Logging
+    // ===== CONFIGURATION AND STATUS =====
+    
     void logStatus() const;
     
+    // Get current developmental stage
+    DevelopmentalStage getDevelopmentalStage() const;
+    void setDevelopmentalStage(DevelopmentalStage stage);
+
 private:
     struct Impl;
     Impl* pImpl;
