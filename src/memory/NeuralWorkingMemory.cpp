@@ -34,7 +34,7 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    if (pattern.empty() || !pImpl->brain) return;
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -44,7 +44,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
+        if (auto* n = pImpl->brain->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
             for (auto* nn : *n) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
@@ -84,8 +84,8 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     }
     
     // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
+    if (pImpl->brain) {
+        pImpl->brain->injectCurrent(neuron, activation * 5.0f);
     }
 }
 

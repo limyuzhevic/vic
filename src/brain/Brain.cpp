@@ -41,6 +41,10 @@ struct Brain::Impl {
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
     
+    // ========== COGNITION SUBSYSTEMS ==========
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
+    
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
     
@@ -116,10 +120,14 @@ struct Brain::Impl {
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
+    // Initialize cognition systems
+    planner = std::make_unique<NeuralPlanner>();
+    conceptFormation = std::make_unique<ConceptFormation>();
+    attention = std::make_unique<AttentionalSelection>();
+    
+    // Initialize cognition subsystems
+    selfModel = std::make_unique<SelfModel>();
+    socialLearning = std::make_unique<SocialLearning>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -254,6 +262,10 @@ bool Brain::initialize() {
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
+    
+    // Initialize cognition subsystems
+    pImpl->selfModel->initialize(this);
+    pImpl->socialLearning->initialize(this);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -511,8 +523,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Predict next state based on current neural activity
+        // The prediction system would analyze current state and predict future
+        // For now, track prediction error history
+        // In a full implementation, would integrate with sensory processing
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -757,6 +771,8 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    if (pImpl->selfModel) pImpl->selfModel->clear();
+    if (pImpl->socialLearning) pImpl->socialLearning->clear();
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -895,17 +911,21 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
-        
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
-        return false;
-    }
+    // Apply synapse states - this is complex because we need to find matching synapses
+    // For now, just log the count
+    NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+    
+    // TODO: Apply synapse weights and states to actual synapses in regions
+    // This would require mapping synapse IDs to actual synapse objects
+    // For Phase 1, we'll skip this for now but should be implemented in Phase 2
+    
+    NLM_LOG_INFO("Brain state loaded successfully");
+    return true;
+
+} catch (const std::exception& e) {
+    NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+    return false;
+}
 }
 
 RegionId Brain::addRegion(const std::string& name) {
@@ -1037,6 +1057,16 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
+// ========== COGNITION SUBSYSTEMS ==========
+
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
+}
+
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
+}
+
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
@@ -1067,6 +1097,20 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+// ========== INTEGRATED NEUROMODULATION ==========
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->noradrenaline.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
