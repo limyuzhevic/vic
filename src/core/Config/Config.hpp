@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <filesystem>
 
 namespace nlm {
 
@@ -55,16 +56,21 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (auto-detects JSON, YAML, or simple format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Load from specific formats
+    bool loadFromSimpleFile(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values with validation
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
@@ -78,20 +84,23 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
+    // Validation and utilities
+    bool validateKey(const std::string& key) const;
     bool has(const std::string& key) const;
-    
-    // Remove key
     void remove(const std::string& key);
-    
-    // Get all keys
     std::vector<std::string> getKeys() const;
+    std::vector<std::string> getKeysBySource(ConfigSource source) const;
     
-    // Clear all
+    // Get all
     void clear();
-    
-    // Get configuration summary
     std::string summary() const;
+    std::string summaryBySource(ConfigSource source) const;
+    
+    // File operations
+    bool fileExists(const std::string& filepath) const;
+    static std::string getFileExtension(const std::string& filepath);
+    static bool isValidKey(const std::string& key);
+    static bool isValidValue(const ConfigValue& value);
     
 private:
     struct Impl;
@@ -100,6 +109,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Private helpers for format detection
+    static std::string getFileExtension(const std::string& filepath);
+    static bool isJSONFile(const std::string& filepath);
+    static bool isYAMLFile(const std::string& filepath);
+    static bool isSimpleFormatFile(const std::string& filepath);
 };
 
 } // namespace nlm
