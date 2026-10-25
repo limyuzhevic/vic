@@ -73,12 +73,14 @@ void Novelty::update(TimestepDuration dt) {
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
-const std::vector<float>& Novelty::getHistory() const {
-    return pImpl->history;
-}
-
-void Novelty::clearHistory() {
-    pImpl->history.clear();
+void Novelty::updatePredictionError(float predictionError) {
+    // Update novelty level based on prediction error
+    // Prediction error is a strong indicator of novelty/unexpectedness
+    float noveltyFromPredictionError = std::abs(predictionError);
+    
+    // Combine with existing novelty detection
+    pImpl->level = std::max(pImpl->level, noveltyFromPredictionError);
+    pImpl->history.push_back(noveltyFromPredictionError);
 }
 
 } // namespace nlm

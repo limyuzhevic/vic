@@ -27,12 +27,8 @@ public:
     void detectNovelty(const std::vector<float>& currentPattern,
                        const std::vector<float>& previousPattern);
     
-    // Decay novelty over time
-    void update(TimestepDuration dt);
-    
-    // Get novelty history
-    const std::vector<float>& getHistory() const;
-    void clearHistory();
+    // Update prediction error based novelty
+    void updatePredictionError(float predictionError);
     
 private:
     struct Impl;
