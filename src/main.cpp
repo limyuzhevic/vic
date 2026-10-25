@@ -376,11 +376,20 @@ int main(int argc, char** argv) {
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_time_constant", 20.0f, ConfigSource::Default);
     
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Neuromodulation parameters
+    config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
+    config->set("dopamine_scale", 1.0f, ConfigSource::Default);
+    config->set("curiosity_decay_rate", 0.01f, ConfigSource::Default);
+    config->set("novelty_threshold", 0.5f, ConfigSource::Default);
+    
+    // Reward parameters
+    config->set("reward_discount_factor", 0.95f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -390,6 +399,16 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  stdp_time_constant: " + std::to_string(config->getOr<float>("stdp_time_constant", 20.0f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
+    NLM_LOG_INFO("  dopamine_baseline: " + std::to_string(config->getOr<float>("dopamine_baseline", 0.1f)));
+    NLM_LOG_INFO("  dopamine_scale: " + std::to_string(config->getOr<float>("dopamine_scale", 1.0f)));
+    NLM_LOG_INFO("  curiosity_decay_rate: " + std::to_string(config->getOr<float>("curiosity_decay_rate", 0.01f)));
+    NLM_LOG_INFO("  novelty_threshold: " + std::to_string(config->getOr<float>("novelty_threshold", 0.5f)));
+    NLM_LOG_INFO("  reward_discount_factor: " + std::to_string(config->getOr<float>("reward_discount_factor", 0.95f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

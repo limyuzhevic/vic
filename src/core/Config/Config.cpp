@@ -1,99 +1,155 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
+// Validation and error handling implementation
 
-namespace nlm {
-
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
-
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Validation implementation
+template<typename T>
+bool Config::validate(const std::vector<std::string>& requiredKeys) const {
+    validationErrors_.clear();
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            validationErrors_.push_back("Missing required key: " + key);
         }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
-}
-
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
     }
     
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!validateKey(entry.key)) {
+            validationErrors_.push_back("Invalid key: " + entry.key);
+        }
+        if (!validateValue(entry.key, entry.value)) {
+            validationErrors_.push_back("Invalid value for key: " + entry.key);
+        }
+    }
+    
+    return validationErrors_.empty();
+}
+
+bool Config::validateSchema(const std::vector<ConfigEntry>& schema) const {
+    validationErrors_.clear();
+    
+    for (const auto& schemaEntry : schema) {
+        if (!has(schemaEntry.key)) {
+            if (schemaEntry.source != ConfigSource::Runtime) {
+                continue;
+            }
+            validationErrors_.push_back("Missing required schema key: " + schemaEntry.key);
+            continue;
+        }
+        
+        auto value = getFromEntry(schemaEntry.key);
+        if (value && !isValueTypeCompatible(value.value(), schemaEntry.value)) {
+            validationErrors_.push_back("Value type mismatch for key: " + schemaEntry.key);
+        }
+    }
+    
+    return validationErrors_.empty();
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    return validationErrors_;
+}
+
+std::string Config::getDiagnosticInfo() const {
+    std::ostringstream oss;
+    oss << "=== NLM Configuration Diagnostics ===\n";
+    oss << "Total entries: " << pImpl->entries.size() << "\n";
+    oss << "Validation errors: " << validationErrors_.size() << "\n";
+    
+    if (!validationErrors_.empty()) {
+        oss << "\nValidation errors:\n";
+        for (const auto& error : validationErrors_) {
+            oss << "  - " << error << "\n";
+        }
+    }
+    
+    oss << "\nEntry sources:\n";
+    std::unordered_map<ConfigSource, size_t> sourceCount;
+    for (const auto& entry : pImpl->entries) {
+        sourceCount[entry.source]++;
+    }
+    
+    for (const auto& [source, count] : sourceCount) {
+        oss << "  " << static_cast<int>(source) << ": " << count << " entries\n";
+    }
+    
+    return oss.str();
+}
+
+void Config::merge(const Config& other, bool overwrite) {
+    for (const auto& entry : other.pImpl->entries) {
+        if (overwrite || !has(entry.key)) {
+            pImpl->entries.push_back(entry);
+        }
+    }
+}
+
+bool Config::isValid() const {
+    return validationErrors_.empty();
+}
+
+size_t Config::getEntryCount() const {
+    return pImpl->entries.size();
+}
+
+std::vector<std::pair<std::string, ConfigSource>> Config::getSourceReport() const {
+    std::vector<std::pair<std::string, ConfigSource>> report;
+    report.reserve(pImpl->entries.size());
+    
+    for (const auto& entry : pImpl->entries) {
+        report.emplace_back(entry.key, entry.source);
+    }
+    
+    return report;
+}
+
+bool Config::validateKey(const std::string& key) const {
+    if (key.empty()) return false;
+    
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_' && c != '.') {
+            return false;
+        }
     }
     
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
+bool Config::validateValue(const std::string& key, const ConfigValue& value) const {
+    std::visit([this, &key](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        
+        if constexpr (std::is_same_v<T, int>) {
+            if (arg < -1000000 || arg > 1000000) {
+                validationErrors_.push_back("Integer value out of range for key: " + key);
+            }
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            if (arg < -1000000000000LL || arg > 1000000000000LL) {
+                validationErrors_.push_back("Int64 value out of range for key: " + key);
+            }
+        } else if constexpr (std::is_same_v<T, double>) {
+            if (std::isnan(arg) || std::isinf(arg)) {
+                validationErrors_.push_back("Invalid float value for key: " + key);
+            }
+        } else if constexpr (std::is_same_v<T, bool>) {
+            // Boolean validation always passes
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            if (arg.empty()) {
+                validationErrors_.push_back("Empty string value for key: " + key);
+            }
+        }
+    }, value);
+    
+    return validationErrors_.empty();
+}
+
+void Config::logValidationError(const std::string& error) {
+    validationErrors_.push_back(error);
+}
+
+bool Config::isValueTypeCompatible(const ConfigValue& actual, const ConfigValue& expected) const {
+    return actual.index() == expected.index();
+}
+
+std::optional<ConfigValue> Config::getFromEntry(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -101,115 +157,23 @@ std::optional<T> Config::get(const std::string& key) const {
         return std::nullopt;
     }
     
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
+    return it->value;
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
+// Validation template instantiations
+template bool Config::validate<int>(const std::vector<std::string>&) const;
+template bool Config::validate<double>(const std::vector<std::string>&) const;
+template bool Config::validate<bool>(const std::vector<std::string>&) const;
+template bool Config::validate<std::string>(const std::vector<std::string>&) const;
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
-}
+// Additional vector template instantiations
+template std::optional<std::vector<int>> Config::get<std::vector<int>>(const std::string&) const;
+template std::optional<std::vector<double>> Config::get<std::vector<double>>(const std::string&) const;
+template std::optional<std::vector<std::string>> Config::get<std::vector<std::string>>(const std::string&) const;
 
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
-    }
-    return oss.str();
-}
-
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Additional getOr vector template instantiations
+template std::vector<int> Config::getOr<std::vector<int>>(const std::string&, const std::vector<int>&) const;
+template std::vector<double> Config::getOr<std::vector<double>>(const std::string&, const std::vector<double>&) const;
+template std::vector<std::string> Config::getOr<std::vector<std::string>>(const std::string&, const std::vector<std::string>&) const;
 
 } // namespace nlm

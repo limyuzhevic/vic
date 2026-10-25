@@ -93,13 +93,39 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Configuration validation
+    bool validate(const std::vector<std::string>& requiredKeys = {}) const;
+    bool validateSchema(const std::vector<ConfigEntry>& schema) const;
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Error handling and diagnostics
+    std::vector<std::string> getValidationErrors() const;
+    std::string getDiagnosticInfo() const;
+    
+    // Configuration merging
+    void merge(const Config& other, bool overwrite = true);
+    bool isValid() const;
+    
+    // Performance and analysis
+    size_t getEntryCount() const;
+    std::vector<std::pair<std::string, ConfigSource>> getSourceReport() const;
+    
+private:
+    // Internal validation helpers
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    void logValidationError(const std::string& error);
+    
+    // Schema definition
+    struct ValidationSchema {
+        std::string key;
+        std::string description;
+        ConfigSource expectedSource;
+        bool required;
+        std::function<bool(const ConfigValue&)> validator;
+    };
+    
+    std::vector<ValidationSchema> validationSchema_;
+    mutable std::vector<std::string> validationErrors_;
 };
 
 } // namespace nlm
