@@ -74,6 +74,14 @@ public:
     // Memory consolidation (move to long-term)
     void consolidate(float relevanceThreshold);
     
+    // Helper methods for consolidation (private implementation details)
+    float calculateNeuralActivationRelevance(const EpisodicMemoryItem& episode) const;
+    float calculateTimeRelevance(const EpisodicMemoryItem& episode) const;
+    float calculateRewardPredictionErrorRelevance() const;
+    float calculateNoveltyRelevance() const;
+    void storeLongTermEpisode(const EpisodicMemoryItem& episode, float relevance);
+    void replayConsolidatedEpisodes();
+    
 private:
     struct Impl;
     Impl* pImpl;
