@@ -1,9 +1,35 @@
-#include "SimpleWorld.hpp"
-#include <cmath>
-#include <algorithm>
-#include <iostream>
+#include "../brain/Brain.hpp"
 
 namespace nlm {
+
+// Simple linear congruential generator
+static uint64_t lcg(uint64_t& state) {
+    state = state * 6364136223846793005ULL + 1442695040888963407ULL;
+    return state;
+}
+
+static float urand(uint64_t& state, float min, float max) {
+    uint64_t r = lcg(state);
+    float normalized = (r & 0xFFFFFFFFFFFFULL) / static_cast<float>(0xFFFFFFFFFFFFULL);
+    return min + normalized * (max - min);
+}
+
+SimpleWorld::SimpleWorld()
+    : width_(20.0f)
+    , height_(20.0f)
+    , visionWidth_(16)
+    , visionHeight_(16)
+    , maxEnergy_(100.0f)
+    , energyDecayRate_(0.01f)
+    , resourceEnergyGain_(30.0f)
+    , simTime_(0.0)
+    , rngSeed_(42)
+    , rngState_(42)
+{
+    agent_.reset();
+}
+
+SimpleWorld::~SimpleWorld() = default;
 
 // Simple linear congruential generator
 static uint64_t lcg(uint64_t& state) {
@@ -398,6 +424,43 @@ void SimpleWorld::checkCollisions() {
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
         agent_.health -= 0.01f;  // Passive damage
     }
+}
+
+float SimpleWorld::applyAction(const class Brain* brain, MotorCommand cmd, double currentTime) {
+    // Apply action to agent and compute reward based on resulting state
+    ActionResult result = applyMotorCommand(cmd, currentTime);
+    
+    // Compute reward based on brain state
+    float reward = computeReward(brain);
+    
+    return reward;
+}
+
+float SimpleWorld::computeReward(const class Brain* brain) const {
+    // Compute reward based on agent state and brain activity
+    float reward = 0.0f;
+    
+    // Energy reward: keep agent alive and energetic
+    float energyRatio = agent_.energy / maxEnergy_;
+    reward += energyRatio * 10.0f;  // Positive reward for having energy
+    
+    // Health penalty: avoid dying
+    reward -= agent_.health * 5.0f;  // Negative reward for low health
+    
+    // Brain activity reward: encourage neural activity if brain is available
+    if (brain) {
+        size_t firingCount = brain->getFiringNeuronCount();
+        size_t totalNeurons = brain->getTotalNeuronCount();
+        if (totalNeurons > 0) {
+            float firingRatio = static_cast<float>(firingCount) / totalNeurons;
+            reward += firingRatio * 5.0f;  // Reward for neural activity
+        }
+    }
+    
+    // Small time-based reward to encourage efficiency
+    reward += 0.1f;
+    
+    return reward;
 }
 
 } // namespace nlm

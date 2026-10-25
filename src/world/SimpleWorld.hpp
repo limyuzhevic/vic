@@ -54,8 +54,17 @@ public:
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
     
+    // Get world object at position
+    WorldObject* getObjectAt(float x, float y);
+    
     // Add object to world
     void addObject(const WorldObject& obj);
+    
+    // Apply action to agent and get reward
+    float applyAction(const class Brain* brain, MotorCommand cmd, double currentTime);
+    
+    // Compute reward for agent state
+    float computeReward(const class Brain* brain) const;
     
     // Remove object at position
     void removeObject(float x, float y);
