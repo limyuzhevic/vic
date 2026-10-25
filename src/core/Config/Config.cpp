@@ -1,16 +1,35 @@
 #include "Config.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::string lastLoadedFile;
+    bool autoSaveEnabled;
+    std::string autoSavePath;
+    double autoSaveInterval;
+    uint64_t lastSaveStep;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->autoSaveEnabled = false;
+    pImpl->autoSaveInterval = 0.0;
+    pImpl->lastSaveStep = 0;
+    pImpl->lastLoadedFile = "";
+    
+    // Set default configuration
+    set("config.version", "2.0", ConfigSource::Default);
+    set("config.format", "json", ConfigSource::Default);
+    set("config.validate_on_load", true, ConfigSource::Default);
+    set("config.validate_on_set", false, ConfigSource::Default);
+}
 
 Config::~Config() = default;
 
@@ -19,9 +38,73 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::string extension = std::filesystem::path(filepath).extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
     
+    bool success = false;
+    if (extension == ".json") {
+        success = loadFromJSON(filepath);
+    } else if (extension == ".yaml" || extension == ".yml") {
+        success = loadFromYAML(filepath);
+    } else {
+        // Fall back to simple key=value format
+        success = loadFromSimpleFile(filepath);
+    }
+    
+    if (success) {
+        pImpl->lastLoadedFile = filepath;
+        NLM_LOG_INFO("Configuration loaded from: " + filepath);
+        NLM_LOG_INFO("Configuration entries: " + std::to_string(pImpl->entries.size()));
+    } else {
+        NLM_LOG_ERROR("Failed to load configuration from: " + filepath);
+    }
+    
+    return success;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Cannot open JSON file: " + filepath);
+            return false;
+        }
+        
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing configuration
+        clear();
+        
+        // Process JSON data recursively
+        processJSON(jsonData, "");
+        
+        NLM_LOG_INFO("JSON configuration loaded successfully");
+        return true;
+        
+    } catch (const nlohmann::json::parse_error& e) {
+        NLM_LOG_ERROR(std::string("JSON parse error: ") + e.what() + " in file: " + filepath);
+        return false;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error loading JSON file: ") + e.what());
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    try {
+        // For now, implement YAML parsing using a simple parser or external library
+        // For now, fall back to simple format
+        return loadFromSimpleFile(filepath);
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Error loading YAML file: ") + e.what());
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFile(const std::string& filepath) {
+    // Original simple key=value format parser
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -53,6 +136,40 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+bool Config::loadFromArgs(int argc, char** argv) {
+    bool success = true;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            set(key, value, ConfigSource::CommandLine);
+        }
+        else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                std::string configFile = arg.substr(arg.find('=') + 1);
+                if (!loadFromFile(configFile)) {
+                    NLM_LOG_ERROR("Failed to load config file from command line: " + configFile);
+                    success = false;
+                }
+            }
+        }
+    }
+    
+    return success;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
