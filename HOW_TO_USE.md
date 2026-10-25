@@ -184,76 +184,376 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Enhanced Python API (NEW!)
+
+The NLM Python API has been significantly enhanced with the following new features:
+
+#### Enhanced Brain Class
+
+##### New Methods:
+
+- **`stepMultiple(steps, timestep=0.001)`** - Perform multiple simulation steps efficiently
+- **`simulateEpisode(duration, timestep=0.001)`** - Run simulation for a specified duration
+- **`getPerformanceMetrics()`** - Get comprehensive performance metrics
+- **`enableAllPlasticity()`** - Enable all plasticity mechanisms (Hebbian, STDP, structural)
+- **`enableAllNeuromodulation()`** - Enable all neuromodulation systems
+- **`getLearningStats()`** - Get statistics about learning mechanisms
+- **`getMemoryStats()`** - Get statistics about memory systems
+
+##### Usage Example:
 
 ```python
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
+# Create enhanced brain with Phase 4 configuration
+brain = pynlm.createBrainFromPhase(4)
+brain.initialize()
+
+# Enable all learning systems
+brain.enableAllPlasticity()
+brain.enableAllNeuromodulation()
+
+# Run efficient multiple steps
+brain.stepMultiple(list(range(1000)))
+
+# Get comprehensive metrics
+metrics = brain.getPerformanceMetrics()
+print(f"Performance: {metrics['average_firing_rate']:.3f} Hz, "
+      f"{metrics['firing_neurons']} neurons firing")
+
+# Analyze learning systems
+learning_stats = brain.getLearningStats()
+memory_stats = brain.getMemoryStats()
+```
+
+#### Enhanced AgentBrain Class
+
+##### New Methods:
+
+- **`runEpisode(world, numSteps)`** - Run complete episode with agent and world
+- **`runControlledEpisode(world, condition, callback, timestep=0.1)`** - Run episode with custom control logic
+- **`getComprehensiveStats()`** - Get comprehensive agent statistics
+- **`enableAllSubsystems(enable)`** - Enable/disable all adaptive systems
+
+##### Usage Example:
+
+```python
+import pynlm
+
+# Setup enhanced agent
+brain = pynlm.createBrainFromPhase(3)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all adaptive systems
+agent.enableAllSubsystems(True)
+
+# Run complete episode
+agent.runEpisode(world, 500)
+
+# Get comprehensive statistics
+stats = agent.getComprehensiveStats()
+print(f"Stats: Curiosity={stats['curiosity_level']:.3f}, "
+      f"Neuromod={stats['neuromodulation_level']:.3f}")
+```
+
+#### Global Functions
+
+##### New Functions:
+
+- **`createBrainFromPhase(phase, scale=1)`** - Create brain configured for specific development phase
+- **`runPhase2Experiment(numSteps, scale=1)`** - Run Phase 2 basic neural computation experiment
+- **`runPhase6IntegrationDemo()`** - Run Phase 6 integration demo
+- **`getVersionInfo()`** - Get version information about the NLM system
+- **`getSystemCapabilities()`** - Get information about supported system capabilities
+
+##### Usage Example:
+
+```python
+import pynlm
+
+# Get system information
+version = pynlm.getVersionInfo()
+print(f"NLM Version: {version['phase']} (Phase {version['major']}.{version['minor']})")
+
+capabilities = pynlm.getSystemCapabilities()
+print(f"Supported phases: {capabilities['phases_supported']}")
+print(f"Memory systems: {capabilities['memory_systems']}")
+
+# Run Phase 2 experiment
+spikes = pynlm.runPhase2Experiment(1000)
+print(f"Phase 2 experiment generated {spikes} spikes")
+
+# Run Phase 6 demo
+results = pynlm.runPhase6IntegrationDemo()
+print(f"Integration test completed with {results['totalReward']:.3f} avg reward")
+```
+
+#### Configuration Management
+
+##### New Features:
+
+- **Phase-based configuration presets** - `configureForPhase(phase, scale=1)`
+- **Enhanced configuration methods** - `getInt()`, `getFloat()`, `setInt()`, etc.
+- **Configuration cloning** - `clone()` method
+- **Configuration validation** - `validate()` method
+- **Phase-specific configuration getter** - `getPhaseSpecificConfig(phase)`
+
+##### Usage Example:
+
+```python
+import pynlm
+
+# Create configuration for Phase 6
+config = pynlm.createDefaultConfig()
+config.configureForPhase(6, scale=0.5)  # Use 1000 neurons instead of 2000
+
+# Validate configuration
+if config.validate():
     brain = pynlm.createBrain(config)
     brain.initialize()
-    
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+else:
+    print("Configuration validation failed!")
 
-# Run the simulation
-run_agent_simulation(1000)
+# Get phase-specific configuration
+phase6_config = config.getPhaseSpecificConfig(6)
+print(f"Phase 6 config: {phase6_config.summary()}")
+```
+
+#### Exception Handling
+
+##### New Exception Classes:
+
+- **`pynlm.RuntimeError`** - General runtime errors
+- **`pynlm.InvalidArgumentError`** - Invalid argument errors  
+- **`pynlm.OutOfRangeError`** - Index out of range errors
+- **`pynlm.LogicError`** - Logic errors
+
+##### Usage Example:
+
+```python
+import pynlm
+
+def safeBrainOperation():
+    try:
+        brain = pynlm.createBrainFromPhase(4)
+        brain.initialize()
+        
+        for i in range(100):
+            brain.step(i)
+            
+        print("Operation completed successfully")
+        
+    except pynlm.InvalidArgumentError as e:
+        print(f"Invalid argument: {e}")
+    except pynlm.RuntimeError as e:
+        print(f"Runtime error: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {type(e).__name__}: {e}")
+
+safeBrainOperation()
+```
+
+#### Advanced Examples
+
+##### Real-Time Monitoring:
+
+```python
+import pynlm
+import time
+
+def monitorBrain(brain, duration=10.0):
+    start_time = time.time()
+    
+    while time.time() - start_time < duration:
+        metrics = brain.getPerformanceMetrics()
+        memory_stats = brain.getMemoryStats()
+        
+        print(f"\r[{time.time() - start_time:5.1f}s] "
+              f"Rate: {metrics['average_firing_rate']:6.3f} Hz | "
+              f"Neurons: {metrics['firing_neurons']:4d} | "
+              f"Spikes: {metrics['total_spikes']:6d} | "
+              f"Dev: {brain.getDevelopmentalStage():2d}", end="")
+        
+        brain.step(static_cast<size_t>((time.time() - start_time) * 100.0))
+        time.sleep(0.01)
+    
+    print("\nMonitoring completed!")
+
+brain = pynlm.createBrainFromPhase(4)
+brain.initialize()
+monitorBrain(brain, 5.0)
+```
+
+##### Learning Analysis:
+
+```python
+import pynlm
+
+def analyzeLearningProgression(brain, phases=[2, 3, 4, 6], scale=0.5):
+    results = {}
+    
+    for phase in phases:
+        print(f"\n=== Testing Phase {phase} ===")
+        
+        brain = pynlm.createBrainFromPhase(phase, scale)
+        brain.initialize()
+        brain.enableAllPlasticity()
+        brain.enableAllNeuromodulation()
+        
+        # Run learning simulation
+        for step in range(200):
+            brain.step(step)
+            
+            if step % 50 == 0:
+                metrics = brain.getPerformanceMetrics()
+                learning_stats = brain.getLearningStats()
+                memory_stats = brain.getMemoryStats()
+                
+                print(f"  Step {step}: Rate={metrics['average_firing_rate']:.3f} Hz, "
+                      f"Spikes={metrics['total_spikes']}, "
+                      f"Dev={brain.getDevelopmentalStage()}")
+        
+        results[phase] = {
+            'metrics': brain.getPerformanceMetrics(),
+            'learning_stats': learning_stats,
+            'memory_stats': memory_stats
+        }
+    
+    return results
+
+# Run learning analysis
+analysis = analyzeLearningProgression(scale=0.3)
+```
+
+##### Multi-Agent System:
+
+```python
+import pynlm
+
+def createMultiAgentSystem(world_config, num_agents=3):
+    """Create a multi-agent system sharing neural resources"""
+    # Shared brain
+    brain = pynlm.createBrainFromPhase(3)
+    brain.initialize()
+    
+    agents = []
+    worlds = []
+    
+    for i in range(num_agents):
+        # Each agent gets its own world but shares the brain
+        world = pynlm.createSimpleWorld()
+        world.configure(**world_config)
+        world.reset()
+        world.setAgentStart(i * 5.0, i * 5.0)
+        
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+        
+        agents.append(agent)
+        worlds.append(world)
+    
+    return agents, worlds, brain
+
+# Create multi-agent system
+agents, worlds, brain = createMultiAgentSystem(
+    {'width': 20, 'height': 20, 'visionWidth': 8, 'visionHeight': 8},
+    num_agents=3
+)
+
+# Run simulation for all agents
+for step in range(100):
+    for i, (agent, world) in enumerate(zip(agents, worlds)):
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step} completed for all {len(agents)} agents")
+```
+
+### Key Enhancements Summary
+
+1. **Performance Monitoring**: Real-time metrics and performance tracking
+2. **Phase-based Configuration**: Pre-configured settings for all development phases
+3. **Advanced Learning Analysis**: Comprehensive statistics on learning mechanisms
+4. **Multi-Agent Support**: Systems where agents share neural resources
+5. **Enhanced Error Handling**: Robust exception management with detailed error information
+6. **Real-Time Monitoring**: Live visualization of brain activity and performance
+7. **Learning Progression Analysis**: Compare behavior across different phases
+8. **Resource Optimization**: Efficient batch processing and memory management
+
+### Migration Guide
+
+#### From Basic to Enhanced API
+
+**Before:**
+
+```python
+import pynlm
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+for i in range(100):
+    brain.step(i)
+```
+
+**After:**
+
+```python
+import pynlm
+
+# Use phase-based configuration (recommended)
+brain = pynlm.createBrainFromPhase(4)
+brain.initialize()
+
+# Enable all learning systems
+brain.enableAllPlasticity()
+brain.enableAllNeuromodulation()
+
+# Use enhanced monitoring
+for i in range(100):
+    brain.step(i)
+    if i % 10 == 0:
+        metrics = brain.getPerformanceMetrics()
+        print(f"Progress: {metrics['average_firing_rate']:.3f} Hz")
+```
+
+### Best Practices
+
+1. **Use phase-based configurations** when creating brains
+2. **Enable appropriate plasticity mechanisms** for your use case
+3. **Monitor performance** during long simulations
+4. **Handle exceptions** gracefully with specific exception types
+5. **Validate configurations** before use
+6. **Use the comprehensive API** for advanced features
+7. **Consider memory usage** for large-scale simulations
+
+### Troubleshooting
+
+**"My simulation is slow"**
+- Use `brain.stepMultiple(steps)` for efficient batch processing
+- Monitor with `brain.getPerformanceMetrics()`
+- Consider Phase 4 for better performance optimization
+
+**"I need better error reporting"**
+- Use specific exception types: `pynlm.InvalidArgumentError`, etc.
+- Validate configurations with `config.validate()`
+
+**"I want to analyze learning"**
+- Use `brain.getLearningStats()` and `brain.getMemoryStats()`
+- Compare different phases with `pynlm.createBrainFromPhase(phase)`
+
+---
+
+## Part 3: Using the Python Library
 ```
 
 ### Key Classes and Methods
