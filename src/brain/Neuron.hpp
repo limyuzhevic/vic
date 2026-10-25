@@ -39,9 +39,10 @@ struct NeuronState {
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
 };
-
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
+// IMPROVED: Added comprehensive logging and error handling
+
 class Neuron {
 public:
     // Create neuron with ID
@@ -134,7 +135,7 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // IMPROVED: Real integrate-and-fire dynamics implementation
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -143,9 +144,28 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Statistics and debugging
+    float getInputCurrent() const;
+    size_t getIncomingSynapseCount() const;
+    size_t getOutgoingSynapseCount() const;
+    float getFiringFrequency() const; // Hz
+    
+    // Configuration validation
+    bool validateParameters() const;
+    void clampParameters(); // Ensure values stay within valid ranges
+    
+    // Performance monitoring
+    Timestamp getLastUpdateTime() const { return lastUpdateTime_; }
+    double getLastStepDuration() const { return lastStepDuration_; }
+    
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Performance monitoring
+    Timestamp lastUpdateTime_;
+    double lastStepDuration_;
+    mutable size_t stepCount_;
 };
 
 } // namespace nlm

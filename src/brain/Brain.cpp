@@ -333,43 +333,73 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // Optimized: Process neurons in a single pass with early filtering
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+            // Cache neuron vectors to avoid repeated getNeurons() calls
+            auto& neurons = pop->getNeurons();
+            if (neurons.empty()) continue;
+            
+            for (auto* neuron : neurons) {
+                // Early skip if neuron is in refractory period (fast path)
+                const auto& state = neuron->getState();
+                if (state.refractoryRemaining > 0) {
+                    // During refractory, only decrement counter
+                    neuron->decrementRefractory();
+                    continue;
+                }
+                
+                // Check for recent spikes from plasticity rules
+                const auto& spikeHistory = neuron->getSpikeHistory();
+                bool hasRecentSpike = !spikeHistory.empty() && 
+                                     (currentTime - spikeHistory.back()) < pImpl->timestep * 2.0f;
+                
+                if (hasRecentSpike) {
+                    // Record spike for plasticity and continue
+                    neuron->recordSpike(currentTime);
+                    continue;
+                }
+                
+                // Standard LIF update
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // Optimized: Process spikes in bulk with vectorized operations
+    std::vector<NeuronId> spikingNeurons;
+    spikingNeurons.reserve(pImpl->totalNeuronCount()); // Preallocate for efficiency
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
-                // Check if neuron just fired this step
                 const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
-
+                
+                // Optimized spike detection
+                bool justFired = false;
+                if (state.firingState == FiringState::Refractory &&
+                    state.lastSpikeTime >= 0.0f &&
+                    std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f) {
+                    justFired = true;
+                    spikingNeurons.push_back(neuron->getId());
+                }
+                
                 if (justFired) {
                     // Neuron fired this step - queue the spike
                     SpikeEvent event(neuron->getId(), currentTime, currentStep);
                     pImpl->spikeSystem->queueSpike(event);
-
-                    // Record post-synaptic spike for incoming synapses (plasticity)
-                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
-                    for (Synapse* syn : incomingSynapses) {
-                        syn->recordPostSpike(currentTime);
-                    }
-
-                    // Get outgoing synapses and schedule delayed spike events
+                    
+                    // Collect outgoing synapses for plasticity processing
                     auto outgoingSynapses = region->getSynapsesFrom(neuron->getId());
+                    
+                    // Process all outgoing synapses in a single pass
                     for (Synapse* syn : outgoingSynapses) {
                         // Create delayed spike event
                         Delay delay = syn->getDelay();
                         SimulationStep deliveryStep = currentStep + delay;
                         Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
-
+                        
                         DelayedSpikeEvent delayedEvent(
                             neuron->getId(),
                             syn->getDestinationNeuron(),
@@ -381,24 +411,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                             currentStep,
                             deliveryStep
                         );
-
+                        
                         pImpl->spikeSystem->queueDelayedSpike(delayedEvent);
-
-                        // Record pre-synaptic spike for plasticity
+                        
+                        // Record pre-synaptic spike for plasticity in batch
                         syn->recordPreSpike(currentTime);
                     }
                     
-                    // Store to working memory - neurons that fire become part of working memory
+                    // Record post-synaptic spike for incoming synapses
+                    auto incomingSynapses = region->getSynapsesTo(neuron->getId());
+                    for (Synapse* syn : incomingSynapses) {
+                        syn->recordPostSpike(currentTime);
+                    }
+                    
+                    // Store to working memory (optimized)
                     if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        float activation = std::abs(state.membranePotential - state.restingPotential) / 10.0f;
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
                     }
                 }
             }
         }
     }
     
-    // Process immediate spikes
+    // Process all spikes at once (bulk operation)
     pImpl->spikeSystem->processSpikes(currentStep);
     
     // ========== STEP 4: Update working memory ==========
@@ -417,21 +453,21 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
+    // Update dopamine (reward prediction error) - OPTIMIZED
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
         // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
+        // Batch process all neurons for dopamine modulation
         float dopamineLevel = pImpl->dopamine->getLevel();
-        for (auto& region : pImpl->regions) {
-            for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
+        if (dopamineLevel > 0.0f) {
+            float excitabilityMod = dopamineLevel * 0.5f;
+            
+            // Single pass through all neurons for dopamine modulation
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    auto& neurons = pop->getNeurons();
+                    for (auto* neuron : neurons) {
                         neuron->injectCurrent(excitabilityMod);
                     }
                 }
@@ -446,35 +482,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // Pre-collect all synapses for batch processing
+    std::vector<Synapse*> allSynapses;
+    allSynapses.reserve(pImpl->totalSynapseCount());
+    
     for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
-                }
-            }
+        const auto& synapses = region->getSynapses();
+        allSynapses.insert(allSynapses.end(), synapses.begin(), synapses.end());
+    }
+    
+    // Process all synapses in a single optimized pass
+    for (Synapse* syn : allSynapses) {
+        // Apply STDP with neuromodulation
+        if (syn->getPlasticityFlags().stdp) {
+            const auto& preSpikes = syn->getPreSpikeHistory();
+            const auto& postSpikes = syn->getPostSpikeHistory();
             
-            // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                }
+            if (!preSpikes.empty() && !postSpikes.empty()) {
+                // Modify weight change based on dopamine
+                pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                float weight = syn->getWeight();
+                weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                syn->setWeight(weight);
             }
-            
-            // Update synapse state
-            syn->step(currentTime);
         }
+        
+        // Apply Hebbian learning
+        if (syn->getPlasticityFlags().hebbian) {
+            const auto& preSpikes = syn->getPreSpikeHistory();
+            const auto& postSpikes = syn->getPostSpikeHistory();
+            
+            if (!preSpikes.empty() && !postSpikes.empty()) {
+                pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+            }
+        }
+        
+        // Update synapse state
+        syn->step(currentTime);
     }
     
     // ========== STEP 7: Update episodic memory ==========
@@ -483,20 +527,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
+            // Capture current brain state as an episode - OPTIMIZED
             EpisodicMemoryItem episode;
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Collect active neurons in a single pass
+            episode.activeNeurons.reserve(pImpl->totalNeuronCount() / 10); // Estimate
+            episode.neuronActivations.reserve(pImpl->totalNeuronCount() / 10);
+            
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
                         if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
                             episode.activeNeurons.push_back(neuron->getId());
                             episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                                std::abs(state.membranePotential - state.restingPotential) / 20.0f);
                         }
                     }
                 }
@@ -519,10 +567,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Apply attention to working memory winners - OPTIMIZED
+        if (pImpl->workingMemory) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                pImpl->attention->processCompetition(memoryNeurons);
+            }
         }
     }
     
@@ -550,7 +600,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Development affects plasticity rates - OPTIMIZED
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;

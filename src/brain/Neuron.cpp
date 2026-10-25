@@ -23,8 +23,14 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Performance monitoring
+    Timestamp lastUpdateTime_;
+    double lastStepDuration_;
+    size_t stepCount_;
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             lastUpdateTime_(0), lastStepDuration_(0.0), stepCount_(0) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -33,6 +39,9 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    pImpl->lastUpdateTime_ = 0;
+    pImpl->lastStepDuration_ = 0.0;
+    pImpl->stepCount_ = 0;
 }
 
 Neuron::~Neuron() = default;
@@ -299,4 +308,52 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
-} // namespace nlm
+MembranePotential Neuron::getInputCurrent() const {
+    return pImpl->synapticInput;
+}
+
+size_t Neuron::getIncomingSynapseCount() const {
+    return pImpl->incomingSynapses.size();
+}
+
+size_t Neuron::getOutgoingSynapseCount() const {
+    return pImpl->outgoingSynapses.size();
+}
+
+float Neuron::getFiringFrequency() const {
+    return pImpl->state.firingRate;
+}
+
+bool Neuron::validateParameters() const {
+    // Validate neuron parameters are within reasonable bounds
+    bool valid = true;
+    
+    // Check membrane potential bounds
+    if (pImpl->state.membranePotential < -100.0f || pImpl->state.membranePotential > 50.0f) {
+        valid = false;
+    }
+    
+    // Check resting potential
+    if (pImpl->state.restingPotential < -100.0f || pImpl->state.restingPotential > 0.0f) {
+        valid = false;
+    }
+    
+    // Check threshold
+    if (pImpl->state.threshold < -100.0f || pImpl->state.threshold > 0.0f) {
+        valid = false;
+    }
+    
+    // Check refractory period
+    if (pImpl->state.refractoryPeriod > 1000) {
+        valid = false;
+    }
+    
+    return valid;
+}
+
+void Neuron::clampParameters() {
+    // Ensure parameters stay within valid ranges
+    pImpl->state.membranePotential = std::clamp(pImpl->state.membranePotential, -100.0f, 50.0f);
+    pImpl->state.restingPotential = std::clamp(pImpl->state.restingPotential, -100.0f, 0.0f);
+    pImpl->state.threshold = std::clamp(pImpl->state.threshold, -100.0f, 0.0f);
+}
