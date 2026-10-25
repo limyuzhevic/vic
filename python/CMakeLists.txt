@@ -12,8 +12,15 @@ endif()
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
 
+# Include the main CMakeLists.txt to get the source configuration
+# This avoids code duplication and ensures consistency
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
+# We need to set the CMake module path to find the main CMakeLists.txt
+# For simplicity, we'll include the core source files directly
+# but in a larger project, you'd use add_subdirectory(../nlm ../)
+
+# Core library components (matching the main CMakeLists.txt)
 set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
@@ -60,18 +67,23 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
 )
 
-set(NLM_AGENT_SOURCES
+# Agent system components
+add_library(nlm_agent STATIC
     ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
     ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
 )
+target_include_directories(nlm_agent PUBLIC ${NLM_SOURCE_DIR})
 
-set(NLM_WORLD_SOURCES
+# World system components
+add_library(nlm_world STATIC
     ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
 )
+target_include_directories(nlm_world PUBLIC ${NLM_SOURCE_DIR})
 
+# Create core library
 add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
 target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
 )
 target_compile_options(nlm_core PRIVATE
@@ -79,24 +91,34 @@ target_compile_options(nlm_core PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 
-add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
-target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+# Link dependencies
 target_link_libraries(nlm_agent PUBLIC nlm_core)
-
-add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
-target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Python bindings module
 pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_include_directories(pynlm PRIVATE ${NLM_SOURCE_DIR})
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
+# Installation targets
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+# Create export configuration for Python package
+# This allows the Python bindings to be properly installed
+export(EXPORT pynlmTargets
+    FILE "${CMAKE_CURRENT_BINARY_DIR}/pynlmTargets.cmake"
+)
+
+# Add custom target for Python package
+add_custom_target(pynlm_python ALL
+    COMMENT "Building NLM Python bindings"
+    VERBATIM
 )
