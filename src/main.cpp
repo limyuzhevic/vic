@@ -11,6 +11,7 @@
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
+#include "core/Constants.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -69,6 +70,8 @@ struct LearningExperiment {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_WARNING("LearningExperiment: No region found for initial weight recording");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -88,6 +91,8 @@ struct LearningExperiment {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_WARNING("LearningExperiment: No region found for final weight recording");
         }
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
@@ -107,7 +112,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         
         if (initialWeights.empty() || finalWeights.empty()) {
-            NLM_LOG_INFO("ERROR: No weights recorded");
+            NLM_LOG_ERROR("ERROR: No weights recorded");
             return;
         }
         
@@ -164,27 +169,35 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
+    if (!brain) {
+        NLM_LOG_ERROR("Brain is null in runBasicConnectivityTest");
+        return;
+    }
+    
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("No region found (RegionId 1) in basic connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_ERROR("  No neurons found!");
         return;
     }
     
     // Get initial spike count
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
+    // Inject strong current into first 10 neurons using constants
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
-    // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
+    // Run a few steps using constant for step count
+    for (SimulationStep step = 0; step < nlm::BASIC_CONNECTIVITY_STEPS; ++step) {
+        brain->step(step, step * nlm::SIMULATION_TIMESTEP);
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
@@ -203,6 +216,11 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
 }
 
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Brain is null in runPlasticityExperiment");
+        return;
+    }
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
@@ -220,15 +238,15 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Applying repeated input patterns (" + std::to_string(nlm::PLASTICITY_EXPERIMENT_STEPS) + " steps)...");
     
-    for (SimulationStep step = 0; step < 1000; ++step) {
+    for (SimulationStep step = 0; step < nlm::PLASTICITY_EXPERIMENT_STEPS; ++step) {
         // Create input pattern - inject current into sensory neurons
         for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
-        brain->step(step, step * 0.001);
+        brain->step(step, step * nlm::SIMULATION_TIMESTEP);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
@@ -366,30 +384,29 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
+    // Set default values for Phase 2 using constants
+    config->set(nlm::ConfigKeys::RANDOM_SEED, static_cast<int64_t>(nlm::DefaultConfig::RANDOM_SEED), ConfigSource::Default);
+    config->set(nlm::ConfigKeys::SIMULATION_TIMESTEP, nlm::SIMULATION_TIMESTEP, ConfigSource::Default);
+    config->set(nlm::ConfigKeys::BRAIN_NEURON_COUNT, static_cast<int64_t>(nlm::DefaultConfig::NEURON_COUNT), ConfigSource::Default);  // Smaller for faster test
+    config->set(nlm::ConfigKeys::REGION_COUNT, static_cast<int64_t>(nlm::DefaultConfig::REGION_COUNT), ConfigSource::Default);
+    config->set(nlm::ConfigKeys::CONNECTION_PROBABILITY, nlm::DefaultConfig::CONNECTION_PROBABILITY, ConfigSource::Default);
+
+    // STDP parameters using constants
+    config->set(nlm::ConfigKeys::PLASTICITY_STDP_LEARNING_RATE, nlm::STDP_LTP_WEIGHT, ConfigSource::Default);
+    config->set(nlm::ConfigKeys::PLASTICITY_STDP_TAU_PLUS, nlm::STDP_TIME_CONSTANT, ConfigSource::Default);
+
+    // Structural plasticity parameters using constants
+    config->set("synaptogenesis_rate", nlm::SYNAPTOGENESIS_RATE, ConfigSource::Default);
+    config->set("pruning_rate", nlm::PRUNING_RATE, ConfigSource::Default);
+
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  " + std::string(nlm::ConfigKeys::RANDOM_SEED) + ": " + std::to_string(config->getOr<int64_t>(nlm::ConfigKeys::RANDOM_SEED, nlm::DefaultConfig::RANDOM_SEED)));
+    NLM_LOG_INFO("  " + std::string(nlm::ConfigKeys::SIMULATION_TIMESTEP) + ": " + std::to_string(config->getOr<double>(nlm::ConfigKeys::SIMULATION_TIMESTEP, nlm::SIMULATION_TIMESTEP)) + "s");
+    NLM_LOG_INFO("  " + std::string(nlm::ConfigKeys::BRAIN_NEURON_COUNT) + ": " + std::to_string(config->getOr<int64_t>(nlm::ConfigKeys::BRAIN_NEURON_COUNT, nlm::DefaultConfig::NEURON_COUNT)));
+    NLM_LOG_INFO("  " + std::string(nlm::ConfigKeys::REGION_COUNT) + ": " + std::to_string(config->getOr<int64_t>(nlm::ConfigKeys::REGION_COUNT, nlm::DefaultConfig::REGION_COUNT)));
+    NLM_LOG_INFO("  " + std::string(nlm::ConfigKeys::CONNECTION_PROBABILITY) + ": " + std::to_string(config->getOr<float>(nlm::ConfigKeys::CONNECTION_PROBABILITY, nlm::DefaultConfig::CONNECTION_PROBABILITY)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

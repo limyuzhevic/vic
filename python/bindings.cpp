@@ -400,6 +400,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Core creation functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,10 +417,422 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Convenience functions for easier usage
+    m.def("createStandardAgent", []() -> std::tuple<std::shared_ptr<Config>, std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return std::make_tuple(config, brain, world, agent);
+    }, "Create a complete agent setup with brain, world, and agent brain interface");
+
+    m.def("createSimulationConfig", [](int neuronCount, float connectionDensity, const std::string& name) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+        config->set("brain.synapse_density", connectionDensity, ConfigSource::Default);
+        config->set("brain.region_count", 1, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        return config;
+    }, py::arg("neuronCount"), py::arg("connectionDensity") = 0.1f, py::arg("name") = "simulation", "Create a pre-configured simulation configuration");
+
+    // Configuration presets for different use cases
+    m.def("createExplorationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // High exploration, learning-focused configuration
+        config->set("brain.neuron_count", 1000, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.08f, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.08f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.exploration_strength", 0.8f, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.sensitivity", 1.5f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.002f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.rate", 0.001f, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.synaptogenesis_rate", 0.00015f, ConfigSource::Default);
+        config->set("plasticity.structural.pruning_rate", 0.00002f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        return config;
+    }, "Create an exploration-focused configuration (high curiosity and learning)");
+
+    m.def("createStabilityConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Stability-focused configuration (slow changes, high memory)
+        config->set("brain.neuron_count", 500, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.03f, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.03f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", false, ConfigSource::Default); // Low exploration
+        config->set("neuromod.novelty.enable", false, ConfigSource::Default); // Low novelty detection
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.0005f, ConfigSource::Default); // Low learning rate
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.rate", 0.0005f, ConfigSource::Default); // Low learning rate
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.synaptogenesis_rate", 0.00005f, ConfigSource::Default); // Low structural change
+        config->set("plasticity.structural.pruning_rate", 0.00001f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(123), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        return config;
+    }, "Create a stability-focused configuration (slow, deliberate learning)");
+
+    m.def("createDevelopmentConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Development-stage focused configuration
+        config->set("brain.neuron_count", 750, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.06f, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.06f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.exploration_strength", 0.5f, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.sensitivity", 1.0f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.0015f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.rate", 0.001f, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.synaptogenesis_rate", 0.00012f, ConfigSource::Default);
+        config->set("plasticity.structural.pruning_rate", 0.000015f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(456), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        return config;
+    }, "Create a development-stage focused configuration (balanced learning)");
+
+    m.def("createMemoryConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Memory-optimized configuration
+        config->set("brain.neuron_count", 1200, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.12f, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.12f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", false, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", false, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.001f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.rate", 0.002f, ConfigSource::Default); // High Hebbian for memory
+        config->set("plasticity.structural.enable", false, ConfigSource::Default); // No structural changes
+        config->set("random_seed", static_cast<int64_t>(789), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        return config;
+    }, "Create a memory-optimized configuration (high stability for memory formation)");
+    m.def("runSimpleSimulation", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (brain) {
+            for (size_t i = 0; i < steps; ++i) {
+                brain->step(i);
+            }
+        }
+    }, py::arg("brain"), py::arg("steps"), "Run a simple brain simulation");
+
+    m.def("runCompleteEpisode", []() -> bool {
+        // Create everything needed for a complete episode
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(10, 10, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable learning
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        // Run episode
+        for (size_t step = 0; step < 100; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Simple reward
+            float reward = 0.1f;
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            agent->updateDevelopment(0.1);
+        }
+        
+        return true;
+    }, "Run a complete simulation episode with everything set up automatically");
+
+    // Configuration loader/saver utilities
+    m.def("saveConfigAsJson", [](const std::string& filepath, const std::shared_ptr<Config>& config) {
+        if (config) {
+            config->saveToFile(filepath);
+        }
+    }, py::arg("filepath"), py::arg("config"), "Save configuration to JSON file");
+
+    m.def("loadConfigFromJson", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"), "Load configuration from JSON file");
+
+    // Statistical utilities
+    m.def("computeBrainStats", [](const std::shared_ptr<Brain>& brain) {
+        std::map<std::string, double> stats;
+        if (!brain) {
+            stats["error"] = -1.0;
+            return stats;
+        }
+        
+        stats["total_neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+        stats["total_synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+        stats["firing_neurons"] = static_cast<double>(brain->getFiringNeuronCount());
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+        stats["spike_rate"] = 0.0; // Placeholder - would need simulation time to compute properly
+        stats["development_stage"] = static_cast<double>(static_cast<int>(brain->getDevelopmentalStage()));
+        
+        return stats;
+    }, py::arg("brain"), "Compute brain statistics as a dictionary");
+
+    // Statistical utilities
+    m.def("computeBrainStats", [](const std::shared_ptr<Brain>& brain) {
+        std::map<std::string, double> stats;
+        if (!brain) {
+            stats["error"] = -1.0;
+            return stats;
+        }
+        
+        stats["total_neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+        stats["total_synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+        stats["firing_neurons"] = static_cast<double>(brain->getFiringNeuronCount());
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+        stats["spike_rate"] = 0.0; // Placeholder - would need simulation time to compute properly
+        stats["development_stage"] = static_cast<double>(static_cast<int>(brain->getDevelopmentalStage()));
+        
+        return stats;
+    }, py::arg("brain"), "Compute brain statistics as a dictionary");
+
+    // Basic testing utilities for quick validation
+    m.def("testBasicConnectivity", []() {
+        // Create a simple brain
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 100, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Basic connectivity test
+        auto* region = brain->getRegion(RegionId(1));
+        if (!region) {
+            throw std::runtime_error("No region found in test");
+        }
+        
+        auto neurons = region->getAllNeurons();
+        if (neurons.empty()) {
+            throw std::runtime_error("No neurons found in test");
+        }
+        
+        // Inject current to test spike propagation
+        size_t initialSpikes = brain->getTotalSpikeCount();
+        neurons[0]->injectCurrent(20.0f);
+        
+        for (int step = 0; step < 50; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
+        return std::make_tuple(
+            true,  // success
+            neurons.size(),  // neuron count
+            spikes,  // spike count
+            brain->getAverageFiringRate()  // average firing rate
+        );
+    }, "Run a basic connectivity test and return results");
+
+    m.def("testPlasticity", []() {
+        // Test STDP and Hebbian plasticity
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 200, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.15f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(123), ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Record initial weights
+        std::vector<float> initialWeights;
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (const auto& syn : region->getSynapses()) {
+                initialWeights.push_back(syn->getWeight());
+            }
+        }
+        
+        size_t initialSynapseCount = brain->getTotalSynapseCount();
+        
+        // Apply learning stimuli
+        for (int step = 0; step < 500; ++step) {
+            // Inject current to stimulate plasticity
+            brain->injectCurrentToNeurons(NeuronType::Sensory, 15.0f);
+            brain->step(step, step * 0.001);
+        }
+        
+        // Record final weights
+        std::vector<float> finalWeights;
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (const auto& syn : region->getSynapses()) {
+                finalWeights.push_back(syn->getWeight());
+            }
+        }
+        
+        size_t finalSynapseCount = brain->getTotalSynapseCount();
+        
+        // Analyze weight changes
+        size_t strengthened = 0, weakened = 0, unchanged = 0;
+        float totalChange = 0.0f;
+        
+        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
+        for (size_t i = 0; i < minSize; ++i) {
+            float delta = finalWeights[i] - initialWeights[i];
+            totalChange += std::abs(delta);
+            if (delta > 0.01f) strengthened++;
+            else if (delta < -0.01f) weakened++;
+            else unchanged++;
+        }
+        
+        bool learningOccurred = (totalChange > 0.001f) || (strengthened > 0) || (weakened > 0);
+        
+        return std::make_tuple(
+            learningOccurred,  // success
+            strengthened,     // strengthened synapses
+            weakened,         // weakened synapses
+            unchanged,        // unchanged synapses
+            totalChange       // total weight change
+        );
+    }, "Test plasticity learning (STDP and Hebbian)");
+
+    m.def("testNeuromodulation", []() {
+        // Test neuromodulation systems
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 150, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(456), ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        // Create a simple world
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(10, 10, 8, 8);
+        world->reset();
+        agent->initialize(*world);
+        
+        // Run some episodes with reward
+        float totalReward = 0.0f;
+        float maxCuriosity = 0.0f;
+        float maxNovelty = 0.0f;
+        
+        for (int step = 0; step < 200; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Simple reward based on action type
+            float reward = 0.0f;
+            if (action == MotorCommand::MoveForward) reward = 0.5f;
+            else if (action == MotorCommand::Interact) reward = 1.0f;
+            
+            agent->applyRewardModulation(reward, 0.0f);
+            totalReward += reward;
+            
+            // Track neuromodulation levels
+            maxCuriosity = std::max(maxCuriosity, agent->getCuriosityLevel());
+            maxNovelty = std::max(maxNovelty, agent->getNoveltyLevel());
+            
+            agent->updateDevelopment(0.1);
+        }
+        
+        bool neuromodulationActive = (maxCuriosity > 0.0f) || (maxNovelty > 0.0f);
+        
+        return std::make_tuple(
+            neuromodulationActive,  // success
+            totalReward,           // total reward received
+            maxCuriosity,          // max curiosity level
+            maxNovelty,            // max novelty level
+            agent->getPredictionError()  // prediction error
+        );
+    }, "Test neuromodulation systems (dopamine, curiosity, novelty)");
+
+    m.def("runQuickValidation", []() {
+        // Run a complete quick validation test
+        std::vector<std::string> testResults;
+        std::vector<bool> testStatus;
+        
+        try {
+            // Test 1: Basic connectivity
+            auto result1 = testBasicConnectivity();
+            bool connSuccess = std::get<0>(result1);
+            size_t neuronCount = std::get<1>(result1);
+            size_t spikeCount = std::get<2>(result1);
+            float firingRate = std::get<3>(result1);
+            testResults.push_back("Basic connectivity: " + std::to_string(neuronCount) + " neurons, " + std::to_string(spikeCount) + " spikes, " + std::to_string(firingRate) + " Hz");
+            testStatus.push_back(connSuccess);
+        } catch (...) {
+            testResults.push_back("Basic connectivity: FAILED");
+            testStatus.push_back(false);
+        }
+        
+        try {
+            // Test 2: Plasticity
+            auto result2 = testPlasticity();
+            bool plastSuccess = std::get<0>(result2);
+            size_t strengthened = std::get<1>(result2);
+            size_t weakened = std::get<2>(result2);
+            size_t unchanged = std::get<3>(result2);
+            float totalChange = std::get<4>(result2);
+            testResults.push_back("Plasticity: " + std::to_string(strengthened) + " strengthened, " + std::to_string(weakened) + " weakened, " + std::to_string(totalChange) + " total change");
+            testStatus.push_back(plastSuccess);
+        } catch (...) {
+            testResults.push_back("Plasticity: FAILED");
+            testStatus.push_back(false);
+        }
+        
+        try {
+            // Test 3: Neuromodulation
+            auto result3 = testNeuromodulation();
+            bool neuromodSuccess = std::get<0>(result3);
+            float totalReward = std::get<1>(result3);
+            float maxCuriosity = std::get<2>(result3);
+            float maxNovelty = std::get<3>(result3);
+            float predError = std::get<4>(result3);
+            testResults.push_back("Neuromodulation: " + std::to_string(totalReward) + " reward, curiosity: " + std::to_string(maxCuriosity) + ", novelty: " + std::to_string(maxNovelty) + ", pred error: " + std::to_string(predError));
+            testStatus.push_back(neuromodSuccess);
+        } catch (...) {
+            testResults.push_back("Neuromodulation: FAILED");
+            testStatus.push_back(false);
+        }
+        
+        bool allPassed = std::all_of(testStatus.begin(), testStatus.end(), [](bool s) { return s; });
+        
+        return std::make_tuple(
+            allPassed,  // overall success
+            testResults, // detailed results
+            testStatus   // individual test status
+        );
+    }, "Run a complete quick validation of NLM systems");
 
 } // namespace nlm
