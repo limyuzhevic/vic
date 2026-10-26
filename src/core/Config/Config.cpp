@@ -27,6 +27,45 @@ bool Config::loadFromFile(const std::string& filepath) {
         return false;
     }
     
+    // Try to detect file format
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    bool isJson = (firstLine.find('{') != std::string::npos && firstLine.find('}') != std::string::npos);
+    bool isYaml = (firstLine.find(':') != std::string::npos && firstLine.find('-') != std::string::npos);
+    
+    if (isJson) {
+        return loadFromJson(filepath);
+    } else if (isYaml) {
+        return loadFromYaml(filepath);
+    } else {
+        // Fall back to simple key=value format
+        return loadFromSimpleFormat(filepath);
+    }
+    
+    return true;
+}
+
+bool Config::loadFromJson(const std::string& filepath) {
+    // TODO PHASE 2: Implement proper JSON parser
+    // PLACEHOLDER: Use simple format for now
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromYaml(const std::string& filepath) {
+    // TODO PHASE 2: Implement proper YAML parser
+    // PLACEHOLDER: Use simple format for now
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -43,7 +82,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -84,88 +123,77 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Try to detect file format from existing file
+    std::ifstream readFile(filepath);
+    std::string firstLine;
+    if (readFile.is_open() && std::getline(readFile, firstLine)) {
+        readFile.close();
+        bool isJson = (firstLine.find('{') != std::string::npos && firstLine.find('}') != std::string::npos);
+        if (isJson) {
+            return saveToJson(filepath);
+        } else if (firstLine.find("[") != std::string::npos) {
+            return saveToArrayJson(filepath);
+        }
+    }
+    
+    // Default to simple key=value format
+    return saveToSimpleFormat(filepath);
+}
+
+bool Config::saveToSimpleFormat(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = " << entry.value << "\n\n";
     }
     
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+bool Config::saveToJson(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
     }
     
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": " << entry.value;
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    file << "}\n";
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    return true;
+}
+
+bool Config::saveToArrayJson(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
     }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    
+    file << "[\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  {\"key\": \"" << entry.key << "\", \"value\": " << entry.value;
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
+    file << "]\n";
+    
+    return true;
 }
 
 std::string Config::summary() const {
@@ -177,6 +205,8 @@ std::string Config::summary() const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
             } else {
                 oss << arg;
             }
