@@ -1,7 +1,9 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/ErrorHandling/ErrorHandling.hpp"
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 
 namespace nlm {
 
@@ -18,7 +20,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    , predictionEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , stepCount_(0)
+    , totalSimulationTime_(0.0)
+    , accumulatedReward_(0.0f)
+    , learningRate_(0.001f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -67,6 +74,13 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    stepCount_ = 0;
+    totalSimulationTime_ = 0.0;
+    accumulatedReward_ = 0.0f;
+    firingRateHistory_.clear();
+    rewardHistory_.clear();
+    errorMessages_.clear();
+    warningMessages_.clear();
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -74,18 +88,13 @@ void AgentBrain::initialize(const SimpleWorld& world) {
                  std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
 }
 
-size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
-}
-
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
-}
-
-void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+bool AgentBrain::processSensoryInput(const SensoryPercept& percept) {
+    bool validInput = true;
+    
+    if (!brain_) {
+        reportError("Cannot process sensory input: brain is null");
+        return false;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -147,22 +156,32 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    return validInput;
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        reportError("Cannot decode motor command: brain is null");
+        return MotorCommand::Wait;
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
-        decoded = selectWithCuriosity(decoded);
+        decoded = decodeMotorCommandWithCuriosity(decoded);
     }
     
     return decoded;
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    if (!brain_) {
+        reportError("Cannot decode motor command: brain is null");
+        return MotorCommand::Wait;
+    }
+    
     // Calculate average activity in each motor group
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
         if (neurons.empty()) return 0.0f;
@@ -209,7 +228,12 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     return best;
 }
 
-MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
+MotorCommand AgentBrain::decodeMotorCommandWithCuriosity(MotorCommand defaultCmd) {
+    if (!brain_) {
+        reportError("Cannot apply curiosity: brain is null");
+        return defaultCmd;
+    }
+    
     // Exploration: occasionally choose random action when curiosity is high
     if (curiosityLevel_ > 0.5f) {
         // Higher curiosity = more exploration
@@ -236,13 +260,17 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (!brain_ || !rewardModulationEnabled_) {
+        if (!brain_) reportError("Cannot apply reward modulation: brain is null");
+        return;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
     
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    accumulatedReward_ += reward;
     
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
@@ -258,7 +286,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             if (std::abs(eligibility) > 0.001f) {
                 // Apply reward-modulated weight change
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_;
-                syn->addToWeight(delta);
+                syn->addToWeight(delta * learningRate_);
                 
                 // Decay eligibility trace
                 syn->decayEligibilityTrace(0.1f);
@@ -280,9 +308,14 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+    if (!brain_ || !developmentEnabled_) {
+        if (!brain_) reportError("Cannot update development: brain is null");
+        return;
+    }
     
     developmentalAge_ += timestep;
+    totalSimulationTime_ += timestep;
+    stepCount_++;
     
     // Simple developmental stages based on age
     // This is a biologically inspired approximation
@@ -311,10 +344,22 @@ void AgentBrain::updateDevelopment(double timestep) {
             sp->setPruningRate(pruneRate);
         }
     }
+    
+    // Record firing rate for metrics
+    if (brain_) {
+        float firingRate = brain_->getAverageFiringRate();
+        firingRateHistory_.push_back(firingRate);
+        if (firingRateHistory_.size() > 100) {
+            firingRateHistory_.erase(firingRateHistory_.begin());
+        }
+    }
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
-    if (!brain_) return DevelopmentalStage::Initial;
+    if (!brain_) {
+        reportError("Cannot get developmental stage: brain is null");
+        return DevelopmentalStage::Initial;
+    }
     return brain_->getDevelopmentalStage();
 }
 
@@ -334,6 +379,10 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+float AgentBrain::getExpectedReward() const {
+    return expectedReward_;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
@@ -342,9 +391,246 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    accumulatedReward_ = 0.0f;
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    
+    // Clear error/warning messages
+    errorMessages_.clear();
+    warningMessages_.clear();
+    
+    // Clear historical data
+    firingRateHistory_.clear();
+    rewardHistory_.clear();
+    
+    NLM_LOG_INFO("AgentBrain reset: all state cleared and initialized");
+}
+
+bool AgentBrain::simulateEpisode(SimpleWorld& world, size_t numSteps, bool computeReward) {
+    if (!brain_) {
+        reportError("Cannot simulate episode: brain is null");
+        return false;
+    }
+    
+    NLM_LOG_INFO("Starting simulation episode with " + std::to_string(numSteps) + " steps");
+    
+    float totalReward = 0.0f;
+    
+    for (size_t step = 0; step < numSteps; ++step) {
+        try {
+            // Update world
+            world.update(0.1);
+            
+            // Get sensory input from world
+            const SensoryPercept& percept = world.getSensoryPercept();
+            
+            // Process sensory input in brain
+            bool validInput = processSensoryInput(percept);
+            if (!validInput) {
+                reportWarning("Sensory input processing failed at step " + std::to_string(step));
+            }
+            
+            // Run brain step
+            brain_->step(static_cast<SimulationStep>(step));
+            
+            // Get action from brain
+            MotorCommand motorCmd = decodeMotorCommand();
+            previousMotorCommand_ = motorCmd;
+            
+            // Apply motor command to world
+            world.applyMotorCommand(motorCmd, world.getSimulationTime());
+            
+            // Compute reward if requested
+            if (computeReward) {
+                float reward = world.computeReward(brain_->getRegions()[0].get());
+                totalReward += reward;
+                
+                // Apply reward modulation
+                applyRewardModulation(reward, 0.0f);
+                
+                // Record reward for metrics
+                rewardHistory_.push_back(reward);
+                if (rewardHistory_.size() > 100) {
+                    rewardHistory_.erase(rewardHistory_.begin());
+                }
+            }
+            
+            // Update development
+            updateDevelopment(0.1);
+            
+            // Log progress periodically
+            if (step % 100 == 0) {
+                NLM_LOG_INFO("Step " + std::to_string(step) + 
+                           " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                           " | Firing: " + std::to_string(brain_->getAverageFiringRate()) +
+                           " | Curiosity: " + std::to_string(curiosityLevel_));
+            }
+            
+        } catch (const std::exception& e) {
+            reportError("Error at step " + std::to_string(step) + ": " + std::string(e.what()));
+            return false;
+        }
+    }
+    
+    NLM_LOG_INFO("Episode completed: " + std::to_string(numSteps) + " steps, " +
+                std::to_string(totalReward) + " total reward, " +
+                std::to_string(brain_->getAverageFiringRate()) + " average firing rate");
+    
+    return true;
+}
+
+std::map<std::string, float> AgentBrain::getAgentState() const {
+    std::map<std::string, float> state;
+    
+    if (brain_) {
+        state["neuron_count"] = static_cast<float>(brain_->getTotalNeuronCount());
+        state["synapse_count"] = static_cast<float>(brain_->getTotalSynapseCount());
+        state["firing_rate"] = brain_->getAverageFiringRate();
+        state["total_spikes"] = static_cast<float>(brain_->getTotalSpikeCount());
+    }
+    
+    state["curiosity_level"] = curiosityLevel_;
+    state["novelty_level"] = noveltyLevel_;
+    state["prediction_error"] = predictionError_;
+    state["neuromodulation_level"] = dopamineLevel_;
+    state["developmental_age"] = static_cast<float>(developmentalAge_);
+    state["plasticity_modifier"] = plasticityModifier_;
+    state["learning_rate"] = learningRate_;
+    state["accumulated_reward"] = accumulatedReward_;
+    
+    return state;
+}
+
+std::string AgentBrain::getAgentStatus() const {
+    std::ostringstream oss;
+    oss << "Agent Status Report:\n";
+    oss << "===================\n\n";
+    
+    oss << "Configuration:\n";
+    oss << "  Reward modulation: " << (rewardModulationEnabled_ ? "enabled" : "disabled") << "\n";
+    oss << "  Structural plasticity: " << (structuralPlasticityEnabled_ ? "enabled" : "disabled") << "\n";
+    oss << "  Development: " << (developmentEnabled_ ? "enabled" : "disabled") << "\n";
+    oss << "  Curiosity: " << (curiosityEnabled_ ? "enabled" : "disabled") << "\n";
+    oss << "  Prediction: " << (predictionEnabled_ ? "enabled" : "disabled") << "\n\n";
+    
+    if (brain_) {
+        oss << "Brain State:\n";
+        oss << "  Neurons: " << brain_->getTotalNeuronCount() << "\n";
+        oss << "  Synapses: " << brain_->getTotalSynapseCount() << "\n";
+        oss << "  Firing rate: " << brain_->getAverageFiringRate() << " Hz\n";
+        oss << "  Total spikes: " << brain_->getTotalSpikeCount() << "\n";
+        oss << "  Developmental stage: " << static_cast<int>(getDevelopmentalStage()) << "\n\n";
+    }
+    
+    oss << "Agent State:\n";
+    oss << "  Curiosity level: " << curiosityLevel_ << "\n";
+    oss << "  Novelty level: " << noveltyLevel_ << "\n";
+    oss << "  Prediction error: " << predictionError_ << "\n";
+    oss << "  Neuromodulation level: " << dopamineLevel_ << "\n";
+    oss << "  Developmental age: " << developmentalAge_ << "s\n";
+    oss << "  Plasticity modifier: " << plasticityModifier_ << "\n";
+    oss << "  Learning rate: " << learningRate_ << "\n";
+    oss << "  Accumulated reward: " << accumulatedReward_ << "\n\n";
+    
+    oss << "Performance:\n";
+    oss << "  Steps simulated: " << stepCount_ << "\n";
+    oss << "  Total simulation time: " << totalSimulationTime_ << "s\n";
+    oss << "  Average firing rate: " << (firingRateHistory_.empty() ? 0.0f : 
+                                   std::accumulate(firingRateHistory_.begin(), firingRateHistory_.end(), 0.0f) / 
+                                   firingRateHistory_.size()) << " Hz\n";
+    
+    if (!errorMessages_.empty()) {
+        oss << "\nErrors:\n";
+        oss << errorMessages_ << "\n";
+    }
+    
+    if (!warningMessages_.empty()) {
+        oss << "\nWarnings:\n";
+        for (const auto& warning : warningMessages_) {
+            oss << "  - " << warning << "\n";
+        }
+    }
+    
+    return oss.str();
+}
+
+AgentBrain::AgentMetrics AgentBrain::getMetrics() const {
+    AgentMetrics metrics;
+    
+    if (brain_) {
+        metrics.averageFiringRate = brain_->getAverageFiringRate();
+        metrics.totalSteps = stepCount_;
+        metrics.activeNeurons = brain_->getActiveNeuronCount();
+    }
+    
+    metrics.curiosityLevel = curiosityLevel_;
+    metrics.noveltyLevel = noveltyLevel_;
+    metrics.predictionError = predictionError_;
+    metrics.neuromodulationLevel = dopamineLevel_;
+    
+    return metrics;
+}
+
+std::string AgentBrain::metricsToString() const {
+    std::ostringstream oss;
+    AgentMetrics metrics = getMetrics();
+    
+    oss << "Agent Metrics:\n";
+    oss << "================\n\n";
+    oss << "Neural Activity:\n";
+    oss << "  Average firing rate: " << metrics.averageFiringRate << " Hz\n";
+    oss << "  Active neurons: " << metrics.activeNeurons << "\n";
+    oss << "  Total steps: " << metrics.totalSteps << "\n\n";
+    
+    oss << "Cognitive State:\n";
+    oss << "  Curiosity level: " << metrics.curiosityLevel << "\n";
+    oss << "  Novelty level: " << metrics.noveltyLevel << "\n";
+    oss << "  Prediction error: " << metrics.predictionError << "\n";
+    oss << "  Neuromodulation level: " << metrics.neuromodulationLevel << "\n\n";
+    
+    oss << "Learning State:\n";
+    oss << "  Developmental age: " << developmentalAge_ << "s\n";
+    oss << "  Plasticity modifier: " << plasticityModifier_ << "\n";
+    oss << "  Learning rate: " << learningRate_ << "\n";
+    oss << "  Accumulated reward: " << accumulatedReward_ << "\n";
+    
+    return oss.str();
+}
+
+void AgentBrain::reportError(const std::string& error) {
+    std::ostringstream oss;
+    oss << "[ERROR] " << error;
+    errorMessages_ += oss.str() + "\n";
+    NLM_LOG_ERROR(oss.str());
+}
+
+void AgentBrain::reportWarning(const std::string& warning) {
+    std::ostringstream oss;
+    oss << "[WARNING] " << warning;
+    warningMessages_.push_back(oss.str());
+    NLM_LOG_WARNING(oss.str());
 }
 
 } // namespace nlm
+
+// Additional helper functions for Python bindings
+template<typename T>
+T getOptionalValue(const std::map<std::string, float>& state, const std::string& key, T defaultValue) {
+    auto it = state.find(key);
+    if (it != state.end()) {
+        return static_cast<T>(it->second);
+    }
+    return defaultValue;
+}
+
+// Python-specific helper functions
+void addAgentBrainHelpers(py::module& m) {
+    m.def("getOptionalValue", &getOptionalValue<double>,
+         py::arg("state"), py::arg("key"), py::arg("default_value"),
+         "Get optional value from agent state");
+    
+    m.def("printAgentMetrics", [](const std::string& metrics) {
+        std::cout << metrics << std::endl;
+    }, py::arg("metrics"), "Print agent metrics to console");
+}

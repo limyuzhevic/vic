@@ -387,34 +387,119 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        // Enhanced configuration methods
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable reward modulation")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable structural plasticity")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+             py::arg("enable"), "Enable or disable development")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             py::arg("enable"), "Enable or disable curiosity-driven exploration")
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled")
+        // Convenience methods for common operations
+        .def("setLearningParameters", [](AgentBrain& self, bool reward, bool structural, bool development, bool curiosity) {
+            self.enableRewardModulation(reward);
+            self.enableStructuralPlasticity(structural);
+            self.enableDevelopment(development);
+            self.enableCuriosity(curiosity);
+        }, py::arg("reward"), py::arg("structural"), py::arg("development"), py::arg("curiosity"),
+             "Enable or disable multiple learning subsystems at once")
+        .def("getLearningParameters", [](const AgentBrain& self) {
+            return std::make_tuple(
+                self.isRewardModulationEnabled(),
+                self.isStructuralPlasticityEnabled(),
+                self.isDevelopmentEnabled(),
+                self.isCuriosityEnabled()
+            );
+        }, "Get current learning parameter settings as a tuple (reward, structural, development, curiosity)")
+        .def("simulateEpisode", [](AgentBrain& self, SimpleWorld& world, Brain& brain, size_t numSteps) {
+            for (size_t step = 0; step < numSteps; ++step) {
+                SensoryPercept percept = world.getSensoryPercept();
+                self.processSensoryInput(percept);
+                brain.step(static_cast<SimulationStep>(step));
+                // Note: This is a simplified simulation - in practice you'd also
+                // apply motor commands and compute rewards
+            }
+            return "Episode completed";
+        }, py::arg("world"), py::arg("brain"), py::arg("numSteps"),
+             "Run a complete simulation episode with brain and world interaction")
+        .def("getDetailedStats", [](const AgentBrain& self) {
+            std::map<std::string, std::string> stats;
+            stats["curiosity_level"] = std::to_string(self.getCuriosityLevel());
+            stats["novelty_level"] = std::to_string(self.getNoveltyLevel());
+            stats["prediction_error"] = std::to_string(self.getPredictionError());
+            stats["neuromodulation_level"] = std::to_string(self.getNeuromodulationLevel());
+            return stats;
+        }, "Get detailed statistics about the agent's current state")
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
-
+    }, "Create a default configuration")
+    
+    // Enhanced brain creation with convenience functions
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        return std::make_shared<Brain>(config);
+    }, "Create a new brain with default configuration");
+    
+    // Additional convenience functions for creating common setups
+    m.def("createStandardBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        
+        // Standard configuration for general use
+        config->set("brain.neuron_count", 1000, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1f, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.05f, ConfigSource::Default);
+        config->set("brain.initial_weight_mean", 0.5f, ConfigSource::Default);
+        config->set("brain.initial_weight_std", 0.1f, ConfigSource::Default);
+        config->set("brain.v_thresh", -50.0f, ConfigSource::Default);
+        config->set("brain.v_rest", -70.0f, ConfigSource::Default);
+        config->set("brain.v_reset", -75.0f, ConfigSource::Default);
+        config->set("brain.tau_mem", 20.0f, ConfigSource::Default);
+        config->set("brain.tau_ref", 2.0f, ConfigSource::Default);
+        
+        // Plasticity settings
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.001f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        
+        // Neuromodulation settings
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        return brain;
+    }, "Create a brain with standard configuration for general use");
+    
+    m.def("createMinimalBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        
+        // Minimal configuration for testing/debugging
+        config->set("brain.neuron_count", 100, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.05f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        return brain;
+    }, "Create a minimal brain configuration for testing/debugging");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

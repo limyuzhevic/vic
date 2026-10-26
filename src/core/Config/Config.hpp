@@ -71,12 +71,16 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Set values with validation
+    bool set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Safe set with validation and error reporting
+    template<typename T>
+    bool setWithValidation(const std::string& key, const T& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -93,6 +97,19 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration
+    bool validate() const;
+    std::string getValidationErrors() const;
+    
+    // Set default configuration
+    static Config createDefaultConfig();
+    
+    // Set development configuration
+    static Config createDevelopmentConfig();
+    
+    // Set performance-optimized configuration
+    static Config createPerformanceConfig();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +117,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    
+    mutable std::string validationErrors;
 };
 
 } // namespace nlm
