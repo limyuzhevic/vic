@@ -6,8 +6,9 @@ namespace nlm {
 struct IntegrateAndFireDynamics::Impl {
     float membraneTimeConstant;  // ms
     float membraneResistance;     // MOhm
+    float currentTime;           // Current simulation time (seconds)
     
-    Impl() : membraneTimeConstant(20.0f), membraneResistance(10.0f) {}
+    Impl() : membraneTimeConstant(20.0f), membraneResistance(10.0f), currentTime(0.0f) {}
 };
 
 IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
@@ -19,6 +20,9 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     // PLACEHOLDER: Simple leaky integrator
     
     const auto& state = neuron->getState();
+    
+    // Update current time before processing this timestep
+    pImpl->currentTime += static_cast<float>(dt);
     
     // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
     // For simplicity using explicit Euler:
@@ -37,7 +41,7 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     // Check for firing
     if (shouldFire(neuron)) {
         neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+        neuron->recordSpike(pImpl->currentTime);  // Pass actual current time
     }
     
     // Refractory mechanism

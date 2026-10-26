@@ -44,7 +44,7 @@ void printBanner() {
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚═════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
@@ -321,6 +321,166 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void printConfiguration(const Config& config) {
+    NLM_LOG_INFO("=== Current Configuration ===");
+    NLM_LOG_INFO("");
+    
+    // Get all keys and display them in order
+    auto keys = config.getKeys();
+    for (const auto& key : keys) {
+        // Try to get different types, prioritizing more specific ones
+        if (config.has(key)) {
+            NLM_LOG_INFO("  " + key + ": ");
+            
+            // Try to get as different types
+            if (auto val = config.get<int64_t>(key)) {
+                NLM_LOG_INFO(std::to_string(val.value()) + " (int64_t)");
+            } else if (auto val = config.get<int>(key)) {
+                NLM_LOG_INFO(std::to_string(val.value()) + " (int)");
+            } else if (auto val = config.get<double>(key)) {
+                NLM_LOG_INFO(std::to_string(val.value()) + " (double)");
+            } else if (auto val = config.get<float>(key)) {
+                NLM_LOG_INFO(std::to_string(val.value()) + " (float)");
+            } else if (auto val = config.get<bool>(key)) {
+                NLM_LOG_INFO(val.value() ? "true" : "false" + " (bool)");
+            } else if (auto val = config.get<std::string>(key)) {
+                NLM_LOG_INFO("\"" + val.value() + "\"" + " (string)");
+            } else if (auto val = config.get<std::vector<int>>(key)) {
+                NLM_LOG_INFO("vector<int> of size " + std::to_string(val.value().size()));
+            } else if (auto val = config.get<std::vector<double>>(key)) {
+                NLM_LOG_INFO("vector<double> of size " + std::to_string(val.value().size()));
+            } else {
+                NLM_LOG_INFO("[unknown type]");
+            }
+        }
+    }
+}
+
+void exportConfiguration(const Config& config, const std::string& filepath) {
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Cannot export configuration: Empty filename");
+        return;
+    }
+    
+    // Check if directory exists and is writable
+    std::filesystem::path filepath_path(filepath);
+    std::filesystem::path parent_dir = filepath_path.parent_path();
+    
+    if (!parent_dir.empty() && !std::filesystem::exists(parent_dir)) {
+        NLM_LOG_ERROR("Cannot export configuration to non-existent directory: " + parent_dir.string());
+        NLM_LOG_INFO("Please create the directory first or use a file in the current directory");
+        return;
+    }
+    
+    if (!parent_dir.empty() && std::filesystem::exists(parent_dir) && !std::filesystem::is_directory(parent_dir)) {
+        NLM_LOG_ERROR("Cannot export configuration: Parent path is not a directory");
+        return;
+    }
+    
+    NLM_LOG_INFO("Exporting configuration to: " + filepath);
+    
+    if (config.saveToFile(filepath)) {
+        NLM_LOG_INFO("Configuration exported successfully to: " + filepath);
+        
+        // Show file size for user confirmation
+        try {
+            auto file_size = std::filesystem::file_size(filepath_path);
+            NLM_LOG_INFO("Exported file size: " + std::to_string(file_size) + " bytes");
+        } catch (...) {
+            // File size check failed, that's okay
+        }
+    } else {
+        NLM_LOG_ERROR("Failed to export configuration to: " + filepath);
+        NLM_LOG_INFO("Possible reasons:");
+        NLM_LOG_INFO("  - Directory permissions insufficient");
+        NLM_LOG_INFO("  - Disk space full");
+        NLM_LOG_INFO("  - Invalid file path");
+        NLM_LOG_INFO("  - Configuration is corrupted");
+    }
+}
+
+void processConfigCommand(const std::string& command, const std::string& param, Config& config) {
+    if (command == "show") {
+        printConfiguration(config);
+    } else if (command == "export") {
+        if (param.empty()) {
+            NLM_LOG_ERROR("Export command requires a filename parameter");
+            NLM_LOG_INFO("Usage: --config-command export <filename>");
+            return;
+        }
+        exportConfiguration(config, param);
+    } else if (command == "set") {
+        if (param.empty()) {
+            NLM_LOG_ERROR("Set command requires a key=value parameter");
+            NLM_LOG_INFO("Usage: --config-command set key=value");
+            return;
+        }
+        
+        // Parse key=value format
+        size_t pos = param.find('=');
+        if (pos != std::string::npos) {
+            std::string key = param.substr(0, pos);
+            std::string value = param.substr(pos + 1);
+            
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_ERROR("Set command requires a non-empty key");
+                return;
+            }
+            
+            // Try to parse value as different types
+            bool parsed = false;
+            
+            // Try bool first (exact match)
+            if (value == "true" || value == "false") {
+                bool boolVal = (value == "true");
+                config.set(key, boolVal, ConfigSource::Runtime);
+                parsed = true;
+                NLM_LOG_INFO("Set " + key + " = " + (boolVal ? "true" : "false") + " (bool)");
+            }
+            // Try number types
+            else {
+                try {
+                    // Check if it's a number with decimal point
+                    size_t decPos = value.find('.');
+                    if (decPos != std::string::npos) {
+                        // Try double
+                        double doubleVal = std::stod(value);
+                        config.set(key, doubleVal, ConfigSource::Runtime);
+                        parsed = true;
+                        NLM_LOG_INFO("Set " + key + " = " + std::to_string(doubleVal) + " (double)");
+                    } else {
+                        // Try int64_t
+                        int64_t intVal = std::stoll(value);
+                        config.set(key, intVal, ConfigSource::Runtime);
+                        parsed = true;
+                        NLM_LOG_INFO("Set " + key + " = " + std::to_string(intVal) + " (int64_t)");
+                    }
+                } catch (const std::exception& e) {
+                    // If parsing fails, treat as string
+                    config.set(key, value, ConfigSource::Runtime);
+                    parsed = true;
+                    NLM_LOG_INFO("Set " + key + " = \"\" + value + "\"\" (string)");
+                } catch (...) {
+                    // Catch-all for any other exception
+                    NLM_LOG_ERROR("Failed to parse value '" + value + "' as number");
+                    return;
+                }
+            }
+            
+            if (!parsed) {
+                NLM_LOG_ERROR("Failed to parse value: " + value);
+            }
+        } else {
+            NLM_LOG_ERROR("Invalid set command format. Use: set key=value");
+            NLM_LOG_INFO("Example: set neuron_count=1000");
+        }
+    } else {
+        NLM_LOG_ERROR("Unknown config command: " + command);
+        NLM_LOG_INFO("Available commands: show, export <filename>, set key=value");
+    }
+}
+
 int main(int argc, char** argv) {
     printBanner();
     
@@ -332,15 +492,59 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    // Process configuration commands (early exit)
+    std::string configCommand;
+    std::string configParam;
     
-    // Load configuration
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--config-command") {
+            // Next argument should be the command
+            if (i + 1 < argc) {
+                configCommand = argv[++i];
+                // Look for parameter in subsequent args
+                for (int j = i + 1; j < argc; ++j) {
+                    if (configParam.empty()) {
+                        configParam = argv[j];
+                    }
+                }
+            }
+            break;
+        }
+    }
+    
+    // Handle configuration commands
+    if (!configCommand.empty()) {
+        auto config = std::make_shared<Config>();
+        
+        // Try to load from file if provided
+        std::string configFile = "configs/default.cfg";
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            if (arg.substr(0, 7) == "--config") {
+                if (arg.find('=') != std::string::npos) {
+                    configFile = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    configFile = argv[++i];
+                }
+            }
+        }
+        
+        // Load config from file (ignore if not found)
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_INFO("Using default configuration.");
+        }
+        
+        // Override with command line args
+        config->loadFromArgs(argc, argv);
+        
+        processConfigCommand(configCommand, configParam, *config);
+        return 0;
+    }
+    
+    // Create config for the main demo
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
