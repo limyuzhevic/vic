@@ -71,12 +71,18 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set with validation
+    bool setValidated(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    bool setValidated(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    bool setValidated(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    bool setValidated(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -92,6 +98,20 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validation methods
+    static bool isValidKey(const std::string& key);
+    static bool isValidValue(const std::string& key, const std::string& value);
+    static bool validateRange(double value, double min, double max);
+    static bool validateLogLevel(const std::string& level);
+    static bool validateNeuronCount(int count);
+    static bool validateConnectionProbability(float prob);
+    static bool validateSimulationTimestep(double timestep);
+    
+    // Debug and utility methods
+    void printHelp() const;
+    void printVersion() const;
+    void listConfigKeys() const;
     
 private:
     struct Impl;

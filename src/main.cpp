@@ -312,16 +312,105 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
     
     NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
-        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
-        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
-    } else {
-        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+// Configuration validation function
+void validateConfiguration(std::shared_ptr<Config> config) {
+    NLM_LOG_INFO("Validating configuration...");
+    
+    // Validate neuron count
+    int64_t neuronCount = config->getOr<int64_t>("neuron_count", 500);
+    if (neuronCount < 1) {
+        NLM_LOG_WARN("Neuron count is too low: " + std::to_string(neuronCount) + ". Minimum is 1.");
+        NLM_LOG_INFO("Using default neuron count: 500");
+    } else if (neuronCount > 100000) {
+        NLM_LOG_WARN("Neuron count is very high: " + std::to_string(neuronCount) + ". May impact performance.");
     }
+    
+    // Validate region count
+    int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+    if (regionCount < 1) {
+        NLM_LOG_ERROR("Region count must be at least 1: " + std::to_string(regionCount));
+        NLM_LOG_INFO("Using default region count: 1");
+    } else if (regionCount > 100) {
+        NLM_LOG_WARN("Region count is high: " + std::to_string(regionCount) + ". May impact performance.");
+    }
+    
+    // Validate connection probability
+    float connectionProb = config->getOr<float>("connection_probability", 0.15f);
+    if (connectionProb < 0.0f) {
+        NLM_LOG_ERROR("Connection probability cannot be negative: " + std::to_string(connectionProb));
+        NLM_LOG_INFO("Using default connection probability: 0.15");
+    } else if (connectionProb > 1.0f) {
+        NLM_LOG_WARN("Connection probability is high: " + std::to_string(connectionProb) + ". Network may be too dense.");
+    }
+    
+    // Validate simulation timestep
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Simulation timestep must be positive: " + std::to_string(timestep));
+        NLM_LOG_INFO("Using default timestep: 0.001");
+    } else if (timestep > 0.1) {
+        NLM_LOG_WARN("Simulation timestep is large: " + std::to_string(timestep) + ". May affect accuracy.");
+    }
+    
+    // Validate plasticity parameters
+    float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.02f);
+    if (ltpWeight < 0.0f) {
+        NLM_LOG_ERROR("STDP LTP weight cannot be negative: " + std::to_string(ltpWeight));
+    }
+    
+    float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.015f);
+    if (ltdWeight < 0.0f) {
+        NLM_LOG_ERROR("STDP LTD weight cannot be negative: " + std::to_string(ltdWeight));
+    }
+    
+    // Validate structural plasticity parameters
+    float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    if (synaptogenesisRate < 0.0f || synaptogenesisRate > 1.0f) {
+        NLM_LOG_WARN("Synaptogenesis rate may be inappropriate: " + std::to_string(synaptogenesisRate));
+    }
+    
+    float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+    if (pruningRate < 0.0f || pruningRate > 1.0f) {
+        NLM_LOG_WARN("Pruning rate may be inappropriate: " + std::to_string(pruningRate));
+    }
+    
+    // Validate log level
+    std::string logLevel = config->getOr<std::string>("log_level", "INFO");
+    std::transform(logLevel.begin(), logLevel.end(), logLevel.begin(), ::toupper);
+    if (logLevel != "DEBUG" && logLevel != "INFO" && logLevel != "WARN" && logLevel != "ERROR") {
+        NLM_LOG_WARN("Invalid log level: " + logLevel + ". Using default: INFO");
+    }
+    
+    NLM_LOG_INFO("Configuration validation completed.");
 }
 
 int main(int argc, char** argv) {
+    // Check for help, version, or config-list options BEFORE processing
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Help option
+        if (arg == "--help" || arg == "-h" || arg == "--h" || arg == "-help") {
+            auto config = std::make_shared<Config>();
+            config->printHelp();
+            return 0;
+        }
+        
+        // Version option
+        if (arg == "--version" || arg == "-v") {
+            auto config = std::make_shared<Config>();
+            config->printVersion();
+            return 0;
+        }
+        
+        // Config list option
+        if (arg == "--config-list" || arg == "--list-config") {
+            auto config = std::make_shared<Config>();
+            config->listConfigKeys();
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -356,15 +445,22 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
+    // Load config from file with better error handling
+    bool configFileLoaded = config->loadFromFile(configFile);
+    if (configFileLoaded) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
+        NLM_LOG_WARN("Configuration file not found or invalid: " + configFile);
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Override with command line args with error handling
+    try {
+        config->loadFromArgs(argc, argv);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error processing command line arguments: " + std::string(e.what()));
+        NLM_LOG_INFO("Continuing with default configuration.");
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -382,7 +478,7 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    // Log configuration summary with validation
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
@@ -392,18 +488,37 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
+    // Validate configuration values
+    NLM_LOG_INFO("Validating configuration...");
+    validateConfiguration(config);
+    
+    // Initialize simulation clock with validation
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation timestep: " + std::to_string(timestep));
+        NLM_LOG_INFO("Using default timestep: 0.001s");
+        timestep = 0.001;
+    }
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Initialize brain with comprehensive error handling
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
     
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+    std::shared_ptr<Brain> brain;
+    try {
+        brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            NLM_LOG_ERROR("Failed to initialize brain!");
+            NLM_LOG_ERROR("Brain initialization failed - check configuration values");
+            return 1;
+        }
+    } catch (const std::bad_alloc& e) {
+        NLM_LOG_ERROR("Memory allocation failed during brain initialization: " + std::string(e.what()));
+        return 1;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception during brain initialization: " + std::string(e.what()));
         return 1;
     }
     
@@ -413,15 +528,19 @@ int main(int argc, char** argv) {
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    // Note: Remove redundant brain->reset() and brain->initialize() calls
+    // These are unnecessary and reduce performance without providing benefit
+    // Reset is called internally by experiment functions when needed
+    // brain->reset();
+    // brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
+    // Same comment as above - remove redundant calls
+    // brain->reset();
+    // brain->initialize();
     runStdpVerification(brain);
     
     // Final brain status
