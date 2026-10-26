@@ -93,13 +93,41 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Enhanced configuration methods
+    
+    // Load from YAML file
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Load from JSON string
+    bool loadFromJSON(const std::string& str);
+    
+    // Load from environment variables
+    void loadFromEnvironment();
+    
+    // Validate configuration
+    bool validate() const;
+    
+    // Generate configuration template
+    std::string generateTemplate() const;
+    
+    // Nested key support
+    std::optional<ConfigValue> getNested(const std::string& key) const;
+    void setNested(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    bool hasNested(const std::string& key) const;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+private:
+    // Internal JSON/YAML parsing helpers
+    static std::map<std::string, ConfigValue> parseJSON(const std::string& filepath);
+    static std::map<std::string, ConfigValue> parseJSONFromString(const std::string& str);
+    static std::map<std::string, ConfigValue> parseYAML(const std::string& filepath);
+    static std::map<std::string, ConfigValue> parseYAMLFromString(const std::string& str);
+    
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

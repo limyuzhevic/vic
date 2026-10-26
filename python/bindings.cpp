@@ -342,6 +342,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+             "Get count of pending spike events")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
@@ -351,7 +353,108 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // ========== MEMORY SYSTEMS ==========
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        
+        // ========== PREDICTION SYSTEM ==========
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        
+        // ========== COGNITION SYSTEMS ==========
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner system")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        
+        // ========== DEVELOPMENT SYSTEM ==========
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        
+        // ========== NEUROMODULATION SYSTEMS ==========
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error neuromodulator")
+        
+        // ========== PLASTICITY SYSTEMS ==========
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity rule")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity rule")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        
+        // ========== ADVANCED METHODS ==========
+        .def("getMostActiveNeurons", [](Brain& self, size_t count) {
+            return self.getSpikeSystem()->getMostActiveNeurons(count);
+        }, py::arg("count") = 10,
+             "Get the most active neurons")
+        .def("getNeuronsByType", [](Brain& self, NeuronType type) {
+            std::vector<NeuronId> result;
+            for (const auto& region : self.getRegions()) {
+                for (const auto& pop : region->getPopulations()) {
+                    if (pop->getNeuronType() == type) {
+                        for (const auto* neuron : pop->getNeurons()) {
+                            result.push_back(neuron->getId());
+                        }
+                    }
+                }
+            }
+            return result;
+        }, py::arg("type"),
+             "Get all neurons of a specific type")
+        .def("getSynapsesBetween", [](Brain& self, NeuronId source, NeuronId target) {
+            std::vector<SynapseId> result;
+            for (const auto& region : self.getRegions()) {
+                for (const auto& syn : region->getSynapses()) {
+                    if (syn->getSourceNeuron() == source && syn->getDestinationNeuron() == target) {
+                        result.push_back(syn->getId());
+                    }
+                }
+            }
+            return result;
+        }, py::arg("source"), py::arg("target"),
+             "Get synapses between two neurons")
+        .def("getSynapsesByWeight", [](Brain& self, float minWeight) {
+            std::vector<SynapseId> result;
+            for (const auto& region : self.getRegions()) {
+                for (const auto& syn : region->getSynapses()) {
+                    if (syn->getWeight() >= minWeight) {
+                        result.push_back(syn->getId());
+                    }
+                }
+            }
+            return result;
+        }, py::arg("minWeight"),
+             "Get synapses with weight >= minimum");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -400,20 +503,89 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             "Initialize with world")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Initialize logger for Python bindings
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "ValueError");
+    py::register_exception<std::out_of_range>(m, "IndexError");
+    
+    // Add Python-style error handling
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
+        try {
+            return std::make_shared<Config>();
+        } catch (const std::exception& e) {
+            throw py::error_already_set();
+        }
     }, "Create a default configuration");
-
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
+        try {
+            return std::make_shared<Brain>(config);
+        } catch (const std::exception& e) {
+            throw py::error_already_set();
+        }
     }, py::arg("config"), "Create a new brain with configuration");
-
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
+        try {
+            return std::make_shared<SimpleWorld>();
+        } catch (const std::exception& e) {
+            throw py::error_already_set();
+        }
     }, "Create a new simple world");
-
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
+        try {
+            return std::make_shared<AgentBrain>(brain);
+        } catch (const std::exception& e) {
+            throw py::error_already_set();
+        }
     }, py::arg("brain"), "Create a new agent brain interface");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);

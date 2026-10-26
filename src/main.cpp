@@ -28,24 +28,42 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printHelp(const std::string& programName) {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+NLM (熙然) - Neural Learning Machine
+An experimental artificial developmental brain simulation
+
+USAGE: "" << programName << R"( [OPTIONS]
+
+OPTIONS:
+  --config <file>            Configuration file (default: configs/default.cfg)
+  --verbose <level>          Output verbosity: 0=quiet, 1=normal, 2=verbose, 3=debug
+  --log-level <level>        Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  --validate-config          Validate configuration before loading
+  --benchmark                Run benchmark instead of demo
+  --help                     Show this help message
+  --version                  Show version information
+
+EXAMPLES:
+  "" << programName << R"( --config myconfig.cfg
+  "" << programName << R"( --verbose 2 --log-level INFO
+  "" << programName << R"( --validate-config --benchmark
+  "" << programName << R"( --help
+  "" << programName << R"( --version
+
+For more information, visit: https://github.com/nlm-project/nlm
+
+";) << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "Version: 0.1.0 (Phase 2)" << std::endl;
+    std::cout << "Build: 2026-10-26" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "This is an experimental artificial developmental brain simulation." << std::endl;
+    std::cout << "Phase 2 implements real spiking neural computation with LIF neurons," << std::endl;
+    std::cout << "event-driven spike propagation, and multiple plasticity rules." << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -363,8 +381,54 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Parse command line arguments for enhanced CLI
+    int verboseLevel = 1;
+    std::string logLevel = "INFO";
+    bool validateConfig = false;
+    bool runBenchmark = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help") {
+            printHelp(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        } else if (arg == "--validate-config") {
+            validateConfig = true;
+        } else if (arg == "--benchmark") {
+            runBenchmark = true;
+        } else if (arg.substr(0, 10) == "--verbose=") {
+            verboseLevel = std::stoi(arg.substr(10));
+        } else if (arg.substr(0, 12) == "--log-level=") {
+            logLevel = arg.substr(12);
+        }
+        // --config= is handled by loadFromArgs below
+    }
+    
+    // Set logging level based on logLevel
+    LogLevel level;
+    if (logLevel == "DEBUG") level = LogLevel::Debug;
+    else if (logLevel == "WARNING") level = LogLevel::Warning;
+    else if (logLevel == "ERROR") level = LogLevel::Error;
+    else if (logLevel == "CRITICAL") level = LogLevel::Critical;
+    else level = LogLevel::Info;
+    
+    consoleLogger->setLevel(level);
+    NLM_LOG_INFO("Log level set to: " + logLevel);
+    NLM_LOG_INFO("Verbose level: " + std::to_string(verboseLevel));
+    
+    // Validate configuration if requested
+    if (validateConfig) {
+        NLM_LOG_INFO("Validating configuration...");
+        if (!config->validate()) {
+            NLM_LOG_ERROR("Configuration validation failed!");
+            return 1;
+        }
+        NLM_LOG_INFO("Configuration validation passed.");
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

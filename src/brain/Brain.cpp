@@ -511,8 +511,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current state for prediction
+        // The prediction system learns to predict future states
+        
+        // Create a representation of current state for prediction
+        std::vector<float> currentState;
+        
+        // Sample neural activity for prediction input
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    currentState.push_back(state.membranePotential);
+                    currentState.push_back(state.firingState == FiringState::Active ? 1.0f : 0.0f);
+                }
+            }
+        }
+        
+        // Use prediction system to learn from current state
+        pImpl->predictionSystem->train(currentState);
+        
+        // Update prediction error and confidence
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Use prediction error to guide neuromodulation
+        if (pImpl->dopamine) {
+            // Dopamine adjusts based on prediction error
+            // Positive prediction error (better than expected) increases dopamine
+            // Negative prediction error (worse than expected) decreases dopamine
+            pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() + predictionError * 0.1f);
+            pImpl->dopamine->setPlasticityFactor(1.0f + confidence * 0.5f);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +558,74 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        
+        // Create a simplified representation of current state for concept formation
+        std::vector<float> pattern;
+        std::vector<float> features;
+        
+        // Sample from active neurons for concept formation
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    if (neuron->isFiring() || state.firingState == FiringState::Active) {
+                        // Neuron activity contributes to concept
+                        float activation = (state.membranePotential - state.restingPotential) / 50.0f;
+                        if (activation < 0) activation = 0;
+                        if (activation > 1.0f) activation = 1.0f;
+                        
+                        pattern.push_back(activation);
+                        features.push_back(activation); // Feature is just activity
+                    }
+                }
+            }
+        }
+        
+        if (!pattern.empty()) {
+            // Get current reward for concept formation
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present this pattern to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                pattern, features, reward, currentStep);
+            
+            // Store concept formation result in episodic memory
+            if (conceptId > 0) {
+                ConceptInstance instance;
+                instance.pattern = pattern;
+                instance.features = features;
+                instance.observationCount = 1;
+                instance.lastObserved = currentStep;
+                instance.avgReward = reward;
+                instance.stability = 1.0f;
+                
+                // Store this instance in episodic memory for later replay
+                if (pImpl->episodicMemory) {
+                    EpisodicMemoryItem episode;
+                    episode.timestamp = currentStep;
+                    episode.reward = reward;
+                    episode.activeNeurons.clear();
+                    episode.neuronActivations.clear();
+                    
+                    // Record active neurons
+                    for (const auto& region : pImpl->regions) {
+                        for (const auto& pop : region->getPopulations()) {
+                            for (const auto* neuron : pop->getNeurons()) {
+                                if (neuron->isFiring() || 
+                                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                                    episode.activeNeurons.push_back(neuron->getId());
+                                    episode.neuronActivations.push_back(
+                                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                                }
+                            }
+                        }
+                    }
+                    
+                    pImpl->episodicMemory->storeEpisode(episode);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
