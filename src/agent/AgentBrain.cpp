@@ -1,7 +1,9 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/RandomGenerator.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cassert>
 
 namespace nlm {
 
@@ -18,7 +20,20 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , structuralPlasticityEnabled_(true)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
+    // Configuration parameters with default values
     , sensoryNoveltyDecay_(0.99f)
+    , curiosityNoveltyWeight_(2.0f)
+    , curiosityPredictionErrorWeight_(0.5f)
+    , expectedRewardDecayFactor_(0.95f)
+    , expectedRewardUpdateFactor_(0.05f)
+    , plasticityFactorBase_(0.5f)
+    , plasticityFactorMultiplier_(0.5f)
+    , actionThreshold_(0.5f)
+    , curiosityThreshold_(0.5f)
+    , developmentMaturationModifier_(0.5f)
+    // Debug logging
+    , debugLoggingEnabled_(false)
+    , lastDebugLogTime_(std::chrono::steady_clock::now())
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -29,17 +44,32 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
+                        // Note: MotorCommand enum now has 15 values (0-14)
                         size_t idx = motorForward_.size() + motorBackward_.size() + 
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
+                                    motorLookLeft_.size() + motorLookRight_.size() +
+                                    motorLook_.size() + motorLookUp_.size() +
+                                    motorLookDown_.size() + motorInteract_.size() +
+                                    motorEat_.size() + motorDrink_.size() +
+                                    motorRest_.size() + motorWait_.size() +
+                                    motorCustom_.size();
                         
-                        switch (idx % 6) {
+                        switch (idx % 15) {
                             case 0: motorForward_.push_back(n); break;
                             case 1: motorBackward_.push_back(n); break;
                             case 2: motorTurnLeft_.push_back(n); break;
                             case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                            case 4: motorLookLeft_.push_back(n); break;
+                            case 5: motorLookRight_.push_back(n); break;
+                            case 6: motorLook_.push_back(n); break;
+                            case 7: motorLookUp_.push_back(n); break;
+                            case 8: motorLookDown_.push_back(n); break;
+                            case 9: motorInteract_.push_back(n); break;
+                            case 10: motorEat_.push_back(n); break;
+                            case 11: motorDrink_.push_back(n); break;
+                            case 12: motorRest_.push_back(n); break;
+                            case 13: motorWait_.push_back(n); break;
+                            case 14: motorCustom_.push_back(n); break;
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
@@ -80,8 +110,8 @@ size_t AgentBrain::getSensoryInputSize() const {
 }
 
 size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+    // One motor neuron per action (including all 15 motor commands)
+    return 15;
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -144,7 +174,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
+        curiosityLevel_ = noveltyLevel_ * curiosityNoveltyWeight_ + std::abs(predictionError_) * curiosityPredictionErrorWeight_;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -178,8 +208,17 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     float backwardAct = calcActivity(motorBackward_);
     float leftAct = calcActivity(motorTurnLeft_);
     float rightAct = calcActivity(motorTurnRight_);
+    float lookLeftAct = calcActivity(motorLookLeft_);
+    float lookRightAct = calcActivity(motorLookRight_);
+    float lookAct = calcActivity(motorLook_);
+    float lookUpAct = calcActivity(motorLookUp_);
+    float lookDownAct = calcActivity(motorLookDown_);
     float interactAct = calcActivity(motorInteract_);
+    float eatAct = calcActivity(motorEat_);
+    float drinkAct = calcActivity(motorDrink_);
+    float restAct = calcActivity(motorRest_);
     float waitAct = calcActivity(motorWait_);
+    float customAct = calcActivity(motorCustom_);
     
     // Find maximum activity
     struct { MotorCommand cmd; float activity; } commands[] = {
@@ -187,8 +226,17 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         {MotorCommand::MoveBackward, backwardAct},
         {MotorCommand::TurnLeft, leftAct},
         {MotorCommand::TurnRight, rightAct},
+        {MotorCommand::LookLeft, lookLeftAct},
+        {MotorCommand::LookRight, lookRightAct},
+        {MotorCommand::Look, lookAct},
+        {MotorCommand::LookUp, lookUpAct},
+        {MotorCommand::LookDown, lookDownAct},
         {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
+        {MotorCommand::Eat, eatAct},
+        {MotorCommand::Drink, drinkAct},
+        {MotorCommand::Rest, restAct},
+        {MotorCommand::Wait, waitAct},
+        {MotorCommand::Custom, customAct}
     };
     
     MotorCommand best = MotorCommand::Wait;
@@ -202,7 +250,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     }
     
     // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    if (bestActivity < actionThreshold_) {
         return MotorCommand::Wait;
     }
     
@@ -211,14 +259,14 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
+    if (curiosityLevel_ > curiosityThreshold_) {
         // Higher curiosity = more exploration
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            // Random motor command - ensure range matches MotorCommand enum (0-14)
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 14);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -226,8 +274,16 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 3: return MotorCommand::TurnRight;
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+                case 6: return MotorCommand::Look;
+                case 7: return MotorCommand::LookUp;
+                case 8: return MotorCommand::LookDown;
+                case 9: return MotorCommand::Interact;
+                case 10: return MotorCommand::Eat;
+                case 11: return MotorCommand::Drink;
+                case 12: return MotorCommand::Rest;
+                case 13: return MotorCommand::Wait;
+                case 14: return MotorCommand::Custom;
+                default: return MotorCommand::Wait;  // Safety fallback
             }
         }
     }
@@ -242,7 +298,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     predictionError_ = reward - predictedReward;
     
     // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    expectedReward_ = expectedRewardDecayFactor_ * expectedReward_ + expectedRewardUpdateFactor_ * reward;
     
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
@@ -268,7 +324,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Modulate plasticity based on dopamine
     // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    float plasticityFactor = plasticityFactorBase_ + plasticityFactorMultiplier_ * dopamineLevel_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
@@ -280,8 +336,6 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
-    
     developmentalAge_ += timestep;
     
     // Simple developmental stages based on age
@@ -293,7 +347,7 @@ void AgentBrain::updateDevelopment(double timestep) {
         plasticityModifier_ = 0.8f;
         brain_->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
     } else if (developmentalAge_ < 900.0) {  // ~15 minutes
-        plasticityModifier_ = 0.5f;
+        plasticityModifier_ = developmentMaturationModifier_;  // Configurable maturation modifier
         brain_->setDevelopmentalStage(DevelopmentalStage::Maturation);
     } else {
         plasticityModifier_ = 0.2f;  // Adult - more stable
@@ -346,5 +400,109 @@ void AgentBrain::reset() {
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
 }
+
+#include <sstream>
+
+namespace nlm {
+
+// ... (rest of existing code)
+
+void AgentBrain::setDevelopmentStage(DevelopmentalStage stage) {
+    if (brain_) brain_->setDevelopmentalStage(stage);
+}
+
+void AgentBrain::setPlasticityModifier(float modifier) {
+    plasticityModifier_ = modifier;
+    if (structuralPlasticityEnabled_ && brain_) {
+        auto* sp = brain_->getStructuralPlasticity();
+        if (sp) {
+            float synRate = 0.0001f * modifier;
+            float pruneRate = 0.00001f * (2.0f - modifier);
+            sp->setSynaptogenesisRate(synRate);
+            sp->setPruningRate(pruneRate);
+        }
+    }
+}
+
+void AgentBrain::setNeuromodulationLevel(float level) {
+    dopamineLevel_ = std::clamp(level, -1.0f, 1.0f);
+}
+
+// Get brain statistics
+float AgentBrain::getAverageFiringRate() const {
+    if (!brain_) return 0.0f;
+    return brain_->getAverageFiringRate();
+}
+
+float AgentBrain::getExcitationInhibitionRatio() const {
+    if (!brain_) return 0.0f;
+    return brain_->getExcitationInhibitionRatio();
+}
+
+float AgentBrain::getDevelopmentProgress() const {
+    // Simple progress based on developmental age (0-100%)
+    const float maxAge = 900.0f; // Maturation stage
+    return std::min(developmentalAge_ / maxAge * 100.0f, 100.0f);
+}
+
+// Apply common neuromodulation presets
+void AgentBrain::applyCuriosityBoost() {
+    setCuriosityLevel(1.0f);
+}
+
+void AgentBrain::applyExplorationMode() {
+    enableCuriosity(true);
+    setCuriosityThreshold(0.2f);
+    setActionThreshold(0.3f);
+}
+
+void AgentBrain::applyExploitationMode() {
+    enableCuriosity(false);
+    setCuriosityThreshold(0.5f);
+    setActionThreshold(0.7f);
+}
+
+void AgentBrain::applyDevelopmentAcceleration() {
+    enableDevelopment(true);
+    setDevelopmentMaturationModifier(0.8f);
+    setPlasticityFactorBase(0.6f);
+}
+
+void AgentBrain::applyMaturationDeceleration() {
+    enableDevelopment(true);
+    setDevelopmentMaturationModifier(0.3f);
+    setPlasticityFactorBase(0.4f);
+}
+
+// Get configuration summary
+std::string AgentBrain::getConfigurationSummary() const {
+    std::ostringstream oss;
+    oss << "=== NLM AgentBrain Configuration ===\n";
+    oss << "Reward Modulation: " << (rewardModulationEnabled_ ? "Enabled" : "Disabled") << "\n";
+    oss << "Structural Plasticity: " << (structuralPlasticityEnabled_ ? "Enabled" : "Disabled") << "\n";
+    oss << "Development: " << (developmentEnabled_ ? "Enabled" : "Disabled") << "\n";
+    oss << "Curiosity: " << (curiosityEnabled_ ? "Enabled" : "Disabled") << "\n";
+    oss << "\nParameters:\n";
+    oss << "  Sensory Novelty Decay: " << sensoryNoveltyDecay_ << "\n";
+    oss << "  Curiosity Novelty Weight: " << curiosityNoveltyWeight_ << "\n";
+    oss << "  Curiosity Prediction Error Weight: " << curiosityPredictionErrorWeight_ << "\n";
+    oss << "  Expected Reward Decay Factor: " << expectedRewardDecayFactor_ << "\n";
+    oss << "  Expected Reward Update Factor: " << expectedRewardUpdateFactor_ << "\n";
+    oss << "  Plasticity Factor Base: " << plasticityFactorBase_ << "\n";
+    oss << "  Plasticity Factor Multiplier: " << plasticityFactorMultiplier_ << "\n";
+    oss << "  Action Threshold: " << actionThreshold_ << "\n";
+    oss << "  Curiosity Threshold: " << curiosityThreshold_ << "\n";
+    oss << "  Development Maturation Modifier: " << developmentMaturationModifier_ << "\n";
+    oss << "\nCurrent State:\n";
+    oss << "  Development Progress: " << getDevelopmentProgress() << "%\n";
+    oss << "  Neuromodulation Level: " << getNeuromodulationLevel() << "\n";
+    oss << "  Curiosity Level: " << getCuriosityLevel() << "\n";
+    oss << "  Novelty Level: " << getNoveltyLevel() << "\n";
+    oss << "  Prediction Error: " << getPredictionError() << "\n";
+    oss << "  Average Firing Rate: " << getAverageFiringRate() << " Hz\n";
+    return oss.str();
+}
+
+// ... (rest of existing code)
 
 } // namespace nlm

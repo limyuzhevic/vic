@@ -130,8 +130,15 @@ PYBIND11_MODULE(pynlm, m) {
         .value("TurnRight", MotorCommand::TurnRight)
         .value("LookLeft", MotorCommand::LookLeft)
         .value("LookRight", MotorCommand::LookRight)
+        .value("Look", MotorCommand::Look)
+        .value("LookUp", MotorCommand::LookUp)
+        .value("LookDown", MotorCommand::LookDown)
         .value("Interact", MotorCommand::Interact)
+        .value("Eat", MotorCommand::Eat)
+        .value("Drink", MotorCommand::Drink)
+        .value("Rest", MotorCommand::Rest)
         .value("Wait", MotorCommand::Wait)
+        .value("Custom", MotorCommand::Custom)
         .export_values();
 
     py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
