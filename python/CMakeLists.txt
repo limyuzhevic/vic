@@ -100,3 +100,9 @@ install(TARGETS pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
 )
+
+# Add enhanced bindings
+add_subdirectory(enhanced)
+
+# Add enhanced bindings
+add_subdirectory(enhanced)

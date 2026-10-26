@@ -899,6 +899,15 @@ bool Brain::load(const std::string& filepath) {
         // For now, just log the count
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
+        // TODO: Proper synapse restoration implementation
+        // Currently synapses are not restored from checkpoint - this needs to be implemented
+        // For a proper implementation, we would need to:
+        // 1. Match synapses by source/destination neurons
+        // 2. Restore synapse weights, delays, types, plasticity states
+        // 3. Recreate the synaptic connectivity structure
+        
+        NLM_LOG_WARNING("Synapse restoration is not fully implemented - checkpoint loading is partial");
+        
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         

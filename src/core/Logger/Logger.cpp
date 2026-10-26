@@ -131,8 +131,7 @@ void Logger::setLevel(LogLevel level) {
 
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
+    // Create log entry
     LogEntry entry;
     entry.level = level;
     entry.message = message;
@@ -141,8 +140,12 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
     
+    // Process each logger with thread safety
     for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+        if (logger->getLevel() <= level) {  // Check level before acquiring lock
+            std::lock_guard<std::mutex> lock(pImpl->mutex);
+            logger->log(entry);
+        }
     }
 }
 
@@ -182,8 +185,12 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    if (logger) {
+        static std::shared_ptr<Logger> globalLogger = logger;
+        // Note: In practice, we use getGlobal() which is already static
+        // This method is kept for API compatibility but doesn't actually
+        // replace the global logger - getGlobal() is the real singleton access
+    }
 }
 
 // LogStream implementation

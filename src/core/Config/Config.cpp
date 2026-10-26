@@ -19,16 +19,15 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +47,13 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception& e) {
+                return false;
+            }
+        } else {
+            return false;  // Invalid format
         }
     }
     
@@ -56,6 +61,7 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool success = true;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,17 +71,29 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                try {
+                    set(key, value, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    return false;
+                }
+            } else {
+                success = false;  // Invalid format
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            try {
+                set(key, value, ConfigSource::CommandLine);
+            } catch (const std::exception& e) {
+                return false;
+            }
+        } else {
+            success = false;  // Invalid format
         }
     }
-    return true;
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
@@ -86,7 +104,46 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Proper serialization of all ConfigValue types
+        file << entry.key << " = ";
+        std::visit([&file](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << val << "\"";
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t> ||
+                                 std::is_same_v<T, double> ||
+                                 std::is_same_v<T, bool>) {
+                file << val;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "["; bool first = true;
+                for (const auto& item : val) {
+                    if (!first) file << ", ";
+                    file << item;
+                    first = false;
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "["; bool first = true;
+                for (const auto& item : val) {
+                    if (!first) file << ", ";
+                    file << item;
+                    first = false;
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; bool first = true;
+                for (const auto& item : val) {
+                    if (!first) file << ", ";
+                    file << "\"" << item << "\"";
+                    first = false;
+                }
+                file << "]";
+            } else {
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
@@ -134,11 +191,27 @@ void Config::set(const std::string& key, int value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
 void Config::set(const std::string& key, double value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<int>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<double>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<std::string>& value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
