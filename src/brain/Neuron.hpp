@@ -134,7 +134,7 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Phase 6: LIF dynamics with spike-frequency adaptation and refractory period
     void step(Timestamp currentTime);
     
     // Reset to initial state

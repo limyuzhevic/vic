@@ -1,9 +1,32 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+// Helper function implementations
+template<typename... Args>
+std::vector<std::vector<Neuron*>*> getAllMotorGroups(Args&... groups) {
+    std::vector<std::vector<Neuron*>*> result = { &groups... };
+    return result;
+}
 
-namespace nlm {
+// Helper function implementations
+template<typename... Args>
+std::vector<std::vector<Neuron*>*> getAllSensoryGroups(Args&... groups) {
+    std::vector<std::vector<Neuron*>*> result = { &groups... };
+    return result;
+}
+
+// Helper function to distribute neurons based on type
+void distributeNeuronsByType(std::vector<Neuron*>& neurons, NeuronType type,
+                             const std::vector<std::vector<Neuron*>*>& targetGroups) {
+    if (neurons.empty() || targetGroups.empty()) return;
+    
+    // For now, distribute to all groups (can be refined per type)
+    for (size_t i = 0; i < neurons.size(); ++i) {
+        Neuron* n = neurons[i];
+        // Use modulo distribution across available groups
+        size_t groupIndex = i % targetGroups.size();
+        if (groupIndex < targetGroups.size() && targetGroups[groupIndex]) {
+            targetGroups[groupIndex]->push_back(n);
+        }
+    }
+}
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
@@ -20,41 +43,24 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups using helper functions
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
+                std::vector<Neuron*> neurons = pop->getNeurons();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
+                    // Get all motor groups
+                    auto motorGroups = getAllMotorGroups(motorForward_, motorBackward_, 
+                                                         motorTurnLeft_, motorTurnRight_, 
+                                                         motorInteract_, motorWait_);
+                    distributeNeuronsByType(neurons, type, motorGroups);
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
+                    // Get all sensory groups
+                    auto sensoryGroups = getAllSensoryGroups(sensoryVision_, sensoryTouch_, 
+                                                           sensoryInternal_, sensoryProprioception_);
+                    distributeNeuronsByType(neurons, type, sensoryGroups);
                 }
             }
         }

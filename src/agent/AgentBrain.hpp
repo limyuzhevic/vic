@@ -6,6 +6,7 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
 
@@ -75,6 +76,22 @@ private:
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Helper functions for neuron distribution
+    template<typename... Args>
+    static std::vector<std::vector<Neuron*>*> getAllMotorGroups(Args&... groups) {
+        std::vector<std::vector<Neuron*>*> result = { &groups... };
+        return result;
+    }
+    
+    template<typename... Args>
+    static std::vector<std::vector<Neuron*>*> getAllSensoryGroups(Args&... groups) {
+        std::vector<std::vector<Neuron*>*> result = { &groups... };
+        return result;
+    }
+    
+    static void distributeNeuronsByType(std::vector<Neuron*>& neurons, NeuronType type,
+                                        const std::vector<std::vector<Neuron*>*>& targetGroups);
     
     std::shared_ptr<Brain> brain_;
     

@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Phase 6: Real neuromodulation system with dynamic state modulation
 
 class Neuromodulator {
 public:
@@ -21,7 +21,7 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Phase 6: Real neuromodulation with state-dependent plasticity
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
