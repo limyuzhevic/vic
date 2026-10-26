@@ -7,6 +7,7 @@ namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , planner_(std::make_shared<NeuralPlanner>())
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -67,6 +68,13 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     previousVision_.resize(world.getVisionWidth() * world.getVisionHeight(), 0.0f);
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Initialize neural planner if we have a brain
+    if (brain_ && planner_) {
+        planner_->initialize(brain_.get());
+        planner_->setPlanningDepth(5);  // Default planning depth
+        NLM_LOG_INFO("AgentBrain neural planner initialized");
+    }
     
     NLM_LOG_INFO("AgentBrain initialized with " + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
@@ -153,6 +161,19 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
     MotorCommand decoded = decodeFromMotorNeurons();
+    
+    // Try to use neural planner if available and curiosity is enabled
+    if (curiosityEnabled_ && planner_ && !planner_->hasRecentSuccessfulPlan()) {
+        // Create current state representation from sensory input
+        std::vector<float> currentState = getCurrentState();
+        
+        // Let planner suggest a better action
+        MotorCommand planned = decodeWithPlanner(currentState);
+        if (planned != MotorCommand::Wait) {
+            decoded = planned;
+            NLM_LOG_INFO("Planner suggested action: " + actionTypeToString(planned));
+        }
+    }
     
     // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
@@ -334,17 +355,92 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+// Get current sensory state for planning
+std::vector<float> AgentBrain::getCurrentState() const {
+    std::vector<float> state;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    // Add vision data from brain's sensory neurons
+    for (Neuron* neuron : sensoryVision_) {
+        if (neuron) {
+            state.push_back(std::abs(neuron->getState().membranePotential - 
+                                   neuron->getState().restingPotential) / 10.0f);
+        }
+    }
+    
+    // Add internal signal data from internal sensory neurons
+    for (Neuron* neuron : sensoryInternal_) {
+        if (neuron) {
+            state.push_back(std::abs(neuron->getState().membranePotential - 
+                                   neuron->getState().restingPotential) / 10.0f);
+        }
+    }
+    
+    return state;
 }
 
-} // namespace nlm
+// Convert ActionType to MotorCommand
+MotorCommand AgentBrain::actionTypeToMotorCommand(ActionType actionType) {
+    switch (actionType) {
+        case ActionType::MoveForward: return MotorCommand::MoveForward;
+        case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+        case ActionType::TurnRight: return MotorCommand::TurnRight;
+        case ActionType::Look: return MotorCommand::LookLeft;  // Simplified
+        case ActionType::LookUp: return MotorCommand::LookUp;
+        case ActionType::LookDown: return MotorCommand::LookDown;
+        case ActionType::Interact: return MotorCommand::Interact;
+        case ActionType::Eat: return MotorCommand::Eat;
+        case ActionType::Drink: return MotorCommand::Drink;
+        case ActionType::Rest: return MotorCommand::Rest;
+        case ActionType::Wait: return MotorCommand::Wait;
+        case ActionType::Custom: return MotorCommand::Wait;
+        default: return MotorCommand::Wait;
+    }
+}
+
+// Action planning using neural planner
+MotorCommand AgentBrain::decodeWithPlanner(const std::vector<float>& currentState,
+                                         float targetReward) {
+    if (!planner_ || !brain_) {
+        return MotorCommand::Wait;
+    }
+    
+    // Get current goal from planner (or compute one)
+    std::vector<float> goal = planner_->getCurrentGoal();
+    if (goal.empty()) {
+        // Set a simple goal to move towards higher visual intensity areas
+        goal = std::vector<float>(currentState.size(), 0.0f);
+        for (size_t i = 0; i < currentState.size() && i < goal.size(); ++i) {
+            // Bias goal toward areas with higher activation
+            goal[i] = currentState[i] * (i % 2 == 0 ? 1.0f : 0.0f);
+        }
+    }
+    
+    // Let planner plan the next action
+    ActionType plannedActionType = planner_->planAction(currentState, targetReward);
+    
+    // Convert ActionType to MotorCommand (only ActionTypes that have MotorCommand equivalents)
+    MotorCommand plannedCmd = MotorCommand::Wait;
+    switch (plannedActionType) {
+        case ActionType::MoveForward: plannedCmd = MotorCommand::MoveForward; break;
+        case ActionType::MoveBackward: plannedCmd = MotorCommand::MoveBackward; break;
+        case ActionType::TurnLeft: plannedCmd = MotorCommand::TurnLeft; break;
+        case ActionType::TurnRight: plannedCmd = MotorCommand::TurnRight; break;
+        case ActionType::Look: plannedCmd = MotorCommand::LookLeft; break;  // Simplified
+        case ActionType::LookUp: plannedCmd = MotorCommand::LookUp; break;
+        case ActionType::LookDown: plannedCmd = MotorCommand::LookDown; break;
+        case ActionType::Interact: plannedCmd = MotorCommand::Interact; break;
+        case ActionType::Rest: plannedCmd = MotorCommand::Wait; break;
+        case ActionType::Wait: plannedCmd = MotorCommand::Wait; break;
+        case ActionType::Eat: plannedCmd = MotorCommand::Interact; break;  // Treat as interaction
+        case ActionType::Drink: plannedCmd = MotorCommand::Interact; break;  // Treat as interaction
+        case ActionType::Custom: plannedCmd = MotorCommand::Wait; break;
+        default: plannedCmd = MotorCommand::Wait; break;
+    }
+    
+    // Store action quality for learning
+    planner_->setActionQuality(plannedActionType, 0.5f);  // Initial quality
+    
+    return plannedCmd;
+}
+}

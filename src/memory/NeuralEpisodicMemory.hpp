@@ -29,6 +29,7 @@ struct EpisodicMemoryItem {
     float reward;
     float energy;
     float novelty;
+    float predictionError;
     
     // Consequence of action
     std::vector<float> resultingSensoryState;
@@ -44,7 +45,7 @@ struct EpisodicMemoryItem {
     EpisodicMemoryItem()
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
-        , reward(0), energy(0), novelty(0)
+        , reward(0), energy(0), novelty(0), predictionError(0)
         , resultingReward(0), age(0) {}
 };
 
@@ -109,7 +110,7 @@ public:
     float getAverageReward() const;
 
     // Clear old episodes
-    void consolidate(float relevanceThreshold);
+    void consolidate(float relevanceThreshold, float dopamineLevel = 1.0f);
 
     // Clear all episodes
     void clear();

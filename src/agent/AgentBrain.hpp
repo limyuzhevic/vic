@@ -3,6 +3,7 @@
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
+#include "../cognition/NeuralPlanner.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
@@ -55,19 +56,18 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Get neural planner for action planning
+    NeuralPlanner* getPlanner() const { return planner_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Configure planner settings
+    void setPlanningDepth(size_t depth) {
+        if (planner_) planner_->setPlanningDepth(depth);
+    }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Check if planner has formed useful plans
+    bool hasRecentSuccessfulPlan() const {
+        return planner_ && planner_->wasRecentPlanSuccessful();
+    }
     
 private:
     // Motor decoding: convert neural activity to motor command
@@ -76,7 +76,20 @@ private:
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
+    // Action planning using neural planner
+    MotorCommand decodeWithPlanner(const std::vector<float>& currentState,
+                                 float targetReward = 0.5f);
+    
+    // Get current sensory state for planning
+    std::vector<float> getCurrentState() const;
+    
+    // Convert ActionType to MotorCommand
+    static MotorCommand actionTypeToMotorCommand(ActionType actionType);
+    
     std::shared_ptr<Brain> brain_;
+    
+    // Neural planner for action planning
+    std::shared_ptr<NeuralPlanner> planner_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;

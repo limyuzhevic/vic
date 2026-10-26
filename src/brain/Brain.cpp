@@ -488,6 +488,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
+            // Store prediction error in the episode
+            // Prediction error is a key learning signal
+            float predictionError = 0.0f;
+            if (pImpl->predictionSystem) {
+                predictionError = pImpl->predictionSystem->getPredictionError();
+            }
+            episode.predictionError = predictionError;
+            
+            // Store sensory novelty in the episode
+            episode.novelty = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+            
             // Store active neurons
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
@@ -502,7 +513,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
-            // Store reward in episode
+            // Store reward in episode (using the same value as above to avoid redundancy)
+            // This is stored again for clarity in the episodic memory structure
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
@@ -511,8 +523,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Make prediction for next sensory state based on current neural activity
+        // This enables predictive coding and anticipation
+        std::vector<float> currentSensoryPattern;
+        if (!pImpl->sensoryNeurons.empty()) {
+            currentSensoryPattern.reserve(pImpl->sensoryNeurons.size());
+            for (Neuron* neuron : pImpl->sensoryNeurons) {
+                // Convert neural activity to sensory pattern
+                currentSensoryPattern.push_back(
+                    std::abs(neuron->getState().membranePotential - 
+                           neuron->getState().restingPotential) / 10.0f);
+            }
+        }
+        
+        // Convert to SensoryInput for prediction
+        SensoryInput currentSensory(currentSensoryPattern);
+        
+        // Make prediction
+        auto predictedSensory = pImpl->predictionSystem->predictNextState(currentSensory);
+        
+        if (predictedSensory) {
+            // Store prediction error for learning
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            
+            // Prediction error modulates neuromodulation systems
+            if (pImpl->dopamine) {
+                // High prediction error increases dopamine signaling
+                // This enhances learning and attention
+                float errorModulation = std::min(std::abs(predictionError) * 2.0f, 1.0f);
+                if (predictionError > 0.0f) {
+                    // Positive error = better than predicted
+                    pImpl->dopamine->signalReward(predictionError * 0.5f);
+                }
+            }
+            
+            // Prediction errors also modulate attention
+            if (pImpl->attention && predictionError > 0.01f) {
+                // High prediction error triggers increased attention
+                // to resolve the mismatch
+                pImpl->attention->update(pImpl->timestep);
+                pImpl->attention->setInhibitionStrength(0.3f);
+                pImpl->attention->setExcitationStrength(2.0f);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -579,7 +632,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        // Dopamine modulates consolidation - high dopamine = more efficient consolidation
+        float dopamineLevel = 1.0f;  // Default baseline
+        if (pImpl->dopamine) {
+            dopamineLevel = pImpl->dopamine->getLevel();
+        }
+        pImpl->episodicMemory->consolidate(0.3f, dopamineLevel);
     }
     
     // ========== STEP 15: Checkpoint management ==========

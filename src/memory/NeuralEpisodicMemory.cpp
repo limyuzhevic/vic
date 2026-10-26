@@ -218,13 +218,65 @@ float NeuralEpisodicMemory::getAverageReward() const {
     return sum / episodes_.size();
 }
 
-void NeuralEpisodicMemory::consolidate(float relevanceThreshold) {
-    // Remove episodes below relevance threshold
-    // In a full implementation, episodes would have relevance scores
-    // For now, just enforce max capacity
-    while (episodes_.size() > maxEpisodes_ * 0.8f) {
-        episodes_.erase(episodes_.begin());
+void NeuralEpisodicMemory::consolidate(float relevanceThreshold, float dopamineLevel) {
+    // Enhanced consolidation modulated by dopamine
+    // Dopamine signals reward prediction error - high dopamine = important memories
+    
+    // Modify relevance threshold based on dopamine level
+    // High dopamine (dopamineLevel > 1.0) = more lenient threshold = keep more memories
+    // Low dopamine (dopamineLevel < 1.0) = stricter threshold = keep fewer memories
+    float effectiveThreshold = relevanceThreshold;
+    if (dopamineLevel > 1.0f) {
+        // Dopamine enhances memory consolidation
+        effectiveThreshold = relevanceThreshold * std::pow(dopamineLevel, 0.5f);
+    } else if (dopamineLevel < 1.0f) {
+        // Low dopamine impairs consolidation
+        effectiveThreshold = relevanceThreshold * dopamineLevel;
     }
+    
+    // Use enhanced consolidation logic
+    // 1. Remove weak episodes first
+    auto it = episodes_.begin();
+    while (it != episodes_.end()) {
+        // Calculate episode relevance based on age, reward, and novelty
+        float relevance = calculateEpisodeRelevance(*it);
+        
+        if (relevance < effectiveThreshold) {
+            it = episodes_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    
+    // 2. If still too many episodes, prioritize by importance
+    if (episodes_.size() > maxEpisodes_ * 0.9f) {
+        std::vector<std::tuple<float, size_t>> scored;  // (score, index)
+        
+        for (size_t i = 0; i < episodes_.size(); ++i) {
+            float score = calculateEpisodeImportance(episodes_[i], dopamineLevel);
+            scored.emplace_back(score, i);
+        }
+        
+        // Sort by importance (highest first)
+        std::sort(scored.begin(), scored.end(),
+                 [](const auto& a, const auto& b) {
+                     return std::get<0>(a) > std::get<0>(b);
+                 });
+        
+        // Keep only the most important episodes
+        std::vector<EpisodicMemoryItem> importantEpisodes;
+        importantEpisodes.reserve(maxEpisodes_);
+        
+        for (size_t i = 0; i < std::min(maxEpisodes_, scored.size()); ++i) {
+            importantEpisodes.push_back(episodes_[std::get<1>(scored[i])]);
+        }
+        
+        episodes_ = std::move(importantEpisodes);
+    }
+    
+    NLM_LOG_INFO("Episodic memory consolidation complete: " +
+                 std::to_string(episodes_.size()) + " episodes, " +
+                 "dopamine=" + std::to_string(dopamineLevel));
 }
 
 void NeuralEpisodicMemory::clear() {
@@ -569,9 +621,45 @@ float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
         normB += b[i] * b[i];
     }
     
-    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
+    float NeuralEpisodicMemory::calculateEpisodeRelevance(const EpisodicMemoryItem& episode) const {
+    // Calculate episode relevance based on multiple factors
+    float relevance = 0.0f;
     
-    return dot / (std::sqrt(normA) * std::sqrt(normB));
+    // Reward contributes strongly to relevance
+    relevance += std::min(episode.reward, 1.0f) * 0.5f;
+    
+    // Recent episodes are more relevant
+    float recencyScore = 1.0f / (episode.age + 1.0f);
+    relevance += recencyScore * 0.3f;
+    
+    // Novelty adds relevance (unexpected experiences are valuable)
+    relevance += episode.novelty * 0.2f;
+    
+    return std::min(relevance, 1.0f);
+}
+
+float NeuralEpisodicMemory::calculateEpisodeImportance(const EpisodicMemoryItem& episode, float dopamineLevel) const {
+    // Calculate episode importance modulated by dopamine
+    float importance = calculateEpisodeRelevance(episode);
+    
+    // Dopamine enhances the importance of reward-associated memories
+    if (dopamineLevel > 1.0f) {
+        importance += (episode.reward - 0.5f) * (dopamineLevel - 1.0f) * 0.3f;
+    }
+    
+    // Higher reward = higher importance
+    importance += std::min(episode.reward, 1.0f) * 0.4f;
+    
+    // Recent episodes are more important
+    float recencyScore = 1.0f / (episode.age + 1.0f);
+    importance += recencyScore * 0.3f;
+    
+    // Dopamine also boosts memory of surprising events
+    if (dopamineLevel > 1.0f) {
+        importance += episode.novelty * 0.2f;
+    }
+    
+    return std::min(importance, 2.0f);  // Cap at 2.0 for scoring
 }
 
 } // namespace nlm
