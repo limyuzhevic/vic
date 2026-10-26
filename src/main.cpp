@@ -25,6 +25,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
 
 using namespace nlm;
 
@@ -49,24 +50,31 @@ void printBanner() {
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
-struct LearningExperiment {
-    std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
-    std::vector<float> initialWeights;
-    std::vector<float> finalWeights;
-    std::vector<NeuronId> mostActiveNeurons;
-    
+class LearningExperiment {
+public:
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
-    void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
+    ~LearningExperiment() {
+        // Cleanup vectors to ensure proper memory management
         initialWeights.clear();
+        finalWeights.clear();
+        mostActiveNeurons.clear();
+    }
+    
+    void recordInitialState() {
+        // Clear existing data first to ensure clean state
+        initialWeights.clear();
+        finalWeights.clear();
+        mostActiveNeurons.clear();
+        
+        initialSynapseCount = brain->getTotalSynapseCount();
         
         // Record initial weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
+            const auto& synapses = region->getSynapses();
+            initialWeights.reserve(synapses.size());
+            for (const auto& syn : synapses) {
                 initialWeights.push_back(syn->getWeight());
             }
         }
@@ -81,11 +89,16 @@ struct LearningExperiment {
     }
     
     void recordFinalState() {
+        // Clear existing data to ensure clean state
+        initialWeights.clear();
         finalWeights.clear();
+        mostActiveNeurons.clear();
         
         // Record final weights from first region
         if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
+            const auto& synapses = region->getSynapses();
+            finalWeights.reserve(synapses.size());
+            for (const auto& syn : synapses) {
                 finalWeights.push_back(syn->getWeight());
             }
         }
@@ -111,7 +124,7 @@ struct LearningExperiment {
             return;
         }
         
-        // Compute weight changes
+        // Pre-calculate sums for efficiency
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
         float initialMean = initialSum / initialWeights.size();
@@ -157,15 +170,23 @@ struct LearningExperiment {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
         }
     }
+    
+    // Add getter methods for better encapsulation
+    const std::vector<float>& getInitialWeights() const { return initialWeights; }
+    const std::vector<float>& getFinalWeights() const { return finalWeights; }
+    const std::vector<NeuronId>& getMostActiveNeurons() const { return mostActiveNeurons; }
+    size_t getInitialSynapseCount() const { return initialSynapseCount; }
+    
+private:
+    std::shared_ptr<Brain> brain;
+    uint64_t seed;
+    size_t initialSynapseCount;
+    std::vector<float> initialWeights;
+    std::vector<float> finalWeights;
+    std::vector<NeuronId> mostActiveNeurons;
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
-    
-    // Inject current into a few neurons and see if spikes propagate
-    auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+bool validateConfiguration(std::shared_ptr<Config> config);
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -366,12 +387,26 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Validate configuration parameters
+    if (!validateConfiguration(config)) {
+        NLM_LOG_ERROR("Configuration validation failed");
+        return 1;
+    }
+    
+    // Set default values for Phase 2 with validation
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    double timestep = 0.001;
+    config->set("simulation_timestep", timestep, ConfigSource::Default);
+    
+    int64_t neuronCount = 500;  // Smaller for faster test
+    config->set("neuron_count", neuronCount, ConfigSource::Default);
+    
+    int64_t regionCount = 1;
+    config->set("region_count", regionCount, ConfigSource::Default);
+    
+    float connectionProbability = 0.15f;
+    config->set("connection_probability", connectionProbability, ConfigSource::Default);
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
@@ -382,6 +417,8 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    NLM_LOG_INFO("Configuration validation passed");
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -389,10 +426,110 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+// Validation function definition
+bool validateConfiguration(std::shared_ptr<Config> config) {
+    bool isValid = true;
     
-    // Initialize simulation clock
+    // Check essential parameters
+    if (!config->has("neuron_count")) {
+        NLM_LOG_ERROR("Missing required parameter: neuron_count");
+        isValid = false;
+    } else {
+        int64_t neuronCount = config->getOr<int64_t>("neuron_count", 0);
+        if (neuronCount <= 0) {
+            NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be positive.");
+            isValid = false;
+        } else if (neuronCount > 1000000) {
+            NLM_LOG_ERROR("Neuron count " + std::to_string(neuronCount) + " is too large");
+            isValid = false;
+        }
+    }
+    
+    if (!config->has("region_count")) {
+        NLM_LOG_ERROR("Missing required parameter: region_count");
+        isValid = false;
+    } else {
+        int64_t regionCount = config->getOr<int64_t>("region_count", 0);
+        if (regionCount <= 0) {
+            NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be positive.");
+            isValid = false;
+        }
+    }
+    
+    if (!config->has("connection_probability")) {
+        NLM_LOG_ERROR("Missing required parameter: connection_probability");
+        isValid = false;
+    } else {
+        float connProb = config->getOr<float>("connection_probability", -1.0f);
+        if (connProb < 0.0f || connProb > 1.0f) {
+            NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connProb) + ". Must be between 0.0 and 1.0.");
+            isValid = false;
+        }
+    }
+    
+    // Check timestep
+    if (!config->has("simulation_timestep")) {
+        NLM_LOG_ERROR("Missing required parameter: simulation_timestep");
+        isValid = false;
+    } else {
+        double timestep = config->getOr<double>("simulation_timestep", 0.0);
+        if (timestep <= 0.0) {
+            NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep) + ". Must be positive.");
+            isValid = false;
+        } else if (timestep > 1.0) {
+            NLM_LOG_ERROR("Simulation timestep " + std::to_string(timestep) + " is too large (max 1.0s).");
+            isValid = false;
+        }
+    }
+    
+    // Check STDP parameters if present
+    if (config->has("stdp_ltp_weight")) {
+        float ltp = config->getOr<float>("stdp_ltp_weight", 0.0f);
+        if (ltp < 0.0f) {
+            NLM_LOG_ERROR("Invalid stdp_ltp_weight: " + std::to_string(ltp) + ". Must be non-negative.");
+            isValid = false;
+        }
+    }
+    
+    if (config->has("stdp_ltd_weight")) {
+        float ltd = config->getOr<float>("stdp_ltd_weight", 0.0f);
+        if (ltd < 0.0f) {
+            NLM_LOG_ERROR("Invalid stdp_ltd_weight: " + std::to_string(ltd) + ". Must be non-negative.");
+            isValid = false;
+        }
+    }
+    
+    if (config->has("stdp_tau")) {
+        float tau = config->getOr<float>("stdp_tau", 0.0f);
+        if (tau <= 0.0f) {
+            NLM_LOG_ERROR("Invalid stdp_tau: " + std::to_string(tau) + ". Must be positive.");
+            isValid = false;
+        }
+    }
+    
+    // Check structural plasticity parameters if present
+    if (config->has("synaptogenesis_rate")) {
+        float rate = config->getOr<float>("synaptogenesis_rate", 0.0f);
+        if (rate < 0.0f || rate > 1.0f) {
+            NLM_LOG_ERROR("Invalid synaptogenesis_rate: " + std::to_string(rate) + ". Must be between 0.0 and 1.0.");
+            isValid = false;
+        }
+    }
+    
+    if (config->has("pruning_rate")) {
+        float rate = config->getOr<float>("pruning_rate", 0.0f);
+        if (rate < 0.0f || rate > 1.0f) {
+            NLM_LOG_ERROR("Invalid pruning_rate: " + std::to_string(rate) + ". Must be between 0.0 and 1.0.");
+            isValid = false;
+        }
+    }
+    
+    if (!isValid) {
+        NLM_LOG_ERROR("Configuration validation failed. Please check configuration parameters.");
+    }
+    
+    return isValid;
+}
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");

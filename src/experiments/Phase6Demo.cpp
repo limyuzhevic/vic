@@ -11,6 +11,28 @@
 
 using namespace nlm;
 
+bool cleanupTemporaryFiles() {
+    const std::string tempPath = "/tmp/nlm_checkpoint_test.bin";
+    std::ifstream fileCheck(tempPath);
+    if (fileCheck.good()) {
+        fileCheck.close();
+        if (std::remove(tempPath.c_str()) != 0) {
+            NLM_LOG_WARNING("Failed to remove temporary checkpoint file: " + tempPath);
+            return false;
+        } else {
+            NLM_LOG_INFO("Cleaned up temporary checkpoint file: " + tempPath);
+            return true;
+        }
+    }
+    return true; // No file to clean up
+}
+
+bool safeFileOperation(const std::string& operation, const std::string& path) {
+    NLM_LOG_INFO("Performing " + operation + " on: " + path);
+    // In real implementation, would add more robust error handling
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
@@ -29,6 +51,8 @@ int main(int argc, char* argv[]) {
     
     if (!integrationOK) {
         std::cerr << "ERROR: Integration verification failed!" << std::endl;
+        // Clean up any temporary files before exiting
+        cleanupTemporaryFiles();
         return 1;
     }
     
@@ -80,6 +104,9 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+    
+    // Clean up temporary files
+    cleanupTemporaryFiles();
     
     return 0;
 }

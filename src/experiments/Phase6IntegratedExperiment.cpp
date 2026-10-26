@@ -1,11 +1,4 @@
-#include "Phase6IntegratedExperiment.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../agent/AgentBrain.hpp"
-#include <chrono>
-#include <cmath>
+#include <fstream>
 
 namespace nlm {
 
@@ -322,9 +315,12 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
     
-    // Create and initialize brain
+    // Create and initialize brain1
     auto brain1 = std::make_shared<Brain>(cfg);
-    brain1->initialize();
+    if (!brain1->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain1 for checkpoint test");
+        return false;
+    }
     
     // Run some steps
     for (int i = 0; i < 100; ++i) {
@@ -339,22 +335,72 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     
     // Save checkpoint
     std::string path = "/tmp/nlm_checkpoint_test.bin";
+    NLM_LOG_INFO("Saving checkpoint to: " + path);
     if (!brain1->save(path)) {
         NLM_LOG_ERROR("Failed to save checkpoint");
+        
+        // Clean up temp file if it exists
+        std::ifstream check(path);
+        if (check.good()) {
+            check.close();
+            std::remove(path.c_str());
+        }
         return false;
     }
     
+    // Verify file was created
+    std::ifstream verifyFile(path);
+    // Verify file was created
+    std::ifstream verifyFile(path);
+    if (!verifyFile.good()) {
+        NLM_LOG_ERROR("Checkpoint file not created after save operation");
+        // Clean up temp file if it exists
+        verifyFile.close();
+        
+        std::ifstream check2(path);
+        if (check2.good()) {
+            check2.close();
+            std::remove(path.c_str());
+        }
+        return false;
+    }
+    verifyFile.close();
+    
     // Create new brain and load
     auto brain2 = std::make_shared<Brain>(cfg);
-    brain2->initialize();
+    if (!brain2->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain2 for checkpoint test");
+        
+        // Clean up temp file
+        std::ifstream check3(path);
+        if (check3.good()) {
+            check3.close();
+            std::remove(path.c_str());
+        }
+        return false;
+    }
     
+    NLM_LOG_INFO("Attempting to load checkpoint from: " + path);
     if (!brain2->load(path)) {
         NLM_LOG_ERROR("Failed to load checkpoint");
+        
+        // Clean up temp file
+        std::ifstream check4(path);
+        if (check4.good()) {
+            check4.close();
+            std::remove(path.c_str());
+        }
         return false;
     }
     
     size_t totalSpikes2 = brain2->getTotalSpikeCount();
     NLM_LOG_INFO("Brain2 total spikes after load: " + std::to_string(totalSpikes2));
+    
+    // Clean up temporary checkpoint file
+    NLM_LOG_INFO("Cleaning up temporary checkpoint file");
+    if (std::remove(path.c_str()) != 0) {
+        NLM_LOG_WARNING("Failed to remove temporary checkpoint file: " + path);
+    }
     
     // Note: Due to the nature of neural simulation, exact state restoration
     // is complex. The load should restore the structure at minimum.
@@ -397,7 +443,170 @@ bool Phase6IntegratedExperiment::testReplay() {
     }
     
     NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
-    return true;
+} // namespace nlm
+
+// Phase 6 Config validation implementation
+namespace Phase6ConfigValidation {
+
+bool validate(const Phase6Config& config) {
+    bool isValid = true;
+    
+    // Validate maxSteps
+    if (config.maxSteps < defaultBounds.minMaxSteps) {
+        NLM_LOG_ERROR("maxSteps " + std::to_string(config.maxSteps) + 
+                     " is less than minimum " + std::to_string(defaultBounds.minMaxSteps));
+        isValid = false;
+    } else if (config.maxSteps > defaultBounds.maxMaxSteps) {
+        NLM_LOG_ERROR("maxSteps " + std::to_string(config.maxSteps) + 
+                     " exceeds maximum " + std::to_string(defaultBounds.maxMaxSteps));
+        isValid = false;
+    }
+    
+    // Validate neuronCount
+    if (config.neuronCount < defaultBounds.minNeuronCount) {
+        NLM_LOG_ERROR("neuronCount " + std::to_string(config.neuronCount) + 
+                     " is less than minimum " + std::to_string(defaultBounds.minNeuronCount));
+        isValid = false;
+    } else if (config.neuronCount > defaultBounds.maxNeuronCount) {
+        NLM_LOG_ERROR("neuronCount " + std::to_string(config.neuronCount) + 
+                     " exceeds maximum " + std::to_string(defaultBounds.maxNeuronCount));
+        isValid = false;
+    }
+    
+    // Validate regionCount
+    if (config.regionCount < defaultBounds.minRegionCount) {
+        NLM_LOG_ERROR("regionCount " + std::to_string(config.regionCount) + 
+                     " is less than minimum " + std::to_string(defaultBounds.minRegionCount));
+        isValid = false;
+    } else if (config.regionCount > defaultBounds.maxRegionCount) {
+        NLM_LOG_ERROR("regionCount " + std::to_string(config.regionCount) + 
+                     " exceeds maximum " + std::to_string(defaultBounds.maxRegionCount));
+        isValid = false;
+    }
+    
+    // Validate connectionProbability
+    if (config.connectionProbability < defaultBounds.minConnectionProbability) {
+        NLM_LOG_ERROR("connectionProbability " + std::to_string(config.connectionProbability) + 
+                     " is less than minimum " + std::to_string(defaultBounds.minConnectionProbability));
+        isValid = false;
+    } else if (config.connectionProbability > defaultBounds.maxConnectionProbability) {
+        NLM_LOG_ERROR("connectionProbability " + std::to_string(config.connectionProbability) + 
+                     " exceeds maximum " + std::to_string(defaultBounds.maxConnectionProbability));
+        isValid = false;
+    }
+    
+    // Validate replayCount
+    if (config.replayCount < defaultBounds.minReplayCount) {
+        NLM_LOG_ERROR("replayCount " + std::to_string(config.replayCount) + 
+                     " is less than minimum " + std::to_string(defaultBounds.minReplayCount));
+        isValid = false;
+    } else if (config.replayCount > defaultBounds.maxReplayCount) {
+        NLM_LOG_ERROR("replayCount " + std::to_string(config.replayCount) + 
+                     " exceeds maximum " + std::to_string(defaultBounds.maxReplayCount));
+        isValid = false;
+    }
+    
+    // Validate paths if file operations are enabled
+    if (config.enableCheckpointing && config.checkpointPath.empty()) {
+        NLM_LOG_ERROR("checkpointPath cannot be empty when checkpointing is enabled");
+        isValid = false;
+    }
+    
+    if (!isValid) {
+        NLM_LOG_ERROR("Phase 6 configuration validation failed. Please check configuration parameters.");
+    }
+    
+    return isValid;
 }
 
-} // namespace nlm
+std::string getValidationError(const Phase6Config& config) {
+    std::ostringstream oss;
+    oss << "Phase 6 Configuration Validation Failed:";
+    
+    if (config.maxSteps < defaultBounds.minMaxSteps) {
+        oss << " maxSteps " << config.maxSteps << " < " << defaultBounds.minMaxSteps;
+    }
+    
+    if (config.maxSteps > defaultBounds.maxMaxSteps) {
+        oss << " maxSteps " << config.maxSteps << " > " << defaultBounds.maxMaxSteps;
+    }
+    
+    if (config.neuronCount < defaultBounds.minNeuronCount) {
+        oss << " neuronCount " << config.neuronCount << " < " << defaultBounds.minNeuronCount;
+    }
+    
+    if (config.neuronCount > defaultBounds.maxNeuronCount) {
+        oss << " neuronCount " << config.neuronCount << " > " << defaultBounds.maxNeuronCount;
+    }
+    
+    if (config.regionCount < defaultBounds.minRegionCount) {
+        oss << " regionCount " << config.regionCount << " < " << defaultBounds.minRegionCount;
+    }
+    
+    if (config.regionCount > defaultBounds.maxRegionCount) {
+        oss << " regionCount " << config.regionCount << " > " << defaultBounds.maxRegionCount;
+    }
+    
+    if (config.connectionProbability < defaultBounds.minConnectionProbability) {
+        oss << " connectionProbability " << config.connectionProbability << " < " 
+            << defaultBounds.minConnectionProbability;
+    }
+    
+    if (config.connectionProbability > defaultBounds.maxConnectionProbability) {
+        oss << " connectionProbability " << config.connectionProbability << " > " 
+            << defaultBounds.maxConnectionProbability;
+    }
+    
+    if (config.replayCount < defaultBounds.minReplayCount) {
+        oss << " replayCount " << config.replayCount << " < " << defaultBounds.minReplayCount;
+    }
+    
+    if (config.replayCount > defaultBounds.maxReplayCount) {
+        oss << " replayCount " << config.replayCount << " > " << defaultBounds.maxReplayCount;
+    }
+    
+    if (config.enableCheckpointing && config.checkpointPath.empty()) {
+        oss << " checkpointPath is empty";
+    }
+    
+    if (oss.str() == "Phase 6 Configuration Validation Failed:") {
+        return "";
+    }
+    
+    return oss.str();
+}
+
+void applySafeDefaults(Phase6Config& config, const std::string& targetEnv) {
+    NLM_LOG_INFO("Applying safe defaults for environment: " + targetEnv);
+    
+    if (targetEnv == "production") {
+        config.maxSteps = 100000;
+        config.neuronCount = 5000;
+        config.regionCount = 2;
+        config.connectionProbability = 0.05f;
+        config.replayCount = 5;
+        config.enableDevelopment = false;
+        config.checkpointPath = "/var/log/nlm_checkpoints.bin";
+    } else if (targetEnv == "testing") {
+        config.maxSteps = 1000;
+        config.neuronCount = 100;
+        config.regionCount = 1;
+        config.connectionProbability = 0.1f;
+        config.replayCount = 1;
+        config.enableDevelopment = false;
+        config.checkpointPath = "./test_checkpoint.bin";
+    } else { // development
+        config.maxSteps = 10000;
+        config.neuronCount = 1000;
+        config.regionCount = 1;
+        config.connectionProbability = 0.1f;
+        config.replayCount = 10;
+        config.enableDevelopment = true;
+        config.checkpointPath = "./checkpoint_test.bin";
+    }
+}
+
+} // namespace Phase6ConfigValidation
+
+// Include namespace nlm for Phase6IntegratedExperiment methods
+using namespace nlm;
