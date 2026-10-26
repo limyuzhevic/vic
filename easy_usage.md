@@ -73,6 +73,45 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
+## Building and Running the Complete System
+
+NLM has multiple demo executables that showcase different phases of development:
+
+### Simple Brain Demo (Phase 2)
+
+```bash
+./nlm
+```
+
+This demonstrates basic neural computation with LIF neurons, synaptic plasticity, and learning.
+
+### Complete Integration Demo (Phase 6)
+
+```bash
+./nlm_phase6_demo
+```
+
+This is the most comprehensive demo that verifies all brain systems work together:
+- **Memory Systems** (Working Memory, Episodic Memory)
+- **Neuromodulation** (Dopamine, Curiosity, Novelty)
+- **Prediction System**
+- **Cognition** (Planning, Concept Formation, Attention)
+- **Development**
+- **Checkpointing** (Save/Load brain state)
+- **Replay** (Memory consolidation)
+
+### Quick Start Options
+
+For the Phase 6 demo, you can use command line options:
+
+```bash
+./nlm_phase6_demo --neurons=1000 --steps=5000
+./nlm_phase6_demo --config=./demo_config.cfg
+./nlm_phase6_demo --checkpoint=true --replay=false
+```
+
+---
+
 ## Simple Analogy
 
 | Real World | NLM Code |
@@ -268,6 +307,36 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+
+---
+
+## Building the Complete System
+
+To build and run all NLM demos:
+
+1. **Clone and build**:
+   ```bash
+   mkdir build
+   cd build
+   cmake .. -DCMAKE_BUILD_TYPE=Release
+   make -j4
+   ```
+
+2. **Run the complete integration demo**:
+   ```bash
+   ./nlm_phase6_demo
+   ```
+
+3. **Run the original brain demo**:
+   ```bash
+   ./nlm
+   ```
+
+4. **Or try other demos**:
+   ```bash
+   ./nlm_phase3_demo
+   ./nlm_phase4_demo
+   ```
 
 ---
 

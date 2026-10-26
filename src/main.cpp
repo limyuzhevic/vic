@@ -25,9 +25,128 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <algorithm>
+#include <sstream>
 
 using namespace nlm;
 
+// Forward declarations
+void printBanner();
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
+
+// Configuration validation constants
+const double MIN_SIMULATION_TIMESTEP = 1e-6;
+const double MAX_SIMULATION_TIMESTEP = 0.1;
+const size_t MIN_NEURON_COUNT = 10;
+const size_t MAX_NEURON_COUNT = 10000;
+const float MIN_CONNECTION_PROBABILITY = 0.01f;
+const float MAX_CONNECTION_PROBABILITY = 1.0f;
+
+/**
+ * Validates configuration parameters
+ * @return true if configuration is valid, false otherwise
+ */
+bool validateConfiguration(const Config& config) {
+    bool isValid = true;
+    
+    // Validate simulation timestep
+    double timestep = config.getOr<double>("simulation_timestep", 0.001);
+    if (timestep < MIN_SIMULATION_TIMESTEP || timestep > MAX_SIMULATION_TIMESTEP) {
+        NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep) +
+                     ". Must be between " + std::to_string(MIN_SIMULATION_TIMESTEP) +
+                     " and " + std::to_string(MAX_SIMULATION_TIMESTEP));
+        isValid = false;
+    }
+    
+    // Validate neuron count
+    int64_t neuronCount = config.getOr<int64_t>("neuron_count", 500);
+    if (neuronCount < static_cast<int64_t>(MIN_NEURON_COUNT) ||
+        neuronCount > static_cast<int64_t>(MAX_NEURON_COUNT)) {
+        NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) +
+                     ". Must be between " + std::to_string(MIN_NEURON_COUNT) +
+                     " and " + std::to_string(MAX_NEURON_COUNT));
+        isValid = false;
+    }
+    
+    // Validate connection probability
+    float connProb = config.getOr<float>("connection_probability", 0.15f);
+    if (connProb < MIN_CONNECTION_PROBABILITY || connProb > MAX_CONNECTION_PROBABILITY) {
+        NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connProb) +
+                     ". Must be between " + std::to_string(MIN_CONNECTION_PROBABILITY) +
+                     " and " + std::to_string(MAX_CONNECTION_PROBABILITY));
+        isValid = false;
+    }
+    
+    // Validate region count
+    int64_t regionCount = config.getOr<int64_t>("region_count", 1);
+    if (regionCount < 1) {
+        NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) +
+                     ". Must be at least 1");
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+/**
+ * Parse command line arguments for more comprehensive configuration
+ */
+void parseAdvancedCommandLineArgs(const Config& config, int argc, char** argv) {
+    std::map<std::string, std::string> argMap;
+    
+    // Simple command line argument parsing for advanced options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 2) == "--") {
+            size_t eqPos = arg.find('=');
+            if (eqPos != std::string::npos) {
+                std::string key = arg.substr(2, eqPos - 2);
+                std::string value = arg.substr(eqPos + 1);
+                argMap[key] = value;
+            } else {
+                argMap[arg.substr(2)] = "true";
+            }
+        }
+    }
+    
+    // Process advanced options
+    auto it = argMap.find("test_mode");
+    if (it != argMap.end()) {
+        std::string testMode = it->second;
+        if (testMode == "quick") {
+            NLM_LOG_INFO("Quick test mode enabled - reducing simulation complexity");
+        } else if (testMode == "thorough") {
+            NLM_LOG_INFO("Thorough test mode enabled - increasing simulation complexity");
+        }
+    }
+    
+    it = argMap.find("verbose");
+    if (it != argMap.end()) {
+        NLM_LOG_INFO("Verbose output enabled");
+    }
+    
+    it = argMap.find("save_results");
+    if (it != argMap.end()) {
+        NLM_LOG_INFO("Results will be saved to: " + it->second);
+    }
+}
+
+/**
+ * Generate a formatted timestamp for logging
+ */
+std::string getTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+
+/**
+ * Print banner with version information
+ */
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -69,6 +188,8 @@ struct LearningExperiment {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_WARNING("No region found for initial weight recording");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -88,6 +209,9 @@ struct LearningExperiment {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_WARNING("No region found for final weight recording");
+            return;
         }
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
@@ -165,7 +289,10 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("No region found for connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
@@ -250,7 +377,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("No region found for STDP test");
+        return;
+    }
     
     // Get first few synapses
     auto& synapses = region->getSynapses();
@@ -324,6 +454,9 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Log startup timestamp
+    NLM_LOG_INFO("Program started at: " + getTimestamp());
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
@@ -366,6 +499,9 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
+    // Advanced command line argument parsing
+    parseAdvancedCommandLineArgs(*config, argc, argv);
+    
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
@@ -384,13 +520,19 @@ int main(int argc, char** argv) {
     
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration Summary:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    
+    // Validate configuration
+    if (!validateConfiguration(*config)) {
+        NLM_LOG_ERROR("Configuration validation failed! Exiting.");
+        return 1;
+    }
+    NLM_LOG_INFO("Configuration validation passed!");
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);

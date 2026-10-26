@@ -63,7 +63,6 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
 
 ```bash
@@ -76,11 +75,54 @@ make -j4
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
-./nlm_phase6_demo
+./nlm_phase6_demo [OPTIONS]
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 2 Demo (Basic Neural Computation)
+
+```bash
+./nlm
+```
+
+This runs the original Phase 2 neural computation demo demonstrating LIF neurons, STDP learning, and structural plasticity.
+
+### Phase 3 Demo
+
+```bash
+./nlm_phase3_demo
+```
+
+### Phase 4 Demo
+
+```bash
+./nlm_phase4_demo
+```
+
+## Phase 6 Demo Options
+
+The Phase 6 demo supports various command line options:
+
+```bash
+nlm_phase6_demo --neurons=1000 --steps=5000 --regions=2
+nlm_phase6_demo --conn_prob=0.05 --checkpoint=true --replay=false
+nlm_phase6_demo --config=./demo_config.cfg
+nlm_phase6_demo --help
+```
+
+Available options:
+- `--neurons=N` - Number of neurons (default: 500)
+- `--steps=N` - Maximum simulation steps (default: 2000)
+- `--regions=N` - Number of brain regions (default: 1)
+- `--conn_prob=VAL` - Connection probability (default: 0.1)
+- `--checkpoint[=BOOL]` - Enable checkpointing (default: true)
+- `--replay[=BOOL]` - Enable replay (default: true)
+- `--development[=BOOL]` - Enable development (default: true)
+- `--config=FILE` - Load configuration from file
+- `--help` - Show this help message
 
 ## Project Structure
 
