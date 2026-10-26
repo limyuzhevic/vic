@@ -18,6 +18,88 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
+## Key Features
+
+- **Complete Integration**: Phase 6 implements all major brain systems (memory, neuromodulation, prediction, development) working together
+- **Dual Interface**: Both C++ and Python APIs available for different use cases
+- **Developmental Stages**: Brain matures through critical periods, maturation, and aging
+- **Memory Systems**: Working memory, episodic memory, and associative memory
+- **Neuromodulation**: Dopamine, curiosity, novelty, and prediction error
+- **Prediction & Planning**: Neural prediction system with cognitive planning
+- **Checkpointing & Replay**: Save/load brain state and memory replay
+- **Real Neural Computation**: LIF neurons with event-driven spike propagation and STDP learning
+
+## Building (C++)
+
+### Prerequisites
+
+- **C++ Compiler**: GCC 10+, Clang 12+, or MSVC 2019+
+- **CMake**: Version 3.16 or higher
+- **Python**: 3.8+ (for Python bindings)
+- **pybind11**: Version 2.11.0+ (for Python bindings)
+
+### Build Steps
+
+```bash
+# Navigate to the project directory
+cd /path/to/nlm
+
+# Create a build directory
+mkdir -p build
+cd build
+
+# Configure with CMake (Release build for best performance)
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build all targets
+make -j$(nproc)
+
+# Run tests (if built)
+ctest --output-on-failure
+```
+
+### Build Outputs
+
+After successful compilation, you will have:
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | Main simulation executable (Phase 2 demo) |
+| `nlm_core` | Static Library | Core brain components |
+| `nlm_agent` | Static Library | Agent system |
+| `nlm_world` | Static Library | World simulation |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_test` | Executable | Unit test suite |
+
+### Python Installation
+
+From the root directory:
+
+```bash
+# Install Python dependencies
+pip install scikit-build-core pybind11 numpy pytest
+
+# Build and install the Python bindings
+pip install .
+
+# Or install in development mode
+pip install -e .
+```
+
+### Quick Test
+
+```bash
+# Run C++ tests
+./build/nlm_test
+
+# Run Phase 6 integration demo
+cd build && ./nlm_phase6_demo
+
+# Test Python bindings
+python3 -c "import pynlm; brain = pynlm.createBrain(pynlm.createDefaultConfig()); brain.initialize(); print('Python bindings work!')"
+```
+
 ## Current Phase
 
 **PHASE 6: FINAL INTEGRATION**
