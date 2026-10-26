@@ -1,49 +1,56 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
+// Configuration validation rules
+struct ValidationRule {
     std::string key;
-    ConfigValue value;
-    ConfigSource source;
+    std::string type; // "int", "double", "bool", "string", "range"
+    std::string min;
+    std::string max;
     std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    bool required = false;
 };
 
-// Main configuration class
+// Configuration validation interface
+class IConfigValidator {
+public:
+    virtual ~IConfigValidator() = default;
+    virtual bool validate(const std::string& key, const ConfigValue& value) const = 0;
+    virtual std::string getError(const std::string& key, const ConfigValue& value) const = 0;
+};
+
+// Range validation for numeric types
+class RangeValidator : public IConfigValidator {
+public:
+    RangeValidator(double min, double max, const std::string& errorMsg = "");
+    
+    bool validate(const std::string& key, const ConfigValue& value) const override;
+    std::string getError(const std::string& key, const ConfigValue& value) const override;
+    
+    void setMin(double min);
+    void setMax(double max);
+    double getMin() const;
+    double getMax() const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Choices validator for string types
+class ChoicesValidator : public IConfigValidator {
+public:
+    ChoicesValidator(const std::vector<std::string>& choices, const std::string& errorMsg = "");
+    
+    bool validate(const std::string& key, const ConfigValue& value) const override;
+    std::string getError(const std::string& key, const ConfigValue& value) const override;
+    
+    void addChoice(const std::string& choice);
+    bool hasChoice(const std::string& choice) const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Main configuration class with enhanced validation
 class Config {
 public:
     Config();
@@ -93,6 +100,19 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    void addValidator(std::shared_ptr<IConfigValidator> validator);
+    void removeValidator(const std::string& key);
+    void clearValidators();
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Default management
+    void setDefault(const std::string& key, const ConfigValue& value, const std::string& description = "");
+    bool hasDefault(const std::string& key) const;
+    ConfigValue getDefault(const std::string& key) const;
+    void clearDefaults();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -101,5 +121,3 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
-
-} // namespace nlm
