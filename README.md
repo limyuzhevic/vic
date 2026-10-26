@@ -18,6 +18,60 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
+## Python Bindings (pynlm)
+
+NLM includes comprehensive **Python bindings** (`pynlm`) that expose the entire NLM simulation framework through a Pythonic interface. This makes it easy to create, simulate, and study artificial brains without needing to work directly with C++ code.
+
+### Key Features
+
+- **Complete API**: Full access to all NLM brain systems
+- **Easy Integration**: Simple Python interface for complex simulations
+- **Documentation**: Comprehensive documentation with examples
+- **Testing**: Extensive test suite for validation
+- **Development Support**: Tools for rapid prototyping and experimentation
+
+### Getting Started
+
+```bash
+# Install Python bindings
+pip install -e .
+
+# Run Python tests
+python test_python_bindings.py
+```
+
+```python
+import pynlm
+
+# Create a simple brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Simulate for 100 steps
+for i in range(100):
+    brain.step(i)
+
+print(f"Simulation complete. {brain.getTotalSpikeCount()} spikes generated.")
+```
+
+### Python Examples
+
+The `python_docs.md` file contains:
+- Complete API documentation
+- Usage examples for all major classes
+- Configuration parameter details
+- Troubleshooting guide
+- Best practices
+- Advanced usage patterns
+
+### Testing
+
+The `test_python_bindings.py` file provides:
+- Unit tests for all Python bindings
+- Integration tests for agent-world loops
+- Checkpoint functionality tests
+- Examples matching documentation patterns
+
 ## Current Phase
 
 **PHASE 6: FINAL INTEGRATION**
@@ -73,45 +127,86 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Available Targets
+
+After building, you will have:
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | Main simulation executable |
+| `nlm_core` | Static Library | Core brain components |
+| `nlm_agent` | Static Library | Agent system |
+| `nlm_world` | Static Library | World simulation |
+| `nlm_phase3` | Static Library | Phase 3 experiments |
+| `nlm_phase4` | Static Library | Phase 4 experiments |
+| `nlm_phase5` | Static Library | Phase 5 experiments |
+| `nlm_phase6` | Static Library | Phase 6 integration |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase5_demo` | Executable | Phase 5 demonstration |
+| `nlm_phase6_demo` | Executable | Phase 6 integration demo |
+| `nlm_phase6_test` | Executable | Phase 6 integration tests |
+
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
+# Run the comprehensive Phase 6 integration test
 ./nlm_phase6_demo
+
+# Run specific Phase 6 tests
+./nlm_phase6_test
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs a comprehensive integration test verifying all brain systems are properly connected and working together.
+
+### Python Examples
+
+```bash
+# Run Python test suite to validate bindings
+python test_python_bindings.py
+
+# View Python documentation
+open python_docs.md
+```
 
 ## Project Structure
 
 ```
 NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
+├── CMakeLists.txt              # Build configuration
+├── README.md                   # This file
+├── python_docs.md              # Python API documentation
+├── test_python_bindings.py     # Python test suite
+├── docs/                      # Documentation
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
 │   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   └── PHASE6_FINAL_AUDIT.md
+├── src/                       # Source code
+│   ├── core/                 # Core utilities
+│   ├── brain/                # Neural components (integrated)
+│   ├── dynamics/             # Neural dynamics
+│   ├── plasticity/           # Plasticity rules
+│   ├── development/          # Developmental system
+│   ├── neuromodulation/       # Neuromodulators (integrated)
+│   ├── memory/               # Memory systems (integrated)
+│   ├── prediction/           # Prediction systems (integrated)
+│   ├── cognition/            # Cognitive mechanisms (integrated)
+│   ├── sensory/              # Sensory processing
+│   ├── motor/                # Motor system
+│   ├── environment/          # Environment interface
+│   ├── experiments/          # Experiment framework (Phase 6)
+│   └── visualization/        # Visualization
+├── tests/                     # C++ unit test suite
+├── python/                    # Python bindings source
+│   └── bindings.cpp           # C++ bindings implementation
+├── configs/                   # Configuration files
+└── easy_usage.md              # Beginner-friendly usage guide
+└── HOW_TO_USE.md              # Comprehensive user guide
 ```
 
 ## Phase Summary
@@ -161,6 +256,8 @@ NLM/
 - Checkpoint save/load working
 - Replay and consolidation functional
 - Phase 6 integration experiment created
+- **Python bindings completed**
+- **Comprehensive documentation created**
 
 ## Scientific Limitations
 
@@ -221,10 +318,72 @@ CHANGED BRAIN
 CHANGED FUTURE BEHAVIOR
 ```
 
+## Key Improvements in Phase 6
+
+### Integration Achievements
+
+1. **Memory Integration**: All memory systems (working, episodic, associative) are now fully integrated and operational
+2. **Neuromodulation**: Dopamine, curiosity, and novelty systems work together to coordinate learning and behavior
+3. **Prediction System**: Prediction error drives attention, learning, and action selection
+4. **Cognition**: Neural planner, concept formation, and self-model systems are integrated
+5. **Development**: Comprehensive developmental stages modulate multiple system rates
+6. **Persistence**: Full checkpoint system enables saving and loading of brain states
+7. **Replay**: Memory replay mechanisms support consolidation
+
+### User Experience Improvements
+
+1. **Python Bindings**: Complete Python API for easy access to NLM functionality
+2. **Documentation**: Comprehensive documentation with examples and troubleshooting
+3. **Testing**: Extensive test suites for both C++ and Python APIs
+4. **Build System**: Complete integration of Phase 6 targets into CMake
+5. **Command-line Tools**: Multiple demonstration executables for different phases
+
+### Technical Improvements
+
+1. **Phase 6 Build Targets**: All Phase 6 experiments and demos are now properly integrated into the build system
+2. **Integration Tests**: Comprehensive test suite for verifying system integration
+3. **Code Quality**: Resolved documentation discrepancies and improved code organization
+4. **Performance**: Optimized hot paths and integrated performance infrastructure
+
+## Python for Researchers and Developers
+
+The Python bindings make NLM particularly valuable for:
+
+- **Research**: Easy experimentation with different brain configurations
+- **Education**: Teaching computational neuroscience concepts
+- **Prototyping**: Rapid development of new brain architectures
+- **Integration**: Combining NLM with other Python scientific tools
+- **Testing**: Automated testing and validation of brain simulations
+
+## Getting Help
+
+### Documentation
+
+- `python_docs.md` - Complete Python API documentation
+- `HOW_TO_USE.md` - Comprehensive user guide for all NLM features
+- `easy_usage.md` - Beginner-friendly quick start guide
+
+### Testing and Validation
+
+- `test_python_bindings.py` - Python binding test suite
+- `tests/` - C++ unit test suite
+
+### Online Resources
+
+- Project documentation in `docs/` directory
+- GitHub repository with additional examples
+- Issue tracker for bug reports and feature requests
+
 ## License
 
-MIT
+MIT License. See LICENSE file for details.
 
 ## Authors
 
 Research project — See docs for scientific background.
+
+---
+
+**Phase 6 represents the culmination of years of development, creating a coherent artificial brain system that integrates memory, neuromodulation, prediction, cognition, and development into a single functional unit.**
+
+The NLM project continues to evolve, with Python bindings and improved user experience making it more accessible to researchers, educators, and developers working in computational neuroscience and artificial intelligence.
