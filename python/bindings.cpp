@@ -181,7 +181,17 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        // Vision convenience methods
+        .def("getVisionData", [](const Vision& v) {
+            return v.getData();
+        }, "Get vision data as a flat list")
+        .def("setVisionData", [](Vision& v, const std::vector<float>& data, 
+                               size_t width, size_t height) {
+            v.configure(width, height);
+            v.setData(data);
+        }, py::arg("data"), py::arg("width"), py::arg("height"),
+         "Set vision data with dimensions");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -191,7 +201,17 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        // Audio convenience methods
+        .def("getAudioData", [](const Audio& a) {
+            return a.getData();
+        }, "Get audio data as a flat list")
+        .def("setAudioData", [](Audio& a, const std::vector<float>& data, 
+                              size_t sampleRate) {
+            a.setSampleRate(sampleRate);
+            a.setData(data);
+        }, py::arg("data"), py::arg("sampleRate"),
+         "Set audio data with sample rate");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
@@ -400,26 +420,95 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Advanced agent features
+    .def("getRandomSeed", &AgentBrain::getRandomGenerator)
+        .def("setExplorationBias", &AgentBrain::setExplorationBias, py::arg("bias"))
+        .def("getExplorationBias", &AgentBrain::getExplorationBias)
+        .def("getNetworkStats", &AgentBrain::getNetworkStats);
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
+
+    // Configuration utilities
+    m.def("createConfigFromFile", [](const std::string& filename) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filename);
+        return config;
+    }, py::arg("filename"), "Create configuration from file");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
+    // Advanced brain creation
+    m.def("createBrainFromParams", [](uint64_t neuronCount, uint64_t regionCount, 
+                                     float connectionProbability) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("brain.region_count", static_cast<int64_t>(regionCount));
+        config->set("brain.connection_probability", connectionProbability);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuronCount"), py::arg("regionCount"), py::arg("connectionProbability"),
+     "Create brain with custom parameters");
+
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
+
+    // Advanced world features
+    m.def("createWorldWithParams", [](uint64_t width, uint64_t height, 
+                                     size_t visionWidth, size_t visionHeight,
+                                     float maxEnergy) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->setMaxEnergy(maxEnergy);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+     py::arg("maxEnergy"), "Create world with custom parameters");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced agent brain features
+    m.def("createAdvancedAgentBrain", [](std::shared_ptr<Brain> brain, 
+                                        std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create and initialize advanced agent brain");
+
+    // System constants and utilities
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Version and info
+    m.attr("__version__") = "0.1.0";
+    m.attr("__description__") = "NLM (Neural Learning Machine) Python Bindings";
+    
+    // Advanced simulation utilities
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                             std::shared_ptr<AgentBrain> agent, uint64_t steps) {
+        for (uint64_t i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            agent->applyRewardModulation(
+                world->getSensoryPercept().getInternal()[0], 0.0f);
+            agent->updateDevelopment(0.1);
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+     "Run complete simulation loop with all components");
+
+    m.def("getSystemInfo", []() {
+        return "NLM Python Bindings v0.1.0 - Advanced neural simulation framework";
+    }, "Get system information");
 }
 
 } // namespace nlm

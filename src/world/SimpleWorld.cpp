@@ -46,6 +46,10 @@ void SimpleWorld::setRandomSeed(uint64_t seed) {
     rngState_ = seed;
 }
 
+uint64_t SimpleWorld::getRandomSeed() const {
+    return rngSeed_;
+}
+
 void SimpleWorld::reset() {
     simTime_ = 0.0;
     agent_.reset();

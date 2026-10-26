@@ -47,11 +47,26 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
+    "-DBUILD_PYTHON_BINDINGS=ON",  # Enable Python bindings build
 ]
+cmake.define = { NLM_SOURCE_DIR = "src" }
 
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
+# Python module output directory
+[tool.scikit-build.modules.pynlm]
+module-dir = "python"
+
+# Install Python module to site-packages
+[tool.scikit-build]
+install-dir = "${{PREFIX}}/lib/python{{ python_version_minor }}/site-packages"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+# Additional configuration for development
+[build.wheel]
+build-backend = "scikit_build_core.build"
+
+# Include Python bindings in package
+[packages.include]
+python = "python"
