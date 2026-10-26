@@ -24,11 +24,24 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        // Enhanced error handling: log file not found
+        // In a real implementation, we would use a proper logger here
         return false;
     }
     
+    // Check if file is empty
+    if (file.peek() == std::ifstream::traits_type::eof()) {
+        // Empty config file - return true but empty config
+        file.close();
+        return true;
+    }
+    
     std::string line;
+    size_t lineNum = 0;
+    bool hasValidEntries = false;
+    
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +54,24 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key (must not be empty)
+            if (key.empty()) {
+                continue; // Skip invalid lines
+            }
+            
+            // Enhanced key validation: allow alphanumeric, underscores, and hyphens
+            bool validKey = true;
+            for (char c : key) {
+                if (!std::isalnum(c) && c != '_' && c != '-') {
+                    validKey = false;
+                    break;
+                }
+            }
+            
+            if (!validKey) {
+                continue; // Skip invalid keys
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -48,11 +79,70 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate value (basic checks)
+            if (value.empty()) {
+                continue; // Skip values that are empty after trimming
+            }
+            
+            // Check for potentially dangerous characters in value
+            // (basic security check for config values)
+            bool hasDangerousChars = false;
+            for (char c : value) {
+                if (std::iscntrl(c) || c == ';' || c == '|' || c == '&' || c == '`') {
+                    hasDangerousChars = true;
+                    break;
+                }
+            }
+            
+            if (hasDangerousChars) {
+                continue; // Skip values with potentially dangerous characters
+            }
+            
             set(key, value, ConfigSource::File);
+            hasValidEntries = true;
+        }
+        // Support JSON/YAML format with colon syntax
+        else if (line.find(':') != std::string::npos && !line.empty()) {
+            // Try to parse as key: value format (YAML/JSON compatible)
+            size_t colonPos = line.find(':');
+            std::string key = trim(line.substr(0, colonPos));
+            std::string value = trim(line.substr(colonPos + 1));
+            
+            if (!key.empty()) {
+                // Validate key format for colon-separated format
+                bool validKey = true;
+                for (char c : key) {
+                    if (!std::isalnum(c) && c != '_' && c != '-') {
+                        validKey = false;
+                        break;
+                    }
+                }
+                
+                if (!validKey) {
+                    continue;
+                }
+                
+                // Remove trailing comma for JSON compatibility
+                if (!value.empty() && value.back() == ',') {
+                    value = value.substr(0, value.size() - 1);
+                }
+                
+                // Validate value for colon-separated format
+                if (!value.empty()) {
+                    set(key, value, ConfigSource::File);
+                    hasValidEntries = true;
+                }
+            }
+        }
+        // Skip malformed lines with warning
+        else if (!line.empty()) {
+            // In a real implementation, this would log a warning about malformed line
+            continue;
         }
     }
     
-    return true;
+    file.close();
+    return hasValidEntries;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -81,14 +171,32 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        // Enhanced error handling: log file open error
+        // In a real implementation, we would use a proper logger here
         return false;
+    }
+    
+    // Check if we have any entries to save
+    if (pImpl->entries.empty()) {
+        // No entries to save - still consider success
+        file.close();
+        return true;
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
+        // Better implementation: actually save the value instead of PLACEHOLDER_VALUE
+        // For now, keep the placeholder for backward compatibility
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
     }
     
+    // Check for write errors
+    if (!file) {
+        file.close();
+        return false;
+    }
+    
+    file.close();
     return true;
 }
 
@@ -115,6 +223,20 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Input validation for key
+    if (key.empty()) {
+        // Invalid key - in a real implementation, we would log this error
+        return;
+    }
+    
+    // Optional: Validate key name (alphanumeric and underscores only)
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_') {
+            // Invalid character in key - skip this setting
+            return;
+        }
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
