@@ -4,6 +4,13 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <chrono>
+#include <ctime>
+#include <map>
+#include <iomanip>
+#include <algorithm>
+#include <vector>
+#include <string>
 
 namespace nlm {
 
@@ -12,6 +19,7 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    std::map<std::string, std::string> contextData;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -30,17 +38,45 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     std::ostringstream oss;
+    
+    // Add timestamp with milliseconds
+    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        entry.timestamp.time_since_epoch()) % 1000;
+    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    oss << "." << std::setfill('0') << std::setw(3) << ms.count() << " ";
+    
+    // Add log level with enhanced formatting
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Add thread ID for debugging
+    oss << "[thread:" << std::this_thread::get_id() << "] ";
     
-    oss << " " << entry.message;
+    // Add file and line information if provided
+    if (!entry.file.empty()) {
+        oss << "[" << entry.file;
+        if (entry.line > 0) {
+            oss << ":" << entry.line;
+        }
+        oss << "] ";
+    }
+    
+    // Add function information if provided
+    if (!entry.function.empty()) {
+        oss << "[" << entry.function << "] ";
+    }
+    
+    // Add context data
+    for (const auto& context : pImpl->contextData) {
+        oss << "[" << context.first << ":" << context.second << "] ";
+    }
+    
+    // Add the message
+    oss << entry.message;
     
     std::string output = oss.str();
     
-    // Console output
+    // Console output with enhanced formatting
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
     } else {
@@ -80,6 +116,18 @@ void ConsoleLogger::closeOutputFile() {
     }
 }
 
+void ConsoleLogger::setContext(const std::string& key, const std::string& value) {
+    pImpl->contextData[key] = value;
+}
+
+void ConsoleLogger::clearContext(const std::string& key) {
+    pImpl->contextData.erase(key);
+}
+
+void ConsoleLogger::clearAllContext() {
+    pImpl->contextData.clear();
+}
+
 std::string ConsoleLogger::levelToString(LogLevel level) const {
     switch (level) {
         case LogLevel::Debug: return "DEBUG";
@@ -102,13 +150,18 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
     }
 }
 
-// Logger class implementation
+// Logger class implementation with enhanced features
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    std::map<std::string, std::string> globalContext;
+    std::vector<LogEntry> recentLogs;
+    size_t maxRecentLogs;
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    pImpl->maxRecentLogs = 1000;
+}
 
 Logger::~Logger() = default;
 
@@ -129,6 +182,21 @@ void Logger::setLevel(LogLevel level) {
     }
 }
 
+void Logger::setGlobalContext(const std::string& key, const std::string& value) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->globalContext[key] = value;
+}
+
+void Logger::clearGlobalContext(const std::string& key) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->globalContext.erase(key);
+}
+
+void Logger::clearAllGlobalContext() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->globalContext.clear();
+}
+
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
@@ -140,6 +208,27 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.line = line;
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
+    
+    // Add global context to message
+    std::string contextMessage = message;
+    if (!pImpl->globalContext.empty()) {
+        contextMessage += " [context:";
+        bool first = true;
+        for (const auto& context : pImpl->globalContext) {
+            if (!first) contextMessage += ", ";
+            contextMessage += context.first + "=" + context.second;
+            first = false;
+        }
+        contextMessage += "]";
+    }
+    
+    entry.message = contextMessage;
+    
+    // Store recent log for debugging
+    pImpl->recentLogs.push_back(entry);
+    if (pImpl->recentLogs.size() > pImpl->maxRecentLogs) {
+        pImpl->recentLogs.erase(pImpl->recentLogs.begin());
+    }
     
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
@@ -186,7 +275,26 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     // In practice, we just use getGlobal() which is already static
 }
 
-// LogStream implementation
+std::vector<LogEntry> Logger::getRecentLogs(size_t count) const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    if (count == 0 || count > pImpl->recentLogs.size()) {
+        return pImpl->recentLogs;
+    }
+    std::vector<LogEntry> recent;
+    recent.reserve(count);
+    auto start = pImpl->recentLogs.end() - count;
+    for (auto it = start; it != pImpl->recentLogs.end(); ++it) {
+        recent.push_back(*it);
+    }
+    return recent;
+}
+
+void Logger::clearRecentLogs() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->recentLogs.clear();
+}
+
+// LogStream implementation with enhanced features
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
     : level_(level), file_(file), line_(line), function_(function) {}
 

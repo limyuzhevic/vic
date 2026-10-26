@@ -29,6 +29,8 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/Utilities/Utilities.cpp
+    src/core/MemoryManagement/MemoryManagement.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -90,7 +92,23 @@ add_library(nlm_core STATIC
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/brain>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/Utilities>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/MemoryManagement>
 )
+
+# Add compilation flags for better error checking and warnings
+target_compile_features(nlm_core PUBLIC cxx_std_20)
+
+# Enable additional warnings
+target_compile_options(nlm_core PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror -Wshadow -Wnon-virtual-dtor -Wold-style-cast>
+)
+
+# Add define for better diagnostics
+target_compile_definitions(nlm_core PRIVATE NLM_ENABLE_ASSERTIONS)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
