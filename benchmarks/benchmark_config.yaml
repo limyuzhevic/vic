@@ -1,0 +1,169 @@
+# NLM Benchmark Configuration
+
+This configuration file defines the benchmark parameters for the NLM performance testing suite.
+
+# Benchmark Configurations
+benchmarks:
+  micro:
+    neurons: 1000
+    steps: 10000
+    timestep: 0.001
+    sparsity: 0.1
+    connectivity: "random"
+    description: "Small-scale benchmark for development and validation"
+    target_performance: 10000  # steps/sec
+    memory_target: 1.0  # MB
+  
+  small:
+    neurons: 10000
+    steps: 20000
+    timestep: 0.001
+    sparsity: 0.05
+    connectivity: "random"
+    description: "Medium-scale benchmark for performance testing"
+    target_performance: 5000  # steps/sec
+    memory_target: 10.0  # MB
+  
+  medium:
+    neurons: 100000
+    steps: 50000
+    timestep: 0.001
+    sparsity: 0.01
+    connectivity: "distance"
+    description: "Large-scale benchmark for scalability analysis"
+    target_performance: 1000  # steps/sec
+    memory_target: 100.0  # MB
+  
+  large:
+    neurons: 1000000
+    steps: 100000
+    timestep: 0.001
+    sparsity: 0.005
+    connectivity: "distance"
+    description: "Maximum-scale benchmark for production validation"
+    target_performance: 100  # steps/sec
+    memory_target: 1000.0  # MB
+
+# Performance Metrics to Measure
+performance_metrics:
+  measure:
+    - neurons_per_second
+    - spikes_per_second
+    - real_time_factor
+    - memory_usage
+    - energy_efficiency
+    - cache_efficiency
+    - event_queue_efficiency
+    - simd_utilization
+    
+  targets:
+    micro:
+      min_steps_per_second: 5000
+      min_memory_efficiency: 500  # bytes/neuron
+      min_real_time_factor: 5.0
+    
+    small:
+      min_steps_per_second: 2500
+      min_memory_efficiency: 600  # bytes/neuron
+      min_real_time_factor: 10.0
+    
+    medium:
+      min_steps_per_second: 500
+      min_memory_efficiency: 800  # bytes/neuron
+      min_real_time_factor: 20.0
+    
+    large:
+      min_steps_per_second: 50
+      min_memory_efficiency: 1000  # bytes/neuron
+      min_real_time_factor: 50.0
+
+# Hardware Configuration
+hardware:
+  cores: 8
+  memory_limit_gb: 16
+  benchmark_timeout_minutes: 60
+  profiling: true
+  cache_analysis: true
+  energy_monitoring: false
+
+# Output Configuration
+output:
+  directory: "results"
+  format: "json,csv,summary"
+  compression: "gzip"
+  include_raw_data: true
+  generate_plots: true
+  generate_reports: true
+
+# Validation Rules
+validation:
+  memory_gate:
+    micro: 2000  # bytes/neuron
+    small: 2000  # bytes/neuron
+    medium: 3000  # bytes/neuron
+    large: 5000  # bytes/neuron
+  
+  speed_gate:
+    micro: 5000  # steps/sec
+    small: 2500  # steps/sec
+    medium: 500  # steps/sec
+    large: 100  # steps/sec
+  
+  event_gate:
+    max_processing_time_us: 10  # microseconds
+  
+  cache_gate:
+    min_efficiency: 80  # percent
+
+# Comparison Targets
+comparison:
+  framework_targets:
+    nest:
+      neurons_per_second: 50000
+      memory_efficiency: 1000  # bytes/neuron
+      overhead_percent: 20
+    
+    brian2:
+      neurons_per_second: 200000
+      memory_efficiency: 800  # bytes/neuron
+      overhead_percent: 15
+    
+    spinnaker:
+      neurons_per_second: 1000000
+      memory_efficiency: 500  # bytes/neuron
+      overhead_percent: 10
+    
+    nlm:
+      neurons_per_second: 637582
+      memory_efficiency: 1248  # bytes/neuron
+      overhead_percent: 5
+
+# Automated Testing Schedule
+automation:
+  daily:
+    enabled: true
+    time: "02:00"
+    scales: ["micro", "small"]
+  
+  weekly:
+    enabled: true
+    time: "Monday 02:00"
+    scales: ["micro", "small", "medium"]
+  
+  nightly:
+    enabled: false
+    time: "23:00"
+    scales: ["micro"]
+
+# Monitoring and Alerting
+monitoring:
+  enable_email_alerts: true
+  alert_email: "nlm-performance@example.com"
+  threshold_violation_alert: true
+  performance_regression_alert: true
+  
+  # Performance thresholds for alerts
+  alert_thresholds:
+    memory_usage_increase: 20  # percent
+    performance_decrease: 10   # percent
+    cache_efficiency_drop: 5    # percent

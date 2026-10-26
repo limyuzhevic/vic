@@ -290,8 +290,24 @@ print("Agent simulation complete!")
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
+1. Read the `NLM_Documentation.md` for more detailed information and building instructions
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+
+For Phase 6 integration, check out the examples in `docs/PHASE6_ARCHITECTURE.md`.
+
+The Phase 6 integration experiment (`nlm_phase6_demo`) demonstrates how all the brain systems work together as a coherent artificial brain. This includes:
+
+- Memory systems (working memory, episodic memory)
+- Neuromodulation (dopamine, curiosity, novelty)
+- Prediction and cognition systems
+- Development and structural plasticity
+- Checkpointing and replay capabilities
+
+After working through the examples, you can run the Phase 6 demo to see the complete integration in action:
+
+```bash
+./nlm_phase6_demo
+```
 
 That's it! You're now ready to use NLM.
