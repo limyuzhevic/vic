@@ -1,7 +1,7 @@
-#include "AgentBrain.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
+#include "../motor/Action.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
 
 namespace nlm {
 
@@ -124,6 +124,31 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
+    // Apply ACh-based attention modulation to sensory neurons
+    float achLevel = getAcetylcholineLevel();
+    if (achLevel > 0.3f) {
+        // Enhance important sensory neurons based on attention
+        for (Neuron* neuron : sensoryVision_) {
+            // ACh increases signal-to-noise ratio
+            if (neuron) {
+                float attentionBoost = achLevel * 2.0f;
+                neuron->injectCurrent(attentionBoost);
+            }
+        }
+    }
+    
+    // Apply NE-based arousal modulation
+    float neLevel = getNorepinephrineLevel();
+    if (neLevel > 0.2f) {
+        // NE increases sensitivity to novel stimuli
+        float arousalBoost = neLevel * 1.5f;
+        for (Neuron* neuron : sensoryTouch_) {
+            if (neuron) {
+                neuron->injectCurrent(arousalBoost);
+            }
+        }
+    }
+    
     // Compute novelty (difference from previous vision)
     if (!vision.empty()) {
         float totalDiff = 0.0f;
@@ -142,10 +167,68 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         previousVision_ = vision;
     }
     
-    // Update curiosity based on novelty
+    // Update curiosity based on novelty and prediction error
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        
+        // Apply NE modulation to curiosity
+        float neArousal = neLevel * 0.5f;
+        curiosityLevel_ = std::min(1.0f, curiosityLevel_ + neArousal);
+    }
+    
+    // Apply serotonin-based stability modulation
+    float serotoninLevel = getSerotoninLevel();
+    if (serotoninLevel > 0.5f) {
+        // High serotonin reduces impulsive exploration, promotes stable behavior
+        float stabilityBoost = (serotoninLevel - 0.5f) * 2.0f;
+        // This would affect action selection in decodeMotorCommand
+        plasticityModifier_ = std::max(0.5f, plasticityModifier_ - stabilityBoost * 0.1f);
+    }
+    
+    // Process through Brain's cognitive systems if available
+    if (brain_) {
+        // Extract neural activity pattern for concept formation
+        std::vector<float> neuralPattern;
+        float totalNeuralActivity = 0.0f;
+        
+        for (const auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activity = std::abs(state.membranePotential - state.restingPotential);
+                    neuralPattern.push_back(activity);
+                    totalNeuralActivity += activity;
+                }
+            }
+        }
+        
+        if (!neuralPattern.empty() && totalNeuralActivity > 1.0f) {
+            // Normalize pattern
+            float scale = 1.0f / totalNeuralActivity;
+            for (float& val : neuralPattern) {
+                val *= scale;
+            }
+            
+            // Present to concept formation for learning
+            auto* conceptFormation = brain_->getConceptFormation();
+            if (conceptFormation && conceptFormation->getConceptCount() > 0) {
+                // Find matching concept
+                size_t conceptId = conceptFormation->getMatchingConcept(neuralPattern, 0.6f);
+                if (conceptId > 0) {
+                    // Update concept with new instance
+                    conceptFormation->updateConcept(conceptId, neuralPattern, vision, predictionError_);
+                }
+            }
+            
+            // Update self-model with this sensory experience
+            auto* selfModel = brain_->getSelfModel();
+            if (selfModel) {
+                // For simplicity, we'd need to track before/after states
+                // This would be implemented in a full integration
+                selfModel->setCapabilityLevel(0.5f + serotoninLevel * 0.3f);
+            }
+        }
     }
 }
 
@@ -334,17 +417,91 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+float AgentBrain::getAcetylcholineLevel() const {
+    if (!brain_) return 0.0f;
+    auto* ach = brain_->getAcetylcholine();
+    return ach ? ach->getLevel() : 0.0f;
+}
+
+float AgentBrain::getNorepinephrineLevel() const {
+    if (!brain_) return 0.0f;
+    auto* ne = brain_->getNorepinephrine();
+    return ne ? ne->getLevel() : 0.0f;
+}
+
+float AgentBrain::getSerotoninLevel() const {
+    if (!brain_) return 0.0f;
+    auto* serotonin = brain_->getSerotonin();
+    return serotonin ? serotonin->getLevel() : 0.0f;
+}
+
+void AgentBrain::applyAcetylcholineModulation(float level) {
+    if (!brain_) return;
+    auto* ach = brain_->getAcetylcholine();
+    if (ach) {
+        ach->setLevel(level);
+    }
+}
+
+void AgentBrain::applyNorepinephrineModulation(float level) {
+    if (!brain_) return;
+    auto* ne = brain_->getNorepinephrine();
+    if (ne) {
+        ne->setLevel(level);
+    }
+}
+
+void AgentBrain::applySerotoninModulation(float level) {
+    if (!brain_) return;
+    auto* serotonin = brain_->getSerotonin();
+    if (serotonin) {
+        serotonin->setLevel(level);
+    }
+}
+
+std::vector<float> AgentBrain::getNeuralActivitySummary(size_t maxNeurons) const {
+    std::vector<float> summary;
+    if (!brain_) return summary;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    // Collect neural activity from all regions
+    size_t collected = 0;
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (collected >= maxNeurons) return summary;
+                
+                const auto& state = neuron->getState();
+                float activity = std::abs(state.membranePotential - state.restingPotential);
+                summary.push_back(activity);
+                collected++;
+            }
+        }
+    }
+    
+    return summary;
+}
+
+// Helper method to get neural activity from a specific population type
+float AgentBrain::getAverageActivityForType(NeuronType type) const {
+    if (!brain_) return 0.0f;
+    
+    float totalActivity = 0.0f;
+    size_t count = 0;
+    
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            if (pop->getNeuronType() == type) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activity = std::abs(state.membranePotential - state.restingPotential);
+                    totalActivity += activity;
+                    count++;
+                }
+            }
+        }
+    }
+    
+    return count > 0 ? totalActivity / count : 0.0f;
 }
 
 } // namespace nlm

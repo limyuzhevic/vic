@@ -52,11 +52,29 @@ public:
     // Get prediction error
     float getPredictionError() const;
     
-    // Reset agent for new episode
-    void reset();
+    // Get acetylcholine level (attention)
+    float getAcetylcholineLevel() const;
     
-    // Get brain pointer
-    Brain* getBrain() { return brain_.get(); }
+    // Get norepinephrine level (arousal/alertness)
+    float getNorepinephrineLevel() const;
+    
+    // Get serotonin level (mood/stability)
+    float getSerotoninLevel() const;
+    
+    // Apply acetylcholine modulation (attention)
+    void applyAcetylcholineModulation(float level);
+    
+    // Apply norepinephrine modulation (arousal)
+    void applyNorepinephrineModulation(float level);
+    
+    // Apply serotonin modulation (mood)
+    void applySerotoninModulation(float level);
+    
+    // Get current brain state for advanced users
+    const std::shared_ptr<Brain>& getBrain() const { return brain_; }
+    
+    // Get neural activity summary
+    std::vector<float> getNeuralActivitySummary(size_t maxNeurons = 1000) const;
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
