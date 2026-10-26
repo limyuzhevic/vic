@@ -99,6 +99,13 @@ uint32_t Neuron::getRefractoryPeriod() const {
     return pImpl->state.refractoryPeriod;
 }
 
+void Neuron::setRefractoryPeriod(uint32_t steps) {
+    pImpl->state.refractoryRemaining = steps;
+    if (steps > 0) {
+        pImpl->state.firingState = FiringState::Refractory;
+    }
+}
+
 void Neuron::setRestingPotential(MembranePotential potential) {
     pImpl->state.restingPotential = potential;
 }

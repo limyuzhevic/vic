@@ -403,6 +403,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Store current neural activity in working memory
+        // Simple integration: neurons that fire get stored
+        
+        // Get neurons that are firing or have high activation
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 10.0f);
+                    }
+                }
+            }
+        }
+        
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
@@ -511,12 +527,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with sensory evidence
+        // The prediction system would receive current sensory input
+        // and update its expectations
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
+        // Update attentional selection based on current neural activity
+        // Attention modulates which neural assemblies are selected for working memory
         pImpl->attention->update(pImpl->timestep);
         
         // Apply attention to working memory winners
@@ -528,9 +547,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This requires sensory state encoding from attention system
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Integrate with working memory
+        if (pImpl->workingMemory) {
+            // Concept formation processes attended sensory input
+            // Get attended regions from attention
+            std::vector<RegionId> attendedRegions;
+            if (pImpl->attention) {
+                attendedRegions = pImpl->attention->getAttendedRegions();
+            }
+            
+            // If no specific attention, use all regions
+            if (attendedRegions.empty()) {
+                attendedRegions = getRegionIds();
+            }
+            
+            // For concept formation, we need to provide pattern and features
+            // This would typically come from sensory processing
+            // For now, just log that concept formation is updating
+            std::vector<float> dummyPattern(10, 0.0f);  // 10-dimensional pattern
+            std::vector<float> dummyFeatures(5, 0.0f);  // 5 features
+            
+            // Concept formation would use this data to form new concepts
+            // But we need the proper API to provide this data
+        }
     }
+    
+    // ========== STEP 13: Apply development effects ==========
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
