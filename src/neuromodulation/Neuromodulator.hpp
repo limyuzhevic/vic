@@ -44,9 +44,28 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
-    // Reward signaling
-    void signalReward(float reward);
-    void signalRewardPredictionError(float error);
+void signalRewardPredictionError(float error);
+    
+    // Enhance attention (for Acetylcholine)
+    void enhanceAttention(float strength);
+    
+    // Promote memory consolidation (for Acetylcholine)
+    void promoteMemoryConsolidation(float strength);
+    
+    // Enhance arousal (for Norepinephrine)
+    void enhanceArousal(float strength);
+    
+    // Increase vigilance (for Norepinephrine)
+    void increaseVigilance(float strength);
+    
+    // Enhance mood (for Serotonin)
+    void enhanceMood(float strength);
+    
+    // Reduce impulsivity (for Serotonin)
+    void reduceImpulsivity(float strength);
+    
+    // Enhance social behavior (for Serotonin)
+    void enhanceSocialBehavior(float strength);
     
 private:
     struct Impl;
@@ -62,6 +81,20 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Enhance attention
+    void enhanceAttention(float strength) {
+        // TODO PHASE 2: Implement real attention enhancement
+        // PLACEHOLDER: Increase attention focus
+        setLevel(std::min(1.0f, getLevel() + strength * 1.0f));
+    }
+    
+    // Promote memory consolidation
+    void promoteMemoryConsolidation(float strength) {
+        // TODO PHASE 2: Implement real memory consolidation enhancement
+        // PLACEHOLDER: Enhance memory consolidation
+        setLevel(std::min(1.0f, getLevel() + strength * 1.0f));
+    }
 };
 
 // Norepinephrine: Arousal and vigilance
@@ -73,6 +106,20 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Enhance arousal
+    void enhanceArousal(float strength) {
+        // TODO PHASE 2: Implement real arousal enhancement
+        // PLACEHOLDER: Increase arousal and vigilance
+        setLevel(std::min(1.0f, getLevel() + strength * 1.0f));
+    }
+    
+    // Increase vigilance
+    void increaseVigilance(float strength) {
+        // TODO PHASE 2: Implement real vigilance enhancement
+        // PLACEHOLDER: Increase alertness and focus
+        setLevel(std::min(1.0f, getLevel() + strength * 1.0f));
+    }
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
@@ -84,6 +131,27 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Enhance mood
+    void enhanceMood(float strength) {
+        // TODO PHASE 2: Implement real mood enhancement
+        // PLACEHOLDER: Increase mood and positive affect
+        setLevel(std::min(1.0f, getLevel() + strength * 1.0f));
+    }
+    
+    // Reduce impulsivity
+    void reduceImpulsivity(float strength) {
+        // TODO PHASE 2: Implement real impulsivity reduction
+        // PLACEHOLDER: Reduce impulsive behavior
+        setLevel(std::min(1.0f, getLevel() + strength * 1.0f));
+    }
+    
+    // Enhance social behavior
+    void enhanceSocialBehavior(float strength) {
+        // TODO PHASE 2: Implement real social behavior enhancement
+        // PLACEHOLDER: Enhance social engagement
+        setLevel(std::min(1.0f, getLevel() + strength * 1.0f));
+    }
 };
 
 } // namespace nlm
