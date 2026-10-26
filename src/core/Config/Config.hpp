@@ -90,7 +90,25 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
+    // Load from simple format
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    // Load from JSON/YAML formats (placeholders for now)
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Export to JSON/YAML formats (placeholders for now)
+    void toJSON(const std::string& filepath) const;
+    void toYAML(const std::string& filepath) const;
+    
+    // Enhanced string-based operations
+    std::string toString(const ConfigValue& value) const;
+    bool setFromString(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // File format detection
+    static std::string getFileExtension(const std::string& filepath);
+    
+    // Configuration summary
     std::string summary() const;
     
 private:

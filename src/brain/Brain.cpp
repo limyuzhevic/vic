@@ -92,6 +92,23 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
+        , workingMemory(nullptr)
+        , episodicMemory(nullptr)
+        , associativeMemory(nullptr)
+        , predictionSystem(nullptr)
+        , planner(nullptr)
+        , conceptFormation(nullptr)
+        , attention(nullptr)
+        , developmentSystem(nullptr)
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , checkpointManager(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -511,8 +528,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current state
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Get prediction error signal
+        PredictionError* predError = pImpl->predictionSystem->getPredictionError();
+        if (predError) {
+            // Apply prediction error to neuromodulation systems
+            // Dopamine level is modulated by prediction error magnitude
+            float predictionErrorLevel = predError->getLevel();
+            if (pImpl->dopamine) {
+                // Scale dopamine based on prediction error
+                float currentDopamine = pImpl->dopamine->getLevel();
+                float targetDopamine = 0.5f + predictionErrorLevel * 0.5f;
+                float newDopamine = currentDopamine * 0.9f + targetDopamine * 0.1f;
+                pImpl->dopamine->setLevel(newDopamine);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +560,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation operates on patterns in working memory and episodic memory
+        pImpl->conceptFormation->update(pImpl->timestep);
+        
+        // Concept formation can influence attention and planning
+        if (pImpl->attention) {
+            // Attention is influenced by concept similarity and relevance
+            pImpl->attention->updateConceptInfluence();
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1106,12 +1145,116 @@ void Brain::logStatus() const {
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
     for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    // Get comprehensive status of all integrated systems
+    std::string getIntegratedSystemsStatus() const {
+        std::ostringstream oss;
+        oss << "=== NLM Integrated Systems Status ===\n";
+        
+        // Memory systems status
+        oss << "\nMemory Systems:\n";
+        if (pImpl->workingMemory) {
+            oss << "  Working Memory: " << pImpl->workingMemory->getActiveTraces() << " active traces\n";
+        }
+        if (pImpl->episodicMemory) {
+            oss << "  Episodic Memory: " << pImpl->episodicMemory->getEpisodeCount() << " episodes, "
+                << "" << pImpl->episodicMemory->getConsolidationCount() << " consolidated\n";
+        }
+        if (pImpl->associativeMemory) {
+            oss << "  Associative Memory: " << pImpl->associativeMemory->getPatternCount() << " patterns\n";
+        }
+        
+        // Prediction system status
+        if (pImpl->predictionSystem) {
+            oss << "\nPrediction System:\n";
+            oss << "  Prediction errors tracked: " << (pImpl->predictionError ? pImpl->predictionError->getLevel() : 0.0f) << "\n";
+            oss << "  Confidence levels active\n";
+        }
+        
+        // Cognition systems status
+        oss << "\nCognition Systems:\n";
+        if (pImpl->planner) {
+            oss << "  Neural Planner: enabled, planning depth " << pImpl->planner->getPlanningDepth() << "\n";
+        }
+        if (pImpl->conceptFormation) {
+            oss << "  Concept Formation: " << pImpl->conceptFormation->getConceptCount() << " concepts\n";
+        }
+        if (pImpl->attention) {
+            oss << "  Attention System: inhibition strength " << pImpl->attention->getInhibitionStrength() 
+                << ", excitation strength " << pImpl->attention->getExcitationStrength() << "\n";
+        }
+        
+        // Development system status
+        oss << "\nDevelopment System:\n";
+        oss << "  Developmental Stage: " << static_cast<int>(pImpl->developmentalStage) << " ("
+            << (pImpl->developmentalStage == DevelopmentalStage::Initial ? "Initial" :
+                pImpl->developmentalStage == DevelopmentalStage::CriticalPeriod ? "Critical Period" :
+                pImpl->developmentalStage == DevelopmentalStage::Maturation ? "Maturation" :
+                pImpl->developmentalStage == DevelopmentalStage::Adult ? "Adult" : "Aging") << ")\n";
+        if (pImpl->developmentSystem) {
+            oss << "  Developmental updates pending\n";
+        }
+        
+        // Neuromodulation systems status
+        oss << "\nNeuromodulation Systems:\n";
+        if (pImpl->dopamine) {
+            oss << "  Dopamine: level " << pImpl->dopamine->getLevel() << " (plasticity factor: " 
+                << pImpl->dopamine->getPlasticityFactor() << ")\n";
+        }
+        if (pImpl->curiosity) {
+            oss << "  Curiosity: level " << pImpl->curiosity->getLevel() << " (exploration drive)\n";
+        }
+        if (pImpl->novelty) {
+            oss << "  Novelty Detection: level " << pImpl->novelty->getLevel() << "\n";
+        }
+        if (pImpl->predictionError) {
+            oss << "  Prediction Error: level " << pImpl->predictionError->getLevel() << "\n";
+        }
+        
+        // Plasticity systems status
+        oss << "\nPlasticity Systems:\n";
+        if (pImpl->stdp) {
+            oss << "  STDP: enabled, LTP weight " << pImpl->stdp->getLTPWeight() 
+                << ", LTD weight " << pImpl->stdp->getLTDWeight() << "\n";
+        }
+        if (pImpl->hebbian) {
+            oss << "  Hebbian: enabled\n";
+        }
+        if (pImpl->structuralPlasticity) {
+            oss << "  Structural Plasticity: synaptogenesis rate " << pImpl->structuralPlasticity->getSynaptogenesisRate()
+                << ", pruning rate " << pImpl->structuralPlasticity->getPruningRate() << "\n";
+        }
+        
+        // Simulation state
+        oss << "\nSimulation State:\n";
+        oss << "  Step: " << pImpl->currentStep << ", Time: " << pImpl->currentTime << "s\n";
+        oss << "  Total spikes: " << pImpl->totalSpikesTotal << " (this step: " << pImpl->totalSpikesThisStep << ")\n";
+        oss << "  Memory neurons: " << pImpl->workingMemory ? pImpl->workingMemory->getMemoryNeurons().size() : 0 << "\n";
+        
+        return oss.str();
     }
-}
-
-} // namespace nlm
+    
+    // Get active memory traces for external systems
+    std::vector<NeuronId> getActiveMemoryTraces() const {
+        if (!pImpl->workingMemory) {
+            return {};
+        }
+        return pImpl->workingMemory->getMemoryNeurons();
+    }
+    
+    // Get most recent episodic memories
+    std::vector<const EpisodicMemoryItem*> getRecentMemos(size_t count) const {
+        if (!pImpl->episodicMemory) {
+            return {};
+        }
+        return pImpl->episodicMemory->getRecentEpisodes(count);
+    }
+    
+    // Get current neuromodulation state for reinforcement learning
+    float getTotalNeuromodulationLevel() const {
+        float total = 0.0f;
+        if (pImpl->dopamine) total += pImpl->dopamine->getLevel();
+        if (pImpl->curiosity) total += pImpl->curiosity->getLevel();
+        if (pImpl->novelty) total += pImpl->novelty->getLevel();
+        if (pImpl->predictionError) total += pImpl->predictionError->getLevel();
+        return total;
+    }

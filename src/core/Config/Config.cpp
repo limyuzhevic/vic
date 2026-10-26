@@ -19,40 +19,18 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to detect file format by extension
+    std::string ext = getFileExtension(filepath);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    if (ext == "json") {
+        return loadFromJSON(filepath);
+    } else if (ext == "yaml" || ext == "yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to simple key=value format
+        return loadFromSimpleFormat(filepath);
     }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -193,10 +171,12 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+std::string Config::getFileExtension(const std::string& filepath) {
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos == std::string::npos) {
+        return "";
+    }
+    return filepath.substr(dotPos + 1);
 }
 
 // Explicit template instantiations
@@ -206,10 +186,114 @@ template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
 
-} // namespace nlm
+// Placeholder implementations for JSON/YAML loading
+bool Config::loadFromJSON(const std::string& filepath) {
+    // TODO: Implement proper JSON parsing with nlohmann::json or similar
+    // For now, fall back to simple format
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // TODO: Implement proper YAML parsing with yaml-cpp or similar
+    // For now, fall back to simple format
+    return loadFromSimpleFormat(filepath);
+}
+
+void Config::toJSON(const std::string& filepath) const {
+    // TODO: Implement proper JSON serialization
+    // For now, just call saveToFile for compatibility
+    saveToFile(filepath);
+}
+
+void Config::toYAML(const std::string& filepath) const {
+    // TODO: Implement proper YAML serialization
+    // For now, just call saveToFile for compatibility
+    saveToFile(filepath);
+}
+
+// Enhanced type conversion utilities
+std::string Config::toString(const ConfigValue& value) const {
+    return std::visit([](auto&& arg) -> std::string {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, int>) {
+            return std::to_string(arg);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return std::to_string(arg);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return std::to_string(arg);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return arg ? "true" : "false";
+        } else {
+            return "";
+        }
+    }, value);
+}
+
+bool Config::setFromString(const std::string& key, const std::string& value, ConfigSource source) {
+    // Try to infer type from value
+    if (value == "true" || value == "false") {
+        bool boolVal = (value == "true");
+        set(key, boolVal, source);
+        return true;
+    }
+    
+    // Try to parse as integer
+    try {
+        size_t pos;
+        int intVal = std::stoi(value, &pos);
+        if (pos == value.size()) {
+            set(key, intVal, source);
+            return true;
+        }
+    } catch (...) {}
+    
+    // Try to parse as double
+    try {
+        size_t pos;
+        double doubleVal = std::stod(value, &pos);
+        if (pos == value.size()) {
+            set(key, doubleVal, source);
+            return true;
+        }
+    } catch (...) {}
+    
+    // Fall back to string
+    set(key, value, source);
+    return true;
+}

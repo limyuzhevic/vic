@@ -29,6 +29,9 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Episodic memory item forward declaration
+class EpisodicMemoryItem;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -189,6 +192,18 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
+    
+    // Get comprehensive status of all integrated systems
+    std::string getIntegratedSystemsStatus() const;
+    
+    // Get active memory traces for external systems
+    std::vector<NeuronId> getActiveMemoryTraces() const;
+    
+    // Get most recent episodic memories
+    std::vector<const EpisodicMemoryItem*> getRecentMemos(size_t count) const;
+    
+    // Get current neuromodulation state for reinforcement learning
+    float getTotalNeuromodulationLevel() const;
     
     // Logging
     void logStatus() const;

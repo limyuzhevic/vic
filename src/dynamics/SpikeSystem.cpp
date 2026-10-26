@@ -77,6 +77,13 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         }
     }
 }
+        
+        // Call handlers
+        for (auto& handler : pImpl->handlers) {
+            handler(detailed);
+        }
+    }
+}
 
 void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime) {
     // Find and process all delayed spikes scheduled for this step

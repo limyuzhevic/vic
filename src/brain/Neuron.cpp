@@ -55,7 +55,9 @@ void Neuron::setType(NeuronType type) {
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+    // Validate membrane potential range for biological realism
+    float clampedPotential = std::clamp(potential, -100.0f, 50.0f);
+    pImpl->state.membranePotential = clampedPotential;
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
@@ -63,7 +65,9 @@ void Neuron::addToMembranePotential(MembranePotential delta) {
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
-    pImpl->state.threshold = threshold;
+    // Validate threshold is within reasonable biological range
+    float clampedThreshold = std::clamp(threshold, -80.0f, -20.0f);
+    pImpl->state.threshold = clampedThreshold;
 }
 
 void Neuron::setFiringState(FiringState state) {
@@ -84,7 +88,9 @@ void Neuron::setFiringRate(FiringRate rate) {
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
-    pImpl->state.leakConductance = conductance;
+    // Validate leak conductance is within reasonable range
+    float clampedConductance = std::clamp(conductance, 0.01f, 0.5f);
+    pImpl->state.leakConductance = clampedConductance;
 }
 
 MembranePotential Neuron::getLeakConductance() const {
@@ -100,7 +106,9 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
+    // Validate resting potential is within reasonable biological range
+    float clampedPotential = std::clamp(potential, -85.0f, -55.0f);
+    pImpl->state.restingPotential = clampedPotential;
 }
 
 MembranePotential Neuron::getRestingPotential() const {
@@ -108,7 +116,9 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
+    // Validate reset potential is within reasonable biological range
+    float clampedPotential = std::clamp(potential, -85.0f, -40.0f);
+    pImpl->state.resetPotential = clampedPotential;
 }
 
 bool Neuron::checkThreshold() const {
@@ -224,8 +234,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        V -= pImpl->state.adaptationVariable * 0.005f;  // Reduced adaptation impact
+        pImpl->state.adaptationVariable *= 0.97f;  // Slightly faster decay
     }
     
     // Clamp membrane potential to prevent instability
@@ -274,25 +284,28 @@ void Neuron::reset() {
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
     // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-5.0f, 5.0f);
     
     // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 3.0f);
     
-    // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Resting potential typically -70mV with biological variation
+    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-3.0f, 2.0f);
     
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Reset potential is usually close to resting, with slight depolarization
+    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 8.0f);
     
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    // Refractory period: 2-20ms typical for different neuron types
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 20));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
+    
+    // Set leaky conductances for biological realism
+    pImpl->state.leakConductance = 0.05f + rng.uniformReal(0.0f, 0.1f);
     
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
