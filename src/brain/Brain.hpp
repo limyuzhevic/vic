@@ -64,6 +64,9 @@ public:
     // Initialize brain with configuration
     bool initialize();
     
+    // Validate configuration parameters
+    bool validateConfiguration() const;
+    
     // Main simulation step
     void step(SimulationStep currentStep);
     

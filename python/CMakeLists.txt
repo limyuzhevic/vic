@@ -65,36 +65,35 @@ set(NLM_AGENT_SOURCES
     ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
 )
 
-set(NLM_WORLD_SOURCES
-    ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
+# Build agent and world libraries
+add_library(nlm_agent STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/agent/SensoryPercept.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/agent/AgentBrain.cpp
 )
-
-add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
-    $<INSTALL_INTERFACE:include>
-)
-target_compile_options(nlm_core PRIVATE
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
-)
-
-add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
 target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
+add_library(nlm_world STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/world/SimpleWorld.cpp
+)
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Create Python bindings module
 pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
-if(MSVC)
-    target_compile_options(pynlm PRIVATE /permissive-)
+# Enable more Python-friendly warnings
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(pynlm PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
+if(MSVC)
+    target_compile_options(pynlm PRIVATE /permissive- /WX)
+endif()
+
+# Install Python module
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
