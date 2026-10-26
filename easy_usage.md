@@ -287,11 +287,133 @@ print("Agent simulation complete!")
 
 ---
 
+**"Everything is 0"**
+- Brains need time to "warm up" - try more steps
+- Some neurons need input to fire - make sure sensory input is connected
+
+---
+
+## Advanced Usage Patterns
+
+The Python bindings now include advanced patterns and features:
+
+### Pattern 1: Using Factory Functions
+
+The Python bindings now include factory functions for creating brains with predefined configurations:
+
+```python
+import pynlm
+
+# Create a minimal brain for basic operations
+brain = pynlm.createBrain("minimal")
+brain.initialize()
+
+# Create a research-optimized brain for experimentation
+brain = pynlm.createBrain("research")
+brain.initialize()
+
+# Create a brain with default configuration
+brain = pynlm.createBrain("default")
+brain.initialize()
+```
+
+### Pattern 2: Error Handling
+
+The Python bindings now include better error handling:
+
+```python
+import pynlm
+
+try:
+    # Create a brain with invalid configuration
+    brain = pynlm.createBrain("invalid")
+    brain.initialize()
+except Exception as e:
+    print(f"Error: {e}")
+
+try:
+    # Try to save brain to invalid path
+    brain.save("/invalid/path/brain.bin")
+except Exception as e:
+    print(f"Error: {e}")
+```
+
+### Pattern 3: Advanced Configuration
+
+You can also create custom configurations and use them with the brain factory:
+
+```python
+import pynlm
+
+# Create a custom configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 500)
+config.set("brain.synapse_density", 0.2)
+config.set("plasticity.stdp.enable", True)
+
+# Create brain with custom configuration
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+### Pattern 4: Brain Statistics
+
+Get comprehensive statistics about your brain:
+
+```python
+import pynlm
+
+brain = pynlm.createBrain("research")
+brain.initialize()
+
+# Run a simulation
+for i in range(100):
+    brain.step(i)
+
+# Get comprehensive statistics
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+print(f"Active neurons: {brain.getActiveNeuronCount()}")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f}")
+print(f"Excitation/inhibition ratio: {brain.getExcitationInhibitionRatio():.2f}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Developmental stage: {brain.getDevelopmentalStage()}")
+print(f"Configuration summary: {brain.getConfig().summary()}")
+```
+
+### Pattern 5: Configuration Validation
+
+The configuration system now includes validation for common parameters:
+
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+
+# This will work
+config.set("brain.neuron_count", 1000)
+config.set("plasticity.stdp.enable", True)
+
+# This will raise an exception
+try:
+    config.set("brain.neuron_count", 0)  # Invalid: neuron count must be > 0
+except ValueError as e:
+    print(f"Validation error: {e}")
+
+# This will also raise an exception
+try:
+    config.set("connection_probability", 1.5)  # Invalid: must be between 0 and 1
+except ValueError as e:
+    print(f"Validation error: {e}")
+```
+
 ## Next Steps
 
 When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the advanced patterns above to get the most out of NLM
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with all the new features and improvements.

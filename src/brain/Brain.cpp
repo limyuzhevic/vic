@@ -447,33 +447,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
+        if (!region) continue;
+        for (auto& synPtr : region->getSynapses()) {
+            if (!synPtr) continue;
             // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
+            if (synPtr->getPlasticityFlags().stdp) {
+                const auto& preSpikes = synPtr->getPreSpikeHistory();
+                const auto& postSpikes = synPtr->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
+                    pImpl->stdp->update(synPtr.get(), preSpikes, postSpikes, pImpl->timestep);
+                    float weight = synPtr->getWeight();
                     weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
+                    synPtr->setWeight(weight);
                 }
             }
             
             // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
+            if (synPtr->getPlasticityFlags().hebbian) {
+                const auto& preSpikes = synPtr->getPreSpikeHistory();
+                const auto& postSpikes = synPtr->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    pImpl->hebbian->update(synPtr.get(), preSpikes, postSpikes, pImpl->timestep);
                 }
             }
             
             // Update synapse state
-            syn->step(currentTime);
+            synPtr->step(currentTime);
         }
     }
     

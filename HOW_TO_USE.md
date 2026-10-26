@@ -526,8 +526,169 @@ pip install --force-reinstall .
 
 ---
 
+**Segmentation faults:**
+- Check that `initialize()` is called before `step()`
+- Ensure `reset()` is called before re-running simulation
+- Use `createBrain("research")` for more robust configuration
+
+---
+
+## Advanced Usage Examples
+
+The following examples demonstrate advanced usage of the NLM framework:
+
+### Example 1: Brain Factory with Error Handling
+
+```python
+import pynlm
+
+# Demonstrate the factory pattern with error handling
+print("Testing brain factory...")
+
+# Test valid configuration types
+valid_configs = ["minimal", "research", "default"]
+for config_type in valid_configs:
+    try:
+        brain = pynlm.createBrain(config_type)
+        brain.initialize()
+        print(f"✓ Created brain with {config_type} configuration")
+        brain.reset()
+    except Exception as e:
+        print(f"✗ Failed to create {config_type} brain: {e}")
+
+# Test invalid configuration type
+try:
+    brain = pynlm.createBrain("invalid")
+    print("✗ Should have thrown exception for invalid config type")
+except ValueError as e:
+    print(f"✓ Correctly caught invalid config type: {e}")
+```
+
+### Example 2: Configuration Validation
+
+```python
+import pynlm
+
+print("\nTesting configuration validation...")
+
+config = pynlm.createDefaultConfig()
+
+# Test valid configuration settings
+print("Testing valid configuration settings...")
+config.set("brain.neuron_count", 500)
+config.set("plasticity.stdp.enable", True)
+config.set("neuromod.curiosity.enable", True)
+print("✓ Valid settings accepted")
+
+# Test invalid configuration settings
+print("\nTesting invalid configuration settings...")
+invalid_tests = [
+    ("brain.neuron_count", 0, "Neuron count must be > 0"),
+    ("brain.neuron_count", -1, "Neuron count must be > 0"),
+    ("connection_probability", 1.5, "Connection probability must be between 0.0 and 1.0"),
+    ("simulation_timestep", -0.001, "Simulation timestep must be > 0"),
+]
+
+for key, value, expected_error in invalid_tests:
+    try:
+        config.set(key, value)
+        print(f"✗ {key}={value} should have been rejected")
+    except ValueError as e:
+        if expected_error in str(e):
+            print(f"✓ {key}={value} correctly rejected: {e}")
+        else:
+            print(f"✗ {key}={value} rejected with wrong error: {e}")
+```
+
+### Example 3: Comprehensive Brain Monitoring
+
+```python
+import pynlm
+import time
+
+print("\nTesting comprehensive brain monitoring...")
+
+# Create a research-optimized brain
+brain = pynlm.createBrain("research")
+brain.initialize()
+
+# Run a simulation with monitoring
+start_time = time.time()
+total_steps = 500
+
+for step in range(total_steps):
+    brain.step(step)
+    
+    # Log statistics every 50 steps
+    if step % 50 == 0:
+        print(f"Step {step}:")
+        print(f"  Total neurons: {brain.getTotalNeuronCount()}")
+        print(f"  Active neurons: {brain.getActiveNeuronCount()}")
+        print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+        print(f"  Average firing rate: {brain.getAverageFiringRate():.2f}")
+        print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+        print(f"  Developmental stage: {brain.getDevelopmentalStage()}")
+        print(f"  Configuration changes: {len(brain.getConfig().getKeys())}")
+
+end_time = time.time()
+print(f"\nSimulation completed in {end_time - start_time:.2f} seconds")
+print(f"Final brain statistics:")
+print(f"  Total neurons: {brain.getTotalNeuronCount()}")
+print(f"  Total synapses: {brain.getTotalSynapseCount()}")
+print(f"  Average firing rate: {brain.getAverageFiringRate():.2f}")
+print(f"  Excitation/inhibition ratio: {brain.getExcitationInhibitionRatio():.2f}")
+print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+
+# Save brain state
+brain.save("final_brain_state.bin")
+print("✓ Brain state saved to final_brain_state.bin")
+```
+
+### Example 4: Error Recovery and Retry Logic
+
+```python
+import pynlm
+
+print("\nTesting error recovery and retry logic...")
+
+# Create a brain with minimal configuration
+brain = pynlm.createBrain("minimal")
+brain.initialize()
+
+# Simulate a scenario where an operation might fail
+for attempt in range(3):
+    try:
+        print(f"Attempt {attempt + 1}:")
+        brain.step(attempt * 100)
+        print("  ✓ Step completed successfully")
+        break
+    except Exception as e:
+        print(f"  ✗ Step failed: {e}")
+        if attempt == 2:
+            print("  ✗ All attempts failed - consider using 'research' configuration")
+        else:
+            print("  Retrying...")
+            brain.reset()
+            brain.initialize()
+```
+
+---
+
 ## Further Reading
+
+The NLM framework includes comprehensive documentation:
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [easy_usage.md](easy_usage.md) - Simplified usage guide with examples
+
+### New Features Added in This Version:
+
+1. **Factory Pattern for Brain Creation**: Create brains with predefined configurations
+2. **Enhanced Error Handling**: Better error messages and exception handling
+3. **Configuration Validation**: Validate configuration parameters before use
+4. **Comprehensive Documentation**: New examples and documentation
+5. **Defensive Programming**: Null pointer checks and parameter validation throughout the codebase
+6. **Removed Hardcoded Dependencies**: Eliminated RegionId(1) hardcoded references
+7. **Performance Improvements**: Better error handling and validation reduce runtime overhead

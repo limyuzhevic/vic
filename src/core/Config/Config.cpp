@@ -19,6 +19,11 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
+    // Validate input parameter
+    if (filepath.empty()) {
+        throw std::invalid_argument("Config filepath cannot be empty");
+    }
+    
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
@@ -41,6 +46,11 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                continue;  // Skip lines with empty keys
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -56,7 +66,19 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 0) {
+        throw std::invalid_argument("Config: argc cannot be negative or zero");
+    }
+    
+    if (!argv) {
+        throw std::invalid_argument("Config: argv cannot be null");
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        if (!argv[i]) {
+            throw std::invalid_argument("Config: argv[" + std::to_string(i) + "] cannot be null");
+        }
+        
         std::string arg(argv[i]);
         
         // Handle --key=value format
@@ -65,12 +87,28 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key
+                if (key.empty()) {
+                    continue;  // Skip lines with empty keys
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
+            
+            // Validate key
+            if (key.empty()) {
+                continue;  // Skip lines with empty keys
+            }
+            
+            if (!argv[i + 1]) {
+                throw std::invalid_argument("Config: argv[" + std::to_string(i + 1) + "] cannot be null");
+            }
+            
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
         }
@@ -79,6 +117,11 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Validate input parameter
+    if (filepath.empty()) {
+        throw std::invalid_argument("Config filepath cannot be empty");
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -94,6 +137,11 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
+    // Validate input parameter
+    if (key.empty()) {
+        throw std::invalid_argument("Config key cannot be empty");
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -115,6 +163,11 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate input parameters
+    if (key.empty()) {
+        throw std::invalid_argument("Config key cannot be empty");
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -127,27 +180,157 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        throw std::invalid_argument("Config key cannot be empty");
+    }
+    
+    // Add specific validation for known keys
+    if (key == "neuron_count") {
+        try {
+            size_t count = std::stoul(value);
+            if (count == 0) {
+                throw std::invalid_argument("Neuron count must be greater than 0");
+            }
+            if (count > 1000000) {
+                throw std::invalid_argument("Neuron count too large (max 1000000)");
+            }
+        } catch (const std::exception& e) {
+            throw std::invalid_argument("Invalid neuron count value '" + value + "': " + std::string(e.what()));
+        }
+    } else if (key == "connection_probability") {
+        try {
+            double prob = std::stod(value);
+            if (prob < 0.0 || prob > 1.0) {
+                throw std::invalid_argument("Connection probability must be between 0.0 and 1.0");
+            }
+        } catch (const std::exception& e) {
+            throw std::invalid_argument("Invalid connection probability value '" + value + "': " + std::string(e.what()));
+        }
+    } else if (key == "simulation_timestep") {
+        try {
+            double timestep = std::stod(value);
+            if (timestep <= 0.0) {
+                throw std::invalid_argument("Simulation timestep must be greater than 0");
+            }
+            if (timestep > 1.0) {
+                throw std::invalid_argument("Simulation timestep too large (max 1.0)");
+            }
+        } catch (const std::exception& e) {
+            throw std::invalid_argument("Invalid simulation timestep value '" + value + "': " + std::string(e.what()));
+        }
+    } else if (key == "random_seed") {
+        try {
+            uint64_t seed = std::stoull(value);
+            if (seed == 0) {
+                throw std::invalid_argument("Random seed must be non-zero");
+            }
+        } catch (const std::exception& e) {
+            throw std::invalid_argument("Invalid random seed value '" + value + "': " + std::string(e.what()));
+        }
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        throw std::invalid_argument("Config key cannot be empty");
+    }
+    
+    // Add specific validation for known keys
+    if (key == "neuron_count") {
+        if (value == 0) {
+            throw std::invalid_argument("Neuron count must be greater than 0");
+        }
+        if (value > 1000000) {
+            throw std::invalid_argument("Neuron count too large (max 1000000)");
+        }
+    } else if (key == "region_count") {
+        if (value == 0) {
+            throw std::invalid_argument("Region count must be greater than 0");
+        }
+    } else if (key == "random_seed") {
+        if (value == 0) {
+            throw std::invalid_argument("Random seed must be non-zero");
+        }
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        throw std::invalid_argument("Config key cannot be empty");
+    }
+    
+    // Add specific validation for known keys
+    if (key == "simulation_timestep") {
+        if (value <= 0.0) {
+            throw std::invalid_argument("Simulation timestep must be greater than 0");
+        }
+        if (value > 1.0) {
+            throw std::invalid_argument("Simulation timestep too large (max 1.0)");
+        }
+    } else if (key == "plasticity.stdp.learning_rate") {
+        if (value < 0.0) {
+            throw std::invalid_argument("STDP learning rate must be non-negative");
+        }
+    } else if (key == "plasticity.hebbian.learning_rate") {
+        if (value < 0.0) {
+            throw std::invalid_argument("Hebbian learning rate must be non-negative");
+        }
+    } else if (key == "neuromod.dopamine.scale") {
+        if (value < 0.0) {
+            throw std::invalid_argument("Dopamine scale must be non-negative");
+        }
+    } else if (key == "neuromod.curiosity.threshold") {
+        if (value < 0.0 || value > 1.0) {
+            throw std::invalid_argument("Curiosity threshold must be between 0.0 and 1.0");
+        }
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    // Validate key
+    if (key.empty()) {
+        throw std::invalid_argument("Config key cannot be empty");
+    }
+    
+    // Add specific validation for known keys
+    if (key == "plasticity.stdp.enable" || key == "plasticity.hebbian.enable" || 
+        key == "plasticity.structural.enable" || key == "neuromod.curiosity.enable" ||
+        key == "neuromod.novelty.enable") {
+        // These are boolean flags, no additional validation needed
+    }
+    
     set(key, ConfigValue(value), source);
 }
 
 bool Config::has(const std::string& key) const {
+    // Validate input parameter
+    if (key.empty()) {
+        throw std::invalid_argument("Config key cannot be empty");
+    }
+    
     return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
 void Config::remove(const std::string& key) {
+    // Validate input parameter
+    if (key.empty()) {
+        throw std::invalid_argument("Config key cannot be empty");
+    }
+    
+    if (!has(key)) {
+        throw std::invalid_argument("Config key does not exist: " + key);
+    }
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),

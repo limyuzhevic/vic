@@ -210,25 +210,29 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
         }
         
         // Pruning: Remove weak or unused synapses
-        for (auto& syn : region->getSynapses()) {
-            float weight = std::abs(syn->getWeight());
-            
-            // Check pruning conditions
-            bool shouldPrune = false;
-            
-            if (weight < pImpl->minWeightThreshold) {
-                // Synapse is too weak
-                shouldPrune = rng.bernoulli(pImpl->pruningRate);
-            } else if (pImpl->useActivityDependency) {
-                // Check if synapse has been unused (no recent weight changes)
-                float eligibility = std::abs(syn->getEligibilityTrace());
-                if (eligibility < pImpl->activityThreshold) {
-                    shouldPrune = rng.bernoulli(pImpl->pruningRate * 0.5f);
+        for (const auto& region : pImpl->regions) {
+            if (!region) continue;
+            for (const auto& synPtr : region->getSynapses()) {
+                if (!synPtr) continue;
+                float weight = std::abs(synPtr->getWeight());
+                
+                // Check pruning conditions
+                bool shouldPrune = false;
+                
+                if (weight < pImpl->minWeightThreshold) {
+                    // Synapse is too weak
+                    shouldPrune = rng.bernoulli(pImpl->pruningRate);
+                } else if (pImpl->useActivityDependency) {
+                    // Check if synapse has been unused (no recent weight changes)
+                    float eligibility = std::abs(synPtr->getEligibilityTrace());
+                    if (eligibility < pImpl->activityThreshold) {
+                        shouldPrune = rng.bernoulli(pImpl->pruningRate * 0.5f);
+                    }
                 }
-            }
-            
-            if (shouldPrune) {
-                removeSynapse(brain, syn->getId());
+                
+                if (shouldPrune) {
+                    removeSynapse(brain, synPtr->getId());
+                }
             }
         }
     }

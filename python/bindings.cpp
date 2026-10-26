@@ -144,15 +144,43 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.loadFromFile(filepath);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to load configuration from file '" + filepath + "': " + std::string(e.what()));
+            }
+        }, py::arg("filepath"),
              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+            try {
+                if (argc <= 0) {
+                    throw std::invalid_argument("argc cannot be negative or zero");
+                }
+                if (!argv) {
+                    throw std::invalid_argument("argv cannot be null");
+                }
+                return self.loadFromArgs(argc, argv);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to load configuration from command line arguments: " + std::string(e.what()));
+            }
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            try {
+                return self.saveToFile(filepath);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to save configuration to file '" + filepath + "': " + std::string(e.what()));
+            }
+        }, py::arg("filepath"),
              "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
+        .def("has", [](Config& self, const std::string& key) {
+            try {
+                return self.has(key);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to check configuration key existence: " + std::string(e.what()));
+            }
+        }, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
@@ -291,8 +319,13 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+        .def("initialize", [](Brain& self) {
+            try {
+                return self.initialize();
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to initialize brain: " + std::string(e.what()));
+            }
+        }, "Initialize the brain with configuration")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
@@ -312,9 +345,21 @@ PYBIND11_MODULE(pynlm, m) {
              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
              "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
+        .def("save", [](Brain& self, const std::string& filepath) {
+            try {
+                return self.save(filepath);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to save brain state to file '" + filepath + "': " + std::string(e.what()));
+            }
+        }, py::arg("filepath"),
              "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
+        .def("load", [](Brain& self, const std::string& filepath) {
+            try {
+                return self.load(filepath);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to load brain state from file '" + filepath + "': " + std::string(e.what()));
+            }
+        }, py::arg("filepath"),
              "Load brain state from file")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
@@ -355,22 +400,48 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+        .def("initialize", [](AgentBrain& self, const SimpleWorld& world) {
+            try {
+                self.initialize(world);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to initialize agent brain: " + std::string(e.what()));
+            }
+        }, py::arg("world"),
              "Initialize with world")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
+        .def("processSensoryInput", [](AgentBrain& self, const SensoryPercept& percept) {
+            try {
+                self.processSensoryInput(percept);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to process sensory input: " + std::string(e.what()));
+            }
+        }, py::arg("percept"),
              "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
-             "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
+        .def("decodeMotorCommand", [](AgentBrain& self) {
+            try {
+                return self.decodeMotorCommand();
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to decode motor command: " + std::string(e.what()));
+            }
+        }, "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", [](AgentBrain& self, float reward, float predictedReward) {
+            try {
+                self.applyRewardModulation(reward, predictedReward);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to apply reward modulation: " + std::string(e.what()));
+            }
+        }, py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
+        .def("updateDevelopment", [](AgentBrain& self, double timestep) {
+            try {
+                self.updateDevelopment(timestep);
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to update development: " + std::string(e.what()));
+            }
+        }, py::arg("timestep"),
              "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
@@ -403,10 +474,55 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
+    
+    m.def("createMinimalConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set minimal configuration for basic brain operation
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.05, ConfigSource::Default);
+        return config;
+    }, "Create a minimal configuration for basic brain operation");
+    
+    m.def("createResearchConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set configuration optimized for research and experimentation
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.1, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        return config;
+    }, "Create a research configuration optimized for experimentation");
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        if (!config) {
+            throw std::invalid_argument("Config cannot be null");
+        }
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
+    
+    m.def("createBrain", [](std::string configType) -> std::shared_ptr<Brain> {
+        std::shared_ptr<Config> config;
+        if (configType == "minimal") {
+            config = createMinimalConfig();
+        } else if (configType == "research") {
+            config = createResearchConfig();
+        } else if (configType == "default") {
+            config = createDefaultConfig();
+        } else {
+            throw std::invalid_argument("Unknown config type: " + configType + ". Available types: 'minimal', 'research', 'default'");
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("configType"), "Create a brain with predefined configuration type");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
