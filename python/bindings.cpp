@@ -142,27 +142,828 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+    // Enhanced Config methods with better parameter validation
+    .def("setInt", [](Config& self, const std::string& key, int value,
+                    const std::string& source = "Runtime") {
+        ConfigSource src;
+        if (source == "Default") src = ConfigSource::Default;
+        else if (source == "File") src = ConfigSource::File;
+        else if (source == "CommandLine") src = ConfigSource::CommandLine;
+        else src = ConfigSource::Runtime;
+        self.set(key, value, src);
+    }, py::arg("key"), py::arg("value"), py::arg("source") = "Runtime",
+       "Set an integer configuration value with optional source specification")
+    .def("setFloat", [](Config& self, const std::string& key, double value,
+                      const std::string& source = "Runtime") {
+        ConfigSource src;
+        if (source == "Default") src = ConfigSource::Default;
+        else if (source == "File") src = ConfigSource::File;
+        else if (source == "CommandLine") src = ConfigSource::CommandLine;
+        else src = ConfigSource::Runtime;
+        self.set(key, value, src);
+    }, py::arg("key"), py::arg("value"), py::arg("source") = "Runtime",
+       "Set a float/double configuration value with optional source specification")
+    .def("setBool", [](Config& self, const std::string& key, bool value,
+                     const std::string& source = "Runtime") {
+        ConfigSource src;
+        if (source == "Default") src = ConfigSource::Default;
+        else if (source == "File") src = ConfigSource::File;
+        else if (source == "CommandLine") src = ConfigSource::CommandLine;
+        else src = ConfigSource::Runtime;
+        self.set(key, value, src);
+    }, py::arg("key"), py::arg("value"), py::arg("source") = "Runtime",
+       "Set a boolean configuration value with optional source specification")
+    
+    // Enhanced get methods with type checking
+    .def("getInt", [](const Config& self, const std::string& key, int defaultValue) {
+        return self.getOr<int>(key, defaultValue);
+    }, py::arg("key"), py::arg("defaultValue"),
+       "Get an integer configuration value with fallback (alias for get)")
+    .def("getFloat", [](const Config& self, const std::string& key, double defaultValue) {
+        return self.getOr<double>(key, defaultValue);
+    }, py::arg("key"), py::arg("defaultValue"),
+       "Get a float/double configuration value with fallback (alias for get)")
+    .def("getBool", [](const Config& self, const std::string& key, bool defaultValue) {
+        return self.getOr<bool>(key, defaultValue);
+    }, py::arg("key"), py::arg("defaultValue"),
+       "Get a boolean configuration value with fallback (alias for get)")
+    .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+        return self.getOr<std::string>(key, defaultValue);
+    }, py::arg("key"), py::arg("defaultValue"),
+       "Get a string configuration value with fallback (alias for get)")
+    
+    // Validation and utility methods for robust configuration handling
+    .def("validateInt", [](const Config& self, const std::string& key, int min, int max) {
+        auto val = self.get<int>(key);
+        if (!val.has_value()) {
+            throw std::runtime_error("Configuration key not found: " + key);
+        }
+        int value = val.value();
+        if (value < min || value > max) {
+            throw std::runtime_error("Configuration value out of range for key '" + key + "': " + 
+                                   std::to_string(value) + " (valid range: " + std::to_string(min) + "-" + 
+                                   std::to_string(max) + ")");
+        }
+        return value;
+    }, py::arg("key"), py::arg("min"), py::arg("max"),
+       "Get an integer with range validation, throws if invalid or not found")
+    
+    .def("validatePositive", [](const Config& self, const std::string& key) {
+        auto val = self.get<double>(key);
+        if (!val.has_value()) {
+            throw std::runtime_error("Configuration key not found: " + key);
+        }
+        double value = val.value();
+        if (value <= 0.0) {
+            throw std::runtime_error("Configuration value must be positive for key '" + key + "': " + 
+                                   std::to_string(value));
+        }
+        return value;
+    }, py::arg("key"),
+       "Get a double and ensure it's positive, throws if not found or non-positive")
+    
+    .def("validatePositiveInt", [](const Config& self, const std::string& key) {
+        auto val = self.get<int>(key);
+        if (!val.has_value()) {
+            throw std::runtime_error("Configuration key not found: " + key);
+        }
+        int value = val.value();
+        if (value <= 0) {
+            throw std::runtime_error("Configuration value must be positive for key '" + key + "': " + 
+                                   std::to_string(value));
+        }
+        return value;
+    }, py::arg("key"),
+       "Get an integer and ensure it's positive, throws if not found or non-positive")
+    
+    .def("validateNonNegative", [](const Config& self, const std::string& key) {
+        auto val = self.get<double>(key);
+        if (!val.has_value()) {
+            throw std::runtime_error("Configuration key not found: " + key);
+        }
+        double value = val.value();
+        if (value < 0.0) {
+            throw std::runtime_error("Configuration value must be non-negative for key '" + key + "': " + 
+                                   std::to_string(value));
+        }
+        return value;
+    }, py::arg("key"),
+       "Get a double and ensure it's non-negative, throws if not found or negative")
+    
+    // Enhanced error handling for configuration access
+    .def("getRequiredInt", [](const Config& self, const std::string& key) {
+        auto val = self.get<int>(key);
+        if (!val.has_value()) {
+            throw std::runtime_error("Required configuration key not found: " + key);
+        }
+        return val.value();
+    }, py::arg("key"),
+       "Get a required integer configuration value, throws if not found")
+    
+    .def("getRequiredFloat", [](const Config& self, const std::string& key) {
+        auto val = self.get<double>(key);
+        if (!val.has_value()) {
+            throw std::runtime_error("Required configuration key not found: " + key);
+        }
+        return val.value();
+    }, py::arg("key"),
+       "Get a required double configuration value, throws if not found")
+    
+    .def("getRequiredString", [](const Config& self, const std::string& key) {
+        auto val = self.get<std::string>(key);
+        if (!val.has_value()) {
+            throw std::runtime_error("Required configuration key not found: " + key);
+        }
+        return val.value();
+    }, py::arg("key"),
+       "Get a required string configuration value, throws if not found")
+    
+    // Configuration import/export utilities
+    .def("fromDict", [](const std::map<std::string, std::variant<int, double, bool, std::string>> dict) {
+        auto config = std::make_shared<Config>();
+        for (const auto& item : dict) {
+            const std::string& key = item.first;
+            const auto& value = item.second;
+            std::visit([&](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int>) {
+                    config->set(key, arg, ConfigSource::Runtime);
+                } else if constexpr (std::is_same_v<T, double>) {
+                    config->set(key, arg, ConfigSource::Runtime);
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    config->set(key, arg, ConfigSource::Runtime);
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    config->set(key, arg, ConfigSource::Runtime);
+                }
+            }, value);
+        }
+        return config;
+    }, py::arg("dict"),
+       "Create a configuration from a Python dictionary (converts values appropriately)")
+    
+    .def("toDict", [](const Config& self) {
+        std::map<std::string, py::object> dict;
+        auto keys = self.getKeys();
+        for (const auto& key : keys) {
+            // Try each type in order
+            auto intVal = self.get<int>(key);
+            if (intVal.has_value()) {
+                dict[key] = py::cast(intVal.value());
+            } else {
+                auto floatVal = self.get<double>(key);
+                if (floatVal.has_value()) {
+                    dict[key] = py::cast(floatVal.value());
+                } else {
+                    auto boolVal = self.get<bool>(key);
+                    if (boolVal.has_value()) {
+                        dict[key] = py::cast(boolVal.value());
+                    } else {
+                        auto stringVal = self.get<std::string>(key);
+                        if (stringVal.has_value()) {
+                            dict[key] = py::cast(stringVal.value());
+                        }
+                    }
+                }
+            }
+        }
+        return dict;
+    }, "Convert configuration to a Python dictionary")
+    
+    // Configuration validation utilities
+    .def("validateRequired", [](const Config& self, 
+                               const std::vector<std::string>& requiredKeys) {
+        std::vector<std::string> missingKeys;
+        for (const auto& key : requiredKeys) {
+            if (!self.has(key)) {
+                missingKeys.push_back(key);
+            }
+        }
+        if (!missingKeys.empty()) {
+            std::string errorMsg = "Missing required configuration keys: ";
+            for (size_t i = 0; i < missingKeys.size(); ++i) {
+                if (i > 0) errorMsg += ", ";
+                errorMsg += "'" + missingKeys[i] + "'";
+            }
+            throw std::runtime_error(errorMsg);
+        }
+        return true;
+    }, py::arg("requiredKeys"),
+       "Validate that all required keys are present, throws if any are missing")
+    
+    .def("validateRange", [](const Config& self,
+                           const std::string& key,
+                           double min, double max, bool inclusive = true) {
+        auto val = self.get<double>(key);
+        if (!val.has_value()) {
+            throw std::runtime_error("Configuration key not found: " + key);
+        }
+        double value = val.value();
+        
+        if (inclusive) {
+            if (value < min || value > max) {
+                throw std::runtime_error("Configuration value out of range for key '" + key + "': " + 
+                                       std::to_string(value) + " (valid range: " + std::to_string(min) + "-" + 
+                                       std::to_string(max) + ", inclusive)");
+            }
+        } else {
+            if (value <= min || value >= max) {
+                throw std::runtime_error("Configuration value out of range for key '" + key + "': " + 
+                                       std::to_string(value) + " (valid range: (" + std::to_string(min) + ", " + 
+                                       std::to_string(max) + ", exclusive)");
+            }
+        }
+        return true;
+    }, py::arg("key"), py::arg("min"), py::arg("max"), py::arg("inclusive") = true,
+       "Validate that a double configuration value is within a specified range")
+    
+    // Configuration utilities
+    .def("merge", [](Config& self, const Config& other) {
+        auto keys = other.getKeys();
+        for (const auto& key : keys) {
+            // Use other config's value, but preserve its source
+            auto val = other.get<int>(key);
+            if (val.has_value()) {
+                self.set(key, val.value(), other.getSource(key));
+            } else {
+                auto val = other.get<double>(key);
+                if (val.has_value()) {
+                    self.set(key, val.value(), other.getSource(key));
+                } else {
+                    auto val = other.get<bool>(key);
+                    if (val.has_value()) {
+                        self.set(key, val.value(), other.getSource(key));
+                    } else {
+                        auto val = other.get<std::string>(key);
+                        if (val.has_value()) {
+                            self.set(key, val.value(), other.getSource(key));
+                        }
+                    }
+                }
+            }
+        }
+        return self;
+    }, py::arg("other"),
+       "Merge another configuration into this one (other config's values take precedence)")
+    
+    // Configuration comparison
+    .def("equals", [](const Config& self, const Config& other) {
+        auto selfKeys = self.getKeys();
+        auto otherKeys = other.getKeys();
+        
+        if (selfKeys.size() != otherKeys.size()) return false;
+        
+        for (const auto& key : selfKeys) {
+            if (!other.has(key)) return false;
+            
+            // Compare values (simplified - could be more robust)
+            auto selfVal = self.get<std::string>(key);
+            auto otherVal = other.get<std::string>(key);
+            
+            if (selfVal != otherVal) return false;
+        }
+        
+        return true;
+    }, py::arg("other"),
+       "Compare two configurations for equality")
+    
+    // Configuration copying and assignment
+    .def("copy", [](const Config& self) {
+        auto config = std::make_shared<Config>();
+        auto keys = self.getKeys();
+        for (const auto& key : keys) {
+            auto val = self.get<int>(key);
+            if (val.has_value()) {
+                config->set(key, val.value(), ConfigSource::Runtime);
+            } else {
+                auto val = self.get<double>(key);
+                if (val.has_value()) {
+                    config->set(key, val.value(), ConfigSource::Runtime);
+                } else {
+                    auto val = self.get<bool>(key);
+                    if (val.has_value()) {
+                        config->set(key, val.value(), ConfigSource::Runtime);
+                    } else {
+                        auto val = self.get<std::string>(key);
+                        if (val.has_value()) {
+                            config->set(key, val.value(), ConfigSource::Runtime);
+                        }
+                    }
+                }
+            }
+        }
+        return config;
+    }, "Create a copy of this configuration")
+    
+    // Configuration export/import utility functions
+    .def("exportToJSON", [](const Config& self, const std::string& filepath) {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file for writing: " + filepath);
+        }
+        
+        file << "{\n";
+        auto keys = self.getKeys();
+        for (size_t i = 0; i < keys.size(); ++i) {
+            const auto& key = keys[i];
+            file << "  \"" << key << "\": ";
+            
+            // Get value and serialize appropriately
+            auto val = self.get<int>(key);
+            if (val.has_value()) {
+                file << val.value();
+            } else {
+                auto val = self.get<double>(key);
+                if (val.has_value()) {
+                    // Format as float without trailing zeros
+                    std::ostringstream oss;
+                    oss << val.value();
+                    std::string str = oss.str();
+                    // Remove trailing zeros and potential decimal point
+                    if (str.find('.') != std::string::npos) {
+                        size_t endpos = str.find_last_not_of('0');
+                        if (endpos != std::string::npos && endpos != str.find('.')) {
+                            str.erase(endpos + 1);
+                        }
+                    }
+                    file << str;
+                } else {
+                    auto val = self.get<bool>(key);
+                    if (val.has_value()) {
+                        file << (val.value() ? "true" : "false");
+                    } else {
+                        auto val = self.get<std::string>(key);
+                        if (val.has_value()) {
+                            // Escape JSON string
+                            std::string escaped = val.value();
+                            // Simple escaping (could be enhanced)
+                            size_t pos = 0;
+                            while ((pos = escaped.find('\\', pos)) != std::string::npos) {
+                                escaped.replace(pos, 1, "\\\\");
+                                pos += 2;
+                            }
+                            while ((pos = escaped.find('\"', pos)) != std::string::npos) {
+                                escaped.replace(pos, 1, "\\\"");
+                                pos += 2;
+                            }
+                            file << "\"" << escaped << "\"";
+                        } else {
+                            file << "null";
+                        }
+                    }
+                }
+            }
+            
+            if (i < keys.size() - 1) file << ",\n";
+        }
+        file << "}\n";
+        
+        return true;
+    }, py::arg("filepath"),
+       "Export configuration to JSON format")
+    
+    .def("importFromJSON", [](Config& self, const std::string& content) {
+        return self.loadFromJSON(content, ConfigSource::Runtime);
+    }, py::arg("content"),
+       "Import configuration from JSON string content")
+    
+    // Configuration utility functions
+    .def("createEmpty", []() {
+        return std::make_shared<Config>();
+    }, "Create an empty configuration (utility function)")
+    
+    .def("mergeConfigs", [](const std::vector<std::shared_ptr<Config>>& configs) {
+        auto result = std::make_shared<Config>();
+        for (const auto& config : configs) {
+            if (config) {
+                auto keys = config->getKeys();
+                for (const auto& key : keys) {
+                    auto val = config->get<int>(key);
+                    if (val.has_value()) {
+                        result->set(key, val.value(), ConfigSource::Runtime);
+                    } else {
+                        auto val = config->get<double>(key);
+                        if (val.has_value()) {
+                            result->set(key, val.value(), ConfigSource::Runtime);
+                        } else {
+                            auto val = config->get<bool>(key);
+                            if (val.has_value()) {
+                                result->set(key, val.value(), ConfigSource::Runtime);
+                            } else {
+                                auto val = config->get<std::string>(key);
+                                if (val.has_value()) {
+                                    result->set(key, val.value(), ConfigSource::Runtime);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return result;
+    }, py::arg("configs"),
+       "Merge multiple configurations into one (later configs override earlier ones)")
+    
+    .def("diff", [](const Config& self, const Config& other) {
+        std::map<std::string, std::string> differences;
+        
+        // Find keys in self but not in other
+        auto selfKeys = self.getKeys();
+        auto otherKeys = other.getKeys();
+        
+        for (const auto& key : selfKeys) {
+            if (!other.has(key)) {
+                differences[key] = "MISSING_IN_OTHER";
+            } else {
+                // Compare values
+                auto selfVal = self.get<std::string>(key);
+                auto otherVal = other.get<std::string>(key);
+                if (selfVal != otherVal) {
+                    differences[key] = "DIFFERENT: self='" + selfVal.value() + "', other='" + otherVal.value() + "'";
+                }
+            }
+        }
+        
+        // Find keys in other but not in self
+        for (const auto& key : otherKeys) {
+            if (!self.has(key)) {
+                differences[key] = "EXTRA_IN_OTHER";
+            }
+        }
+        
+        return differences;
+    }, py::arg("other"),
+       "Compare two configurations and return differences as a dictionary")
+    
+    .def("toJSON", [](const Config& self) {
+        std::ostringstream oss;
+        oss << "{\n";
+        auto keys = self.getKeys();
+        for (size_t i = 0; i < keys.size(); ++i) {
+            const auto& key = keys[i];
+            oss << "  \"" << key << "\": ";
+            
+            auto val = self.get<int>(key);
+            if (val.has_value()) {
+                oss << val.value();
+            } else {
+                auto val = self.get<double>(key);
+                if (val.has_value()) {
+                    oss << val.value();
+                } else {
+                    auto val = self.get<bool>(key);
+                    if (val.has_value()) {
+                        oss << (val.value() ? "true" : "false");
+                    } else {
+                        auto val = self.get<std::string>(key);
+                        if (val.has_value()) {
+                            oss << "\"" << val.value() << "\"";
+                        } else {
+                            oss << "null";
+                        }
+                    }
+                }
+            }
+            
+            if (i < keys.size() - 1) oss << ",\n";
+        }
+        oss << "}\n";
+        return oss.str();
+    }, "Convert configuration to JSON string")
+    
+    .def("fromJSON", [](const std::string& json) {
+        auto config = std::make_shared<Config>();
+        config->loadFromJSON(json, ConfigSource::Runtime);
+        return config;
+    }, py::arg("json"),
+       "Create a configuration from a JSON string")
+    
+    // Configuration summary and metadata
+    .def("getEntryCount", [](const Config& self) {
+        return self.getKeys().size();
+    }, "Get the number of entries in the configuration")
+    
+    .def("hasEntries", [](const Config& self) {
+        return !self.getKeys().empty();
+    }, "Check if the configuration has any entries")
+    
+    .def("getDescription", [](const Config& self, const std::string& key) {
+        // Note: Config struct doesn't currently store descriptions, 
+        // this is a placeholder for future enhancement
+        return std::string("Description for '" + key + "'") + 
+               " (descriptions not yet implemented in C++ Config)";
+    }, py::arg("key"),
+       "Get description for a configuration key (placeholder for future enhancement)")
+    
+    // Configuration constants and utilities
+    .def("createDefault", []() {
+        auto config = std::make_shared<Config>();
+        // Set some sensible defaults
+        config->setInt("brain.neuron_count", 1000);
+        config->setFloat("brain.synapse_density", 0.1f);
+        config->setFloat("brain.connection_probability", 0.05f);
+        config->setInt("random_seed", 42);
+        return config;
+    }, "Create a configuration with sensible default values")
+    
+    .def("createMinimal", []() {
+        return std::make_shared<Config>();
+    }, "Create an empty configuration")
+    
+    // Configuration debugging and inspection
+    .def("debug", [](const Config& self) {
+        std::ostringstream oss;
+        oss << "=== Configuration Debug Info ===\n";
+        oss << "Entry count: " << self.getKeys().size() << "\n";
+        oss << "Keys: [";
+        auto keys = self.getKeys();
+        for (size_t i = 0; i < keys.size(); ++i) {
+            if (i > 0) oss << ", ";
+            oss << "'" << keys[i] << "'";
+        }
+        oss << "]\n";
+        return oss.str();
+    }, "Get debug information about the configuration")
+    
+    // Configuration iteration and enumeration
+    .def("keyIterator", [](const Config& self) {
+        return py::make_key_iterator(self.getKeys());
+    }, py::return_value_policy::reference_internal,
+       "Get an iterator over configuration keys (Pythonic)")
+    
+    .def("entriesIterator", [](const Config& self) {
+        auto keys = self.getKeys();
+        std::vector<std::pair<std::string, py::object>> entries;
+        for (const auto& key : keys) {
+            // Get value as Python object
+            auto val = self.get<int>(key);
+            if (val.has_value()) {
+                entries.emplace_back(key, py::cast(val.value()));
+            } else {
+                auto val = self.get<double>(key);
+                if (val.has_value()) {
+                    entries.emplace_back(key, py::cast(val.value()));
+                } else {
+                    auto val = self.get<bool>(key);
+                    if (val.has_value()) {
+                        entries.emplace_back(key, py::cast(val.value()));
+                    } else {
+                        auto val = self.get<std::string>(key);
+                        if (val.has_value()) {
+                            entries.emplace_back(key, py::cast(val.value()));
+                        }
+                    }
+                }
+            }
+        }
+        return entries;
+    }, "Get all configuration entries as key-value pairs")
+    
+    // Configuration utility functions
+    .def("validateAllTypes", [](const Config& self) {
+        std::vector<std::string> errors;
+        auto keys = self.getKeys();
+        
+        for (const auto& key : keys) {
+            // Check if value can be parsed as the expected type
+            auto val = self.get<int>(key);
+            if (!val.has_value()) {
+                auto val = self.get<double>(key);
+                if (!val.has_value()) {
+                    auto val = self.get<bool>(key);
+                    if (!val.has_value()) {
+                        auto val = self.get<std::string>(key);
+                        if (!val.has_value()) {
+                            errors.push_back("Key '" + key + "' has no valid value");
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!errors.empty()) {
+            std::string errorMsg = "Configuration validation failed:\n";
+            for (const auto& error : errors) {
+                errorMsg += "  - " + error + "\n";
+            }
+            throw std::runtime_error(errorMsg);
+        }
+        
+        return true;
+    }, "Validate that all configuration values are properly typed")
+    
+    .def("getValidTypes", [](const Config& self, const std::string& key) {
+        std::vector<std::string> validTypes;
+        
+        auto val = self.get<int>(key);
+        if (val.has_value()) validTypes.push_back("int");
+        
+        auto val = self.get<double>(key);
+        if (val.has_value()) validTypes.push_back("float/double");
+        
+        auto val = self.get<bool>(key);
+        if (val.has_value()) validTypes.push_back("bool");
+        
+        auto val = self.get<std::string>(key);
+        if (val.has_value()) validTypes.push_back("string");
+        
+        if (validTypes.empty()) {
+            return std::vector<std::string>{"no_valid_type"};
+        }
+        
+        return validTypes;
+    }, py::arg("key"),
+       "Get the valid data types for a configuration key (for debugging)")
+    
+    // Configuration streaming and serialization
+    .def("__str__", [](const Config& self) {
+        return self.summary();
+    }, "String representation of configuration (alias for summary())")
+    
+    .def("__repr__", [](const Config& self) {
+        return "<Config with " + std::to_string(self.getKeys().size()) + " entries>";
+    }, "Debug representation of configuration")
+    
+    // Configuration comparison operators
+    .def("isSubsetOf", [](const Config& self, const Config& other) {
+        auto selfKeys = self.getKeys();
+        for (const auto& key : selfKeys) {
+            if (!other.has(key)) return false;
+        }
+        return true;
+    }, py::arg("other"),
+       "Check if this configuration is a subset of another configuration")
+    
+    .def("diff", [](const Config& self, const Config& other) {
+        std::map<std::string, std::string> diff;
+        
+        auto selfKeys = self.getKeys();
+        auto otherKeys = other.getKeys();
+        
+        for (const auto& key : selfKeys) {
+            if (!other.has(key)) {
+                diff[key] = "REMOVED";
+            } else {
+                auto selfVal = self.get<std::string>(key);
+                auto otherVal = other.get<std::string>(key);
+                if (selfVal != otherVal) {
+                    diff[key] = "CHANGED: was '" + selfVal.value() + "', now '" + otherVal.value() + "'";
+                }
+            }
+        }
+        
+        for (const auto& key : otherKeys) {
+            if (!self.has(key)) {
+                diff[key] = "ADDED";
+            }
+        }
+        
+        return diff;
+    }, py::arg("other"),
+       "Get a diff between this configuration and another")
+    
+    // Configuration metadata and statistics
+    .def("getSourceInfo", [](const Config& self, const std::string& key) {
+        // Note: ConfigEntry doesn't currently store source information accessible from Python
+        // This is a placeholder for future enhancement
+        return std::string("Source information for '" + key + "' (not yet implemented)");
+    }, py::arg("key"),
+       "Get source information for a configuration key (placeholder for future enhancement)")
+    
+    .def("countBySource", [](const Config& self) {
+        // Note: ConfigEntry doesn't currently store source information accessible from Python
+        // This is a placeholder for future enhancement
+        return std::map<std::string, int>{
+            {"Default", 0}, {"File", 0}, {"CommandLine", 0}, {"Runtime", 0}
+        };
+    }, "Count configuration entries by source (placeholder for future enhancement)")
+    
+    .def("getOldestEntry", [](const Config& self) {
+        // Note: ConfigEntry doesn't currently store timestamp information
+        // This is a placeholder for future enhancement
+        if (self.getKeys().empty()) {
+            return std::string("No entries");
+        }
+        return std::string("Oldest entry (timestamp not yet implemented)");
+    }, "Get information about the oldest entry (placeholder for future enhancement)")
+    
+    .def("getYoungestEntry", [](const Config& self) {
+        // Note: ConfigEntry doesn't currently store timestamp information
+        // This is a placeholder for future enhancement
+        if (self.getKeys().empty()) {
+            return std::string("No entries");
+        }
+        return std::string("Youngest entry (timestamp not yet implemented)");
+    }, "Get information about the youngest entry (placeholder for future enhancement)");
+        // Enhanced set methods with better type safety
+        .def("set", [](Config& self, const std::string& key, const std::string& value, 
+                     const std::string& source = "Runtime") {
+            ConfigSource src;
+            if (source == "Default") src = ConfigSource::Default;
+            else if (source == "File") src = ConfigSource::File;
+            else if (source == "CommandLine") src = ConfigSource::CommandLine;
+            else src = ConfigSource::Runtime;
+            self.set(key, value, src);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = "Runtime",
+           "Set a string configuration value with optional source specification")
+        .def("set", [](Config& self, const std::string& key, int value,
+                     const std::string& source = "Runtime") {
+            ConfigSource src;
+            if (source == "Default") src = ConfigSource::Default;
+            else if (source == "File") src = ConfigSource::File;
+            else if (source == "CommandLine") src = ConfigSource::CommandLine;
+            else src = ConfigSource::Runtime;
+            self.set(key, value, src);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = "Runtime",
+           "Set an integer configuration value with optional source specification")
+        .def("set", [](Config& self, const std::string& key, double value,
+                     const std::string& source = "Runtime") {
+            ConfigSource src;
+            if (source == "Default") src = ConfigSource::Default;
+            else if (source == "File") src = ConfigSource::File;
+            else if (source == "CommandLine") src = ConfigSource::CommandLine;
+            else src = ConfigSource::Runtime;
+            self.set(key, value, src);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = "Runtime",
+           "Set a double (float) configuration value with optional source specification")
+        .def("set", [](Config& self, const std::string& key, bool value,
+                     const std::string& source = "Runtime") {
+            ConfigSource src;
+            if (source == "Default") src = ConfigSource::Default;
+            else if (source == "File") src = ConfigSource::File;
+            else if (source == "CommandLine") src = ConfigSource::CommandLine;
+            else src = ConfigSource::Runtime;
+            self.set(key, value, src);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = "Runtime",
+           "Set a boolean configuration value with optional source specification")
+        // Enhanced get methods with better error handling
+        .def("get", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto val = self.get<std::string>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a string configuration value, returns default if not found")
+        .def("get", [](const Config& self, const std::string& key, int defaultValue) {
+            auto val = self.get<int>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get an integer configuration value, returns default if not found")
+        .def("get", [](const Config& self, const std::string& key, double defaultValue) {
+            auto val = self.get<double>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a double configuration value, returns default if not found")
+        .def("get", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a boolean configuration value, returns default if not found")
+        // New utility methods for better API
+        .def("getInt", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get an integer with fallback (alias for get)")
+        .def("getFloat", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a float/double with fallback (alias for get)")
+        .def("getBool", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a boolean with fallback (alias for get)")
+        .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a string with fallback (alias for get)")
+        // Validation and utility methods
+        .def("validateInt", [](const Config& self, const std::string& key, int min, int max) {
+            auto val = self.get<int>(key);
+            if (!val.has_value()) {
+                throw std::runtime_error("Configuration key not found: " + key);
+            }
+            int value = val.value();
+            if (value < min || value > max) {
+                throw std::runtime_error("Configuration value out of range for key '" + key + "': " + 
+                                       std::to_string(value) + " (valid range: " + std::to_string(min) + "-" + 
+                                       std::to_string(max) + ")");
+            }
+            return value;
+        }, py::arg("key"), py::arg("min"), py::arg("max"),
+           "Get an integer with range validation, throws if invalid or not found")
+        .def("validatePositive", [](const Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (!val.has_value()) {
+                throw std::runtime_error("Configuration key not found: " + key);
+            }
+            double value = val.value();
+            if (value <= 0.0) {
+                throw std::runtime_error("Configuration value must be positive for key '" + key + "': " + 
+                                       std::to_string(value));
+            }
+            return value;
+        }, py::arg("key"),
+           "Get a double and ensure it's positive, throws if not found or non-positive")
+        .def("clone", []() {
+            return std::make_shared<Config>();
+        }, "Create a new empty configuration (utility function)");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

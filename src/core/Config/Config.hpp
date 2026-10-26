@@ -100,6 +100,20 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Advanced file format parsing
+    bool loadFromJSON(const std::string& content, ConfigSource source);
+    bool loadFromYAML(const std::string& content, ConfigSource source);
+    
+    // JSON helper functions
+    static std::string extractJsonValue(const std::string& json, size_t& pos);
+    static std::string extractJsonKey(const std::string& json, size_t& pos);
+    static bool parseJsonKeyValue(const std::string& json, const std::string& key, ConfigValue& value);
+    
+    // YAML helper functions
+    static std::string extractYamlValue(const std::string& yaml, size_t& pos);
+    static std::string extractYamlKey(const std::string& yaml, size_t& pos);
+    static bool parseYamlKeyValue(const std::string& yaml, const std::string& key, ConfigValue& value);
 };
 
 } // namespace nlm
