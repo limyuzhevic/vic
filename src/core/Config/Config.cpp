@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "../Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -24,11 +25,17 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for reading: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    size_t validEntries = 0;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +48,13 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Config file " + filepath + ": line " + std::to_string(lineNumber) + 
+                              " has empty key");
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -48,14 +62,24 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            if (set(key, value, ConfigSource::File)) {
+                validEntries++;
+            } else {
+                NLM_LOG_WARNING("Failed to set config key: " + key);
+            }
+        } else {
+            NLM_LOG_WARNING("Config file " + filepath + ": line " + std::to_string(lineNumber) + 
+                          " malformed - missing '='");
         }
     }
     
+    NLM_LOG_INFO("Loaded configuration from " + filepath + ": " + std::to_string(validEntries) + " entries");
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    size_t validArgs = 0;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,30 +89,98 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key
+                if (key.empty()) {
+                    NLM_LOG_WARNING("Command line argument malformed - empty key");
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+                validArgs++;
+            } else {
+                NLM_LOG_WARNING("Command line argument malformed: " + arg);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Command line argument malformed - empty key");
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+            validArgs++;
+        } else {
+            NLM_LOG_WARNING("Unknown command line argument: " + arg);
         }
     }
+    
+    NLM_LOG_INFO("Processed " + std::to_string(validArgs) + " valid command line arguments");
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write description as comment
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write key=value pair with proper formatting
+        file << entry.key << " = ";
+        
+        // Use visitor to properly serialize the value
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t> ||
+                                 std::is_same_v<T, double> ||
+                                 std::is_same_v<T, bool>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]";
+            } else {
+                // Unknown type - write as string
+                file << "[unknown]";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
+    NLM_LOG_INFO("Configuration saved to: " + filepath);
     return true;
 }
 

@@ -72,10 +72,64 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
-
 ## Running
 
+### Command Line Interface
+
+NLM now provides a comprehensive command-line interface for advanced users:
+
+#### Basic Usage
+```bash
+nlm                    # Run all tests with default settings
+```
+
+#### Help and Usage
+```bash
+nlm --help             # Display comprehensive help information
+nlm -h                 # Short help
+```
+
+#### Configuration Options
+```bash
+# Load custom configuration file
+nlm --config=myconfig.cfg
+nlm -c myconfig.cfg
+
+# Run specific test modes
+nlm --test-mode=connectivity    # Only connectivity test
+nlm --test-mode=plasticity       # Only plasticity experiment
+nlm --test-mode=stdp             # Only STDP verification
+nlm --test-mode=all              # All tests (default)
+
+# Control simulation parameters
+nlm --steps=5000                # Increase simulation steps
+nlm --seed=123                  # Set random seed for reproducible experiments
+nlm --neuron-count=1000         # Increase neuron count
+nlm --region-count=3            # Multi-region configuration
+nlm --checkpoint-dir=./checkpoints # Custom checkpoint directory
+
+# Verbosity and output control
+nlm --verbose                   # Enable debug logging
+nlm --quiet                     # Suppress informational messages
+```
+
+#### Examples
+```bash
+# Run all tests with default settings
+nlm
+
+# Run plasticity experiment with verbose output
+nlm --test-mode=plasticity --verbose
+
+# Reproducible experiment with custom config and settings
+nlm --config=myconfig.cfg --seed=123 --steps=10000 --test-mode=all
+
+# Development and debugging
+nlm --test-mode=connectivity --verbose
+```
+
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
