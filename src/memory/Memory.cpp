@@ -17,15 +17,66 @@ WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
     // TODO PHASE 2: Implement real storage with capacity limits
+    // Now properly implements LRU eviction policy with capacity limits
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
+            // Move to front for LRU
+            auto it = std::find_if(pImpl->items.begin(), pImpl->items.end(),
+                                 [&neuron](const auto& item) { return item.first == neuron; });
+            if (it != pImpl->items.begin()) {
+                std::rotate(pImpl->items.begin(), it, std::next(it));
+            }
             return;
         }
     }
-    if (pImpl->items.size() < pImpl->capacity) {
-        pImpl->items.emplace_back(neuron, value);
+    
+    // If capacity is full, remove oldest item
+    if (pImpl->items.size() >= pImpl->capacity) {
+        pImpl->items.pop_back();
     }
+    
+    // Add new item to front
+    pImpl->items.emplace_front(neuron, value);
+}
+
+void WorkingMemory::decay(float decayRate) {
+    // Enhanced decay with proper exponential decay
+    for (auto& item : pImpl->items) {
+        // Apply exponential decay with bounds
+        item.second *= (1.0f - decayRate);
+        if (item.second < 0.001f) {
+            item.second = 0.0f;
+        }
+    }
+}
+
+void WorkingMemory::update(float timestep) {
+    // Enhanced working memory update with competition
+    if (pImpl->items.empty()) return;
+    
+    // Find maximum value for competition
+    float maxValue = 0.0f;
+    for (const auto& item : pImpl->items) {
+        if (item.second > maxValue) {
+            maxValue = item.second;
+        }
+    }
+    
+    // Normalize values (soft competition)
+    float competitionStrength = 0.5f;
+    for (auto& item : pImpl->items) {
+        // Apply competition-based decay
+        item.second *= competitionStrength;
+        
+        // Increase value for active neurons
+        if (item.second < maxValue) {
+            item.second += (maxValue - item.second) * 0.1f;
+        }
+    }
+    
+    // Apply decay based on timestep
+    decay(timestep * 10.0f);
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
@@ -109,6 +160,50 @@ void EpisodicMemory::clear() {
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
     // TODO PHASE 2: Implement real consolidation
+    // Enhanced consolidation with relevance-based pruning
+    if (pImpl->episodes.empty()) return;
+    
+    // Calculate total activation of all episodes
+    float totalActivation = 0.0f;
+    for (const auto& episode : pImpl->episodes) {
+        totalActivation += episode.relevance;
+    }
+    
+    // Keep only episodes above threshold or most recent ones
+    std::vector<EpisodicMemoryItem> consolidatedEpisodes;
+    consolidatedEpisodes.reserve(pImpl->maxEpisodes);
+    
+    // First pass: keep episodes with relevance above threshold
+    for (const auto& episode : pImpl->episodes) {
+        if (episode.relevance >= relevanceThreshold) {
+            consolidatedEpisodes.push_back(episode);
+        }
+    }
+    
+    // If we still have capacity, fill remaining slots with most recent episodes
+    if (consolidatedEpisodes.size() < pImpl->maxEpisodes) {
+        size_t remaining = pImpl->maxEpisodes - consolidatedEpisodes.size();
+        size_t startFrom = pImpl->episodes.size() - remaining;
+        if (startFrom > consolidatedEpisodes.size()) {
+            startFrom = consolidatedEpisodes.size();
+        }
+        
+        for (size_t i = startFrom; i < pImpl->episodes.size(); ++i) {
+            consolidatedEpisodes.push_back(pImpl->episodes[i]);
+        }
+    }
+    
+    // Replace with consolidated episodes
+    pImpl->episodes = std::move(consolidatedEpisodes);
+    
+    // Recalculate relevance scores based on usage patterns
+    for (auto& episode : pImpl->episodes) {
+        // Apply consolidation-based relevance adjustment
+        episode.relevance *= 1.2f;  // Boost already consolidated memories
+        if (episode.relevance > 1.0f) {
+            episode.relevance = 1.0f;
+        }
+    }
 }
 
 // Semantic Memory Implementation

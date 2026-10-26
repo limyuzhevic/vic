@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Enhanced with Phase 6 Integration Tests
 
 #include <iostream>
 #include <cassert>
@@ -37,6 +38,14 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_integration {
+    void runAll();
+}
+
+namespace test_integration {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -45,7 +54,24 @@ int main() {
     std::cout << "  - STDP Plasticity" << std::endl;
     std::cout << std::endl;
     
+    std::cout << "=== NLM Phase 6 Integration Tests ===" << std::endl;
+    std::cout << "Testing Complete Brain Integration:" << std::endl;
+    std::cout << "  - Memory Systems" << std::endl;
+    std::cout << "  - Neuromodulation" << std::endl;
+    std::cout << "  - Prediction" << std::endl;
+    std::cout << "  - Cognition" << std::endl;
+    std::cout << "  - Development" << std::endl;
+    std::cout << "  - Sensorimotor Integration" << std::endl;
+    std::cout << "  - Memory Replay & Consolidation" << std::endl;
+    std::cout << "  - Plasticity" << std::endl;
+    std::cout << "  - Checkpoints" << std::endl;
+    std::cout << "  - Configuration" << std::endl;
+    std::cout << "  - Performance & Stability" << std::endl;
+    std::cout << std::endl;
+    
     bool allPassed = true;
+    
+    std::cout << "=== Phase 2: Core Neural Computation Tests ===" << std::endl;
     
     std::cout << "Running Types tests..." << std::endl;
     try {
@@ -119,9 +145,20 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Integration tests..." << std::endl;
+    try {
+        test_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << std::endl;
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "Phase 2 core computation: SUCCESS" << std::endl;
+        std::cout << "Phase 6 integration: SUCCESS" << std::endl;
         return 0;
     } else {
         std::cout << "=== Some Tests FAILED ===" << std::endl;
