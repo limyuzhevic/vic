@@ -3,11 +3,15 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<ConfigEntry> schemaEntries;
+    std::vector<std::string> validationErrors;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,40 +23,30 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Try different parsers in order
+    std::string extension = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos);
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+    // JSON first (most common)
+    if (extension == ".json" || extension == ".JSON" || filepath.find(".json") != std::string::npos) {
+        if (parseJSONFile(filepath, pImpl->entries)) {
+            return true;
         }
     }
     
-    return true;
+    // YAML second
+    if (extension == ".yaml" || extension == ".yml" || extension == ".YAML" || extension == ".YML" ||
+        filepath.find(".yaml") != std::string::npos || filepath.find(".yml") != std::string::npos) {
+        if (parseYAMLFile(filepath, pImpl->entries)) {
+            return true;
+        }
+    }
+    
+    // Fallback to simple parser
+    return parseSimpleFile(filepath, pImpl->entries);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -211,5 +205,473 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Explicit template instantiations
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// =============================================================================
+// JSON and YAML Parsing Helper Functions
+// =============================================================================
+
+// JSON parsing implementation
+bool parseJSONFile(const std::string& filepath, std::vector<ConfigEntry>& entries) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
+        
+        for (auto it = jsonConfig.begin(); it != jsonConfig.end(); ++it) {
+            std::string key = it.key();
+            std::string description = "";
+            
+            // Check if this is a comment object (e.g., "key": {"value": 42, "description": "comment"})
+            if (it->is_object() && it->contains("value") && it->contains("description")) {
+                auto valueJson = (*it)["value"];
+                description = (*it)["description"].get<std::string>();
+                
+                // Convert JSON value to ConfigValue
+                ConfigValue configValue;
+                if (valueJson.is_number_integer()) {
+                    configValue = valueJson.get<int64_t>();
+                } else if (valueJson.is_number_unsigned()) {
+                    configValue = valueJson.get<uint64_t>();
+                } else if (valueJson.is_number_float()) {
+                    configValue = valueJson.get<double>();
+                } else if (valueJson.is_boolean()) {
+                    configValue = valueJson.get<bool>();
+                } else if (valueJson.is_string()) {
+                    configValue = valueJson.get<std::string>();
+                } else if (valueJson.is_array()) {
+                    std::vector<double> vec = valueJson.get<std::vector<double>>();
+                    configValue = vec;
+                }
+                
+                entries.emplace_back(key, configValue, ConfigSource::File, description);
+            } else {
+                // Simple key=value format
+                ConfigValue configValue;
+                if (it->is_number_integer()) {
+                    configValue = it->get<int64_t>();
+                } else if (it->is_number_unsigned()) {
+                    configValue = it->get<uint64_t>();
+                } else if (it->is_number_float()) {
+                    configValue = it->get<double>();
+                } else if (it->is_boolean()) {
+                    configValue = it->get<bool>();
+                } else if (it->is_string()) {
+                    configValue = it->get<std::string>();
+                } else if (it->is_array()) {
+                    configValue = it->get<std::vector<double>>();
+                }
+                
+                entries.emplace_back(key, configValue, ConfigSource::File, "");
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "JSON parsing error: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// YAML parsing implementation
+bool parseYAMLFile(const std::string& filepath, std::vector<ConfigEntry>& entries) {
+    try {
+        YAML::Loader loader;
+        YAML::Node doc = YAML::LoadFile(filepath);
+        
+        for (const auto& key : doc.keys()) {
+            std::string keyName = key.as<std::string>();
+            std::string description = "";
+            
+            // Handle YAML's scalar or mapping format
+            if (doc[key].IsMap() && doc[key]["value"] && doc[key]["description"]) {
+                auto valueNode = doc[key]["value"];
+                description = doc[key]["description"].as<std::string>();
+                
+                ConfigValue configValue;
+                if (valueNode.IsInt()) {
+                    configValue = valueNode.as<int64_t>();
+                } else if (valueNode.IsFloat()) {
+                    configValue = valueNode.as<double>();
+                } else if (valueNode.IsBool()) {
+                    configValue = valueNode.as<bool>();
+                } else if (valueNode.IsScalar()) {
+                    configValue = valueNode.as<std::string>();
+                } else if (valueNode.IsSequence()) {
+                    std::vector<double> vec;
+                    for (const auto& item : valueNode) {
+                        vec.push_back(item.as<double>());
+                    }
+                    configValue = vec;
+                }
+                
+                entries.emplace_back(keyName, configValue, ConfigSource::File, description);
+            } else {
+                // Simple YAML format
+                ConfigValue configValue;
+                if (doc[key].IsInt()) {
+                    configValue = doc[key].as<int64_t>();
+                } else if (doc[key].IsFloat()) {
+                    configValue = doc[key].as<double>();
+                } else if (doc[key].IsBool()) {
+                    configValue = doc[key].as<bool>();
+                } else if (doc[key].IsScalar()) {
+                    configValue = doc[key].as<std::string>();
+                } else if (doc[key].IsSequence()) {
+                    std::vector<double> vec;
+                    for (const auto& item : doc[key]) {
+                        vec.push_back(item.as<double>());
+                    }
+                    configValue = vec;
+                }
+                
+                entries.emplace_back(keyName, configValue, ConfigSource::File, "");
+            }
+        }
+        
+        return true;
+    } catch (const YAML::Exception& e) {
+        std::cerr << "YAML parsing error: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// Helper functions for type conversion
+ConfigValue convertToConfigValue(const rapidjson::Value& value) {
+    if (value.IsInt()) {
+        return value.GetInt();
+    } else if (value.IsInt64()) {
+        return value.GetInt64();
+    } else if (value.IsUint()) {
+        return value.GetUint();
+    } else if (value.IsUint64()) {
+        return value.GetUint64();
+    } else if (value.IsDouble()) {
+        return value.GetDouble();
+    } else if (value.IsBool()) {
+        return value.GetBool();
+    } else if (value.IsString()) {
+        return value.GetString();
+    } else if (value.IsArray()) {
+        std::vector<double> vec;
+        for (rapidjson::SizeType i = 0; i < value.Size(); ++i) {
+            vec.push_back(value[i].GetDouble());
+        }
+        return vec;
+    }
+    return std::string("");
+}
+
+bool parseRapidJSONFile(const std::string& filepath, std::vector<ConfigEntry>& entries) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        rapidjson::IStreamWrapper isw(file);
+        rapidjson::Document doc;
+        doc.ParseStream(isw);
+        
+        if (doc.HasParseError()) {
+            std::cerr << "RapidJSON parsing error at offset " 
+                      << doc.GetParseErrorOffset() << ": "
+                      << rapidjson::GetParseError_En(doc.GetParseError()) << std::endl;
+            return false;
+        }
+        
+        for (rapidjson::Value::ConstMemberIterator it = doc.MemberBegin(); 
+             it != doc.MemberEnd(); ++it) {
+            std::string key = it->name.GetString();
+            std::string description = "";
+            
+            if (it->value.IsObject() && it->value.FindMember("value") != it->value.MemberEnd() &&
+                it->value.FindMember("description") != it->value.MemberEnd()) {
+                auto valueObj = it->value["value"];
+                description = it->value["description"].GetString();
+                ConfigValue configValue = convertToConfigValue(valueObj);
+                entries.emplace_back(key, configValue, ConfigSource::File, description);
+            } else {
+                ConfigValue configValue = convertToConfigValue(it->value);
+                entries.emplace_back(key, configValue, ConfigSource::File, "");
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        std::cerr << "RapidJSON parsing error: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// Simple key=value parser (fallback)
+bool parseSimpleFile(const std::string& filepath, std::vector<ConfigEntry>& entries) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            if (value.size() >= 2 && 
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+// Save as JSON implementation
+bool saveAsJSONFile(const std::vector<ConfigEntry>& entries, const std::string& filepath) {
+    nlohmann::json jsonConfig;
+    
+    for (const auto& entry : entries) {
+        if (!entry.description.empty()) {
+            // Rich entry with description
+            nlohmann::json valueJson;
+            std::visit([&valueJson](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || 
+                             std::is_same_v<T, uint64_t>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    std::vector<double> vec(arg.begin(), arg.end());
+                    valueJson = vec;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    valueJson = arg;
+                }
+            }, entry.value);
+            
+            jsonConfig[entry.key] = {
+                {"value", valueJson},
+                {"description", entry.description},
+                {"source", static_cast<int>(entry.source)}
+            };
+        } else {
+            // Simple entry
+            nlohmann::json valueJson;
+            std::visit([&valueJson](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || 
+                             std::is_same_v<T, uint64_t>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    std::vector<double> vec(arg.begin(), arg.end());
+                    valueJson = vec;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    valueJson = arg;
+                }
+            }, entry.value);
+            
+            jsonConfig[entry.key] = valueJson;
+        }
+    }
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << std::setw(2) << jsonConfig << std::endl;
+    return true;
+}
+
+// Implementation of all other Config methods remains the same as before
+
+// Config method implementations
+bool Config::validate() const {
+    validateSchema();
+    return pImpl->validationErrors.empty();
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    return pImpl->validationErrors;
+}
+
+void Config::addSchemaEntry(const std::string& key, const std::string& type,
+                           const ConfigValue& defaultValue, const std::string& description) {
+    pImpl->schemaEntries.emplace_back(key, defaultValue, ConfigSource::Default, description);
+}
+
+void Config::setSchema(const std::string& key, const std::string& type,
+                      const ConfigValue& defaultValue, const std::string& description) {
+    pImpl->schemaEntries.emplace_back(key, defaultValue, ConfigSource::Default, description);
+}
+
+void Config::batchSet(const std::vector<std::pair<std::string, ConfigValue>>& updates) {
+    for (const auto& update : updates) {
+        set(update.first, update.second);
+    }
+}
+
+bool Config::mergeFrom(const Config& other, ConfigSource source) {
+    bool changed = false;
+    for (const auto& entry : other.pImpl->entries) {
+        bool exists = false;
+        for (auto& thisEntry : pImpl->entries) {
+            if (thisEntry.key == entry.key) {
+                thisEntry.value = entry.value;
+                thisEntry.source = source;
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) {
+            pImpl->entries.push_back(entry);
+            pImpl->entries.back().source = source;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+Config Config::filter(const std::vector<std::string>& keys) const {
+    Config filteredConfig;
+    for (const auto& key : keys) {
+        auto value = getAsVariant(key);
+        if (value) {
+            filteredConfig.set(key, value.value(), ConfigSource::Runtime);
+        }
+    }
+    return filteredConfig;
+}
+
+Config Config::transform(const std::function<ConfigValue(ConfigValue)>& transform) const {
+    Config transformedConfig;
+    for (const auto& entry : pImpl->entries) {
+        ConfigValue newValue = transform(entry.value);
+        transformedConfig.set(entry.key, newValue, entry.source);
+    }
+    return transformedConfig;
+}
+
+std::optional<ConfigValue> Config::getAsVariant(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    return it->value;
+}
+
+// Save as JSON implementation
+bool saveAsJSONFile(const std::vector<ConfigEntry>& entries, const std::string& filepath) {
+    nlohmann::json jsonConfig;
+    
+    for (const auto& entry : entries) {
+        if (!entry.description.empty()) {
+            // Rich entry with description
+            nlohmann::json valueJson;
+            std::visit([&valueJson](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || 
+                             std::is_same_v<T, uint64_t>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    std::vector<double> vec(arg.begin(), arg.end());
+                    valueJson = vec;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    valueJson = arg;
+                }
+            }, entry.value);
+            
+            jsonConfig[entry.key] = {
+                {"value", valueJson},
+                {"description", entry.description},
+                {"source", static_cast<int>(entry.source)}
+            };
+        } else {
+            // Simple entry
+            nlohmann::json valueJson;
+            std::visit([&valueJson](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || 
+                             std::is_same_v<T, uint64_t>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    valueJson = arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    std::vector<double> vec(arg.begin(), arg.end());
+                    valueJson = vec;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    valueJson = arg;
+                }
+            }, entry.value);
+            
+            jsonConfig[entry.key] = valueJson;
+        }
+    }
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << std::setw(2) << jsonConfig << std::endl;
+    return true;
+}
 
 } // namespace nlm

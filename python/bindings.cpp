@@ -142,10 +142,10 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<Config>(m, "Config", R"pbdoc(Advanced Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON/YAML file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
@@ -160,9 +160,191 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Enhanced type-safe getters
+        .def("getFloat", [](Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("default") = 0.0,
+           "Get float value with default")
+        .def("getInt", [](Config& self, const std::string& key, int64_t defaultValue) {
+            return self.getOr<int64_t>(key, defaultValue);
+        }, py::arg("key"), py::arg("default") = 0,
+           "Get int value with default")
+        .def("getString", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("default") = "",
+           "Get string value with default")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("default") = false,
+           "Get bool value with default")
+        .def("getVector", [](Config& self, const std::string& key, const std::vector<double>& defaultValue) {
+            auto result = self.get<std::vector<double>>(key);
+            return result.has_value() ? result.value() : defaultValue;
+        }, py::arg("key"), py::arg("default") = std::vector<double>(),
+           "Get vector value with default")
+        // Schema validation
+        .def("validate", &Config::validate,
+             "Validate configuration against schema")
+        .def("getValidationErrors", &Config::getValidationErrors,
+             "Get validation errors as a list of strings")
+        // Schema management
+        .def("setSchema", [](Config& self, const std::string& key, 
+                           const std::string& type,
+                           const ConfigValue& defaultValue,
+                           const std::string& description) {
+            self.addSchemaEntry(key, type, defaultValue, description);
+        }, py::arg("key"), py::arg("type"), py::arg("defaultValue"), py::arg("description") = "",
+           "Add a schema entry for validation")
+        // Batch operations
+        .def("batchSet", [](Config& self, const std::vector<std::pair<std::string, ConfigValue>>& updates) {
+            self.batchSet(updates);
+        }, py::arg("updates"),
+             "Set multiple configuration values at once")
+        .def("batchSetDict", [](Config& self, const py::dict& updates) {
+            std::vector<std::pair<std::string, ConfigValue>> updateList;
+            for (auto item : updates) {
+                std::string key = py::cast<std::string>(item.first);
+                ConfigValue value;
+                
+                // Try to convert Python type to ConfigValue
+                if (py::isinstance<py::int_>(item.second)) {
+                    value = py::cast<int64_t>(item.second);
+                } else if (py::isinstance<py::float_>(item.second)) {
+                    value = py::cast<double>(item.second);
+                } else if (py::isinstance<py::bool_>(item.second)) {
+                    value = py::cast<bool>(item.second);
+                } else if (py::isinstance<py::str>(item.second)) {
+                    value = py::cast<std::string>(item.second);
+                } else if (py::isinstance<py::list>(item.second)) {
+                    std::vector<double> vec = py::cast<std::vector<double>>(item.second);
+                    value = vec;
+                }
+                
+                updateList.emplace_back(key, value);
+            }
+            self.batchSet(updateList);
+        }, py::arg("updates"),
+             "Set configuration values from Python dictionary")
+        // Filter and transform operations
+        .def("filter", [](Config& self, const std::vector<std::string>& keys) {
+            return self.filter(keys);
+        }, py::arg("keys"),
+             "Return a new Config with only specified keys")
+        .def("transform", [](Config& self, const std::function<ConfigValue(ConfigValue)>& transformFunc) {
+            return self.transform(transformFunc);
+        }, py::arg("transformFunc"),
+             "Return a new Config with transformed values")
+        // Bracket notation support
+        .def("__getitem__", [](Config& self, const std::string& key) {
+            auto value = self.getAsVariant(key);
+            if (!value) {
+                throw py::key_error("Key not found: '" + key + "'");
+            }
+            
+            // Convert ConfigValue to Python object
+            py::object result;
+            std::visit([&result](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>) {
+                    result = py::int_(arg);
+                } else if constexpr (std::is_same_v<T, double>) {
+                    result = py::float_(arg);
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    result = py::bool_(arg);
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    result = py::str(arg);
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    result = py::list(arg.begin(), arg.end());
+                }
+            }, value.value());
+            
+            return result;
+        }, py::arg("key"),
+             "Get configuration value using bracket notation")
+        .def("__setitem__", [](Config& self, const std::string& key, py::object value) {
+            ConfigValue configValue;
+            
+            // Convert Python object to ConfigValue
+            if (py::isinstance<py::int_>(value)) {
+                configValue = py::cast<int64_t>(value);
+            } else if (py::isinstance<py::float_>(value)) {
+                configValue = py::cast<double>(value);
+            } else if (py::isinstance<py::bool_>(value)) {
+                configValue = py::cast<bool>(value);
+            } else if (py::isinstance<py::str>(value)) {
+                configValue = py::cast<std::string>(value);
+            } else if (py::isinstance<py::list>(value)) {
+                std::vector<double> vec = py::cast<std::vector<double>>(value);
+                configValue = vec;
+            }
+            
+            self.set(key, configValue);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value using bracket assignment")
+        .def("__contains__", &Config::has,
+             "Check if key exists using 'in' operator")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Conversion methods
+        .def("to_dict", [](const Config& self) {
+            py::dict result;
+            for (const auto& key : self.getKeys()) {
+                auto value = self.getAsVariant(key);
+                if (value) {
+                    // Convert ConfigValue to Python object
+                    std::visit([&result, &key](auto&& arg) {
+                        using T = std::decay_t<decltype(arg)>;
+                        if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t>) {
+                            result[key] = py::int_(arg);
+                        } else if constexpr (std::is_same_v<T, double>) {
+                            result[key] = py::float_(arg);
+                        } else if constexpr (std::is_same_v<T, bool>) {
+                            result[key] = py::bool_(arg);
+                        } else if constexpr (std::is_same_v<T, std::string>) {
+                            result[key] = py::str(arg);
+                        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                            result[key] = py::list(arg.begin(), arg.end());
+                        }
+                    }, value.value());
+                }
+            }
+            return result;
+        }, "Convert config to Python dictionary")
+        .def("from_dict", [](Config& self, const py::dict& config_dict) {
+            for (auto item : config_dict) {
+                std::string key = py::cast<std::string>(item.first);
+                py::object value = item.second;
+                
+                ConfigValue configValue;
+                
+                // Convert Python object to ConfigValue
+                if (py::isinstance<py::int_>(value)) {
+                    configValue = py::cast<int64_t>(value);
+                } else if (py::isinstance<py::float_>(value)) {
+                    configValue = py::cast<double>(value);
+                } else if (py::isinstance<py::bool_>(value)) {
+                    configValue = py::cast<bool>(value);
+                } else if (py::isinstance<py::str>(value)) {
+                    configValue = py::cast<std::string>(value);
+                } else if (py::isinstance<py::list>(value)) {
+                    std::vector<double> vec = py::cast<std::vector<double>>(value);
+                    configValue = vec;
+                }
+                
+                self.set(key, configValue);
+            }
+        }, py::arg("config_dict"),
+             "Create config from Python dictionary")
+        .def("merge", [](Config& self, const Config& other, int source) {
+            return self.mergeFrom(other, static_cast<ConfigSource>(source));
+        }, py::arg("other"), py::arg("source") = 3,  // ConfigSource::Runtime default
+             "Merge another config into this one")
+        .def("clone", [](const Config& self) {
+            Config clonedConfig;
+            clonedConfig = self; // This uses copy assignment
+            return clonedConfig;
+        }, "Create a deep copy of this configuration");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

@@ -90,8 +90,26 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Schema management
+    void addSchemaEntry(const std::string& key, const std::string& type, 
+                       const ConfigValue& defaultValue, const std::string& description);
+    void setSchema(const std::string& key, const std::string& type,
+                  const ConfigValue& defaultValue, const std::string& description);
+    bool validateSchema() const;
+    
+    // Advanced operations
+    void batchSet(const std::vector<std::pair<std::string, ConfigValue>>& updates);
+    bool mergeFrom(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    Config filter(const std::vector<std::string>& keys) const;
+    Config transform(const std::function<ConfigValue(ConfigValue)>& transform) const;
+    
+    // Python-friendly methods
+    bool loadFromFile(const std::string& filepath);
+    bool saveToFile(const std::string& filepath) const;
+    bool loadFromArgs(int argc, char** argv);
     
 private:
     struct Impl;
@@ -100,6 +118,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper for Python bindings
+    std::optional<ConfigValue> getAsVariant(const std::string& key) const;
+    
+    // Parsing implementations
+    bool parseJSONFile(const std::string& filepath, std::vector<ConfigEntry>& entries);
+    bool parseYAMLFile(const std::string& filepath, std::vector<ConfigEntry>& entries);
+    bool parseRapidJSONFile(const std::string& filepath, std::vector<ConfigEntry>& entries);
+    bool parseSimpleFile(const std::string& filepath, std::vector<ConfigEntry>& entries);
+    bool saveAsJSONFile(const std::vector<ConfigEntry>& entries, const std::string& filepath);
 };
 
 } // namespace nlm
