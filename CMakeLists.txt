@@ -6,16 +6,19 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif()
+# Build options
+option(NLM_ENABLE_JSON "Enable JSON configuration support" ON)
 
-# Enable warnings
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+# Find nlohmann/json if requested
+if(NLM_ENABLE_JSON)
+    find_package(nlohmann_json QUIET)
+    if(nlohmann_json_FOUND)
+        message(STATUS "Found nlohmann_json: ${nlohmann_json_VERSION}")
+        set(NLM_HAS_NLOHMANN_JSON ON)
+    else()
+        message(STATUS "nlohmann_json not found, using fallback config format")
+        set(NLM_ENABLE_JSON OFF)
+    endif()
 endif()
 
 # Source directory
@@ -87,10 +90,10 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
-target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:include>
-)
+# Add nlohmann/json compilation definitions
+if(NLM_HAS_NLOHMANN_JSON)
+    target_compile_definitions(nlm_core PUBLIC NLM_HAS_NLOHMANN_JSON)
+endif()
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC

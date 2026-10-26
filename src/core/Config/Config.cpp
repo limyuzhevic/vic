@@ -19,9 +19,83 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Load configuration from JSON file using nlohmann/json library
+    // Check if nlohmann/json is available
+#if defined(NLM_HAS_NLOHMANN_JSON)
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        nlohmann::json j;
+        file >> j;
+        
+        // Clear existing entries
+        clear();
+        
+        // Parse JSON and populate config entries
+        if (j.is_object()) {
+            for (auto& [key, value] : j.items()) {
+                ConfigEntry entry;
+                entry.key = key;
+                entry.source = ConfigSource::File;
+                
+                // Convert JSON value to ConfigValue
+                if (value.is_string()) {
+                    entry.value = value.get<std::string>();
+                } else if (value.is_number_integer()) {
+                    entry.value = value.get<int>();
+                } else if (value.is_number_unsigned()) {
+                    entry.value = static_cast<int64_t>(value.get<uint64_t>());
+                } else if (value.is_number_float()) {
+                    entry.value = value.get<double>();
+                } else if (value.is_boolean()) {
+                    entry.value = value.get<bool>();
+                } else if (value.is_array()) {
+                    // Handle arrays - determine element type
+                    if (!value.empty()) {
+                        if (std::all_of(value.begin(), value.end(), [](const auto& v) { return v.is_number_integer(); })) {
+                            std::vector<int> intArray;
+                            for (const auto& v : value) {
+                                intArray.push_back(v.get<int>());
+                            }
+                            entry.value = intArray;
+                        } else if (std::all_of(value.begin(), value.end(), [](const auto& v) { return v.is_number_float(); })) {
+                            std::vector<double> doubleArray;
+                            for (const auto& v : value) {
+                                doubleArray.push_back(v.get<double>());
+                            }
+                            entry.value = doubleArray;
+                        } else if (std::all_of(value.begin(), value.end(), [](const auto& v) { return v.is_string(); })) {
+                            std::vector<std::string> stringArray;
+                            for (const auto& v : value) {
+                                stringArray.push_back(v.get<std::string>());
+                            }
+                            entry.value = stringArray;
+                        } else {
+                            // Mixed array - convert to string representation
+                            entry.value = value.dump();
+                        }
+                    } else {
+                        // Empty array
+                        entry.value = std::vector<int>();
+                    }
+                } else {
+                    // Unsupported type - convert to string
+                    entry.value = value.dump();
+                }
+                
+                pImpl->entries.push_back(entry);
+            }
+            return true;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Failed to load config from JSON file ") + filepath + ": " + e.what());
+    }
+#endif
     
+    // Fallback to simple key=value format for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -84,11 +158,65 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "{\n";
+    
+    bool first = true;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!first) {
+            file << ",\n";
+        }
+        first = false;
+        
+        // Add indentation
+        file << "  \"" << entry.key << "\": ";
+        
+        // Serialize based on value type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format double to avoid scientific notation
+                std::stringstream ss;
+                ss.precision(6);
+                ss << std::fixed << arg;
+                file << ss.str();
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    std::stringstream ss;
+                    ss.precision(6);
+                    ss << std::fixed << arg[i];
+                    file << ss.str();
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                // Default fallback - convert to string
+                file << "\"" << "unknown_type" << "\"";
+            }
+        }, entry.value);
     }
     
+    file << "\n}\n";
     return true;
 }
 

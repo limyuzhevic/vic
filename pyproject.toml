@@ -27,7 +27,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+dependencies = [
+    "nlohmann-json>=3.11.2",  # For JSON config support
+]
 
 [project.optional-dependencies]
 dev = [
