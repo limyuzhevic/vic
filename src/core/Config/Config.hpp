@@ -5,6 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_set>
+#include <algorithm>
+#include <stdexcept>
+#include <fstream>
+#include <sstream>
 
 namespace nlm {
 
@@ -41,6 +46,19 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Configuration validation exceptions
+class ConfigValidationError : public std::runtime_error {
+public:
+    ConfigValidationError(const std::string& message) 
+        : std::runtime_error("Configuration validation error: " + message) {}
+};
+
+class ConfigValidationWarning : public std::runtime_error {
+public:
+    ConfigValidationWarning(const std::string& message)
+        : std::runtime_error("Configuration warning: " + message) {}
 };
 
 // Main configuration class
@@ -102,4 +120,97 @@ private:
     static std::string toLower(const std::string& str);
 };
 
+// Enhanced configuration class with validation
+class ValidatedConfig : public Config {
+private:
+    std::vector<std::string> validationWarnings;
+    std::vector<std::string> validationErrors;
+    
+public:
+    ValidatedConfig();
+    
+    // Disable copying, enable moving
+    ValidatedConfig(const ValidatedConfig&) = delete;
+    ValidatedConfig& operator=(const ValidatedConfig&) = delete;
+    ValidatedConfig(ValidatedConfig&&) noexcept;
+    ValidatedConfig& operator=(ValidatedConfig&&) noexcept;
+    
+    // Override set method with validation
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime) override;
+    
+    // Override set methods with type-specific validation
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime) override;
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime) override;
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime) override;
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime) override;
+    
+    // Load from file with validation
+    bool loadFromFile(const std::string& filepath) override;
+    
+    // Get validation warnings
+    const std::vector<std::string>& getValidationWarnings() const;
+    
+    // Get validation errors
+    const std::vector<std::string>& getValidationErrors() const;
+    
+    // Clear validation history
+    void clearValidationHistory();
+    
+    // Validate all current parameters
+    void validateAllParameters();
+    
+    // Get any ConfigValue
+    std::optional<ConfigValue> getAnyValue(const std::string& key) const;
+    
+private:
+    // Configuration validation
+    static bool isValidParameter(const std::string& key);
+    static void validateParameterType(const std::string& key, const ConfigValue& value);
+    static void validateParameterRange(const std::string& key, const ConfigValue& value);
+    static void validateParameterDependencies(const std::string& key, const ConfigValue& value);
+    
+    // Value extraction helpers
+    static int64_t getIntValue(const ConfigValue& value);
+    static double getFloatValue(const ConfigValue& value);
+    static std::string getStringValue(const ConfigValue& value);
+};
+
+// Configuration file error handling
+class ConfigFileError : public std::runtime_error {
+public:
+    ConfigFileError(const std::string& message) 
+        : std::runtime_error("Configuration file error: " + message) {}
+};
+
+class ConfigFileNotFoundError : public ConfigFileError {
+public:
+    ConfigFileNotFoundError(const std::string& filepath)
+        : ConfigFileError("Configuration file not found: " + filepath) {}
+};
+
+class ConfigParseError : public ConfigFileError {
+public:
+    ConfigParseError(const std::string& message)
+        : ConfigFileError("Configuration file parsing error: " + message) {}
+};
+
+// Safe configuration loading function
+std::shared_ptr<ValidatedConfig> loadConfigSafe(const std::string& filepath = "configs/default.cfg");
+
+// Configuration validation helper function
+bool validateConfig(const ValidatedConfig& config);
+
+// Configuration backup helper function
+bool backupConfig(const std::string& originalPath, const std::string& backupPath = "configs/backup.cfg");
+
+// Configuration recovery helper function
+bool recoverConfig(const std::string& backupPath, const std::string& targetPath);
+
+// Export enhanced config class as default
+using Config = ValidatedConfig;
+
 } // namespace nlm
+
+// Include implementation headers
+#include "src/core/Config/Config.cpp"
+#include "src/core/Config/ValidatedConfig.cpp"

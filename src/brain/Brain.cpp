@@ -94,58 +94,77 @@ struct Brain::Impl {
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
+        // Use default seed of 42 if no seed is specified in configuration
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        // Initialize plasticity systems (Phase 2 neural computation components)
+        // These implement real spiking neural dynamics and learning rules
+        spikeSystem = std::make_unique<SpikeSystem>();  // Event-driven spike propagation
+        stdp = std::make_unique<STDP>();              // Spike-Timing Dependent Plasticity
+        hebbian = std::make_unique<Hebbian>();        // Hebbian learning rule
+        structuralPlasticity = std::make_unique<StructuralPlasticity>();  // Synaptogenesis/pruning
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
+        // This section initializes all the integrated brain systems (Phase 6 achievements)
         
-        // Initialize memory systems
+        // Initialize memory systems (Phase 6: Memory Systems)
+        // Working memory maintains persistent neural activity for active maintenance
         workingMemory = std::make_unique<NeuralWorkingMemory>();
+        // Episodic memory encodes and stores experiences as episodes
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+        // Associative memory forms pattern associations through Hebbian learning
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
+        // Initialize prediction system (Phase 6: Prediction System)
+        // Integrated prediction system that tracks prediction errors and confidence
         predictionSystem = std::make_unique<PredictionSystem>();
         
-        // Initialize cognition systems
+        // Initialize cognition systems (Phase 6: Cognition Systems)
+        // Neural planner evaluates action sequences for goal-directed behavior
         planner = std::make_unique<NeuralPlanner>();
+        // Concept formation extracts patterns and forms abstract representations
         conceptFormation = std::make_unique<ConceptFormation>();
+        // Attention system provides competitive selection dynamics
         attention = std::make_unique<AttentionalSelection>();
         
-        // Initialize development system
+        // Initialize development system (Phase 6: Development Integration)
+        // Developmental system modulates plasticity rates based on brain age
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
-        // Initialize neuromodulation systems
+        // Initialize neuromodulation systems (Phase 6: Neuromodulation Integration)
+        // Dopamine affects neural excitability and plasticity
         dopamine = std::make_unique<Dopamine>();
+        // Curiosity drives exploration behavior
         curiosity = std::make_unique<Curiosity>();
+        // Prediction error signals learning errors for reinforcement learning
         predictionError = std::make_unique<PredictionError>();
+        // Novelty detection identifies unexpected patterns
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        // Configure STDP parameters with values from configuration or defaults
+        // STDP: spike-timing dependent plasticity strengthens synapses for precise timing
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);      // Long-Term Potentiation weight
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);     // Long-Term Depression weight
+        float tau = config->getOr<float>("stdp_tau", 20.0f);                   // Time constant for STDP
         stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Configure structural plasticity
+        // Configure structural plasticity parameters
+        // Controls rate of new synapse formation (synaptogenesis) and synapse elimination (pruning)
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
+        // Get simulation timestep from configuration (default 1ms)
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
-        // Get integration intervals from config
+        // Get integration intervals from configuration for memory systems
+        // replayInterval: how often to replay important memories (default every 100 steps)
+        // consolidationInterval: how often to consolidate memories (default every 1000 steps)
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
