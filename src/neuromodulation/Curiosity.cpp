@@ -47,6 +47,12 @@ float Curiosity::getExplorationDrive() const {
     return pImpl->level;
 }
 
+void Curiosity::signalSurprise(float surprise) {
+    // Surprise increases curiosity directly
+    // Surprise is essentially prediction error
+    pImpl->level = std::min(1.0f, pImpl->level + surprise * 0.3f);
+}
+
 void Curiosity::setNoveltyWeight(float weight) {
     pImpl->noveltyWeight = weight;
 }

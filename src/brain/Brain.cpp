@@ -61,6 +61,9 @@ struct Brain::Impl {
     SimulationStep currentStep;
     Timestamp currentTime;
     
+    // Latest sensory input for prediction
+    std::unique_ptr<class SensoryInput> lastSensoryInput;
+    
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
@@ -78,17 +81,22 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // AgentBrain integration
+    class AgentBrain* agentBrain;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
-        , timestep(0.001)
-        , currentStep(0)
-        , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
+    , timestep(0.001)
+    , currentStep(0)
+    , currentTime(0.0)
+        , lastSensoryInput(nullptr)
+        , agentBrain(nullptr)
+    , totalSpikesThisStep(0)
+    , totalSpikesTotal(0)
+    , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
@@ -332,6 +340,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
+    // Store current sensory input for prediction system
+    // This is needed to make predictions about next state
+    pImpl->lastSensoryInput.reset();
+    
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
@@ -510,9 +522,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->lastSensoryInput) {
+        // Make prediction based on current sensory state
+        auto predictedInput = pImpl->predictionSystem->predictNextState(*pImpl->lastSensoryInput);
+        
+        // Store prediction for evaluation
+        pImpl->predictionSystem->updatePredictions(*predictedInput, *pImpl->lastSensoryInput);
+        
+        // Get prediction error and confidence
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Use prediction error to update neuromodulation
+        if (pImpl->predictionError) {
+            pImpl->predictionError->setLevel(predictionError);
+        }
+        
+        // Use confidence to modulate attention and learning
+        if (confidence < 0.3f) {
+            // Low confidence - increase exploration
+            if (pImpl->curiosity) {
+                pImpl->curiosity->signalSurprise(confidence);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,29 +560,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
-        }
-    }
-    
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        // Concept formation processes sensory experiences to discover patterns
+        // This requires encoding sensory state into feature vectors
+        std::vector<float> sensoryFeatures;
         
-        // Development affects plasticity rates
+        if (pImpl->lastSensoryInput) {
+            const auto& sensoryData = pImpl->lastSensoryInput->getData();
+            // Extract features from sensory input
+            for (size_t i = 0; i < std::min(size_t(32), sensoryData.size()); ++i) {
+                sensoryFeatures.push_back(sensoryData[i]);
+            }
+        }
+        
+        // Present experience to concept formation system
+        pImpl->conceptFormation->presentExperience(sensoryFeatures, sensoryFeatures, 
+                                                 pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                                                 pImpl->currentStep);
+    }
+    
+        // Check for neural planner integration
+    if (pImpl->planner) {
+        // Neural planner could be used for action planning based on goals and current state
+        // For now, we use the simple action selection
+        pImpl->planner->setCurrentGoal(std::vector<float>());  // No goal set yet
+    }
+    
+    // Update self-model with current experience
+    if (pImpl->conceptFormation && pImpl->lastSensoryInput) {
+        // Self-model learns about its own effects on the environment
+        // This is done through concept formation which tracks experiences
+    }
+    
+    // Run social learning if enabled
+    if (pImpl->conceptFormation && pImpl->lastSensoryInput) {
+        // Social learning observes patterns and can imitate successful behaviors
+        // This is also part of concept formation
+    }
+    
+    // Update development system
+    pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    
+    // Apply developmental effects
+    if (pImpl->developmentSystem) {
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
@@ -576,6 +627,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // Check for self and social learning integration
+    if (pImpl->conceptFormation) {
+        // Concept formation can learn self-actions and their consequences
+        // This updates self-model implicitly
+        
+        // Can also learn about others if social learning is enabled
+        // In a multi-agent setting, this would be more explicit
+    }
+    
+    // Update development system
+    if (pImpl->developmentSystem && currentStep % 1000 == 0) {  // Update development every 1000 steps
+    
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
@@ -597,6 +660,9 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
+    
+    // Store the sensory input for prediction system
+    pImpl->lastSensoryInput = input.clone();
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {

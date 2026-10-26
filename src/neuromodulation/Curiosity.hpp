@@ -24,6 +24,9 @@ public:
     // Get exploration drive (same as level)
     float getExplorationDrive() const;
     
+    // Signal surprise (prediction error)
+    void signalSurprise(float surprise);
+    
     // Set curiosity parameters
     void setNoveltyWeight(float weight);
     void setPredictionErrorWeight(float weight);

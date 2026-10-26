@@ -29,6 +29,9 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Forward declare AgentBrain for integration
+class AgentBrain;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
