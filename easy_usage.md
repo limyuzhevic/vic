@@ -143,14 +143,133 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+#### Pattern 4: Advanced Brain Configuration
 
 ```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+# Configure brain development parameters
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 2000)  # More neurons for complex tasks
+config.set("region_count", 5)     # Multiple brain regions
+config.set("connection_probability", 0.2)
+config.set("stdp_ltp_weight", 0.03f)
+config.set("stdp_ltd_weight", 0.02f)
+config.set("synaptogenesis_rate", 0.00005f)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+### Advanced Agent Control
+
+```python
+# Enable all advanced features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+# Set exploration vs exploitation
+agent.setCuriosityThreshold(0.7)
+agent.setExplorationRate(0.3)
+
+# Advanced neuromodulation control
+agent.applyCustomNeuromodulation(0.5)  # Apply custom dopamine signal
+agent.scheduleNeuromodulationEvent(100.0, 0.8, "dopamine")  # Schedule event
+
+# Development control
+agent.setDevelopmentSpeed(1.5)
+agent.accelerateDevelopment(2.0)  # Speed up development
+agent.pauseDevelopment(True)  # Pause development
+
+# Brain statistics
+memory = agent.getMemoryUsage()
+firing_rate = agent.getFiringRate()
+learning_rate = agent.getLearningRate()
+active_neurons = agent.getActiveNeuronCount()
+synapses = agent.getTotalSynapseCount()
+
+# Sensory and motor analysis
+analysis = agent.analyzeSensoryInput()
+# analysis contains: [mean, min, max, stdDev, novelty, curiosity]
+predicted_action = agent.predictNextAction()
+```
+
+### World Configuration
+
+```python
+# Create and configure world with custom parameters
+world = pynlm.createSimpleWorld()
+world.configure(width=50, height=50, visionWidth=16, visionHeight=16)
+world.setMaxEnergy(100.0)
+world.setEnergyDecayRate(0.01)
+world.setRandomSeed(42)
+
+# Add objects to world
+obj = pynlm.WorldObject()
+obj.x, obj.y = 25, 25
+obj.type = pynlm.WorldObjectType.Resource
+obj.value = 10.0
+world.addObject(obj)
+```
+
+### Brain State Management
+
+```python
+# Save and load brain states (checkpointing)
+brain.save("my_brain_checkpoint.pkl")
+
+# Load and continue learning
+# brain.load("my_brain_checkpoint.pkl")
+
+# Get detailed brain statistics
+stats = brain.getBrainStats()
+print("Neuron count:", stats['neuron_count'])
+print("Synapse count:", stats['synapse_count'])
+print("Total spikes:", stats['total_spikes'])
+print("Average firing rate:", stats['firing_rate'])
+print("Development stage:", stats['development_stage'])
+
+# Export for analysis
+brain.exportNeuralTopology("topology.json")
+```
+
+### World Configuration
+
+```python
+# Create and configure world with custom parameters
+world = pynlm.createSimpleWorld()
+world.configure(width=50, height=50, visionWidth=16, visionHeight=16)
+world.setMaxEnergy(100.0)
+world.setEnergyDecayRate(0.01)
+world.setRandomSeed(42)
+
+# Add objects to world
+obj = pynlm.WorldObject()
+obj.x, obj.y = 25, 25
+obj.type = pynlm.WorldObjectType.Resource
+obj.value = 10.0
+world.addObject(obj)
+```
+
+### Brain State Management
+
+```python
+# Save and load brain states (checkpointing)
+brain.save("my_brain_checkpoint.pkl")
+
+# Load and continue learning
+# brain.load("my_brain_checkpoint.pkl")
+
+# Get detailed brain statistics
+stats = brain.getBrainStats()
+print("Neuron count:", stats['neuron_count'])
+print("Synapse count:", stats['synapse_count'])
+print("Total spikes:", stats['total_spikes'])
+print("Average firing rate:", stats['firing_rate'])
+print("Development stage:", stats['development_stage'])
+
+# Export for analysis
+brain.exportNeuralTopology("topology.json")
 ```
 
 ---

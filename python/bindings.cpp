@@ -399,27 +399,69 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
+    
+    // ========== ADVANCED AGENT BRAIN FEATURES ==========
+    
+    // Advanced configuration
+    .def("setCuriosityThreshold", &AgentBrain::setCuriosityThreshold,
+         py::arg("threshold"), "Set curiosity threshold for exploration")
+    .def("setExplorationRate", &AgentBrain::setExplorationRate,
+         py::arg("rate"), "Set exploration rate (0.0-1.0)")
+    
+    // Advanced neuromodulation
+    .def("applyCustomNeuromodulation", &AgentBrain::applyCustomNeuromodulation,
+         py::arg("level"), py::arg("duration") = 1.0f,
+         "Apply custom neuromodulation signal")
+    .def("scheduleNeuromodulationEvent", &AgentBrain::scheduleNeuromodulationEvent,
+         py::arg("time"), py::arg("level"), py::arg("type"),
+         "Schedule neuromodulation event at specified time")
+    
+    // Brain statistics and monitoring
+    .def("getMemoryUsage", &AgentBrain::getMemoryUsage,
+         "Get estimated memory usage in bytes")
+    .def("getFiringRate", &AgentBrain::getFiringRate,
+         "Get current firing rate (0.0-1.0)")
+    .def("getLearningRate", &AgentBrain::getLearningRate,
+         "Get current learning rate (0.0-1.0)")
+    .def("getActiveNeuronCount", &AgentBrain::getActiveNeuronCount,
+         "Get count of currently active neurons")
+    .def("getTotalSynapseCount", &AgentBrain::getTotalSynapseCount,
+         "Get total synapse count")
+    
+    // Sensory and motor analysis
+    .def("analyzeSensoryInput", &AgentBrain::analyzeSensoryInput,
+         "Analyze sensory input and return statistics vector")
+    .def("predictNextAction", &AgentBrain::predictNextAction,
+         "Predict next motor action based on current neural activity")
+    
+    // Development and aging
+    .def("setDevelopmentSpeed", &AgentBrain::setDevelopmentSpeed,
+         py::arg("speed"), "Set development speed factor")
+    .def("accelerateDevelopment", &AgentBrain::accelerateDevelopment,
+         py::arg("factor") = 2.0f, "Accelerate development by factor")
+    .def("pauseDevelopment", &AgentBrain::pauseDevelopment,
+         py::arg("pause"), "Pause or resume development")
+    
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
-
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    m.attr("INVALID_NEURON_ID") = INVALID_NEURON_ID;
+    m.attr("INVALID_SYNAPSE_ID") = INVALID_SYNAPSE_ID;
+    m.attr("INVALID_REGION_ID") = INVALID_REGION_ID;
+    m.attr("INVALID_POPULATION_ID") = INVALID_POPULATION_ID;
 }
 
 } // namespace nlm

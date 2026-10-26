@@ -4,13 +4,27 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <memory>
 #include <vector>
 
 namespace nlm {
 
-// AgentBrain: Connects NLM brain to the world
-// Handles sensory transduction and motor decoding
+// Neuromodulator type enumeration
+enum class NeuromodulatorType {
+    Dopamine,
+    Acetylcholine,
+    Norepinephrine,
+    Serotonin
+};
+
+// Neuromodulator type enumeration
+enum class NeuromodulatorType {
+    Dopamine,
+    Acetylcholine,
+    Norepinephrine,
+    Serotonin
+};
 class AgentBrain {
 public:
     AgentBrain(std::shared_ptr<Brain> brain);
@@ -69,6 +83,32 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // ========== ADVANCED CONFIGURATION ==========
+    
+    // Set exploration-exploitation parameters
+    void setCuriosityThreshold(float threshold);
+    void setExplorationRate(float rate);
+    
+    // Advanced neuromodulation control
+    void applyCustomNeuromodulation(float level, float duration = 1.0f);
+    void scheduleNeuromodulationEvent(float time, float level, NeuromodulatorType type);
+    
+    // Brain statistics and monitoring
+    float getMemoryUsage() const;
+    float getFiringRate() const;
+    float getLearningRate() const;
+    size_t getActiveNeuronCount() const;
+    size_t getTotalSynapseCount() const;
+    
+    // Sensory and motor analysis
+    std::vector<float> analyzeSensoryInput() const;
+    MotorCommand predictNextAction() const;
+    
+    // Development and aging
+    void setDevelopmentSpeed(float speed);
+    void accelerateDevelopment(float factor = 2.0f);
+    void pauseDevelopment(bool pause);
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -109,9 +149,24 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
+    // Advanced configuration
+    float curiosityThreshold_;
+    float explorationRate_;
+    float developmentSpeed_;
+    bool developmentPaused_;
+    
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Neuromodulation events (for advanced scheduling)
+    struct NeuromodulationEvent {
+        double time;
+        float level;
+        NeuromodulatorType type;
+        float duration;
+    };
+    std::vector<NeuromodulationEvent> neuromodulationEvents_;
 };
 
 } // namespace nlm
