@@ -77,9 +77,9 @@ size_t ConceptFormation::createConcept(const std::vector<float>& pattern,
     concept.avgStability = 1.0f;
     
     // Determine category hint based on properties
-    if (reward > 0.5f) {
+    if (reward > 0.0f) {
         concept.categoryHint = "rewarding";
-    } else if (reward < -0.3f) {
+    } else if (reward < 0.0f) {
         concept.categoryHint = "harmful";
     } else {
         concept.categoryHint = "neutral";

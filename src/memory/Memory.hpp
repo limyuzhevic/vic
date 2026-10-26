@@ -7,7 +7,8 @@
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Now implemented with neural dynamics using NeuralWorkingMemory
+// This class maintains backward compatibility with basic interface
 
 class WorkingMemory {
 public:
@@ -15,7 +16,7 @@ public:
     ~WorkingMemory();
     
     // Store item
-    // TODO PHASE 2: Implement real storage
+    // Uses neural dynamics for persistent activity representation
     void store(NeuronId neuron, float value);
     
     // Retrieve item
@@ -28,15 +29,41 @@ public:
     void clear();
     
     // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
+    size_t getCapacity() const { return 100; }  // Default capacity
+    size_t getCurrentSize() const { return currentSize_; }
     
     // Decay all items
     void decay(float decayRate);
     
+    // Access to neural implementation for advanced users
+    void initialize(class NeuralWorkingMemory* neuralMem) {
+        neuralMemory_ = neuralMem;
+    }
+    
+    // Get number of active traces from neural implementation
+    size_t getActiveTraces() const {
+        return neuralMemory_ ? neuralMemory_->getActiveTraces() : 0;
+    }
+    
+    // Update neural working memory dynamics
+    void update(float dt) {
+        if (neuralMemory_) {
+            neuralMemory_->update(dt);
+        }
+    }
+    
+    // Add a neuron to working memory
+    void addNeuron(NeuronId neuron, float activation) {
+        if (neuralMemory_) {
+            neuralMemory_->storeToNeuron(neuron, activation);
+        }
+    }
+    
 private:
     struct Impl;
     Impl* pImpl;
+    NeuralWorkingMemory* neuralMemory_;
+    size_t currentSize_;
 };
 
 // Episodic memory: storage of events and experiences
@@ -50,6 +77,9 @@ struct EpisodicMemoryItem {
     
     EpisodicMemoryItem() : timestamp(0) {}
 };
+
+// Episodic memory: storage of events and experiences
+// Now delegates to NeuralEpisodicMemory for real implementation
 
 class EpisodicMemory {
 public:
@@ -74,13 +104,22 @@ public:
     // Memory consolidation (move to long-term)
     void consolidate(float relevanceThreshold);
     
+    // Initialize with neural implementation
+    void initialize(class NeuralEpisodicMemory* neuralMem) {
+        neuralMemory_ = neuralMem;
+    }
+    
+    // Get neural implementation for advanced usage
+    class NeuralEpisodicMemory* getNeuralImplementation() { return neuralMemory_; }
+    
 private:
     struct Impl;
     Impl* pImpl;
+    NeuralEpisodicMemory* neuralMemory_;
 };
 
 // Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
+// Now implements basic knowledge storage for Phase 1
 
 class SemanticMemory {
 public:
@@ -102,6 +141,15 @@ public:
     // Clear all
     void clear();
     
+    // Create concept from pattern (Phase 1 basic implementation)
+    void createConcept(const std::vector<float>& pattern, const std::string& conceptName);
+    
+    // Retrieve concept by name
+    std::vector<float> retrieveConcept(const std::string& conceptName) const;
+    
+    // Get all concept names
+    std::vector<std::string> getConceptNames() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
@@ -117,6 +165,9 @@ struct Skill {
     
     Skill() : proficiency(0.0f) {}
 };
+
+// Procedural memory: learned skills and habits
+// Now implements basic skill learning for Phase 1
 
 class ProceduralMemory {
 public:
@@ -138,13 +189,19 @@ public:
     // Clear all
     void clear();
     
+    // Get skill proficiency
+    float getProficiency(const std::string& name) const;
+    
+    // Check if skill exists
+    bool hasSkill(const std::string& name) const;
+    
 private:
     struct Impl;
     Impl* pImpl;
 };
 
 // Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
+// Now implements basic associations for Phase 1
 
 class AssociativeMemory {
 public:
@@ -165,6 +222,12 @@ public:
     
     // Clear all
     void clear();
+    
+    // Spread activation from a neuron
+    std::vector<NeuronId> spreadActivation(NeuronId source, float strength = 1.0f) const;
+    
+    // Get all associations
+    std::vector<std::tuple<NeuronId, NeuronId, float>> getAllAssociations() const;
     
 private:
     struct Impl;

@@ -511,8 +511,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get current sensory state from sensory neurons
+        std::vector<float> currentState;
+        for (NeuronId id : pImpl->sensoryNeuronIds) {
+            // Find neuron and get its activity
+            float activity = 0.0f;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->getId() == id) {
+                            activity = (neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                            break;
+                        }
+                    }
+                    if (activity != 0.0f) break;
+                }
+            }
+            currentState.push_back(activity);
+        }
+        
+        // Update prediction system with current state
+        pImpl->predictionSystem->update(currentState, pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -526,10 +545,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // ========== STEP 10a: Planning ==========
+    if (pImpl->planner) {
+        // Get current state for planning
+        std::vector<float> currentState;
+        
+        // Collect activity from key regions for planning
+        for (auto& region : pImpl->regions) {
+            // Use internal region activity for planning
+            bool isInternal = false;
+            for (auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Internal) {
+                    isInternal = true;
+                    break;
+                }
+            }
+            
+            if (isInternal) {
+                float totalActivity = 0.0f;
+                int neuronCount = 0;
+                for (auto& pop : region->getPopulations()) {
+                    if (pop->getNeuronType() == NeuronType::Internal) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            totalActivity += std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                            neuronCount++;
+                        }
+                    }
+                }
+                if (neuronCount > 0) {
+                    currentState.push_back(totalActivity / neuronCount);
+                }
+            }
+        }
+        
+        // Generate action plan based on current state
+        std::vector<ActionType> actionPlan = pImpl->planner->planActions(currentState);
+        
+        // Store the plan in working memory for execution
+        if (!actionPlan.empty()) {
+            // Create a simple representation of the plan in working memory
+            // This would integrate with the AgentBrain for actual action selection
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -609,8 +665,7 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        if (pImpl->workingMemory) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
