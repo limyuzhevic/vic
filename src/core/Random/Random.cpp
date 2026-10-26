@@ -38,6 +38,23 @@ uint64_t RandomGenerator::getSeed() const {
     return pImpl->currentSeed;
 }
 
+template<typename T>
+T RandomGenerator::uniformInt(T min, T max) {
+    if (min > max) {
+        throw std::invalid_argument("min must be <= max");
+    }
+    if (min == max) {
+        return min;
+    }
+    std::uniform_int_distribution<T> dist(min, max);
+    return dist(pImpl->gen);
+}
+
+// Template implementations
+template uint32_t RandomGenerator::uniformInt(uint32_t, uint32_t);
+template uint64_t RandomGenerator::uniformInt(uint64_t, uint64_t);
+
+// Specialization for uint32_t
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
     if (min > max) {
         throw std::invalid_argument("min must be <= max");
@@ -49,6 +66,7 @@ uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
     return dist(pImpl->gen);
 }
 
+// Specialization for uint64_t
 uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
     if (min > max) {
         throw std::invalid_argument("min must be <= max");

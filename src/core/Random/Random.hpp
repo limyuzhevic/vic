@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -35,6 +37,9 @@ public:
     
     // Random number generation
     // Uniform integer in [min, max]
+    template<typename T>
+    T uniformInt(T min, T max);
+    
     uint32_t uniformInt(uint32_t min, uint32_t max);
     uint64_t uniformInt(uint64_t min, uint64_t max);
     
@@ -92,6 +97,7 @@ private:
 };
 
 // Template implementations
+
 template<typename Container>
 void RandomGenerator::shuffle(Container& container) {
     std::shuffle(container.begin(), container.end(), engine());

@@ -1,0 +1,86 @@
+# NLM Configuration - YAML Format
+name: Phase 3 Demo Configuration
+description: Configuration for Phase 3 world interaction demo
+parameters:
+  random_seed: 42
+  simulation_timestep: 0.001
+  neuron_count: 500
+  region_count: 2
+  connection_probability: 0.1
+  environment_width: 20
+  environment_height: 20
+  vision_width: 16
+  vision_height: 16
+
+plasticities:
+  stdp_ltp_weight: 0.01
+  stdp_ltd_weight: 0.012
+  stdp_time_constant: 20.0
+  synaptogenesis_rate: 0.0001
+  pruning_rate: 0.00001
+
+neuromodulation:
+  dopamine_baseline: 0.1
+  curiosity_baseline: 0.05
+  novelty_threshold: 0.05
+  reward_scale: 1.0
+
+memory:
+  working_memory_capacity: 100
+  episodic_recall_window: 1000
+  semantic_formation_threshold: 0.8
+
+cognition:
+  planning_horizon: 10
+  concept_stability: 0.9
+  attention_selectivity: 0.8
+
+debug:
+  log_level: DEBUG
+  log_to_file: true
+  log_filename: "nlm_debug.log"
+  profiling_enabled: true
+  performance_sampling_rate: 100
+
+# Experimental parameters
+experiments:
+  - name: Phase3Demo
+    type: world_interaction
+    episodes: 10
+    steps_per_episode: 200
+    max_energy: 100
+    reward_function: "standard"
+
+  - name: Phase4Demo
+    type: cognitive_experiments
+    trials: 50
+    working_memory_test: true
+    episodic_recall_test: true
+    concept_formation_test: true
+    attention_test: true
+    planning_test: true
+
+  - name: Phase6Integrated
+    type: integration_test
+    comprehensive: true
+    validate_connections: true
+    validate_plasticity: true
+    validate_memory: true
+    validate_neuromodulation: true
+    validate_cognition: true
+
+# Performance settings
+performance:
+  threading: true
+  vectorization: "AVX2"
+  optimization_level: 2
+  checkpoint_interval: 1000
+  checkpoint_path: "./checkpoints/"
+
+# Visualization settings
+visualization:
+  enabled: false
+  update_rate: 30.0
+  output_formats: ["png", "svg", "pdf"]
+  output_directory: "./visualizations/"
+  quality: "high"

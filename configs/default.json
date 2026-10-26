@@ -1,0 +1,45 @@
+{
+  "name": "Phase 3 Demo Configuration",
+  "description": "Configuration for Phase 3 world interaction demo",
+  "parameters": {
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    "neuron_count": 500,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "environment_width": 20,
+    "environment_height": 20,
+    "vision_width": 16,
+    "vision_height": 16
+  },
+  "plasticities": {
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012,
+    "stdp_time_constant": 20.0,
+    "synaptogenesis_rate": 0.0001,
+    "pruning_rate": 0.00001
+  },
+  "neuromodulation": {
+    "dopamine_baseline": 0.1,
+    "curiosity_baseline": 0.05,
+    "novelty_threshold": 0.05,
+    "reward_scale": 1.0
+  },
+  "memory": {
+    "working_memory_capacity": 100,
+    "episodic_recall_window": 1000,
+    "semantic_formation_threshold": 0.8
+  },
+  "cognition": {
+    "planning_horizon": 10,
+    "concept_stability": 0.9,
+    "attention_selectivity": 0.8
+  },
+  "debug": {
+    "log_level": "DEBUG",
+    "log_to_file": true,
+    "log_filename": "nlm_debug.log",
+    "profiling_enabled": true,
+    "performance_sampling_rate": 100
+  }
+}

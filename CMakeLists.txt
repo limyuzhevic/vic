@@ -18,6 +18,13 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Find JSON and YAML libraries
+find_package(nlohmann_json 3.11.2 REQUIRED)
+find_package(yaml-cpp 0.8.0 REQUIRED)
+
+# Define macros for JSON and YAML support
+add_definitions(-DWITH_JSON -DWITH_YAML)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
@@ -55,11 +62,7 @@ add_library(nlm_core STATIC
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
     # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
+    src/memory/Memory.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -74,11 +77,11 @@ add_library(nlm_core STATIC
     src/prediction/PredictionSystem.cpp
     src/prediction/NeuralPrediction.cpp
     # Motor
+    src/motor/Action.cpp
     src/motor/MotorSystem.cpp
     # Environment
     src/environment/Environment.cpp
     src/environment/Observation.cpp
-    src/environment/Action.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
@@ -92,11 +95,21 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# CommandLine parser
+add_library(nlm_cli STATIC
+    src/core/CommandLineParser.cpp
+)
+
+target_include_directories(nlm_cli PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
     src/agent/AgentBrain.cpp
 )
+
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
@@ -104,6 +117,7 @@ target_link_libraries(nlm_agent PUBLIC nlm_core)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
+
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
@@ -111,6 +125,7 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
 )
+
 target_include_directories(nlm_phase3 PUBLIC src)
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 
@@ -118,6 +133,7 @@ target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
+
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
@@ -125,18 +141,21 @@ target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+
+target_link_libraries(nlm PUBLIC nlm_core nlm_cli)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
+
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
+
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
