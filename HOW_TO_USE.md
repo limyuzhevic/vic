@@ -526,8 +526,298 @@ pip install --force-reinstall .
 
 ---
 
-## Further Reading
+## Enhanced Features (New in Version 0.1.0)
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+The enhanced version of NLM now includes several new features for improved usability and functionality:
+
+### Enhanced Python Interface
+
+The enhanced NLM Python interface now provides two main ways to use the library:
+
+1. **Simple/Classic API** (backward compatible) - Use `pynlm.createBrain()`, `pynlm.createDefaultConfig()`
+2. **Enhanced/High-level API** (new features and utilities) - Use `NLM` class, `ConfigBuilder`, `create_educational_simulation()`, etc.
+
+#### Enhanced Interface Example
+
+```python
+import pynlm
+from pynlm import ConfigBuilder, create_educational_simulation, run_episode, NLM
+
+# Method 1: Using ConfigBuilder for advanced configuration
+config = (ConfigBuilder()
+         .set_neuron_count(1000)
+         .set_region_count(2)
+         .set_connection_probability(0.15)
+         .enable_stdp(True, ltp_weight=0.01, ltd_weight=0.012, tau=20.0)
+         .enable_curiosity(True)
+         .enable_structural_plasticity(True)
+         .build())
+
+# Method 2: Using high-level NLM class
+nlm = NLM()
+nlm.setup(world_width=30.0, world_height=30.0, enable_learning=True)
+
+# Run simulation
+stats = nlm.run(1000, verbose=True)
+```
+
+### New Classes and Utilities
+
+#### ConfigBuilder Class (New)
+
+The `ConfigBuilder` class provides a fluent API for creating NLM configurations with validation:
+
+```python
+# Create custom configuration
+config = (ConfigBuilder()
+         .set_neuron_count(500)  # Will raise ValueError if negative
+         .set_connection_probability(0.15)  # Will raise ValueError if out of range
+         .enable_stdp(True)
+         .enable_curiosity(True)
+         .set_simulation_timestep(0.001)
+         .set_random_seed(42)
+         .build())
+
+# Load from file
+config = (ConfigBuilder()
+         .load_from_file("my_config.cfg")
+         .set_neuron_count(500)
+         .build())
+```
+
+#### NLM Class (New)
+
+The `NLM` class provides a high-level interface for common simulation scenarios:
+
+```python
+# Create and run simulation
+nlm = NLM()
+nlm.setup(world_width=20.0, world_height=20.0, enable_learning=True)
+
+stats = nlm.run(1000, verbose=True)
+print(f"Efficiency score: {stats['efficiency_score']:.4f}")
+```
+
+#### PerformanceMonitor Class (New)
+
+The `PerformanceMonitor` class tracks simulation performance for optimization:
+
+```python
+from pynlm import create_performance_monitor
+
+monitor = create_performance_monitor()
+
+for step in range(100):
+    monitor.start_step()
+    # Run simulation step
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    monitor.end_step(brain, world)
+
+# Get performance summary
+perf_stats = monitor.get_summary()
+print(f"Average step time: {perf_stats['avg_step_time_ms']:.1f} ms")
+print(f"Efficiency score: {perf_stats['efficiency_score']:.4f}")
+```
+
+#### Context Managers (New)
+
+New context managers provide automatic resource management:
+
+```python
+from pynlm import brain_context, simulation_episode
+
+# Automatic brain lifecycle management
+with brain_context() as brain:
+    for step in range(1000):
+        brain.step(step)
+
+# Complete episode management with automatic cleanup
+with simulation_episode(brain, world, agent, 500) as stats:
+    # Simulation runs
+    pass
+```
+
+#### Configuration Presets (New)
+
+Predefined configuration presets for common scenarios:
+
+```python
+# Research-grade configuration (large, detailed)
+research_config = pynlm.create_research_config()
+
+# Educational configuration (medium complexity)
+educational_config = pynlm.create_educational_config()
+
+# Simple configuration (quick tests)
+simple_config = pynlm.create_simple_config()
+```
+
+## Enhanced Factory Functions
+
+### create_educational_simulation()
+
+Creates a complete educational simulation with a learning agent:
+
+```python
+brain, world, agent = pynlm.create_educational_simulation()
+
+# Enable learning
+agent.enable_reward_modulation(True)
+agent.enable_curiosity(True)
+agent.enable_structural_plasticity(True)
+agent.enable_development(True)
+
+# Run simulation
+stats = pynlm.run_episode(brain, world, agent, 500, verbose=True)
+```
+
+### run_episode() (Enhanced)
+
+Runs a complete simulation episode with comprehensive statistics:
+
+```python
+stats = pynlm.run_episode(
+    brain, world, agent, 
+    num_steps=1000, 
+    verbose=True
+)
+
+print(f"Episode completed in {stats['steps_completed']} steps")
+print(f"Total spikes: {stats['total_spikes']}")
+print(f"Efficiency: {stats['efficiency_score']:.4f}")
+print(f"Action distribution: {stats['action_counts']}")
+```
+
+## Enhanced Exception Handling
+
+The enhanced interface provides better error messages and recovery suggestions:
+
+```python
+try:
+    brain = pynlm.create_brain(config)
+    brain.initialize()
+except pynlm.ConfigurationError as e:
+    print(f"Configuration error: {e}")
+    print("Try checking your config parameters")
+except pynlm.InitializationError as e:
+    print(f"Initialization error: {e}")
+    print("Ensure all required subsystems are enabled")
+except pynlm.SimulationError as e:
+    print(f"Simulation error: {e}")
+    print("Check that brain.initialize() was called before brain.step()")
+```
+
+## Advanced Examples
+
+### Learning with Performance Monitoring
+
+```python
+import pynlm
+
+# Create educational simulation
+brain, world, agent = pynlm.create_educational_simulation()
+
+# Setup performance monitoring
+from pynlm import create_performance_monitor
+monitor = create_performance_monitor()
+
+# Run simulation with monitoring
+for step in range(500):
+    monitor.start_step()
+    
+    # Single simulation step
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # End step and record metrics
+    monitor.end_step(brain, world)
+
+# Get performance summary
+perf_stats = monitor.get_summary()
+print(f"Performance summary:")
+print(f"  Steps completed: {perf_stats['steps_completed']}")
+print(f"  Average step time: {perf_stats['avg_step_time_ms']:.1f} ms")
+print(f"  Efficiency score: {perf_stats['efficiency_score']:.4f}")
+```
+
+### Custom Development Configuration
+
+```python
+import pynlm
+from pynlm import ConfigBuilder
+
+# Create a development-focused configuration
+config = (ConfigBuilder()
+         .set_neuron_count(2000)  # Larger network for development
+         .set_region_count(4)     # Multiple regions
+         .set_connection_probability(0.2)
+         .enable_stdp(True, ltp_weight=0.015, ltd_weight=0.013, tau=25.0)
+         .enable_hebbian(True)
+         .enable_structural_plasticity(True)
+         .enable_curiosity(True)      # Drive exploration
+         .enable_novelty(True)       # Detect new experiences
+         .enable_reward_modulation(True)
+         .set_replay_interval(50)     # Frequent memory replay
+         .set_development_interval(500)  # Longer development periods
+         .build())
+
+# Use the configuration
+brain = pynlm.create_brain(config)
+brain.initialize()
+print(f"Development brain created with {brain.getTotalNeuronCount()} neurons")
+```
+
+## Backward Compatibility
+
+The enhanced interface maintains full backward compatibility with existing code:
+
+```python
+# Old code still works (classic/simple API)
+import pynlm
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for step in range(100):
+    brain.step(step)
+
+# Enhanced code (new features)
+import pynlm
+from pynlm import NLM, ConfigBuilder
+
+# High-level control
+nlm = NLM()
+nlm.setup(enable_learning=True)
+stats = nlm.run(1000)
+```
+
+## Performance Optimization Tips
+
+1. **Use simple configurations for testing**: `create_simple_config()`
+2. **Disable learning for speed**: `enable_reward_modulation(False)`
+3. **Monitor performance**: Use `PerformanceMonitor()`
+4. **Use context managers**: `with simulation_episode(...)`
+5. **Leverage presets**: Use predefined configurations
+
+## Summary of New Features
+
+| Feature | Description | When to Use |
+|---------|-------------|-------------|
+| `ConfigBuilder` | Fluent configuration API with validation | Custom configurations |
+| `NLM` class | High-level simulation control | Common use cases |
+| `PerformanceMonitor` | Performance tracking and optimization | Benchmarking |
+| `brain_context` | Automatic brain lifecycle management | Reusable simulations |
+| `simulation_episode` | Complete episode management | Complex scenarios |
+| `create_educational_simulation()` | Ready-to-use educational setup | Teaching/learning |
+| `create_performance_monitor()` | Factory for performance monitoring | Any simulation |
+| Enhanced exceptions | Better error messages and recovery | Debugging |
+
+The enhanced NLM interface provides a complete solution for neural network simulation, from simple demonstrations to complex research scenarios, with tools for optimization, monitoring, and easy configuration management.
