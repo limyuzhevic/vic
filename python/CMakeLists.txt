@@ -14,6 +14,25 @@ find_package(pybind11 CONFIG REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
+# Include the Python bindings headers
+set(BINDINGS_HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/exceptions.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/core_identifiers.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/enums.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/config_class.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/sensory_input.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/action_world_object.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/agent_body_result.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/percept.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/world_class.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/brain_class.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/agent_brain_class.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/factory_functions.h
+)
+
+# Add current directory to include path for bindings headers
+target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
 set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
@@ -89,7 +108,7 @@ target_link_libraries(nlm_world PUBLIC nlm_core)
 
 pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
