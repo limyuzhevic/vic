@@ -15,6 +15,7 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/visualization/VisualizationInterface.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -121,7 +122,28 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Rest", ActionType::Rest)
         .value("Wait", ActionType::Wait)
         .value("Custom", ActionType::Custom)
-        .export_values();
+        .export_values()
+        .def("get_name", [](ActionType action) {
+            static const std::map<ActionType, std::string> names = {
+                {ActionType::MoveForward, "MoveForward"},
+                {ActionType::MoveBackward, "MoveBackward"},
+                {ActionType::MoveLeft, "MoveLeft"},
+                {ActionType::MoveRight, "MoveRight"},
+                {ActionType::TurnLeft, "TurnLeft"},
+                {ActionType::TurnRight, "TurnRight"},
+                {ActionType::Look, "Look"},
+                {ActionType::LookUp, "LookUp"},
+                {ActionType::LookDown, "LookDown"},
+                {ActionType::Interact, "Interact"},
+                {ActionType::Eat, "Eat"},
+                {ActionType::Drink, "Drink"},
+                {ActionType::Rest, "Rest"},
+                {ActionType::Wait, "Wait"},
+                {ActionType::Custom, "Custom"}
+            };
+            auto it = names.find(action);
+            return it != names.end() ? it->second : "Unknown";
+        });
 
     py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
         .value("MoveForward", MotorCommand::MoveForward)
@@ -362,16 +384,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
+             py::arg("percept"), "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
+             py::arg("timestep"), "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
@@ -398,23 +418,63 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Python convenience methods
+        .def("simulate_step", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world, float timestep) {
+            world->update(timestep);
+            auto percept = world->getSensoryPercept();
+            self.processSensoryInput(percept);
+            return self.decodeMotorCommand();
+        }, py::arg("world"), py::arg("timestep"),
+             "Convenience method: update world, process input, get motor command")
+        .def("simulate_step_with_stats", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world, float timestep) {
+            world->update(timestep);
+            auto percept = world->getSensoryPercept();
+            self.processSensoryInput(percept);
+            auto action = self.decodeMotorCommand();
+            return std::make_tuple(action, self.getNeuromodulationLevel(), 
+                                 self.getCuriosityLevel(), self.getNoveltyLevel());
+        }, py::arg("world"), py::arg("timestep"),
+             "Convenience method: simulate step and return stats (action, neuromod, curiosity, novelty)")
+        .def("get_stats", [](AgentBrain& self) {
+            return std::make_tuple(
+                self.getNeuromodulationLevel(),
+                self.getCuriosityLevel(),
+                self.getNoveltyLevel(),
+                self.getPredictionError(),
+                self.getDevelopmentalStage()
+            );
+        }, "Get current agent statistics (neuromod, curiosity, novelty, prediction_error, stage)")
+        .def("enable_all_features", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+        }, "Enable all neuromodulation and plasticity features for advanced simulation")
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    py::class_<VisualizationInterface>(m, "VisualizationInterface", R"pbdoc(Visualization interface for debugging and analysis)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &VisualizationInterface::initialize,
+             "Initialize visualization")
+        .def("update", &VisualizationInterface::update,
+             "Update visualization data")
+        .def("render", &VisualizationInterface::render,
+             "Render current state")
+        .def("close", &VisualizationInterface::close,
+             "Close visualization")
+        .def("isActive", &VisualizationInterface::isActive,
+             "Check if visualization is active")
+        .def("setUpdateRate", &VisualizationInterface::setUpdateRate,
+             py::arg("hz"), "Set update rate")
+        .def("getUpdateRate", &VisualizationInterface::getUpdateRate,
+             "Get update rate")
+        .def("visualizeNetwork", &VisualizationInterface::visualizeNetwork,
+             py::arg("brain"), "Visualize network structure")
+        .def("visualizeActivity", &VisualizationInterface::visualizeActivity,
+             py::arg("brain"), "Visualize neural activity")
+        .def("visualizeWeights", &VisualizationInterface::visualizeWeights,
+             py::arg("brain"), "Visualize synaptic weights");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

@@ -86,7 +86,48 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Properly serialize the configuration value based on its type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, int>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (value ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
