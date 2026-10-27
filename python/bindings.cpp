@@ -1,23 +1,19 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
-#include <pybind11/chrono.h>
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
 #include "../src/core/Types/Types.hpp"
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
-
-namespace py = pybind11;
-namespace nlm {
+#include "../src/environment/Environment.hpp"
+#include "../src/experiments/Experiment.hpp"
+#include "../src/experiments/ExperimentRunner.hpp"
+#include "../src/experiments/Metrics.hpp"
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -179,9 +175,22 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("setDataPtr", [](Vision& self, float* data, size_t size) {
+            self.setData(data, size);
+        }, py::arg("data"), py::arg("size"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getData", &Vision::getData)
+        .def("getType", &Vision::getType);
+    
+    // VisionProcessor
+    py::class_<VisionProcessor>(m, "VisionProcessor", R"pbdoc(Vision processing)pbdoc")
+        .def(py::init<>())
+        .def("process", &VisionProcessor::process, py::arg("input"))
+        .def("getFeatures", &VisionProcessor::getFeatures,
+             py::return_value_policy::reference_internal)
+        .def("getFeatureDimensions", &VisionProcessor::getFeatureDimensions);
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -191,12 +200,16 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("getData", &Audio::getData)
+        .def("getType", &Audio::getType);
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("clearSignals", &InternalSignals::clearSignals)
+        .def("getData", &InternalSignals::getData)
+        .def("getType", &InternalSignals::getType);
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -400,21 +413,94 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Utility functions for common operations
+    m.def("createExperiment", [](const std::string& name) -> std::shared_ptr<Experiment> {
+        return std::make_shared<Experiment>(name);
+    }, py::arg("name"), "Create a new experiment");
+    
+    m.def("runExperiment", [](std::shared_ptr<Experiment> experiment,
+                            std::shared_ptr<Brain> brain,
+                            std::shared_ptr<Environment> environment,
+                            SimulationStep maxSteps) {
+        return std::make_shared<ExperimentRunner>()->runExperiment(experiment, brain, environment, maxSteps);
+    }, py::arg("experiment"), py::arg("brain"), py::arg("environment"), py::arg("maxSteps"),
+       "Run an experiment");
+    
+    m.def("runBatch", [](const std::vector<std::shared_ptr<Experiment>>& experiments,
+                       std::shared_ptr<Brain> brainTemplate,
+                       std::shared_ptr<Environment> environmentTemplate,
+                       SimulationStep maxSteps) {
+        return std::make_shared<ExperimentRunner>()->runBatch(
+            experiments, brainTemplate, environmentTemplate, maxSteps);
+    }, py::arg("experiments"), py::arg("brainTemplate"), py::arg("environmentTemplate"), py::arg("maxSteps"),
+       "Run a batch of experiments");
+    
+    m.def("saveExperimentResults", [](const std::string& filepath,
+                                     const std::vector<std::shared_ptr<Experiment>>& experiments) {
+        auto runner = std::make_shared<ExperimentRunner>();
+        for (auto& exp : experiments) {
+            runner->getExperiments().push_back(exp);
+        }
+        return runner->saveResults(filepath);
+    }, py::arg("filepath"), py::arg("experiments"),
+       "Save experiment results to file");
+    
+    // Brain utility functions
+    m.def("simulateBrain", [](std::shared_ptr<Brain> brain,
+                           const std::vector<std::shared_ptr<SensoryInput>>& inputs,
+                           const std::vector<std::shared_ptr<Action>>& outputs,
+                           size_t steps) {
+        for (size_t i = 0; i < steps; ++i) {
+            if (i < inputs.size() && inputs[i]) {
+                brain->receiveSensoryInput(*inputs[i]);
+            }
+            brain->step(i);
+            if (i < outputs.size() && outputs[i]) {
+                // Note: Brain doesn't directly produce actions based on inputs
+                // This is a convenience wrapper
+            }
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("inputs"), py::arg("outputs"), py::arg("steps"),
+       "Simulate brain for specified steps");
+    
+    m.def("brainToDict", [](std::shared_ptr<Brain> brain) {
+        py::dict result;
+        result["neuron_count"] = brain->getTotalNeuronCount();
+        result["synapse_count"] = brain->getTotalSynapseCount();
+        result["firing_count"] = brain->getFiringNeuronCount();
+        result["average_firing_rate"] = brain->getAverageFiringRate();
+        result["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        result["total_spikes"] = brain->getTotalSpikeCount();
+        result["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        return result;
+    }, py::arg("brain"), "Convert brain state to dictionary");
+    
+    m.def("dictToConfig", [](const py::dict& config_dict) {
+        auto config = std::make_shared<Config>();
+        for (auto item : config_dict) {
+            std::string key = py::cast<std::string>(item.first);
+            py::object value_obj = py::cast<py::object>(item.second);
+            
+            // Try to determine type from Python object
+            if (value_obj.is(py::int_())) {
+                config->set(key, py::cast<int>(value_obj));
+            } else if (value_obj.is(py::float_())) {
+                config->set(key, py::cast<float>(value_obj));
+            } else if (value_obj.is(py::bool_())) {
+                config->set(key, py::cast<bool>(value_obj));
+            } else if (value_obj.is(py::str())) {
+                config->set(key, py::cast<std::string>(value_obj));
+            }
+        }
+        return config;
+    }, py::arg("config_dict"), "Convert Python dictionary to Config object");
+    
+    m.def("getBrainInfo", [](std::shared_ptr<Brain> brain) {
+        std::stringstream ss;
+        brain->logStatus();
+        return "Brain info logged to output";
+    }, py::arg("brain"), "Get detailed brain information");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
