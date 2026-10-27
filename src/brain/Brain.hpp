@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "NeuralRegion.hpp"
+#include "BrainOrchestrator.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
@@ -44,21 +45,72 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+/**
+ * @class Brain
+ * @brief The central coordinator of the neural system
+ * @details Implements real spiking neural computation with event-driven dynamics
+ *          and integrated memory, prediction, cognition, and neuromodulation systems.
+ *          This is the main interface for NLM (Neural Learning Machine) simulation.
+ *          
+ * The Brain class orchestrates all neural subsystems including:
+ * - Core neural computation (LIF neurons with spike propagation)
+ * - Memory systems (working, episodic, associative)
+ * - Prediction systems (temporal sequence learning)
+ * - Cognitive systems (attention, planning, concept formation)
+ * - Neuromodulation systems (dopamine, curiosity, novelty, prediction error)
+ * - Development system (plasticity rate modulation over time)
+ * - Plasticity rules (STDP and Hebbian learning)
+ * - Checkpoint system (state persistence)
+ * 
+ * The Brain uses a Strategy pattern for processing, delegating step execution
+ * to a BrainOrchestrator with configurable processing strategies.
+ * 
+ * @note This class is the main entry point for NLM Python bindings.
+ * @author NLM Research Team
+ * @version 0.1.0
+ * @date 2026
+ * @copyright MIT License
+ */
 
 class Brain {
 public:
-    // Create brain with configuration
+    /**
+     * @brief Construct a new Brain object with configuration
+     * 
+     * @param config Shared pointer to configuration object containing
+     *               simulation parameters such as neuron count, timestep,
+     *               plasticity rates, etc.
+     */
     explicit Brain(std::shared_ptr<Config> config);
     
+    /**
+     * @brief Destroy the Brain object and clean up all resources
+     */
     ~Brain();
     
-    // Disable copying, enable moving
+    /**
+     * @brief Disable copy constructor (Brain is not copyable)
+     */
     Brain(const Brain&) = delete;
+    
+    /**
+     * @brief Disable copy assignment operator (Brain is not copyable)
+     */
     Brain& operator=(const Brain&) = delete;
+    
+    /**
+     * @brief Move constructor (brain ownership transferred)
+     * 
+     * @param other Brain to move from
+     */
     Brain(Brain&&) noexcept;
+    
+    /**
+     * @brief Move assignment operator (brain ownership transferred)
+     * 
+     * @param other Brain to move from
+     * @return Brain& Reference to this object
+     */
     Brain& operator=(Brain&&) noexcept;
     
     // Initialize brain with configuration

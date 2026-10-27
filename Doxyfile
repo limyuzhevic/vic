@@ -1,0 +1,64 @@
+# Doxygen configuration file for NLM (Neural Learning Machine)
+# Generated for Phase 6: Final Integration
+
+# Project related configuration options
+doxygen_version           = 1.9.1
+dot_image_format         = png
+dotfontopts              = \"-Gdpi=96 -Gtolerance=50 -Gpixelsize=48\"
+optimize_output_for_c    = YES
+example_path             =
+include_path             =
+input                    = src/
+file_patterns             = *.hpp *.cpp
+exclude_patterns          = */build/* */tests/* */build_tools/* */.git/* */.gitignore
+
+# Configuration: control the level of detail in generated output
+# The SHOW_* tags control whether information should be shown in the generated output
+# The INPUT_* tags control the files and directories that are used as input
+# The EXCLUDE_* tags control what files and directories should be excluded
+
+# For more details about doxygen configuration, see:
+# http://www.stack.nl/~dimitri/doxygen/manual/config.html
+
+# Configuration: name of the project
+project_name           = NLM (熙然)
+project_number         = 0.1.0
+project_logo           = docs/nlm-logo.png
+project_banner         = docs/brain.png
+project_brief          = An Experimental Artificial Developmental Brain
+project_description    =
+project_url            = https://github.com/nlm-project/nlm
+project_lead           = NLM Research Team
+
+# Configuration: output
+output_directory       = docs/doxygen
+class_hierarchy_file   = class_hierarchy.html
+class_graph            = YES
+collaboration_graph    = YES
+group_grph             = YES
+uml_look               = YES
+uml_recursive           = YES
+include_files          = src/brain/Brain.hpp src/core/Config/Config.hpp
+included_by_file       = 
+SOURCE_BROWSER          = YES
+INLINE_SOURCES         = YES
+SOURCE_TOOLTIPS        = YES
+
+# Configuration: search
+SEARCHENGINE           = YES
+SEARCHENGINE_URL       = https://duckduckgo.com/
+
+# Configuration: indexes
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_XML           = YES
+GENERATE_MAN           = NO
+GENERATE_DOCSET        = YES
+GENERATE_PDF           = NO
+GENERATE_RTF          = NO
+GENERATE_HTMLHELP      = NO
+GENERATE_CHI          = NO
+GENERATE_XHTML         = NO
+GENERATE_XML          = YES
+GENERATE_DOCSET       = YES
+GENERATE_PREPROCESS    = NO
