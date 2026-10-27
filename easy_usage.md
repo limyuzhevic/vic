@@ -9,8 +9,25 @@ Think of it like this:
 - **Synapses** = Connections between brain cells
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
+- **Neuromodulation** = Motivation and reward signals
+- **Development** = Brain maturation and growth
 
-That's it! NLM simulates all of this.
+That's it! NLM simulates all of this, and now with an enhanced Python API that provides access to all brain systems!
+
+## Enhanced Python API
+
+The new Python API includes:
+- **Complete brain system access**: Memory, neuromodulation, development, cognition
+- **Convenience functions**: High-level simulation control
+- **Experiment tools**: Built-in Phase 6 experiment support
+- **Advanced features**: Performance optimization and metrics collection
+
+You can now access systems that were previously hidden inside the C++ core:
+- Memory systems: WorkingMemory, EpisodicMemory, AssociativeMemory
+- Neuromodulation: Dopamine, Reward, Curiosity, Novelty
+- Development: Synaptogenesis, Pruning, Maturation
+- Cognition: Attention, Planning, Concept Formation
+- Performance: Memory pools, checkpointing, metrics
 
 ---
 
