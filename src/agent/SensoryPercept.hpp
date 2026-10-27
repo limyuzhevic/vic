@@ -37,6 +37,13 @@ public:
     const std::vector<float>& getAudio() const { return audio_; }
     void setAudio(const std::vector<float>& a) { audio_ = a; }
     
+    // Utility methods
+    void resizeAudioChannel(size_t numSamples);
+    void clear();
+    bool validateChannelSizes() const;
+    float getMaxSignal() const;
+    float getTotalSignalPower() const;
+    
     // Get all signals concatenated (for brain input)
     std::vector<float> getAllSignals() const;
     

@@ -74,6 +74,9 @@ public:
     // Injects current into sensory neurons based on input pattern
     void receiveSensoryInput(const class SensoryInput& input);
     
+    // Get last sensory input for prediction system
+    const SensoryInput* getLastSensoryInput() const;
+    
     // Inject current directly into a specific neuron
     void injectCurrent(NeuronId neuron, MembranePotential current);
     
