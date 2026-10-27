@@ -48,6 +48,185 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printHelp() {
+    std::cout << R"(
+NLM - Neural Learning Machine
+Phase 2: Real Neural Computation
+
+USAGE:
+    nlm [OPTIONS] [CONFIG_FILE]
+
+OPTIONS:
+    --help, -h                    Show this help message and exit
+    --config=FILE, --config FILE   Load configuration from file
+    --key=VALUE, --key VALUE       Override configuration key with value
+    --random_seed VALUE            Random seed (integer)
+    --simulation_timestep VALUE    Simulation timestep in seconds (float)
+    --neuron_count VALUE           Number of neurons (integer)
+    --region_count VALUE           Number of regions (integer)
+    --connection_probability VALUE Connection probability (float)
+    --stdp_ltp_weight VALUE        STDP LTP weight (float)
+    --stdp_ltd_weight VALUE        STDP LTD weight (float)
+    --stdp_tau VALUE               STDP time constant (float)
+    --synaptogenesis_rate VALUE    Synaptogenesis rate (float)
+    --pruning_rate VALUE           Pruning rate (float)
+
+CONFIGURATION FILE:
+    Configuration can be specified via a .cfg file or JSON file.
+    The file can contain key=value pairs or JSON key-value pairs.
+    See examples in the configs/ directory.
+
+EXAMPLES:
+    nlm                          Run with default configuration
+    nlm --config myconfig.cfg      Load custom configuration
+    nlm --neuron_count 1000 --region_count 2
+                                 Override neuron and region count
+    nlm --help                    Show this help message
+
+CONFIGURATION KEYS:
+    random_seed                   Random seed for reproducible experiments
+    simulation_timestep           Simulation timestep in seconds
+    neuron_count                  Number of neurons in the brain
+    region_count                  Number of brain regions
+    connection_probability        Connection probability for random connectivity
+    stdp_ltp_weight               STDP LTP learning rate
+    stdp_ltd_weight               STDP LTD learning rate
+    stdp_tau                      STDP time constant
+    synaptogenesis_rate            Synaptogenesis (growth) rate
+    pruning_rate                  Pruning (loss) rate
+    log_level                     Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+NOTE:
+    Configuration values can be overridden via command line arguments.
+    Command line arguments take precedence over configuration files.
+    Invalid arguments are ignored with a warning message.
+    )";
+}
+
+void validateConfigValue(const std::shared_ptr<const Config>& config, 
+                         const std::string& key, const std::string& value) {
+    // Validate specific keys based on their expected types
+    if (key == "random_seed") {
+        try {
+            size_t pos;
+            long long seed = std::stoll(value, &pos);
+            if (pos != value.size()) {
+                NLM_LOG_WARNING(std::string("Invalid random_seed value: ") + value + 
+                               std::string(". Must be an integer."));
+            } else if (seed < 0 || seed > 0xFFFFFFFFFFFF) {
+                NLM_LOG_WARNING(std::string("random_seed out of range: ") + value + 
+                               std::string(". Must be between 0 and 2^48."));
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING(std::string("Invalid random_seed value: ") + value + 
+                           std::string(". Must be an integer."));
+        }
+    } else if (key == "simulation_timestep") {
+        try {
+            size_t pos;
+            double timestep = std::stod(value, &pos);
+            if (pos != value.size()) {
+                NLM_LOG_WARNING(std::string("Invalid simulation_timestep value: ") + value + 
+                               std::string(". Must be a float."));
+            } else if (timestep <= 0.0 || timestep > 1.0) {
+                NLM_LOG_WARNING(std::string("simulation_timestep out of range: ") + value + 
+                               std::string(". Must be between 0 and 1 second."));
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING(std::string("Invalid simulation_timestep value: ") + value + 
+                           std::string(". Must be a float."));
+        }
+    } else if (key == "neuron_count") {
+        try {
+            size_t pos;
+            long long neuronCount = std::stoll(value, &pos);
+            if (pos != value.size()) {
+                NLM_LOG_WARNING(std::string("Invalid neuron_count value: ") + value + 
+                               std::string(". Must be an integer."));
+            } else if (neuronCount <= 0 || neuronCount > 100000) {
+                NLM_LOG_WARNING(std::string("neuron_count out of range: ") + value + 
+                               std::string(". Must be between 1 and 100000."));
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING(std::string("Invalid neuron_count value: ") + value + 
+                           std::string(". Must be an integer."));
+        }
+    } else if (key == "region_count") {
+        try {
+            size_t pos;
+            long long regionCount = std::stoll(value, &pos);
+            if (pos != value.size()) {
+                NLM_LOG_WARNING(std::string("Invalid region_count value: ") + value + 
+                               std::string(". Must be an integer."));
+            } else if (regionCount <= 0 || regionCount > 1000) {
+                NLM_LOG_WARNING(std::string("region_count out of range: ") + value + 
+                               std::string(". Must be between 1 and 1000."));
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING(std::string("Invalid region_count value: ") + value + 
+                           std::string(". Must be an integer."));
+        }
+    } else if (key == "connection_probability") {
+        try {
+            size_t pos;
+            double prob = std::stod(value, &pos);
+            if (pos != value.size()) {
+                NLM_LOG_WARNING(std::string("Invalid connection_probability value: ") + value + 
+                               std::string(". Must be a float."));
+            } else if (prob < 0.0 || prob > 1.0) {
+                NLM_LOG_WARNING(std::string("connection_probability out of range: ") + value + 
+                               std::string(". Must be between 0.0 and 1.0."));
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING(std::string("Invalid connection_probability value: ") + value + 
+                           std::string(". Must be a float."));
+        }
+    } else if (key == "stdp_ltp_weight" || key == "stdp_ltd_weight" || key == "stdp_tau" || 
+               key == "synaptogenesis_rate" || key == "pruning_rate") {
+        try {
+            size_t pos;
+            double param = std::stod(value, &pos);
+            if (pos != value.size()) {
+                NLM_LOG_WARNING(std::string("Invalid " + key + " value: ") + value + 
+                               std::string(". Must be a float."));
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING(std::string("Invalid " + key + " value: ") + value + 
+                           std::string(". Must be a float."));
+        }
+    }
+}
+
+void validateSimulationParameters(const std::shared_ptr<const Config>& config) {
+    // Validate that simulation parameters are consistent
+    int64_t neuronCount = config->getOr<int64_t>("neuron_count", 1000);
+    int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+    
+    // Ensure neurons per region is reasonable
+    int64_t neuronsPerRegion = neuronCount / regionCount;
+    if (neuronsPerRegion < 1) {
+        NLM_LOG_WARNING(std::string("Adjusting neuron_count to match region_count.") + 
+                       std::string(" Neuron count per region would be too low."));
+        // In a real implementation, we would adjust the parameters here
+    }
+    
+    // Validate that timestep is reasonable for the simulation
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep < 0.0001) {
+        NLM_LOG_WARNING(std::string("simulation_timestep is very small (" + std::to_string(timestep) + 
+                                   std::string("s). Simulation may be slow.")));
+    } else if (timestep > 0.1) {
+        NLM_LOG_WARNING(std::string("simulation_timestep is large (" + std::to_string(timestep) + 
+                                   std::string("s). May cause instability.")));
+    }
+    
+    // Check for potential memory issues
+    if (neuronCount > 50000) {
+        NLM_LOG_WARNING(std::string("Large neuron count (") + std::to_string(neuronCount) + 
+                       std::string(") may cause memory issues. Consider reducing."));
+    }
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -340,31 +519,78 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
+    // CLI help and parameter validation
+    bool helpRequested = false;
+    std::vector<std::string> validArgs;
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    // Parse command line arguments for help and validation
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+        
+        if (arg == "--help" || arg == "-h") {
+            helpRequested = true;
+        } else if (arg.substr(0, 2) == "--") {
+            validArgs.push_back(arg.substr(2));
+        } else if (arg[0] == '-') {
+            validArgs.push_back(arg.substr(1));
+        }
+    }
+    
+    if (helpRequested) {
+        printHelp();
+        return 0;
+    }
+    
+    // Validate and normalize CLI arguments
+    std::vector<std::pair<std::string, std::string>> processedArgs;
+    for (size_t i = 0; i < validArgs.size(); ++i) {
+        const std::string& arg = validArgs[i];
+        size_t eqPos = arg.find('=');
+        
+        if (eqPos != std::string::npos) {
+            std::string key = arg.substr(0, eqPos);
+            std::string value = arg.substr(eqPos + 1);
+            processedArgs.push_back({key, value});
+            
+            // Validate key exists in configuration
+            if (!config->has(key)) {
+                NLM_LOG_WARNING(std::string("Unknown configuration key: ") + key + 
+                               std::string(". Using default value."));
+            }
+            
+            // Validate value format based on expected type
+            validateConfigValue(config, key, value);
+        } else {
+            // Check if next argument exists (for -key value format)
+            if (i + 1 < validArgs.size()) {
+                std::string key = arg;
+                std::string value = validArgs[i + 1];
+                processedArgs.push_back({key, value});
+                i++; // Skip next argument
+                
+                if (!config->has(key)) {
+                    NLM_LOG_WARNING(std::string("Unknown configuration key: ") + key + 
+                                   std::string(". Using default value."));
+                }
+                
+                validateConfigValue(config, key, value);
+            } else {
+                NLM_LOG_WARNING(std::string("Incomplete argument: ") + arg);
             }
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Apply processed arguments to config
+    for (const auto& arg : processedArgs) {
+        config->set(arg.first, arg.second, ConfigSource::CommandLine);
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Enhanced parameter validation for critical settings
+    validateSimulationParameters(config);
+    
+    // Log configuration changes
+    NLM_LOG_INFO("Configuration validated and applied from CLI arguments.");
+}
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

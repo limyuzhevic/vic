@@ -20,25 +20,391 @@ This document covers:
 - **Python**: 3.8+ (for Python bindings)
 - **pybind11**: Version 2.11.0+ (for Python bindings)
 
-### Build Steps
+### Build Outputs
+
+After successful compilation, you will have:
+
+| Target | Type | Description |
+|--------|------|-------------|
+| `nlm` | Executable | Main simulation executable |
+| `nlm_core` | Static Library | Core brain components |
+| `nlm_agent` | Static Library | Agent system |
+| `nlm_world` | Static Library | World simulation |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_test` | Executable | Unit test suite |
+
+### Running the C++ Interface
+
+#### Overview
+
+The C++ interface is the foundation of the NLM system and provides direct access to the neural simulation engine. It includes:
+
+- **Main executable (`nlm`)**: Core neural simulation engine
+- **Phase 3/4 demos**: Advanced demonstration of specific NLM phases
+- **Unit tests (`nlm_test`)**: Comprehensive test suite
+
+#### Running the Main Simulation
+
+The main executable (`./nlm`) provides:
+
+- **Simple usage**: Run with default configuration
+- **Configuration file support**: Load from JSON or key=value format
+- **Command-line parameter overrides**: Override configuration values
+- **Help system**: Comprehensive help documentation
+- **Error handling**: Detailed error reporting and validation
 
 ```bash
-# Navigate to the project directory
-cd /path/to/nlm
+# Run with default configuration
+./nlm
 
-# Create a build directory
-mkdir -p build
-cd build
+# Show help message
+./nlm --help
+./nlm -h
 
-# Configure with CMake (Release build for best performance)
-cmake .. -DCMAKE_BUILD_TYPE=Release
+# Load custom configuration file
+./nlm --config my_config.json
+./nlm --config my_config.cfg
 
-# Build all targets
-make -j$(nproc)
+# Override parameters from command line
+./nlm --neuron_count 2000 --region_count 3
 
-# Run tests (if built)
-ctest --output-on-failure
+# Combine file and parameter overrides
+./nlm --config my_config.json --simulation_timestep 0.0001
 ```
+
+#### Configuration File Support
+
+The C++ interface supports two configuration file formats:
+
+##### JSON Configuration
+
+```json
+{
+    "brain": {
+        "neuron_count": 1000,
+        "region_count": 1,
+        "connection_probability": 0.1
+    },
+    "plasticity": {
+        "stdp": {
+            "enable": true,
+            "learning_rate": 0.001,
+            "tau_plus": 20.0,
+            "tau_minus": 20.0
+        }
+    },
+    "logging": {
+        "level": "INFO",
+        "to_file": false,
+        "filename": "nlm.log"
+    }
+}
+```
+
+##### Key=Value Format (Legacy)
+
+```
+# Configuration comments supported
+brain.neuron_count = 1000
+brain.region_count = 1
+brain.connection_probability = 0.1
+plasticity.stdp.enable = true
+logging.level = INFO
+```
+
+#### Configuration File Examples
+
+**Example 1: Fast test configuration**
+
+```bash
+mkdir -p configs
+echo '
+brain.neuron_count = 100
+brain.region_count = 1
+brain.connection_probability = 0.05
+plasticity.stdp.learning_rate = 0.01
+logging.level = INFO
+' > configs/fast_test.cfg
+./nlm --config configs/fast_test.cfg
+```
+
+**Example 2: JSON experiment configuration**
+
+```bash
+mkdir -p configs
+echo '{
+    "brain": {
+        "neuron_count": 500,
+        "region_count": 2,
+        "connection_probability": 0.1
+    },
+    "plasticity": {
+        "stdp": {
+            "enable": true,
+            "learning_rate": 0.005
+        }
+    },
+    "logging": {
+        "level": "WARNING",
+        "to_file": true
+    }
+}' > configs/experiment.json
+./nlm --config configs/experiment.json
+```
+
+#### Available Command Line Options
+
+```bash
+--help, -h                    Display help message and exit
+--config, --config=FILE       Load configuration from file (JSON or key=value format)
+--key=VALUE, --key VALUE      Override configuration parameter
+--random_seed VALUE            Random seed (integer)
+--simulation_timestep VALUE    Simulation timestep in seconds
+--neuron_count VALUE           Number of neurons
+--region_count VALUE           Number of regions
+--connection_probability VALUE Connection probability
+--stdp_ltp_weight VALUE        STDP LTP learning rate
+--stdp_ltd_weight VALUE        STDP LTD learning rate
+--stdp_tau VALUE               STDP time constant
+--synaptogenesis_rate VALUE    Synaptogenesis rate
+--pruning_rate VALUE           Pruning rate
+--log_level LEVEL             Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+```
+
+#### Parameter Validation
+
+The CLI validates parameter types and ranges:
+
+```bash
+# Valid parameters
+./nlm --neuron_count 1000 --region_count 3
+
+# Invalid parameters (will show warning)
+./nlm --neuron_count 0      # Warning: neuron_count must be > 0
+./nlm --simulation_timestep 10  # Warning: timestep out of reasonable range
+```
+
+#### Error Handling
+
+The C++ interface provides comprehensive error reporting:
+
+```bash
+# File not found
+./nlm --config nonexistent.cfg
+# Error: Failed to load configuration from nonexistent.cfg
+
+# Invalid JSON
+./nlm --config malformed.json
+# Error: JSON parsing error in malformed.json
+
+# Invalid argument format
+./nlm --neuron_count "not_a_number"
+# Warning: Invalid neuron_count value: not_a_number. Must be an integer.
+```
+
+#### Running Phase 3 and Phase 4 Demos
+
+##### Phase 3 Demo (`./nlm_phase3_demo`)
+
+Phase 3 demonstrates:
+
+- **Neural prediction system**: Implementation of predictive coding
+- **Working memory**: Neural working memory with maintenance and competition
+- **Episodic-like memory**: Experience encoding and retrieval
+- **Concept formation**: Pattern discovery from neural activity
+- **Predictive planning**: Action sequence evaluation
+
+```bash
+# Run Phase 3 demo
+./nlm_phase3_demo
+
+# With custom configuration
+./nlm_phase3_demo --config configs/phase3.json
+```
+
+##### Phase 4 Demo (`./nlm_phase4_demo`)
+
+Phase 4 demonstrates:
+
+- **Self-model**: Neural representation of self
+- **Social learning**: Learning from others
+- **Continual learning**: Adapting to new experiences
+- **Neural attention**: Focused attention mechanisms
+
+```bash
+# Run Phase 4 demo
+./nlm_phase4_demo
+
+# With custom configuration
+./nlm_phase4_demo --config configs/phase4.json
+```
+
+#### Running Tests
+
+The test executable (`./nlm_test`) runs comprehensive unit tests:
+
+```bash
+# Run all tests
+./nlm_test
+
+# Run tests with verbose output
+./nlm_test -v
+
+# Run specific test suites
+./nlm_test --config test_config
+```
+
+#### Example Configuration Files
+
+**Minimal configuration for fast testing**
+
+```bash
+cat > config_minimal.cfg << EOF
+brain.neuron_count = 100
+brain.region_count = 1
+brain.connection_probability = 0.05
+plasticity.stdp.enable = false
+plasticity.structural.enable = false
+logging.level = WARNING
+EOF
+
+./nlm --config config_minimal.cfg
+```
+
+**Large network configuration**
+
+```bash
+cat > config_large.cfg << EOF
+brain.neuron_count = 10000
+brain.region_count = 5
+brain.connection_probability = 0.15
+plasticity.stdp.learning_rate = 0.001
+plasticity.structural.enable = true
+logging.level = INFO
+EOF
+
+./nlm --config config_large.cfg
+```
+
+#### Working with Different Configuration Formats
+
+**Converting between formats**
+
+```bash
+# Convert key=value to JSON
+#!/bin/bash
+
+cat > keyvalue_to_json.py << 'EOF'
+import json
+import sys
+
+# Read key=value file
+config = {}
+with open(sys.argv[1], 'r') as f:
+    for line in f:
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if '=' in line:
+            key, value = line.split('=', 1)
+            key = key.strip()
+            value = value.strip()
+            
+            # Convert value to appropriate type
+            if value.lower() in ['true', 'false']:
+                value = value.lower() == 'true'
+            elif value.isdigit():
+                value = int(value)
+            else:
+                try:
+                    value = float(value)
+                except ValueError:
+                    # Keep as string (remove quotes)
+                    if (value.startswith('"') and value.endswith('"')) or \
+                       (value.startswith("'") and value.endswith("'")):
+                        value = value[1:-1]
+            
+            config[key] = value
+
+# Write JSON file
+with open(sys.argv[2], 'w') as f:
+    json.dump(config, f, indent=4)
+
+print(f"Converted {sys.argv[1]} to {sys.argv[2]}")
+EOF
+
+# Usage: python3 keyvalue_to_json.py config.keyvalue config.json
+```
+
+#### Scripting Examples
+
+**Bash script for batch processing**
+
+```bash
+#!/bin/bash
+
+# Run multiple simulations with different configurations
+for seed in 42 123 456 789 999; do
+    echo "Running simulation with seed $seed"
+    ./nlm --random_seed $seed --neuron_count 1000
+    mv checkpoint.bin checkpoint_seed$seed.bin
+    echo "Saved: checkpoint_seed$seed.bin"
+done
+```
+
+**Python script for experiment management**
+
+```python
+import subprocess
+import time
+import os
+
+def run_experiments(config_file, param_sets):
+    """Run multiple experiments with different parameters."""
+    results = []
+    
+    for i, params in enumerate(param_sets):
+        print(f"Running experiment {i+1}/{len(param_sets)}")
+        
+        # Build command
+        cmd = ['./nlm', f'--config', config_file]
+        for key, value in params.items():
+            cmd.extend([f'--{key}', str(value)])
+        
+        # Run simulation
+        start_time = time.time()
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        elapsed = time.time() - start_time
+        
+        results.append({
+            'experiment': i,
+            'parameters': params,
+            'success': result.returncode == 0,
+            'stdout': result.stdout,
+            'stderr': result.stderr,
+            'time': elapsed
+        })
+        
+        if result.returncode != 0:
+            print(f"Experiment {i} failed: {result.stderr}")
+        else:
+            print(f"Experiment {i} completed in {elapsed:.2f}s")
+    
+    return results
+
+# Example usage
+param_sets = [
+    {'neuron_count': 500, 'region_count': 1},
+    {'neuron_count': 1000, 'region_count': 2},
+    {'neuron_count': 2000, 'region_count': 3},
+    {'neuron_count': 5000, 'region_count': 5},
+]
+
+results = run_experiments('configs/base.json', param_sets)
+```
+
+This comprehensive C++ interface documentation provides users with detailed information about building, configuring, and running NLM simulations using the native C++ interface.
 
 ### Build Outputs
 

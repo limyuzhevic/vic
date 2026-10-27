@@ -58,8 +58,14 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Legacy format support (key=value)
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    // Parse JSON with error handling
+    bool parseJSON(const std::string& filepath);
+    
+    // Export to JSON
+    bool exportToJSON(const std::string& filepath) const;
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
@@ -69,7 +75,14 @@ public:
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
+    std::optional<T> getWithValidation(const std::string& key) const;
+    
+    template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
+    
+    // Type checking
+    template<typename T>
+    bool isTypeCompatible(const ConfigEntry& entry) const;
     
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
