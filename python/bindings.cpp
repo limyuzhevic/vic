@@ -162,7 +162,42 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // New convenience methods for Python users
+        .def("get", static_cast<std::optional<int> (Config::*)(const std::string&) const>(&Config::get<int>), py::arg("key"))
+        .def("getOr", static_cast<int (Config::*)(const std::string&, const int&) const>(&Config::getOr<int>), py::arg("key"), py::arg("defaultValue"))
+        .def("setInt", [](Config& self, const std::string& key, int value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime, "Set an integer configuration value")
+        .def("setDouble", [](Config& self, const std::string& key, double value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime, "Set a double configuration value")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime, "Set a string configuration value")
+        .def("setBool", [](Config& self, const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime, "Set a boolean configuration value")
+        .def("getInt", [](Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (val) return *val;
+            throw std::runtime_error("Key not found or wrong type: " + key);
+        }, py::arg("key"), "Get an integer configuration value (throws if not found)")
+        .def("getDouble", [](Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (val) return *val;
+            throw std::runtime_error("Key not found or wrong type: " + key);
+        }, py::arg("key"), "Get a double configuration value (throws if not found)")
+        .def("getString", [](Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val) return *val;
+            throw std::runtime_error("Key not found or wrong type: " + key);
+        }, py::arg("key"), "Get a string configuration value (throws if not found)")
+        .def("getBool", [](Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (val) return *val;
+            throw std::runtime_error("Key not found or wrong type: " + key);
+        }, py::arg("key"), "Get a boolean configuration value (throws if not found)");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -403,18 +438,75 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
-
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Add convenience functions for common operations
+    m.def("initializeBrain", [](std::shared_ptr<Brain> brain) {
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+    }, py::arg("brain"), "Initialize a brain with default configuration");
+    
+    m.def("stepBrain", [](std::shared_ptr<Brain> brain, SimulationStep step, Timestamp time = 0.0) {
+        brain->step(step, time);
+    }, py::arg("brain"), py::arg("step"), py::arg("time") = 0.0, "Perform a simulation step");
+    
+    m.def("resetBrain", [](std::shared_ptr<Brain> brain) {
+        brain->reset();
+        brain->initialize();
+    }, py::arg("brain"), "Reset and reinitialize a brain");
+    
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, std::string> stats;
+        stats["total_neurons"] = std::to_string(brain->getTotalNeuronCount());
+        stats["total_synapses"] = std::to_string(brain->getTotalSynapseCount());
+        stats["active_neurons"] = std::to_string(brain->getActiveNeuronCount());
+        stats["firing_neurons"] = std::to_string(brain->getFiringNeuronCount());
+        stats["total_spikes"] = std::to_string(brain->getTotalSpikeCount());
+        stats["average_firing_rate"] = std::to_string(brain->getAverageFiringRate());
+        stats["excitation_inhibition_ratio"] = std::to_string(brain->getExcitationInhibitionRatio());
+        stats["developmental_stage"] = std::to_string(static_cast<int>(brain->getDevelopmentalStage()));
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics");
+    
+    m.def("getBrainStatus", [](std::shared_ptr<Brain> brain) {
+        std::stringstream ss;
+        brain->logStatus();
+        // Note: This is a simplification - in practice you'd capture the log output
+        return "Brain status logged to console";
+    }, py::arg("brain"), "Log brain status");
+    
+    // Add error codes and exception types
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    py::register_exception<std::invalid_argument>(m, "InvalidArgument");
+    py::register_exception<std::out_of_range>(m, "OutOfRange");
+    
+    // Add constants for common values
+    m.attr("PHASE2_DEFAULT_NEURONS") = 500;
+    m.attr("PHASE2_DEFAULT_REGIONS") = 1;
+    m.attr("PHASE2_DEFAULT_TIMESTEP") = 0.001;
+    m.attr("PHASE2_DEFAULT_PLACTICITY") = 0.01;
+    
+    // Add convenience constants for neuron types
+    py::enum_<NeuronType>(m, "NeuronTypes", R"pbdoc(Neuron type enumeration)pbdoc")
+        .value("Excitatory", NeuronType::Excitatory)
+        .value("Inhibitory", NeuronType::Inhibitory)
+        .value("Modulatory", NeuronType::Modulatory)
+        .value("Sensory", NeuronType::Sensory)
+        .value("Motor", NeuronType::Motor)
+        .value("Internal", NeuronType::Internal)
+        .export_values();
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

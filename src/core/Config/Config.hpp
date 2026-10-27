@@ -5,6 +5,9 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
+#include <functional>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -31,16 +34,78 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+// Validation result
+struct ValidationResult {
+    bool valid;
+    std::string errorMessage;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ValidationResult(bool v = true, const std::string& msg = "") 
+        : valid(v), errorMessage(msg) {}
+    
+    static ValidationResult Success() { return ValidationResult(true); }
+    static ValidationResult Error(const std::string& msg) { return ValidationResult(false, msg); }
+};
+
+// Validation function type
+using ValidationFunction = std::function<ValidationResult(const ConfigValue&)>;
+
+// Configuration schema entry
+struct ConfigSchemaEntry {
+    std::string key;
+    std::string type;  // "int", "int64_t", "double", "bool", "string", "vector<int>", "vector<double>", "vector<string>"
+    std::string description;
+    ConfigSource source;
+    ConfigValue defaultValue;
+    ValidationFunction validator;
+    bool required;
+    
+    ConfigSchemaEntry() : key(), type(), description(), source(ConfigSource::Default), 
+                         defaultValue(), validator(nullptr), required(false) {}
+    
+    ConfigSchemaEntry(const std::string& k, const std::string& t, const std::string& desc = "",
+                     ConfigSource s = ConfigSource::Default, const ConfigValue& def = ConfigValue(),
+                     const ValidationFunction& val = nullptr, bool req = false)
+        : key(k), type(t), description(desc), source(s), defaultValue(def), 
+          validator(val), required(req) {}
+};
+
+// Configuration schema
+class ConfigSchema {
+public:
+    ConfigSchema() = default;
+    
+    // Add a schema entry
+    void addEntry(const std::string& key, const std::string& type, 
+                 const std::string& description = "",
+                 ConfigSource source = ConfigSource::Default,
+                 const ConfigValue& defaultValue = ConfigValue(),
+                 const ValidationFunction& validator = nullptr,
+                 bool required = false);
+    
+    // Get schema entry by key
+    const ConfigSchemaEntry* getEntry(const std::string& key) const;
+    
+    // Get all schema entries
+    const std::vector<ConfigSchemaEntry>& getEntries() const { return entries; }
+    
+    // Validate configuration against schema
+    ValidationResult validate(const Config& config) const;
+    
+    // Get all keys from schema
+    std::vector<std::string> getKeys() const;
+    
+    // Create default configuration from schema
+    std::shared_ptr<Config> createDefaultConfig() const;
+    
+    // Clear all entries
+    void clear() { entries.clear(); }
+    
+private:
+    std::vector<ConfigSchemaEntry> entries;
+    
+    // Type conversion helpers
+    bool isTypeCompatible(const std::string& type, const ConfigValue& value) const;
+    std::string getTypeName(const ConfigValue& value) const;
 };
 
 // Main configuration class
@@ -93,6 +158,17 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Schema validation
+    ValidationResult validateWithSchema(const ConfigSchema& schema) const;
+    
+    // Configuration validation helpers
+    static ValidationResult validateRange(const ConfigValue& value, double min, double max, const std::string& paramName);
+    static ValidationResult validatePositive(const ConfigValue& value, const std::string& paramName);
+    static ValidationResult validateNonNegative(const ConfigValue& value, const std::string& paramName);
+    static ValidationResult validateProbability(const ConfigValue& value, const std::string& paramName);
+    static ValidationResult validateNeuronCount(const ConfigValue& value, const std::string& paramName);
+    static ValidationResult validateTimestep(const ConfigValue& value, const std::string& paramName);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +176,19 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Create default schema for backward compatibility
+    static ConfigSchema createDefaultSchema();
+    
+    friend class ConfigSchema;
 };
+
+// Common configuration schemas for different NLM phases
+namespace ConfigSchemas {
+    ConfigSchema createPhase1Schema();
+    ConfigSchema createPhase2Schema();
+    ConfigSchema createDefaultSchema();
+    ConfigSchema createValidationSchema();
+}
 
 } // namespace nlm

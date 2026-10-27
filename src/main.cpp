@@ -340,28 +340,185 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
+// Initialize logger
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Implementing:");
+    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("");
+    
+    // Validate configuration and set Phase 2 defaults
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Configuration validation
+    auto validateConfig = [&]() {
+        NLM_LOG_INFO("Validating configuration...");
+        
+        bool valid = true;
+        
+        // Validate core parameters
+        if (auto neurons = config->getOr<int64_t>("neuron_count", 0); neurons <= 0) {
+            NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(neurons) + ". Must be positive.");
+            valid = false;
         }
+        
+        if (auto regions = config->getOr<int64_t>("region_count", 0); regions <= 0) {
+            NLM_LOG_ERROR("Invalid region count: " + std::to_string(regions) + ". Must be positive.");
+            valid = false;
+        }
+        
+        if (auto timestep = config->getOr<double>("simulation_timestep", 0); timestep <= 0) {
+            NLM_LOG_ERROR("Invalid timestep: " + std::to_string(timestep) + ". Must be positive.");
+            valid = false;
+        }
+        
+        if (auto prob = config->getOr<float>("connection_probability", -1); prob < 0 || prob > 1) {
+            NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(prob) + ". Must be between 0.0 and 1.0.");
+            valid = false;
+        }
+        
+        // Validate plasticity parameters
+        if (auto plasticity = config->getOr<double>("plasticity_learning_rate", -1); plasticity < 0) {
+            NLM_LOG_ERROR("Invalid plasticity rate: " + std::to_string(plasticity) + ". Must be non-negative.");
+            valid = false;
+        }
+        
+        if (auto stdpLtp = config->getOr<float>("stdp_ltp_weight", -1); stdpLtp < 0) {
+            NLM_LOG_ERROR("Invalid STDP LTP weight: " + std::to_string(stdpLtp) + ". Must be non-negative.");
+            valid = false;
+        }
+        
+        if (auto stdpLtd = config->getOr<float>("stdp_ltd_weight", -1); stdpLtd < 0) {
+            NLM_LOG_ERROR("Invalid STDP LTD weight: " + std::to_string(stdpLtd) + ". Must be non-negative.");
+            valid = false;
+        }
+        
+        // Validate development parameters
+        if (auto genesis = config->getOr<float>("synaptogenesis_rate", -1); genesis < 0 || genesis > 1) {
+            NLM_LOG_ERROR("Invalid synaptogenesis rate: " + std::to_string(genesis) + ". Must be between 0.0 and 1.0.");
+            valid = false;
+        }
+        
+        if (auto pruning = config->getOr<float>("pruning_rate", -1); pruning < 0 || pruning > 1) {
+            NLM_LOG_ERROR("Invalid pruning rate: " + std::to_string(pruning) + ". Must be between 0.0 and 1.0.");
+            valid = false;
+        }
+        
+        // Validate neuromodulation parameters
+        if (auto dopamine = config->getOr<double>("dopamine_baseline", -1); dopamine < 0) {
+            NLM_LOG_ERROR("Invalid dopamine baseline: " + std::to_string(dopamine) + ". Must be non-negative.");
+            valid = false;
+        }
+        
+        if (valid) {
+            NLM_LOG_INFO("Configuration validation passed.");
+        } else {
+            NLM_LOG_ERROR("Configuration validation failed. Please check the configuration values.");
+        }
+        
+        return valid;
+    };
+    
+    // Configuration safety checks
+    auto performSafetyChecks = [&]() {
+        NLM_LOG_INFO("Performing safety checks...");
+        
+        // Check for potentially problematic parameter combinations
+        auto neurons = config->getOr<int64_t>("neuron_count", 0);
+        auto regions = config->getOr<int64_t>("region_count", 0);
+        auto timestep = config->getOr<double>("simulation_timestep", 0);
+        
+        // Warn about performance implications
+        if (neurons > 10000) {
+            NLM_LOG_WARNING("High neuron count (" + std::to_string(neurons) + ") may impact performance.");
+        }
+        
+        if (regions > 10) {
+            NLM_LOG_WARNING("High region count (" + std::to_string(regions) + ") may impact performance.");
+        }
+        
+        if (timestep < 0.0001) {
+            NLM_LOG_WARNING("Very small timestep (" + std::to_string(timestep) + ") may cause numerical instability.");
+        }
+        
+        if (timestep > 0.1) {
+            NLM_LOG_WARNING("Large timestep (" + std::to_string(timestep) + ") may affect simulation accuracy.");
+        }
+        
+        NLM_LOG_INFO("Safety checks completed.");
+    };
+    
+    // Configuration summary for debugging
+    auto logConfigurationSummary = [&]() {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Configuration Summary:");
+        NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+        NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+        NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+        NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+        NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+        NLM_LOG_INFO("");
+    };
+    
+    // Load configuration
+    if (!config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Using default configuration.");
+    } else {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Load from command line arguments (overrides file)
+    if (!config->loadFromArgs(argc, argv)) {
+        NLM_LOG_WARNING("Failed to parse some command line arguments.");
     }
+    
+    // Apply Phase 2 defaults (these can be overridden by config file)
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Run validation
+    if (!validateConfig()) {
+        NLM_LOG_ERROR("Configuration validation failed. Exiting.");
+        return 1;
+    }
+    
+    // Perform safety checks
+    performSafetyChecks();
+    
+    // Log configuration summary
+    logConfigurationSummary();
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
@@ -409,20 +566,103 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
+    // Start performance monitoring
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Performance Monitoring ===");
+    
+    // Record start time for performance benchmarking
+    auto startTime = std::chrono::high_resolution_clock::now();
+    auto simulationStartTime = startTime;
+    
     // Run Test 1: Basic connectivity
+    auto test1Start = std::chrono::high_resolution_clock::now();
     runBasicConnectivityTest(brain);
+    auto test1End = std::chrono::high_resolution_clock::now();
+    auto test1Duration = std::chrono::duration_cast<std::chrono::milliseconds>(test1End - test1Start).count();
+    NLM_LOG_INFO("Test 1 (Basic Connectivity) completed in " + std::to_string(test1Duration) + " ms");
     
     // Reset brain for plasticity experiment
+    auto resetStart = std::chrono::high_resolution_clock::now();
     brain->reset();
     brain->initialize();
+    auto resetEnd = std::chrono::high_resolution_clock::now();
+    auto resetDuration = std::chrono::duration_cast<std::chrono::milliseconds>(resetEnd - resetStart).count();
+    NLM_LOG_INFO("Brain reset and reinitialization completed in " + std::to_string(resetDuration) + " ms");
     
     // Run Test 2: Plasticity learning experiment
+    auto test2Start = std::chrono::high_resolution_clock::now();
     runPlasticityExperiment(brain);
+    auto test2End = std::chrono::high_resolution_clock::now();
+    auto test2Duration = std::chrono::duration_cast<std::chrono::milliseconds>(test2End - test2Start).count();
+    NLM_LOG_INFO("Test 2 (Plasticity Learning Experiment) completed in " + std::to_string(test2Duration) + " ms");
     
     // Reset and run Test 3: STDP verification
+    auto reset2Start = std::chrono::high_resolution_clock::now();
     brain->reset();
     brain->initialize();
+    auto reset2End = std::chrono::high_resolution_clock::now();
+    auto reset2Duration = std::chrono::duration_cast<std::chrono::milliseconds>(reset2End - reset2Start).count();
+    NLM_LOG_INFO("Second brain reset and reinitialization completed in " + std::to_string(reset2Duration) + " ms");
+    
+    auto test3Start = std::chrono::high_resolution_clock::now();
     runStdpVerification(brain);
+    auto test3End = std::chrono::high_resolution_clock::now();
+    auto test3Duration = std::chrono::duration_cast<std::chrono::milliseconds>(test3End - test3Start).count();
+    NLM_LOG_INFO("Test 3 (STDP Verification) completed in " + std::to_string(test3Duration) + " ms");
+    
+    // Record end time
+    auto endTime = std::chrono::high_resolution_clock::now();
+    
+    // Calculate comprehensive performance statistics
+    auto totalDuration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+    auto simulationDuration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - simulationStartTime).count();
+    
+    // Performance metrics collection
+    size_t totalNeurons = brain->getTotalNeuronCount();
+    size_t totalSynapses = brain->getTotalSynapseCount();
+    size_t totalSpikes = brain->getTotalSpikeCount();
+    size_t activeNeurons = brain->getActiveNeuronCount();
+    size_t firingNeurons = brain->getFiringNeuronCount();
+    double avgFiringRate = brain->getAverageFiringRate();
+    double excitationInhibitionRatio = brain->getExcitationInhibitionRatio();
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Final Performance Statistics ===");
+    NLM_LOG_INFO("Total execution time: " + std::to_string(totalDuration) + " ms");
+    NLM_LOG_INFO("Total simulation time: " + std::to_string(simulationDuration) + " ms");
+    NLM_LOG_INFO("Individual test times:");
+    NLM_LOG_INFO("  Test 1 (Connectivity): " + std::to_string(test1Duration) + " ms");
+    NLM_LOG_INFO("  Reset 1: " + std::to_string(resetDuration) + " ms");
+    NLM_LOG_INFO("  Test 2 (Plasticity): " + std::to_string(test2Duration) + " ms");
+    NLM_LOG_INFO("  Reset 2: " + std::to_string(reset2Duration) + " ms");
+    NLM_LOG_INFO("  Test 3 (STDP): " + std::to_string(test3Duration) + " ms");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Network Statistics:");
+    NLM_LOG_INFO("  Total neurons: " + std::to_string(totalNeurons));
+    NLM_LOG_INFO("  Total synapses: " + std::to_string(totalSynapses));
+    NLM_LOG_INFO("  Active neurons: " + std::to_string(activeNeurons));
+    NLM_LOG_INFO("  Firing neurons: " + std::to_string(firingNeurons));
+    NLM_LOG_INFO("  Total spikes: " + std::to_string(totalSpikes));
+    NLM_LOG_INFO("  Average firing rate: " + std::to_string(avgFiringRate) + " Hz");
+    NLM_LOG_INFO("  Excitation/Inhibition ratio: " + std::to_string(excitationInhibitionRatio));
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Performance Analysis:");
+    
+    // Calculate derived metrics
+    if (totalDuration > 0) {
+        double spikesPerSecond = (totalSpikes / (totalDuration / 1000.0));
+        NLM_LOG_INFO("  Spikes per second: " + std::to_string(spikesPerSecond));
+    }
+    
+    if (totalNeurons > 0) {
+        double neuronsPerMs = totalNeurons / static_cast<double>(totalDuration);
+        NLM_LOG_INFO("  Neurons processed per ms: " + std::to_string(neuronsPerMs));
+    }
+    
+    if (avgFiringRate > 0) {
+        double efficiency = (activeNeurons / static_cast<double>(totalNeurons)) * 100.0;
+        NLM_LOG_INFO("  Network efficiency: " + std::to_string(efficiency) + "% active neurons");
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
