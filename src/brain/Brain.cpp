@@ -168,8 +168,7 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
         delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::exchange(other.pImpl, nullptr);
     }
     return *this;
 }
@@ -1108,10 +1107,78 @@ void Brain::logStatus() const {
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
                     " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+// Helper functions for testing and debugging
+std::vector<std::string> Brain::getTestDiagnostics() const {
+    std::vector<std::string> diagnostics;
+    
+    diagnostics.push_back("Total neurons: " + std::to_string(getTotalNeuronCount()));
+    diagnostics.push_back("Total synapses: " + std::to_string(getTotalSynapseCount()));
+    diagnostics.push_back("Active neurons: " + std::to_string(getActiveNeuronCount()));
+    diagnostics.push_back("Firing neurons: " + std::to_string(getFiringNeuronCount()));
+    diagnostics.push_back("Total spikes: " + std::to_string(getTotalSpikeCount()));
+    
+    if (validateConfiguration()) {
+        diagnostics.push_back("Configuration: VALID");
+    } else {
+        diagnostics.push_back("Configuration: INVALID - " + getValidationErrors());
     }
+    
+    // Add memory system diagnostics
+    if (pImpl->workingMemory) {
+        diagnostics.push_back("Working memory: " + 
+                             std::to_string(pImpl->workingMemory->getActiveTraces()) + " traces");
+    }
+    
+    // Add neuromodulation diagnostics
+    if (pImpl->dopamine) {
+        diagnostics.push_back("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    
+    return diagnostics;
+}
+
+bool Brain::runValidationTest(const std::string& testName) const {
+    if (testName == "basic_connectivity") {
+        // Test if basic neural connectivity works
+        return getTotalNeuronCount() > 0 && 
+               getTotalSynapseCount() > 0 &&
+               getActiveNeuronCount() > 0;
+    } else if (testName == "memory_systems") {
+        // Test if memory systems are functional
+        bool workingMemOK = true;
+        bool episodicMemOK = true;
+        
+        if (pImpl->workingMemory) {
+            workingMemOK = pImpl->workingMemory->getActiveTraces() >= 0;
+        }
+        if (pImpl->episodicMemory) {
+            episodicMemOK = pImpl->episodicMemory->getEpisodeCount() >= 0;
+        }
+        
+        return workingMemOK && episodicMemOK;
+    } else if (testName == "neuromodulation") {
+        // Test if neuromodulation is working
+        if (pImpl->dopamine) {
+            return pImpl->dopamine->getLevel() >= 0.0f && 
+                   pImpl->dopamine->getLevel() <= 1.0f;
+        }
+        return false;
+    } else if (testName == "plasticity") {
+        // Test if plasticity rules are working
+        for (const auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                if (syn->getPlasticityFlags().hebbian || 
+                    syn->getPlasticityFlags().stdp) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    
+    // Unknown test name
+    return false;
 }
 
 } // namespace nlm
+

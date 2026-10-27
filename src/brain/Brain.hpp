@@ -184,14 +184,64 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // ========== CONVENIENCE FUNCTIONS ==========
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Find all neurons of a specific type across all regions
+    std::vector<Neuron*> findNeuronsByType(NeuronType type);
+    std::vector<const Neuron*> findNeuronsByType(NeuronType type) const;
     
-    // Logging
-    void logStatus() const;
+    // Get neurons that are currently active (firing)
+    std::vector<Neuron*> getActiveNeurons();
+    std::vector<const Neuron*> getActiveNeurons() const;
+    
+    // Apply a simple learning pattern (common training routine)
+    void applyLearningPattern(const std::string& patternName);
+    
+    // Reset the brain with a specific pattern
+    void reset(const std::string& resetPattern = "default");
+    
+    // Get a summary of brain state for debugging
+    std::string getStateSummary() const;
+    
+    // Simple exploration functions for common use cases
+    float getNetworkExcitability() const;
+    float getNetworkPlasticity() const;
+    size_t getMaxSpikeCount() const;
+    
+    // Integration with environment
+    bool isReadyForInteraction() const;
+    void prepareForEpisode(const std::string& episodeName);
+    
+    // Validation and checks
+    bool validateConfiguration() const;
+    std::string getValidationErrors() const;
+    
+    // Performance monitoring
+    double getAverageProcessingTime() const;
+    size_t getOperationsCount() const;
+    void resetPerformanceCounters();
+    
+    // ========== ADVANCED UTILITY FUNCTIONS ==========
+    
+    // Complex operations combining multiple systems
+    void performCorticalProcess(const std::string& processName, 
+                               const std::vector<float>& parameters);
+    
+    // Memory consolidation and cleanup
+    void consolidateMemory(float consolidationThreshold);
+    void cleanupWeakConnections(float strengthThreshold);
+    
+    // Developmental milestones
+    bool hasReachedDevelopmentalStage(DevelopmentalStage stage) const;
+    void advanceDevelopmentalStage();
+    
+    // Integration checkpoint
+    bool canSaveState() const;
+    bool canLoadState() const;
+    
+    // Helper functions for testing and debugging
+    std::vector<std::string> getTestDiagnostics() const;
+    bool runValidationTest(const std::string& testName) const;
     
 private:
     struct Impl;
