@@ -51,17 +51,13 @@ void printBanner() {
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
-    uint64_t seed;
-    size_t initialSynapseCount;
     std::vector<float> initialWeights;
     std::vector<float> finalWeights;
     std::vector<NeuronId> mostActiveNeurons;
     
-    LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+    LearningExperiment(std::shared_ptr<Brain> b) : brain(b) {}
     
     void recordInitialState() {
-        initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
         
         // Record initial weights from first region
@@ -72,7 +68,7 @@ struct LearningExperiment {
         }
         
         NLM_LOG_INFO("Initial state recorded:");
-        NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
+        NLM_LOG_INFO("  Synapses: " + std::to_string(brain->getTotalSynapseCount()));
         if (!initialWeights.empty()) {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
@@ -321,50 +317,165 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
+void printHelp() {
     printBanner();
+    std::cout << R"(
+USAGE:
+    ./nlm [OPTIONS]
+
+OPTIONS:
+    --help, -h                    Show this help message
+    --config <file>              Load configuration from file (default: configs/default.cfg)
+    --neuron-count <n>           Set number of neurons
+    --region-count <n>           Set number of brain regions
+    --timestep <t>               Set simulation timestep
+    --seed <s>                   Set random seed
+    --log-level <level>          Set log level (Debug, Info, Warning, Error, Critical)
+    --log-file <file>            Enable logging to file
+    --show-config                Show current configuration
+    --test-only                  Run tests and exit
+    --version                    Show version information
+
+EXAMPLES:
+    ./nlm                           Run with default configuration
+    ./nlm --config myconfig.cfg     Use custom configuration
+    ./nlm --neuron-count 100       Create smaller brain for faster testing
+    ./nlm --log-level Debug        Enable detailed debug logging
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2: Real Neural Computation v0.1.0" << std::endl;
+    std::cout << "Based on neural simulation framework with LIF dynamics" << std::endl;
+}
+
+int parseArguments(int argc, char** argv, std::shared_ptr<Config>& config, 
+                   std::string& configFile, bool& showConfig, bool& testOnly) {
+    std::string logLevel = "";
+    std::string logFile = "";
+    int neuronCount = -1;
+    int regionCount = -1;
+    double timestep = -1.0;
+    int64_t seed = -1;
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 1;
+        }
+        else if (arg == "--version") {
+            printVersion();
+            return 1;
+        }
+        else if (arg == "--show-config") {
+            showConfig = true;
+        }
+        else if (arg == "--test-only") {
+            testOnly = true;
+        }
+        else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
         }
+        else if (arg.substr(0, 6) == "--seed") {
+            if (arg.find('=') != std::string::npos) {
+                seed = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                seed = std::stoll(argv[++i]);
+            }
+        }
+        else if (arg.substr(0, 14) == "--neuron-count") {
+            if (arg.find('=') != std::string::npos) {
+                neuronCount = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                neuronCount = std::stoi(argv[++i]);
+            }
+        }
+        else if (arg.substr(0, 14) == "--region-count") {
+            if (arg.find('=') != std::string::npos) {
+                regionCount = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                regionCount = std::stoi(argv[++i]);
+            }
+        }
+        else if (arg.substr(0, 10) == "--timestep") {
+            if (arg.find('=') != std::string::npos) {
+                timestep = std::stod(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                timestep = std::stod(argv[++i]);
+            }
+        }
+        else if (arg.substr(0, 12) == "--log-level") {
+            if (arg.find('=') != std::string::npos) {
+                logLevel = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logLevel = argv[++i];
+            }
+        }
+        else if (arg.substr(0, 11) == "--log-file") {
+            if (arg.find('=') != std::string::npos) {
+                logFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logFile = argv[++i];
+            }
+        }
+        // Handle short options
+        else if (arg == "-c" && i + 1 < argc) {
+            configFile = argv[++i];
+        }
+        else if (arg == "-n" && i + 1 < argc) {
+            neuronCount = std::stoi(argv[++i]);
+        }
+        else if (arg == "-r" && i + 1 < argc) {
+            regionCount = std::stoi(argv[++i]);
+        }
+        else if (arg == "-t" && i + 1 < argc) {
+            timestep = std::stod(argv[++i]);
+        }
+        else {
+            // Unknown argument
+            NLM_LOG_WARNING("Unknown argument: " + arg);
+        }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Apply overrides to config
+    if (neuronCount >= 0) {
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+    }
+    if (regionCount >= 0) {
+        config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::CommandLine);
+    }
+    if (timestep > 0.0) {
+        config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+    }
+    if (seed >= 0) {
+        config->set("random_seed", seed, ConfigSource::CommandLine);
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Set log level
+    if (!logLevel.empty()) {
+        LogLevel level;
+        if (logLevel == "Debug") level = LogLevel::Debug;
+        else if (logLevel == "Warning") level = LogLevel::Warning;
+        else if (logLevel == "Error") level = LogLevel::Error;
+        else if (logLevel == "Critical") level = LogLevel::Critical;
+        else level = LogLevel::Info; // default
+        
+        auto consoleLogger = std::make_shared<ConsoleLogger>(level);
+        logger->addLogger(consoleLogger);
+        
+        if (!logFile.empty()) {
+            consoleLogger->setOutputFile(logFile);
+        }
+    }
+    
+    return 0;
+}
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

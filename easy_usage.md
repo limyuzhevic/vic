@@ -29,8 +29,8 @@ That's it! NLM simulates all of this.
 ```python
 import pynlm
 
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Step 1: Make a brain (simplified)
+brain = pynlm.createBrain()
 
 # Step 2: Turn it on
 brain.initialize()
@@ -48,10 +48,10 @@ print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 import pynlm
 
 # Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain = pynlm.createBrain()
 brain.initialize()
 
-world = pynlm.createSimpleWorld()
+world = pynlm.createWorld()
 world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
 world.reset()
 
@@ -157,9 +157,17 @@ agent.enableCuriosity(True)             # Explore new things
 
 ## What Each Part Does
 
+### `pynlm.createBrain()`
+Creates a virtual brain with neurons and synapses (using default configuration).
+
 ### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+Creates a virtual brain with neurons and synapses (with custom configuration).
+
+### `pynlm.createWorld()`
+Creates a new world environment for the brain to interact with.
+
+### `pynlm.createAgentBrain(brain)`
+Creates an agent brain interface that connects the brain to the world.
 
 ### `brain.initialize()`
 Starts up the brain. Always call this before using the brain!
@@ -170,11 +178,8 @@ Makes the brain process one moment in time. The brain:
 - Sends signals between connected neurons
 - Updates connections based on learning rules
 
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
+### `world.getSensoryPercept()`
+Gets sensory information (vision, touch, etc.) from the world.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
@@ -260,11 +265,11 @@ print("Agent simulation complete!")
 
 | What you want | Code |
 |--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
+| Create brain | `pynlm.createBrain()` or `pynlm.createBrain(config)` |
+| Create world | `pynlm.createWorld()` |
+| Create agent | `pynlm.createAgentBrain(brain)` |
 | Start brain | `brain.initialize()` |
 | Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |

@@ -1,8 +1,9 @@
-#include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,16 +20,33 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first (with nlohmann/json if available)
+    try {
+        // Check if file starts with { (likely JSON)
+        std::string firstLine;
+        std::getline(file, firstLine);
+        file.clear();
+        file.seekg(0);
+        
+        if (!firstLine.empty() && firstLine[0] == '{') {
+            // TODO: Implement JSON parsing with nlohmann/json library
+            // For now, fall back to simple parser
+            NLM_LOG_WARNING("JSON parsing not implemented yet, using simple parser");
+        }
+    } catch (...) {
+        // Fall back to simple parser
+    }
+    
+    // Simple key=value parser (original implementation)
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +66,74 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to parse value based on content
+            bool parsed = false;
+            
+            // Try integer
+            size_t numPos;
+            if ((numPos = value.find_first_not_of("0123456789")) == std::string::npos) {
+                try {
+                    long long intVal = std::stoll(value);
+                    set(key, intVal, ConfigSource::File);
+                    parsed = true;
+                } catch (...) {}
+            }
+            
+            // Try float
+            if (!parsed) {
+                try {
+                    double floatVal = std::stod(value);
+                    set(key, floatVal, ConfigSource::File);
+                    parsed = true;
+                } catch (...) {}
+            }
+            
+            // Try boolean
+            if (!parsed) {
+                if (value == "true" || value == "1" || value == "yes") {
+                    set(key, true, ConfigSource::File);
+                    parsed = true;
+                } else if (value == "false" || value == "0" || value == "no") {
+                    set(key, false, ConfigSource::File);
+                    parsed = true;
+                }
+            }
+            
+            // Try vector (comma-separated)
+            if (!parsed) {
+                if (value.find(',') != std::string::npos) {
+                    std::vector<double> vec;
+                    size_t start = 0;
+                    size_t commaPos;
+                    while ((commaPos = value.find(',', start)) != std::string::npos) {
+                        std::string numStr = value.substr(start, commaPos - start);
+                        try {
+                            double numVal = std::stod(numStr);
+                            vec.push_back(numVal);
+                        } catch (...) {}
+                        start = commaPos + 1;
+                    }
+                    // Last number
+                    if (start < value.size()) {
+                        std::string numStr = value.substr(start);
+                        try {
+                            double numVal = std::stod(numStr);
+                            vec.push_back(numVal);
+                        } catch (...) {}
+                    }
+                    if (!vec.empty()) {
+                        set(key, vec, ConfigSource::File);
+                        parsed = true;
+                    }
+                }
+            }
+            
+            // Fall back to string
+            if (!parsed) {
+                set(key, value, ConfigSource::File);
+            }
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": " + line);
         }
     }
     
@@ -56,6 +141,14 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    std::string configFile;
+    std::string logLevel = "";
+    std::string logFile = "";
+    int neuronCount = -1;
+    int regionCount = -1;
+    double timestep = -1.0;
+    int64_t seed = -1;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -75,6 +168,108 @@ bool Config::loadFromArgs(int argc, char** argv) {
             set(key, value, ConfigSource::CommandLine);
         }
     }
+    
+    // Process enhanced command line arguments with better parsing
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            // Help is handled in main.cpp, just skip
+            continue;
+        }
+        else if (arg == "--version") {
+            // Version is handled in main.cpp, just skip
+            continue;
+        }
+        else if (arg == "--show-config") {
+            // Handled in main.cpp
+            continue;
+        }
+        else if (arg == "--test-only") {
+            // Handled in main.cpp
+            continue;
+        }
+        else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+        else if (arg.substr(0, 6) == "--seed") {
+            if (arg.find('=') != std::string::npos) {
+                seed = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                seed = std::stoll(argv[++i]);
+            }
+        }
+        else if (arg.substr(0, 14) == "--neuron-count") {
+            if (arg.find('=') != std::string::npos) {
+                neuronCount = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                neuronCount = std::stoi(argv[++i]);
+            }
+        }
+        else if (arg.substr(0, 14) == "--region-count") {
+            if (arg.find('=') != std::string::npos) {
+                regionCount = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                regionCount = std::stoi(argv[++i]);
+            }
+        }
+        else if (arg.substr(0, 10) == "--timestep") {
+            if (arg.find('=') != std::string::npos) {
+                timestep = std::stod(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                timestep = std::stod(argv[++i]);
+            }
+        }
+        else if (arg.substr(0, 12) == "--log-level") {
+            if (arg.find('=') != std::string::npos) {
+                logLevel = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logLevel = argv[++i];
+            }
+        }
+        else if (arg.substr(0, 11) == "--log-file") {
+            if (arg.find('=') != std::string::npos) {
+                logFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logFile = argv[++i];
+            }
+        }
+        // Handle short options
+        else if (arg == "-c" && i + 1 < argc) {
+            configFile = argv[++i];
+        }
+        else if (arg == "-n" && i + 1 < argc) {
+            neuronCount = std::stoi(argv[++i]);
+        }
+        else if (arg == "-r" && i + 1 < argc) {
+            regionCount = std::stoi(argv[++i]);
+        }
+        else if (arg == "-t" && i + 1 < argc) {
+            timestep = std::stod(argv[++i]);
+        }
+    }
+    
+    // Apply enhanced overrides to config
+    if (neuronCount >= 0) {
+        set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::CommandLine);
+    }
+    if (regionCount >= 0) {
+        set("region_count", static_cast<int64_t>(regionCount), ConfigSource::CommandLine);
+    }
+    if (timestep > 0.0) {
+        set("simulation_timestep", timestep, ConfigSource::CommandLine);
+    }
+    if (seed >= 0) {
+        set("random_seed", seed, ConfigSource::CommandLine);
+    }
+    
+    // Set log level (this should be handled by the main logger)
+    // Log level configuration is now handled in main.cpp directly
+    
     return true;
 }
 
@@ -84,9 +279,43 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM on " << getCurrentTime() << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# " << entry.description << " (source: " << static_cast<int>(entry.source) << ")\n";
+        
+        // Format value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, double> || 
+                                std::is_same_v<T, float> ||
+                                std::is_same_v<T, int> ||
+                                std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                std::is_same_v<T, std::vector<double>> ||
+                                std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = ";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << arg[i] << "\"";
+                    } else {
+                        file << arg[i];
+                    }
+                }
+                file << "\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -193,10 +422,13 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+std::string Config::getCurrentTime() {
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
 }
 
 // Explicit template instantiations

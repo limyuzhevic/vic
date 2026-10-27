@@ -400,26 +400,79 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
+    // Create world with configuration
+    m.def("createWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new world");
+    
+    // Create agent brain interface
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
+    }, py::arg("brain"), "Create an agent brain interface");
+    
+    // Create sensory input
+    m.def("createVision", [](size_t width, size_t height, size_t channels) -> std::shared_ptr<Vision> {
+        return std::make_shared<Vision>(width, height, channels);
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3, "Create vision sensory input");
+    
+    m.def("createAudio", [](size_t sampleRate, size_t numSamples) -> std::shared_ptr<Audio> {
+        return std::make_shared<Audio>(sampleRate, numSamples);
+    }, py::arg("sampleRate"), py::arg("numSamples"), "Create audio sensory input");
+    
+    m.def("createInternalSignals", []() -> std::shared_ptr<InternalSignals> {
+        return std::make_shared<InternalSignals>();
+    }, "Create internal signals sensory input");
+    
+    // Get utility constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Add convenience functions for common scenarios
+    m.def("createDefaultConfigWithParameters", [](int64_t randomSeed, double timestep, 
+                                                   int64_t neuronCount, int64_t regionCount) {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", randomSeed, ConfigSource::Default);
+        config->set("simulation_timestep", timestep, ConfigSource::Default);
+        config->set("neuron_count", neuronCount, ConfigSource::Default);
+        config->set("region_count", regionCount, ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        return config;
+    }, py::arg("randomSeed") = 42, py::arg("timestep") = 0.001,
+       py::arg("neuronCount") = 100, py::arg("regionCount") = 1,
+       "Create a configuration with custom parameters");
+    
+    // Add function to run a simple demonstration
+    m.def("runBrainDemo", []() {
+        std::cout << "NLM Python Demo: Creating and running a simple brain..." << std::endl;
+        
+        // Create configuration
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(50), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        
+        // Create brain
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Run a few steps
+        for (int step = 0; step < 20; ++step) {
+            brain->step(step);
+            if (step % 5 == 0) {
+                std::cout << "  Step " << step << ": " << brain->getFiringNeuronCount() 
+                          << " firing neurons, " << brain->getTotalSpikeCount() 
+                          << " total spikes" << std::endl;
+            }
+        }
+        
+        std::cout << "Demo completed successfully!" << std::endl;
+        return brain;
+    }, "Run a simple brain demonstration");
 }
 
 } // namespace nlm
