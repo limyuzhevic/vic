@@ -326,19 +326,35 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
+    // Check if Phase 6 demo is being run separately (not through main.cpp)
+    bool runningPhase6Demo = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--phase6" || arg == "--phase6_demo" || arg == "--p6" || arg == "--experiment" && 
+            (i + 1 < argc && (argv[i + 1] == std::string("phase6") || 
+                              argv[i + 1] == std::string("p6") || 
+                              argv[i + 1] == std::string("phase6_demo")))) {
+            runningPhase6Demo = true;
+            break;
+        }
+    }
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    if (!runningPhase6Demo) {
+        std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+        
+        // Initialize logger
+        auto logger = std::make_shared<Logger>();
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        logger->addLogger(consoleLogger);
+        Logger::setGlobal(logger);
+        
+        NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+        NLM_LOG_INFO("Implementing:");
+        NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+        NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+        NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+        NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+        NLM_LOG_INFO("");
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -366,7 +382,86 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Determine which experiment to run based on command line arguments
+    bool runPhase2 = true;  // Default
+    bool runPhase3 = false;
+    bool runPhase4 = false;
+    bool runPhase5 = false;
+    bool runPhase6 = false;
+    
+    // Parse experiment mode from command line
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--phase2" || arg == "--phase2_demo" || arg == "--p2") {
+            runPhase2 = true;
+            runPhase3 = false;
+            runPhase4 = false;
+            runPhase5 = false;
+            runPhase6 = false;
+        } else if (arg == "--phase3" || arg == "--phase3_demo" || arg == "--p3") {
+            runPhase2 = false;
+            runPhase3 = true;
+            runPhase4 = false;
+            runPhase5 = false;
+            runPhase6 = false;
+        } else if (arg == "--phase4" || arg == "--phase4_demo" || arg == "--p4") {
+            runPhase2 = false;
+            runPhase3 = false;
+            runPhase4 = true;
+            runPhase5 = false;
+            runPhase6 = false;
+        } else if (arg == "--phase5" || arg == "--phase5_demo" || arg == "--p5") {
+            runPhase2 = false;
+            runPhase3 = false;
+            runPhase4 = false;
+            runPhase5 = true;
+            runPhase6 = false;
+        } else if (arg == "--phase6" || arg == "--phase6_demo" || arg == "--p6") {
+            runPhase2 = false;
+            runPhase3 = false;
+            runPhase4 = false;
+            runPhase5 = false;
+            runPhase6 = true;
+        } else if (arg == "--experiment") {
+            if (i + 1 < argc) {
+                std::string exp = argv[++i];
+                if (exp == "phase2" || exp == "p2") {
+                    runPhase2 = true;
+                    runPhase3 = false;
+                    runPhase4 = false;
+                    runPhase5 = false;
+                    runPhase6 = false;
+                } else if (exp == "phase3" || exp == "p3") {
+                    runPhase2 = false;
+                    runPhase3 = true;
+                    runPhase4 = false;
+                    runPhase5 = false;
+                    runPhase6 = false;
+                } else if (exp == "phase4" || exp == "p4") {
+                    runPhase2 = false;
+                    runPhase3 = false;
+                    runPhase4 = true;
+                    runPhase5 = false;
+                    runPhase6 = false;
+                } else if (exp == "phase5" || exp == "p5") {
+                    runPhase2 = false;
+                    runPhase3 = false;
+                    runPhase4 = false;
+                    runPhase5 = true;
+                    runPhase6 = false;
+                } else if (exp == "phase6" || exp == "p6") {
+                    runPhase2 = false;
+                    runPhase3 = false;
+                    runPhase4 = false;
+                    runPhase5 = false;
+                    runPhase6 = true;
+                }
+            }
+        }
+    }
+    
+    // Set default values for Phase 2 if not already set
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -409,20 +504,59 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run selected experiment based on command line arguments
+    if (runPhase2) {
+        NLM_LOG_INFO("\n=== RUNNING PHASE 2: BASIC NEURAL COMPUTATION ===\n");
+        runBasicConnectivityTest(brain);
+        brain->reset();
+        brain->initialize();
+        runPlasticityExperiment(brain);
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+        
+        NLM_LOG_INFO("\n=== Phase 2 Complete ===\n");
+        NLM_LOG_INFO("Phase 2 Objectives Completed:");
+        NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
+        NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
+        NLM_LOG_INFO("  ✓ STDP plasticity rule");
+        NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
+        NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
+        NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
+        NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+    } else if (runPhase3) {
+        NLM_LOG_INFO("\n=== RUNNING PHASE 3: SENSORY-MOTOR INTEGRATION ===\n");
+        NLM_LOG_INFO("Phase 3 demonstration - world interaction loop, reward prediction error");
+        // Phase 3 would be implemented here with world interaction, sensory input, motor output
+        NLM_LOG_INFO("Phase 3 not yet implemented in main.cpp (see nlm_phase3_demo executable)\n");
+    } else if (runPhase4) {
+        NLM_LOG_INFO("\n=== RUNNING PHASE 4: SOCIAL LEARNING AND PREDICTIVE PLANNING ===\n");
+        NLM_LOG_INFO("Phase 4 demonstration - predictive planning, social learning, self-model");
+        // Phase 4 would be implemented here with concept formation, predictive planning
+        NLM_LOG_INFO("Phase 4 not yet implemented in main.cpp (see nlm_phase4_demo executable)\n");
+    } else if (runPhase5) {
+        NLM_LOG_INFO("\n=== RUNNING PHASE 5: PERFORMANCE OPTIMIZATION AND CONTINUAL LEARNING ===\n");
+        NLM_LOG_INFO("Phase 5 demonstration - performance optimizations, memory pools, SIMD vectorization");
+        // Phase 5 would be implemented here with parallel processing, continual learning
+        NLM_LOG_INFO("Phase 5 not yet implemented in main.cpp (see nlm_phase5_demo executable)\n");
+    } else if (runPhase6) {
+        NLM_LOG_INFO("\n=== RUNNING PHASE 6: FINAL INTEGRATION DEMO ===\n");
+        // Phase 6 integration demo using Phase6Demo.cpp
+        NLM_LOG_INFO("Phase 6 integration test - verifying all systems are connected");
+        NLM_LOG_INFO("See nlm_phase6_demo executable for full integration test");
+        // For now, run a simplified Phase 6 integration test
+        NLM_LOG_INFO("Phase 6 integration test requires nlm_phase6_demo executable\n");
+        NLM_LOG_INFO("Run: ./nlm_phase6_demo\n");
+    } else {
+        NLM_LOG_INFO("\n=== DEFAULT: RUNNING PHASE 2 ===\n");
+        runBasicConnectivityTest(brain);
+        brain->reset();
+        brain->initialize();
+        runPlasticityExperiment(brain);
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -430,19 +564,7 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+    NLM_LOG_INFO("=== Experiment Complete ===");
     NLM_LOG_INFO("");
     
     return 0;

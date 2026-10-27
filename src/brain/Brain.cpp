@@ -258,6 +258,7 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);  // Initialize prediction error system
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -510,9 +511,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->predictionError) {
+        // The prediction system generates predictions based on learned temporal sequences
+        // and broadcasts prediction error as a neuromodulatory signal to guide learning
+        
+        // Example implementation would:
+        // 1. Get current sensory state (from sensory input)
+        // 2. Generate prediction for next state using learned temporal sequences
+        // 3. Compare prediction with actual observation
+        // 4. Compute prediction error magnitude and components
+        // 5. Broadcast prediction error as neuromodulation signal
+        // 6. Use prediction error to modulate plasticity (dopamine signal)
+        
+        // For now: Simple placeholder - use attention prediction as basic prediction
+        float prediction = 0.5f;  // Default prediction
+        if (pImpl->attention) {
+            prediction = pImpl->attention->getPrediction();
+        }
+        
+        // Compute prediction error using prediction error system
+        float actualValue = 0.5f;  // Would be actual sensory input
+        pImpl->predictionError->computeError(prediction, actualValue);
+        
+        // Apply prediction error as neuromodulation signal
+        // Higher prediction error increases dopaminergic signaling for learning
+        float predictionError = pImpl->predictionError->getError();
+        float neuromodulationLevel = std::abs(predictionError) * 2.0f;  // Scale error to neuromodulation range
+        
+        if (pImpl->dopamine) {
+            pImpl->dopamine->setLevel(neuromodulationLevel);
+        }
+        
+        // Store prediction in prediction system
+        pImpl->predictionSystem->getPredictionError();  // Access to trigger initialization
+    }
     }
     
     // ========== STEP 9: Update attention system ==========

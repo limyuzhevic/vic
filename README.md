@@ -72,15 +72,47 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
-
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Phase 5 Performance Demo
+
+```bash
+./nlm_phase5_demo
+```
+
+This runs the Phase 5 performance optimization and continual learning demonstration.
+
+### Phase 4 Social Learning Demo
+
+```bash
+./nlm_phase4_demo
+```
+
+This runs the Phase 4 social learning and predictive planning demonstration.
+
+### Phase 3 Sensory-Motor Demo
+
+```bash
+./nlm_phase3_demo
+```
+
+This runs the Phase 3 sensory-motor integration demonstration.
+
+### Phase 2 Basic Test (For backward compatibility)
+
+```bash
+./nlm
+```
+
+This runs the basic Phase 2 neural computation test.
 
 ## Project Structure
 
