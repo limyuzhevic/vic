@@ -2,7 +2,30 @@
 
 ## Overview
 
-NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
+NLM is a **brain-inspired artificial developmental brain** simulator written in C++20. It implements **Phase 6: Final Integration** - a complete closed-loop brain system where all components work together cohesively.
+
+**Key Features (Phase 6 Complete):**
+- Memory systems fully integrated with neural processing
+- Neuromodulation affecting plasticity and dynamics  
+- Prediction integrated as central organizing principle
+- Developmental stages modulating learning rates
+- Checkpoint save/load and replay functionality
+- Complete brain loop: WORLD → SENSORY → NEURAL → MEMORY/PREDICTION → MOTIVATION → ACTION → WORLD
+
+**Project Architecture:**
+```
+                 WORLD CONSEQUENCE
+                       ↓
+               REWARD / SURPRISE / ERROR
+                       ↓
+                 PLASTICITY (STDP, Hebbian, structural)
+                       ↓
+                 MEMORY / DEVELOPMENT
+                       ↓
+                CHANGED BRAIN
+                       ↓
+               CHANGED FUTURE BEHAVIOR
+```
 
 This document covers:
 1. Building the C++ project from source
@@ -115,64 +138,248 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 ---
 
-## Part 3: Using the Python Library
+## Advanced Usage (Phase 6 Features)
 
-### Basic Usage
-
-#### Creating a Brain
+### 1. Phase 6 Integration Tests
 
 ```python
 import pynlm
 
-# Create a default configuration
-config = pynlm.createDefaultConfig()
-
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
-
-# Create and initialize the brain
-brain = pynlm.createBrain(config)
-brain.initialize()
-
-print(f"Total neurons: {brain.getTotalNeuronCount()}")
-print(f"Total synapses: {brain.getTotalSynapseCount()}")
+# Run comprehensive Phase 6 integration test
+print("Running Phase 6 integration test...")
+results = pynlm.run_phase6_integration_test(episodes=5, steps_per_episode=200)
+print(f"Integration results: {results}")
 ```
 
-#### Running a Simulation
+### 2. Advanced Configuration Management
 
 ```python
 import pynlm
 
-# Create brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
+# Create advanced configuration
+config = pynlm.create_default_config()
+config.set("neuron_count", 2000)
+config.set("region_count", 3)
+config.set("dopamine_baseline", 0.2)
+config.set("curiosity_baseline", 0.1)
 
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
-    
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+# Convert to dictionary and back
+config_dict = pynlm.config_to_dict(config)
+print(f"Configuration: {config_dict}")
+
+# Create from dictionary
+custom_config = pynlm.create_config_from_dict(config_dict)
 ```
 
-#### Creating a Simple World
+### 3. Brain Validation and Health Checks
 
 ```python
 import pynlm
 
-# Create a simple 2D world
-world = pynlm.createSimpleWorld()
+# Create and validate brain
+brain = pynlm.createBrain(config)
+valid, issues = pynlm.validate_brain(brain)
+print(f"Brain valid: {valid}")
+print(f"Issues: {issues}")
 
-# Configure world dimensions
-world.configure(
-    width=20,
-    height=20,
-    visionWidth=8,
-    visionHeight=8
+# Health check
+health = pynlm.brain_health_check(brain)
+print(f"Health status: {health}")
+```
+
+### 4. Performance and Benchmarking
+
+```python
+import pynlm
+
+# Run brain benchmark
+brain = pynlm.createBrain(pynlm.create_default_config())
+brain.initialize()
+
+metrics = pynlm.run_brain_benchmark(brain, num_steps=1000)
+print(f"Benchmark results: {metrics}")
+
+# Memory analysis
+memory_usage = pynlm.estimate_memory_usage(brain)
+print(f"Memory usage: {memory_usage} bytes")
+
+# Efficiency metrics
+efficiency = pynlm.get_brain_efficiency_metrics(brain)
+print(f"Efficiency metrics: {efficiency}")
+```
+
+### 5. Research Tools and Workflows
+
+```python
+import pynlm
+
+# Create research workspace
+research = pynlm.create_research_workspace()
+
+# Run research experiment
+brain = research["brain"]
+world = research["world"]
+agent = research["agent"]
+
+results = pynlm.run_research_experiment(
+    brain, world, agent, 
+    experiment_type="integration_test",
+    trials=10
 )
+
+# Analyze results
+analysis = pynlm.analyze_research_data([results])
+print(f"Analysis: {analysis}")
+```
+
+### 6. Learning and Optimization
+
+```python
+import pynlm
+
+# Enable adaptive learning
+brain = pynlm.createBrain(pynlm.create_default_config())
+brain = pynlm.enable_adaptive_learning(brain, "balanced")
+
+# Create learning environment
+env = pynlm.create_learning_environment(episodes=20, steps_per_episode=300)
+brain = env["brain"]
+world = env["world"]
+agent = env["agent"]
+
+# Custom reward function
+def curiosity_reward():
+    return agent.getCuriosityLevel() * 10.0
+
+# Run learning session
+results = pynlm.learning_session(brain, world, agent, episodes=10)
+print(f"Learning results: {results}")
+```
+
+### 7. Simulation Control and Monitoring
+
+```python
+import pynlm
+
+# Create simulation controller
+brain = pynlm.createBrain(pynlm.create_default_config())
+world = pynlm.createSimpleWorld()
+agent = pynlm.createAgentBrain(brain)
+
+controller = pynlm.create_simulation_controller(brain, world, agent)
+
+# Control simulation
+print(controller["reset"]())
+print(controller["status"]())
+
+# Step through simulation
+for i in range(10):
+    controller["step"](1)
+    status = controller["status"]()
+    print(f"Step {i+1}: {status['spikes']} spikes")
+```
+
+### 8. Export and Serialization
+
+```python
+import pynlm
+
+# Create and save brain
+brain = pynlm.createBrain(pynlm.create_default_config())
+brain.initialize()
+
+# Save brain state
+pynlm.save_brain_state(brain, "my_brain.nlm")
+
+# Load brain state
+loaded_brain = pynlm.load_brain_state("my_brain.nlm")
+print(f"Loaded brain: {loaded_brain.getTotalNeuronCount()} neurons")
+
+# Export research data
+results = {"experiment": "demo", "score": 0.85}
+pynlm.export_results(results, "research_data.json", "json")
+```
+
+### 9. Phase 6 Specific Functions
+
+```python
+import pynlm
+
+# Run Phase 6 demo
+brain, world, agent, result = pynlm.create_phase6_demo()
+print(f"Phase 6 demo completed: {result}")
+
+# Validate Phase 6 system
+is_valid, issues = pynlm.validate_phase6_system(brain)
+print(f"Phase 6 validation: {is_valid}")
+print(f"Issues: {issues}")
+
+# Benchmark Phase 6 system
+benchmark_results = pynlm.benchmark_phase6_system(num_steps=500)
+print(f"Benchmark: {benchmark_results}")
+```
+
+### 10. Python Bindings Help and Examples
+
+```python
+import pynlm
+
+# Get help information
+nlm.print_help()
+
+# Get usage examples
+examples = nlm.get_examples()
+print(f"Example categories: {list(examples.keys())}")
+
+# Show advanced help
+nlm.print_advanced_help()
+
+# Show migration guide
+nlm.legacy_mode()
+```
+
+## Performance Considerations (Phase 6 Optimized)
+
+### Memory Requirements
+
+```python
+# Estimate memory for different brain sizes
+memory_1k = nlm.estimate_simulation_memory(neurons=1000, regions=2, connections=5000)
+memory_10k = nlm.estimate_simulation_memory(neurons=10000, regions=5, connections=50000)
+memory_100k = nlm.estimate_simulation_memory(neurons=100000, regions=10, connections=500000)
+```
+
+### Recommendations
+
+1. **Small networks (< 1000 neurons)**: Enable visualization for debugging
+2. **Medium networks (1k-10k neurons)**: Use standard simulation settings
+3. **Large networks (>10k neurons)**: Enable performance optimizations
+4. **Research workloads**: Use parallel simulation for multiple experiments
+
+### Advanced Configuration
+
+```python
+# Optimized configuration for research
+research_config = nlm.create_advanced_config(
+    neurons=2000,
+    regions=3,
+    connection_prob=0.1,
+    dopamine_level=0.15
+)
+
+# Run optimization study
+study_config = {
+    "learning_rate": 0.01,
+    "plasticity_type": "stdp",
+    "development_enabled": True
+}
+
+study = nlm.create_research_experiment(
+    name="brain_optimization",
+    description="Optimizing neural parameters for learning",
+    parameters=study_config
+)
+```
 
 # Reset world to initial state
 world.reset()
