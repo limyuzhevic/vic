@@ -545,4 +545,25 @@ void TemporalRelation::clear() {
     sequences_.clear();
 }
 
+void ConceptFormation::processActivityPattern(const std::vector<float>& pattern,
+                                              SimulationStep currentTime) {
+    // Convert neural activity pattern to features
+    std::vector<float> features = pattern;
+    
+    // Use current firing rate as reward signal (proxy for success)
+    float reward = 0.0f;
+    if (!brain_) return;
+    
+    size_t firingNeurons = brain_->getFiringNeuronCount();
+    size_t totalNeurons = brain_->getTotalNeuronCount();
+    
+    if (totalNeurons > 0) {
+        float firingRate = static_cast<float>(firingNeurons) / totalNeurons;
+        reward = firingRate * 2.0f - 1.0f;  // Convert to -1 to 1 range
+    }
+    
+    // Present this as an experience to the concept formation system
+    presentExperience(pattern, features, reward, currentTime);
+}
+
 } // namespace nlm
