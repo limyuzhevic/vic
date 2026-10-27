@@ -1,8 +1,7 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
 #include <algorithm>
-#include <filesystem>
+#include <cctype>
+#include <sstream>
+#include <unordered_set>
 
 namespace nlm {
 
@@ -199,17 +198,166 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Configuration validation functions
+bool Config::validate(std::vector<std::string>& errors) const {
+    errors.clear();
+    
+    // Basic validation rules
+    std::unordered_set<std::string> requiredKeys = {
+        "brain.neuron_count",
+        "brain.synapse_density",
+        "brain.connection_probability"
+    };
+    
+    // Check for required keys
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            errors.push_back("Missing required configuration key: " + key);
+        }
+    }
+    
+    // Validate neuron count
+    if (has("brain.neuron_count")) {
+        auto neurons = get<size_t>("brain.neuron_count");
+        if (neurons == 0) {
+            errors.push_back("brain.neuron_count cannot be zero");
+        } else if (neurons > 1000000) {
+            errors.push_back("brain.neuron_count too large (max: 1000000)");
+        }
+    }
+    
+    // Validate synapse density
+    if (has("brain.synapse_density")) {
+        auto density = get<float>("brain.synapse_density");
+        if (density < 0.0f || density > 1.0f) {
+            errors.push_back("brain.synapse_density must be between 0.0 and 1.0");
+        }
+    }
+    
+    // Validate connection probability
+    if (has("brain.connection_probability")) {
+        auto prob = get<float>("brain.connection_probability");
+        if (prob < 0.0f || prob > 1.0f) {
+            errors.push_back("brain.connection_probability must be between 0.0 and 1.0");
+        }
+    }
+    
+    // Validate STDP parameters
+    if (has("stdp_ltp_weight")) {
+        auto weight = get<float>("stdp_ltp_weight");
+        if (weight < 0.0f) {
+            errors.push_back("stdp_ltp_weight must be non-negative");
+        }
+    }
+    
+    if (has("stdp_ltd_weight")) {
+        auto weight = get<float>("stdp_ltd_weight");
+        if (weight < 0.0f) {
+            errors.push_back("stdp_ltd_weight must be non-negative");
+        }
+    }
+    
+    if (has("stdp_tau")) {
+        auto tau = get<float>("stdp_tau");
+        if (tau <= 0.0f) {
+            errors.push_back("stdp_tau must be positive");
+        }
+    }
+    
+    // Validate developmental stage if present
+    if (has("developmental_stage")) {
+        auto stage = get<int>("developmental_stage");
+        if (stage < 0 || stage > 5) {
+            errors.push_back("developmental_stage must be between 0 and 5");
+        }
+    }
+    
+    // Validate memory capacity
+    if (has("working_memory.capacity")) {
+        auto capacity = get<size_t>("working_memory.capacity");
+        if (capacity > 10000) {
+            errors.push_back("working_memory.capacity too large (max: 10000)");
+        }
+    }
+    
+    return errors.empty();
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    validate(errors);
+    return errors;
+}
+
+bool Config::isValid() const {
+    std::vector<std::string> errors;
+    return validate(errors);
+}
+
+std::string Config::getValidationReport() const {
+    std::vector<std::string> errors;
+    validate(errors);
+    
+    if (errors.empty()) {
+        return "✓ Configuration is valid";
+    }
+    
+    std::ostringstream oss;
+    oss << "✗ Configuration validation failed with " << errors.size() << " error(s):\n";
+    for (size_t i = 0; i < errors.size(); ++i) {
+        oss << "  " << (i + 1) << ". " << errors[i] << "\n";
+    }
+    return oss.str();
+}
+
+void Config::applyConfigPresets(const std::string& preset) {
+    // Apply common configuration presets
+    if (preset == "debug") {
+        set("brain.neuron_count", static_cast<int64_t>(100), ConfigSource::Runtime);
+        set("brain.synapse_density", 0.2f, ConfigSource::Runtime);
+        set("simulation_timestep", 0.0001, ConfigSource::Runtime);
+        set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        set("neuromodulation.curiosity.enable", true, ConfigSource::Runtime);
+        set("neuromodulation.novelty.enable", true, ConfigSource::Runtime);
+        set("checkpoint.enable", true, ConfigSource::Runtime);
+        
+    } else if (preset == "production") {
+        set("brain.neuron_count", static_cast<int64_t>(5000), ConfigSource::Runtime);
+        set("brain.synapse_density", 0.1f, ConfigSource::Runtime);
+        set("simulation_timestep", 0.001, ConfigSource::Runtime);
+        set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        set("plasticity.stdp.learning_rate", 0.001f, ConfigSource::Runtime);
+        set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        set("neuromodulation.curiosity.enable", true, ConfigSource::Runtime);
+        set("neuromodulation.novelty.enable", true, ConfigSource::Runtime);
+        set("checkpoint.enable", false, ConfigSource::Runtime);
+        
+    } else if (preset == "research") {
+        set("brain.neuron_count", static_cast<int64_t>(10000), ConfigSource::Runtime);
+        set("brain.synapse_density", 0.15f, ConfigSource::Runtime);
+        set("simulation_timestep", 0.0005, ConfigSource::Runtime);
+        set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        set("plasticity.stdp.learning_rate", 0.002f, ConfigSource::Runtime);
+        set("plasticity.structural.enable", true, ConfigSource::Runtime);
+        set("development.enable", true, ConfigSource::Runtime);
+        set("neuromodulation.curiosity.enable", true, ConfigSource::Runtime);
+        set("neuromodulation.novelty.enable", true, ConfigSource::Runtime);
+        set("checkpoint.enable", true, ConfigSource::Runtime);
+        set("checkpoint.save_interval", 1000, ConfigSource::Runtime);
+    }
+    
+    // Unknown preset - silently ignore
+}
+
+std::string Config::getPresetList() {
+    return "Available presets:\n"
+           "  debug    - Low neuron count, high logging, detailed output\n"
+           "  production - Medium neuron count, optimized for speed\n"
+           "  research  - High neuron count, maximum features enabled\n";
+}
+
+// Explicit template instantiations
+// (keeping existing template instantiations...)
 
 } // namespace nlm

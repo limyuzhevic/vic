@@ -416,6 +416,111 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    // Enhanced createBrain with validation and convenience methods
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        return std::make_shared<Brain>(config);
+    }, "Create a new brain with default configuration");
+
+    // Enhanced createSimpleWorld with configuration options
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createSimpleWorld", 
+        [](size_t width, size_t height, size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+       "Create a new simple world with specified dimensions");
+
+    // Enhanced createAgentBrain with validation
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Convenience functions for common simulation patterns
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, size_t steps) {
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+    }, py::arg("brain"), py::arg("steps"), "Run a simple simulation for given steps");
+
+    m.def("runAgentSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                 std::shared_ptr<AgentBrain> agent, size_t steps) {
+        for (size_t i = 0; i < steps; ++i) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(i);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run a complete agent simulation with brain, world, and agent");
+
+    // Advanced debugging and analysis functions
+    m.def("analyzeBrainState", [](std::shared_ptr<Brain> brain) {
+        std::string result;
+        result += "Brain Analysis:\n";
+        result += "  Total Neurons: " + std::to_string(brain->getTotalNeuronCount()) + "\n";
+        result += "  Total Synapses: " + std::to_string(brain->getTotalSynapseCount()) + "\n";
+        result += "  Active Neurons: " + std::to_string(brain->getActiveNeuronCount()) + "\n";
+        result += "  Firing Neurons: " + std::to_string(brain->getFiringNeuronCount()) + "\n";
+        result += "  Average Firing Rate: " + std::to_string(brain->getAverageFiringRate()) + "\n";
+        result += "  E/I Ratio: " + std::to_string(brain->getExcitationInhibitionRatio()) + "\n";
+        return result;
+    }, py::arg("brain"), "Analyze and return detailed brain state information");
+
+    // Configuration utilities
+    m.def("getDefaultConfigTemplate", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set reasonable default values for key parameters
+        config->set("brain.neuron_count", static_cast<int64_t>(1000));
+        config->set("brain.synapse_density", 0.1f);
+        config->set("brain.connection_probability", 0.05f);
+        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("simulation_timestep", 0.001);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("stdp_tau", 20.0f);
+        
+        return config;
+    }, "Create a configuration with sensible default values");
+
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        std::vector<std::string> errors;
+        
+        // Basic validation
+        if (config->has("brain.neuron_count")) {
+            auto neurons = config->get<size_t>("brain.neuron_count");
+            if (neurons == 0) {
+                errors.push_back("brain.neuron_count cannot be zero");
+            } else if (neurons > 1000000) {
+                errors.push_back("brain.neuron_count too large (max: 1000000)");
+            }
+        }
+        
+        if (config->has("brain.synapse_density")) {
+            auto density = config->get<float>("brain.synapse_density");
+            if (density < 0.0f || density > 1.0f) {
+                errors.push_back("brain.synapse_density must be between 0.0 and 1.0");
+            }
+        }
+        
+        return errors;
+    }, py::arg("config"), "Validate configuration and return list of errors");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

@@ -333,18 +333,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // Optimized: Pre-fetch population references and iterate more efficiently
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+        auto& populations = region->getPopulations();
+        for (auto& pop : populations) {
+            auto& neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // Optimized: Pre-fetch region data and reduce redundant lookups
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            for (auto* neuron : pop->getNeurons()) {
+        auto& populations = region->getPopulations();
+        for (auto& pop : populations) {
+            auto& neurons = pop->getNeurons();
+            for (auto* neuron : neurons) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
                 bool justFired = (state.firingState == FiringState::Refractory &&
@@ -446,8 +452,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
+    // Optimized: Pre-fetch synapses to reduce redundant container lookups
     for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
+        const auto& synapses = region->getSynapses();
+        for (auto* syn : synapses) {
+            if (!syn) continue; // Safety check for null synapses
+            
             // Apply STDP with neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
@@ -598,7 +608,8 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
-    // Distribute input across sensory neurons
+    // Optimized: Pre-fetch neurons and values for better cache locality
+    const auto& neurons = pImpl->sensoryNeurons;
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
@@ -606,20 +617,26 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
         
+        // Safety check for null neuron
+        if (!neurons[i]) continue;
+        
         // Inject current into this sensory neuron
-        pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
+        neurons[i]->injectCurrent(normalizedValue);
         
         // Also store in working memory
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+            pImpl->workingMemory->storeToNeuron(neurons[i]->getId(), normalizedValue / 10.0f);
         }
     }
 }
+}
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    // Optimized: Pre-fetch regions to reduce container lookups
     for (auto& region : pImpl->regions) {
-        auto neurons = region->getAllNeurons();
-        for (auto* n : neurons) {
+        const auto& allNeurons = region->getAllNeurons();
+        for (const auto* n : allNeurons) {
+            if (!n) continue; // Safety check for null neuron
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
                 return;
@@ -629,10 +646,14 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // Optimized: Pre-fetch regions and populations to reduce container lookups
     for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
+        const auto& populations = region->getPopulations();
+        for (const auto& pop : populations) {
             if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
+                const auto& neurons = pop->getNeurons();
+                for (const auto* neuron : neurons) {
+                    if (!neuron) continue; // Safety check for null neuron
                     neuron->injectCurrent(current);
                 }
             }
@@ -664,8 +685,11 @@ float Brain::getExcitationInhibitionRatio() const {
     float totalExcitatory = 0.0f;
     float totalInhibitory = 0.0f;
     
+    // Optimized: Pre-fetch regions to reduce container lookups
     for (const auto& region : pImpl->regions) {
-        for (const auto& syn : region->getSynapses()) {
+        const auto& synapses = region->getSynapses();
+        for (const auto* syn : synapses) {
+            if (!syn) continue; // Safety check for null synapse
             float weight = syn->getWeight();
             if (weight > 0) {
                 totalExcitatory += weight;
@@ -697,9 +721,11 @@ std::unique_ptr<class Action> Brain::produceAction() {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
+    // Optimized: Pre-fetch neurons and use range-based for loop
     size_t firingMotor = 0;
-    for (auto* neuron : pImpl->motorNeurons) {
+    const auto& neurons = pImpl->motorNeurons;
+    for (const auto* neuron : neurons) {
+        if (!neuron) continue; // Safety check for null neuron
         if (neuron->isFiring()) {
             ++firingMotor;
         }

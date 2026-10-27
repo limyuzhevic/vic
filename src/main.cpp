@@ -343,10 +343,19 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Enhanced command-line argument parsing with more options
     std::string configFile = "configs/default.cfg";
+    std::string preset = "";
+    bool validateOnly = false;
+    bool debugMode = false;
+    bool performanceMode = false;
+    std::string checkpointFile = "";
+    size_t maxSteps = 0;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        
+        // Configuration file
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
@@ -354,17 +363,47 @@ int main(int argc, char** argv) {
                 configFile = argv[++i];
             }
         }
+        // Preset
+        else if (arg.substr(0, 10) == "--preset=") {
+            preset = arg.substr(10);
+        }
+        // Validate only
+        else if (arg == "--validate") {
+            validateOnly = true;
+        }
+        // Debug mode
+        else if (arg == "--debug") {
+            debugMode = true;
+        }
+        // Performance mode
+        else if (arg == "--performance") {
+            performanceMode = true;
+        }
+        // Checkpoint file
+        else if (arg.substr(0, 12) == "--checkpoint=") {
+            checkpointFile = arg.substr(12);
+        }
+        // Max steps
+        else if (arg.substr(0, 12) == "--max-steps=") {
+            maxSteps = std::stoull(arg.substr(12));
+        }
     }
     
-    // Load config from file (ignore if not found)
+    // Load configuration with enhanced error handling
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration (file not found: " + configFile + ")");
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Apply preset if specified
+    if (!preset.empty()) {
+        config->applyConfigPresets(preset);
+        NLM_LOG_INFO("Applied configuration preset: " + preset);
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -382,6 +421,19 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Performance optimizations
+    if (performanceMode) {
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Runtime);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Runtime);
+        NLM_LOG_INFO("Performance mode enabled - increased simulation size");
+    }
+    
+    // Set max steps if specified
+    if (maxSteps > 0) {
+        config->set("max_steps", static_cast<int64_t>(maxSteps), ConfigSource::Runtime);
+        NLM_LOG_INFO("Max steps set to: " + std::to_string(maxSteps));
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -390,17 +442,24 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
     
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
+    // Validate configuration if requested
+    if (validateOnly) {
+        std::cout << "=== CONFIGURATION VALIDATION ===" << std::endl;
+        std::cout << "Validating configuration..." << std::endl;
+        
+        std::vector<std::string> errors;
+        if (config->validate(errors)) {
+            std::cout << "✓ Configuration is valid" << std::endl;
+        } else {
+            std::cout << "✗ Configuration validation failed:" << std::endl;
+            for (const auto& error : errors) {
+                std::cout << "  - " << error << std::endl;
+            }
+            std::cout << "\nUse --show-presets to see available configuration presets." << std::endl;
+            return 1;
+        }
+    }
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");

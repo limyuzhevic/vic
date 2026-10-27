@@ -252,7 +252,10 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
+        const auto& synapses = region->getSynapses();
+        for (auto* syn : synapses) {
+            if (!syn) continue; // Safety check for null synapses
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {

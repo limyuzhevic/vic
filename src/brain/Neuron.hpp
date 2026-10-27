@@ -52,19 +52,19 @@ public:
     // Disable copying, enable moving
     Neuron(const Neuron&) = delete;
     Neuron& operator=(const Neuron&) = delete;
-    Neuron(Neuron&&) noexcept;
-    Neuron& operator=(Neuron&&) noexcept;
+    Neuron(Neuron&&) noexcept = default;
+    Neuron& operator=(Neuron&&) noexcept = default;
     
     // Identity
-    NeuronId getId() const;
+    NeuronId getId() const noexcept;
     
     // Type
     NeuronType getType() const;
     void setType(NeuronType type);
     
     // State access
-    const NeuronState& getState() const;
-    NeuronState& getState();
+    const NeuronState& getState() const noexcept;
+    NeuronState& getState() noexcept;
     
     // Membrane potential
     MembranePotential getMembranePotential() const;
@@ -145,7 +145,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
