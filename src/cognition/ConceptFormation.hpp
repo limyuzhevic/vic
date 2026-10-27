@@ -147,6 +147,33 @@ private:
     // Update concept prototype using Hebbian averaging
     void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
 
+// Enhanced concept formation methods
+    bool checkNoveltyAtMultipleScales(const std::vector<float>& pattern) const;
+    
+    // Temporary concept management
+    size_t getOrCreateTemporaryConcept(const std::vector<float>& pattern,
+                                       const std::vector<float>& features,
+                                       float reward,
+                                       SimulationStep currentTime);
+    
+    // Advanced concept updating with temporal weighting
+    void updateConceptWithTemporalWeighting(size_t conceptId,
+                                            const std::vector<float>& newPattern,
+                                            const std::vector<float>& features,
+                                            float reward,
+                                            SimulationStep currentTime);
+    
+    // Advanced Hebbian learning for prototype updates
+    void updatePrototypeWithHebbianLearning(size_t conceptId,
+                                            const std::vector<float>& newPattern,
+                                            float temporalWeight);
+    
+    // Update concept category hints based on experience
+    void updateCategoryHint(size_t conceptId, float reward, float temporalWeight);
+    
+    // Check for and merge similar concepts
+    void checkAndMergeSimilarConcepts(size_t conceptId);
+
     // Check if concept is stable enough to be considered "discovered"
     bool isConceptStable(size_t conceptId) const;
 
@@ -156,7 +183,7 @@ private:
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
-    
+
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable

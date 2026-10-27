@@ -125,9 +125,9 @@ public:
     void replaySequence(const std::vector<size_t>& episodeIds);
 
 private:
-    // Compute similarity between query and stored episode
-    float computeSimilarity(const std::vector<float>& query,
-                          const EpisodicMemoryItem& episode) const;
+    // Compute enhanced similarity with temporal and contextual modulation
+    float computeEnhancedSimilarity(const std::vector<float>& query,
+                                   const EpisodicMemoryItem& episode) const;
 
     // Check if episode matches criteria
     bool matchesCriteria(const EpisodicMemoryItem& episode,

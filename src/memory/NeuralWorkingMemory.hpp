@@ -75,8 +75,8 @@ public:
     float getMemoryActivity() const;
 
 private:
-    // Create recurrent connection for maintenance
-    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
+    // Create intelligent maintenance connections based on activation patterns
+    void createIntelligentMaintenanceConnections(float strength);
 
     // Update recurrent connections for maintenance
     void updateRecurrentConnections();
