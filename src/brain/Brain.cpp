@@ -178,9 +178,57 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
     // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
+    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 500);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.15f);
+    
+    // Advanced configuration options
+    float plasticityLearningRate = pImpl->config->getOr<float>("plasticity_learning_rate", 0.01f);
+    float stdpLtpWeight = pImpl->config->getOr<float>("stdp_ltp_weight", 0.02f);
+    float stdpLtdWeight = pImpl->config->getOr<float>("stdp_ltd_weight", 0.015f);
+    float stdpTimeConstant = pImpl->config->getOr<float>("stdp_time_constant", 20.0f);
+    float synaptogenesisRate = pImpl->config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    float pruningRate = pImpl->config->getOr<float>("pruning_rate", 0.00001f);
+    
+    // Neuromodulation settings
+    float dopamineBaseline = pImpl->config->getOr<float>("dopamine_baseline", 0.1f);
+    float rewardDiscountFactor = pImpl->config->getOr<float>("reward_discount_factor", 0.99f);
+    
+    // Advanced NLM Phase 2 configuration options
+    size_t replayInterval = pImpl->config->getOr<size_t>("replay_interval", 100);
+    size_t consolidationInterval = pImpl->config->getOr<size_t>("consolidation_interval", 1000);
+    float consolidationThreshold = pImpl->config->getOr<float>("consolidation_threshold", 0.3f);
+    
+    // Attention and cognition settings
+    float attentionInhibitionStrength = pImpl->config->getOr<float>("attention_inhibition_strength", 0.5f);
+    float attentionExcitationStrength = pImpl->config->getOr<float>("attention_excitation_strength", 1.5f);
+    float attentionDecayRate = pImpl->config->getOr<float>("attention_decay_rate", 0.95f);
+    int planningDepth = pImpl->config->getOr<int>("planning_depth", 5);
+    float conceptFormationThreshold = pImpl->config->getOr<float>("concept_formation_threshold", 0.7f);
+    
+    // Development system settings
+    float developmentalMaturationRate = pImpl->config->getOr<float>("maturation_rate", 0.01f);
+    float plasticityDecayRate = pImpl->config->getOr<float>("plasticity_decay_rate", 0.95f);
+    
+    // Neuromodulation system settings
+    float dopaminePlasticityFactor = pImpl->config->getOr<float>("dopamine_plasticity_factor", 1.0f);
+    float curiosityExplorationRate = pImpl->config->getOr<float>("curiosity_exploration_rate", 0.5f);
+    float noveltyThreshold = pImpl->config->getOr<float>("novelty_threshold", 0.1f);
+    float predictionErrorDecay = pImpl->config->getOr<float>("prediction_error_decay", 0.99f);
+    
+    // Memory system settings
+    size_t workingMemoryCapacity = pImpl->config->getOr<size_t>("working_memory_capacity", 50);
+    size_t episodicMemoryMaxEpisodes = pImpl->config->getOr<size_t>("episodic_memory_max_episodes", 1000);
+    float associativeMemoryDecay = pImpl->config->getOr<float>("associative_memory_decay", 0.9f);
+    
+    // Spike system settings
+    size_t spikeSystemMaxDelay = pImpl->config->getOr<size_t>("spike_system_max_delay", 100);
+    float spikeSystemReuseThreshold = pImpl->config->getOr<float>("spike_system_reuse_threshold", 0.1f);
+    
+    // Checkpoint settings
+    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+    size_t checkpointInterval = pImpl->config->getOr<size_t>("checkpoint_interval", 1000);
+    bool checkpointCompression = pImpl->config->getOr<bool>("checkpoint_compression", true);
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
@@ -229,15 +277,13 @@ bool Brain::initialize() {
         }
     }
     
-    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
-    
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    pImpl->workingMemory->setCapacity(workingMemoryCapacity);
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    pImpl->episodicMemory->setMaxEpisodes(episodicMemoryMaxEpisodes);
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
@@ -247,13 +293,13 @@ bool Brain::initialize() {
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    pImpl->planner->setPlanningDepth(planningDepth);
     
     pImpl->conceptFormation->initialize(this);
     
     pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    pImpl->attention->setInhibitionStrength(attentionInhibitionStrength);
+    pImpl->attention->setExcitationStrength(attentionExcitationStrength);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -287,8 +333,7 @@ bool Brain::initialize() {
     });
     
     // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    pImpl->checkpointManager->configure(checkpointDir, checkpointInterval, 5, checkpointCompression);
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
