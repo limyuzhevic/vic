@@ -97,6 +97,12 @@ struct Brain::Impl {
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
+            // Validate seed is not zero (while zero is technically valid, log a warning)
+            if (seed == 0) {
+                NLM_LOG_WARNING("Random seed is zero, results may be predictable");
+            }
+        } else {
+            NLM_LOG_WARNING("Random seed not found in config, using default 42");
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
@@ -130,24 +136,63 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
+        // Configure STDP parameters with validation
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
+        
+        // Validate STDP parameters
+        if (ltpWeight < 0.0f || ltpWeight > 1.0f) {
+            NLM_LOG_WARNING("STDP LTP weight " + std::to_string(ltpWeight) + " out of range [0.0, 1.0], clamping");
+            ltpWeight = std::clamp(ltpWeight, 0.0f, 1.0f);
+        }
+        if (ltdWeight < 0.0f || ltdWeight > 1.0f) {
+            NLM_LOG_WARNING("STDP LTD weight " + std::to_string(ltdWeight) + " out of range [0.0, 1.0], clamping");
+            ltdWeight = std::clamp(ltdWeight, 0.0f, 1.0f);
+        }
+        if (tau <= 0.0f) {
+            NLM_LOG_WARNING("STDP tau " + std::to_string(tau) + " must be positive, using default");
+            tau = 20.0f;
+        }
+        
         stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Configure structural plasticity
+        // Configure structural plasticity with validation
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+        
+        // Validate structural plasticity parameters
+        if (synaptogenesisRate < 0.0f || synaptogenesisRate > 1.0f) {
+            NLM_LOG_WARNING("Synaptogenesis rate " + std::to_string(synaptogenesisRate) + " out of range [0.0, 1.0], clamping");
+            synaptogenesisRate = std::clamp(synaptogenesisRate, 0.0f, 1.0f);
+        }
+        if (pruningRate < 0.0f || pruningRate > 1.0f) {
+            NLM_LOG_WARNING("Pruning rate " + std::to_string(pruningRate) + " out of range [0.0, 1.0], clamping");
+            pruningRate = std::clamp(pruningRate, 0.0f, 1.0f);
+        }
+        
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
         
-        // Get timestep
+        // Get timestep with validation
         timestep = config->getOr<double>("simulation_timestep", 0.001);
+        if (timestep <= 0.0 || timestep > 1.0) {
+            NLM_LOG_WARNING("Simulation timestep " + std::to_string(timestep) + " out of range (0.0, 1.0], using default 0.001");
+            timestep = 0.001;
+        }
         
-        // Get integration intervals from config
+        // Get integration intervals from config with validation
         replayInterval = config->getOr<size_t>("replay_interval", 100);
+        if (replayInterval == 0 || replayInterval > 10000) {
+            NLM_LOG_WARNING("Replay interval " + std::to_string(replayInterval) + " invalid, using default 100");
+            replayInterval = 100;
+        }
+        
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        if (consolidationInterval == 0 || consolidationInterval > 100000) {
+            NLM_LOG_WARNING("Consolidation interval " + std::to_string(consolidationInterval) + " invalid, using default 1000");
+            consolidationInterval = 1000;
+        }
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -167,7 +212,9 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {  // Check if pImpl is not null before deleting
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -181,6 +228,22 @@ bool Brain::initialize() {
     size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
     size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    
+    // Validate configuration parameters
+    if (neuronCount == 0 || neuronCount > 100000) {
+        NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(neuronCount) + ". Must be between 1 and 100000.");
+        return false;
+    }
+    
+    if (regionCount == 0 || regionCount > 1000) {
+        NLM_LOG_ERROR("Invalid region count: " + std::to_string(regionCount) + ". Must be between 1 and 1000.");
+        return false;
+    }
+    
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_WARNING("Connection probability " + std::to_string(connectionProbability) + " out of range [0.0, 1.0], clamping");
+        connectionProbability = std::clamp(connectionProbability, 0.0f, 1.0f);
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");

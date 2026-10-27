@@ -15,9 +15,9 @@ struct Synapse::Impl {
     // Synapse type
     SynapseType type;
     
-    // Spike history for STDP
-    std::vector<Timestamp> preSpikeHistory;
-    std::vector<Timestamp> postSpikeHistory;
+    // Spike history for STDP - using circular buffer for O(1) operations
+    SpikeHistory preSpikeHistory;
+    SpikeHistory postSpikeHistory;
     
     // Plasticity state
     PlasticityFlags plasticityFlags;
@@ -70,7 +70,9 @@ Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {  // Check if pImpl is not null before deleting
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -128,28 +130,25 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
-    }
+    std::lock_guard<std::mutex> lock(pImpl->mutex_);  // Thread safety
+    pImpl->preSpikeHistory.recordSpike(timestamp);
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
-    }
+    std::lock_guard<std::mutex> lock(pImpl->mutex_);  // Thread safety
+    pImpl->postSpikeHistory.recordSpike(timestamp);
 }
 
-const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
+const SpikeHistory& Synapse::getPreSpikeHistory() const {
     return pImpl->preSpikeHistory;
 }
 
-const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
+const SpikeHistory& Synapse::getPostSpikeHistory() const {
     return pImpl->postSpikeHistory;
 }
 
 void Synapse::clearHistory() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex_);  // Thread safety
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
 }
@@ -235,20 +234,42 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     if (pImpl->type == SynapseType::Excitatory) {
         // Excitatory synapses: small positive weights
         pImpl->weight = rng.uniformReal(0.1f, 0.4f);
+        // Validate weight bounds
+        if (pImpl->weight < Impl::MIN_WEIGHT || pImpl->weight > Impl::MAX_WEIGHT) {
+            pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+        }
         // Excitatory synapses have moderate initial efficacy
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        // Validate efficacy bounds
+        pImpl->efficacy = std::clamp(pImpl->efficacy, 0.0f, 2.0f);
     } else if (pImpl->type == SynapseType::Inhibitory) {
         // Inhibitory synapses: negative weights
         pImpl->weight = -rng.uniformReal(0.1f, 0.4f);
+        // Validate weight bounds
+        if (pImpl->weight < Impl::MIN_WEIGHT || pImpl->weight > Impl::MAX_WEIGHT) {
+            pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+        }
         pImpl->efficacy = rng.uniformReal(0.8f, 1.0f);
+        // Validate efficacy bounds
+        pImpl->efficacy = std::clamp(pImpl->efficacy, 0.0f, 2.0f);
     } else {
         // Other types: small random weights
         pImpl->weight = rng.uniformReal(-0.1f, 0.1f);
+        // Validate weight bounds
+        if (pImpl->weight < Impl::MIN_WEIGHT || pImpl->weight > Impl::MAX_WEIGHT) {
+            pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+        }
         pImpl->efficacy = rng.uniformReal(0.9f, 1.0f);
+        // Validate efficacy bounds
+        pImpl->efficacy = std::clamp(pImpl->efficacy, 0.0f, 2.0f);
     }
     
     // Random delay: 1-5 steps (1-5ms at 1ms timestep)
     pImpl->delay = static_cast<Delay>(rng.uniformInt(1, 5));
+    // Validate delay is positive
+    if (pImpl->delay < 1) {
+        pImpl->delay = 1;
+    }
     
     // Initialize short-term plasticity state
     pImpl->shortTermDepression = 1.0f;  // Fully recovered
