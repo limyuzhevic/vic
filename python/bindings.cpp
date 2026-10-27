@@ -388,17 +388,104 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // ========== MEMORY SYSTEMS ==========
+
+    // Working memory access
+    .def("getWorkingMemory", &Brain::getWorkingMemory,
+         py::return_value_policy::reference_internal,
+         "Get working memory system")
+    .def("getNeuralWorkingMemory", &Brain::getNeuralWorkingMemory,
+         py::return_value_policy::reference_internal,
+         "Get neural working memory system")
+    
+    // Episodic memory access
+    .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+         py::return_value_policy::reference_internal,
+         "Get episodic memory system")
+    .def("getNeuralEpisodicMemory", &Brain::getNeuralEpisodicMemory,
+         py::return_value_policy::reference_internal,
+         "Get neural episodic memory system")
+    
+    // Associative memory access
+    .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+         py::return_value_policy::reference_internal,
+         "Get associative memory system")
+    
+    // Get memory statistics
+    .def("getMemoryStats", [](Brain& brain) {
+        std::map<std::string, std::string> stats;
+        auto* wm = brain.getWorkingMemory();
+        if (wm) stats["working_memory_traces"] = std::to_string(wm->getActiveTraces());
+        
+        auto* em = brain.getEpisodicMemory();
+        if (em) stats["episodic_memory_episodes"] = std::to_string(em->getEpisodeCount());
+        
+        auto* am = brain.getAssociativeMemory();
+        if (am) stats["associative_memory_patterns"] = std::to_string(am->getPatternCount());
+        
+        return stats;
+    }, "Get memory system statistics");
+
+    // Development system access
+    .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+         py::return_value_policy::reference_internal,
+         "Get development system")
+    .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+         "Get current developmental stage")
+    .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+         py::arg("stage"),
+         "Set developmental stage")
+    
+    // Neuromodulation systems access
+    .def("getDopamine", &Brain::getDopamine,
+         py::return_value_policy::reference_internal,
+         "Get dopamine system")
+    .def("getCuriosity", &Brain::getCuriosity,
+         py::return_value_policy::reference_internal,
+         "Get curiosity system")
+    .def("getNovelty", &Brain::getNovelty,
+         py::return_value_policy::reference_internal,
+         "Get novelty system")
+    .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+         py::return_value_policy::reference_internal,
+         "Get prediction error signal system")
+    
+    // Get system statistics
+    .def("getSystemStats", [](Brain& brain) {
+        std::map<std::string, std::string> stats;
+        stats["total_neurons"] = std::to_string(brain.getTotalNeuronCount());
+        stats["total_synapses"] = std::to_string(brain.getTotalSynapseCount());
+        stats["firing_neurons"] = std::to_string(brain.getFiringNeuronCount());
+        stats["total_spikes"] = std::to_string(brain.getTotalSpikeCount());
+        stats["avg_firing_rate"] = std::to_string(brain.getAverageFiringRate());
+        stats["e/i_ratio"] = std::to_string(brain.getExcitationInhibitionRatio());
+        
+        auto* wm = brain.getWorkingMemory();
+        if (wm) stats["working_memory_traces"] = std::to_string(wm->getActiveTraces());
+        
+        auto* em = brain.getEpisodicMemory();
+        if (em) stats["episodic_memory_episodes"] = std::to_string(em->getEpisodeCount());
+        
+        auto* dev = brain.getDevelopmentSystem();
+        if (dev) stats["developmental_stage"] = std::to_string(static_cast<int>(brain.getDevelopmentalStage()));
+        
+        auto* dop = brain.getDopamine();
+        if (dop) stats["dopamine_level"] = std::to_string(dop->getLevel());
+        
+        return stats;
+    }, "Get comprehensive system statistics");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

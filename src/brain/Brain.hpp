@@ -137,13 +137,19 @@ public:
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
     
-    // ========== MEMORY SYSTEMS ==========
-    
+// ========== MEMORY SYSTEMS ==========
+
     // Working memory - transient active information
     NeuralWorkingMemory* getWorkingMemory();
     
+    // Neural-based working memory (persistent activity)
+    NeuralWorkingMemory* getNeuralWorkingMemory();
+    
     // Episodic memory - experience storage
     NeuralEpisodicMemory* getEpisodicMemory();
+    
+    // Neural-based episodic memory (experience storage)
+    NeuralEpisodicMemory* getNeuralEpisodicMemory();
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();

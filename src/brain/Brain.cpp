@@ -1009,7 +1009,15 @@ NeuralWorkingMemory* Brain::getWorkingMemory() {
     return pImpl->workingMemory.get();
 }
 
+NeuralWorkingMemory* Brain::getNeuralWorkingMemory() {
+    return pImpl->workingMemory.get();
+}
+
 NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    return pImpl->episodicMemory.get();
+}
+
+NeuralEpisodicMemory* Brain::getNeuralEpisodicMemory() {
     return pImpl->episodicMemory.get();
 }
 
