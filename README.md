@@ -72,15 +72,77 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
-
 ## Running
 
 ### Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
 This runs a comprehensive integration test verifying all brain systems are connected.
+
+### Python Module
+
+NLM now includes comprehensive Python bindings:
+
+```bash
+python3 examples.py
+```
+
+Run the examples to see the Python API in action.
+
+## Python Module
+
+NLM now includes comprehensive Python bindings for easier experimentation and research:
+
+### Quick Start
+
+```python
+from pynlm import createBrain, createDefaultConfig, createSimpleWorld, createAgentBrain
+
+# Create brain
+config = createDefaultConfig()
+brain = createBrain(config)
+brain.initialize()
+
+# Create world and agent
+world = createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = createAgentBrain(brain)
+agent.initialize(world)
+
+# Run simulation
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+### Key Features
+
+- **Brain API** - Create and control neural brains
+- **World API** - Simulate environments
+- **Agent API** - Bridge between brain and world
+- **Learning API** - Enable reward, curiosity, development
+- **Configuration API** - Customize brain parameters
+- **Checkpointing** - Save/load brain states
+
+### Examples
+
+- `examples.py` - Comprehensive Python examples
+- `PYTHON_SETUP.md` - Python module setup guide
+- `easy_usage.md` - Beginner-friendly tutorial
+
+### Installation
+
+```bash
+pip install -e .
+```
 
 ## Project Structure
 
@@ -88,31 +150,38 @@ This runs a comprehensive integration test verifying all brain systems are conne
 NLM/
 ├── CMakeLists.txt
 ├── README.md
+├── PYTHON_SETUP.md          # Python module documentation
+├── easy_usage.md           # Beginner-friendly tutorial
+├── examples.py             # Comprehensive Python examples
 ├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
+│   ├── ARCHITECTURE.md     # Technical architecture
+│   ├── SCIENCE.md          # Scientific background
+│   ├── ROADMAP.md          # Development roadmap
+│   ├── EXPERIMENTS.md      # Experiment documentation
+│   ├── LIMITATIONS.md      # Known limitations
+│   └── PHASE6_FINAL_AUDIT.md  # Phase 6 integration status
 ├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   ├── core/              # Core utilities
+│   ├── brain/             # Neural components (integrated)
+│   ├── dynamics/          # Neural dynamics
+│   ├── plasticity/        # Plasticity rules
+│   ├── development/       # Developmental system
+│   ├── neuromodulation/    # Neuromodulators (integrated)
+│   ├── memory/            # Memory systems (integrated)
+│   ├── prediction/        # Prediction systems (integrated)
+│   ├── cognition/         # Cognitive mechanisms (integrated)
+│   ├── sensory/           # Sensory processing
+│   ├── motor/             # Motor system
+│   ├── environment/       # Environment interface
+│   ├── experiments/       # Experiment framework
+│   └── visualization/     # Visualization
+├── python/                 # Python bindings
+│   └── bindings.cpp        # PyBind11 bindings
+├── tests/                  # Unit tests
+└── build/                  # Build artifacts (if generated)
 ```
+
+## Python Module (pynlm)
 
 ## Phase Summary
 
