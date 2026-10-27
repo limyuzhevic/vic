@@ -4,6 +4,9 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <thread>
+#include <chrono>
+#include <ctime>
 
 namespace nlm {
 
@@ -12,6 +15,16 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    
+    // File rotation settings
+    std::string logFile;
+    size_t maxFileSize = 10 * 1024 * 1024;  // 10MB
+    int maxFiles = 5;
+    size_t currentFileSize = 0;
+    
+    // Log formatting
+    std::string timestampFormat = "%Y-%m-%d %H:%M:%S";
+    std::string colorFormat = true;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -22,6 +35,30 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 
 ConsoleLogger::~ConsoleLogger() = default;
 
+std::string ConsoleLogger::getTimestamp(const std::chrono::system_clock::time_point& timestamp, const std::string& format) {
+    auto time = std::chrono::system_clock::to_time_t(timestamp);
+    
+    std::tm tm_time;
+    std::tm tm_time_local;
+    
+    // Thread-safe localtime conversion
+    std::istringstream ss(std::to_string(time));
+    if (ss >> std::get_time(&tm_time_local, "%Y-%m-%d %H:%M:%S")) {
+        tm_time = tm_time_local;
+    } else {
+        // Fallback to localtime with thread safety
+        std::time_t time_t_val = time;
+        if (std::localtime_r(&time_t_val, &tm_time) == nullptr) {
+            // If localtime fails, use empty struct
+            std::memset(&tm_time, 0, sizeof(tm_time));
+        }
+    }
+    
+    std::ostringstream oss;
+    oss << std::put_time(&tm_time, format.c_str());
+    return oss.str();
+}
+
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
         return;
@@ -30,15 +67,71 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Format timestamp
+    std::string timestamp = getTimestamp(entry.timestamp, pImpl->timestampFormat);
     
-    oss << " " << entry.message;
+    // Add thread ID for multi-threaded debugging
+    std::ostringstream threadOss;
+    threadOss << std::this_thread::get_id();
+    
+    // Structured logging format
+    oss << "[" << levelToString(entry.level) << "] "
+        << timestamp << " " << threadOss.str() << " "
+        << entry.message;
+    
+    // Add file info if provided
+    if (!entry.file.empty()) {
+        oss << " [" << entry.file;
+        if (entry.line > 0) {
+            oss << ":" << entry.line;
+        }
+        oss << "]";
+    }
+    
+    // Add function info if provided
+    if (!entry.function.empty()) {
+        oss << " <" << entry.function << ">";
+    }
     
     std::string output = oss.str();
+    
+    // File rotation check
+    if (!pImpl->logFile.empty() && !pImpl->fileOut.is_open()) {
+        pImpl->fileOut.open(pImpl->logFile, std::ios::app);
+    }
+    
+    // Check file size and rotate if needed
+    if (pImpl->fileOut.is_open() && pImpl->currentFileSize >= pImpl->maxFileSize) {
+        pImpl->fileOut.close();
+        
+        // Rotate existing files
+        for (int i = pImpl->maxFiles - 1; i >= 0; --i) {
+            std::string from = pImpl->logFile;
+            std::string to = pImpl->logFile;
+            if (i < pImpl->maxFiles - 1) {
+                to = pImpl->logFile + "." + std::to_string(i + 1);
+            }
+            
+            if (i == pImpl->maxFiles - 1) {
+                // Delete the oldest file
+                std::remove(to.c_str());
+            } else {
+                // Rename the next file to current position
+                std::rename(to.c_str(), (to + ".bak").c_str());
+            }
+            
+            if (i > 0) {
+                // Rename the file backward
+                std::string nextFile = pImpl->logFile + "." + std::to_string(i);
+                std::rename(nextFile.c_str(), to.c_str());
+            }
+        }
+        
+        // Create new file
+        pImpl->fileOut.open(pImpl->logFile, std::ios::trunc);
+        pImpl->currentFileSize = 0;
+    }
     
     // Console output
     if (pImpl->useColors) {
@@ -51,6 +144,7 @@ void ConsoleLogger::log(const LogEntry& entry) {
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();
+        pImpl->currentFileSize += output.size() + 1;  // +1 for newline
     }
 }
 
@@ -71,7 +165,20 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    pImpl->logFile = filepath;
+    
+    // Close current file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Open file for appending
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (pImpl->fileOut.is_open()) {
+        // Get current file size
+        pImpl->fileOut.seekp(0, std::ios::end);
+        pImpl->currentFileSize = pImpl->fileOut.tellp();
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {

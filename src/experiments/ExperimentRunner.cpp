@@ -1,4 +1,7 @@
 #include "ExperimentRunner.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -113,8 +116,76 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    NLM_LOG_INFO("Saving experiment results to: " + filepath);
+    
+    // Create JSON structure for all experiments
+    nlohmann::json results;
+    
+    // Add metadata
+    results["metadata"]["version"] = "1.0";
+    results["metadata"]["date"] = "2026-10-27";  // TODO: Add actual date
+    results["metadata"]["num_experiments"] = pImpl->experiments.size();
+    
+    // Add each experiment's data
+    nlohmann::json experiments_json = nlohmann::json::array();
+    
+    for (const auto& exp : pImpl->experiments) {
+        nlohmann::json exp_json;
+        exp_json["name"] = exp->getName();
+        exp_json["seed"] = exp->getSeed();
+        exp_json["start_step"] = exp->getStartStep();
+        exp_json["end_step"] = exp->getEndStep();
+        
+        // Add metrics
+        nlohmann::json metrics_json = nlohmann::json::object();
+        const auto& expMetrics = exp->getMetrics();
+        for (const auto& metric : expMetrics) {
+            metrics_json[metric.first] = metric.second;
+        }
+        exp_json["metrics"] = metrics_json;
+        
+        // Add step data
+        nlohmann::json steps_json = nlohmann::json::array();
+        const auto& stepData = exp->getStepData();
+        for (const auto& step : stepData) {
+            nlohmann::json step_json;
+            step_json["step"] = step.step;
+            step_json["neurons"] = step.neuronCount;
+            step_json["synapses"] = step.synapseCount;
+            step_json["firing"] = step.firingCount;
+            step_json["avg_firing_rate"] = step.avgFiringRate;
+            steps_json.push_back(step_json);
+        }
+        exp_json["steps"] = steps_json;
+        
+        // Add notes
+        nlohmann::json notes_json = nlohmann::json::array();
+        const auto& notes = exp->getNotes();
+        for (const auto& note : notes) {
+            notes_json.push_back(note);
+        }
+        exp_json["notes"] = notes_json;
+        
+        experiments_json.push_back(exp_json);
+    }
+    
+    results["experiments"] = experiments_json;
+    
+    // Write to file
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
+        return false;
+    }
+    
+    // Write with indentation for readability
+    file << std::setw(2) << results;
+    file.close();
+    
+    NLM_LOG_INFO("Experiment results saved successfully to: " + filepath);
+    NLM_LOG_INFO("Saved " + std::to_string(pImpl->experiments.size()) + " experiments");
+    
+    return true;
 }
 
 } // namespace nlm

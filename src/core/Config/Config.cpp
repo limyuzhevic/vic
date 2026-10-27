@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,14 +20,77 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first
+    try {
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
+        clear();
+        
+        for (auto it = jsonConfig.begin(); it != jsonConfig.end(); ++it) {
+            const std::string& key = it.key();
+            const nlohmann::json& value = it.value();
+            
+            // Convert JSON value to ConfigValue
+            ConfigValue configValue;
+            if (value.is_string()) {
+                configValue = value.get<std::string>();
+            } else if (value.is_number_integer()) {
+                configValue = value.get<int64_t>();
+            } else if (value.is_number_unsigned()) {
+                configValue = value.get<uint64_t>();
+            } else if (value.is_number_float()) {
+                configValue = value.get<double>();
+            } else if (value.is_boolean()) {
+                configValue = value.get<bool>();
+            } else if (value.is_array()) {
+                // Handle arrays - convert to vector based on element type
+                if (!value.empty() && value[0].is_number_integer()) {
+                    std::vector<int64_t> intArray;
+                    for (const auto& item : value) {
+                        intArray.push_back(item.get<int64_t>());
+                    }
+                    configValue = intArray;
+                } else if (!value.empty() && value[0].is_number_float()) {
+                    std::vector<double> doubleArray;
+                    for (const auto& item : value) {
+                        doubleArray.push_back(item.get<double>());
+                    }
+                    configValue = doubleArray;
+                } else if (!value.empty() && value[0].is_string()) {
+                    std::vector<std::string> stringArray;
+                    for (const auto& item : value) {
+                        stringArray.push_back(item.get<std::string>());
+                    }
+                    configValue = stringArray;
+                } else {
+                    // Default to vector<double>
+                    std::vector<double> doubleArray;
+                    for (const auto& item : value) {
+                        doubleArray.push_back(item.get<double>());
+                    }
+                    configValue = doubleArray;
+                }
+            } else {
+                // Fallback to string representation
+                configValue = value.dump();
+            }
+            
+            set(key, configValue, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception&) {
+        // Fall back to simple key=value format
+        file.clear();
+        file.seekg(0, std::ios::beg);
+    }
+    
+    // Fallback to simple key=value format
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -211,5 +275,199 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Add a validation function
+void Config::addValidator(const std::function<bool(const std::string&, const ConfigValue&)>& validator) {
+    pImpl->validators.push_back(validator);
+}
+
+// Set description for a configuration key
+void Config::setDescription(const std::string& key, const std::string& description) {
+    pImpl->descriptions[key] = description;
+}
+
+// Get description for a configuration key
+std::string Config::getDescription(const std::string& key) const {
+    auto it = pImpl->descriptions.find(key);
+    if (it != pImpl->descriptions.end()) {
+        return it->second;
+    }
+    return "";
+}
+
+// Validate configuration
+bool Config::validate() const {
+    for (const auto& entry : pImpl->entries) {
+        // Validate against all validators
+        for (const auto& validator : pImpl->validators) {
+            if (!validator(entry.key, entry.value)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+// Generate configuration documentation
+std::string Config::generateDocumentation() const {
+    std::ostringstream oss;
+    oss << "NLM Configuration Documentation" << std::endl;
+    oss << "=============================" << std::endl;
+    oss << "Generated: " << getCurrentDateTime() << std::endl;
+    oss << std::endl;
+    
+    oss << "Available Configuration Keys:" << std::endl;
+    oss << "--------------------------" << std::endl;
+    
+    for (const auto& entry : pImpl->entries) {
+        oss << "Key: " << entry.key << std::endl;
+        
+        // Get description
+        std::string description = getDescription(entry.key);
+        if (!description.empty()) {
+            oss << "  Description: " << description << std::endl;
+        }
+        
+        // Show value
+        oss << "  Current Value: ";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << std::endl;
+        
+        // Show source
+        oss << "  Source: " << static_cast<int>(entry.source) << std::endl;
+        oss << std::endl;
+    }
+    
+    oss << "Configuration Examples:" << std::endl;
+    oss << "----------------------" << std::endl;
+    oss << "// Configuration file example:" << std::endl;
+    oss << "// nlm_config.cfg" << std::endl;
+    oss << "random_seed = 42" << std::endl;
+    oss << "simulation_timestep = 0.001" << std::endl;
+    oss << "neuron_count = 1000" << std::endl;
+    oss << "region_count = 1" << std::endl;
+    oss << "connection_probability = 0.15" << std::endl;
+    oss << "stdp_ltp_weight = 0.02" << std::endl;
+    oss << "stdp_ltd_weight = 0.015" << std::endl;
+    oss << "synaptogenesis_rate = 0.0001" << std::endl;
+    oss << "pruning_rate = 0.00001" << std::endl;
+    oss << std::endl;
+    
+    oss << "Command line overrides:" << std::endl;
+    oss << "--------------------" << std::endl;
+    oss << "nlm_main --config myconfig.cfg --neuron-count 500 --region-count 2" << std::endl;
+    oss << "nlm_main --stdp_ltp_weight=0.03 --stdp_ltd_weight=0.02" << std::endl;
+    oss << "nlm_main --steps 10000 --save checkpoint.bin" << std::endl;
+    
+    return oss.str();
+}
+
+// Get current date/time string
+std::string Config::getCurrentDateTime() {
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    
+    std::tm tm_time;
+    std::tm tm_time_local;
+    
+    // Thread-safe localtime conversion
+    std::istringstream ss(std::to_string(time_t));
+    if (ss >> std::get_time(&tm_time_local, "%Y-%m-%d %H:%M:%S")) {
+        tm_time = tm_time_local;
+    } else {
+        // Fallback
+        if (std::localtime_r(&time_t, &tm_time) == nullptr) {
+            std::memset(&tm_time, 0, sizeof(tm_time));
+        }
+    }
+    
+    std::ostringstream oss;
+    oss << std::put_time(&tm_time, "%Y-%m-%d %H:%M:%S");
+    return oss.str();
+}
+
+// Generate JSON schema for configuration validation
+std::string Config::generateJSONSchema() const {
+    nlohmann::json schema;
+    schema["$schema"] = "http://json-schema.org/draft-07/schema#";
+    schema["title"] = "NLM Configuration";
+    schema["description"] = "Neural Learning Machine Configuration Schema";
+    schema["type"] = "object";
+    
+    nlohmann::json properties = nlohmann::json::object();
+    
+    for (const auto& entry : pImpl->entries) {
+        nlohmann::json prop;
+        prop["type"] = getTypeName(entry.value);
+        prop["description"] = getDescription(entry.key);
+        prop["default"] = getDefaultValue(entry.value);
+        properties[entry.key] = prop;
+    }
+    
+    schema["properties"] = properties;
+    schema["required"] = getRequiredKeys();
+    
+    return schema.dump(2);
+}
+
+// Get type name as string
+std::string Config::getTypeName(const ConfigValue& value) const {
+    std::string typeName;
+    std::visit([&typeName](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            typeName = "integer";
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            typeName = "integer";
+        } else if constexpr (std::is_same_v<T, double>) {
+            typeName = "number";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            typeName = "boolean";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            typeName = "string";
+        } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+            typeName = "array";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            typeName = "array";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            typeName = "array";
+        } else {
+            typeName = "string";
+        }
+    }, value);
+    return typeName;
+}
+
+// Get default value as string
+std::string Config::getDefaultValue(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
+}
+
+// Get required keys
+std::vector<std::string> Config::getRequiredKeys() const {
+    // For now, return empty vector (no required keys by default)
+    // This can be extended to support configuration schema validation
+    return {};
+}
 
 } // namespace nlm

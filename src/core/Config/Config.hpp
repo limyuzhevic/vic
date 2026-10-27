@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <functional>
+#include <map>
 
 namespace nlm {
 
@@ -55,7 +57,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -93,6 +95,24 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Add a validation function
+    void addValidator(const std::function<bool(const std::string&, const ConfigValue&)>& validator);
+    
+    // Set description for a configuration key
+    void setDescription(const std::string& key, const std::string& description);
+    
+    // Get description for a configuration key
+    std::string getDescription(const std::string& key) const;
+    
+    // Validate configuration
+    bool validate() const;
+    
+    // Generate configuration documentation
+    std::string generateDocumentation() const;
+    
+    // Generate JSON schema for configuration validation
+    std::string generateJSONSchema() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +120,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper functions for documentation generation
+    std::string getTypeName(const ConfigValue& value) const;
+    std::string getDefaultValue(const ConfigValue& value) const;
+    std::vector<std::string> getRequiredKeys() const;
+    static std::string getCurrentDateTime();
 };
 
 } // namespace nlm
