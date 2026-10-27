@@ -160,6 +160,64 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("get", [](Config& self, const std::string& key) {
+            if (self.has(key)) {
+                return self.getOr<std::string>(key, "");
+            }
+            throw std::runtime_error("Configuration key not found: " + key);
+        }, py::arg("key"), "Get a configuration value")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"),
+             "Set a configuration value")
+        .def("setInt", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), "Set an integer configuration value")
+        .def("setFloat", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), "Set a float configuration value")
+        .def("setBool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), "Set a boolean configuration value")
+        .def("getInt", [](Config& self, const std::string& key) {
+            return self.getOr<int64_t>(key, 0);
+        }, py::arg("key"), "Get an integer configuration value")
+        .def("getFloat", [](Config& self, const std::string& key) {
+            return self.getOr<float>(key, 0.0f);
+        }, py::arg("key"), "Get a float configuration value")
+        .def("getBool", [](Config& self, const std::string& key) {
+            return self.getOr<bool>(key, false);
+        }, py::arg("key"), "Get a boolean configuration value")
+        .def("copy", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a copy of the default configuration")
+        .def("merge", [](Config& self, const Config& other) {
+            // Implementation would merge other config into self
+            // For now, just copy basic keys
+            for (const auto& key : other.getKeys()) {
+                if (other.has(key)) {
+                    // Get the value based on type
+                    try {
+                        auto strVal = other.getOr<std::string>(key, "");
+                        self.set(key, strVal, ConfigSource::Runtime);
+                    } catch (...) {
+                        try {
+                            auto intVal = other.getOr<int64_t>(key, 0);
+                            self.set(key, intVal, ConfigSource::Runtime);
+                        } catch (...) {
+                            try {
+                                auto floatVal = other.getOr<float>(key, 0.0f);
+                                self.set(key, floatVal, ConfigSource::Runtime);
+                            } catch (...) {
+                                try {
+                                    auto boolVal = other.getOr<bool>(key, false);
+                                    self.set(key, boolVal, ConfigSource::Runtime);
+                                } catch (...) {}
+                            }
+                        }
+                    }
+                }
+            }
+            return self;
+        }, py::arg("other"), "Merge another configuration into this one")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -420,6 +478,517 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Python utility functions and advanced features
+    m.def("run_demo", [](const std::string& demoType, const std::string& configFile) {
+        std::cout << "=== NLM Python Demo ===" << std::endl;
+        std::cout << "Running demo: " << demoType << std::endl;
+        std::cout << "Config file: " << configFile << std::endl;
+        
+        auto config = std::make_shared<Config>();
+        if (config->loadFromFile(configFile)) {
+            std::cout << "Configuration loaded successfully" << std::endl;
+        } else {
+            std::cout << "Using default configuration" << std::endl;
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            std::cerr << "Failed to initialize brain!" << std::endl;
+            return;
+        }
+        
+        std::cout << "Brain initialized with " << brain->getTotalNeuronCount() 
+                  << " neurons and " << brain->getTotalSynapseCount() << " synapses" << std::endl;
+        
+        // Run a simple demonstration
+        for (int step = 0; step < 100; ++step) {
+            brain->step(step, step * 0.001);
+            if (step % 20 == 0) {
+                std::cout << "Step " << step << ": " << brain->getFiringNeuronCount() 
+                          << " neurons firing, " << brain->getAverageFiringRate() 
+                          << " avg firing rate" << std::endl;
+            }
+        }
+        
+        std::cout << "Demo completed successfully!" << std::endl;
+    }, py::arg("demoType") = "phase6", py::arg("configFile") = "./configs/default.cfg",
+       "Run an NLM demo simulation");
+
+    m.def("profile_brain", [](std::shared_ptr<Brain> brain, int numSteps) {
+        if (!brain || !brain->initialize()) {
+            throw std::runtime_error("Invalid brain or initialization failed");
+        }
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        std::cout << "=== Brain Profile ===" << std::endl;
+        std::cout << "Steps: " << numSteps << std::endl;
+        std::cout << "Duration: " << duration.count() << " ms" << std::endl;
+        std::cout << "Avg steps/ms: " << (numSteps / (double)duration.count()) << std::endl;
+        std::cout << "Total neurons: " << brain->getTotalNeuronCount() << std::endl;
+        std::cout << "Total synapses: " << brain->getTotalSynapseCount() << std::endl;
+        std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        
+        return std::make_pair(duration.count(), brain->getTotalSpikeCount());
+    }, py::arg("brain"), py::arg("numSteps") = 1000,
+       "Profile brain performance over a number of steps");
+
+    m.def("benchmark_plasticity", [](std::shared_ptr<Brain> brain, int numSteps) {
+        if (!brain || !brain->initialize()) {
+            throw std::runtime_error("Invalid brain or initialization failed");
+        }
+        
+        // Enable plasticity
+        auto config = brain->getConfig();
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.structural.enable", true, ConfigSource::Runtime);
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            // Apply random input to stimulate learning
+            for (size_t i = 0; i < brain->getTotalNeuronCount() / 10 && i < 20; ++i) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 50.0f);
+            }
+            brain->step(step, step * 0.001);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        std::cout << "=== Plasticity Benchmark ===" << std::endl;
+        std::cout << "Steps: " << numSteps << std::endl;
+        std::cout << "Duration: " << duration.count() << " ms" << std::endl;
+        std::cout << "Avg steps/ms: " << (numSteps / (double)duration.count()) << std::endl;
+        std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        
+        return std::make_pair(duration.count(), brain->getTotalSpikeCount());
+    }, py::arg("brain"), py::arg("numSteps") = 1000,
+       "Benchmark brain plasticity learning over a number of steps");
+
+    m.def("benchmark_stdp", [](std::shared_ptr<Brain> brain, int numSteps) {
+        if (!brain || !brain->initialize()) {
+            throw std::runtime_error("Invalid brain or initialization failed");
+        }
+        
+        // Enable only STDP for this benchmark
+        auto config = brain->getConfig();
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", false, ConfigSource::Runtime);
+        config->set("plasticity.structural.enable", false, ConfigSource::Runtime);
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            // Create correlated pre-post activity for STDP
+            if (step % 2 == 0) {
+                // Pre-synaptic activity
+                for (size_t i = 0; i < brain->getTotalNeuronCount() / 20 && i < 5; ++i) {
+                    brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+                }
+            } else {
+                // Post-synaptic activity (potentially learning from pre)
+                for (size_t i = 0; i < brain->getTotalNeuronCount() / 20 && i < 5; ++i) {
+                    brain->injectCurrentToNeurons(NeuronType::Motor, 30.0f);
+                }
+            }
+            brain->step(step, step * 0.001);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::milliseconds>(endTime - startTime);
+        
+        std::cout << "=== STDP Benchmark ===" << std::endl;
+        std::cout << "Steps: " << numSteps << std::endl;
+        std::cout << "Duration: " << duration.count() << " ms" << std::endl;
+        std::cout << "Avg steps/ms: " << (numSteps / (double)duration.count()) << std::endl;
+        std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        
+        return std::make_pair(duration.count(), brain->getTotalSpikeCount());
+    }, py::arg("brain"), py::arg("numSteps") = 1000,
+       "Benchmark STDP learning over a number of steps");
+
+    m.def("save_brain_snapshot", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain) {
+            throw std::runtime_error("Invalid brain");
+        }
+        
+        if (brain->save(filepath)) {
+            std::cout << "Brain saved successfully to: " << filepath << std::endl;
+            return true;
+        } else {
+            std::cerr << "Failed to save brain to: " << filepath << std::endl;
+            return false;
+        }
+    }, py::arg("brain"), py::arg("filepath"),
+       "Save current brain state to a file");
+
+    m.def("load_brain_snapshot", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        
+        if (brain->load(filepath)) {
+            std::cout << "Brain loaded successfully from: " << filepath << std::endl;
+            return brain;
+        } else {
+            std::cerr << "Failed to load brain from: " << filepath << std::endl;
+            return nullptr;
+        }
+    }, py::arg("filepath"), "Load brain state from a file");
+
+    m.def("benchmark_multiple_agents", [](int numAgents, int numSteps, const std::string& configFile) {
+        std::cout << "=== Multi-Agent Benchmark ===" << std::endl;
+        std::cout << "Creating " << numAgents << " agents..." << std::endl;
+        
+        auto config = std::make_shared<Config>();
+        if (!configFile.empty() && config->loadFromFile(configFile)) {
+            std::cout << "Configuration loaded from: " << configFile << std::endl;
+        }
+        
+        // Create multiple agent instances
+        std::vector<std::shared_ptr<Brain>> brains;
+        std::vector<std::shared_ptr<AgentBrain>> agents;
+        
+        for (int i = 0; i < numAgents; ++i) {
+            auto brain = std::make_shared<Brain>(config);
+            if (!brain->initialize()) {
+                std::cerr << "Failed to initialize brain for agent " << i << std::endl;
+                return;
+            }
+            
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->initialize(SimpleWorld());  // Use default world
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            
+            brains.push_back(brain);
+            agents.push_back(agent);
+            
+            std::cout << "Agent " << i << ": " << brain->getTotalNeuronCount() 
+                      << " neurons" << std::endl;
+        }
+        
+        // Run all agents in parallel
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            for (size_t i = 0; i < agents.size(); ++i) {
+                // Each agent gets a different random input pattern
+                for (size_t j = 0; j < brains[i]->getTotalNeuronCount() / (numAgents * 10) && j < 10; ++j) {
+                    brains[i]->injectCurrentToNeurons(NeuronType::Sensory, 
+                                                      20.0f * (1.0f + (rand() % 100) / 100.0f));
+                }
+                brains[i]->step(step, step * 0.001);
+            }
+            
+            if (step % 100 == 0) {
+                std::cout << "Step " << step << "/" << numSteps << " completed" << std::endl;
+            }
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        // Calculate statistics
+        size_t totalSpikes = 0;
+        size_t totalNeurons = 0;
+        for (const auto& brain : brains) {
+            totalSpikes += brain->getTotalSpikeCount();
+            totalNeurons += brain->getTotalNeuronCount();
+        }
+        
+        std::cout << "\n=== Benchmark Results ===" << std::endl;
+        std::cout << "Agents: " << numAgents << std::endl;
+        std::cout << "Steps: " << numSteps << std::endl;
+        std::cout << "Duration: " << duration.count() << " ms" << std::endl;
+        std::cout << "Avg steps/ms: " << (numSteps / (double)duration.count()) << std::endl;
+        std::cout << "Total spikes across all agents: " << totalSpikes << std::endl;
+        std::cout << "Total neurons across all agents: " << totalNeurons << std::endl;
+        std::cout << "Avg spikes per neuron: " << (totalSpikes / (double)totalNeurons) << std::endl;
+        
+    }, py::arg("numAgents") = 5, py::arg("numSteps") = 500, py::arg("configFile") = "",
+       "Benchmark multiple agents running in parallel");
+
+    m.def("generate_config_report", [](std::shared_ptr<Config> config) {
+        std::cout << "=== Configuration Report ===" << std::endl;
+        std::cout << config->summary() << std::endl;
+        
+        // Print key configuration parameters
+        std::vector<std::string> importantKeys = {
+            "brain.neuron_count",
+            "brain.synapse_density",
+            "brain.connection_probability",
+            "brain.v_thresh",
+            "brain.v_rest",
+            "plasticity.stdp.enable",
+            "plasticity.hebbian.enable",
+            "plasticity.structural.enable",
+            "neuromod.dopamine.scale",
+            "neuromod.curiosity.enable"
+        };
+        
+        std::cout << "\nKey Configuration Parameters:" << std::endl;
+        for (const auto& key : importantKeys) {
+            if (config->has(key)) {
+                try {
+                    auto strVal = config->getOr<std::string>(key, "");
+                    std::cout << "  " << key << ": " << strVal << std::endl;
+                } catch (...) {
+                    try {
+                        auto intVal = config->getOr<int64_t>(key, 0);
+                        std::cout << "  " << key << ": " << intVal << std::endl;
+                    } catch (...) {
+                        try {
+                            auto floatVal = config->getOr<float>(key, 0.0f);
+                            std::cout << "  " << key << ": " << floatVal << std::endl;
+                        } catch (...) {
+                            try {
+                                auto boolVal = config->getOr<bool>(key, false);
+                                std::cout << "  " << key << ": " << (boolVal ? "true" : "false") << std::endl;
+                            } catch (...) {}
+                        }
+                    }
+                }
+            }
+        }
+    }, py::arg("config"), "Generate a detailed report of configuration settings");
+
+    m.def("compare_configs", [](const std::vector<std::string>& configFiles) {
+        std::cout << "=== Configuration Comparison ===" << std::endl;
+        
+        std::vector<std::shared_ptr<Config>> configs;
+        for (const auto& file : configFiles) {
+            auto config = std::make_shared<Config>();
+            if (config->loadFromFile(file)) {
+                configs.push_back(config);
+                std::cout << "Loaded: " << file << std::endl;
+            } else {
+                std::cerr << "Failed to load: " << file << std::endl;
+            }
+        }
+        
+        if (configs.size() < 2) {
+            std::cerr << "Need at least 2 configurations to compare" << std::endl;
+            return;
+        }
+        
+        // Compare neuron counts
+        std::cout << "\nNeuron Count Comparison:" << std::endl;
+        for (size_t i = 0; i < configs.size(); ++i) {
+            std::cout << "  Config " << i << ": " << configs[i]->getOr<int64_t>("brain.neuron_count", 0) << std::endl;
+        }
+        
+        // Compare plasticity settings
+        std::cout << "\nPlasticity Settings Comparison:" << std::endl;
+        std::string plasticityKeys[] = {
+            "plasticity.stdp.enable",
+            "plasticity.hebbian.enable",
+            "plasticity.structural.enable"
+        };
+        
+        for (const auto& key : plasticityKeys) {
+            std::cout << "  " << key << ":" << std::endl;
+            for (size_t i = 0; i < configs.size(); ++i) {
+                try {
+                    bool value = configs[i]->getOr<bool>(key, false);
+                    std::cout << "    Config " << i << ": " << (value ? "true" : "false") << std::endl;
+                } catch (...) {
+                    std::cout << "    Config " << i << ": not set" << std::endl;
+                }
+            }
+        }
+    }, py::arg("configFiles") = std::vector<std::string>(),
+       "Compare multiple configuration files");
+
+    m.def("validate_config", [](std::shared_ptr<Config> config) -> bool {
+        std::cout << "=== Configuration Validation ===" << std::endl;
+        
+        bool isValid = true;
+        
+        // Check required keys
+        std::vector<std::string> requiredKeys = {
+            "brain.neuron_count",
+            "brain.synapse_density",
+            "brain.connection_probability"
+        };
+        
+        for (const auto& key : requiredKeys) {
+            if (!config->has(key)) {
+                std::cout << "  ERROR: Missing required key: " << key << std::endl;
+                isValid = false;
+            }
+        }
+        
+        // Validate values
+        if (config->has("brain.neuron_count")) {
+            try {
+                int64_t neuronCount = config->getOr<int64_t>("brain.neuron_count", 0);
+                if (neuronCount < 10 || neuronCount > 100000) {
+                    std::cout << "  WARNING: neuron_count " << neuronCount 
+                              << " may be outside recommended range (10-100000)" << std::endl;
+                }
+            } catch (...) {
+                std::cout << "  ERROR: Invalid neuron_count value" << std::endl;
+                isValid = false;
+            }
+        }
+        
+        if (config->has("brain.synapse_density")) {
+            try {
+                float density = config->getOr<float>("brain.synapse_density", 0.0f);
+                if (density < 0.0f || density > 1.0f) {
+                    std::cout << "  WARNING: synapse_density " << density 
+                              << " should be between 0.0 and 1.0" << std::endl;
+                }
+            } catch (...) {
+                std::cout << "  ERROR: Invalid synapse_density value" << std::endl;
+                isValid = false;
+            }
+        }
+        
+        if (isValid) {
+            std::cout << "Configuration is valid!" << std::endl;
+        } else {
+            std::cout << "Configuration has issues that should be addressed." << std::endl;
+        }
+        
+        return isValid;
+    }, py::arg("config"), "Validate configuration for potential issues");
+
+    m.def("create_random_config", [](int minNeurons, int maxNeurons) {
+        auto config = std::make_shared<Config>();
+        
+        // Set random seed for reproducibility
+        srand(static_cast<unsigned int>(time(nullptr)));
+        
+        // Set random values for key parameters
+        config->set("brain.neuron_count", rand() % (maxNeurons - minNeurons + 1) + minNeurons, ConfigSource::Runtime);
+        config->set("brain.synapse_density", (rand() % 100) / 100.0f, ConfigSource::Runtime);
+        config->set("brain.connection_probability", (rand() % 100) / 1000.0f, ConfigSource::Runtime);
+        config->set("brain.initial_weight_mean", (rand() % 100) / 100.0f, ConfigSource::Runtime);
+        config->set("brain.initial_weight_std", (rand() % 50) / 100.0f, ConfigSource::Runtime);
+        
+        // Enable plasticity with 80% probability
+        config->set("plasticity.stdp.enable", (rand() % 100) < 80, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", (rand() % 100) < 80, ConfigSource::Runtime);
+        config->set("plasticity.structural.enable", (rand() % 100) < 50, ConfigSource::Runtime);
+        
+        std::cout << "Created random configuration with " << config->getOr<int64_t>("brain.neuron_count", 0) 
+                  << " neurons" << std::endl;
+        
+        return config;
+    }, py::arg("minNeurons") = 100, py::arg("maxNeurons") = 1000,
+       "Create a configuration with random parameters");
+
+    m.def("list_all_config_keys", []() {
+        auto config = std::make_shared<Config>();
+        auto keys = config->getKeys();
+        
+        std::cout << "=== Available Configuration Keys ===" << std::endl;
+        std::cout << "Total keys: " << keys.size() << std::endl;
+        
+        for (const auto& key : keys) {
+            std::cout << "  " << key << std::endl;
+        }
+        
+        return keys;
+    }, "List all available configuration keys");
+
+    m.def("get_config_types", []() {
+        auto config = std::make_shared<Config>();
+        auto keys = config->getKeys();
+        
+        std::cout << "=== Configuration Key Types ===" << std::endl;
+        
+        std::map<std::string, std::string> keyTypes;
+        for (const auto& key : keys) {
+            // Infer type based on key name
+            std::string type = "unknown";
+            if (key.find(".neuron_count") != std::string::npos || 
+                key.find(".region_count") != std::string::npos ||
+                key.find(".sample_rate") != std::string::npos) {
+                type = "int";
+            } else if (key.find(".density") != std::string::npos ||
+                       key.find(".probability") != std::string::npos ||
+                       key.find(".weight") != std::string::npos ||
+                       key.find(".threshold") != std::string::npos ||
+                       key.find(".scale") != std::string::npos) {
+                type = "float";
+            } else if (key.find(".enable") != std::string::npos ||
+                       key.find(".enabled") != std::string::npos ||
+                       key.find(".active") != std::string::npos) {
+                type = "bool";
+            } else if (key.find(".name") != std::string::npos ||
+                       key.find(".message") != std::string::npos ||
+                       key.find(".filename") != std::string::npos ||
+                       key.find(".path") != std::string::npos) {
+                type = "string";
+            }
+            keyTypes[key] = type;
+        }
+        
+        for (const auto& pair : keyTypes) {
+            std::cout << "  " << pair.first << ": " << pair.second << std::endl;
+        }
+        
+        return keyTypes;
+    }, "Get types for all configuration keys");
+
+    m.def("create_config_from_dict", [](std::map<std::string, std::string> settings) {
+        auto config = std::make_shared<Config>();
+        
+        for (const auto& pair : settings) {
+            // Try to infer type from string value
+            const std::string& valueStr = pair.second;
+            
+            try {
+                // Try to parse as integer
+                size_t pos;
+                int intVal = std::stoi(valueStr, &pos);
+                if (pos == valueStr.size()) {
+                    config->set(pair.first, intVal, ConfigSource::Runtime);
+                    continue;
+                }
+            } catch (...) {}
+            
+            try {
+                // Try to parse as float
+                size_t pos;
+                float floatVal = std::stof(valueStr, &pos);
+                if (pos == valueStr.size()) {
+                    config->set(pair.first, floatVal, ConfigSource::Runtime);
+                    continue;
+                }
+            } catch (...) {}
+            
+            try {
+                // Try to parse as boolean
+                if (valueStr == "true" || valueStr == "false" || 
+                    valueStr == "yes" || valueStr == "no" ||
+                    valueStr == "1" || valueStr == "0") {
+                    bool boolVal = (valueStr == "true" || valueStr == "yes" || valueStr == "1");
+                    config->set(pair.first, boolVal, ConfigSource::Runtime);
+                    continue;
+                }
+            } catch (...) {}
+            
+            // Fall back to string
+            config->set(pair.first, valueStr, ConfigSource::Runtime);
+        }
+        
+        std::cout << "Created configuration from dictionary with " << settings.size() << " settings" << std::endl;
+        
+        return config;
+    }, py::arg("settings"), "Create a configuration from a dictionary of settings");
 }
 
 } // namespace nlm

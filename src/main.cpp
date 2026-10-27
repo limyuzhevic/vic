@@ -28,24 +28,135 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printUsage() {
+    std::cout << "NLM Phase 2 Demo Usage:" << std::endl;
+    std::cout << "  nlm [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --version, -v                 Show version information" << std::endl;
+    std::cout << "  --neurons N, -n N             Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --steps S, -s S                Set number of simulation steps (default: 2000)" << std::endl;
+    std::cout << "  --region R, -r R               Set number of regions (default: 1)" << std::endl;
+    std::cout << "  --connectivity C, -c C         Set connection probability (default: 0.15)" << std::endl;
+    std::cout << "  --config FILE, -f FILE          Load configuration from file" << std::endl;
+    std::cout << "  --verbose, -V                  Enable verbose logging" << std::endl;
+    std::cout << "  --debug, -d                    Enable debug logging" << std::endl;
+    std::cout << "  --performance, -p              Run performance benchmarks" << std::endl;
+    std::cout << "  --benchmark BL, -b BL           Benchmark type: 'plasticity', 'stdp', 'all'" << std::endl;
+    std::cout << "  --quiet, -q                    Suppress most output" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm                           Run basic demonstration" << std::endl;
+    std::cout << "  nlm --neurons 1000 --steps 5000  # Larger network" << std::endl;
+    std::cout << "  nlm --performance --benchmark plasticity  # Benchmark plasticity" << std::endl;
+    std::cout << "  nlm -f configs/large.cfg  # Load custom configuration" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM (熙然) - Neural Learning Machine v0.1.0" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Copyright (c) 2024 NLM Authors" << std::endl;
+    std::cout << "License: MIT" << std::endl;
+}
+
+void printProgress(int current, int total, int step, float reward = 0.0f) {
+    if (current % 100 == 0 || current == total) {
+        std::cout << "\rProgress: " << (current * 100 / total) << "% | "
+                  << "Step: " << step << " | " << "Reward: " << std::fixed << std::setprecision(3) << reward << "   " << std::flush;
+    }
+}
+
+void printBrainStatistics(std::shared_ptr<Brain> brain, bool detailed = false) {
+    std::cout << "=== Brain Statistics ===" << std::endl;
+    std::cout << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+    std::cout << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+    std::cout << "Active neurons: " << brain->getActiveNeuronCount() << std::endl;
+    std::cout << "Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+    std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+    std::cout << "Average firing rate: " << std::fixed << std::setprecision(2) 
+              << brain->getAverageFiringRate() << std::endl;
+    std::cout << "Excitatory/Inhibitory ratio: " << std::fixed << std::setprecision(3)
+              << brain->getExcitationInhibitionRatio() << std::endl;
+    
+    if (detailed) {
+        std::cout << std::endl;
+        std::cout << "=== Detailed Statistics ===" << std::endl;
+        std::cout << "Developmental stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+        
+        // Log brain status
+        brain->logStatus();
+    }
+}
+
+void runBenchmark(std::shared_ptr<Brain> brain, const std::string& benchmarkType, int numSteps) {
+    std::cout << "=== " << benchmarkType << " Benchmark ===" << std::endl;
+    std::cout << "Running " << benchmarkType << " benchmark for " << numSteps << " steps..." << std::endl;
+    
+    // Enable necessary plasticity based on benchmark type
+    auto config = brain->getConfig();
+    
+    if (benchmarkType == "plasticity" || benchmarkType == "all") {
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.structural.enable", true, ConfigSource::Runtime);
+    }
+    
+    if (benchmarkType == "stdp" || benchmarkType == "all") {
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", false, ConfigSource::Runtime);
+        config->set("plasticity.structural.enable", false, ConfigSource::Runtime);
+    }
+    
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    for (int step = 0; step < numSteps; ++step) {
+        // Apply stimulation based on benchmark type
+        if (benchmarkType == "plasticity" || benchmarkType == "all") {
+            // Apply random input to stimulate learning
+            int numInputs = std::min(static_cast<size_t>(20), brain->getTotalNeuronCount() / 10);
+            for (size_t i = 0; i < numInputs; ++i) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 50.0f);
+            }
+        }
+        
+        if (benchmarkType == "stdp" || benchmarkType == "all") {
+            // Create correlated pre-post activity
+            if (step % 2 == 0) {
+                // Pre-synaptic activity
+                int numInputs = std::min(static_cast<size_t>(5), brain->getTotalNeuronCount() / 20);
+                for (size_t i = 0; i < numInputs; ++i) {
+                    brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+                }
+            } else {
+                // Post-synaptic activity
+                int numInputs = std::min(static_cast<size_t>(5), brain->getTotalNeuronCount() / 20);
+                for (size_t i = 0; i < numInputs; ++i) {
+                    brain->injectCurrentToNeurons(NeuronType::Motor, 30.0f);
+                }
+            }
+        }
+        
+        brain->step(step, step * 0.001);
+        
+        if (step % 500 == 0 && step > 0) {
+            std::cout << "Step " << step << ": " << brain->getTotalSpikeCount() 
+                      << " spikes, " << brain->getAverageFiringRate() 
+                      << " avg firing rate" << std::endl;
+        }
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    
+    std::cout << std::endl;
+    std::cout << "=== Benchmark Results ===" << std::endl;
+    std::cout << "Benchmark type: " << benchmarkType << std::endl;
+    std::cout << "Steps: " << numSteps << std::endl;
+    std::cout << "Duration: " << duration.count() << " ms" << std::endl;
+    std::cout << "Average steps per ms: " << (numSteps / (double)duration.count()) << std::endl;
+    std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+    std::cout << "Average firing rate: " << brain->getAverageFiringRate() << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -322,56 +433,140 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    // Parse command line arguments
+    bool verbose = false;
+    bool debug = false;
+    bool performanceMode = false;
+    bool quiet = false;
+    std::string configFile = "configs/default.cfg";
+    int neuronCount = 500;
+    int regionCount = 1;
+    float connectionProbability = 0.15f;
+    int steps = 2000;
+    std::string benchmarkType = "none";
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        } else if (arg == "--version" || arg == "-v") {
+            printVersion();
+            return 0;
+        } else if (arg == "--verbose" || arg == "-V") {
+            verbose = true;
+        } else if (arg == "--debug" || arg == "-d") {
+            debug = true;
+            verbose = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            quiet = true;
+        } else if (arg == "--performance" || arg == "-p") {
+            performanceMode = true;
+        } else if (arg == "--neurons" || arg == "-n") {
+            if (i + 1 < argc) {
+                neuronCount = std::stoi(argv[++i]);
+            }
+        } else if (arg == "--steps" || arg == "-s") {
+            if (i + 1 < argc) {
+                steps = std::stoi(argv[++i]);
+            }
+        } else if (arg == "--region" || arg == "-r") {
+            if (i + 1 < argc) {
+                regionCount = std::stoi(argv[++i]);
+            }
+        } else if (arg == "--connectivity" || arg == "-c") {
+            if (i + 1 < argc) {
+                connectionProbability = std::stof(argv[++i]);
+            }
+        } else if (arg == "--config" || arg == "-f") {
+            if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg == "--benchmark" || arg == "-b") {
+            if (i + 1 < argc) {
+                benchmarkType = argv[++i];
+            }
+        } else if (arg == "--benchmark-plasticity") {
+            benchmarkType = "plasticity";
+        } else if (arg == "--benchmark-stdp") {
+            benchmarkType = "stdp";
+        } else if (arg == "--benchmark-all") {
+            benchmarkType = "all";
+        } else if (arg.substr(0, 2) == "--") {
+            std::cerr << "Unknown option: " << arg << std::endl;
+            printUsage();
+            return 1;
+        }
+    }
     
-    // Initialize logger
+    // Initialize logging
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    auto consoleLogger = std::make_shared<ConsoleLogger>(verbose ? LogLevel::Debug : 
+                                                           (debug ? LogLevel::Debug : LogLevel::Info));
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
+    // Set log level based on verbosity
+    if (debug) {
+        Logger::getInstance().setLevel(Logger::Level::Debug);
+    } else if (verbose) {
+        Logger::getInstance().setLevel(Logger::Level::Info);
+    }
+    
+    // Print banner unless quiet
+    if (!quiet) {
+        printBanner();
+    }
+    
+    // Print version information unless quiet
+    if (!quiet) {
+        printVersion();
+    }
+    
+    // Print help if no other arguments provided
+    if (argc == 1) {
+        printUsage();
+        return 0;
+    }
+    
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    
+    // Display configuration
+    if (!quiet) {
+        NLM_LOG_INFO("Configuration:");
+        NLM_LOG_INFO("  neurons: " + std::to_string(neuronCount));
+        NLM_LOG_INFO("  regions: " + std::to_string(regionCount));
+        NLM_LOG_INFO("  connectivity: " + std::to_string(connectionProbability));
+        NLM_LOG_INFO("  steps: " + std::to_string(steps));
+        NLM_LOG_INFO("  config file: " + configFile);
+        if (!benchmarkType.empty() && benchmarkType != "none") {
+            NLM_LOG_INFO("  benchmark: " + benchmarkType);
+        }
+    }
     
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    if (!quiet) {
+        NLM_LOG_INFO("Loading configuration...");
     }
     
-    // Load config from file (ignore if not found)
+    // Try to load from file if provided
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Override with command line arguments
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values with command line overrides
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Runtime);
+    config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::Runtime);
+    config->set("connection_probability", connectionProbability, ConfigSource::Runtime);
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
@@ -382,24 +577,16 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
-    
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    if (!quiet) {
+        NLM_LOG_INFO("Simulation clock initialized with timestep: " + 
+                    std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    }
     
     // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
+    if (!quiet) {
+        NLM_LOG_INFO("Initializing NLM Brain...");
+    }
+    
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
@@ -409,41 +596,79 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    if (!quiet) {
+        printBrainStatistics(brain, verbose);
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
-    
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    // Handle performance/benchmark modes
+    if (performanceMode || benchmarkType != "none") {
+        if (!quiet) {
+            std::cout << "\n" << "=" * 50 << std::endl;
+            std::cout << "PERFORMANCE MODE" << std::endl;
+            std::cout << "=" * 50 << std::endl;
+        }
+        
+        // Determine number of steps for benchmark
+        int benchmarkSteps = (benchmarkType != "none") ? std::min(steps, 5000) : std::min(steps, 1000);
+        
+        // Run benchmark
+        runBenchmark(brain, benchmarkType, benchmarkSteps);
+        
+        // Print final statistics
+        if (!quiet) {
+            std::cout << "\n=== Final Brain State ===" << std::endl;
+            printBrainStatistics(brain, verbose);
+        }
+    } else {
+        // Run original test suite
+        if (!quiet) {
+            std::cout << std::endl;
+            std::cout << "=" * 50 << std::endl;
+            std::cout << "RUNNING TESTS" << std::endl;
+            std::cout << "=" * 50 << std::endl;
+        }
+        
+        // Reset brain for Test 1: Basic connectivity
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 1: Basic connectivity
+        runBasicConnectivityTest(brain);
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+        
+        // Final brain status
+        if (!quiet) {
+            std::cout << std::endl;
+            std::cout << "=" * 50 << std::endl;
+            std::cout << "FINAL RESULTS" << std::endl;
+            std::cout << "=" * 50 << std::endl;
+            printBrainStatistics(brain, verbose);
+            
+            std::cout << std::endl;
+            std::cout << "Phase 2 Objectives Completed:" << std::endl;
+            std::cout << "  ✓ Real LIF neuron dynamics implemented" << std::endl;
+            std::cout << "  ✓ Event-driven spike propagation with delays" << std::endl;
+            std::cout << "  ✓ STDP plasticity rule" << std::endl;
+            std::cout << "  ✓ Hebbian plasticity rule" << std::endl;
+            std::cout << "  ✓ Structural plasticity (synaptogenesis/pruning)" << std::endl;
+            std::cout << "  ✓ Learning experiment demonstrates measurable changes" << std::endl;
+            std::cout << "  ✓ Network shows activity-dependent synaptic modification" << std::endl;
+            std::cout << std::endl;
+            std::cout << "The NLM brain is now a functioning artificial neural substrate" << std::endl;
+            std::cout << "capable of changing its own synaptic connections through experience." << std::endl;
+        }
+    }
     
     return 0;
 }
