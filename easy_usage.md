@@ -1,297 +1,287 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM Quick Start Guide
 
-## What is NLM?
+## Overview
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (Neural Learning Machine) is an experimental artificial developmental brain project. This guide provides quick access to the most common tasks and workflows.
 
-Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+## Quick Usage
 
-That's it! NLM simulates all of this.
+### 1. Building
 
----
+```bash
+# Build the project
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
 
-## The 3 Things You Need to Know
+### 2. Running Demos
 
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
+```bash
+# Phase 6 Integration Demo (recommended for first run)
+./build/nlm_phase6_demo
 
----
+# Phase 2 Neural Computation Demo (basic neural dynamics)
+./build/nlm_phase2_demo
 
-## Quick Start (Copy & Paste)
+# Phase 3 Learning Demo (world interaction)
+./build/nlm_phase3_demo
 
-### Example 1: Simplest Brain
+# Phase 4 Cognition Demo (advanced abilities)
+./build/nlm_phase4_demo
+```
 
-```python
-import pynlm
+### 3. Using the Command Line Interface
 
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+```bash
+# Run the NLM CLI
+./nlm-cli demo              # Run Phase 6 integration demo
+./nlm-cli experiment         # Run custom experiment
+./nlm-cli config <file>      # Load and validate config
+./nlm-cli test              # Run unit tests
+./nlm-cli visualize          # Start visualization
+./nlm-cli save-config <file> # Save current config
+```
 
-# Step 2: Turn it on
-brain.initialize()
+### 4. Python Bindings
 
-# Step 3: Make it think for 100 steps
+```bash
+# Install Python bindings
+cd python
+pip install -e .
+
+# Run a simple Python example
+python -c "
+from pynlm import NLM, BrainConfig
+
+config = BrainConfig()
+config.random_seed = 42
+config.neuron_count = 1000
+
+brain = NLM(config)
 for i in range(100):
-    brain.step(i)  # One step of thinking
+    brain.step(i * config.simulation_timestep)
 
-print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+print(f'Total spikes: {brain.getTotalSpikeCount()}')
+"
 ```
 
-### Example 2: Brain in a Simple World
+## Configuration
 
-```python
-import pynlm
+### Basic Configuration
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
+Create a configuration file (`configs/myconfig.cfg`):
 
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
-
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+```ini
+# NLM Configuration
+random_seed = 42
+simulation_timestep = 0.001
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.15
+platomacy_learning_rate = 0.01
 ```
 
----
+### Command Line Configuration
 
-## Simple Analogy
-
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
-
-```python
-import pynlm
-
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Initialize it
-brain.initialize()
-
-# Make it active
-brain.step(0)
-
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+```bash
+./nlm --config configs/myconfig.cfg --neurons 2000 --steps 5000
 ```
 
----
+## Common Workflows
 
-## Common Patterns
+### 1. Testing Your Installation
 
-### Pattern 1: Run a Simulation
+```bash
+# Run unit tests
+./build/nlm_test
 
-```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
-
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
+# Run integration demo
+./build/nlm_phase6_demo
 ```
 
-### Pattern 2: Get Brain Stats
+### 2. Running a Custom Experiment
 
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
+```bash
+# Run with default parameters
+./build/nlm
+
+# Run with custom parameters
+./build/nlm --neurons 5000 --steps 20000 --regions 4
+
+# Run with custom configuration
+./build/nlm --config configs/large_network.cfg
 ```
 
-### Pattern 3: Enable Brain Features
+### 3. Debugging and Development
 
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+```bash
+# Build with debugging symbols
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+make -j4
+
+# Run with debugging output
+./nlm --neurons 100 --steps 1000
 ```
 
----
+### 4. Performance Testing
 
-## What Each Part Does
+```bash
+# Build with performance profiling
+cd build
+cmake .. -DNLM_PERF_PROFILE=ON
+make -j4
 
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
-
----
-
-## Mini Projects
-
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
+# Run performance benchmarks
+./build/benchmark --mode full
 ```
-
-### Project 2: Brain Watching a World
-
-```python
-import pynlm
-
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
-
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
-
-print("Agent simulation complete!")
-```
-
----
-
-## Quick Reference
-
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
-
----
 
 ## Troubleshooting
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+### Build Issues
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+```bash
+# Ensure you have required dependencies
+sudo apt-get install cmake build-essential python3-dev
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+# Clean and rebuild
+cd build
+make clean
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
 
----
+### Runtime Issues
 
-## Next Steps
+```bash
+# Check for memory issues
+ulimit -v 4096000  # 4GB limit
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+# Check for file descriptor limits
+ulimit -n 1024
 
-That's it! You're now ready to use NLM.
+# Run with fewer neurons for testing
+./build/nlm --neurons 100 --steps 1000
+```
+
+### Configuration Issues
+
+```bash
+# Check configuration syntax
+# Configuration format: key = value
+# Comments start with #
+
+# Example config file
+configs/example.cfg
+```
+
+## Getting Help
+
+### Documentation
+
+- **Main README**: `README.md` - Complete project documentation
+- **Quick Guide**: `easy_usage.md` - This file
+- **Detailed Instructions**: `HOW_TO_USE.md` - Advanced usage
+- **API Documentation**: `docs/` - Technical API documentation
+
+### Command Line Help
+
+```bash
+# NLM CLI help
+./nlm-cli --help
+
+# NLM executable help
+./build/nlm --help
+```
+
+### Examples
+
+```bash
+# Find example programs
+find . -name "*example*" -type f
+
+# Look at test programs for patterns
+test/test_neuron.cpp
+```
+
+## Advanced Usage
+
+### Python Scripting
+
+```python
+from pynlm import NLM, BrainConfig
+import json
+
+# Create a custom brain
+config = BrainConfig()
+config.random_seed = 12345
+config.neuron_count = 2000
+config.simulation_timestep = 0.001
+
+brain = NLM(config)
+
+# Save brain state
+brain.saveState("my_brain.json")
+
+# Run simulation
+for step in range(1000):
+    brain.step(step * config.simulation_timestep)
+
+# Load saved state
+brain.loadState("saved_brain.json")
+```
+
+### Batch Processing
+
+```bash
+#!/bin/bash
+# batch_run.sh - Run multiple experiments
+
+for neurons in 100 500 1000 2000; do
+    echo "Running experiment with $neurons neurons..."
+    ./build/nlm --neurons $neurons --steps 1000 --output results_$neurons.txt
+    echo "Results saved to results_$neurons.txt"
+done
+```
+
+## Files and Directories
+
+```
+.
+├── build/                    # Build output directory
+├── configs/                  # Configuration files
+│   ├── default.cfg          # Default configuration
+│   └── example.cfg          # Example configuration
+├── docs/                     # Technical documentation
+├── easy_usage.md             # This quick start guide
+├── HOW_TO_USE.md             # Detailed instructions
+├── README.md                 # Complete documentation
+├── src/                      # Source code
+│   ├── ...
+├── tests/                    # Unit tests
+├── python/                   # Python bindings
+├── nlm-cli                  # Command line interface
+└── examples/                 # Example programs
+```
+
+## Phase Information
+
+NLM is developed in phases. Each phase adds new capabilities:
+
+- **Phase 1**: Project skeleton and core interfaces
+- **Phase 2**: Real neural computation with LIF neurons
+- **Phase 3**: World interaction and learning
+- **Phase 4**: Advanced cognitive abilities
+- **Phase 5**: Performance optimizations
+- **Phase 6**: Final integration of all systems
+
+Each demo corresponds to a specific phase. Start with Phase 6 demo for the most comprehensive test.
+
+## License
+
+MIT License
+
+## Support
+
+For issues and support, please refer to the main README.md file for contact information and project resources.

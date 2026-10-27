@@ -54,6 +54,14 @@ public:
     // Get observation space
     virtual size_t getObservationSpaceSize() const = 0;
     
+    // Integration with agent system
+    virtual std::unique_ptr<SensoryPercept> getPerceptForAgent() const;
+    virtual ActionResult applyAgentAction(const MotorCommand& motorCommand) = 0;
+    
+    // Configuration access
+    virtual float getDeltaTime() const = 0;
+    virtual void setDeltaTime(float dt) = 0;
+    
 protected:
     EnvironmentState* state_;
     float lastReward_;

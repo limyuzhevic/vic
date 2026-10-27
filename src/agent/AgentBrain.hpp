@@ -31,6 +31,9 @@ public:
     // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
     
+    // Apply advanced behavior modulation
+    void applyAdvancedBehavior(float reward, float predictedReward);
+    
     // Apply neuromodulation based on reward
     void applyRewardModulation(float reward, float predictedReward);
     
@@ -78,19 +81,21 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
+    // Motor neuron groups including advanced commands
     std::vector<Neuron*> motorForward_;
     std::vector<Neuron*> motorBackward_;
     std::vector<Neuron*> motorTurnLeft_;
     std::vector<Neuron*> motorTurnRight_;
     std::vector<Neuron*> motorInteract_;
+    std::vector<Neuron*> motorJump_;
     std::vector<Neuron*> motorWait_;
     
-    // Sensory neuron groups
+    // Sensory neuron groups including audio
     std::vector<Neuron*> sensoryVision_;
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
+    std::vector<Neuron*> sensoryAudio_;
     
     // Neuromodulation state
     float dopamineLevel_;

@@ -55,8 +55,11 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format or simple key=value)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from string
+    bool loadFromString(const std::string& content);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -90,8 +93,14 @@ public:
     // Clear all
     void clear();
     
-    // Get configuration summary
+        // Get configuration summary
     std::string summary() const;
+    
+    // Validate configuration values against known keys
+    bool validate() const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
     
 private:
     struct Impl;

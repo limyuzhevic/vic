@@ -1,0 +1,253 @@
+#!/usr/bin/env python3
+
+"""
+NLM Command Line Interface
+
+A user-friendly interface for running NLM simulations with various modes
+and configuration options.
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+# Add project root to Python path
+project_root = Path(__file__).parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+from src.core.Config.Config import Config
+from src.agent.AgentBrain import AgentBrain
+from src.brain.Brain import Brain
+from src.world.SimpleWorld import SimpleWorld
+from src.environment.Environment import GridWorldEnvironment
+
+class NLMCLI:
+    """NLM Command Line Interface"""
+    
+    def __init__(self):
+        self.config = Config()
+        
+    def run_demo(self, args):
+        """Run NLM Phase 6 demo"""
+        print("=== NLM Phase 6 Integration Demo ===")
+        print("This demo tests all brain systems integration...")
+        
+        # Run the existing Phase 6 demo binary
+        demo_binary = project_root / "build" / "nlm_phase6_demo"
+        if demo_binary.exists():
+            try:
+                result = subprocess.run([str(demo_binary)], 
+                                      capture_output=True, text=True, cwd=project_root)
+                print(result.stdout)
+                if result.stderr:
+                    print("STDERR:", result.stderr)
+                return result.returncode == 0
+            except Exception as e:
+                print(f"Error running demo: {e}")
+                return False
+        else:
+            print(f"Demo binary not found: {demo_binary}")
+            return False
+            
+    def run_experiment(self, args):
+        """Run a custom NLM experiment"""
+        print(f"=== NLM Experiment Mode ===")
+        print(f"Running experiment with {args.neuron_count} neurons for {args.steps} steps")
+        
+        # Initialize configuration
+        self.config.set("random_seed", 42)
+        self.config.set("simulation_timestep", 0.001)
+        self.config.set("neuron_count", args.neuron_count)
+        self.config.set("region_count", args.regions)
+        self.config.set("connection_probability", args.connection_prob)
+        
+        # Create brain
+        brain = Brain(self.config)
+        if (!brain->initialize()) {
+            print("Failed to initialize brain!")
+            return False
+        }
+        
+        # Create agent
+        auto agent = AgentBrain(brain);
+        
+        // Create world
+        auto world = SimpleWorld();
+        world->configure(args.width, args.height, 16, 16);
+        world->setAgentStart(args.width / 2.0, args.height / 2.0);
+        
+        // Run simulation
+        auto brain = std::make_shared<Brain>(config);
+        auto agentBrain = AgentBrain(brain);
+        agentBrain->initialize(world);
+        
+        for (SimulationStep step = 0; step < args.steps; ++step) {
+            // Get sensory percept
+            auto percept = world->getSensoryPercept();
+            agentBrain->processSensoryInput(percept);
+            
+            // Get motor command
+            MotorCommand cmd = agentBrain->decodeMotorCommand();
+            
+            // Apply action
+            ActionResult result = world->applyMotorCommand(cmd, step * 0.001);
+            
+            // Log progress
+            if (step % 100 == 0) {
+                std::cout << "Step " << step 
+                         << " | Firing: " << brain->getFiringNeuronCount()
+                         << " | Reward: " << result.reward << std::endl;
+            }
+        }
+        
+        std::cout << "=== Experiment Complete ===" << std::endl;
+        std::cout << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        return true;
+    }
+    
+    def run_config(self, args):
+        """Load and display configuration"""
+        print(f"=== NLM Configuration: {args.config_file} ===")
+        
+        if (!config->loadFromFile(args.config_file)) {
+            std::cerr << "Failed to load configuration from " << args.config_file << std::endl;
+            return false;
+        }
+        
+        std::cout << config->summary() << std::endl;
+        
+        // Validate configuration
+        auto errors = config->getValidationErrors();
+        if (!errors.empty()) {
+            std::cerr << "Configuration validation errors:" << std::endl;
+            for (const auto& error : errors) {
+                std::cerr << "  - " << error << std::endl;
+            }
+            return false;
+        }
+        
+        std::cout << "Configuration is valid!" << std::endl;
+        return true;
+    
+    def run_test(self, args):
+        """Run unit tests"""
+        print("=== NLM Unit Tests ===")
+        
+        // Run the nlm_test binary
+        test_binary = project_root / "build" / "nlm_test";
+        if test_binary.exists()) {
+            try {
+                result = subprocess.run([str(test_binary)], 
+                                      capture_output=True, text=True, cwd=project_root);
+                print(result.stdout);
+                if (result.stderr) {
+                    print("STDERR:", result.stderr);
+                }
+                return result.returncode == 0;
+            } catch (Exception as e) {
+                print(f"Error running tests: {e}");
+                return false;
+            }
+        } else {
+            print(f"Test binary not found: {test_binary}")
+            return false;
+        }
+    
+    def run_visualize(self, args):
+        """Start visualization (placeholder for now)"""
+        print("=== NLM Visualization ===")
+        std::cout << "Visualization module not yet implemented." << std::endl;
+        std::cout << "Features planned:" << std::endl;
+        std::cout << "  - Neural activity visualization" << std::endl;
+        std::cout << "  - Brain state monitoring" << std::endl;
+        std::cout << "  - Real-time simulation viewing" << std::endl;
+        std::cout << "  - Export for external tools" << std::endl;
+        return true;
+    
+    def save_config(self, args):
+        """Save current configuration to file"""
+        if (!config->saveToFile(args.output_file)) {
+            std::cerr << "Failed to save configuration to " << args.output_file << std::endl;
+            return false;
+        }
+        
+        std::cout << "Configuration saved to " << args.output_file << std::endl;
+        return true;
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="NLM (Neural Learning Machine) Command Line Interface",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  nlm-cli demo                    Run Phase 6 integration demo
+  nlm-cli experiment --neurons 1000 --steps 5000  Run custom experiment
+  nlm-cli config --config configs/myconfig.cfg  Load and validate config
+  nlm-cli test                    Run unit tests
+  nlm-cli visualize               Start visualization
+  nlm-cli save-config --output myconfig.cfg   Save current config
+        """
+    )
+    
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Demo command
+    demo_parser = subparsers.add_parser("demo", help="Run Phase 6 integration demo")
+    demo_parser.set_defaults(func=lambda args: NLMCLI().run_demo(args))
+    
+    # Experiment command
+    experiment_parser = subparsers.add_parser("experiment", help="Run custom NLM experiment")
+    experiment_parser.add_argument("--neurons", type=int, default=500,
+                                  help="Number of neurons (default: 500)")
+    experiment_parser.add_argument("--steps", type=int, default=1000,
+                                  help="Number of simulation steps (default: 1000)")
+    experiment_parser.add_argument("--regions", type=int, default=1,
+                                  help="Number of brain regions (default: 1)")
+    experiment_parser.add_argument("--connection-prob", type=float, default=0.15,
+                                  help="Connection probability (0.0-1.0, default: 0.15)")
+    experiment_parser.add_argument("--width", type=float, default=10.0,
+                                  help="World width (default: 10.0)")
+    experiment_parser.add_argument("--height", type=float, default=10.0,
+                                  help="World height (default: 10.0)")
+    experiment_parser.set_defaults(func=lambda args: NLMCLI().run_experiment(args))
+    
+    # Config command
+    config_parser = subparsers.add_parser("config", help="Load and validate configuration")
+    config_parser.add_argument("config_file", help="Configuration file path")
+    config_parser.set_defaults(func=lambda args: NLMCLI().run_config(args))
+    
+    # Test command
+    test_parser = subparsers.add_parser("test", help="Run unit tests")
+    test_parser.set_defaults(func=lambda args: NLMCLI().run_test(args))
+    
+    # Visualize command
+    visualize_parser = subparsers.add_parser("visualize", help="Start visualization")
+    visualize_parser.set_defaults(func=lambda args: NLMCLI().run_visualize(args))
+    
+    # Save config command
+    save_config_parser = subparsers.add_parser("save-config", help="Save current configuration")
+    save_config_parser.add_argument("output_file", help="Output configuration file path")
+    save_config_parser.set_defaults(func=lambda args: NLMCLI().save_config(args))
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    if not hasattr(args, 'func'):
+        parser.print_help()
+        return 1
+    
+    # Run the command
+    try {
+        return 0 if args.func(args) else 1;
+    } catch (Exception as e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
+
+if __name__ == "__main__":
+    sys.exit(main());

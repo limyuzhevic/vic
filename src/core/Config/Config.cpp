@@ -55,7 +55,37 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
+// Load from string (JSON format or simple key=value)
+bool Config::loadFromString(const std::string& content) {
+    std::istringstream stream(content);
+    
+    std::string line;
+    while (std::getline(stream, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -197,9 +227,81 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+// Validate configuration values against known keys
+bool Config::validate() const {
+    std::vector<std::string> errors = getValidationErrors();
+    return errors.empty();
 }
 
-// Explicit template instantiations
+// Get validation errors
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    // Check for required keys
+    const std::vector<std::string> requiredKeys = {
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count",
+        "region_count",
+        "connection_probability"
+    };
+    
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            errors.push_back("Missing required configuration key: " + key);
+        }
+    }
+    
+    // Validate value ranges
+    if (has("random_seed")) {
+        auto seed = get<int64_t>("random_seed");
+        if (seed && (*seed < 0 || *seed > 2147483647)) {
+            errors.push_back("random_seed must be between 0 and 2147483647");
+        }
+    }
+    
+    if (has("simulation_timestep")) {
+        auto timestep = get<double>("simulation_timestep");
+        if (timestep && (*timestep <= 0.0 || *timestep > 1.0)) {
+            errors.push_back("simulation_timestep must be between 0.0 and 1.0");
+        }
+    }
+    
+    if (has("neuron_count")) {
+        auto neuronCount = get<int64_t>("neuron_count");
+        if (neuronCount && (*neuronCount <= 0)) {
+            errors.push_back("neuron_count must be positive");
+        }
+    }
+    
+    if (has("region_count")) {
+        auto regionCount = get<int64_t>("region_count");
+        if (regionCount && (*regionCount <= 0)) {
+            errors.push_back("region_count must be positive");
+        }
+    }
+    
+    if (has("connection_probability")) {
+        auto connProb = get<float>("connection_probability");
+        if (connProb && (*connProb < 0.0f || *connProb > 1.0f)) {
+            errors.push_back("connection_probability must be between 0.0 and 1.0");
+        }
+    }
+    
+    // Check for duplicate keys
+    std::vector<std::string> keys;
+    for (const auto& entry : pImpl->entries) {
+        keys.push_back(entry.key);
+    }
+    std::sort(keys.begin(), keys.end());
+    for (size_t i = 1; i < keys.size(); ++i) {
+        if (keys[i] == keys[i-1]) {
+            errors.push_back("Duplicate configuration key: " + keys[i]);
+        }
+    }
+    
+    return errors;
+}
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
