@@ -21,8 +21,9 @@ public:
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
-    // Get prediction error
-    float getPredictionError() const;
+    // Update prediction system with current state
+    // Called during each simulation step to maintain predictions
+    void update(TimestepDuration dt);
     
     // Get prediction confidence
     float getConfidence() const;

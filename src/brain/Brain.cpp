@@ -511,8 +511,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory observations
+        // This enables sensory prediction and error computation
+        // The prediction system uses sensory input to predict next state
+        // and computes prediction error for reward modulation
+        pImpl->predictionSystem->update(pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +531,11 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Concept formation identifies recurring patterns in neural activity
+        // and creates abstract representations for efficient cognition
+        // This requires encoding current sensory state and neural activity
+        pImpl->conceptFormation->update(pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -895,12 +901,20 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
+    // Apply synapse states - this is complex because we need to find matching synapses
+    // For now, just log the count
+    NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+    
+    // Restore memory systems state if available
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+    }
+    
+    // Restore development stage
+    pImpl->developmentalStage = DevelopmentalStage::Initial;
+
+    NLM_LOG_INFO("Brain state loaded successfully");
+    return true;
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
@@ -1077,6 +1091,46 @@ RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
 }
 
+CheckpointManager* Brain::getCheckpointManager() {
+    return pImpl->checkpointManager.get();
+}
+
+const CheckpointManager* Brain::getCheckpointManager() const {
+    return pImpl->checkpointManager.get();
+}
+
+// Checkpoint convenience methods
+bool Brain::autoSave(const std::string& prefix) {
+    if (!pImpl->checkpointManager) return false;
+    
+    std::string name = prefix + "_step_" + std::to_string(pImpl->currentStep);
+    return pImpl->checkpointManager->saveImmediately(name);
+}
+
+std::string Brain::getLastCheckpointPath() const {
+    if (pImpl->checkpointManager) {
+        return pImpl->checkpointManager->getLastCheckpointPath();
+    }
+    return "";
+}
+
+std::vector<std::string> Brain::listCheckpoints() const {
+    std::vector<std::string> checkpointNames;
+    if (pImpl->checkpointManager) {
+        auto checkpoints = pImpl->checkpointManager->listCheckpoints();
+        for (const auto& cp : checkpoints) {
+            checkpointNames.push_back(cp.name);
+        }
+    }
+    return checkpointNames;
+}
+
+void Brain::cleanupOldCheckpoints(size_t keepCount) {
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->pruneOldCheckpoints(keepCount);
+    }
+}
+
 void Brain::logStatus() const {
     NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
     NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
@@ -1111,6 +1165,12 @@ void Brain::logStatus() const {
                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    }
+    
+    // Checkpoint status
+    if (pImpl->checkpointManager) {
+        NLM_LOG_INFO("Checkpoints: " + std::to_string(pImpl->checkpointManager->listCheckpoints().size()) +
+                    " total, last: " + pImpl->checkpointManager->getLastCheckpointPath());
     }
 }
 

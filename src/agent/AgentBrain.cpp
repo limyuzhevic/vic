@@ -149,6 +149,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
 }
 
+    return best;
+}
+
+// Enhanced motor decoding with memory integration
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
     
@@ -159,7 +163,90 @@ MotorCommand AgentBrain::decodeMotorCommand() {
         decoded = selectWithCuriosity(decoded);
     }
     
+    // Apply planning-based motor selection if available
+    if (brain_->getPlanner()) {
+        std::vector<float> currentState = getCurrentSensoryState();
+        ActionType plannedAction = brain_->getPlanner()->planAction(currentState, expectedReward_);
+        
+        // Convert action to motor command
+        MotorCommand plannedMotor = convertActionToMotor(plannedAction);
+        
+        // Blend planned action with direct decoding (blend based on confidence)
+        float planningConfidence = brain_->getPlanner()->getPlanningConfidence();
+        if (planningConfidence > 0.5f && plannedMotor != MotorCommand::Wait) {
+            // If we have a good plan, prefer it over raw motor activity
+            decoded = plannedMotor;
+        }
+    }
+    
+    // Apply concept-based motor selection if available
+    if (brain_->getConceptFormation() && conceptFormationEnabled_) {
+        std::vector<float> currentState = getCurrentSensoryState();
+        size_t conceptId = brain_->getConceptFormation()->getMatchingConcept(currentState);
+        
+        if (conceptId > 0) {
+            const auto& concept = brain_->getConceptFormation()->getConcept(conceptId);
+            
+            // Check if concept suggests specific action
+            ActionType conceptSuggestedAction = getConceptSuggestedAction(concept);
+            if (conceptSuggestedAction != ActionType::Wait) {
+                MotorCommand conceptMotor = convertActionToMotor(conceptSuggestedAction);
+                
+                // Blend with current selection
+                float conceptStrength = concept.avgStability;
+                if (conceptStrength > 0.7f) {
+                    decoded = conceptMotor;
+                }
+            }
+        }
+    }
+    
     return decoded;
+}
+
+// Get current sensory state for cognitive systems
+std::vector<float> AgentBrain::getCurrentSensoryState() const {
+    std::vector<float> state;
+    
+    // Combine vision, touch, and internal sensors
+    state.insert(state.end(), previousVision_.begin(), previousVision_.end());
+    
+    // Add other sensory modalities
+    // In full implementation, would add touch, proprioception, etc.
+    
+    return state;
+}
+
+// Convert ActionType to MotorCommand
+MotorCommand AgentBrain::convertActionToMotor(ActionType action) const {
+    switch (action) {
+        case ActionType::MoveForward: return MotorCommand::MoveForward;
+        case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+        case ActionType::TurnRight: return MotorCommand::TurnRight;
+        case ActionType::LookLeft: return MotorCommand::LookLeft;
+        case ActionType::LookRight: return MotorCommand::LookRight;
+        case ActionType::Interact: return MotorCommand::Interact;
+        case ActionType::Wait: return MotorCommand::Wait;
+        default: return MotorCommand::Wait;
+    }
+}
+
+// Get action suggested by concept
+ActionType AgentBrain::getConceptSuggestedAction(const DiscoveredConcept& concept) const {
+    // Simple heuristic: if concept category contains certain words, suggest action
+    std::string category = concept.categoryHint;
+    
+    if (category.find("reward") != std::string::npos) {
+        return ActionType::Interact;
+    } else if (category.find("danger") != std::string::npos || 
+               category.find("harm") != std::string::npos) {
+        return ActionType::Wait; // Avoid potentially harmful actions
+    } else if (category.find("explore") != std::string::npos) {
+        return ActionType::MoveForward;
+    }
+    
+    return ActionType::Wait;
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
@@ -334,17 +421,161 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
-    
-    // Clear previous vision
+// Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// Enhanced memory integration methods
+void AgentBrain::integrateWithWorkingMemory() {
+    if (!brain_ || !brain_->getWorkingMemory()) return;
+    
+    // Get working memory content
+    const auto& memoryNeurons = brain_->getWorkingMemory()->getMemoryNeurons();
+    
+    if (memoryNeurons.empty()) return;
+    
+    // Analyze memory content for influence on motor output
+    std::vector<float> memoryPattern = brain_->getWorkingMemory()->retrieve();
+    
+    // Check if memory suggests specific actions
+    if (!memoryPattern.empty()) {
+        // Apply memory influence based on activation levels
+        float memoryActivation = brain_->getWorkingMemory()->getMemoryActivity();
+        
+        if (memoryActivation > 0.5f) {
+            // High memory activation means we should be more persistent
+            // If the agent was planning to do something, continue that action
+            // For now, just increase the tendency to not change actions
+            if (lastDecodedAction_ != MotorCommand::Wait) {
+                // Keep current motor command more strongly
+                currentMotorTendency_ = lastDecodedAction_;
+                motorTendencyConfidence_ += 0.2f * memoryActivation;
+            }
+        }
+    }
+}
+
+void AgentBrain::integrateWithEpisodicMemory() {
+    if (!brain_ || !brain_->getEpisodicMemory()) return;
+    
+    // Get recent episodes that might be relevant
+    size_t episodeCount = brain_->getEpisodicMemory()->getEpisodeCount();
+    if (episodeCount == 0) return;
+    
+    // Get most recent episodes
+    auto recentEpisodes = brain_->getEpisodicMemory()->getRecentEpisodes(std::min<size_t>(3, episodeCount));
+    
+    for (const auto* episode : recentEpisodes) {
+        if (!episode) continue;
+        
+        // Analyze episode for influence on current behavior
+        if (episode->action == lastDecodedAction_) {
+            // Success: this action worked before
+            if (episode->reward > 0.0f) {
+                // Positive outcome - reinforce this action
+                reinforceAction(lastDecodedAction_, 0.5f);
+            } else {
+                // Negative outcome - be cautious
+                reduceActionConfidence(lastDecodedAction_, 0.3f);
+            }
+        }
+    }
+}
+
+void AgentBrain::integrateWithAssociativeMemory() {
+    if (!brain_ || !brain_->getAssociativeMemory()) return;
+    
+    std::vector<float> currentState = getCurrentSensoryState();
+    
+    // Retrieve associations for current state
+    auto associations = brain_->getAssociativeMemory()->retrieve(currentState, 3);
+    
+    for (const auto& assoc : associations) {
+        // Convert associated pattern to action suggestion
+        if (!assoc.empty()) {
+            // Pattern might suggest a course of action
+            // For now, just log the association
+            // In full implementation, would convert pattern to motor command
+        }
+    }
+}
+
+void AgentBrain::applyMemoryGuidedLearning(float reward, float predictionError) {
+    if (!brain_) return;
+    
+    // Update memory systems based on experience
+    NeuralWorkingMemory* workingMem = brain_->getWorkingMemory();
+    NeuralEpisodicMemory* episodicMem = brain_->getEpisodicMemory();
+    NeuralAssociativeMemory* assocMem = brain_->getAssociativeMemory();
+    
+    if (workingMem) {
+        // Store experience in working memory
+        std::vector<float> currentPattern = getCurrentSensoryState();
+        workingMem->store(currentPattern, std::abs(reward) * 0.5f + std::abs(predictionError) * 0.5f);
+    }
+    
+    if (episodicMem && reward != 0.0f) {
+        // Store episode when there's significant outcome
+        EpisodicMemoryItem episode;
+        episode.timestamp = currentStep_;
+        episode.action = lastDecodedAction_;
+        episode.reward = reward;
+        episode.energy = currentEnergy_;
+        episode.novelty = noveltyLevel_;
+        episode.sensoryState = getCurrentSensoryState();
+        
+        // Generate predicted next state based on action
+        std::vector<float> predictedState = predictNextState();
+        episode.resultingSensoryState = predictedState;
+        episode.resultingReward = reward;
+        
+        episodicMem->storeEpisode(episode);
+    }
+    
+    if (assocMem && !currentStatePattern_.empty()) {
+        // Learn associations between current and resulting states
+        assocMem->associateFromExperience(episode);
+    }
+}
+
+void AgentBrain::applyMemoryGuidedPlanning() {
+    if (!brain_ || !brain_->getPlanner()) return;
+    
+    std::vector<float> currentState = getCurrentSensoryState();
+    
+    // Get planning depth based on memory availability
+    size_t planningDepth = 2;  // Default
+    
+    // Adjust planning based on memory
+    if (brain_->getWorkingMemory() && brain_->getWorkingMemory()->getActiveTraces() > 0) {
+        planningDepth = 4;  // More memory = deeper planning
+    }
+    
+    brain_->getPlanner()->setPlanningDepth(planningDepth);
+    
+    // Set planning goal based on memory
+    std::vector<float> goalState = getPlanningGoal();
+    brain_->getPlanner()->setCurrentGoal(goalState);
+    
+    // Plan action
+    ActionType plannedAction = brain_->getPlanner()->planAction(currentState, expectedReward_);
+    plannedAction_ = plannedAction;
+}
+
+void AgentBrain::applyMemoryGuidedAttention() {
+    if (!brain_ || !brain_->getAttention()) return;
+    
+    std::vector<float> currentState = getCurrentSensoryState();
+    
+    // Get competing sensory inputs
+    std::vector<NeuronId> competitors;
+    if (brain_->getWorkingMemory()) {
+        competitors = brain_->getWorkingMemory()->getMemoryNeurons();
+    }
+    
+    if (!competitors.empty()) {
+        brain_->getAttention()->processCompetition(competitors);
+    }
 }
 
 } // namespace nlm

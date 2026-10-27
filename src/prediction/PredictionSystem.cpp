@@ -1,4 +1,5 @@
 #include "PredictionSystem.hpp"
+#include "../core/Types/Types.hpp"
 
 namespace nlm {
 
@@ -53,8 +54,24 @@ void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    pImpl->errorHistory.push_back(pImpl->predictionError);
+}
+
+void PredictionSystem::update(TimestepDuration dt) {
+    // Update prediction system with current state
+    // Called during each simulation step to maintain predictions
+    // For now, maintain prediction error history and confidence
+    static float timeSinceLastUpdate = 0.0f;
+    timeSinceLastUpdate += dt;
+    
+    // Gradually reduce prediction error over time (model uncertainty)
+    if (timeSinceLastUpdate > 1.0f) {
+        pImpl->predictionError *= 0.95f;  // Decay error toward zero
+        timeSinceLastUpdate = 0.0f;
+    }
+    
+    // Confidence decreases with prediction error
+    pImpl->confidence = 1.0f / (1.0f + std::abs(pImpl->predictionError));
 }
 
 } // namespace nlm
