@@ -207,7 +207,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        .def("to_dict", [](const Action& self) {
+            py::dict result;
+            result["type"] = self.getType();
+            result["parameters"] = self.getParameters();
+            result["name"] = self.getName();
+            return result;
+        }, "Convert Action to Python dictionary");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -219,7 +226,17 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("radius", &WorldObject::radius)
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+        .def_readwrite("active", &WorldObject::active)
+        .def("to_dict", [](const WorldObject& self) {
+            py::dict result;
+            result["x"] = self.x;
+            result["y"] = self.y;
+            result["radius"] = self.radius;
+            result["type"] = self.type;
+            result["value"] = self.value;
+            result["active"] = self.active;
+            return result;
+        }, "Convert WorldObject to Python dictionary");
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
@@ -352,6 +369,45 @@ PYBIND11_MODULE(pynlm, m) {
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
+
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Development system for brain maturation)pbdoc")
+        .def("update", static_cast<void(DevelopmentSystem::*)(Brain*, RandomGenerator&, TimestepDuration)>(&DevelopmentSystem::update),
+             py::arg("brain"), py::arg("rng"), py::arg("timestep"),
+             "Update development system")
+        .def("update", static_cast<void(DevelopmentSystem::*)(Brain*, SimulationStep)>(&DevelopmentSystem::update),
+             py::arg("brain"), py::arg("currentStep"),
+             "Update development system (simple version)")
+        .def("getStage", &DevelopmentSystem::getStage)
+        .def("setStage", &DevelopmentSystem::setStage, py::arg("stage"))
+        .def("advanceStage", &DevelopmentSystem::advanceStage)
+        .def("getStageName", &DevelopmentSystem::getStageName)
+        .def("getPlasticityModifier", &DevelopmentSystem::getPlasticityModifier)
+        .def("isCriticalPeriod", &DevelopmentSystem::isCriticalPeriod)
+        .def("getCriticalPeriodProgress", &DevelopmentSystem::getCriticalPeriodProgress)
+        .def("getDevelopmentalAge", &DevelopmentSystem::getDevelopmentalAge)
+        .def("setDevelopmentalAge", &DevelopmentSystem::setDevelopmentalAge, py::arg("age"));
+
+    py::class_<Neuromodulator>(m, "Neuromodulator", R"pbdoc(Abstract base for neuromodulatory signals)pbdoc")
+        .def("getName", &Neuromodulator::getName, "Get modulator name")
+        .def("getLevel", &Neuromodulator::getLevel, "Get current concentration/level")
+        .def("setLevel", &Neuromodulator::setLevel, py::arg("level"), "Set current concentration/level")
+        .def("getPlasticityFactor", &Neuromodulator::getPlasticityFactor, "Get neuromodulatory effect on plasticity")
+        .def("update", &Neuromodulator::update, py::arg("dt"), "Update neuromodulator state");
+
+    py::class_<Dopamine, Neuromodulator>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"), "Signal reward")
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError, py::arg("error"), "Signal reward prediction error");
+
+    py::class_<Curiosity, Neuromodulator>(m, "Curiosity", R"pbdoc(Curiosity neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getExplorationDrive", &Curiosity::getExplorationDrive)
+        .def("setExplorationDrive", &Curiosity::setExplorationDrive, py::arg("drive"));
+
+    py::class_<Novelty, Neuromodulator>(m, "Novelty", R"pbdoc(Novelty detection neuromodulator)pbdoc")
+        .def(py::init<>())
+        .def("getNoveltyLevel", &Novelty::getNoveltyLevel)
+        .def("detectNovelty", &Novelty::detectNovelty, py::arg("input_pattern"), "Detect novelty in input pattern");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

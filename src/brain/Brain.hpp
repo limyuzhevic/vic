@@ -148,6 +148,9 @@ public:
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
     
+    // Get all integrated systems at once for advanced access
+    std::map<std::string, std::any> getIntegratedSystems() const;
+    
     // ========== PREDICTION SYSTEM ==========
     
     // Prediction system for sensory prediction and error computation

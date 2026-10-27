@@ -11,14 +11,18 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <map>
+#include <any>
 
 namespace nlm {
 
@@ -1115,3 +1119,33 @@ void Brain::logStatus() const {
 }
 
 } // namespace nlm
+
+// Implementation of getIntegratedSystems method
+std::map<std::string, std::any> Brain::getIntegratedSystems() const {
+    std::map<std::string, std::any> systems;
+    
+    // Add memory systems
+    systems["working_memory"] = getWorkingMemory();
+    systems["episodic_memory"] = getEpisodicMemory();
+    systems["associative_memory"] = getAssociativeMemory();
+    
+    // Add prediction system
+    systems["prediction_system"] = getPredictionSystem();
+    
+    // Add cognition systems
+    systems["planner"] = getPlanner();
+    systems["concept_formation"] = getConceptFormation();
+    systems["attention"] = getAttention();
+    
+    // Add development system
+    systems["development_system"] = getDevelopmentSystem();
+    systems["developmental_stage"] = getDevelopmentalStage();
+    
+    // Add neuromodulation systems
+    systems["dopamine"] = getDopamine();
+    systems["curiosity"] = getCuriosity();
+    systems["novelty"] = getNovelty();
+    systems["prediction_error"] = getPredictionErrorSignal();
+    
+    return systems;
+}
