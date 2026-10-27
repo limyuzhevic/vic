@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -55,8 +57,17 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/key-value format auto-detected)
     bool loadFromFile(const std::string& filepath);
+    
+    // Legacy key=value format
+    bool loadFromKeyValue(const std::string& filepath);
+    
+    // JSON format
+    bool loadFromJSON(const std::string& filepath);
+    
+    // YAML format
+    bool loadFromYAML(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -100,6 +111,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parsing helpers
+    void parseJSON(const nlohmann::json& jsonData, ConfigSource source);
+    void parseYAML(YAML::Node node, ConfigSource source);
+    void setFromJSONValue(const std::string& key, const nlohmann::json& value, ConfigSource source);
+    void setFromYAMLValue(const std::string& key, const YAML::Node& value, ConfigSource source);
 };
 
 } // namespace nlm

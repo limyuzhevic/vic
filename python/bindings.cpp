@@ -145,11 +145,17 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON/YAML/file format (auto-detected by extension)")
+        .def("loadFromJSON", &Config::loadFromJSON, py::arg("filepath"),
              "Load configuration from a JSON file")
+        .def("loadFromYAML", &Config::loadFromYAML, py::arg("filepath"),
+             "Load configuration from a YAML file")
+        .def("loadFromKeyValue", &Config::loadFromKeyValue, py::arg("filepath"),
+             "Load configuration from a key=value file (backward compatibility)")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
