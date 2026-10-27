@@ -14,9 +14,17 @@ public:
     WorkingMemory();
     ~WorkingMemory();
     
+    // Initialize with brain reference
+    void initialize(Brain* brain);
+    
+    // Set capacity
+    void setCapacity(size_t cap);
+    
     // Store item
-    // TODO PHASE 2: Implement real storage
     void store(NeuronId neuron, float value);
+    
+    // Store specific neuron activation (for neural-based implementation)
+    void storeToNeuron(NeuronId neuron, float activation);
     
     // Retrieve item
     float retrieve(NeuronId neuron) const;
@@ -34,6 +42,15 @@ public:
     // Decay all items
     void decay(float decayRate);
     
+    // Update working memory (for neural-based implementation)
+    void update(float dt);
+    
+    // Get active memory traces (for neural-based implementation)
+    size_t getActiveTraces() const;
+    
+    // Get memory neurons (for neural-based implementation)
+    std::vector<NeuronId> getMemoryNeurons() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
@@ -48,7 +65,12 @@ struct EpisodicMemoryItem {
     std::vector<float> values;
     std::string metadata;
     
-    EpisodicMemoryItem() : timestamp(0) {}
+    // Additional fields for replay and consolidation
+    std::vector<NeuronId> activeNeurons;
+    std::vector<float> neuronActivations;
+    float reward;
+    
+    EpisodicMemoryItem() : timestamp(0), reward(0.0f) {}
 };
 
 class EpisodicMemory {
@@ -68,11 +90,14 @@ public:
     // Get recent episodes
     std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
     
-    // Clear all
-    void clear();
+    // Get recent episodes (alias for getRecentEpisodes for compatibility)
+    const std::vector<const EpisodicMemoryItem*>& getRecentEpisodes(size_t count) const;
     
-    // Memory consolidation (move to long-term)
-    void consolidate(float relevanceThreshold);
+    // Get episodes suitable for replay
+    const std::vector<const EpisodicMemoryItem*>& getEpisodesForReplay(size_t count) const;
+    
+    // Replay an episode (reactivate memory traces)
+    void replayEpisode(const EpisodicMemoryItem* episode);
     
 private:
     struct Impl;

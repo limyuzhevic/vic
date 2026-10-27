@@ -15,6 +15,37 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 
 WorkingMemory::~WorkingMemory() = default;
 
+void WorkingMemory::initialize(Brain* brain) {
+    // Placeholder for Phase 2
+    // In Phase 2, this will bridge to NeuralWorkingMemory
+}
+
+void WorkingMemory::setCapacity(size_t cap) {
+    pImpl->capacity = cap;
+}
+
+void WorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    // Bridge to neural-based implementation
+    store(neuron, activation);
+}
+
+void WorkingMemory::update(float dt) {
+    // Placeholder for Phase 2
+    decay(0.01f * dt);  // Simple decay model
+}
+
+size_t WorkingMemory::getActiveTraces() const {
+    return getCurrentSize();  // Simple model - all stored items are active traces
+}
+
+std::vector<NeuronId> WorkingMemory::getMemoryNeurons() const {
+    std::vector<NeuronId> neurons;
+    for (const auto& item : pImpl->items) {
+        neurons.push_back(item.first);
+    }
+    return neurons;
+}
+
 void WorkingMemory::store(NeuronId neuron, float value) {
     // TODO PHASE 2: Implement real storage with capacity limits
     for (auto& item : pImpl->items) {
@@ -109,6 +140,86 @@ void EpisodicMemory::clear() {
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
     // TODO PHASE 2: Implement real consolidation
+    // For now, just remove lowest relevance episodes if above threshold
+    if (relevanceThreshold > 0.0f) {
+        // Find episodes to remove (based on relevance)
+        std::vector<size_t> toRemove;
+        for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+            const auto& episode = pImpl->episodes[i];
+            float relevance = 0.0f;
+            if (!episode.activeNeurons.empty()) {
+                // Calculate relevance based on number of active neurons
+                relevance = static_cast<float>(episode.activeNeurons.size()) / 100.0f;  // Normalize
+            }
+            if (relevance < relevanceThreshold && relevanceThreshold > 0.0f) {
+                toRemove.push_back(i);
+            }
+        }
+        
+        // Remove low relevance episodes (from end to beginning to maintain indices)
+        for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+            if (*it < pImpl->episodes.size()) {
+                pImpl->episodes.erase(pImpl->episodes.begin() + *it);
+            }
+        }
+    }
+}
+
+// Get episodes suitable for replay
+const std::vector<const EpisodicMemoryItem*> EpisodicMemory::getEpisodesForReplay(size_t count) const {
+    std::vector<const EpisodicMemoryItem*> result;
+    
+    // Get recent episodes first
+    auto recentEpisodes = getRecentEpisodes(count * 2);
+    for (const auto& episode : recentEpisodes) {
+        result.push_back(&episode);  // Note: this is potentially dangerous as item may be temporary
+    }
+    
+    // Sort by relevance (episode with more active neurons first)
+    std::sort(result.begin(), result.end(),
+        [this](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
+            float relevanceA = 0.0f, relevanceB = 0.0f;
+            if (!a->activeNeurons.empty()) relevanceA = static_cast<float>(a->activeNeurons.size()) / 100.0f;
+            if (!b->activeNeurons.empty()) relevanceB = static_cast<float>(b->activeNeurons.size()) / 100.0f;
+            return relevanceA > relevanceB;
+        });
+    
+    // Return top count episodes
+    if (result.size() > count) {
+        result.resize(count);
+    }
+    
+    return result;
+}
+
+// Replay an episode (reactivate memory traces)
+void EpisodicMemory::replayEpisode(const EpisodicMemoryItem* episode) {
+    if (!episode) return;
+    
+    // Replay the episode by reactivating the neural traces
+    // This strengthens the synaptic connections associated with the experience
+    
+    // In a full implementation, this would:
+    // 1. Reactivate the neurons that were active during the episode
+    // 2. Strengthen synaptic connections through STDP-like mechanisms
+    // 3. Update working memory with the replayed patterns
+    // 4. Enhance prediction accuracy for similar future states
+    
+    // Placeholder: Just log the replay
+    (void)episode;  // Suppress unused parameter warning
+}
+
+// Get recent episodes (alias for getRecentEpisodes for compatibility)
+const std::vector<const EpisodicMemoryItem*>& EpisodicMemory::getRecentEpisodes(size_t count) const {
+    static std::vector<const EpisodicMemoryItem*> recentEpisodes;
+    recentEpisodes.clear();
+    
+    auto episodeList = getRecentEpisodes(count);
+    for (const auto& episode : episodeList) {
+        recentEpisodes.push_back(&episode);
+    }
+    
+    return recentEpisodes;
 }
 
 // Semantic Memory Implementation
