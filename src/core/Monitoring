@@ -1,0 +1,471 @@
+#pragma once
+
+#include <chrono>
+#include <thread>
+#include <atomic>
+#include <mutex>
+#include <vector>
+#include <string>
+#include <memory>
+#include <algorithm>
+#include <iostream>
+#include <iomanip>
+#include <numeric>
+
+namespace nlm {
+
+// Performance monitoring types
+struct PerformanceMetrics {
+    double elapsedTime;           // Total elapsed time in seconds
+    double cpuUsage;              // CPU usage percentage (0-100)
+    double memoryUsage;           // Memory usage in MB
+    size_t totalSpikeCount;       // Total number of spikes
+    size_t spikeRate;             // Spikes per second
+    float simulationTimeStep;     // Current simulation timestep
+    size_t activeNeuronCount;     // Number of currently active neurons
+    size_t firingNeuronCount;     // Number of firing neurons this step
+    float excitationInhibitionRatio; // E/I ratio
+    float averageFiringRate;      // Average firing rate across all neurons
+    size_t checkpointCount;       // Number of checkpoints saved
+    std::chrono::high_resolution_clock::time_point startTime;
+    std::chrono::high_resolution_clock::time_point lastUpdateTime;
+    
+    PerformanceMetrics() : elapsedTime(0.0), cpuUsage(0.0), memoryUsage(0.0),
+                          totalSpikeCount(0), spikeRate(0), simulationTimeStep(0.001f),
+                          activeNeuronCount(0), firingNeuronCount(0),
+                          excitationInhibitionRatio(0.0f), averageFiringRate(0.0f),
+                          checkpointCount(0) {
+        startTime = lastUpdateTime = std::chrono::high_resolution_clock::now();
+    }
+    
+    void update(double timestep) {
+        auto now = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime);
+        elapsedTime = duration.count() / 1000.0;
+        
+        auto stepDuration = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastUpdateTime);
+        lastUpdateTime = now;
+        
+        if (stepDuration.count() > 0) {
+            spikeRate = static_cast<size_t>((totalSpikeCount * 1000.0) / stepDuration.count());
+        }
+    }
+    
+    std::string getPerformanceReport() const {
+        std::stringstream ss;
+        ss << "=== NLM Performance Metrics ===\n";
+        ss << "Simulation Time: " << std::fixed << std::setprecision(3) << elapsedTime << "s\n";
+        ss << "CPU Usage: " << std::fixed << std::setprecision(1) << cpuUsage << "%\n";
+        ss << "Memory Usage: " << std::fixed << std::setprecision(1) << memoryUsage << " MB\n";
+        ss << "Spike Count: " << totalSpikeCount << " (" << spikeRate << " spikes/sec)\n";
+        ss << "Time Step: " << std::fixed << std::setprecision(6) << simulationTimeStep << "s\n";
+        ss << "Active Neurons: " << activeNeuronCount << "\n";
+        ss << "Firing Neurons: " << firingNeuronCount << "\n";
+        ss << "E/I Ratio: " << std::fixed << std::setprecision(3) << excitationInhibitionRatio << "\n";
+        ss << "Average Firing Rate: " << std::fixed << std::setprecision(2) << averageFiringRate << " Hz\n";
+        ss << "Checkpoints Saved: " << checkpointCount << "\n";
+        ss << "\n";
+        return ss.str();
+    }
+};
+
+// Progress reporting types
+struct ProgressInfo {
+    std::string phaseName;
+    int currentStep;
+    int totalSteps;
+    double percentage;
+    std::string statusMessage;
+    std::chrono::high_resolution_clock::time_point startTime;
+    std::chrono::high_resolution_clock::time_point lastProgressTime;
+    
+    ProgressInfo() : currentStep(0), totalSteps(100), percentage(0.0),
+                    startTime(std::chrono::high_resolution_clock::now()),
+                    lastProgressTime(std::chrono::high_resolution_clock::now()) {}
+    
+    ProgressInfo(const std::string& phase, int steps, int total)
+        : phaseName(phase), currentStep(0), totalSteps(total), percentage(0.0),
+          statusMessage("Starting..."), startTime(std::chrono::high_resolution_clock::now()),
+          lastProgressTime(std::chrono::high_resolution_clock::now()) {}
+    
+    void update(int step, const std::string& status = "") {
+        currentStep = step;
+        percentage = (totalSteps > 0) ? (static_cast<double>(step) / totalSteps) * 100.0 : 0.0;
+        statusMessage = status;
+        lastProgressTime = std::chrono::high_resolution_clock::now();
+    }
+    
+    std::string getProgressBar(int width = 50) const {
+        std::stringstream ss;
+        ss << "[";
+        int pos = static_cast<int>(width * percentage / 100.0);
+        for (int i = 0; i < width; ++i) {
+            if (i < pos) ss << "=";
+            else if (i == pos) ss << ">";
+            else ss << " ";
+        }
+        ss << "] " << std::fixed << std::setprecision(1) << percentage << "%";
+        if (!statusMessage.empty()) {
+            ss << " - " << statusMessage;
+        }
+        return ss.str();
+    }
+};
+
+// Event-driven monitoring system
+class MonitoringSystem {
+public:
+    MonitoringSystem() : verbose(true), realTimeMode(true), updateInterval(0.5), 
+                         cpuSampleInterval(1.0), autoSaveEnabled(false),
+                         autoSaveInterval(100), statsFile("nlm_stats.csv") {
+        performance = std::make_unique<PerformanceMetrics>();
+        cpuSamples.reserve(10);
+        startCpuMonitoring();
+    }
+    
+    ~MonitoringSystem() {
+        stopCpuMonitoring();
+    }
+    
+    // Configuration methods
+    void setVerbose(bool enable) { verbose = enable; }
+    void setRealTimeMode(bool enable) { realTimeMode = enable; }
+    void setUpdateInterval(double interval) { updateInterval = interval; }
+    void setCpuSampleInterval(double interval) { cpuSampleInterval = interval; }
+    void setAutoSave(bool enable, size_t interval = 100) {
+        autoSaveEnabled = enable;
+        autoSaveInterval = interval;
+    }
+    void setStatsFile(const std::string& filename) { statsFile = filename; }
+    
+    // Progress tracking
+    void startPhase(const std::string& phaseName, int totalSteps) {
+        currentPhase = ProgressInfo(phaseName, 0, totalSteps);
+        phaseStartTime = std::chrono::high_resolution_clock::now();
+        
+        if (verbose) {
+            std::cout << "\n=== Starting " << phaseName << " ===" << std::endl;
+            std::cout << "Total steps: " << totalSteps << std::endl;
+        }
+    }
+    
+    void updateProgress(int step, const std::string& status = "") {
+        if (realTimeMode) {
+            currentPhase.update(step, status);
+            
+            auto now = std::chrono::high_resolution_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - phaseStartTime).count();
+            
+            if (verbose && elapsed > updateInterval) {
+                std::cout << "\r" << currentPhase.getProgressBar();
+                std::cout.flush();
+                
+                // Display elapsed time
+                double eta = (totalSteps > 0 && step > 0) ? 
+                    (elapsed / step) * (totalSteps - step) : 0.0;
+                std::cout << " - ETA: " << std::fixed << std::setprecision(1) << eta << "s";
+                
+                if (step >= totalSteps) {
+                    std::cout << "\n" << std::endl;
+                }
+            }
+        }
+    }
+    
+    void completePhase(const std::string& finalStatus = "Completed") {
+        if (realTimeMode && verbose) {
+            std::cout << "\n" << currentPhase.getProgressBar() << " - " << finalStatus << std::endl;
+        }
+        
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::high_resolution_clock::now() - phaseStartTime).count() / 1000.0;
+        
+        if (verbose) {
+            std::cout << "Phase " << currentPhase.phaseName << " completed in " 
+                      << std::fixed << std::setprecision(3) << duration << "s" << std::endl;
+        }
+        
+        currentPhase = ProgressInfo();
+    }
+    
+    // Performance metrics management
+    void updatePerformanceMetrics(double timestep, size_t spikeCount,
+                                  size_t activeNeurons, size_t firingNeurons,
+                                  float eiRatio, float avgFiringRate) {
+        performance->update(timestep);
+        performance->totalSpikeCount = spikeCount;
+        performance->simulationTimeStep = timestep;
+        performance->activeNeuronCount = activeNeurons;
+        performance->firingNeuronCount = firingNeurons;
+        performance->excitationInhibitionRatio = eiRatio;
+        performance->averageFiringRate = avgFiringRate;
+        
+        // Update CPU usage periodically
+        static auto lastCpuUpdate = std::chrono::high_resolution_clock::now();
+        auto now = std::chrono::high_resolution_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(now - lastCpuUpdate).count();
+        
+        if (elapsed >= cpuSampleInterval) {
+            cpuSamples.push_back(getCurrentCpuUsage());
+            if (cpuSamples.size() > 10) {
+                cpuSamples.erase(cpuSamples.begin());
+            }
+            lastCpuUpdate = now;
+        }
+        
+        // Calculate average CPU usage
+        if (!cpuSamples.empty()) {
+            double sum = std::accumulate(cpuSamples.begin(), cpuSamples.end(), 0.0);
+            performance->cpuUsage = (sum / cpuSamples.size()) * 100.0;
+        }
+        
+        // Log performance periodically
+        static size_t lastLogStep = 0;
+        if (lastLogStep == 0 || spikeCount - lastLogStep >= 1000) {
+            if (verbose) {
+                std::cout << "\n" << performance->getPerformanceReport();
+            }
+            lastLogStep = spikeCount;
+        }
+    }
+    
+    void incrementCheckpointCount() {
+        performance->checkpointCount++;
+    }
+    
+    // File output
+    void savePerformanceStats(const std::string& prefix = "") {
+        std::string filename = prefix + statsFile;
+        std::ofstream file(filename, std::ios::app);
+        
+        if (file.is_open()) {
+            if (file.tellp() == 0) {
+                // Write header
+                file << "step,elapsed_time,total_spikes,spike_rate,active_neurons,firing_neurons,ei_ratio,avg_firing_rate,cpu_usage,memory_mb\n";
+            }
+            
+            file << std::fixed << std::setprecision(3);
+            file << performance->totalSpikeCount << ",";
+            file << performance->elapsedTime << ",";
+            file << performance->spikeRate << ",";
+            file << performance->activeNeuronCount << ";";
+            file << performance->firingNeuronCount << ",";
+            file << performance->excitationInhibitionRatio << ",";
+            file << performance->averageFiringRate << ",";
+            file << performance->cpuUsage << ",";
+            file << performance->memoryUsage << "\n";
+            
+            file.close();
+            
+            if (verbose) {
+                std::cout << "Performance stats saved to: " << filename << std::endl;
+            }
+        }
+    }
+    
+    // Get current metrics
+    const PerformanceMetrics& getPerformanceMetrics() const { return *performance; }
+    const ProgressInfo& getCurrentProgress() const { return currentPhase; }
+    
+    // Start/stop monitoring
+    void start() {
+        monitoringActive = true;
+        monitorThread = std::thread(&MonitoringSystem::monitoringLoop, this);
+    }
+    
+    void stop() {
+        monitoringActive = false;
+        if (monitorThread.joinable()) {
+            monitorThread.join();
+        }
+    }
+    
+    // Auto-save functionality
+    bool shouldAutoSave(size_t step) const {
+        return autoSaveEnabled && (step % autoSaveInterval == 0) && step > 0;
+    }
+    
+private:
+    void startCpuMonitoring() {
+        cpuMonitoringActive = true;
+        cpuMonitorThread = std::thread(&MonitoringSystem::cpuMonitorLoop, this);
+    }
+    
+    void stopCpuMonitoring() {
+        cpuMonitoringActive = false;
+        if (cpuMonitorThread.joinable()) {
+            cpuMonitorThread.join();
+        }
+    }
+    
+    void monitoringLoop() {
+        while (monitoringActive) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            
+            if (realTimeMode) {
+                // Update CPU usage
+                cpuSamples.push_back(getCurrentCpuUsage());
+                if (cpuSamples.size() > 10) {
+                    cpuSamples.erase(cpuSamples.begin());
+                }
+                
+                double sum = std::accumulate(cpuSamples.begin(), cpuSamples.end(), 0.0);
+                performance->cpuUsage = (sum / cpuSamples.size()) * 100.0;
+            }
+        }
+    }
+    
+    void cpuMonitorLoop() {
+        while (cpuMonitoringActive) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(cpuSampleInterval * 1000)));
+            
+            if (monitoringActive) {
+                double cpuUsage = getCurrentCpuUsage();
+                cpuSamples.push_back(cpuUsage);
+                if (cpuSamples.size() > 10) {
+                    cpuSamples.erase(cpuSamples.begin());
+                }
+            }
+        }
+    }
+    
+    double getCurrentCpuUsage() {
+        // Simplified CPU usage calculation
+        // In a real implementation, you would use system-specific calls
+        static double lastCpuUsage = 0.0;
+        
+        // Return a simulated value that changes slightly
+        return 30.0 + (rand() % 40) / 100.0;  // Simulate 30-70% CPU usage
+    }
+    
+    bool verbose;
+    bool realTimeMode;
+    double updateInterval;
+    double cpuSampleInterval;
+    bool autoSaveEnabled;
+    size_t autoSaveInterval;
+    std::string statsFile;
+    bool monitoringActive;
+    bool cpuMonitoringActive;
+    
+    std::unique_ptr<PerformanceMetrics> performance;
+    ProgressInfo currentPhase;
+    std::chrono::high_resolution_clock::time_point phaseStartTime;
+    std::vector<double> cpuSamples;
+    
+    size_t totalSteps;
+    
+    std::thread monitorThread;
+    std::thread cpuMonitorThread;
+};
+
+// Convenience functions for common monitoring patterns
+class SimulationMonitor {
+public:
+    SimulationMonitor() {
+        monitoringSystem = std::make_unique<MonitoringSystem>();
+        monitoringSystem->setVerbose(false);
+        monitoringSystem->setRealTimeMode(true);
+    }
+    
+    SimulationMonitor(bool verbose, bool realTime = true) {
+        monitoringSystem = std::make_unique<MonitoringSystem>();
+        monitoringSystem->setVerbose(verbose);
+        monitoringSystem->setRealTimeMode(realTime);
+    }
+    
+    void startSetup(int totalSteps) {
+        monitoringSystem->startPhase("Setup", totalSteps);
+    }
+    
+    void updateSetup(int step) {
+        monitoringSystem->updateProgress(step, "Initializing brain...");
+    }
+    
+    void completeSetup() {
+        monitoringSystem->completePhase("Setup Complete");
+    }
+    
+    void startSimulation(int totalSteps) {
+        monitoringSystem->startPhase("Simulation", totalSteps);
+    }
+    
+    void updateSimulation(int step, const std::string& status = "") {
+        monitoringSystem->updateProgress(step, status);
+    }
+    
+    void completeSimulation() {
+        monitoringSystem->completePhase("Simulation Complete");
+    }
+    
+    void startAnalysis(int totalSteps) {
+        monitoringSystem->startPhase("Analysis", totalSteps);
+    }
+    
+    void updateAnalysis(int step, const std::string& status = "") {
+        monitoringSystem->updateProgress(step, status);
+    }
+    
+    void completeAnalysis() {
+        monitoringSystem->completePhase("Analysis Complete");
+    }
+    
+    void recordPerformance(double timestep, size_t spikeCount,
+                          size_t activeNeurons, size_t firingNeurons,
+                          float eiRatio, float avgFiringRate) {
+        monitoringSystem->updatePerformanceMetrics(
+            timestep, spikeCount, activeNeurons, firingNeurons, eiRatio, avgFiringRate);
+    }
+    
+    bool shouldAutoSave(size_t step) {
+        return monitoringSystem->shouldAutoSave(step);
+    }
+    
+    void saveStats(const std::string& prefix = "") {
+        monitoringSystem->savePerformanceStats(prefix);
+    }
+    
+    const PerformanceMetrics& getMetrics() const {
+        return monitoringSystem->getPerformanceMetrics();
+    }
+    
+    std::string getPerformanceReport() const {
+        return monitoringSystem->getPerformanceMetrics().getPerformanceReport();
+    }
+    
+    void stop() {
+        monitoringSystem->stop();
+    }
+    
+private:
+    std::unique_ptr<MonitoringSystem> monitoringSystem;
+};
+
+// Macro for easy monitoring integration
+#define MONITOR_PERFORMANCE(monitor, step, timestep, spikeCount, activeNeurons, firingNeurons, eiRatio, avgFiringRate) \
+    do { \
+        if (monitor) { \
+            monitor->recordPerformance(timestep, spikeCount, activeNeurons, firingNeurons, eiRatio, avgFiringRate); \
+        } \
+    } while(0)
+
+// Global monitoring instance for convenience
+extern std::unique_ptr<MonitoringSystem> globalMonitor;
+
+// Initialize global monitor
+inline void initializeGlobalMonitor(bool verbose = false, bool realTime = true) {
+    globalMonitor = std::make_unique<MonitoringSystem>();
+    globalMonitor->setVerbose(verbose);
+    globalMonitor->setRealTimeMode(realTime);
+    globalMonitor->start();
+}
+
+// Clean up global monitor
+inline void cleanupGlobalMonitor() {
+    if (globalMonitor) {
+        globalMonitor->stop();
+        globalMonitor.reset();
+    }
+}
+
+} // namespace nlm
