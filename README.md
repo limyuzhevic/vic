@@ -63,24 +63,73 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
 
 ```bash
+# Create build directory
 mkdir build
 cd build
+
+# Configure with CMake
 cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build with parallel compilation
 make -j4
 ```
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Main NLM Executable
+
+The main `nlm` executable provides comprehensive testing of Phase 2 neural computation:
+
 ```bash
+# Run basic connectivity, plasticity, and STDP tests
+./nlm
+
+# Run with specific test selection
+./nlm connectivity
+./nlm plasticity
+./nlm stdp
+./nlm connectivity plasticity stdp
+
+# Run with custom configuration
+./nlm --timestep 0.01 --max-steps 5000 --neuron-count 1000
+
+# Run with quiet output (minimal logging)
+./nlm --quiet
+
+# Run with verbose output (debug information)
+./nlm --verbose
+
+# Validate configuration without running tests
+./nlm --dry-run --config my_config.cfg
+
+# Show help information
+./nlm --help
+```
+
+### Phase 6 Integration Demo
+
+The `nlm_phase6_demo` executable runs comprehensive integration tests for Phase 6:
+
+```bash
+# Run full integration test
+./nlm_phase6_demo
+
+# Run with custom settings via environment variables
+export NLM_NEURON_COUNT=500
+export NLM_MAX_STEPS=2000
+export NLM_ENABLE_DEVELOPMENT=true
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Available Demos
+
+- `nlm`: Phase 2 neural computation tests (connectivity, plasticity, STDP)
+- `nlm_phase3_demo`: Phase 3 world interaction experiments
+- `nlm_phase4_demo`: Phase 4 cognitive capabilities
+- `nlm_phase6_demo`: Phase 6 complete integration test
 
 ## Project Structure
 
@@ -96,22 +145,26 @@ NLM/
 │   ├── LIMITATIONS.md
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
-│   ├── core/           # Core utilities
+│   ├── core/           # Core utilities (Config, Random, Logger, SimulationClock)
 │   ├── brain/          # Neural components (integrated)
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
 │   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
+│   ├── neuromodulation/ # Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
 │   ├── cognition/      # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
+│   ├── experiments/   # Experiment framework (Phase 3-6)
 │   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── tests/             # Unit tests
+│   ├── test_*.cpp     # Test files
+│   └── CMakeLists.txt # Test configuration
+└── configs/           # Configuration files
+    ├── default.cfg
+    └── user.cfg
 ```
 
 ## Phase Summary
