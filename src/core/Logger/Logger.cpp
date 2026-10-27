@@ -23,7 +23,7 @@ ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
 ConsoleLogger::~ConsoleLogger() = default;
 
 void ConsoleLogger::log(const LogEntry& entry) {
-    if (entry.level < pImpl->level) {
+    if (entry.level < LogLevel::Debug || entry.level > pImpl->level) {
         return;
     }
     
@@ -82,22 +82,26 @@ void ConsoleLogger::closeOutputFile() {
 
 std::string ConsoleLogger::levelToString(LogLevel level) const {
     switch (level) {
+        case LogLevel::Trace: return "TRACE";
         case LogLevel::Debug: return "DEBUG";
         case LogLevel::Info: return "INFO";
         case LogLevel::Warning: return "WARN";
         case LogLevel::Error: return "ERROR";
         case LogLevel::Critical: return "CRIT";
+        case LogLevel::Performance: return "PERF";
         default: return "UNKNOWN";
     }
 }
 
 std::string ConsoleLogger::levelToColor(LogLevel level) const {
     switch (level) {
+        case LogLevel::Trace: return "\033[90m";    // Bright Black (gray)
         case LogLevel::Debug: return "\033[36m";    // Cyan
         case LogLevel::Info: return "\033[32m";      // Green
         case LogLevel::Warning: return "\033[33m";   // Yellow
         case LogLevel::Error: return "\033[31m";     // Red
         case LogLevel::Critical: return "\033[35m"; // Magenta
+        case LogLevel::Performance: return "\033[34m"; // Blue
         default: return "\033[0m";
     }
 }
@@ -164,6 +168,23 @@ void Logger::error(const std::string& message, const std::string& file, int line
 
 void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
     log(LogLevel::Critical, message, file, line, function);
+}
+
+void Logger::trace(const std::string& message, const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Trace, message, file, line, function);
+}
+
+void Logger::performance(const std::string& message, double durationMs, const std::string& file, int line, const std::string& function) {
+    std::ostringstream oss;
+    oss << message << " [" << std::fixed << std::setprecision(2) << durationMs << "ms]";
+    log(LogLevel::Performance, oss.str(), file, line, function);
+}
+
+void Logger::logWithContext(LogLevel level, const std::string& context, const std::string& message,
+                           const std::string& file, int line, const std::string& function) {
+    std::ostringstream oss;
+    oss << "[" << context << "] " << message;
+    log(level, oss.str(), file, line, function);
 }
 
 bool Logger::isEnabled(LogLevel level) const {

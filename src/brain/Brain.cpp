@@ -247,17 +247,32 @@ bool Brain::initialize() {
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    
+    // Configure planning depth from config (with fallback)
+    int planningDepth = pImpl->config->getOr<int>("planning_depth", 5);
+    pImpl->planner->setPlanningDepth(planningDepth);
     
     pImpl->conceptFormation->initialize(this);
     
+    // Configure attention system from config (with fallback)
+    float attentionExcitation = pImpl->config->getOr<float>("attention_excitation_strength", 1.5f);
+    float attentionInhibition = pImpl->config->getOr<float>("attention_inhibition_strength", 0.5f);
     pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    pImpl->attention->setInhibitionStrength(attentionInhibition);
+    pImpl->attention->setExcitationStrength(attentionExcitation);
+    
+    // Configure curiosity from config (with fallback)
+    // Set novelty and prediction error weights for curiosity
+    float noveltyWeight = pImpl->config->getOr<float>("curiosity_novelty_weight", 0.5f);
+    float predictionErrorWeight = pImpl->config->getOr<float>("curiosity_prediction_error_weight", 0.5f);
+    float curiosityDecay = pImpl->config->getOr<float>("curiosity_decay_rate", 0.05f);
+    
+    pImpl->curiosity->setNoveltyWeight(noveltyWeight);
+    pImpl->curiosity->setPredictionErrorWeight(predictionErrorWeight);
+    pImpl->curiosity->setDecayRate(curiosityDecay);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {

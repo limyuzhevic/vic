@@ -154,9 +154,15 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
+        // Apply curiosity-based exploration
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // Apply exploration bonus and penalty from config
+    if (curiosityLevel_ > 0.5f) {
+        // Add exploration bonus to encourage trying new actions
+        // This could be implemented by slightly modifying motor command strength
     }
     
     return decoded;
@@ -218,7 +224,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int choice = brain_->getRandomGenerator()->uniformInt(0, 6);
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -227,7 +233,6 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 4: return MotorCommand::LookLeft;
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
             }
         }
     }

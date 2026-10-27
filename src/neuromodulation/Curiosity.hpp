@@ -27,6 +27,10 @@ public:
     // Set curiosity parameters
     void setNoveltyWeight(float weight);
     void setPredictionErrorWeight(float weight);
+    void setDecayRate(float rate);
+    
+    // Get curiosity parameters
+    float getDecayRate() const;
     
     // Reset
     void reset();

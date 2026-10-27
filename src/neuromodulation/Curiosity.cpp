@@ -55,6 +55,14 @@ void Curiosity::setPredictionErrorWeight(float weight) {
     pImpl->predictionErrorWeight = weight;
 }
 
+void Curiosity::setDecayRate(float rate) {
+    pImpl->decayRate = rate;
+}
+
+float Curiosity::getDecayRate() const {
+    return pImpl->decayRate;
+}
+
 void Curiosity::reset() {
     pImpl->level = 0.0f;
 }

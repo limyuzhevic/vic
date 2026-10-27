@@ -11,11 +11,13 @@ namespace nlm {
 
 // Log severity levels
 enum class LogLevel {
+    Trace = -1,
     Debug = 0,
     Info = 1,
     Warning = 2,
     Error = 3,
-    Critical = 4
+    Critical = 4,
+    Performance = 5  // Special level for performance timing
 };
 
 // Log entry structure
@@ -95,6 +97,14 @@ public:
     void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
     
+    // Additional debugging methods
+    void trace(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    void performance(const std::string& message, double durationMs, const std::string& file = "", int line = 0, const std::string& function = "");
+    
+    // Context-aware logging
+    void logWithContext(LogLevel level, const std::string& context, const std::string& message,
+                       const std::string& file = "", int line = 0, const std::string& function = "");
+    
     // Check if level is enabled
     bool isEnabled(LogLevel level) const;
     
@@ -110,13 +120,15 @@ private:
 };
 
 // Convenience macro for file/line/function info
+#define NLM_LOG_TRACE(msg) nlm::Logger::getGlobal().trace(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_PERFORMANCE(msg, duration) nlm::Logger::getGlobal().performance(msg, duration, __FILE__, __LINE__, __func__)
 #define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
 
-// Stream-style logging helper
+// Enhanced stream-style logging helper
 class LogStream {
 public:
     LogStream(LogLevel level, const std::string& file, int line, const std::string& function);

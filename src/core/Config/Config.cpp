@@ -24,11 +24,17 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Config file not found: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
+    bool success = true;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,34 +54,60 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR("Error parsing config file " + filepath + 
+                             " at line " + std::to_string(lineNumber) +
+                             ": " + e.what() + " (key: '" + key + "')");
+                success = false;
+            }
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNumber) + 
+                           " in file " + filepath + ": " + line);
+            success = false;
         }
     }
     
-    return true;
+    if (success) {
+        NLM_LOG_INFO("Successfully loaded configuration from: " + filepath);
+    } else {
+        NLM_LOG_WARNING("Configuration loaded with errors from: " + filepath);
+    }
+    
+    return true; // Always return true, even with warnings
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
+    try {
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Handle --key=value format
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string value = arg.substr(pos + 1);
+                    set(key, value, ConfigSource::CommandLine);
+                } else {
+                    NLM_LOG_WARNING("Invalid command line argument (missing value): " + arg);
+                }
+            }
+            // Handle -key value format
+            else if (arg[0] == '-' && i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
                 set(key, value, ConfigSource::CommandLine);
+            } else if (arg[0] == '-') {
+                NLM_LOG_WARNING("Invalid command line argument (missing value): " + arg);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing command line arguments: " + std::string(e.what()));
+        return false;
     }
-    return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
@@ -94,16 +126,26 @@ bool Config::saveToFile(const std::string& filepath) const {
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
     try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it == pImpl->entries.end()) {
+            // Log debug message for missing key (could be expected for optional configs)
+            // NLM_LOG_DEBUG("Config key not found: " + key);
+            return std::nullopt;
+        }
+        
+        try {
+            return std::get<T>(it->value);
+        } catch (const std::bad_variant_access&) {
+            NLM_LOG_ERROR("Config type mismatch for key '" + key + 
+                         "': expected type " + typeid(T).name() + 
+                         ", got " + describeVariantType(it->value));
+            return std::nullopt;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Unexpected error accessing config key '" + key + ": " + e.what());
         return std::nullopt;
     }
 }
@@ -184,6 +226,24 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+// Helper function to describe variant type for error messages
+std::string Config::describeVariantType(const ConfigValue& value) {
+    std::string typeName;
+    std::visit([&typeName](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) typeName = "int";
+        else if constexpr (std::is_same_v<T, int64_t>) typeName = "int64_t";
+        else if constexpr (std::is_same_v<T, double>) typeName = "double";
+        else if constexpr (std::is_same_v<T, bool>) typeName = "bool";
+        else if constexpr (std::is_same_v<T, std::string>) typeName = "string";
+        else if constexpr (std::is_same_v<T, std::vector<int>>) typeName = "vector<int>";
+        else if constexpr (std::is_same_v<T, std::vector<double>>) typeName = "vector<double>";
+        else if constexpr (std::is_same_v<T, std::vector<std::string>>) typeName = "vector<string>";
+        else typeName = "unknown";
+    }, value);
+    return typeName;
 }
 
 std::string Config::trim(const std::string& str) {
