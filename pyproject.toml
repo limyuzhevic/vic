@@ -3,19 +3,20 @@ requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "pynlm"
-version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+name = "pynlm-enhanced"
+version = "0.1.0-enhanced"
+description = "Enhanced Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework with Pythonic APIs and batch simulation capabilities"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "enhanced", "pythonic"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,6 +26,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: System :: Simulation",
 ]
 
 dependencies = []
@@ -33,12 +36,15 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "matplotlib>=3.0",
+    "jupyter>=1.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Bug Tracker" = "https://github.com/nlm-project/nlm/issues"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -55,3 +61,28 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.pylint]
+max-line-length = 120
+ignore = [".git", ".gitignore", ".pylintrc"]
+
+[tool.black]
+line-length = 120
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+include = "\.pyi?$"
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | docs
+  | examples
+)/'
+'''
