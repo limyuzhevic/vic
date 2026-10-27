@@ -142,6 +142,90 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Configuration validation and utility functions
+    m.def("validateBrainConfig", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::runtime_error("Config is null");
+        }
+        
+        std::vector<std::string> errors;
+        
+        // Check required basic parameters
+        if (!config->has("brain.neuron_count")) {
+            errors.push_back("brain.neuron_count not set (recommended: 100-10000)");
+        } else {
+            auto count = config->get<size_t>("brain.neuron_count");
+            if (count < 10) {
+                errors.push_back("brain.neuron_count too small (recommended: 100-10000)");
+            } else if (count > 100000) {
+                errors.push_back("brain.neuron_count too large (recommended: 100-10000)");
+            }
+        }
+        
+        if (!config->has("brain.synapse_density")) {
+            errors.push_back("brain.synapse_density not set (recommended: 0.05-0.2)");
+        } else {
+            auto density = config->get<double>("brain.synapse_density");
+            if (density < 0.01) {
+                errors.push_back("brain.synapse_density too low (recommended: 0.05-0.2)");
+            } else if (density > 0.5) {
+                errors.push_back("brain.synapse_density too high (recommended: 0.05-0.2)");
+            }
+        }
+        
+        if (!errors.empty()) {
+            std::string errorMsg = "Configuration validation failed:\n";
+            for (const auto& err : errors) {
+                errorMsg += "  - " + err + "\n";
+            }
+            throw std::runtime_error(errorMsg);
+        }
+        
+        return true;
+    }, py::arg("config"), R"pbdoc(Validate brain configuration and return true if valid, throws exception otherwise.
+        
+        Checks common configuration parameters for typical values and provides helpful error messages.
+        Validated parameters include neuron_count, synapse_density, connection_probability.
+        )pbdoc");
+
+    m.def("createDemoConfig", [](size_t neuronCount = 1000, double synapseDensity = 0.1) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neuronCount);
+        config->set("brain.synapse_density", synapseDensity);
+        config->set("brain.connection_probability", 0.05);
+        config->set("brain.initial_weight_mean", 0.5);
+        config->set("brain.initial_weight_std", 0.1);
+        config->set("brain.v_thresh", -50.0);
+        config->set("brain.v_rest", -70.0);
+        config->set("brain.v_reset", -75.0);
+        config->set("brain.tau_mem", 20.0);
+        config->set("brain.tau_ref", 2.0);
+        
+        // Enable common subsystems
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("memory.working.enable", true);
+        config->set("memory.episodic.enable", true);
+        
+        return config;
+    }, py::arg("neuronCount") = 1000, py::arg("synapseDensity") = 0.1, R"pbdoc(Create a demonstration configuration with recommended default values.
+        
+        Creates a production-ready configuration with typical values for neuron_count
+        and synapse_density, enabling common plasticity and neuromodulation subsystems.
+        Useful for getting started quickly.
+        
+        Args:
+            neuronCount: Number of neurons (default: 1000)
+            synapseDensity: Synaptic connection density (default: 0.1)
+            
+        Returns:
+            A configured Config object
+        )pbdoc");
+
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -382,24 +466,301 @@ PYBIND11_MODULE(pynlm, m) {
              "Get novelty level")
         .def("getPredictionError", &AgentBrain::getPredictionError,
              "Get prediction error")
+    py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+              "Initialize with world")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+              "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+              "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+              py::arg("percept"),
+              "Process sensory percept and inject into brain")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+              "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+              py::arg("reward"), py::arg("predictedReward"),
+              "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+              py::arg("timestep"),
+              "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+              "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+              "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+              "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+              "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+              "Get prediction error")
         .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
+              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Batch operations and convenience functions for Brain
+    .def("getStatistics", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        return std::vector<float>{
+            static_cast<float>(brain->getTotalNeuronCount()),
+            static_cast<float>(brain->getTotalSynapseCount()),
+            static_cast<float>(brain->getFiringNeuronCount()),
+            static_cast<float>(brain->getAverageFiringRate()),
+            static_cast<float>(brain->getExcitationInhibitionRatio()),
+            static_cast<float>(brain->getTotalSpikeCount()),
+            static_cast<float>(brain->getDevelopmentalStage())
+        };
+    }, py::arg("brain"), R"pbdoc(Get brain statistics as a batch of float values.
+        
+        Returns statistics in this order:
+        [total_neuron_count, total_synapse_count, firing_neuron_count,
+         average_firing_rate, excitation_inhibition_ratio, total_spike_count,
+         developmental_stage]
+         
+        Args:
+            brain: The brain instance to query statistics from
+            
+        Returns:
+            List of 7 float values containing brain statistics
+        )pbdoc");
+
+    .def("getAllRegionNames", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        std::vector<std::string> names;
+        for (const auto& region : brain->getRegions()) {
+            if (region) {
+                names.push_back(region->getName());
+            }
+        }
+        return names;
+    }, py::arg("brain"), R"pbdoc(Get names of all brain regions as a batch.
+        
+        Args:
+            brain: The brain instance to query regions from
+            
+        Returns:
+            List of region names
+        )pbdoc");
+
+    .def("getNeuronCountsByType", [](const std::shared_ptr<Brain>& brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        std::map<std::string, size_t> counts;
+        for (const auto& region : brain->getRegions()) {
+            if (region) {
+                for (const auto& population : region->getPopulations()) {
+                    if (population) {
+                        std::string typeName;
+                        switch (population->getNeuronType()) {
+                            case NeuronType::Excitatory: typeName = "Excitatory"; break;
+                            case NeuronType::Inhibitory: typeName = "Inhibitory"; break;
+                            case NeuronType::Sensory: typeName = "Sensory"; break;
+                            case NeuronType::Motor: typeName = "Motor"; break;
+                            case NeuronType::Modulatory: typeName = "Modulatory"; break;
+                            case NeuronType::Internal: typeName = "Internal"; break;
+                            default: typeName = "Unknown"; break;
+                        }
+                        counts[typeName] += population->getNeuronCount();
+                    }
+                }
+            }
+        }
+        return counts;
+    }, py::arg("brain"), R"pbdoc(Get counts of neurons by type across all regions.
+        
+        Args:
+            brain: The brain instance to query neuron counts from
+            
+        Returns:
+            Dictionary mapping neuron type names to counts
+        )pbdoc");
+
+    .def("createAgentWithDefaults", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        if (!brain || !world) {
+            throw std::runtime_error("Brain or world is null");
+        }
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable common features
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"), R"pbdoc(Create an AgentBrain with default settings enabled.
+        
+        This is a convenience function that creates an AgentBrain, initializes it with the given world,
+        and enables the most commonly used features (reward modulation, structural plasticity,
+        development, and curiosity).
+        
+        Args:
+            brain: The brain instance to wrap
+            world: The world instance to initialize with
+            
+        Returns:
+            Configured AgentBrain instance
+        )pbdoc");
+
+    // Common workflow helper functions
+    m.def("runSimpleEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                              std::shared_ptr<AgentBrain> agent, int numSteps) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("Brain, world, or agent is null");
+        }
+        
+        agent->reset();
+        world->reset();
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return std::vector<float>{
+            static_cast<float>(brain->getTotalNeuronCount()),
+            static_cast<float>(brain->getTotalSpikeCount()),
+            static_cast<float>(agent->getCuriosityLevel()),
+            static_cast<float>(agent->getNoveltyLevel()),
+            static_cast<float>(agent->getPredictionError())
+        };
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), R"pbdoc(Run a simple agent episode with brain and world interaction.
+        
+        This helper function implements a complete episode loop where an agent interacts
+        with a world, processes sensory input, and produces motor actions.
+        
+        Args:
+            brain: The brain instance
+            world: The world instance
+            agent: The agent brain interface
+            numSteps: Number of simulation steps to run
+            
+        Returns:
+            List of final statistics: [neuron_count, total_spikes, curiosity_level,
+                                     novelty_level, prediction_error]
+        )pbdoc");
+
+    // Pythonic iterators and utility functions for Brain regions
+    m.def("getRegionByName", [](const std::shared_ptr<Brain>& brain, const std::string& name) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        for (const auto& region : brain->getRegions()) {
+            if (region && region->getName() == name) {
+                return region;
+            }
+        }
+        throw std::runtime_error("Region with name '" + name + "' not found");
+    }, py::arg("brain"), py::arg("name"), R"pbdoc(Get a brain region by its name.
+        
+        Args:
+            brain: The brain instance to search in
+            name: The name of the region to find
+            
+        Returns:
+            The NeuralRegion with the given name
+            
+        Raises:
+            RuntimeError: If the region is not found
+        )pbdoc");
+
+    m.def("getPopulationByType", [](const std::shared_ptr<NeuralRegion>& region, NeuronType type) {
+        if (!region) {
+            throw std::runtime_error("Region is null");
+        }
+        for (const auto& population : region->getPopulations()) {
+            if (population && population->getNeuronType() == type) {
+                return population;
+            }
+        }
+        throw std::runtime_error("Population with type " + std::to_string(static_cast<int>(type)) + " not found");
+    }, py::arg("region"), py::arg("type"), R"pbdoc(Get a neural population from a region by neuron type.
+        
+        Args:
+            region: The neural region to search in
+            type: The neuron type to find
+            
+        Returns:
+            The NeuralPopulation with the given neuron type
+            
+        Raises:
+            RuntimeError: If the population is not found
+        )pbdoc");
+
+    m.def("getNeuronsByType", [](const std::shared_ptr<NeuralRegion>& region, NeuronType type) {
+        if (!region) {
+            throw std::runtime_error("Region is null");
+        }
+        std::vector<Neuron*> neurons;
+        for (const auto& population : region->getPopulations()) {
+            if (population && population->getNeuronType() == type) {
+                for (auto neuron : population->getNeurons()) {
+                    neurons.push_back(neuron);
+                }
+            }
+        }
+        return neurons;
+    }, py::arg("region"), py::arg("type"), R"pbdoc(Get all neurons of a specific type from a region.
+        
+        Args:
+            region: The neural region to search in
+            type: The neuron type to filter by
+            
+        Returns:
+            List of neurons of the specified type
+        )pbdoc");
+
+    m.def("createMultiAgentSetup", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                   const std::vector<std::string>& agentNames) {
+        if (!brain || !world) {
+            throw std::runtime_error("Brain or world is null");
+        }
+        std::map<std::string, std::shared_ptr<AgentBrain>> agents;
+        for (const auto& name : agentNames) {
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->initialize(*world);
+            agents[name] = agent;
+        }
+        return agents;
+    }, py::arg("brain"), py::arg("world"), py::arg("agentNames"), R"pbdoc(Create multiple agent brain instances for a shared brain and world.
+        
+        Args:
+            brain: The shared brain instance
+            world: The world instance
+            agentNames: List of names for the agents to create
+            
+        Returns:
+            Dictionary mapping agent names to AgentBrain instances
+        )pbdoc");
+
+    // Configuration validation helpers
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
