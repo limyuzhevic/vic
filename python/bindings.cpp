@@ -160,6 +160,84 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value (string)")
+        .def("set", [](Config& self, const std::string& key, int64_t value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value (integer)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value (float)")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            return self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value (boolean)")
+        .def("get", [](Config& self, const std::string& key) {
+            return self.get<std::string>(key);
+        }, py::arg("key"),
+             "Get a configuration value (string)")
+        .def("getInt", [](Config& self, const std::string& key) {
+            return self.get<int64_t>(key);
+        }, py::arg("key"),
+             "Get a configuration value (integer)")
+        .def("getFloat", [](Config& self, const std::string& key) {
+            return self.get<double>(key);
+        }, py::arg("key"),
+             "Get a configuration value (float)")
+        .def("getBool", [](Config& self, const std::string& key) {
+            return self.get<bool>(key);
+        }, py::arg("key"),
+             "Get a configuration value (boolean)")
+        .def("setFromMap", [](Config& self, const py::dict& params) {
+            for (auto item : params) {
+                std::string key = py::cast<std::string>(item.first);
+                self.set(key, py::cast<std::string>(item.second));
+            }
+            return self;
+        }, py::arg("params"),
+             "Set multiple configuration values from a dictionary")
+        .def("preset", [](Config& self, const std::string& name) {
+            if (name == "default") {
+                // Set default configuration for quick setup
+                self.set("brain.neuron_count", 1000);
+                self.set("brain.region_count", 2);
+                self.set("brain.connection_probability", 0.1);
+                self.set("plasticity.stdp.enable", true);
+                self.set("plasticity.hebbian.enable", true);
+                self.set("plasticity.structural.enable", true);
+                self.set("neuromod.dopamine.scale", 1.0);
+                self.set("neuromod.curiosity.enable", true);
+                self.set("neuromod.novelty.enable", true);
+                self.set("neuromod.prediction.enable", true);
+                self.set("development.enable", true);
+            } else if (name == "high_performance") {
+                self.set("brain.neuron_count", 5000);
+                self.set("brain.region_count", 4);
+                self.set("brain.connection_probability", 0.05);
+                self.set("plasticity.stdp.enable", true);
+                self.set("plasticity.hebbian.enable", true);
+                self.set("plasticity.structural.enable", false);
+                self.set("development.enable", true);
+            } else if (name == "exploration") {
+                self.set("brain.neuron_count", 2000);
+                self.set("brain.region_count", 3);
+                self.set("brain.connection_probability", 0.15);
+                self.set("plasticity.stdp.enable", true);
+                self.set("plasticity.hebbian.enable", true);
+                self.set("plasticity.structural.enable", true);
+                self.set("neuromod.curiosity.enable", true);
+                self.set("neuromod.novelty.enable", true);
+                self.set("development.enable", true);
+            } else {
+                py::raise(py::value_error(), "Unknown preset: " + name);
+            }
+            return self;
+        }, py::arg("name"),
+             "Apply a preset configuration (default, high_performance, exploration)")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -400,21 +478,266 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, int numSteps) {
+        if (!brain) {
+            py::raise(py::value_error(), "Brain cannot be null");
+        }
+        
+        brain->initialize();
+        
+        size_t totalSpikes = 0;
+        size_t activeNeurons = 0;
+        
+        for (int step = 0; step < numSteps; ++step) {
+            brain->step(step);
+            totalSpikes += brain->getTotalSpikeCount();
+            activeNeurons += brain->getFiringNeuronCount();
+        }
+        
+        return py::dict({
+            {"total_spikes", totalSpikes},
+            {"avg_firing_rate", static_cast<double>(totalSpikes) / numSteps},
+            {"avg_active_neurons", static_cast<double>(activeNeurons) / numSteps},
+            {"steps_completed", numSteps}
+        });
+    }, py::arg("brain"), py::arg("numSteps"),
+       "Run a simple simulation for a given number of steps and return statistics");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("compareBrains", [](std::vector<std::shared_ptr<Brain>> brains,
+                            int numSteps,
+                            const std::string& metric = "firing_rate") {
+        if (brains.empty()) {
+            py::raise(py::value_error(), "At least one brain must be provided");
+        }
+        
+        py::dict results;
+        py::list metrics;
+        
+        for (int i = 0; i < brains.size(); ++i) {
+            if (!brains[i]) {
+                py::raise(py::value_error(), "Brain at index " + std::to_string(i) + " is null");
+            }
+            
+            brains[i]->initialize();
+            
+            double brainMetric = 0.0;
+            
+            if (metric == "firing_rate") {
+                size_t totalSpikes = 0;
+                for (int step = 0; step < numSteps; ++step) {
+                    brains[i]->step(step);
+                    totalSpikes += brains[i]->getTotalSpikeCount();
+                }
+                brainMetric = static_cast<double>(totalSpikes) / numSteps;
+            } else if (metric == "active_neurons") {
+                size_t totalActive = 0;
+                for (int step = 0; step < numSteps; ++step) {
+                    brains[i]->step(step);
+                    totalActive += brains[i]->getFiringNeuronCount();
+                }
+                brainMetric = static_cast<double>(totalActive) / numSteps;
+            } else if (metric == "synapse_count") {
+                brainMetric = brains[i]->getTotalSynapseCount();
+            } else {
+                py::raise(py::value_error(), "Unknown metric: " + metric);
+            }
+            
+            std::string brainName = "brain_" + std::to_string(i);
+            metrics.append(py::dict({
+                {"name", brainName},
+                {"metric", brainName + "_" + metric},
+                {"value", brainMetric}
+            }));
+        }
+        
+        results["comparisons"] = metrics;
+        results["metric"] = metric;
+        results["brain_count"] = brains.size();
+        results["steps_performed"] = numSteps;
+        
+        return results;
+    }, py::arg("brains"), py::arg("numSteps"), py::arg("metric") = "firing_rate",
+       "Compare multiple brains over the same simulation and return comparative results");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("exportBrainState", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        if (!brain) {
+            py::raise(py::value_error(), "Brain cannot be null");
+        }
+        
+        if (filename.empty()) {
+            py::raise(py::value_error(), "Filename cannot be empty");
+        }
+        
+        if (!brain->save(filename)) {
+            py::raise(py::runtime_error(), "Failed to save brain state to " + filename);
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("filename"),
+       "Save brain state to a file and return success status");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("loadBrainState", [](const std::string& filename) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        
+        if (!brain->load(filename)) {
+            py::raise(py::runtime_error(), "Failed to load brain state from " + filename);
+        }
+        
+        return brain;
+    }, py::arg("filename"),
+       "Load brain state from a file and return the brain object");
+
+    m.def("createConfigFromString", [](const std::string& configStr) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Parse simple key=value pairs
+        std::stringstream stream(configStr);
+        std::string line;
+        while (std::getline(stream, line)) {
+            line = Config::trim(line);
+            if (line.empty() || line[0] == '#') {
+                continue;
+            }
+            
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = Config::trim(line.substr(0, pos));
+                std::string value = Config::trim(line.substr(pos + 1));
+                config->set(key, value);
+            }
+        }
+        
+        return config;
+    }, py::arg("configStr"),
+       "Create a configuration from a string of key=value pairs");
+
+    m.def("getDefaultConfigKeys", []() {
+        auto config = std::make_shared<Config>();
+        return config->getKeys();
+    }, "Get all default configuration keys");
+
+    m.def("getConfigPresets", []() {
+        py::dict presets;
+        
+        presets["default"] = py::dict({
+            {"brain.neuron_count", 1000},
+            {"brain.region_count", 2},
+            {"plasticity.stdp.enable", true},
+            {"plasticity.hebbian.enable", true},
+            {"development.enable", true}
+        });
+        
+        presets["high_performance"] = py::dict({
+            {"brain.neuron_count", 5000},
+            {"brain.region_count", 4},
+            {"plasticity.stdp.enable", true},
+            {"plasticity.hebbian.enable", true},
+            {"plasticity.structural.enable", false},
+            {"development.enable", true}
+        });
+        
+        presets["exploration"] = py::dict({
+            {"brain.neuron_count", 2000},
+            {"brain.region_count", 3},
+            {"plasticity.stdp.enable", true},
+            {"plasticity.hebbian.enable", true},
+            {"plasticity.structural.enable", true},
+            {"neuromod.curiosity.enable", true},
+            {"neuromod.novelty.enable", true},
+            {"development.enable", true}
+        });
+        
+        return presets;
+    }, "Get available configuration presets");
+
+    m.def("benchmarkComparison", [](std::vector<std::shared_ptr<Brain>> brains,
+                                   int numSteps,
+                                   const std::string& outputFile = "benchmark_results.json") {
+        if (brains.size() < 2) {
+            py::raise(py::value_error(), "At least 2 brains required for comparison");
+        }
+        
+        py::dict benchmarkResults;
+        py::list comparisons;
+        
+        for (int i = 0; i < brains.size(); ++i) {
+            if (!brains[i]) {
+                py::raise(py::value_error(), "Brain at index " + std::to_string(i) + " is null");
+            }
+            
+            std::vector<double> stepTimes;
+            std::vector<double> firingRates;
+            
+            for (int trial = 0; trial < 5; ++trial) {  // 5 trials for averaging
+                auto trialBrain = std::make_shared<Brain>(*brains[i]->getConfig());
+                trialBrain->initialize();
+                
+                auto start = std::chrono::high_resolution_clock::now();
+                
+                for (int step = 0; step < numSteps; ++step) {
+                    trialBrain->step(step);
+                }
+                
+                auto end = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration<double>(end - start).count();
+                
+                stepTimes.push_back(duration / numSteps);
+                firingRates.push_back(trialBrain->getAverageFiringRate());
+            }
+            
+            // Calculate averages
+            double avgTime = 0.0, avgFiring = 0.0;
+            for (double t : stepTimes) avgTime += t;
+            for (double f : firingRates) avgFiring += f;
+            avgTime /= stepTimes.size();
+            avgFiring /= firingRates.size();
+            
+            comparisons.append(py::dict({
+                {"brain_id", i},
+                {"avg_step_time_ms", avgTime * 1000.0},
+                {"avg_firing_rate", avgFiring},
+                {"min_step_time_ms", *std::min_element(stepTimes.begin(), stepTimes.end()) * 1000.0},
+                {"max_step_time_ms", *std::max_element(stepTimes.begin(), stepTimes.end()) * 1000.0}
+            }));
+        }
+        
+        benchmarkResults["comparisons"] = comparisons;
+        benchmarkResults["num_steps"] = numSteps;
+        benchmarkResults["output_file"] = outputFile;
+        
+        return benchmarkResults;
+    }, py::arg("brains"), py::arg("numSteps"), py::arg("outputFile") = "benchmark_results.json",
+       "Run benchmark comparison on multiple brains and return detailed performance statistics");
+
+    m.def("createMultiAgentSystem", [](std::shared_ptr<Config> config,
+                                      const std::vector<std::shared_ptr<SimpleWorld>>& worlds) {
+        if (worlds.empty()) {
+            py::raise(py::value_error(), "At least one world required for multi-agent system");
+        }
+        
+        py::dict system;
+        std::vector<std::shared_ptr<Brain>> brains;
+        std::vector<std::shared_ptr<AgentBrain>> agents;
+        
+        for (size_t i = 0; i < worlds.size(); ++i) {
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            brains.push_back(brain);
+            
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->initialize(*worlds[i]);
+            agents.push_back(agent);
+        }
+        
+        system["brains"] = brains;
+        system["agents"] = agents;
+        system["worlds"] = worlds;
+        system["num_agents"] = worlds.size();
+        
+        return system;
+    }, py::arg("config"), py::arg("worlds"),
+       "Create a multi-agent system with multiple brains, agents, and worlds");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

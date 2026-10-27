@@ -19,8 +19,9 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO PHASE 3: Implement proper JSON/YAML parser
+    // PLACEHOLDER - Phase 2 uses a simple key=value format
+    // Enhanced error handling and robustness improvements applied
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -56,7 +57,22 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (!argv) {
+        NLM_LOG_ERROR("Config: Cannot load from args - invalid argv pointer");
+        return false;
+    }
+    
+    if (argc <= 1) {
+        NLM_LOG_INFO("Config: No command line arguments to process");
+        return true;
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        if (!argv[i]) {
+            NLM_LOG_WARNING("Config: Skipping null argument at position " + std::to_string(i));
+            continue;
+        }
+        
         std::string arg(argv[i]);
         
         // Handle --key=value format
@@ -65,30 +81,93 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                if (key.empty()) {
+                    NLM_LOG_WARNING("Config: Empty key in argument " + arg);
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARNING("Config: Invalid command line argument format: " + arg);
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg[0] == '-' && i + 1 < argc && argv[i + 1]) {
             std::string key = arg.substr(1);
+            if (key.empty()) {
+                NLM_LOG_WARNING("Config: Empty key in argument " + arg);
+                continue;
+            }
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+        } else if (arg[0] == '-') {
+            NLM_LOG_WARNING("Config: Argument missing value: " + arg);
         }
     }
+    
+    NLM_LOG_INFO("Config: Processed command line arguments");
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Config: Cannot save to file - empty filepath");
+        return false;
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Config: Cannot open file for writing: " + filepath);
         return false;
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Convert ConfigValue to string for saving
+        std::visit([this, &file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                file << std::to_string(arg);
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << '"' << arg << '"';
+            } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << std::to_string(arg[i]);
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << '"' << arg[i] << '"';
+                }
+                file << "]";
+            } else {
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
+    NLM_LOG_INFO("Config: Saved " + std::to_string(pImpl->entries.size()) + 
+                 " entries to " + filepath);
     return true;
 }
 

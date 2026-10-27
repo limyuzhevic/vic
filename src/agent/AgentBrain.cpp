@@ -85,7 +85,10 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    if (!brain_) {
+        NLM_LOG_WARNING("AgentBrain: Cannot process sensory input - brain pointer is null");
+        return;
+    }
     
     // Vision input (256 values -> sensoryVision_ neurons)
     const auto& vision = percept.getVision();
@@ -150,7 +153,17 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        NLM_LOG_WARNING("AgentBrain: Cannot decode motor command - brain pointer is null");
+        return MotorCommand::Wait;
+    }
+    
+    if (motorForward_.empty() && motorBackward_.empty() && 
+        motorTurnLeft_.empty() && motorTurnRight_.empty() &&
+        motorInteract_.empty() && motorWait_.empty()) {
+        NLM_LOG_WARNING("AgentBrain: No motor neurons configured for command decoding");
+        return MotorCommand::Wait;
+    }
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
@@ -165,13 +178,21 @@ MotorCommand AgentBrain::decodeMotorCommand() {
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
     // Calculate average activity in each motor group
     auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
+        if (neurons.empty()) {
+            NLM_LOG_WARNING("AgentBrain: Attempted to calculate activity on empty neuron vector");
+            return 0.0f;
+        }
+        
         float sum = 0.0f;
         for (Neuron* n : neurons) {
+            if (!n) {
+                NLM_LOG_WARNING("AgentBrain: Null neuron pointer in activity calculation");
+                continue;
+            }
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
         }
-        return sum / neurons.size();
+        return neurons.empty() ? 0.0f : sum / neurons.size();
     };
     
     float forwardAct = calcActivity(motorForward_);
@@ -236,7 +257,12 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    if (!brain_ || !rewardModulationEnabled_) {
+        if (!brain_) {
+            NLM_LOG_WARNING("AgentBrain: Cannot apply reward modulation - brain pointer is null");
+        }
+        return;
+    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;
@@ -253,6 +279,8 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (auto* syn : region->getSynapses()) {
+            if (!syn) continue;  // Safety check
+            
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {
@@ -280,7 +308,12 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
+    if (!brain_ || !developmentEnabled_) {
+        if (!brain_) {
+            NLM_LOG_WARNING("AgentBrain: Cannot update development - brain pointer is null");
+        }
+        return;
+    }
     
     developmentalAge_ += timestep;
     
