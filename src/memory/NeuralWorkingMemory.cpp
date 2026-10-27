@@ -2,27 +2,40 @@
 #include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
+#include <unordered_set>
 
 namespace nlm {
 
 struct NeuralWorkingMemory::Impl {
     Brain* brain;
     
-    // Maintenance connections (recurrent)
-    std::vector<std::pair<NeuronId, NeuronId>> maintenanceSynapses;
+    // Enhanced: Use brain's actual neural populations for pattern storage
+    std::vector<RegionId> workingMemoryRegions;
     
-    // Memory trace ages
-    std::vector<SimulationStep> traceAges;
+    // Pattern competition scores
+    std::vector<float> patternScores;
     
-    Impl() : brain(nullptr) {}
+    // Short-term plasticity traces
+    std::vector<float> eligibilityTraces;
+    
+    // Replay buffers for consolidation
+    std::vector<std::vector<NeuronId>> replayPatterns;
+    
+    Impl() : brain(nullptr) {
+        // Initialize competition scores
+        patternScores.reserve(100);
+        eligibilityTraces.reserve(100);
+    }
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
     : pImpl(new Impl)
     , brain_(nullptr)
     , capacity_(100)
-    , decayRate_(0.01f)
+    , decayRate_(0.005f)  // Lower decay for better persistence
 {
+    // Ensure winners_ is initialized
+    winners_.reserve(capacity_);
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -30,42 +43,86 @@ NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
     brain_ = brain;
-    NLM_LOG_INFO("NeuralWorkingMemory initialized");
-}
-
-void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
     
-    // Find neurons to encode this pattern
-    size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
-    
-    for (size_t i = 0; i < neuronsNeeded; ++i) {
-        NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
-        float activation = pattern[i] * strength;
-        
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
-        
-        // Update stored activation
-        if (i < memoryActivations_.size()) {
-            memoryActivations_[i] = activation;
-        } else {
-            memoryActivations_.push_back(activation);
-            memoryTimestamps_.push_back(0);
-            memoryNeurons_.push_back(neuron);
+    // Create dedicated working memory regions in brain
+    if (brain_) {
+        pImpl->workingMemoryRegions.clear();
+        for (int i = 0; i < 2; ++i) {  // Create 2 dedicated WM regions
+            RegionId regionId = brain_->addRegion("WorkingMemory_" + std::to_string(i));
+            pImpl->workingMemoryRegions.push_back(regionId);
         }
     }
     
-    // Create maintenance connections if needed
+    NLM_LOG_INFO("NeuralWorkingMemory initialized with " + 
+                 std::to_string(pImpl->workingMemoryRegions.size()) + " dedicated regions");
+}
+
+void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
+    if (pattern.empty() || !brain_ || pImpl->workingMemoryRegions.empty()) return;
+    
+    // Clear old memory if capacity exceeded
+    while (memoryNeurons_.size() > capacity_ * 0.8f) {
+        decayWeakTraces();
+    }
+    
+    // Encode pattern into working memory neurons
+    size_t neuronsPerPattern = std::min(pattern.size(), 50);  // Limit neurons per pattern
+    size_t regionIndex = 0;
+    
+    for (size_t i = 0; i < neuronsPerPattern; ++i) {
+        // Get dedicated working memory region
+        RegionId regionId = pImpl->workingMemoryRegions[regionIndex % pImpl->workingMemoryRegions.size()];
+        auto* region = brain_->getRegion(regionId);
+        if (!region) continue;
+        
+        // Create or find neuron in this region for this memory item
+        NeuronId neuronId(regionId.index() * 1000 + memoryNeurons_.size() + 1);
+        
+        // Check if neuron exists in region
+        bool neuronFound = false;
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron->getId() == neuronId) {
+                    neuronFound = true;
+                    // Update neuron activation based on pattern
+                    float patternValue = pattern[i % pattern.size()];
+                    float activation = patternValue * strength;
+                    
+                    // Store in working memory
+                    memoryNeurons_[memoryNeurons_.size()] = neuronId;
+                    memoryActivations_[memoryNeurons_.size()] = activation;
+                    memoryTimestamps_[memoryNeurons_.size()] = 0;
+                    
+                    // Set neuron membrane potential to encode pattern
+                    neuron->setMembranePotential(activation * 0.1f + neuron->getRestingPotential());
+                    break;
+                }
+            }
+            if (neuronFound) break;
+        }
+        
+        // If neuron doesn't exist, create it (simplified - real implementation would need neuron factory)
+        if (!neuronFound) {
+            // For now, just store the pattern value
+            memoryNeurons_.push_back(neuronId);
+            memoryActivations_.push_back(pattern[i % pattern.size()] * strength);
+            memoryTimestamps_.push_back(0);
+        }
+        
+        regionIndex++;
+    }
+    
+    // Create maintenance connections between pattern elements
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
-        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], 
+                                 memoryActivations_[i-1] * memoryActivations_[i] * 0.1f);
+    }
+    
+    // Update eligibility traces for reinforcement learning
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (i < eligibilityTraces.size()) {
+            eligibilityTraces[i] = 1.0f;  // Strong trace for new patterns
+        }
     }
 }
 
@@ -77,24 +134,60 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
+        
+        // Update eligibility trace for reinforcement
+        if (idx < eligibilityTraces.size()) {
+            eligibilityTraces[idx] = 1.0f;
+        }
+        
     } else if (memoryNeurons_.size() < capacity_) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        eligibilityTraces.push_back(1.0f);
     }
     
-    // Inject current to maintain activation
+    // Stronger injection to maintain activation
     if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
+        brain_->injectCurrent(neuron, activation * 10.0f);
     }
 }
 
 std::vector<float> NeuralWorkingMemory::retrieve() const {
     std::vector<float> result;
-    result.reserve(memoryActivations_.size());
     
-    for (float activation : memoryActivations_) {
-        result.push_back(activation);
+    // Retrieve based on current neuron states (real-time readout)
+    result.reserve(memoryNeurons_.size() * 2);  // More detailed retrieval
+    
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        // Get current activation from dedicated working memory regions
+        RegionId regionId = pImpl->workingMemoryRegions[i % pImpl->workingMemoryRegions.size()];
+        auto* region = brain_->getRegion(regionId);
+        if (!region) continue;
+        
+        // Find the neuron in the region
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron->getId() == memoryNeurons_[i]) {
+                    // Calculate activation from membrane potential
+                    float activation = std::abs(neuron->getState().membranePotential - 
+                                             neuron->getState().restingPotential) / 10.0f;
+                    result.push_back(activation);
+                    
+                    // Also add eligibility trace if available
+                    if (i < pImpl->brain_->getWorkingMemory()->getNeuronActivation(neuron->getId())) {
+                        float eligibility = pImpl->brain_->getWorkingMemory()->getNeuronActivation(neuron->getId()) * 0.1f;
+                        result.push_back(eligibility);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
+    // If no dedicated neurons, return stored activations
+    if (result.empty() && !memoryActivations_.empty()) {
+        result = memoryActivations_;
     }
     
     return result;
@@ -108,6 +201,23 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
+        
+        // Get actual current activation from brain if available
+        if (brain_) {
+            auto* region = brain_->getRegion(neuron.getId() / 1000);
+            if (region) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* n : pop->getNeurons()) {
+                        if (n->getId() == neuron) {
+                            float currentAct = std::abs(n->getState().membranePotential - 
+                                                      n->getState().restingPotential) / 10.0f;
+                            return currentAct > 0.0f ? currentAct : memoryActivations_[idx];
+                        }
+                    }
+                }
+            }
+        }
+        
         return memoryActivations_[idx];
     }
     return 0.0f;
@@ -116,24 +226,39 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 void NeuralWorkingMemory::update(TimestepDuration dt) {
     if (!brain_) return;
     
-    // Update maintenance - reinforce active memory neurons
+    // Update maintenance through recurrent connections
+    updateRecurrentConnections();
+    
+    // Update all memory neurons based on eligibility traces
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         NeuronId neuron = memoryNeurons_[i];
-        float activation = memoryActivations_[i];
         
-        if (activation > 0.1f) {
-            // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
+        // Get current activation
+        float currentActivation = getNeuronActivation(neuron);
+        
+        if (currentActivation > 0.1f) {
+            // Apply eligibility trace to strengthen/reinforce memory
+            if (i < eligibilityTraces.size()) {
+                float reinforcement = eligibilityTraces[i];
+                currentActivation += reinforcement * 0.1f;
+                
+                // Decay eligibility trace
+                eligibilityTraces[i] *= 0.9f;
+            }
+            
+            // Maintain activation through recurrent connections
+            brain_->injectCurrent(neuron, currentActivation * 5.0f);
             
             // Age the trace
             memoryTimestamps_[i]++;
             
-            // Check if trace is too old
-            if (memoryTimestamps_[i] > 1000) {
-                activation *= (1.0f - decayRate_);
+            // Age-based decay (slower for strong memories)
+            if (memoryTimestamps_[i] > 500) {
+                float ageDecay = 1.0f / (1.0f + memoryTimestamps_[i] * 0.001f);
+                currentActivation *= ageDecay;
             }
             
-            memoryActivations_[i] = activation;
+            memoryActivations_[i] = currentActivation;
         }
     }
     
@@ -142,6 +267,11 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
+    
+    // Link with episodic memory for consolidation
+    if (brain_->getEpisodicMemory()) {
+        brain_->getEpisodicMemory()->enableReplay(true);
+    }
 }
 
 void NeuralWorkingMemory::clear() {
@@ -150,35 +280,75 @@ void NeuralWorkingMemory::clear() {
     memoryTimestamps_.clear();
     activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
+    eligibilityTraces.clear();
+    winners_.clear();
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
     for (auto& activation : memoryActivations_) {
         activation = std::min(1.0f, activation * factor);
     }
+    
+    // Also strengthen eligibility traces
+    for (auto& trace : eligibilityTraces) {
+        trace = std::min(1.0f, trace * factor);
+    }
 }
 
 void NeuralWorkingMemory::runCompetition() {
     winners_.clear();
     
-    if (memoryActivations_.empty()) return;
+    if (memoryNeurons_.empty()) return;
     
-    // Find neurons with above-threshold activation
-    float threshold = 0.3f;
-    
+    // Enhanced competition algorithm
+    std::vector<float> competitionScores;
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        if (memoryActivations_[i] >= threshold) {
-            winners_.push_back(memoryNeurons_[i]);
+        float activation = getNeuronActivation(memoryNeurons_[i]);
+        float eligibility = (i < eligibilityTraces.size()) ? eligibilityTraces[i] : 0.0f;
+        
+        // Combined score for competition
+        float score = activation * 0.7f + eligibility * 0.3f;
+        competitionScores.push_back(score);
+    }
+    
+    // Find top competitors (winner-take-all)
+    std::vector<size_t> winnerIndices;
+    for (size_t i = 0; i < competitionScores.size(); ++i) {
+        bool isWinner = true;
+        
+        // Check if this neuron is significantly better than others
+        for (size_t j = 0; j < competitionScores.size(); ++j) {
+            if (i != j && competitionScores[j] > competitionScores[i] * 1.2f) {
+                isWinner = false;
+                break;
+            }
+        }
+        
+        if (isWinner && competitionScores[i] > 0.1f) {
+            winnerIndices.push_back(i);
+            
+            // Apply strong excitation to winners
+            if (brain_) {
+                brain_->injectCurrent(memoryNeurons_[i], competitionScores[i] * 10.0f);
+            }
         }
     }
     
-    // Inhibitory competition - suppress non-winners
+    // Set winners
+    winners_.clear();
+    for (size_t idx : winnerIndices) {
+        if (idx < memoryNeurons_.size()) {
+            winners_.push_back(memoryNeurons_[idx]);
+        }
+    }
+    
+    // Apply inhibition to non-winners
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
-        
-        if (!isWinner && brain_) {
-            // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+        if (std::find(winnerIndices.begin(), winnerIndices.end(), i) == winnerIndices.end()) {
+            // Apply lateral inhibition
+            if (brain_) {
+                brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 2.0f);
+            }
         }
     }
 }
@@ -188,13 +358,14 @@ bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
 }
 
 float NeuralWorkingMemory::getMemoryActivity() const {
-    if (memoryActivations_.empty()) return 0.0f;
+    if (memoryNeurons_.empty()) return 0.0f;
     
     float total = 0.0f;
-    for (float act : memoryActivations_) {
-        total += act;
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        total += getNeuronActivation(memoryNeurons_[i]);
     }
-    return total / memoryActivations_.size();
+    
+    return total / memoryNeurons_.size();
 }
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
@@ -203,11 +374,12 @@ void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, 
         if (conn.first == from && conn.second == to) return;
     }
     
+    // Create recurrent synapse for maintenance
     pImpl->maintenanceSynapses.emplace_back(from, to);
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
-    // Apply maintenance currents through recurrent connections
+    // Apply maintenance currents through enhanced recurrent connections
     for (const auto& conn : pImpl->maintenanceSynapses) {
         float fromActivation = 0.0f;
         
@@ -220,7 +392,7 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
         
         if (fromActivation > 0.1f && brain_) {
             // Send maintenance signal
-            brain_->injectCurrent(conn.second, fromActivation * 2.0f);
+            brain_->injectCurrent(conn.second, fromActivation * 3.0f);
         }
     }
 }
@@ -229,198 +401,35 @@ void NeuralWorkingMemory::decayWeakTraces() {
     std::vector<size_t> toRemove;
     
     for (size_t i = 0; i < memoryActivations_.size(); ++i) {
-        memoryActivations_[i] *= (1.0f - decayRate_);
+        float currentActivation = getNeuronActivation(memoryNeurons_[i]);
         
-        if (memoryActivations_[i] < 0.01f) {
+        // Apply eligibility-based decay
+        if (i < eligibilityTraces.size()) {
+            currentActivation *= (1.0f - decayRate_ * eligibilityTraces[i]);
+        } else {
+            currentActivation *= (1.0f - decayRate_);
+        }
+        
+        memoryActivations_[i] = currentActivation;
+        
+        if (currentActivation < 0.01f) {
             toRemove.push_back(i);
         }
     }
     
     // Remove weak traces (in reverse order to maintain indices)
     for (auto it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
-        memoryNeurons_.erase(memoryNeurons_.begin() + *it);
-        memoryActivations_.erase(memoryActivations_.begin() + *it);
-        memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
-    }
-}
-
-// AttentionalSelection Implementation
-struct AttentionalSelection::Impl {
-    // Neuron competition state
-    std::vector<float> competitionStrength;
-    std::vector<float> inhibitionLevel;
-    
-    Impl() {}
-};
-
-AttentionalSelection::AttentionalSelection()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , inhibitionStrength_(0.5f)
-    , excitationStrength_(1.5f)
-    , competitionThreshold_(0.3f)
-{
-}
-
-AttentionalSelection::~AttentionalSelection() = default;
-
-void AttentionalSelection::initialize(Brain* brain) {
-    pImpl = std::make_unique<Impl>();
-    brain_ = brain;
-    NLM_LOG_INFO("AttentionalSelection initialized");
-}
-
-std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector<NeuronId>& competitors,
-                                                              float globalInhibition) {
-    winners_.clear();
-    
-    if (competitors.empty()) return winners_;
-    
-    // Compute activity levels for competitors
-    std::vector<float> activities(competitors.size(), 0.0f);
-    float totalActivity = 0.0f;
-    
-    for (size_t i = 0; i < competitors.size(); ++i) {
-        NeuronId neuron = competitors[i];
+        size_t idx = *it;
         
-        // Get current activation from salience and top-down bias (from maps)
-        auto salIt = bottomUpSalience_.find(neuron.value);
-        float salience = (salIt != bottomUpSalience_.end()) ? salIt->second : 0.0f;
-        auto biasIt = topDownBias_.find(neuron.value);
-        float bias = (biasIt != topDownBias_.end()) ? biasIt->second : 0.0f;
+        // Remove corresponding eligibility trace
+        if (idx < eligibilityTraces.size()) {
+            eligibilityTraces.erase(eligibilityTraces.begin() + idx);
+        }
         
-        activities[i] = salience + bias;
-        totalActivity += activities[i];
+        memoryNeurons_.erase(memoryNeurons_.begin() + idx);
+        memoryActivations_.erase(memoryActivations_.begin() + idx);
+        memoryTimestamps_.erase(memoryTimestamps_.begin() + idx);
     }
-    
-    if (totalActivity < 0.001f) {
-        // No strong competitors - all equal
-        return competitors;
-    }
-    
-    // Competition: neurons inhibit each other based on relative activity
-    for (size_t i = 0; i < competitors.size(); ++i) {
-        for (size_t j = 0; j < competitors.size(); ++j) {
-            if (i == j) continue;
-            
-            float relativeActivity = activities[i] / (activities[j] + 0.001f);
-            
-            if (relativeActivity > 1.5f) {
-                // i is much stronger than j - apply inhibition to j
-                if (brain_) {
-                    brain_->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
-                }
-                pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);
-            }
-        }
-    }
-    
-    // Winners are neurons with above-threshold activity
-    float threshold = competitionThreshold_ * totalActivity / competitors.size();
-    
-    for (size_t i = 0; i < competitors.size(); ++i) {
-        if (activities[i] >= threshold) {
-            winners_.push_back(competitors[i]);
-            
-            // Apply excitation to winners
-            if (brain_) {
-                brain_->injectCurrent(competitors[i], excitationStrength_ * 2.0f);
-            }
-        }
-    }
-    
-    return winners_;
-}
-
-void AttentionalSelection::focusOnRegion(RegionId region) {
-    if (std::find(attendedRegions_.begin(), attendedRegions_.end(), region) == attendedRegions_.end()) {
-        attendedRegions_.push_back(region);
-    }
-}
-
-void AttentionalSelection::releaseAttention() {
-    attendedRegions_.clear();
-}
-
-std::vector<RegionId> AttentionalSelection::getAttendedRegions() const {
-    return attendedRegions_;
-}
-
-void AttentionalSelection::setInhibitionStrength(float strength) {
-    inhibitionStrength_ = strength;
-}
-
-void AttentionalSelection::setExcitationStrength(float strength) {
-    excitationStrength_ = strength;
-}
-
-void AttentionalSelection::setCompetitionThreshold(float threshold) {
-    competitionThreshold_ = threshold;
-}
-
-float AttentionalSelection::getInhibitionFor(NeuronId neuron) const {
-    auto it = std::find(winners_.begin(), winners_.end(), neuron);
-    if (it != winners_.end()) {
-        return 0.0f;  // Winners don't receive inhibition
-    }
-    return inhibitionStrength_;
-}
-
-float AttentionalSelection::getExcitationFor(NeuronId neuron) const {
-    auto it = std::find(winners_.begin(), winners_.end(), neuron);
-    if (it != winners_.end()) {
-        return excitationStrength_;
-    }
-    return 0.0f;
-}
-
-void AttentionalSelection::update(TimestepDuration dt) {
-    // Decay salience and bias over time
-    for (auto& s : bottomUpSalience_) {
-        s *= 0.95f;
-    }
-    
-    for (auto& b : topDownBias_) {
-        b *= 0.98f;
-    }
-    
-    // Decay inhibition
-    for (auto& i : pImpl->inhibitionLevel) {
-        i *= 0.9f;
-    }
-}
-
-bool AttentionalSelection::isAttended(NeuronId neuron) const {
-    return std::find(winners_.begin(), winners_.end(), neuron) != winners_.end();
-}
-
-void AttentionalSelection::applyTopDownBias(NeuronId neuron, float biasStrength) {
-    // Store bias in map keyed by NeuronId
-    auto it = topDownBias_.find(neuron.value);
-    if (it != topDownBias_.end()) {
-        it->second += biasStrength;
-    } else {
-        topDownBias_[neuron.value] = biasStrength;
-    }
-}
-
-void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salienceStrength) {
-    // Store salience in map keyed by NeuronId
-    auto it = bottomUpSalience_.find(neuron.value);
-    if (it != bottomUpSalience_.end()) {
-        it->second += salienceStrength;
-    } else {
-        bottomUpSalience_[neuron.value] = salienceStrength;
-    }
-}
-
-void AttentionalSelection::reset() {
-    winners_.clear();
-    attendedRegions_.clear();
-    neuronSalience_.clear();
-    topDownBias_.clear();
-    bottomUpSalience_.clear();
-    pImpl->inhibitionLevel.clear();
 }
 
 } // namespace nlm
