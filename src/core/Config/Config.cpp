@@ -8,6 +8,7 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<std::string> validationErrors;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -84,16 +85,36 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    std::string valueStr;
+    if (entry.value.index() == static_cast<size_t>(ConfigValue::index<std::string>())) {
+        valueStr = "\"" + std::get<std::string>(entry.value) + "\"";
+    } else if (entry.value.index() == static_cast<size_t>(ConfigValue::index<bool>())) {
+        valueStr = std::get<bool>(entry.value) ? "true" : "false";
+    } else {
+        // For other types, use generic string conversion
+        std::ostringstream oss;
+        std::visit([&oss](auto&& arg) {
+            oss << arg;
+        }, entry.value);
+        valueStr = oss.str();
     }
     
+    file << "# " << entry.description << "\n";
+    file << entry.key << " = " << valueStr << "\n";
+    file << "# " << static_cast<int>(entry.source) << " (" << configSourceToString(entry.source) << ")\n";
+    file << "\n";
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
+std::string Config::configSourceToString(ConfigSource source) {
+    switch (source) {
+        case ConfigSource::Default: return "Default";
+        case ConfigSource::File: return "File";
+        case ConfigSource::CommandLine: return "CommandLine";
+        case ConfigSource::Runtime: return "Runtime";
+        default: return "Unknown";
+    }
+}
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -206,10 +227,48 @@ template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+    }
+    
+    if (!isValid) {
+        pImpl->validationErrors = errors;
+    }
+    
+    return isValid;
+}
 
-} // namespace nlm
+std::vector<std::string> Config::getValidationErrors() const {
+    return pImpl->validationErrors;
+}
+
+std::string Config::getValueTypeString(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return "Not found";
+    }
+    
+    switch (it->value.index()) {
+        case static_cast<size_t>(ConfigValue::index<int>()): return "int";
+        case static_cast<size_t>(ConfigValue::index<int64_t>()): return "int64_t";
+        case static_cast<size_t>(ConfigValue::index<double>()): return "double";
+        case static_cast<size_t>(ConfigValue::index<bool>()): return "bool";
+        case static_cast<size_t>(ConfigValue::index<std::string>()): return "string";
+        case static_cast<size_t>(ConfigValue::index<std::vector<int>>()): return "vector<int>";
+        case static_cast<size_t>(ConfigValue::index<std::vector<double>>()): return "vector<double>";
+        case static_cast<size_t>(ConfigValue::index<std::vector<std::string>>()): return "vector<string>";
+        default: return "unknown";
+    }
+}
+
+bool Config::isValueTypeValid(const std::string& key, const std::string& typeName) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return false;
+    }
+    
+    std::string actualType = getValueTypeString(key);
+    return actualType == typeName;
+}

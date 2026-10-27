@@ -93,13 +93,17 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
+    static std::string configSourceToString(ConfigSource source);
+    
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Get configuration type information
+    std::string getValueTypeString(const std::string& key) const;
+    bool isValueTypeValid(const std::string& key, const std::string& typeName) const;;
 
 } // namespace nlm

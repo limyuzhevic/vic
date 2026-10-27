@@ -526,8 +526,301 @@ pip install --force-reinstall .
 
 ---
 
+### Advanced Python-Specific Issues
+
+**"Brain isn't doing anything"**
+- Did you call `brain.initialize()`?
+- Try increasing the number of steps
+- Check that sensory input is connected
+
+**"Agent isn't moving"**
+- Did you call `world.applyMotorCommand()`?
+- Check that `world.update()` is being called
+
+**"Configuration validation fails"**
+- Use `pynlm.validateConfig()` to check configuration
+- Use `pynlm.getConfigErrors()` to get detailed error messages
+
+**"Brain statistics are empty"**
+- Ensure the brain has been initialized
+- Check that simulation steps have been run
+- Use `pynlm.brainStats()` for comprehensive statistics
+
+**"ImportError: No module named 'pynlm':**
+```bash
+pip install --force-reinstall .
+```
+
+**Segmentation faults:**
+- Check that `initialize()` is called before `step()`
+- Ensure `reset()` is called before re-running simulation
+
+---
+
+## Advanced Python API
+
+### Enhanced Configuration Management
+
+```python
+import pynlm
+
+# Create configuration
+config = pynlm.createDefaultConfig()
+
+# Query configuration
+if config.has("brain.neuron_count"):
+    print(f"Neuron count: {config.getOr<int>('brain.neuron_count', 1000)}")
+
+# Modify configuration
+config.set("brain.neuron_count", 2000)
+config.set("brain.synapse_density", 0.2)
+config.set("plasticity.stdp.learning_rate", 0.001)
+
+# Save to file
+config.saveToFile("my_config.json")
+
+# Load from file
+new_config = pynlm.createDefaultConfig()
+new_config.loadFromFile("my_config.json")
+
+# Validate configuration
+if not config.validate():
+    errors = config.getValidationErrors()
+    print(f"Configuration errors: {errors}")
+    raise pynlm.ConfigurationError(f"Invalid configuration: {errors}")
+```
+
+### Advanced Brain Features
+
+```python
+import pynlm
+
+# Create brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Get comprehensive brain statistics
+stats = pynlm.brainStats(brain)
+print(stats)
+
+# Access advanced brain features
+brain.getWorkingMemory()           # Get working memory
+brain.getEpisodicMemory()          # Get episodic memory
+brain.getAssociativeMemory()       # Get associative memory
+brain.getPredictionSystem()        # Get prediction system
+brain.getPlanner()                 # Get neural planner
+brain.getConceptFormation()        # Get concept formation
+brain.getAttention()               # Get attentional selection
+brain.getDevelopmentSystem()       # Get development system
+brain.getDopamine()                # Get dopamine neuromodulator
+brain.getCuriosity()               # Get curiosity neuromodulator
+brain.getNovelty()                 # Get novelty neuromodulator
+brain.getPredictionErrorSignal()   # Get prediction error signal
+brain.getRandomGenerator()         # Get random generator
+```
+
+### Advanced Agent Features
+
+```python
+import pynlm
+
+# Create agent
+agent = pynlm.createAgentBrain(brain)
+
+# Advanced sensory processing
+agent.processSensoryInput(percept)
+
+# Advanced motor decoding
+motor_cmd = agent.decodeMotorCommand()
+
+# Advanced neuromodulation
+agent.applyRewardModulation(reward, predicted_reward)
+
+# Advanced development
+agent.updateDevelopment(timestep)
+agent.getDevelopmentalStage()
+
+# Advanced subsystem control
+agent.enableRewardModulation(True/False)
+agent.enableStructuralPlasticity(True/False)
+agent.enableDevelopment(True/False)
+agent.enableCuriosity(True/False)
+
+# Advanced statistics
+print(f"Curiosity level: {agent.getCuriosityLevel():.3f}")
+print(f"Novelty level: {agent.getNoveltyLevel():.3f}")
+print(f"Prediction error: {agent.getPredictionError():.3f}")
+print(f"Neuromodulation level: {agent.getNeuromodulationLevel():.3f}")
+```
+
+### Convenience Functions and Templates
+
+```python
+import pynlm
+
+# Configuration templates
+config1 = pynlm.createStandardConfig()
+config2 = pynlm.createMinimalConfig()
+config3 = pynlm.createHighPerformanceConfig()
+
+# Brain statistics utility
+brain = pynlm.createBrain(config1)
+brain.initialize()
+print(pynlm.brainStats(brain))
+
+# Configuration validation
+if pynlm.validateConfig(config1):
+    print("Configuration is valid!")
+else:
+    print("Configuration has errors:", pynlm.getConfigErrors(config1))
+
+# Batch operations
+brains = pynlm.createMultipleBrains(5)
+for i, brain in enumerate(brains):
+    brain.initialize()
+    brain.step(10)
+    print(f"Brain {i}: {brain.getTotalSpikeCount()} spikes")
+
+# Save brain with timestamp
+success = pynlm.saveBrainWithTimestamp(brain, "my_simulation")
+print(f"Saved successfully: {success}")
+```
+
+### Complete Advanced Example
+
+```python
+import pynlm
+import sys
+
+def advanced_simulation(config_type="standard", steps=1000):
+    """Run an advanced simulation with configuration selection"""
+    
+    # Select configuration type
+    if config_type == "minimal":
+        config = pynlm.createMinimalConfig()
+    elif config_type == "high_performance":
+        config = pynlm.createHighPerformanceConfig()
+    else:
+        config = pynlm.createStandardConfig()
+    
+    print(f"Running simulation with {config_type} configuration...")
+    
+    # Validate configuration
+    if not pynlm.validateConfig(config):
+        errors = pynlm.getConfigErrors(config)
+        print(f"Configuration errors: {errors}")
+        return False
+    
+    # Create all components
+    brain = pynlm.createBrain(config)
+    world = pynlm.createSimpleWorld()
+    agent = pynlm.createAgentBrain(brain)
+    
+    # Configure world
+    world.configure(width=30, height=30, visionWidth=10, visionHeight=10)
+    world.reset()
+    world.setAgentStart(15.0, 15.0)
+    
+    # Initialize agent
+    agent.initialize(world)
+    
+    # Enable all subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Run simulation with progress monitoring
+    for step in range(steps):
+        world.update(0.1)
+        
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Optional: Print progress
+        if step % 200 == 0:
+            print(f"Step {step}: {brain.getFiringNeuronCount()} firing, "
+                  f"curiosity: {agent.getCuriosityLevel():.3f}")
+    
+    # Save results
+    success = pynlm.saveBrainWithTimestamp(brain, f"advanced_simulation_{config_type}")
+    
+    print(f"Simulation completed! Stats: {pynlm.brainStats(brain)}")
+    return success
+
+# Run different simulation types
+if __name__ == "__main__":
+    results = []
+    
+    # Run standard simulation
+    results.append(("Standard", advanced_simulation("standard", 500)))
+    
+    # Run minimal simulation
+    results.append(("Minimal", advanced_simulation("minimal", 200)))
+    
+    # Print summary
+    print("\nSimulation Summary:")
+    for name, success in results:
+        status = "✓ SUCCESS" if success else "✗ FAILED"
+        print(f"  {name}: {status}")
+    
+    sys.exit(0 if all(r[1] for r in results) else 1)
+```
+
+### Module Metadata and Constants
+
+```python
+import pynlm
+
+# Module metadata
+print(f"Version: {pynlm.__version__}")
+print(f"Author: {pynlm.__author__}")
+print(f"Description: {pynlm.__description__}")
+print(f"License: {pynlm.__license__}")
+
+# Version constants
+print(f"Version: {pynlm.VERSION_MAJOR}.{pynlm.VERSION_MINOR}.{pynlm.VERSION_PATCH}")
+
+# Special constants
+print(f"Invalid neuron ID: {pynlm.INVALID_NEURON_ID}")
+print(f"Invalid synapse ID: {pynlm.INVALID_SYNAPSE_ID}")
+```
+
+### Error Handling and Exceptions
+
+```python
+import pynlm
+
+try:
+    # Code that might raise NLM exceptions
+    config = pynlm.createDefaultConfig()
+    config.set("invalid_key", "bad_value")
+    
+    # This might raise ConfigurationError
+    if not config.validate():
+        errors = config.getValidationErrors()
+        raise pynlm.ConfigurationError(f"Invalid configuration: {errors}")
+        
+except pynlm.ConfigurationError as e:
+    print(f"Configuration error: {e}")
+except pynlm.BrainError as e:
+    print(f"Brain error: {e}")
+except pynlm.NLMException as e:
+    print(f"NLM error: {e}")
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+---
+
 ## Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [README.md](README.md) - High-level project overview
+- [easy_usage.md](easy_usage.md) - Beginner-friendly usage guide

@@ -71,113 +71,110 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
-
-## Simple Analogy
-
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
+### New: Example 3: Advanced Brain Configuration
 
 ```python
 import pynlm
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Create a standard configuration (new convenience function)
+config = pynlm.createStandardConfig()
 
-# Initialize it
+# Get brain statistics before initialization
+print("Config validation:", pynlm.validateConfig(config))
+
+# Create and initialize the brain
+brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Make it active
-brain.step(0)
+# Use advanced convenience function for brain stats
+stats = pynlm.brainStats(brain)
+print(stats)
 
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Test with minimal configuration for faster startup
+min_config = pynlm.createMinimalConfig()
+brain2 = pynlm.createBrain(min_config)
+brain2.initialize()
 ```
 
----
-
-## Common Patterns
-
-### Pattern 1: Run a Simulation
+### New: Example 4: Batch Processing
 
 ```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
+import pynlm
+
+# Create multiple brains for batch processing (new convenience function)
+brains = pynlm.createMultipleBrains(5)
+
+# Initialize and run each brain
+for i, brain in enumerate(brains):
+    brain.initialize()
+    for step in range(50):
         brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
+    print(f"Brain {i+1} fired {brain.getTotalSpikeCount()} times")
 
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
+# Save all brains with timestamps
+for i, brain in enumerate(brains):
+    saved = pynlm.saveBrainWithTimestamp(brain, f"brain_{i+1}")
+    print(f"Saved brain {i+1}: {saved}")
 ```
 
-### Pattern 2: Get Brain Stats
+### New: Example 5: Complete Simulation with Error Handling
 
 ```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
+import pynlm
+import sys
+
+def run_safe_simulation(steps=100):
+    """Run a simulation with proper error handling"""
+    try:
+        # Create configuration
+        config = pynlm.createStandardConfig()
+        
+        # Validate configuration first
+        if not pynlm.validateConfig(config):
+            errors = pynlm.getConfigErrors(config)
+            print("Configuration errors:", errors)
+            return False
+        
+        # Create all components
+        brain = pynlm.createBrain(config)
+        world = pynlm.createSimpleWorld()
+        agent = pynlm.createAgentBrain(brain)
+        
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        agent.initialize(world)
+        
+        # Enable learning
+        agent.enableRewardModulation(True)
+        agent.enableCuriosity(True)
+        
+        # Run simulation loop
+        for step in range(steps):
+            world.update(0.1)
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            brain.step(step)
+            action = agent.decodeMotorCommand()
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            if step % 50 == 0:
+                print(f"Step {step}: Firing rate = {brain.getAverageFiringRate():.3f}")
+        
+        print("Simulation completed successfully!")
+        return True
+        
+    except pynlm.NLMException as e:
+        print(f"NLM Error: {e}")
+        return False
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return False
+
+# Run the safe simulation
+if __name__ == "__main__":
+    success = run_safe_simulation(200)
+    sys.exit(0 if success else 1)
 ```
-
-### Pattern 3: Enable Brain Features
-
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
-
----
-
-## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
 
 ---
 
@@ -197,28 +194,22 @@ for i in range(10):
 print("Silent brain test done!")
 ```
 
-### Project 2: Brain Watching a World
+### New: Project 2: Configuration Comparison
 
 ```python
 import pynlm
 
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+# Compare different configurations
+configs = [
+    ("Minimal", pynlm.createMinimalConfig()),
+    ("Standard", pynlm.createStandardConfig()),
+    ("High Performance", pynlm.createHighPerformanceConfig())
+]
 
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
+for name, config in configs:
+    print(f"\n{name} configuration:")
+    print(f"  - Validation: {pynlm.validateConfig(config)}")
+    print(f"  - Error count: {len(pynlm.getConfigErrors(config))}")
 ```
 
 ### Project 3: Complete Agent
@@ -265,9 +256,16 @@ print("Agent simulation complete!")
 | Make brain think | `brain.step(step)` |
 | Create world | `pynlm.createSimpleWorld()` |
 | Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
+| Get brain stats | `pynlm.brainStats(brain)` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Validate config | `pynlm.validateConfig(config)` |
+| Get config errors | `pynlm.getConfigErrors(config)` |
+| Create multiple brains | `pynlm.createMultipleBrains(count)` |
+| Save brain with timestamp | `pynlm.saveBrainWithTimestamp(brain, path)` |
+| Create standard config | `pynlm.createStandardConfig()` |
+| Create minimal config | `pynlm.createMinimalConfig()` |
+| Create high performance config | `pynlm.createHighPerformanceConfig()` |
 
 ---
 
@@ -285,6 +283,10 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Configuration errors"**
+- Check validation with `pynlm.validateConfig(config)`
+- Use `pynlm.getConfigErrors(config)` for detailed error messages
+
 ---
 
 ## Next Steps
@@ -294,4 +296,4 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with the enhanced Python bindings.
