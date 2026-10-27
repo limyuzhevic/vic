@@ -31,6 +31,14 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration format
+enum class ConfigFormat {
+    Simple,
+    JSON,
+    YAML,
+    Auto
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -55,8 +63,9 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
+    bool loadFromFile(const std::string& filepath, ConfigFormat format);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -100,6 +109,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
+    
+    // JSON/YAML parsing helpers
+    void parseJSONToConfig(const nlohmann::json& j, ConfigSource source);
+    void parseYAMLToConfig(const YAML::Node& node, ConfigSource source);
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
+    bool loadFromAutoFormatFile(const std::string& filepath);
+    
+}; // namespace nlm
 
-} // namespace nlm
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>

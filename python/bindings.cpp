@@ -144,14 +144,16 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def("loadFromFile", static_cast<bool (Config::*)(const std::string&)>(&Config::loadFromFile), py::arg("filepath"),
+             "Load configuration from a simple key=value file")
+        .def("loadFromFile", static_cast<bool (Config::*)(const std::string&, ConfigFormat)>(&Config::loadFromFile), py::arg("filepath"), py::arg("format"),
+             "Load configuration from a JSON or YAML file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a simple key=value file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -220,6 +222,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
         .def_readwrite("active", &WorldObject::active);
+
+    py::enum_<ConfigFormat>(m, "ConfigFormat", R"pbdoc(Configuration file format enumeration)pbdoc")
+        .value("Simple", ConfigFormat::Simple)
+        .value("JSON", ConfigFormat::JSON)
+        .value("YAML", ConfigFormat::YAML)
+        .value("Auto", ConfigFormat::Auto)
+        .export_values();
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
