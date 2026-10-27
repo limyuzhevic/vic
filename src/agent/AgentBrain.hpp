@@ -6,14 +6,41 @@
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
+#include <functional>
 
 namespace nlm {
+
+// Neuron group structure for dependency injection
+struct NeuronGroups {
+    std::vector<Neuron*> forward;
+    std::vector<Neuron*> backward;
+    std::vector<Neuron*> turnLeft;
+    std::vector<Neuron*> turnRight;
+    std::vector<Neuron*> interact;
+    std::vector<Neuron*> wait;
+    std::vector<Neuron*> vision;
+    std::vector<Neuron*> touch;
+    std::vector<Neuron*> internal;
+    std::vector<Neuron*> proprioception;
+};
+
+// Factory function types for dependency injection
+using NeuronGroupFactory = std::function<NeuronGroups(const std::vector<Neuron*>& neurons, const std::string& type)>;
+using NeuromodulationFactory = std::function<std::shared_ptr<Neuromodulator>()>;
+using DevelopmentSystemFactory = std::function<std::shared_ptr<DevelopmentSystem>()>;
 
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
+    // Default constructor for backward compatibility
     AgentBrain(std::shared_ptr<Brain> brain);
+    
+    // Dependency injection constructor for better testability
+    AgentBrain(std::shared_ptr<Brain> brain,
+              NeuronGroupFactory neuronGroupFactories,
+              NeuromodulationFactory neuromodulationFactory,
+              DevelopmentSystemFactory developmentFactory);
     ~AgentBrain();
     
     // Initialize with world
@@ -77,6 +104,15 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Dependency injection components
+    NeuronGroupFactory neuronGroupFactories_;
+    NeuromodulationFactory neuromodulationFactory_;
+    DevelopmentSystemFactory developmentFactory_;
+    
+    // Composed components
+    std::shared_ptr<Neuromodulator> neuromodulation_;
+    std::shared_ptr<DevelopmentSystem> development_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
