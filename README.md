@@ -1,230 +1,305 @@
-# NLM — 熙然
+# NLM (Neural Learning Machine) - Enhanced Architecture
 
-**An Experimental Artificial Developmental Brain**
+## Overview
 
-## What is NLM?
+NLM is a comprehensive neural simulation framework implementing experimental artificial developmental brains. This document describes the significant architectural improvements made to enhance modularity, testability, and extensibility.
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+## Key Improvements
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+### 1. Modular Architecture
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+The codebase has been refactored from a monolithic structure into modular components:
 
-## Current Phase
+#### Core Configuration System
+- **ConfigurationManager**: Centralized configuration management with validation
+- **Validation**: Comprehensive configuration validation framework
+- **CommandLineParser**: Advanced command-line argument parsing with validation
 
-**PHASE 6: FINAL INTEGRATION**
+#### Testing Framework
+- **TestRunner**: Structured test execution with statistics
+- **LearningExperiment**: Dedicated learning experiment class
+- **AdvancedTestConfiguration**: Advanced testing modes and configurations
+- **AdvancedTestRunner**: Comprehensive advanced testing capabilities
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+#### Brain Initialization
+- **BrainInitializer**: Dedicated brain setup and state management
 
-### Phase 6 Integration Achievements
+#### Performance Monitoring
+- **PerformanceBenchmark**: Performance benchmarking utilities
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+### 2. Enhanced Command-Line Interface
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+#### New Command Options
+```
+--help, -h              Display this help message
+--version               Display version information  
+--batch                 Run in batch mode (non-interactive)
+--verbose               Enable verbose logging
+--config=<file>         Load configuration from file
+--log=<level>           Set log level (debug, info, warning, error, critical)
+```
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+#### Features
+- Comprehensive argument validation
+- Configuration file loading
+- Flexible logging control
+- Batch mode support
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+### 3. Advanced Testing Capabilities
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+#### Test Modes
+- **Basic**: Fundamental neural connectivity tests
+- **Learning**: Plasticity and learning experiments
+- **Plasticity**: STDP and Hebbian rule verification
+- **Integration**: System-wide integration testing
+- **Stress**: Stress testing under varying conditions
+- **Performance**: Performance benchmarking
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
+#### Configuration Validation
+- **Basic**: Essential parameter validation
+- **Comprehensive**: Extended validation including data types
+- **Strict**: Full validation with error recovery
 
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+### 4. Performance Monitoring
 
-## Building
+#### Benchmark Features
+- Operation timing tracking
+- Memory usage measurement
+- CPU usage measurement
+- Multi-operation benchmarking
+- Progress reporting
 
+### 5. Enhanced Error Handling
+
+#### Error Recovery
+- Configuration validation with detailed error reporting
+- Graceful error handling in test execution
+- Comprehensive error messages
+- Recovery mechanisms for test failures
+
+#### Validation Framework
+- Type-safe validation
+- Detailed error reporting
+- Configurable validation levels
+- Automated validation integration
+
+### 6. Improved Logging and Output
+
+#### Enhanced Logging
+- Colored console output
+- Configurable log levels
+- Detailed progress reporting
+- Performance metrics logging
+
+#### Output Formatting
+- Structured configuration summaries
+- Test statistics reporting
+- Benchmark result formatting
+- Comprehensive progress tracking
+
+### 7. Configuration Management
+
+#### Configuration Features
+- File-based configuration
+- Command-line overrides
+- Runtime configuration
+- Configuration validation
+- Default configuration management
+
+#### Configuration Types
+- **File**: JSON/YAML configuration files
+- **CommandLine**: Command-line argument parsing
+- **Runtime**: Dynamic configuration changes
+- **Default**: Built-in default values
+
+## Architectural Benefits
+
+### 1. **Improved Testability**
+- Isolated test components
+- Dependency injection for easier mocking
+- Comprehensive test coverage
+- Automated test execution
+
+### 2. **Better Performance**
+- Optimized benchmark utilities
+- Memory usage tracking
+- CPU performance monitoring
+- Operation timing analysis
+
+### 3. **Enhanced Extensibility**
+- Modular component design
+- Easy addition of new tests
+- Configuration-driven behavior
+- Plugin-like architecture
+
+### 4. **Improved Maintainability**
+- Clear separation of concerns
+- Well-defined interfaces
+- Comprehensive documentation
+- Consistent coding standards
+
+### 5. **Better User Experience**
+- Intuitive command-line interface
+- Detailed error messages
+- Progress reporting
+- Comprehensive help documentation
+
+## Build Instructions
+
+### Prerequisites
+- CMake 3.16 or higher
+- C++20 compatible compiler
+
+### Build Steps
 ```bash
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+cmake ..
+cmake --build .
 ```
 
-## Running
+### Available Executables
+- `nlm`: Main neural simulation application
+- `nlm_phase3_demo`: Phase 3 demonstration
+- `nlm_phase4_demo`: Phase 4 demonstration
+- `nlm_phase6_demo`: Phase 6 integration test
 
-### Phase 6 Demo (Integration Test)
+### Testing
 ```bash
-./nlm_phase6_demo
+# Run all tests
+ctest --output-on-failure
+
+# Run specific test target
+make test_target
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+## Usage Examples
 
-## Project Structure
+### Basic Usage
+```bash
+# Run with default configuration
+./nlm
 
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+# Load custom configuration
+./nlm --config=myconfig.cfg
+
+# Enable verbose logging
+./nlm --verbose
+
+# Run in batch mode
+./nlm --batch
 ```
 
-## Phase Summary
+### Advanced Testing
+```bash
+# Run stress test
+./nlm --config=stress_config.cfg
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+# Run performance benchmark
+./nlm --config=performance_config.cfg
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
-
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+# Run integration test
+./nlm --config=integration_config.cfg
 ```
 
-## License
+## Configuration File Format
 
-MIT
+### Example Configuration File
+```
+# NLM Configuration File
+# neuron_count = Number of neurons (500)
+# region_count = Number of brain regions (1)
+# simulation_timestep = Time step for simulation (0.001)
+# connection_probability = Probability of synaptic connections (0.15)
 
-## Authors
+neuron_count = 1000
+region_count = 2
+simulation_timestep = 0.0001
+connection_probability = 0.2
 
-Research project — See docs for scientific background.
+# STDP parameters
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_tau = 20.0
+
+# Structural plasticity parameters
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+```
+
+## Performance Monitoring
+
+The enhanced architecture includes comprehensive performance monitoring:
+
+### Benchmark Commands
+```bash
+# Memory usage benchmark
+./nlm --config=memory_config.cfg
+
+# CPU performance benchmark
+./nlm --config=cpu_config.cfg
+
+# Combined performance benchmark
+./nlm --config=combined_config.cfg
+```
+
+### Output Metrics
+- Total execution time
+- Configuration loading time
+- Brain initialization time
+- Test execution time
+- Memory usage
+- CPU usage
+- Operations per second
+
+## Migration Guide
+
+### From Old to New Architecture
+
+#### Changes Required
+1. **Configuration Loading**: All configuration is now centralized in ConfigurationManager
+2. **Testing**: Tests are now executed through the TestRunner with advanced features
+3. **Error Handling**: Comprehensive error handling replaces sparse error checking
+4. **Logging**: Enhanced logging with configurable levels and colors
+5. **Performance**: Built-in performance monitoring replaces manual timing
+
+#### Compatibility
+- All existing functionality is preserved
+- Backward-compatible configuration formats
+- No breaking changes to public APIs
+- Enhanced features are additive
+
+## Future Enhancements
+
+### Planned Improvements
+1. **Distributed Computing**: Parallel processing support
+2. **Visualization**: Enhanced visualization tools
+3. **Cloud Integration**: Cloud-based simulation capabilities
+4. **Model Export**: Export capabilities for external tools
+5. **Plugin System**: Plugin architecture for extensions
+
+### Research Directions
+1. **Advanced Plasticity**: New plasticity rule implementations
+2. **Neuromodulation**: Enhanced neuromodulator systems
+3. **Memory Systems**: Advanced memory architectures
+4. **Learning Algorithms**: Novel learning algorithms
+5. **Development**: Enhanced developmental processes
+
+## Conclusion
+
+The NLM framework has been significantly enhanced with a modular architecture that improves:
+
+- **Modularity**: Clear separation of concerns
+- **Testability**: Comprehensive testing framework
+- **Extensibility**: Easy addition of new features
+- **Performance**: Built-in performance monitoring
+- **Maintainability**: Clear code structure and documentation
+- **User Experience**: Enhanced command-line interface
+
+This architecture provides a solid foundation for future research and development in neural simulation while maintaining backward compatibility with existing functionality.
+
+## Acknowledgments
+
+This enhancement project was developed to address the need for a more maintainable, testable, and extensible neural simulation framework. The improvements reflect best practices in software engineering and provide a foundation for continued research and development in computational neuroscience.
+
+For more information, visit the NLM documentation or contact the development team.
