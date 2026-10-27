@@ -41,11 +41,22 @@ struct EpisodicMemoryItem {
     // Time since this episode
     SimulationStep age;
     
+    // Concept ID if this episode was classified (for concept formation integration)
+    size_t conceptId;
+    
+    // Concept prototype pattern if derived from concept
+    std::vector<float> conceptPrototype;
+    
+    // Concept stability score
+    float conceptStability;
+    
     EpisodicMemoryItem()
         : timestamp(0), positionX(0), positionY(0), orientation(0)
         , action(ActionType::Wait)
         , reward(0), energy(0), novelty(0)
-        , resultingReward(0), age(0) {}
+        , resultingReward(0), age(0)
+        , conceptId(0)
+        , conceptStability(0) {}
 };
 
 // NeuralEpisodicMemory: Stores experiences in a way that interacts with neural substrate

@@ -440,6 +440,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
+    
+    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
@@ -510,9 +512,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Get current sensory input from working memory
+        std::vector<float> currentWorkingMemory = pImpl->workingMemory->retrieve();
+        
+        if (!currentWorkingMemory.empty()) {
+            // Convert to SensoryInput for prediction system
+            SensoryInput currentState(currentWorkingMemory);
+            
+            // Make prediction for next state
+            std::unique_ptr<SensoryInput> predictedState = 
+                pImpl->predictionSystem->predictNextState(currentState);
+            
+            // We could store prediction if we had sensory input
+            // For now, just ensure the prediction system is being used
+            float error = pImpl->predictionSystem->getPredictionError();
+            
+            // Apply prediction error to neuromodulation
+            if (pImpl->predictionError) {
+                pImpl->predictionError->setError(error);
+                pImpl->predictionError->update(pImpl->timestep);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +548,59 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory && pImpl->episodicMemory) {
+        // Get current neural activity patterns from working memory
+        std::vector<float> workingMemoryPattern = pImpl->workingMemory->retrieve();
+        
+        if (!workingMemoryPattern.empty()) {
+            // Get the most recent episode to associate with current state
+            std::vector<const EpisodicMemoryItem*> recentEpisodes = 
+                pImpl->episodicMemory->getRecentEpisodes(1);
+            
+            if (!recentEpisodes.empty()) {
+                const EpisodicMemoryItem* lastEpisode = recentEpisodes.front();
+                
+                // Create features vector from neural activity
+                std::vector<float> features = workingMemoryPattern;
+                if (lastEpisode->neuronActivations.size() < features.size()) {
+                    features.resize(lastEpisode->neuronActivations.size());
+                }
+                
+                // Present experience to concept formation system
+                // Extract reward from episodic memory reward
+                float reward = lastEpisode->reward;
+                
+                // For now, use average neural activation as reward signal
+                if (!workingMemoryPattern.empty()) {
+                    float sumActivation = 0.0f;
+                    for (float act : workingMemoryPattern) sumActivation += act;
+                    reward = sumActivation / workingMemoryPattern.size();
+                }
+                
+                size_t conceptId = pImpl->conceptFormation->presentExperience(
+                    workingMemoryPattern,
+                    features,
+                    reward,
+                    currentStep
+                );
+                
+                // If concept was formed (returned non-zero), store it
+                if (conceptId > 0) {
+                    const DiscoveredConcept* concept = pImpl->conceptFormation->getConcept(conceptId);
+                    if (concept) {
+                        // Store concept in episodic memory for future reference
+                        EpisodicMemoryItem conceptEpisode;
+                        conceptEpisode.timestamp = currentStep;
+                        conceptEpisode.reward = reward;
+                        conceptEpisode.conceptId = conceptId;
+                        conceptEpisode.conceptPrototype.assign(concept->prototype.begin(), concept->prototype.end());
+                        conceptEpisode.conceptStability = pImpl->conceptFormation->getConceptStability(conceptId);
+                        
+                        pImpl->episodicMemory->storeEpisode(conceptEpisode);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -582,11 +653,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+    // ========== STEP 16: Update planner with new goal/neuron activity ==========
+    if (pImpl->planner) {
+        // Get current working memory for goal context
+        std::vector<float> workingMemoryState = pImpl->workingMemory->retrieve();
+        
+        // Present to planner for planning
+        pImpl->planner->update(pImpl->timestep);
+        
+        // If planner sets a goal, we could activate neurons to pursue it
+        // For now, just ensure planner is being updated
     }
-}
+    
+    // ========== STEP 17: Final attention modulation ==========
+    if (pImpl->attention) {
+        // Apply top-down bias from planner and concept formation
+        if (pImpl->workingMemory) {
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Apply attention bias to important working memory traces
+            for (size_t i = 0; i < memoryNeurons.size() && i < 5; ++i) {
+                // Gradually decrease bias to avoid permanent fixation
+                float biasStrength = 0.1f / (i + 1);
+                pImpl->attention->applyTopDownBias(memoryNeurons[i], biasStrength);
+            }
+        }
+    }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
