@@ -3,6 +3,7 @@
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
+#include "../brain/Neuron.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
 #include <vector>
@@ -57,6 +58,19 @@ public:
     
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
+    
+    // Helper methods for testing framework
+    std::vector<Neuron*>& getMotorForwardNeurons() { return motorForward_; }
+    std::vector<Neuron*>& getMotorBackwardNeurons() { return motorBackward_; }
+    std::vector<Neuron*>& getMotorTurnLeftNeurons() { return motorTurnLeft_; }
+    std::vector<Neuron*>& getMotorTurnRightNeurons() { return motorTurnRight_; }
+    std::vector<Neuron*>& getMotorInteractNeurons() { return motorInteract_; }
+    std::vector<Neuron*>& getMotorWaitNeurons() { return motorWait_; }
+    
+    std::vector<Neuron*>& getSensoryVisionNeurons() { return sensoryVision_; }
+    std::vector<Neuron*>& getSensoryTouchNeurons() { return sensoryTouch_; }
+    std::vector<Neuron*>& getSensoryInternalNeurons() { return sensoryInternal_; }
+    std::vector<Neuron*>& getSensoryProprioceptionNeurons() { return sensoryProprioception_; }
     
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }

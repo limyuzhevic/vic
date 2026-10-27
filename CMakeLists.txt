@@ -107,6 +107,27 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Performance benchmarks
+add_library(nlm_performance STATIC
+    src/performance/NLMBenchmarks.cpp
+    src/performance/PlatformImplementation.hpp
+)
+target_include_directories(nlm_performance PUBLIC src)
+target_link_libraries(nlm_performance PUBLIC nlm_core nlm_agent nlm_world)
+
+# Agent testing framework
+add_library(nlm_testing STATIC
+    src/agent/TestingFramework.cpp
+)
+target_include_directories(nlm_testing PUBLIC src)
+target_link_libraries(nlm_testing PUBLIC nlm_core nlm_agent nlm_world nlm_performance)
+
+# Examples
+add_executable(agent_testing_examples
+    src/examples/AgentTestingExamples.cpp
+)
+target_link_libraries(agent_testing_examples PUBLIC nlm_core nlm_agent nlm_world nlm_testing nlm_performance)
+
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
@@ -144,7 +165,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo agent_testing_examples
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
