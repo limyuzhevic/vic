@@ -55,14 +55,26 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or key=value format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON file
+    bool loadFromJSON(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON or key=value format)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to JSON file
+    bool saveToJSON(const std::string& filepath) const;
+    
+    // Parse JSON string
+    bool parseJSON(const std::string& jsonContent);
+    
+    // Find matching bracket in JSON
+    static size_t findMatchingBracket(const std::string& str, size_t start);
     
     // Get values
     template<typename T>

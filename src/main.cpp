@@ -65,7 +65,7 @@ struct LearningExperiment {
         initialWeights.clear();
         
         // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        if (auto* region = brain->getRegion(RegionId(0))) {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
             }
@@ -84,7 +84,7 @@ struct LearningExperiment {
         finalWeights.clear();
         
         // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
+        if (auto* region = brain->getRegion(RegionId(0))) {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
             }
@@ -164,7 +164,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
     // Inject current into a few neurons and see if spikes propagate
-    auto* region = brain->getRegion(RegionId(1));
+    auto* region = brain->getRegion(RegionId(0));
     if (!region) return;
     
     auto neurons = region->getAllNeurons();
@@ -212,7 +212,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.recordInitialState();
     
     // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
+    if (auto* region = brain->getRegion(RegionId(0))) {
         for (auto& syn : region->getSynapses()) {
             syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
         }
@@ -249,7 +249,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
-    auto* region = brain->getRegion(RegionId(1));
+    auto* region = brain->getRegion(RegionId(0));
     if (!region) return;
     
     // Get first few synapses

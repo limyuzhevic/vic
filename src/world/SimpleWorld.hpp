@@ -54,6 +54,12 @@ public:
     // Get agent body state
     const AgentBody& getAgentBody() const { return agent_; }
     
+    // Observe world from agent's perspective (for brain input)
+    SensoryPercept observe(const NeuronRegion* region = nullptr) const;
+    
+    // Apply action to world (for motor output)
+    ActionResult applyAction(const NeuronRegion* region, const MotorCommand& cmd);
+    
     // Add object to world
     void addObject(const WorldObject& obj);
     

@@ -3,6 +3,224 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cctype>
+
+namespace nlm {
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // Try JSON format first
+    if (filepath.find(".json") != std::string::npos) {
+        return loadFromJSON(filepath);
+    }
+    
+    // Fall back to simple key=value format for backward compatibility
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Simple JSON parser for basic structures
+    return parseJSON(content);
+}
+
+bool Config::parseJSON(const std::string& jsonContent) {
+    // Remove whitespace and comments
+    std::string cleaned;
+    bool inString = false;
+    bool escaped = false;
+    
+    for (char c : jsonContent) {
+        if (escaped) {
+            cleaned += c;
+            escaped = false;
+            continue;
+        }
+        
+        if (c == '\\') {
+            escaped = true;
+            cleaned += c;
+            continue;
+        }
+        
+        if (c == '"') {
+            inString = !inString;
+            cleaned += c;
+            continue;
+        }
+        
+        if (!inString && (c == '/' || c == '#')) {
+            // Skip comments
+            while (++c && c != '\n' && c != '\r');
+        }
+        
+        if (!inString && (c == ' ' || c == '\t' || c == '\n' || c == '\r')) {
+            // Skip whitespace
+            continue;
+        }
+        
+        cleaned += c;
+    }
+    
+    // Parse key-value pairs (simple JSON object)
+    size_t pos = 0;
+    while (pos < cleaned.size()) {
+        // Find key
+        size_t keyStart = cleaned.find('\"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = cleaned.find('\"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = cleaned.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find value
+        size_t valueStart = cleaned.find(':', keyEnd);
+        if (valueStart == std::string::npos) break;
+        
+        size_t valueEnd = findMatchingBracket(cleaned, valueStart + 1);
+        if (valueEnd == std::string::npos) break;
+        
+        std::string valueStr = cleaned.substr(valueStart + 1, valueEnd - valueStart - 1);
+        
+        // Parse value based on type
+        set(key, valueStr, ConfigSource::File);
+        
+        pos = valueEnd + 1;
+        
+        // Skip comma
+        if (pos < cleaned.size() && cleaned[pos] == ',') {
+            pos++;
+        }
+    }
+    
+    return true;
+}
+
+size_t Config::findMatchingBracket(const std::string& str, size_t start) {
+    if (start >= str.size()) return std::string::npos;
+    
+    char bracket = str[start];
+    if (bracket != '\"' && bracket != '[' && bracket != '{') {
+        // Not a JSON value, find next comma or end
+        size_t comma = str.find(',', start);
+        size_t brace = str.find('}', start);
+        size_t bracketClose = str.find(']', start);
+        
+        size_t result = std::string::npos;
+        if (comma != std::string::npos) result = comma;
+        if (brace != std::string::npos && (result == std::string::npos || brace < result)) result = brace;
+        if (bracketClose != std::string::npos && (result == std::string::npos || bracketClose < result)) result = bracketClose;
+        
+        return result;
+    }
+    
+    if (bracket == '\"') {
+        // String value - find closing quote
+        size_t pos = start + 1;
+        while (pos < str.size()) {
+            if (str[pos] == '\\') {
+                pos += 2; // Skip escaped character
+                continue;
+            }
+            if (str[pos] == '\"') return pos;
+            pos++;
+        }
+    } else if (bracket == '[') {
+        // Array - count brackets
+        int depth = 1;
+        size_t pos = start + 1;
+        while (pos < str.size() && depth > 0) {
+            if (str[pos] == '\\') {
+                pos += 2; // Skip escaped character
+                continue;
+            }
+            if (str[pos] == '[') depth++;
+            else if (str[pos] == ']') depth--;
+            else if (str[pos] == '\"') {
+                pos++; // Skip string
+                while (pos < str.size() && str[pos] != '\"') {
+                    if (str[pos] == '\\') pos += 2;
+                    else pos++;
+                }
+            }
+            pos++;
+        }
+        return pos - 1;
+    } else if (bracket == '{') {
+        // Object - count braces
+        int depth = 1;
+        size_t pos = start + 1;
+        while (pos < str.size() && depth > 0) {
+            if (str[pos] == '\\') {
+                pos += 2; // Skip escaped character
+                continue;
+            }
+            if (str[pos] == '{') depth++;
+            else if (str[pos] == '}') depth--;
+            else if (str[pos] == '\"') {
+                pos++; // Skip string
+                while (pos < str.size() && str[pos] != '\"') {
+                    if (str[pos] == '\\') pos += 2;
+                    else pos++;
+                }
+            }
+            pos++;
+        }
+        return pos - 1;
+    }
+    
+    return std::string::npos;
+}
 
 namespace nlm {
 
@@ -84,10 +302,77 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Check if file has .json extension
+    if (filepath.find(".json") != std::string::npos) {
+        return saveToJSON(filepath);
+    }
+    
+    // Default to simple key=value format for backward compatibility
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
+    
+    return true;
+}
+
+bool Config::saveToJSON(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "{\n";
+    
+    bool first = true;
+    for (const auto& entry : pImpl->entries) {
+        if (!first) {
+            file << ",\n";
+        }
+        first = false;
+        
+        file << "  \"" << entry.key << "\": ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+    }
+    
+    file << "\n}\n";
     
     return true;
 }
