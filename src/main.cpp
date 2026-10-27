@@ -69,6 +69,8 @@ struct LearningExperiment {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
             }
+        } else {
+            NLM_LOG_ERROR("ERROR: Brain has no regions for weight recording");
         }
         
         NLM_LOG_INFO("Initial state recorded:");
@@ -345,13 +347,30 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configFileError = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        // Safe substring with bounds checking
+        if (arg.size() >= 7 && arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
+                size_t eqPos = arg.find('=');
+                std::string value = arg.substr(eqPos + 1);
+                // Validate value is not too long
+                if (value.length() > 256) {
+                    NLM_LOG_ERROR("Configuration file path too long, using default");
+                    configFileError = true;
+                } else {
+                    configFile = value;
+                }
             } else if (i + 1 < argc) {
-                configFile = argv[++i];
+                std::string value(argv[++i]);
+                // Validate value is not too long
+                if (value.length() > 256) {
+                    NLM_LOG_ERROR("Configuration file path too long, using default");
+                    configFileError = true;
+                } else {
+                    configFile = value;
+                }
             }
         }
     }
@@ -405,6 +424,10 @@ int main(int argc, char** argv) {
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
         return 1;
+    } else {
+        NLM_LOG_INFO("Brain initialized successfully with " + 
+                    std::to_string(brain->getTotalNeuronCount()) + " neurons and " +
+                    std::to_string(brain->getTotalSynapseCount()) + " synapses");
     }
     
     brain->logStatus();

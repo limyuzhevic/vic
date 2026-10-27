@@ -85,8 +85,13 @@ bool Config::saveToFile(const std::string& filepath) const {
     }
     
     for (const auto& entry : pImpl->entries) {
+        // Validate the configuration value
+        if (!validateConfigValue(entry.key, entry.value)) {
+            continue; // Skip invalid entries
+        }
+        
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = " << configValueToString(entry.value) << "\n\n";
     }
     
     return true;
@@ -197,6 +202,42 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Helper function to convert ConfigValue to string
+static std::string configValueToString(const ConfigValue& value) {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << '"' << arg << '"';
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
+}
+
+// Validate configuration value
+static bool validateConfigValue(const std::string& key, const ConfigValue& value) {
+    // Add validation rules for specific keys
+    if (key == "neuron_count") {
+        int64_t count = std::get<int64_t>(value);
+        return count > 0 && count <= 1000000; // Reasonable upper limit
+    } else if (key == "region_count") {
+        int64_t regions = std::get<int64_t>(value);
+        return regions > 0 && regions <= 1000;
+    } else if (key == "connection_probability") {
+        double prob = std::get<double>(value);
+        return prob >= 0.0 && prob <= 1.0;
+    } else if (key == "simulation_timestep") {
+        double dt = std::get<double>(value);
+        return dt > 0.0 && dt <= 1.0; // Should be reasonably small
+    }
+    
+    return true; // No validation for unknown keys
 }
 
 // Explicit template instantiations
