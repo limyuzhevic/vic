@@ -86,7 +86,21 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Get actual value instead of placeholder
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings to preserve them
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t> || 
+                                 std::is_same_v<T, double> || 
+                                 std::is_same_v<T, float> ||
+                                 std::is_same_v<T, bool>) {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;

@@ -29,6 +29,8 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/ArgumentParser.cpp
+    src/core/ConfigValidator.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -89,6 +91,8 @@ add_library(nlm_core STATIC
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/Config>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -121,30 +125,42 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Test framework
+add_library(nlm_test_framework STATIC
+    src/test_framework/TestFramework.hpp
+    src/test_framework/TestFramework.cpp
+    src/test_framework/TestImplementations.cpp
+    src/test_framework/BasicConnectivityTest.hpp
+    src/test_framework/PlasticityExperimentTest.hpp
+    src/test_framework/StdpVerificationTest.hpp
+)
+target_include_directories(nlm_test_framework PUBLIC src)
+target_link_libraries(nlm_test_framework PUBLIC nlm_core)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_test_framework)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_test_framework)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_test_framework)
 
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_test_framework
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
