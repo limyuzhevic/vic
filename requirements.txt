@@ -1,0 +1,42 @@
+# NLM Python Dependencies
+# This file contains the Python package dependencies for NLM development and usage.
+
+# Core dependencies (required for basic functionality)
+numpy>=1.20
+
+# Development dependencies (for testing and development)
+pytest>=7.0
+pybind11>=2.11.0
+scikit-build-core>=0.5.0
+
+# Advanced users can install additional dependencies
+# pynlm_enhanced[advanced] = [
+#     numpy>=1.20,
+#     matplotlib>=3.0,  # for visualization
+#     pandas>=1.0,     # for data analysis
+#     scipy>=1.0,     # for scientific computing
+# ]
+
+# Optional visualization and analysis dependencies
+matplotlib>=3.0
+pandas>=1.0
+scipy>=1.0
+plotly>=4.0
+
+# Documentation dependencies
+docstring-parser>=0.7
+myst-parser>=0.15
+sphinx>=4.0
+
+# Performance monitoring
+psutil>=5.0
+memory-profiler>=0.5
+
+# Advanced machine learning
+# scikit-learn>=1.0  # optional for advanced analysis
+
+# Development tools
+black>=21.0
+flake8>=3.8
+mypy>=0.910
+pre-commit>=2.15

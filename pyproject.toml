@@ -40,6 +40,11 @@ Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
 
+# Enhanced bindings for advanced users
+[project.optional-dependencies]advanced = [
+    "pynlm_enhanced",
+]
+
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
 cmake.build-type = "Release"
@@ -55,3 +60,7 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.scikit-build.packages]
+pynlm = "python"
+pynlm_enhanced = "python"
