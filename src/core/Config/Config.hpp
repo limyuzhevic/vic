@@ -100,6 +100,24 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Additional private methods for enhanced functionality
+    std::optional<ConfigValue> inferType(const std::string& value) const;
+    void validateKeyValue(const std::string& key, const ConfigValue& value);
+    void validateConfiguration() const;
+    void skipWhitespace(const std::string& content, size_t& pos) const;
+    std::optional<ConfigValue> parseJSONValue(const std::string& content, size_t& pos) const;
+    bool parseJSONContent(const std::string& content);
+    bool loadFromINI(std::ifstream& file);
+    bool loadFromJSON(std::ifstream& file);
+    bool loadFromYAML(std::ifstream& file);
+    bool parseYAMLContent(const std::string& content);
+    bool saveToINI(std::ofstream& file) const;
+    bool saveToJSON(std::ofstream& file) const;
+    bool saveToYAML(std::ofstream& file) const;
+    std::string formatValue(const ConfigValue& value) const;
+    std::string formatJSONValue(const ConfigValue& value) const;
+    std::string formatYAMLValue(const ConfigValue& value) const;
 };
 
 } // namespace nlm
