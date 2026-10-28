@@ -4,6 +4,7 @@
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../core/Error/Error.hpp"
 #include <chrono>
 #include <cmath>
 
@@ -23,20 +24,48 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
+    // Create configuration with error handling
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", config.neuronCount);
-    cfg->set("region_count", config.regionCount);
-    cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    try {
+        cfg->set("neuron_count", config.neuronCount);
+        cfg->set("region_count", config.regionCount);
+        cfg->set("connection_probability", config.connectionProbability);
+        cfg->set("stdp_ltp_weight", 0.01f);
+        cfg->set("stdp_ltd_weight", 0.012f);
+        cfg->set("synaptogenesis_rate", 0.0001f);
+        cfg->set("pruning_rate", 0.00001f);
+        
+        NLM_LOG_INFO("Configuration created successfully");
+    } catch (const std::exception& e) {
+        auto error = std::make_shared<nlm::ConfigurationException>(
+            "Failed to create configuration: " + std::string(e.what()));
+        nlm::ErrorHandler::getInstance().addError(error);
+        result.endTime = time(nullptr);
+        return result;
+    }
     
-    // Create brain
+    // Create brain with error handling
     auto brain = std::make_shared<Brain>(cfg);
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain");
+    try {
+        if (!brain->initialize()) {
+            auto error = std::make_shared<nlm::IntegrationException>("Failed to initialize brain");
+            nlm::ErrorHandler::getInstance().addError(error);
+            NLM_LOG_ERROR("Failed to initialize brain");
+            result.endTime = time(nullptr);
+            return result;
+        }
+    } catch (const nlm::MemoryException& e) {
+        nlm::ErrorHandler::getInstance().addError(
+            std::make_shared<nlm::MemoryException>(
+                "Memory allocation failed during brain initialization: " + std::string(e.what())));
+        NLM_LOG_ERROR("Memory error during brain initialization");
+        result.endTime = time(nullptr);
+        return result;
+    } catch (const std::exception& e) {
+        auto error = std::make_shared<nlm::IntegrationException>(
+            "Unexpected error during brain initialization: " + std::string(e.what()));
+        nlm::ErrorHandler::getInstance().addError(error);
+        NLM_LOG_ERROR("Unexpected error during brain initialization");
         result.endTime = time(nullptr);
         return result;
     }
@@ -139,9 +168,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
                 NLM_LOG_INFO("Checkpoint loaded successfully");
                 result.checkpointingWorks = true;
             } else {
+                auto error = std::make_shared<nlm::FileSystemException>("Failed to load checkpoint");
+                nlm::ErrorHandler::getInstance().addError(error);
                 NLM_LOG_ERROR("Failed to load checkpoint");
             }
         } else {
+            auto error = std::make_shared<nlm::FileSystemException>("Failed to save checkpoint");
+            nlm::ErrorHandler::getInstance().addError(error);
             NLM_LOG_ERROR("Failed to save checkpoint");
         }
     }
@@ -168,8 +201,18 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     cfg->set("region_count", 1);
     
     auto brain = std::make_shared<Brain>(cfg);
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Brain initialization failed");
+    try {
+        if (!brain->initialize()) {
+            auto error = std::make_shared<nlm::IntegrationException>("Brain initialization failed");
+            nlm::ErrorHandler::getInstance().addError(error);
+            NLM_LOG_ERROR("Brain initialization failed");
+            return false;
+        }
+    } catch (const std::exception& e) {
+        auto error = std::make_shared<nlm::SystemException>(
+            "Unexpected error during brain initialization in verification: " + std::string(e.what()));
+        nlm::ErrorHandler::getInstance().addError(error);
+        NLM_LOG_ERROR("Unexpected error during brain initialization in verification");
         return false;
     }
     

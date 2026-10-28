@@ -170,32 +170,100 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // Advanced configuration options
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    // Set synaptic plasticity parameters
+    void setSTDPParameters(float ltpWeight, float ltdWeight, float tau);
+    void setHebbianParameters(float learningRate, float decayRate);
+    void setStructuralPlasticityParameters(float synaptogenesisRate, float pruningRate);
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // Set neuromodulation parameters
+    void setNeuromodulationParameters(float dopamineScale, float curiosityThreshold,
+                                       float noveltyThreshold, float predictionErrorGain);
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
+    // Set memory system parameters
+    void setWorkingMemoryParameters(size_t capacity, float decayRate);
+    void setEpisodicMemoryParameters(size_t maxEpisodes, size_t replayInterval);
+    void setAssociativeMemoryParameters(float patternThreshold, size_t patternCapacity);
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    // Set cognitive parameters
+    void setCognitiveParameters(size_t planningDepth, float attentionGain,
+                               float conceptThreshold, float inhibitionStrength);
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Set development parameters
+    void setDevelopmentParameters(size_t criticalPeriodStart, size_t criticalPeriodEnd,
+                                 float plasticityModulationRate);
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Set performance optimization parameters
+    void setPerformanceParameters(size_t memoryPoolSize, bool enableSIMD,
+                                  bool enableParallel, size_t threadCount);
     
-    // Logging
-    void logStatus() const;
+    // Set checkpointing parameters
+    void setCheckpointParameters(const std::string& directory, size_t maxCheckpoints,
+                                 float compressionLevel, bool autoSave);
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-} // namespace nlm
+    // Enable/disable subsystems
+    void enableSubsystem(const std::string& subsystemName, bool enable);
+    
+    // Get current configuration values as summary
+    std::string getConfigurationSummary() const;
+    
+    // Performance monitoring
+    void enablePerformanceMonitoring(bool enable);
+    bool isPerformanceMonitoringEnabled() const;
+    
+    // Get performance statistics
+    size_t getStepCount() const;
+    double getAverageStepTime() const;
+    size_t getMaxMemoryUsage() const;
+    double getCPUUsage() const;
+    
+    // Get neural system statistics
+    size_t getTotalConnections() const;
+    size_t getActiveConnections() const;
+    size_t getSynapticStrengthSum() const;
+    float getAverageSynapticWeight() const;
+    float getNetworkStability() const;
+    
+    // Get memory system statistics
+    size_t getWorkingMemoryUsage() const;
+    size_t getEpisodicMemoryUsage() const;
+    size_t getAssociativeMemoryUsage() const;
+    float getMemoryConsolidationRate() const;
+    
+    // Get neuromodulation statistics
+    float getAverageDopamineLevel() const;
+    float getAverageCuriosityLevel() const;
+    float getAverageNoveltyLevel() const;
+    float getAveragePredictionError() const;
+    
+    // Get developmental statistics
+    size_t getDevelopmentalStageDuration(DevelopmentalStage stage) const;
+    float getPlasticityRate() const;
+    float getStructuralPlasticityRate() const;
+    
+    // Advanced neural operations
+    void enableCuriosityDrivenExploration(bool enable, float explorationRate);
+    void setGoalBasedMotivation(float goalImportance, float intrinsicMotivation);
+    void setSocialLearningParameters(float imitationStrength, float socialBonding);
+    
+    // Batch operations for efficiency
+    void batchInjectCurrent(const std::vector<NeuronId>& neurons, MembranePotential current);
+    void batchSetWeights(const std::vector<SynapseId>& synapses, float weight);
+    void batchEnablePlasticity(const std::vector<SynapseId>& synapses, bool stdp, bool hebbian, bool structural);
+    
+    // Simulation control
+    void pauseSimulation(bool pause);
+    bool isSimulationPaused() const;
+    
+    // Event-driven control
+    void enableEventDrivenSimulation(bool enable);
+    bool isEventDrivenSimulationEnabled() const;
+    
+    // External influence
+    void injectExternalInput(const class ExternalInput& input);
+    void applyExternalInfluence(const class ExternalInfluence& influence);
+    
+    // System health
+    bool isSystemHealthy() const;
+    std::string getSystemStatus() const;

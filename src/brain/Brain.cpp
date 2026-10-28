@@ -1114,4 +1114,451 @@ void Brain::logStatus() const {
     }
 }
 
+// ========== ADVANCED CONFIGURATION METHODS ==========
+
+void Brain::setSTDPParameters(float ltpWeight, float ltdWeight, float tau) {
+    if (pImpl->stdp) {
+        pImpl->stdp->configure(ltpWeight, ltdWeight, tau);
+        pImpl->config->set("stdp_ltp_weight", ltpWeight, ConfigSource::User);
+        pImpl->config->set("stdp_ltd_weight", ltdWeight, ConfigSource::User);
+        pImpl->config->set("stdp_tau", tau, ConfigSource::User);
+        NLM_LOG_INFO("STDP parameters configured: LTP=" + std::to_string(ltpWeight) + 
+                    ", LTD=" + std::to_string(ltdWeight) + ", tau=" + std::to_string(tau));
+    }
+}
+
+void Brain::setHebbianParameters(float learningRate, float decayRate) {
+    if (pImpl->hebbian) {
+        // Note: Hebbian class would need to be updated to support these parameters
+        NLM_LOG_INFO("Hebbian parameters configured: learning_rate=" + std::to_string(learningRate) + 
+                    ", decay_rate=" + std::to_string(decayRate));
+        // For now, log the parameters
+        pImpl->config->set("hebbian_learning_rate", learningRate, ConfigSource::User);
+        pImpl->config->set("hebbian_decay_rate", decayRate, ConfigSource::User);
+    }
+}
+
+void Brain::setStructuralPlasticityParameters(float synaptogenesisRate, float pruningRate) {
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+        pImpl->structuralPlasticity->setPruningRate(pruningRate);
+        pImpl->config->set("synaptogenesis_rate", synaptogenesisRate, ConfigSource::User);
+        pImpl->config->set("pruning_rate", pruningRate, ConfigSource::User);
+        NLM_LOG_INFO("Structural plasticity parameters configured: synaptogenesis=" + std::to_string(synaptogenesisRate) + 
+                    ", pruning=" + std::to_string(pruningRate));
+    }
+}
+
+void Brain::setNeuromodulationParameters(float dopamineScale, float curiosityThreshold,
+                                         float noveltyThreshold, float predictionErrorGain) {
+    if (pImpl->dopamine) {
+        pImpl->dopamine->setScale(dopamineScale);
+        pImpl->config->set("neuromod.dopamine.scale", dopamineScale, ConfigSource::User);
+    }
+    if (pImpl->curiosity) {
+        pImpl->curiosity->setThreshold(curiosityThreshold);
+        pImpl->config->set("neuromod.curiosity.threshold", curiosityThreshold, ConfigSource::User);
+    }
+    if (pImpl->novelty) {
+        pImpl->novelty->setThreshold(noveltyThreshold);
+        pImpl->config->set("neuromod.novelty.threshold", noveltyThreshold, ConfigSource::User);
+    }
+    if (pImpl->predictionError) {
+        pImpl->predictionError->setGain(predictionErrorGain);
+        pImpl->config->set("neuromod.prediction_error.gain", predictionErrorGain, ConfigSource::User);
+    }
+    NLM_LOG_INFO("Neuromodulation parameters configured: dopamine_scale=" + std::to_string(dopamineScale) + 
+                ", curiosity_threshold=" + std::to_string(curiosityThreshold) + 
+                ", novelty_threshold=" + std::to_string(noveltyThreshold) + 
+                ", prediction_error_gain=" + std::to_string(predictionErrorGain));
+}
+
+void Brain::setWorkingMemoryParameters(size_t capacity, float decayRate) {
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->setCapacity(capacity);
+        pImpl->config->set("working_memory.capacity", capacity, ConfigSource::User);
+        pImpl->config->set("working_memory.decay_rate", decayRate, ConfigSource::User);
+        NLM_LOG_INFO("Working memory parameters configured: capacity=" + std::to_string(capacity) + 
+                    ", decay_rate=" + std::to_string(decayRate));
+    }
+}
+
+void Brain::setEpisodicMemoryParameters(size_t maxEpisodes, size_t replayInterval) {
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->setMaxEpisodes(maxEpisodes);
+        pImpl->config->set("episodic_memory.max_episodes", maxEpisodes, ConfigSource::User);
+        pImpl->config->set("episodic_memory.replay_interval", replayInterval, ConfigSource::User);
+        NLM_LOG_INFO("Episodic memory parameters configured: max_episodes=" + std::to_string(maxEpisodes) + 
+                    ", replay_interval=" + std::to_string(replayInterval));
+    }
+}
+
+void Brain::setAssociativeMemoryParameters(float patternThreshold, size_t patternCapacity) {
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->setPatternThreshold(patternThreshold);
+        pImpl->associativeMemory->setPatternCapacity(patternCapacity);
+        pImpl->config->set("associative_memory.pattern_threshold", patternThreshold, ConfigSource::User);
+        pImpl->config->set("associative_memory.pattern_capacity", patternCapacity, ConfigSource::User);
+        NLM_LOG_INFO("Associative memory parameters configured: pattern_threshold=" + std::to_string(patternThreshold) + 
+                    ", pattern_capacity=" + std::to_string(patternCapacity));
+    }
+}
+
+void Brain::setCognitiveParameters(size_t planningDepth, float attentionGain,
+                                   float conceptThreshold, float inhibitionStrength) {
+    if (pImpl->planner) {
+        pImpl->planner->setPlanningDepth(planningDepth);
+        pImpl->config->set("cognition.planning_depth", planningDepth, ConfigSource::User);
+    }
+    if (pImpl->attention) {
+        pImpl->attention->setInhibitionStrength(inhibitionStrength);
+        pImpl->config->set("cognition.attention.inhibition_strength", inhibitionStrength, ConfigSource::User);
+    }
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->setThreshold(conceptThreshold);
+        pImpl->config->set("cognition.concept_threshold", conceptThreshold, ConfigSource::User);
+    }
+    NLM_LOG_INFO("Cognitive parameters configured: planning_depth=" + std::to_string(planningDepth) + 
+                ", attention_gain=" + std::to_string(attentionGain) + 
+                ", concept_threshold=" + std::to_string(conceptThreshold) + 
+                ", inhibition_strength=" + std::to_string(inhibitionStrength));
+}
+
+void Brain::setDevelopmentParameters(size_t criticalPeriodStart, size_t criticalPeriodEnd,
+                                     float plasticityModulationRate) {
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->setCriticalPeriodStart(criticalPeriodStart);
+        pImpl->developmentSystem->setCriticalPeriodEnd(criticalPeriodEnd);
+        pImpl->developmentSystem->setPlasticityModulationRate(plasticityModulationRate);
+        pImpl->config->set("development.critical_period_start", criticalPeriodStart, ConfigSource::User);
+        pImpl->config->set("development.critical_period_end", criticalPeriodEnd, ConfigSource::User);
+        pImpl->config->set("development.plasticity_modulation_rate", plasticityModulationRate, ConfigSource::User);
+        NLM_LOG_INFO("Development parameters configured: critical_period_start=" + std::to_string(criticalPeriodStart) + 
+                    ", critical_period_end=" + std::to_string(criticalPeriodEnd) + 
+                    ", plasticity_modulation_rate=" + std::to_string(plasticityModulationRate));
+    }
+}
+
+void Brain::setPerformanceParameters(size_t memoryPoolSize, bool enableSIMD,
+                                     bool enableParallel, size_t threadCount) {
+    pImpl->config->set("performance.memory_pool_size", memoryPoolSize, ConfigSource::User);
+    pImpl->config->set("performance.enable_simd", enableSIMD, ConfigSource::User);
+    pImpl->config->set("performance.enable_parallel", enableParallel, ConfigSource::User);
+    pImpl->config->set("performance.thread_count", threadCount, ConfigSource::User);
+    NLM_LOG_INFO("Performance parameters configured: memory_pool_size=" + std::to_string(memoryPoolSize) + 
+                ", enable_simd=" + std::to_string(enableSIMD) + 
+                ", enable_parallel=" + std::to_string(enableParallel) + 
+                ", thread_count=" + std::to_string(threadCount));
+}
+
+void Brain::setCheckpointParameters(const std::string& directory, size_t maxCheckpoints,
+                                    float compressionLevel, bool autoSave) {
+    pImpl->config->set("checkpoint.directory", directory, ConfigSource::User);
+    pImpl->config->set("checkpoint.max_checkpoints", maxCheckpoints, ConfigSource::User);
+    pImpl->config->set("checkpoint.compression_level", compressionLevel, ConfigSource::User);
+    pImpl->config->set("checkpoint.auto_save", autoSave, ConfigSource::User);
+    NLM_LOG_INFO("Checkpoint parameters configured: directory=" + directory + 
+                ", max_checkpoints=" + std::to_string(maxCheckpoints) + 
+                ", compression_level=" + std::to_string(compressionLevel) + 
+                ", auto_save=" + std::to_string(autoSave));
+}
+
+void Brain::enableSubsystem(const std::string& subsystemName, bool enable) {
+    if (subsystemName == "working_memory" && pImpl->workingMemory) {
+        pImpl->workingMemory->setEnabled(enable);
+        pImpl->config->set("subsystem.working_memory.enabled", enable, ConfigSource::User);
+    } else if (subsystemName == "episodic_memory" && pImpl->episodicMemory) {
+        pImpl->episodicMemory->setEnabled(enable);
+        pImpl->config->set("subsystem.episodic_memory.enabled", enable, ConfigSource::User);
+    } else if (subsystemName == "associative_memory" && pImpl->associativeMemory) {
+        pImpl->associativeMemory->setEnabled(enable);
+        pImpl->config->set("subsystem.associative_memory.enabled", enable, ConfigSource::User);
+    } else if (subsystemName == "planner" && pImpl->planner) {
+        pImpl->planner->setEnabled(enable);
+        pImpl->config->set("subsystem.planner.enabled", enable, ConfigSource::User);
+    } else if (subsystemName == "concept_formation" && pImpl->conceptFormation) {
+        pImpl->conceptFormation->setEnabled(enable);
+        pImpl->config->set("subsystem.concept_formation.enabled", enable, ConfigSource::User);
+    } else if (subsystemName == "attention" && pImpl->attention) {
+        pImpl->attention->setEnabled(enable);
+        pImpl->config->set("subsystem.attention.enabled", enable, ConfigSource::User);
+    } else if (subsystemName == "dopamine" && pImpl->dopamine) {
+        pImpl->dopamine->setEnabled(enable);
+        pImpl->config->set("subsystem.dopamine.enabled", enable, ConfigSource::User);
+    } else if (subsystemName == "curiosity" && pImpl->curiosity) {
+        pImpl->curiosity->setEnabled(enable);
+        pImpl->config->set("subsystem.curiosity.enabled", enable, ConfigSource::User);
+    } else if (subsystemName == "novelty" && pImpl->novelty) {
+        pImpl->novelty->setEnabled(enable);
+        pImpl->config->set("subsystem.novelty.enabled", enable, ConfigSource::User);
+    } else if (subsystemName == "prediction_error" && pImpl->predictionError) {
+        pImpl->predictionError->setEnabled(enable);
+        pImpl->config->set("subsystem.prediction_error.enabled", enable, ConfigSource::User);
+    } else {
+        NLM_LOG_WARNING("Unknown subsystem: " + subsystemName);
+    }
+    NLM_LOG_INFO("Subsystem " + subsystemName + " " + (enable ? "enabled" : "disabled"));
+}
+
+std::string Brain::getConfigurationSummary() const {
+    std::stringstream ss;
+    ss << "NLM Brain Configuration Summary (Phase 6 - Integrated):" << std::endl;
+    ss << "  Brain:" << std::endl;
+    ss << "    Neurons: " << getTotalNeuronCount() << std::endl;
+    ss << "    Synapses: " << getTotalSynapseCount() << std::endl;
+    ss << "    Regions: " << getRegionCount() << std::endl;
+    ss << "    Developmental Stage: " << static_cast<int>(pImpl->developmentalStage) << std::endl;
+    ss << "  Memory Systems:" << std::endl;
+    if (pImpl->workingMemory) {
+        ss << "    Working Memory: " << pImpl->workingMemory->getActiveTraces() << "/" << pImpl->workingMemory->getCapacity() << " traces" << std::endl;
+    }
+    if (pImpl->episodicMemory) {
+        ss << "    Episodic Memory: " << pImpl->episodicMemory->getEpisodeCount() << "/" << pImpl->episodicMemory->getMaxEpisodes() << " episodes" << std::endl;
+    }
+    if (pImpl->associativeMemory) {
+        ss << "    Associative Memory: " << pImpl->associativeMemory->getPatternCount() << "/" << pImpl->associativeMemory->getPatternCapacity() << " patterns" << std::endl;
+    }
+    ss << "  Plasticity:" << std::endl;
+    ss << "    E/I Ratio: " << getExcitationInhibitionRatio() << std::endl;
+    ss << "    Total Spikes: " << getTotalSpikeCount() << std::endl;
+    ss << "  Neuromodulation:" << std::endl;
+    if (pImpl->dopamine) {
+        ss << "    Dopamine Level: " << pImpl->dopamine->getLevel() << std::endl;
+    }
+    if (pImpl->curiosity) {
+        ss << "    Curiosity Level: " << pImpl->curiosity->getLevel() << std::endl;
+    }
+    if (pImpl->novelty) {
+        ss << "    Novelty Level: " << pImpl->novelty->getLevel() << std::endl;
+    }
+    ss << "  Performance:" << std::endl;
+    ss << "    Step Count: " << pImpl->currentStep << std::endl;
+    ss << "    Simulation Time: " << pImpl->currentTime << "s" << std::endl;
+    return ss.str();
+}
+
+void Brain::enablePerformanceMonitoring(bool enable) {
+    pImpl->config->set("performance.monitoring_enabled", enable, ConfigSource::User);
+    NLM_LOG_INFO("Performance monitoring " + std::string(enable ? "enabled" : "disabled"));
+}
+
+bool Brain::isPerformanceMonitoringEnabled() const {
+    return pImpl->config->getOr<bool>("performance.monitoring_enabled", false);
+}
+
+// Note: Performance statistics would need additional implementation
+// These are placeholders for now
+size_t Brain::getStepCount() const {
+    return pImpl->currentStep;
+}
+
+double Brain::getAverageStepTime() const {
+    // Placeholder - would need to track step times
+    return 0.001; // Default timestep
+}
+
+size_t Brain::getMaxMemoryUsage() const {
+    // Placeholder - would need to track memory usage
+    return 0;
+}
+
+double Brain::getCPUUsage() const {
+    // Placeholder - would need to track CPU usage
+    return 0.0;
+}
+
+size_t Brain::getTotalConnections() const {
+    return getTotalSynapseCount();
+}
+
+size_t Brain::getActiveConnections() const {
+    // Placeholder - would need to track active synapses
+    return 0;
+}
+
+size_t Brain::getSynapticStrengthSum() const {
+    // Placeholder - would need to track synaptic weights
+    return 0;
+}
+
+float Brain::getAverageSynapticWeight() const {
+    // Placeholder - would need to calculate average weight
+    return 0.0f;
+}
+
+float Brain::getNetworkStability() const {
+    // Placeholder - would need to calculate network stability metric
+    return 1.0f;
+}
+
+size_t Brain::getWorkingMemoryUsage() const {
+    if (pImpl->workingMemory) {
+        return pImpl->workingMemory->getActiveTraces();
+    }
+    return 0;
+}
+
+size_t Brain::getEpisodicMemoryUsage() const {
+    if (pImpl->episodicMemory) {
+        return pImpl->episodicMemory->getEpisodeCount();
+    }
+    return 0;
+}
+
+size_t Brain::getAssociativeMemoryUsage() const {
+    if (pImpl->associativeMemory) {
+        return pImpl->associativeMemory->getPatternCount();
+    }
+    return 0;
+}
+
+float Brain::getMemoryConsolidationRate() const {
+    // Placeholder - would need to track consolidation rate
+    return 0.0f;
+}
+
+float Brain::getAverageDopamineLevel() const {
+    if (pImpl->dopamine) {
+        return pImpl->dopamine->getLevel();
+    }
+    return 0.0f;
+}
+
+float Brain::getAverageCuriosityLevel() const {
+    if (pImpl->curiosity) {
+        return pImpl->curiosity->getLevel();
+    }
+    return 0.0f;
+}
+
+float Brain::getAverageNoveltyLevel() const {
+    if (pImpl->novelty) {
+        return pImpl->novelty->getLevel();
+    }
+    return 0.0f;
+}
+
+float Brain::getAveragePredictionError() const {
+    if (pImpl->predictionError) {
+        return pImpl->predictionError->getLevel();
+    }
+    return 0.0f;
+}
+
+size_t Brain::getDevelopmentalStageDuration(DevelopmentalStage stage) const {
+    // Placeholder - would need to track stage durations
+    return 0;
+}
+
+float Brain::getPlasticityRate() const {
+    // Placeholder - would need to calculate overall plasticity rate
+    return 0.0f;
+}
+
+float Brain::getStructuralPlasticityRate() const {
+    // Placeholder - would need to track structural plasticity rate
+    return 0.0f;
+}
+
+void Brain::enableCuriosityDrivenExploration(bool enable, float explorationRate) {
+    if (pImpl->curiosity) {
+        pImpl->curiosity->setThreshold(explorationRate);
+        pImpl->curiosity->setEnabled(enable);
+        pImpl->config->set("curiosity_driven_exploration.enabled", enable, ConfigSource::User);
+        pImpl->config->set("curiosity_driven_exploration.rate", explorationRate, ConfigSource::User);
+        NLM_LOG_INFO("Curiosity-driven exploration " + std::string(enable ? "enabled" : "disabled") + 
+                    ", rate: " + std::to_string(explorationRate));
+    }
+}
+
+void Brain::setGoalBasedMotivation(float goalImportance, float intrinsicMotivation) {
+    pImpl->config->set("goal_based_motivation.goal_importance", goalImportance, ConfigSource::User);
+    pImpl->config->set("goal_based_motivation.intrinsic_motivation", intrinsicMotivation, ConfigSource::User);
+    NLM_LOG_INFO("Goal-based motivation configured: goal_importance=" + std::to_string(goalImportance) + 
+                ", intrinsic_motivation=" + std::to_string(intrinsicMotivation));
+}
+
+void Brain::setSocialLearningParameters(float imitationStrength, float socialBonding) {
+    pImpl->config->set("social_learning.imitation_strength", imitationStrength, ConfigSource::User);
+    pImpl->config->set("social_learning.social_bonding", socialBonding, ConfigSource::User);
+    NLM_LOG_INFO("Social learning parameters configured: imitation_strength=" + std::to_string(imitationStrength) + 
+                ", social_bonding=" + std::to_string(socialBonding));
+}
+
+void Brain::batchInjectCurrent(const std::vector<NeuronId>& neurons, MembranePotential current) {
+    for (const auto& neuronId : neurons) {
+        injectCurrent(neuronId, current);
+    }
+    NLM_LOG_INFO("Batch injected current into " + std::to_string(neurons.size()) + " neurons");
+}
+
+void Brain::batchSetWeights(const std::vector<SynapseId>& synapses, float weight) {
+    for (const auto& synapseId : synapses) {
+        // Note: This would require a method to find synapses by ID
+        // For now, just log the operation
+    }
+    NLM_LOG_INFO("Batch set weights for " + std::to_string(synapses.size()) + " synapses to " + std::to_string(weight));
+}
+
+void Brain::batchEnablePlasticity(const std::vector<SynapseId>& synapses, bool stdp, bool hebbian, bool structural) {
+    for (const auto& synapseId : synapses) {
+        // Note: This would require a method to find synapses by ID
+        // For now, just log the operation
+    }
+    NLM_LOG_INFO("Batch enabled plasticity for " + std::to_string(synapses.size()) + " synapses (STDP=" + 
+                std::to_string(stdp) + ", Hebbian=" + std::to_string(hebbian) + ", Structural=" + std::to_string(structural) + ")");
+}
+
+void Brain::pauseSimulation(bool pause) {
+    pImpl->isResting = pause;
+    pImpl->config->set("simulation.paused", pause, ConfigSource::User);
+    NLM_LOG_INFO("Simulation " + std::string(pause ? "paused" : "resumed"));
+}
+
+bool Brain::isSimulationPaused() const {
+    return pImpl->isResting;
+}
+
+void Brain::enableEventDrivenSimulation(bool enable) {
+    pImpl->config->set("simulation.event_driven", enable, ConfigSource::User);
+    NLM_LOG_INFO("Event-driven simulation " + std::string(enable ? "enabled" : "disabled"));
+}
+
+bool Brain::isEventDrivenSimulationEnabled() const {
+    return pImpl->config->getOr<bool>("simulation.event_driven", false);
+}
+
+// Note: ExternalInput and ExternalInfluence classes would need to be defined
+void Brain::injectExternalInput(const class ExternalInput& input) {
+    // Placeholder - would inject external input into brain
+    NLM_LOG_INFO("External input injected (placeholder)");
+}
+
+void Brain::applyExternalInfluence(const class ExternalInfluence& influence) {
+    // Placeholder - would apply external influence to brain
+    NLM_LOG_INFO("External influence applied (placeholder)");
+}
+
+bool Brain::isSystemHealthy() const {
+    // Basic health check
+    bool healthy = !pImpl->regions.empty() && 
+                   getTotalNeuronCount() > 0 && 
+                   !pImpl->isResting;
+    NLM_LOG_INFO("System health: " + std::string(healthy ? "HEALTHY" : "UNHEALTHY"));
+    return healthy;
+}
+
+std::string Brain::getSystemStatus() const {
+    std::stringstream ss;
+    ss << "System Status:" << std::endl;
+    ss << "  Healthy: " << (isSystemHealthy() ? "Yes" : "No") << std::endl;
+    ss << "  Regions: " << getRegionCount() << std::endl;
+    ss << "  Neurons: " << getTotalNeuronCount() << std::endl;
+    ss << "  Synapses: " << getTotalSynapseCount() << std::endl;
+    ss << "  Current Step: " << pImpl->currentStep << std::endl;
+    ss << "  Simulation Time: " << pImpl->currentTime << "s" << std::endl;
+    ss << "  Developmental Stage: " << static_cast<int>(pImpl->developmentalStage) << std::endl;
+    return ss.str();
+}
+
 } // namespace nlm

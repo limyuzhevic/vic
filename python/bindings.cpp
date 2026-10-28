@@ -348,10 +348,173 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status")
+        
+        // ========== ADVANCED CONFIGURATION METHODS ==========
+        
+        // Set synaptic plasticity parameters
+        .def("setSTDPParameters", &Brain::setSTDPParameters,
+             py::arg("ltp_weight"), py::arg("ltd_weight"), py::arg("tau"),
+             "Set STDP plasticity parameters")
+        .def("setHebbianParameters", &Brain::setHebbianParameters,
+             py::arg("learning_rate"), py::arg("decay_rate"),
+             "Set Hebbian plasticity parameters")
+        .def("setStructuralPlasticityParameters", &Brain::setStructuralPlasticityParameters,
+             py::arg("synaptogenesis_rate"), py::arg("pruning_rate"),
+             "Set structural plasticity parameters")
+        
+        // Set neuromodulation parameters
+        .def("setNeuromodulationParameters", &Brain::setNeuromodulationParameters,
+             py::arg("dopamine_scale"), py::arg("curiosity_threshold"),
+             py::arg("novelty_threshold"), py::arg("prediction_error_gain"),
+             "Set neuromodulation parameters")
+        
+        // Set memory system parameters
+        .def("setWorkingMemoryParameters", &Brain::setWorkingMemoryParameters,
+             py::arg("capacity"), py::arg("decay_rate"),
+             "Set working memory parameters")
+        .def("setEpisodicMemoryParameters", &Brain::setEpisodicMemoryParameters,
+             py::arg("max_episodes"), py::arg("replay_interval"),
+             "Set episodic memory parameters")
+        .def("setAssociativeMemoryParameters", &Brain::setAssociativeMemoryParameters,
+             py::arg("pattern_threshold"), py::arg("pattern_capacity"),
+             "Set associative memory parameters")
+        
+        // Set cognitive parameters
+        .def("setCognitiveParameters", &Brain::setCognitiveParameters,
+             py::arg("planning_depth"), py::arg("attention_gain"),
+             py::arg("concept_threshold"), py::arg("inhibition_strength"),
+             "Set cognitive parameters")
+        
+        // Set development parameters
+        .def("setDevelopmentParameters", &Brain::setDevelopmentParameters,
+             py::arg("critical_period_start"), py::arg("critical_period_end"),
+             py::arg("plasticity_modulation_rate"),
+             "Set development parameters")
+        
+        // Set performance optimization parameters
+        .def("setPerformanceParameters", &Brain::setPerformanceParameters,
+             py::arg("memory_pool_size"), py::arg("enable_simd"),
+             py::arg("enable_parallel"), py::arg("thread_count"),
+             "Set performance optimization parameters")
+        
+        // Set checkpointing parameters
+        .def("setCheckpointParameters", &Brain::setCheckpointParameters,
+             py::arg("directory"), py::arg("max_checkpoints"),
+             py::arg("compression_level"), py::arg("auto_save"),
+             "Set checkpointing parameters")
+        
+        // Enable/disable subsystems
+        .def("enableSubsystem", &Brain::enableSubsystem,
+             py::arg("subsystem_name"), py::arg("enable"),
+             "Enable or disable a subsystem")
+        
+        // Get configuration summary
+        .def("getConfigurationSummary", &Brain::getConfigurationSummary,
+             "Get a summary of the current brain configuration")
+        
+        // Performance monitoring
+        .def("enablePerformanceMonitoring", &Brain::enablePerformanceMonitoring, py::arg("enable"),
+             "Enable or disable performance monitoring")
+        .def("isPerformanceMonitoringEnabled", &Brain::isPerformanceMonitoringEnabled,
+             "Check if performance monitoring is enabled")
+        
+        // Performance statistics (placeholders)
+        .def("getStepCount", &Brain::getStepCount,
+             "Get the current step count")
+        .def("getAverageStepTime", &Brain::getAverageStepTime,
+             "Get average step time")
+        .def("getMaxMemoryUsage", &Brain::getMaxMemoryUsage,
+             "Get maximum memory usage")
+        .def("getCPUUsage", &Brain::getCPUUsage,
+             "Get CPU usage")
+        
+        // Neural system statistics
+        .def("getTotalConnections", &Brain::getTotalConnections,
+             "Get total number of connections")
+        .def("getActiveConnections", &Brain::getActiveConnections,
+             "Get number of active connections")
+        .def("getSynapticStrengthSum", &Brain::getSynapticStrengthSum,
+             "Get sum of synaptic strengths")
+        .def("getAverageSynapticWeight", &Brain::getAverageSynapticWeight,
+             "Get average synaptic weight")
+        .def("getNetworkStability", &Brain::getNetworkStability,
+             "Get network stability metric")
+        
+        // Memory system statistics
+        .def("getWorkingMemoryUsage", &Brain::getWorkingMemoryUsage,
+             "Get working memory usage")
+        .def("getEpisodicMemoryUsage", &Brain::getEpisodicMemoryUsage,
+             "Get episodic memory usage")
+        .def("getAssociativeMemoryUsage", &Brain::getAssociativeMemoryUsage,
+             "Get associative memory usage")
+        .def("getMemoryConsolidationRate", &Brain::getMemoryConsolidationRate,
+             "Get memory consolidation rate")
+        
+        // Neuromodulation statistics
+        .def("getAverageDopamineLevel", &Brain::getAverageDopamineLevel,
+             "Get average dopamine level")
+        .def("getAverageCuriosityLevel", &Brain::getAverageCuriosityLevel,
+             "Get average curiosity level")
+        .def("getAverageNoveltyLevel", &Brain::getAverageNoveltyLevel,
+             "Get average novelty level")
+        .def("getAveragePredictionError", &Brain::getAveragePredictionError,
+             "Get average prediction error")
+        
+        // Development statistics
+        .def("getDevelopmentalStageDuration", &Brain::getDevelopmentalStageDuration,
+             py::arg("stage"), "Get duration of a developmental stage")
+        .def("getPlasticityRate", &Brain::getPlasticityRate,
+             "Get overall plasticity rate")
+        .def("getStructuralPlasticityRate", &Brain::getStructuralPlasticityRate,
+             "Get structural plasticity rate")
+        
+        // Advanced neural operations
+        .def("enableCuriosityDrivenExploration", &Brain::enableCuriosityDrivenExploration,
+             py::arg("enable"), py::arg("rate") = 0.1f,
+             "Enable or disable curiosity-driven exploration")
+        .def("setGoalBasedMotivation", &Brain::setGoalBasedMotivation,
+             py::arg("goal_importance"), py::arg("intrinsic_motivation"),
+             "Set goal-based motivation parameters")
+        .def("setSocialLearningParameters", &Brain::setSocialLearningParameters,
+             py::arg("imitation_strength"), py::arg("social_bonding"),
+             "Set social learning parameters")
+        
+        // Batch operations
+        .def("batchInjectCurrent", &Brain::batchInjectCurrent,
+             py::arg("neurons"), py::arg("current"),
+             "Inject current into multiple neurons")
+        .def("batchSetWeights", &Brain::batchSetWeights,
+             py::arg("synapses"), py::arg("weight"),
+             "Set weights for multiple synapses")
+        .def("batchEnablePlasticity", &Brain::batchEnablePlasticity,
+             py::arg("synapses"), py::arg("stdp"), py::arg("hebbian"), py::arg("structural"),
+             "Enable plasticity for multiple synapses")
+        
+        // Simulation control
+        .def("pauseSimulation", &Brain::pauseSimulation, py::arg("pause"),
+             "Pause or resume simulation")
+        .def("isSimulationPaused", &Brain::isSimulationPaused,
+             "Check if simulation is paused")
+        .def("enableEventDrivenSimulation", &Brain::enableEventDrivenSimulation, py::arg("enable"),
+             "Enable or disable event-driven simulation")
+        .def("isEventDrivenSimulationEnabled", &Brain::isEventDrivenSimulationEnabled,
+             "Check if event-driven simulation is enabled")
+        
+        // External influence (placeholders)
+        .def("injectExternalInput", &Brain::injectExternalInput,
+             py::arg("input"), "Inject external input")
+        .def("applyExternalInfluence", &Brain::applyExternalInfluence,
+             py::arg("influence"), "Apply external influence")
+        
+        // System health
+        .def("isSystemHealthy", &Brain::isSystemHealthy,
+             "Check if system is healthy")
+        .def("getSystemStatus", &Brain::getSystemStatus,
+             "Get system status string");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
