@@ -403,6 +403,98 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
+    
+    m.attr("__version__") = "0.1.0";
+
+    // Add utility functions for error handling and advanced operations
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        // Validate configuration and return list of errors/warnings
+        std::vector<std::string> results;
+        
+        // Check required keys
+        std::vector<std::string> requiredKeys = {"random_seed", "simulation_timestep", "neuron_count"};
+        for (const auto& key : requiredKeys) {
+            if (!config->has(key)) {
+                results.push_back("Missing required key: " + key);
+            }
+        }
+        
+        // Check for reasonable values
+        if (config->has("neuron_count")) {
+            auto neuronCount = config->getOr<int64_t>("neuron_count", 0);
+            if (neuronCount <= 0) {
+                results.push_back("neuron_count must be positive, got: " + std::to_string(neuronCount));
+            }
+        }
+        
+        if (config->has("simulation_timestep")) {
+            auto timestep = config->getOr<double>("simulation_timestep", 0.0);
+            if (timestep <= 0.0) {
+                results.push_back("simulation_timestep must be positive, got: " + std::to_string(timestep));
+            }
+        }
+        
+        return results;
+    }, "Validate configuration and return warnings/errors");
+    
+    m.def("exportConfig", [](const std::shared_ptr<Config> config, const std::string& filename) {
+        // Export configuration to file with error handling
+        bool success = config->saveToFile(filename);
+        if (!success) {
+            throw py::runtime_error("Failed to export configuration to file: " + filename);
+        }
+        return success;
+    }, "Export configuration to file", py::arg("config"), py::arg("filename"));
+    
+    m.def("importConfig", [](const std::string& filename) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        bool success = config->loadFromFile(filename);
+        if (!success) {
+            throw py::runtime_error("Failed to import configuration from file: " + filename);
+        }
+        return config;
+    }, "Import configuration from file", py::arg("filename"));
+    
+    // Add advanced brain manipulation functions
+    m.def("createCustomBrain", [](const std::shared_ptr<Config> config, 
+                                const std::unordered_map<std::string, double>& params) {
+        auto brain = std::make_shared<Brain>(config);
+        
+        // Apply custom parameters if provided
+        for (const auto& param : params) {
+            config->set(param.first, param.second, ConfigSource::Runtime);
+        }
+        
+        if (!brain->initialize()) {
+            throw py::runtime_error("Failed to initialize custom brain");
+        }
+        
+        return brain;
+    }, "Create a custom brain with parameters", py::arg("config"), py::arg("params") = std::unordered_map<std::string, double>());
+    
+    // Add convenience function for quick simulation
+    m.def("runQuickSimulation", [](int steps, double timestep = 0.1) {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", 42, ConfigSource::Default);
+        config->set("simulation_timestep", timestep, ConfigSource::Default);
+        config->set("neuron_count", 100, ConfigSource::Default);
+        config->set("region_count", 1, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw py::runtime_error("Failed to initialize brain for quick simulation");
+        }
+        
+        for (int i = 0; i < steps; ++i) {
+            brain->step(i, i * timestep);
+        }
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getFiringNeuronCount(),
+            brain->getAverageFiringRate()
+        );
+    }, "Run a quick simulation with default settings", py::arg("steps"), py::arg("timestep") = 0.1);
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
