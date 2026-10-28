@@ -416,10 +416,189 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced system factory functions
+    m.def("createWorkingMemory", []() {
+        return std::make_shared<NeuralWorkingMemory>();
+    }, "Create working memory system");
+    
+    m.def("createEpisodicMemory", []() {
+        return std::make_shared<NeuralEpisodicMemory>();
+    }, "Create episodic memory system");
+    
+    m.def("createPredictionSystem", []() {
+        return std::make_shared<PredictionSystem>();
+    }, "Create prediction system");
+    
+    m.def("createCuriosity", []() {
+        return std::make_shared<Curiosity>();
+    }, "Create curiosity system");
+    
+    m.def("createDopamine", []() {
+        return std::make_shared<Dopamine>();
+    }, "Create dopamine neuromodulation system");
+    
+    m.def("createDevelopmentSystem", []() {
+        return std::make_shared<DevelopmentSystem>();
+    }, "Create development system");
+    
+    m.def("createNovelty", []() {
+        return std::make_shared<Novelty>();
+    }, "Create novelty detection system");
+    
+    m.def("createPredictionError", []() {
+        return std::make_shared<PredictionError>();
+    }, "Create prediction error system");
+
+    // Constants for advanced configuration
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Advanced brain configuration helper
+    m.def("createAdvancedConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set defaults for Phase 6 advanced features
+        config->set("brain.neuron_count", 2000);
+        config->set("brain.synapse_density", 0.15);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.synaptogenesis_rate", 0.001);
+        config->set("development.pruning_rate", 0.0001);
+        config->set("memory.episodic.enabled", true);
+        config->set("memory.associative.enabled", true);
+        config->set("prediction.enabled", true);
+        config->set("cognition.planner.enabled", true);
+        config->set("cognition.attention.enabled", true);
+        
+        return config;
+    }, "Create advanced configuration with Phase 6 features enabled");
+    
+    // Utility functions for advanced operations
+    m.def("exportBrainState", [](const Brain& brain, const std::string& filepath) {
+        return brain.save(filepath);
+    }, py::arg("brain"), py::arg("filepath"),
+        "Export brain state to file");
+    
+    m.def("importBrainState", [](Brain& brain, const std::string& filepath) {
+        return brain.load(filepath);
+    }, py::arg("brain"), py::arg("filepath"),
+        "Import brain state from file");
+    
+    // Debug and inspection functions
+    m.def("inspectBrain", [](const Brain& brain) {
+        std::stringstream ss;
+        brain.logStatus();
+        return ss.str();
+    }, py::arg("brain"),
+        "Get detailed brain status information");
+    
+    // Performance monitoring function
+    m.def("getBrainStats", [](const Brain& brain) {
+        py::dict stats;
+        stats["neuron_count"] = brain.getTotalNeuronCount();
+        stats["synapse_count"] = brain.getTotalSynapseCount();
+        stats["firing_neuron_count"] = brain.getFiringNeuronCount();
+        stats["average_firing_rate"] = brain.getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain.getExcitationInhibitionRatio();
+        stats["total_spike_count"] = brain.getTotalSpikeCount();
+        stats["developmental_stage"] = static_cast<int>(brain.getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"),
+        "Get comprehensive brain statistics");
+    
+    // Memory system access (through brain interface)
+    m.def("getWorkingMemory", [](Brain& brain) {
+        return brain.getWorkingMemory();
+    }, py::arg("brain"),
+        "Get working memory system (requires Phase 6 implementation)");
+    
+    m.def("getEpisodicMemory", [](Brain& brain) {
+        return brain.getEpisodicMemory();
+    }, py::arg("brain"),
+        "Get episodic memory system (requires Phase 6 implementation)");
+    
+    m.def("getAssociativeMemory", [](Brain& brain) {
+        return brain.getAssociativeMemory();
+    }, py::arg("brain"),
+        "Get associative memory system (requires Phase 6 implementation)");
+    
+    // Prediction system access
+    m.def("getPredictionSystem", [](Brain& brain) {
+        return brain.getPredictionSystem();
+    }, py::arg("brain"),
+        "Get prediction system (requires Phase 6 implementation)");
+    
+    // Neuromodulation system access
+    m.def("getDopamine", [](Brain& brain) {
+        return brain.getDopamine();
+    }, py::arg("brain"),
+        "Get dopamine neuromodulation system (requires Phase 6 implementation)");
+    
+    m.def("getCuriosity", [](Brain& brain) {
+        return brain.getCuriosity();
+    }, py::arg("brain"),
+        "Get curiosity system (requires Phase 6 implementation)");
+    
+    m.def("getNovelty", [](Brain& brain) {
+        return brain.getNovelty();
+    }, py::arg("brain"),
+        "Get novelty system (requires Phase 6 implementation)");
+    
+    m.def("getPredictionError", [](Brain& brain) {
+        return brain.getPredictionErrorSignal();
+    }, py::arg("brain"),
+        "Get prediction error system (requires Phase 6 implementation)");
+    
+    // Development system access
+    m.def("getDevelopmentSystem", [](Brain& brain) {
+        return brain.getDevelopmentSystem();
+    }, py::arg("brain"),
+        "Get development system (requires Phase 6 implementation)");
+    
+    // Cognition system access
+    m.def("getPlanner", [](Brain& brain) {
+        return brain.getPlanner();
+    }, py::arg("brain"),
+        "Get neural planner (requires Phase 6 implementation)");
+    
+    m.def("getConceptFormation", [](Brain& brain) {
+        return brain.getConceptFormation();
+    }, py::arg("brain"),
+        "Get concept formation system (requires Phase 6 implementation)");
+    
+    m.def("getAttention", [](Brain& brain) {
+        return brain.getAttention();
+    }, py::arg("brain"),
+        "Get attentional selection system (requires Phase 6 implementation)");
+    
+    // Plasticity system access
+    m.def("getSTDP", [](Brain& brain) {
+        return brain.getSTDP();
+    }, py::arg("brain"),
+        "Get Spike-Timing-Dependent Plasticity system");
+    
+    m.def("getHebbian", [](Brain& brain) {
+        return brain.getHebbian();
+    }, py::arg("brain"),
+        "Get Hebbian plasticity system");
+    
+    m.def("getStructuralPlasticity", [](Brain& brain) {
+        return brain.getStructuralPlasticity();
+    }, py::arg("brain"),
+        "Get structural plasticity system");
+    
+    m.def("getSpikeSystem", [](Brain& brain) {
+        return brain.getSpikeSystem();
+    }, py::arg("brain"),
+        "Get spike system");
 }
+
+} // namespace nlm
 
 } // namespace nlm

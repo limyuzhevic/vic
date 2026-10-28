@@ -6,6 +6,15 @@
 #include <variant>
 #include <optional>
 
+// Include JSON and YAML libraries for configuration parsing
+#ifdef CONFIG_USE_JSON
+#include <nlohmann/json.hpp>
+#endif
+
+#ifdef CONFIG_USE_YAML
+#include <yaml-cpp/yaml.h>
+#endif
+
 namespace nlm {
 
 // Forward declarations
@@ -55,13 +64,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON/YAML/key=value format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -100,6 +109,26 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parsing helpers
+#ifdef CONFIG_USE_JSON
+    bool loadFromJSON(const std::string& filepath);
+    bool saveToJSON(const std::string& filepath) const;
+    void processJSONConfig(const nlohmann::json& json, ConfigSource source);
+    nlohmann::json getJSONValue(const ConfigValue& value) const;
+#endif
+    
+#ifdef CONFIG_USE_YAML
+    bool loadFromYAML(const std::string& filepath);
+    bool saveToYAML(const std::string& filepath) const;
+    void processYAMLConfig(const YAML::Node& node, ConfigSource source);
+    YAML::Node getYAMLValue(const ConfigValue& value) const;
+#endif
+    
+    void setDescription(const std::string& key, const std::string& description);
+    
+    // Prevent accidental mixing of different library versions
+    static const int EXPECTED_LIBRARY_VERSION = 1;
 };
 
 } // namespace nlm
