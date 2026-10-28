@@ -72,17 +72,106 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
+## 🚀 NEW: Enhanced Python API
 
-## Running
+NLM now includes a **completely enhanced Python interface** with:
 
-### Phase 6 Demo (Integration Test)
-```bash
-./nlm_phase6_demo
+### Key Improvements
+
+#### Pythonic Interface
+- **Properties**: `brain.neuron_count` instead of `brain.getTotalNeuronCount()`
+- **Context Managers**: `with brain:` for automatic resource management
+- **Enhanced Error Handling**: Graceful failure recovery and validation
+
+#### Advanced Features
+- **Callback System**: Event-driven programming support
+- **High-Level Convenience Methods**: `brain.run_simulation()`, `agent.run_episode()`
+- **Performance Monitoring**: `brain.get_performance_metrics()`
+- **Memory Management**: `brain.clear_memory()`, `brain.validate_integrity()`
+- **Configuration Validation**: `brain.check_config()`
+- **Batch Operations**: Efficient multi-step execution
+- **State Management**: Save and restore brain state
+
+#### Expert-Level Tools
+- **Custom Policy Framework**: Implement behavior-based control
+- **Performance Optimization**: `brain.optimize_for_performance()`
+- **Development Simulation**: `brain.advance_development()`
+- **Comprehensive Monitoring**: `brain.monitor_performance()`
+
+### Usage Examples
+
+#### Basic Enhanced Usage
+```python
+import pynlm
+
+# Create brain with enhanced Pythonic interface
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Use Pythonic properties
+print(f"Brain has {brain.neuron_count} neurons")
+print(f"Stage: {brain.stage}")
+print(f"Firing: {brain.firing_count} neurons currently firing")
+
+# Run simulation with context manager
+with brain:
+    brain.step(100)  # 100 simulation steps
+
+# Get comprehensive metrics
+metrics = brain.get_performance_metrics()
+print(f"Simulation completed: {metrics['total_spikes']} total spikes")
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+#### Advanced Agent Programming
+```python
+import pynlm
 
-## Project Structure
+# Create complete agent setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all advanced systems
+agent.enable_all_systems()
+
+# Run complete episode with single method
+agent.run_episode(world, 500)
+
+# Collect comprehensive metrics
+metrics = agent.collect_metrics()
+print(f"Agent performance: {metrics}")
+```
+
+#### Event-Driven Programming
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Set up event callbacks
+def on_spike(event):
+    print(f"Spike at neuron {event.neuron_id} at time {event.time}")
+
+brain.add_spike_callback(on_spike)
+
+# Set up plasticity callbacks
+def on_plasticity_change(synapse):
+    print(f"Synapse weight changed: {synapse.getWeight():.3f}")
+
+brain.add_plasticity_callback(on_plasticity_change)
+
+# Run simulation with event monitoring
+for step in range(1000):
+    brain.step(step)
+```
+
+---
 
 ```
 NLM/

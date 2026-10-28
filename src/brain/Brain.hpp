@@ -153,8 +153,8 @@ public:
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
     
-    // ========== COGNITION SYSTEMS ==========
-    
+// ========== COGNITION SYSTEMS ==========
+
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
     
@@ -163,6 +163,15 @@ public:
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    
+    // Attention configuration
+    void setAttentionParameters(float inhibitionStrength, float excitationStrength);
+    
+    // Planning configuration
+    void setPlannerParameters(int planningDepth, float planningHorizon);
+    
+    // Concept formation configuration
+    void setConceptFormationParameters(float similarityThreshold, size_t minPatternSize);
     
     // ========== DEVELOPMENT SYSTEM ==========
     

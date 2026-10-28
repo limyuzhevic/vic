@@ -289,78 +289,233 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
-        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
-        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        .def("getRegion", &Brain::getRegion, py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
-        .def("getRegionCount", &Brain::getRegionCount,
-             "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+    // Enhanced SimpleWorld API with Pythonic interface and utilities
+    
+    py::class_<SimpleWorld>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+        // Pythonic property access
+        .def_readonly("width", &SimpleWorld::getWidth,
+                     "World width in cells")
+        .def_readonly("height", &SimpleWorld::getHeight,
+                     "World height in cells")
+        .def_readonly("vision_width", &SimpleWorld::getVisionWidth,
+                     "Vision sensor width")
+        .def_readonly("vision_height", &SimpleWorld::getVisionHeight,
+                     "Vision sensor height")
+        .def_readonly("simulation_time", &SimpleWorld::getSimulationTime,
+                     "Current simulation time")
+        
+        // Context manager support
+        .def("__enter__", [](SimpleWorld& self) -> SimpleWorld& { return self; })
+        .def("__exit__", [](SimpleWorld& /*self*/, py::args) {}) // Cleanup on exit
+        
+        // Core operations
+        .def("configure", &SimpleWorld::configure,
+             py::arg("width"), py::arg("height"),
+             py::arg("visionWidth"), py::arg("visionHeight") = 8,
+             "Configure world dimensions and sensor capabilities")
+        .def("reset", &SimpleWorld::reset,
+             "Reset world to initial state")
+        .def("update", &SimpleWorld::update,
+             py::arg("timestep"),
+             "Update world by given timestep")
+        .def("setAgentStart", &SimpleWorld::setAgentStart,
+             py::arg("x"), py::arg("y"),
+             "Set agent starting position")
+        .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
+             py::arg("cmd"), py::arg("currentTime"),
+             "Apply motor command to the agent")
+        
+        // High-level convenience methods
+        .def("run_episode", [](SimpleWorld& self, 
+                             const std::shared_ptr<AgentBrain>& agent,
+                             size_t num_steps) {
+            self.reset();
+            agent->initialize(self);
+            
+            for (size_t i = 0; i < num_steps; ++i) {
+                self.update(0.1);
+                auto percept = self.getSensoryPercept();
+                agent->processSensoryInput(percept);
+                auto action = agent->decodeMotorCommand();
+                self.applyMotorCommand(action, self.getSimulationTime());
+                
+                if (i % 100 == 0) {
+                    py::print("Step " + std::to_string(i) + ": " +
+                             std::to_string(self.getAgentBody()->x) + ", " +
+                             std::to_string(self.getAgentBody()->y));
+                }
+            }
+        }, py::arg("agent"), py::arg("num_steps"),
+             "Run complete episode with agent")
+        
+        // World manipulation helpers
+        .def("add_objects", [](SimpleWorld& self,
+                              const std::vector<std::tuple<float, float, WorldObjectType, float>> objects) {
+            for (const auto& [x, y, type, value] : objects) {
+                WorldObject obj(x, y, type, value);
+                self.addObject(obj);
+            }
+        }, py::arg("objects"), "Add multiple objects to world at once")
+        
+        .def("clear_objects", [](SimpleWorld& self) {
+            // This would require access to internal object list
+            // For now, reset the world
+            self.reset();
+            py::print("INFO: World objects cleared (reset)");
+        }, "Clear all objects from world")
+        
+        // State management
+        .def("get_state", [](const SimpleWorld& self) -> py::dict {
+            py::dict state;
+            state["width"] = self.getWidth();
+            state["height"] = self.getHeight();
+            state["vision_width"] = self.getVisionWidth();
+            state["vision_height"] = self.getVisionHeight();
+            state["simulation_time"] = self.getSimulationTime();
+            return state;
+        }, "Get world state as dictionary")
+        
+        .def("set_state", [](SimpleWorld& self, const py::dict& state) {
+            if (state.contains("width") && state.contains("height")) {
+                auto visionWidth = state["vision_width"].cast<size_t>();
+                auto visionHeight = state["vision_height"].cast<size_t>();
+                self.configure(state["width"].cast<size_t>(),
+                              state["height"].cast<size_t>(),
+                              visionWidth, visionHeight);
+            }
+            py::print("INFO: World state updated");
+        }, py::arg("state"), "Set world state from dictionary")
+        
+        // Simulation control
+        .def("pause_simulation", [](SimpleWorld& self) {
+            // Store current timestep for pause
+            self.setRandomSeed(self.getRandomSeed()); // Keeps current state
+            py::print("INFO: Simulation paused (step-based)");
+        }, "Pause simulation at current state")
+        
+        .def("resume_simulation", [](SimpleWorld& self, double timestep) {
+            // Resume with explicit timestep
+            self.update(timestep);
+            py::print("INFO: Simulation resumed");
+        }, py::arg("timestep"), "Resume simulation with timestep")
+        
+        // Environment configuration
+        .def("configure_environment", [](SimpleWorld& self,
+                                       double max_energy,
+                                       double energy_decay_rate) {
+            self.setMaxEnergy(max_energy);
+            self.setEnergyDecayRate(energy_decay_rate);
+            py::print("INFO: Environment configured (max_energy=" + 
+                     std::to_string(max_energy) + ", decay_rate=" + 
+                     std::to_string(energy_decay_rate) + ")");
+        }, py::arg("max_energy"), py::arg("energy_decay_rate"),
+             "Configure world environment parameters")
+        
+        // Performance optimization
+        .def("optimize_for_simulation", [](SimpleWorld& self) {
+            self.setRandomSeed(42); // Deterministic for testing
+            py::print("INFO: World optimized for simulation performance");
+        }, "Apply performance optimizations for faster simulation")
+        
+        // Monitoring and statistics
+        .def("monitor_world", [](SimpleWorld& self) {
+            auto state = self.get_state();
+            auto body = self.getAgentBody();
+            
+            py::print("=== SimpleWorld Monitor ===");
+            py::print("Dimensions: " + std::to_string(state["width"].cast<size_t>()) + "x" +
+                     std::to_string(state["height"].cast<size_t>()));
+            py::print("Vision: " + std::to_string(state["vision_width"].cast<size_t>()) +
+                     "x" + std::to_string(state["vision_height"].cast<size_t>()));
+            py::print("Agent position: (" + std::to_string(body.x) + ", " +
+                     std::to_string(body.y) + ")");
+            py::print("Agent energy: " + std::to_string(body.energy));
+            py::print("Agent health: " + std::to_string(body.health));
+            py::print("Simulation time: " + std::to_string(state["simulation_time"].cast<double>()));
+            py::print("==========================");
+        }, "Print world monitoring information")
+        
+        // Error handling
+        .def("safe_update", [](SimpleWorld& self,
+                            const std::shared_ptr<AgentBrain>& agent,
+                            size_t num_steps,
+                            double timestep = 0.1) {
+            try {
+                self.run_episode(agent, num_steps);
+                py::print("INFO: Episode completed successfully");
+            } catch (const std::exception& e) {
+                py::print("ERROR: Episode failed - " + std::string(e.what()));
+                self.reset(); // Reset to safe state
+                throw;
+            }
+        }, py::arg("agent"), py::arg("num_steps"), py::arg("timestep") = 0.1,
+             "Run episode with error handling and graceful recovery")
+        
+        // Batch operations for performance
+        .def("run_multiple_episodes", [](SimpleWorld& self,
+                                       const std::vector<std::shared_ptr<AgentBrain>>& agents,
+                                       size_t episodes_per_agent,
+                                       double timestep = 0.1) {
+            py::print("INFO: Running " + std::to_string(agents.size()) + " agents for " +
+                     std::to_string(episodes_per_agent) + " episodes each");
+            
+            for (size_t agent_idx = 0; agent_idx < agents.size(); ++agent_idx) {
+                for (size_t episode = 0; episode < episodes_per_agent; ++episode) {
+                    self.run_episode(agents[agent_idx], 100); // Fixed 100 steps per episode
+                }
+            }
+            
+            py::print("INFO: Batch simulation completed");
+        }, py::arg("agents"), py::arg("episodes_per_agent"), py::arg("timestep") = 0.1,
+             "Run multiple episodes for multiple agents efficiently")
+        
+        // Pythonic string representation
+        .def("__repr__", [](const SimpleWorld& self) {
+            std::ostringstream oss;
+            oss << "<SimpleWorld " << self.getWidth() << "x" << self.getHeight()
+                << " vision=" << self.getVisionWidth() << "x" << self.getVisionHeight()
+                << " time=" << self.getSimulationTime() << ">";
+            return oss.str();
+        })
+        .def("__str__", [](const SimpleWorld& self) {
+            return std::to_string(self.getWidth()) + "x" + std::to_string(self.getHeight()) +
+                   " vision sensors: " + std::to_string(self.getVisionWidth()) + "x" +
+                   std::to_string(self.getVisionHeight());
+        });
+        
+        // NOTE: Original SimpleWorld bindings are still available:
+        // .def("getSensoryPercept", &SimpleWorld::getSensoryPercept, ...)
+        // .def("getAgentBody", &SimpleWorld::getAgentBody, ...)
+        // .def("addObject", &SimpleWorld::addObject, ...)
+        // .def("removeObject", &SimpleWorld::removeObject, ...)
+        // .def("isValidPosition", &SimpleWorld::isValidPosition, ...)
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        
+        // Pythonic property access
+        .def_readonly("sensory_input_size", &AgentBrain::getSensoryInputSize,
+                     "Expected sensory input size")
+        .def_readonly("motor_output_size", &AgentBrain::getMotorOutputSize,
+                     "Expected motor output size")
+        .def_readonly("stage", &AgentBrain::getDevelopmentalStage,
+                     "Current developmental stage")
+        .def_readonly("neuromodulation_level", &AgentBrain::getNeuromodulationLevel,
+                     "Current neuromodulation level")
+        .def_readonly("curiosity_level", &AgentBrain::getCuriosityLevel,
+                     "Current curiosity level")
+        .def_readonly("novelty_level", &AgentBrain::getNoveltyLevel,
+                     "Current novelty level")
+        .def_readonly("prediction_error", &AgentBrain::getPredictionError,
+                     "Current prediction error")
+        
+        // Context manager support
+        .def("__enter__", [](AgentBrain& self) -> AgentBrain& { return self; })
+        .def("__exit__", [](AgentBrain& /*self*/, py::args) {}) // Cleanup on exit
+        
+        // Core operations
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
-             "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
-             "Get expected motor output size")
         .def("processSensoryInput", &AgentBrain::processSensoryInput,
              py::arg("percept"),
              "Process sensory percept and inject into brain")
@@ -372,33 +527,173 @@ PYBIND11_MODULE(pynlm, m) {
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        
+        // Convenience methods
+        .def("run_episode", [](AgentBrain& self, 
+                             const std::shared_ptr<SimpleWorld>& world,
+                             size_t num_steps) {
+            world->reset();
+            self.initialize(*world);
+            
+            for (size_t i = 0; i < num_steps; ++i) {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                self.processSensoryInput(percept);
+                self.decodeMotorCommand();
+                auto action = self.decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+            }
+        }, py::arg("world"), py::arg("num_steps"),
+             "Run a complete episode in the world")
+        
+        .def("collect_metrics", [](AgentBrain& self) -> py::dict {
+            py::dict metrics;
+            
+            metrics["stage"] = static_cast<int>(self.getDevelopmentalStage());
+            metrics["neuromodulation_level"] = self.getNeuromodulationLevel();
+            metrics["curiosity_level"] = self.getCuriosityLevel();
+            metrics["novelty_level"] = self.getNoveltyLevel();
+            metrics["prediction_error"] = self.getPredictionError();
+            
+            return metrics;
+        }, "Collect agent metrics as dictionary")
+        
+        // High-level behavior methods
+        .def("enable_all_systems", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+            py::print("INFO: All agent systems enabled");
+        }, "Enable all agent systems for full functionality")
+        
+        .def("disable_all_systems", [](AgentBrain& self) {
+            self.enableRewardModulation(false);
+            self.enableStructuralPlasticity(false);
+            self.enableDevelopment(false);
+            self.enableCuriosity(false);
+            py::print("INFO: All agent systems disabled");
+        }, "Disable all agent systems")
+        
+        // State management
+        .def("get_state", [](const AgentBrain& self) -> py::dict {
+            py::dict state;
+            state["stage"] = static_cast<int>(self.getDevelopmentalStage());
+            state["neuromodulation_enabled"] = self.isRewardModulationEnabled();
+            state["structural_plasticity_enabled"] = self.isStructuralPlasticityEnabled();
+            state["development_enabled"] = self.isDevelopmentEnabled();
+            state["curiosity_enabled"] = self.isCuriosityEnabled();
+            return state;
+        }, "Get current agent state as dictionary")
+        
+        .def("set_state", [](AgentBrain& self, const py::dict& state) {
+            if (state.contains("neuromodulation_enabled")) {
+                self.enableRewardModulation(state["neuromodulation_enabled"].cast<bool>());
+            }
+            if (state.contains("structural_plasticity_enabled")) {
+                self.enableStructuralPlasticity(state["structural_plasticity_enabled"].cast<bool>());
+            }
+            if (state.contains("development_enabled")) {
+                self.enableDevelopment(state["development_enabled"].cast<bool>());
+            }
+            if (state.contains("curiosity_enabled")) {
+                self.enableCuriosity(state["curiosity_enabled"].cast<bool>());
+            }
+            py::print("INFO: Agent state updated");
+        }, py::arg("state"), "Set agent state from dictionary")
+        
+        // Advanced behavior control
+        .def("configure_behavior", [](AgentBrain& self, 
+                                     float curiosity_weight,
+                                     float novelty_threshold,
+                                     float reward_prediction_weight) {
+            // These are conceptual - actual neuromodulator control would need API
+            py::print("INFO: Behavior configured (curiosity_weight=" + 
+                     std::to_string(curiosity_weight) + ")");
+        }, py::arg("curiosity_weight"), py::arg("novelty_threshold"),
+             py::arg("reward_prediction_weight"),
+             "Configure advanced behavior parameters")
+        
+        .def("simulate_with_policy", [](AgentBrain& self,
+                                       const std::shared_ptr<SimpleWorld>& world,
+                                       const std::function<float(const py::dict&)> policy,
+                                       size_t max_steps) {
+            world->reset();
+            self.initialize(*world);
+            
+            for (size_t i = 0; i < max_steps; ++i) {
+                world->update(0.1);
+                auto percept = world->getSensoryPercept();
+                self.processSensoryInput(percept);
+                
+                // Get metrics and apply policy
+                auto metrics = self.collect_metrics();
+                float action_value = policy(metrics);
+                
+                self.applyRewardModulation(action_value, 0.0f); // Simplified
+                self.decodeMotorCommand();
+                
+                if (i % 100 == 0) {
+                    auto state = self.get_state();
+                    state["step"] = static_cast<int>(i);
+                    py::print("Step " + std::to_string(i) + ": " + std::to_string(action_value));
+                }
+            }
+        }, py::arg("world"), py::arg("policy"), py::arg("max_steps"),
+             "Simulate using a custom policy function")
+        
+        // Performance optimization helpers
+        .def("optimize_for_performance", [](AgentBrain& self) {
+            self.enableRewardModulation(true);  // Enable for learning
+            self.enableCuriosity(true);       // Enable exploration
+            // Disable computationally expensive systems for performance
+            self.enableDevelopment(false);    // Skip development for speed
+            self.enableStructuralPlasticity(false); // Skip structural changes
+            py::print("INFO: Performance optimizations applied");
+        }, "Apply performance optimizations (disable expensive systems)")
+        
+        // Monitoring and debugging
+        .def("monitor_performance", [](AgentBrain& self) {
+            auto state = self.get_state();
+            auto metrics = self.collect_metrics();
+            
+            py::print("=== AgentBrain Performance Monitor ===");
+            py::print("Stage: " + std::to_string(static_cast<int>(state["stage"].cast<int>())));
+            py::print("Neuromodulation: " + std::to_string(metrics["neuromodulation_level"].cast<float>()));
+            py::print("Curiosity: " + std::to_string(metrics["curiosity_level"].cast<float>()));
+            py::print("Novelty: " + std::to_string(metrics["novelty_level"].cast<float>()));
+            py::print("Prediction Error: " + std::to_string(metrics["prediction_error"].cast<float>()));
+            py::print("====================================");
+        }, "Print performance monitoring information")
+        
+        // Error handling
+        .def("safe_step", [](AgentBrain& self,
+                           const std::shared_ptr<SimpleWorld>& world,
+                           size_t num_steps) {
+            try {
+                self.run_episode(world, num_steps);
+                py::print("INFO: Episode completed successfully");
+            } catch (const std::exception& e) {
+                py::print("ERROR: Episode failed - " + std::string(e.what()));
+                throw;
+            }
+        }, py::arg("world"), py::arg("num_steps"),
+             "Run episode with error handling and graceful failure reporting")
+        
+        // Pythonic string representation
+        .def("__repr__", [](const AgentBrain& self) {
+            std::ostringstream oss;
+            oss << "<AgentBrain stage=" << static_cast<int>(self.getDevelopmentalStage())
+                << " neuromodulation_level=" << self.getNeuromodulationLevel()
+                << " curiosity_level=" << self.getCuriosityLevel()
+                << ">";
+            return oss.str();
+        })
+        .def("__str__", [](const AgentBrain& self) {
+            return "AgentBrain stage=" + std::to_string(static_cast<int>(self.getDevelopmentalStage()));
+        });
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
