@@ -69,4 +69,23 @@ private:
     std::unique_ptr<Impl> pImpl;
 };
 
-} // namespace nlm
+// Experiment statistics for batch analysis
+struct ExperimentStats {
+    std::string name;
+    SimulationStep totalSteps;
+    size_t neuronsAtStart;
+    size_t neuronsAtEnd;
+    size_t synapsesAtStart;
+    size_t synapsesAtEnd;
+    size_t firingAtStart;
+    size_t firingAtEnd;
+    float averageFiringRate;
+    float totalReward;
+    float plasticityRatio;
+    
+    ExperimentStats()
+        : name(), totalSteps(0), neuronsAtStart(0), neuronsAtEnd(0),
+          synapsesAtStart(0), synapsesAtEnd(0), firingAtStart(0),
+          firingAtEnd(0), averageFiringRate(0.0f), totalReward(0.0f),
+          plasticityRatio(0.0f) {}
+};

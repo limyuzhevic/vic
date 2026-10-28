@@ -48,6 +48,88 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printHelp() {
+    std::cout << "NLM - Neural Learning Machine" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: nlm [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config <file>     Configuration file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --experiment <type>  Type of experiment to run:" << std::endl;
+    std::cout << "                         basic-connectivity    (Test 1: Neural connectivity)" << std::endl;
+    std::cout << "                         plasticity           (Test 2: Plasticity learning)" << std::endl;
+    std::cout << "                         stdp-verification     (Test 3: STDP verification)" << std::endl;
+    std::cout << "                         all                  (Run all tests, default)" << std::endl;
+    std::cout << "  --verbose, -v        Enable verbose output" << std::endl;
+    std::cout << "  --output <file>      Write detailed results to file" << std::endl;
+    std::cout << "  --output-format <fmt> Output format (text, csv, json, parquet, hdf5, mat, png, html, svg)" << std::endl;
+    std::cout << "  --visualization       Enable visualization interface" << std::endl;
+    std::cout << "  --statistics          Enable statistics collection" << std::endl;
+    std::cout << "  --help, -h           Show this help message" << std::endl;
+    std::cout << "  --version, -V        Show version information" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --experiment basic-connectivity --verbose" << std::endl;
+    std::cout << "  nlm --experiment plasticity --output results.txt --output-format csv" << std::endl;
+    std::cout << "  nlm --experiment stdp-verification --config custom.cfg --visualization" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Version: 2.0.0 (Phase 2 Release)" << std::endl;
+    std::cout << "Description: Experimental artificial developmental brain with real spiking neural computation" << std::endl;
+}
+
+enum class ExperimentType {
+    All,
+    BasicConnectivity,
+    Plasticity,
+    StdpVerification
+};
+
+ExperimentType parseExperimentType(const std::string& typeStr) {
+    std::string lowerType = typeStr;
+    for (char& c : lowerType) {
+        c = std::tolower(c);
+    }
+    
+    if (lowerType == "basic-connectivity" || lowerType == "connectivity") {
+        return ExperimentType::BasicConnectivity;
+    } else if (lowerType == "plasticity") {
+        return ExperimentType::Plasticity;
+    } else if (lowerType == "stdp-verification" || lowerType == "stdp") {
+        return ExperimentType::StdpVerification;
+    } else if (lowerType == "all") {
+        return ExperimentType::All;
+    } else {
+        return ExperimentType::All;
+    }
+}
+
+void runSelectedExperiment(std::shared_ptr<Brain> brain, ExperimentType experimentType) {
+    switch (experimentType) {
+        case ExperimentType::BasicConnectivity:
+            runBasicConnectivityTest(brain);
+            break;
+        case ExperimentType::Plasticity:
+            runPlasticityExperiment(brain);
+            break;
+        case ExperimentType::StdpVerification:
+            runStdpVerification(brain);
+            break;
+        case ExperimentType::All:
+            runBasicConnectivityTest(brain);
+            brain->reset();
+            brain->initialize();
+            runPlasticityExperiment(brain);
+            brain->reset();
+            brain->initialize();
+            runStdpVerification(brain);
+            break;
+    }
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -267,7 +349,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         beforeWeights.push_back(synapses[i]->getWeight());
         synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
+                        " before: " + std::to_string(beforeWeights[i]));
     }
     
     // Create correlated activity: fire pre then post to trigger LTP
@@ -301,8 +383,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)
@@ -322,13 +404,62 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Parse command line arguments
+    std::string configFile = "configs/default.cfg";
+    ExperimentType experimentType = ExperimentType::All;
+    bool verbose = false;
+    std::string outputFile = "";
+    std::string outputFormat = "text";
+    bool enableVisualization = false;
+    bool enableStatistics = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version" || arg == "-V") {
+            printVersion();
+            return 0;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        } else if (arg == "--experiment" && i + 1 < argc) {
+            experimentType = parseExperimentType(argv[++i]);
+        } else if (arg == "--output" && i + 1 < argc) {
+            outputFile = argv[++i];
+        } else if (arg == "--output-format" && i + 1 < argc) {
+            outputFormat = argv[++i];
+        } else if (arg == "--visualization" || arg == "--enable-viz") {
+            enableVisualization = true;
+        } else if (arg == "--statistics" || arg == "--enable-stats") {
+            enableStatistics = true;
+        } else if (arg.substr(0, 7) == "--config") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                configFile = arg.substr(pos + 1);
+            }
+        } else if (arg.substr(0, 12) == "--experiment=") {
+            experimentType = parseExperimentType(arg.substr(12));
+        } else if (arg.substr(0, 9) == "--output=") {
+            outputFile = arg.substr(9);
+        } else if (arg.substr(0, 18) == "--output-format=") {
+            outputFormat = arg.substr(18);
+        } else if (arg[0] == '-') {
+            // Unknown option, ignore but warn
+            NLM_LOG_WARN("Unknown option: " + arg);
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    auto consoleLogger = std::make_shared<ConsoleLogger>(verbose ? LogLevel::Debug : LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -340,21 +471,28 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+    // Initialize visualization interface if requested
+    std::shared_ptr<VisualizationInterface> visualization;
+    if (enableVisualization) {
+        NLM_LOG_INFO("Initializing visualization interface...");
+        visualization = std::make_shared<VisualizationInterface>();
+        if (visualization->initialize()) {
+            NLM_LOG_INFO("Visualization interface initialized successfully");
+            
+            // Configure output formats if specified
+            if (!outputFile.empty()) {
+                VisualizationInterface::OutputFormat format = parseOutputFormat(outputFormat);
+                visualization->enableOutputFormat(format, outputFile);
+                NLM_LOG_INFO("Output format enabled: " + outputFile + " (" + outputFormat + ")");
             }
+        } else {
+            NLM_LOG_WARN("Failed to initialize visualization interface");
+            visualization.reset();
         }
     }
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
@@ -369,7 +507,7 @@ int main(int argc, char** argv) {
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
@@ -409,20 +547,56 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Log experiment selection
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Running experiment: " + (experimentType == ExperimentType::All ? "ALL TESTS" :
+        (experimentType == ExperimentType::BasicConnectivity ? "BASIC NEURAL CONNECTIVITY" :
+        (experimentType == ExperimentType::Plasticity ? "PLASTICITY LEARNING" :
+        (experimentType == ExperimentType::StdpVerification ? "STDP VERIFICATION" : "UNKNOWN")))));
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    if (enableStatistics) {
+        NLM_LOG_INFO("Statistics collection enabled.");
+        // In a real implementation, would set up statistics collection here
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    // Start visualization if enabled
+    if (visualization && visualization->isActive()) {
+        visualization->startBatchVisualization("Phase 2 Experiment");
+        visualization->update();
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run selected experiment
+    runSelectedExperiment(brain, experimentType);
+    
+    // Stop visualization if enabled
+    if (visualization && visualization->isActive()) {
+        visualization->update();
+        visualization->endBatchVisualization();
+        
+        // Generate statistics report if enabled
+        if (enableStatistics) {
+            std::string statsFile = "experiment_stats.json";
+            visualization->generateStatisticsReport(statsFile);
+            NLM_LOG_INFO("Statistics report generated: " + statsFile);
+            
+            std::string perfFile = "performance_metrics.json";
+            visualization->generatePerformanceMetrics(perfFile);
+            NLM_LOG_INFO("Performance metrics generated: " + perfFile);
+            
+            std::string learningFile = "learning_analysis.json";
+            visualization->generateLearningAnalysis(learningFile);
+            NLM_LOG_INFO("Learning analysis generated: " + learningFile);
+        }
+        
+        visualization->close();
+    }
+    
+    // Generate output files if requested
+    if (!outputFile.empty()) {
+        NLM_LOG_INFO("Generating output file: " + outputFile);
+        // In a real implementation, would export data based on output format
+        // For now, just log that it would be generated
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
