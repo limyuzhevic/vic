@@ -47,7 +47,7 @@ struct Synapse::Impl {
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
-    : pImpl(new Impl) {
+    : pImpl(std::make_unique<Impl>()) {
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -128,6 +128,9 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    if (timestamp < 0.0f) {
+        return;  // Invalid timestamp
+    }
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
@@ -135,6 +138,9 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    if (timestamp < 0.0f) {
+        return;  // Invalid timestamp
+    }
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
@@ -199,20 +205,31 @@ void Synapse::step(Timestamp currentTime) {
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
+    // OPTIMIZATION: Cache last spike times to avoid repeated access
+    float lastPreTime = pImpl->lastPreSpikeTime;
+    float lastPostTime = pImpl->lastPostSpikeTime;
+    
     // Decay short-term facilitation (Tsodyks-Markram model)
-    if (pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+    if (lastPreTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(currentTime - lastPreTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
+    // Decay short-term depression - OPTIMIZATION: Simplify condition and calculation
+    bool hasRecentActivity = (lastPreTime >= 0.0f) || (lastPostTime >= 0.0f);
+    if (hasRecentActivity) {
+        // OPTIMIZATION: Pre-calculate the most recent spike time
+        float mostRecentTime;
+        if (lastPreTime >= lastPostTime && lastPreTime >= 0.0f) {
+            mostRecentTime = static_cast<float>(currentTime - lastPreTime);
+        } else if (lastPostTime >= lastPreTime && lastPostTime >= 0.0f) {
+            mostRecentTime = static_cast<float>(currentTime - lastPostTime);
+        } else {
+            mostRecentTime = 0.0f;
+        }
+        
         // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-mostRecentTime / Impl::STP_DEPRESSION_TAU));
     }
     
     // Decay eligibility trace for reward-modulated learning

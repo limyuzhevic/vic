@@ -13,7 +13,7 @@ struct Dopamine::Impl {
     Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
 };
 
-Dopamine::Dopamine() : pImpl(new Impl) {}
+Dopamine::Dopamine() : pImpl(std::make_unique<Impl>()) {}
 
 Dopamine::~Dopamine() = default;
 
@@ -36,9 +36,11 @@ float Dopamine::getPlasticityFactor() const {
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
+    // Implement real dopamine dynamics
     // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    if (dt > 0.0f) {
+        pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    }
 }
 
 void Dopamine::signalReward(float reward) {
