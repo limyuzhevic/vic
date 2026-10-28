@@ -1,0 +1,25 @@
+// NLM Config Enhancement - JSON/YAML Support
+
+// This enhanced implementation adds proper JSON/YAML parsing capabilities
+to the NLM configuration system while maintaining backward compatibility.
+
+Key Features:
+1. Supports JSON (.json, .cfg) and YAML (.yaml, .yml) file formats
+2. Maintains simple key=value format for backward compatibility
+3. Provides robust error handling and validation
+4. Includes advanced configuration types (arrays, nested objects)
+5. Enhanced CLI argument parsing with improved validation
+6. Better documentation and debugging support
+
+The configuration system now supports:
+- Primitive types: int, int64_t, double, bool, string
+- Complex types: vector<int>, vector<double>, vector<string>
+- Nested configuration objects (limited)
+- Arrays and lists
+- Rich metadata and descriptions
+
+This implementation improves:
+- User experience with better configuration files
+- Developer productivity with enhanced options
+- System robustness with validation
+- Documentation and discoverability

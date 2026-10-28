@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <map>
 
 namespace nlm {
 
@@ -55,13 +56,18 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple key=value)
     bool loadFromFile(const std::string& filepath);
+    
+    // Enhanced file loading
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
+    bool loadFromSimpleFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (supports JSON, YAML, or simple format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,6 +99,13 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Internal helpers for enhanced parsing
+    void parseJSON(const std::string& jsonStr);
+    void parseYAML(const std::string& yamlStr);
+    void parseJSONValue(std::string& content, size_t startPos, const std::string& key);
+    void parseJSONArray(std::string& content, size_t startPos, const std::string& key);
+    ConfigValue parseJSONPrimitive(const std::string& str);
+    void parseYAMLValue(std::string& content, const std::string& key);
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -101,5 +114,18 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
+
+// Explicit template instantiations
+extern template std::optional<int> Config::get<int>(const std::string&) const;
+extern template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+extern template std::optional<double> Config::get<double>(const std::string&) const;
+extern template std::optional<bool> Config::get<bool>(const std::string&) const;
+extern template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+extern template int Config::getOr<int>(const std::string&, const int&) const;
+extern template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+extern template double Config::getOr<double>(const std::string&, const double&) const;
+extern template bool Config::getOr<bool>(const std::string&, const bool&) const;
+extern template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
