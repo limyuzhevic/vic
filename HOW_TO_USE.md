@@ -256,129 +256,334 @@ def run_agent_simulation(num_steps=1000):
 run_agent_simulation(1000)
 ```
 
-### Key Classes and Methods
+### Python Binding Enhancements
 
-#### Brain Class
+Since Phase 6, the NLM project has added comprehensive Python bindings with support for all Phase 6 systems. Here are the Python-specific features:
 
+#### New Python API Features
+
+**1. Convenience Constructors for Different Brain Types**
 ```python
-# Creation
-brain = pynlm.createBrain(config)
+import pynlm
 
-# Initialization
+# Research brain - optimized for studying learning dynamics
+brain = pynlm.createResearchBrain(neuron_count=5000, learning_rate=0.001)
 brain.initialize()
 
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
+# Development brain - with developmental plasticity
+brain = pynlm.createDevelopmentBrain(1000, enable_development=True)
+brain.initialize()
 
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
+# Performance brain - optimized for speed testing
+brain = pynlm.createPerformanceBrain(2000, optimized_for_speed=True)
+brain.initialize()
 
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
+# Simple brain - basic configuration for quick testing
+brain = pynlm.createSimpleBrain(100)
+brain.initialize()
 ```
 
-#### Config Class
-
+**2. Configuration Presets**
 ```python
-# Create
-config = pynlm.createDefaultConfig()
+# Research configuration
+research_config = pynlm.createResearchConfig()
 
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
+# Development configuration  
+dev_config = pynlm.createDevelopmentConfig()
 
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
+# Performance configuration
+perf_config = pynlm.createPerformanceConfig()
 
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
+# Simple configuration
+simple_config = pynlm.createSimpleConfig()
 ```
 
-#### AgentBrain Class
-
+**3. Batch Operations**
 ```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
+# Process multiple sensory inputs at once
+percepts = [world.getSensoryPercept() for _ in range(10)]
+pynlm.receiveSensoryInputs(brain, percepts)
 
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+# Process batch with timing
+percepts = [world.getSensoryPercept() for _ in range(5)]
+timestamps = [t * 0.001 for t in range(5)]
+pynlm.receiveSensoryInputs(brain, percepts, timestamps)
 ```
 
-#### SimpleWorld Class
-
+**4. Performance Monitoring**
 ```python
-# Creation
-world = pynlm.createSimpleWorld()
+# Detailed benchmarking
+result = pynlm.benchmark(brain, num_steps=1000, detailed=True)
+print(f"Steps completed: {result.stepsCompleted}")
+print(f"Average firing rate: {result.averageFiringRate:.2f} Hz")
+print(f"Total time: {result.totalTime:.3f}s")
 
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+# Get memory usage
+usage = pynlm.getMemoryUsage(brain)
+print(f"Memory utilization: {usage.memoryUtilization:.2%}")
+print(f"Working memory capacity: {usage.workingMemoryCapacity} traces")
+print(f"Episodic memory episodes: {usage.episodicMemoryCount}")
+```
 
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
+**5. Phase 6 System Access**
+```python
+# Memory systems access
+working_memory = brain.getBrainWorkingMemory()
+working_memory.store([0.1, 0.2, 0.3, 0.4])
+memory_activity = working_memory.getMemoryActivity()
 
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
+# Prediction system access
+prediction = brain.getBrainPredictionSystem()
+if prediction:
+    error = prediction.getPredictionError()
+    confidence = prediction.getPredictionConfidence()
 
-# State access
+# Cognition systems access
+planner = brain.getBrainPlanner()
+if planner:
+    action = planner.planAction([0.1, 0.2, 0.3], 0.5)
+
+attention = brain.getBrainAttentionalSelection()
+if attention:
+    winners = attention.processCompetition([1, 2, 3, 4, 5])
+
+# Neuromodulation systems access
+curiosity = brain.getBrainCuriosity()
+if curiosity:
+    level = curiosity.getCuriosityLevel()
+
+novelty = brain.getBrainNovelty()
+if novelty:
+    test_input = pynlm.Vision(8, 8)
+    novelty_level = novelty.computeNovelty(test_input)
+```
+
+**6. Simulation Utilities**
+```python
+# Run simulation for fixed number of steps
+pynlm.runForSteps(brain, num_steps=100, log_progress=True)
+
+# Run until condition is met
+def stop_condition(brain):
+    return brain.getTotalSpikeCount() > 1000
+
+pynlm.runUntil(brain, stop_condition, max_steps=10000, log_progress=True)
+
+# Save checkpoint with backup
+pynlm.saveCheckpoint(brain, "brain_state.json", create_backup=True)
+```
+
+**7. Validation and Error Checking**
+```python
+# Validate sensory input before processing
 percept = world.getSensoryPercept()
-body = world.getAgentBody()
+if pynlm.validateSensoryInput(brain, percept):
+    agent.processSensoryInput(percept)
 
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
+# Validate configuration
+is_valid, errors = pynlm.validateConfig(config)
+if not is_valid:
+    print("Configuration errors:", errors)
+```
 
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
+**8. Random Number Generation**
+```python
+import pynlm
+
+# Create random generator with specific seed
+rng = pynlm.RandomGenerator(42)
+print(f"Seed: {rng.getSeed()}")
+
+# Generate random values
+float_val = rng.randomFloat()
+int_val = rng.randomInt(1, 10)
+normal_val = rng.randomNormal(0.0, 1.0)
+bool_val = rng.randomBool(0.7)
+```
+
+### Complete Python Example - Agent Simulation with Phase 6 Systems
+
+This example demonstrates using the enhanced Python API with all Phase 6 systems:
+
+```python
+import pynlm
+
+def run_complete_agent_simulation():
+    # 1. Create configuration and brain
+    config = pynlm.createDevelopmentConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # 2. Create world and agent
+    world = pynlm.createSimpleWorld()
+    world.configure(20, 20, 8, 8)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # 3. Enable Phase 6 systems
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    # 4. Get system references for monitoring
+    working_memory = brain.getBrainWorkingMemory()
+    planner = brain.getBrainPlanner()
+    curiosity = brain.getBrainCuriosity()
+    
+    # 5. Main simulation loop
+    for step in range(1000):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process sensory input
+        agent.processSensoryInput(percept)
+        
+        # Store experience in working memory
+        working_memory.store([percept.getVisionWidth(), percept.getVisionHeight()])
+        
+        # Brain processes
+        brain.step(step)
+        
+        # Decode action
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Apply reward modulation
+        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+        agent.applyRewardModulation(reward, 0.0)
+        
+        # Update development
+        agent.updateDevelopment(0.1)
+        
+        # Log progress periodically
+        if step % 100 == 0:
+            print(f"Step {step}:")
+            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+            print(f"  Curiosity: {curiosity.getCuriosityLevel():.3f}")
+            print(f"  Memory activity: {working_memory.getMemoryActivity():.3f}")
+            if planner:
+                print(f"  Planning confidence: {planner.getPlanningConfidence():.3f}")
+    
+    print("\nSimulation complete!")
+    print(f"Final spike count: {brain.getTotalSpikeCount()}")
+    print(f"Final firing rate: {brain.getAverageFiringRate():.2f} Hz")
+
+# Run the simulation
+run_complete_agent_simulation()
+```
+
+### Performance Monitoring Example
+
+```python
+import pynlm
+import time
+
+def benchmark_brain_performance():
+    # Create different brain types for comparison
+    brains = {
+        "simple": pynlm.createSimpleBrain(100),
+        "research": pynlm.createResearchBrain(1000, 0.001),
+        "development": pynlm.createDevelopmentBrain(500, True),
+        "performance": pynlm.createPerformanceBrain(2000, True),
+    }
+    
+    results = {}
+    
+    for name, brain in brains.items():
+        print(f"Benchmarking {name} brain...")
+        brain.initialize()
+        
+        start_time = time.time()
+        result = pynlm.benchmark(brain, 500, True)
+        end_time = time.time()
+        
+        results[name] = {
+            "benchmark": result,
+            "wall_time": end_time - start_time,
+            "speedup": result.totalTime / (end_time - start_time) if (end_time - start_time) > 0 else 0
+        }
+        
+        print(f"  Steps: {result.stepsCompleted}")
+        print(f"  Total spikes: {result.totalSpikes}")
+        print(f"  Average firing rate: {result.averageFiringRate:.2f} Hz")
+        print(f"  Execution time: {result.totalTime:.3f}s")
+    
+    print("\nPerformance Comparison:")
+    for name, result in results.items():
+        print(f"{name:12s}: {result['benchmark'].averageFiringRate:8.2f} Hz/s, "
+              f"{result['benchmark'].totalTime:6.3f}s total")
+
+benchmark_brain_performance()
+```
+
+### Error Handling and Validation Example
+
+```python
+import pynlm
+
+def robust_simulation_example():
+    # Create configuration
+    config = pynlm.createResearchConfig()
+    
+    # Validate configuration
+    is_valid, errors = pynlm.validateConfig(config)
+    if not is_valid:
+        print("Configuration errors found:")
+        for error in errors:
+            print(f"  - {error}")
+        return False
+    
+    # Create brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create world
+    world = pynlm.createSimpleWorld()
+    world.configure(10, 10, 4, 4)
+    world.reset()
+    
+    # Create agent
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Main simulation loop with error checking
+    for step in range(100):
+        # Update world
+        world.update(0.1)
+        
+        # Get and validate sensory input
+        percept = world.getSensoryPercept()
+        if not pynlm.validateSensoryInput(brain, percept):
+            print(f"Warning: Invalid sensory input at step {step}")
+            continue
+        
+        # Process input
+        agent.processSensoryInput(percept)
+        
+        # Step brain
+        brain.step(step)
+        
+        # Check for emergency conditions
+        if brain.getTotalSpikeCount() > 10000:
+            print(f"Emergency shutdown at step {step}: spike count too high")
+            break
+        
+        # Save checkpoint periodically
+        if step % 50 == 0:
+            success = pynlm.saveCheckpoint(brain, f"checkpoint_step_{step}.bin", create_backup=False)
+            if success:
+                print(f"Checkpoint saved at step {step}")
+            else:
+                print(f"Warning: Failed to save checkpoint at step {step}")
+    
+    print("Robust simulation completed successfully")
+    return True
+
+robust_simulation_example()
 ```
 
 ### Enumerations
