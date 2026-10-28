@@ -25,6 +25,44 @@ PYBIND11_MODULE(pynlm, m) {
         ---------------------------------------------
         A Python binding for the NLM C++ neural simulation framework.
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+
+        Advanced Features:
+        - Neural network introspection and analysis
+        - Agent brain scripting and customization
+        - Performance monitoring and benchmarking
+        - Developmental stage tracking
+        - Neuromodulation control
+        - Memory system analysis
+
+        Example Usage:
+        ```python
+        import pynlm
+
+        # Create a brain with custom configuration
+        config = pynlm.createDefaultConfig()
+        config.set("neuron_count", 1000)
+        config.set("region_count", 2)
+
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+
+        # Create an agent brain for world interaction
+        agent = pynlm.createAgentBrain(brain)
+        agent.initialize(world)
+
+        # Run simulation with advanced features
+        for step in range(1000):
+            percept = world.getSensoryPercept()
+            agent.processSensoryInput(percept)
+            brain.step(step, step * 0.001)
+            action = agent.decodeMotorCommand()
+            # ... apply action
+
+        # Analyze learning and development
+        print(f"Final developmental stage: {agent.getDevelopmentalStage()}")
+        print(f"Neuromodulation level: {agent.getNeuromodulationLevel()}")
+        print(f"Curiosity level: {agent.getCuriosityLevel()}")
+        ```
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
@@ -398,7 +436,169 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Helper functions for common operations
+        .def("initializeRandomSeed", [](AgentBrain& self, uint64_t seed) {
+            if (self.getBrain() && self.getBrain()->getRandomGenerator()) {
+                self.getBrain()->getRandomGenerator()->seed(seed);
+            }
+        }, py::arg("seed"), "Initialize random seed for reproducible simulations")
+        .def("setSimulationParameters", [](AgentBrain& self, uint64_t neuronCount, double timestep) {
+            // Update brain configuration
+            if (self.getBrain() && self.getBrain()->getConfig()) {
+                self.getBrain()->getConfig()->set("neuron_count", static_cast<int64_t>(neuronCount));
+                self.getBrain()->getConfig()->set("simulation_timestep", timestep);
+            }
+        }, py::arg("neuronCount"), py::arg("timestep"), "Set simulation parameters")
+        .def("getSimulationParameters", [](const AgentBrain& self) -> std::string {
+            std::stringstream ss;
+            if (self.getBrain() && self.getBrain()->getConfig()) {
+                auto& config = self.getBrain()->getConfig();
+                ss << "Simulation Parameters:\n";
+                ss << "  Neuron Count: " << config->getOr<int64_t>("neuron_count", 0) << "\n";
+                ss << "  Timestep: " << config->getOr<double>("simulation_timestep", 0.001) << "s\n";
+                ss << "  Region Count: " << config->getOr<int64_t>("region_count", 1) << "\n";
+                ss << "  Connection Probability: " << config->getOr<float>("connection_probability", 0.0f) << "\n";
+            }
+            return ss.str();
+        }, "Get current simulation parameters")
+        .def("createAgentPercept", [](const AgentBrain& self, size_t width, size_t height) -> SensoryPercept {
+            SensoryPercept percept;
+            
+            // Create simple vision data
+            std::vector<float> visionData(width * height, 0.5f);
+            percept.setVision(visionData);
+            
+            // Create touch data
+            std::vector<float> touchData(8, 0.0f);
+            percept.setTouch(touchData);
+            
+            // Create internal signals
+            std::vector<float> internalData(4, 0.0f);
+            percept.setInternal(internalData);
+            
+            // Create proprioception
+            std::vector<float> proprioData(6, 0.0f);
+            for (size_t i = 0; i < proprioData.size(); ++i) {
+                proprioData[i] = (static_cast<float>(i) / proprioData.size() * 2.0f) - 1.0f;
+            }
+            percept.setProprioception(proprioData);
+            
+            return percept;
+        }, py::arg("width"), py::arg("height"), "Create a default sensory percept for testing")
+        .def("createAgentAction", [](AgentBrain& self, ActionType type, std::vector<float> parameters = std::vector<float>()) -> Action {
+            Action action(type, parameters);
+            
+            // If no parameters provided, set reasonable defaults based on action type
+            if (parameters.empty()) {
+                switch (type) {
+                    case ActionType::MoveForward:
+                        parameters = {1.0f, 0.0f, 0.0f};  // forward vector
+                        break;
+                    case ActionType::MoveLeft:
+                        parameters = {0.0f, 1.0f, 0.0f};  // left vector
+                        break;
+                    case ActionType::MoveRight:
+                        parameters = {0.0f, -1.0f, 0.0f};  // right vector
+                        break;
+                    case ActionType::MoveBackward:
+                        parameters = {-1.0f, 0.0f, 0.0f};  // backward vector
+                        break;
+                    case ActionType::TurnLeft:
+                        parameters = {0.0f, 0.0f, 1.0f};  // rotate up
+                        break;
+                    case ActionType::TurnRight:
+                        parameters = {0.0f, 0.0f, -1.0f};  // rotate down
+                        break;
+                    case ActionType::Interact:
+                        parameters = {0.0f, 0.0f, 0.0f};  // position for interaction
+                        break;
+                    case ActionType::Look:
+                        parameters = {0.0f, 0.0f, 0.0f};  // look direction
+                        break;
+                    case ActionType::LookUp:
+                        parameters = {0.0f, 1.0f, 0.0f};  // look up
+                        break;
+                    case ActionType::LookDown:
+                        parameters = {0.0f, -1.0f, 0.0f};  // look down
+                        break;
+                    case ActionType::Eat:
+                        parameters = {0.0f, 0.0f, 0.0f};  // food position
+                        break;
+                    case ActionType::Drink:
+                        parameters = {0.0f, 0.0f, 0.0f};  // water position
+                        break;
+                    case ActionType::Rest:
+                        parameters = {0.0f, 0.0f, 0.0f};  // rest duration
+                        break;
+                    case ActionType::Wait:
+                        parameters = {0.0f};  // wait time
+                        break;
+                    case ActionType::Custom:
+                        parameters = {0.0f, 0.0f, 0.0f};  // custom parameters
+                        break;
+                }
+            }
+            
+            action.setParameters(parameters);
+            return action;
+        }, py::arg("type"), py::arg("parameters") = std::vector<float>(), "Create a motor action with specified type and parameters")
+        .def("getActionName", [](ActionType type) -> std::string {
+            switch (type) {
+                case ActionType::MoveForward: return "MoveForward";
+                case ActionType::MoveBackward: return "MoveBackward";
+                case ActionType::MoveLeft: return "MoveLeft";
+                case ActionType::MoveRight: return "MoveRight";
+                case ActionType::TurnLeft: return "TurnLeft";
+                case ActionType::TurnRight: return "TurnRight";
+                case ActionType::Look: return "Look";
+                case ActionType::LookUp: return "LookUp";
+                case ActionType::LookDown: return "LookDown";
+                case ActionType::Interact: return "Interact";
+                case ActionType::Eat: return "Eat";
+                case ActionType::Drink: return "Drink";
+                case ActionType::Rest: return "Rest";
+                case ActionType::Wait: return "Wait";
+                case ActionType::Custom: return "Custom";
+                default: return "Unknown";
+            }
+        }, py::arg("type"), "Get human-readable name for action type")
+        .def("getNeuronTypeName", [](NeuronType type) -> std::string {
+            switch (type) {
+                case NeuronType::Excitatory: return "Excitatory";
+                case NeuronType::Inhibitory: return "Inhibitory";
+                case NeuronType::Modulatory: return "Modulatory";
+                case NeuronType::Sensory: return "Sensory";
+                case NeuronType::Motor: return "Motor";
+                case NeuronType::Internal: return "Internal";
+                default: return "Unknown";
+            }
+        }, py::arg("type"), "Get human-readable name for neuron type")
+        .def("generateRandomAction", [](AgentBrain& self) -> ActionType {
+            if (self.getBrain() && self.getBrain()->getRandomGenerator()) {
+                int choice = self.getBrain()->getRandomGenerator()->uniformInt(0, 7);
+                switch (choice) {
+                    case 0: return ActionType::MoveForward;
+                    case 1: return ActionType::MoveBackward;
+                    case 2: return ActionType::MoveLeft;
+                    case 3: return ActionType::MoveRight;
+                    case 4: return ActionType::TurnLeft;
+                    case 5: return ActionType::TurnRight;
+                    case 6: return ActionType::Interact;
+                    default: return ActionType::Wait;
+                }
+            }
+            return ActionType::Wait;
+        }, "Generate a random action for exploration")
+        .def("getAvailableActionTypes", []() -> std::vector<ActionType> {
+            return std::vector<ActionType>{
+                ActionType::MoveForward, ActionType::MoveBackward, ActionType::MoveLeft, ActionType::MoveRight,
+                ActionType::TurnLeft, ActionType::TurnRight, ActionType::Look, ActionType::LookUp, ActionType::LookDown,
+                ActionType::Interact, ActionType::Eat, ActionType::Drink, ActionType::Rest, ActionType::Wait,
+                ActionType::Custom
+            };
+        }, "Get list of all available action types");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

@@ -324,7 +324,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation..." << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -340,8 +340,40 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
+    // Enhanced logging levels
+    enum class LogLevel {
+        Silent = 0,
+        Error = 1,
+        Warning = 2,
+        Info = 3,
+        Debug = 4,
+        Trace = 5
+    };
+
+    // Enhanced command-line argument parser
+    struct CommandLineOptions {
+        std::string configFile = "configs/default.cfg";
+        LogLevel logLevel = LogLevel::Info;
+        uint64_t randomSeed = 42;
+        int64_t neuronCount = 500;
+        int64_t regionCount = 1;
+        float connectionProbability = 0.15f;
+        double simulationTimestep = 0.001;
+        uint64_t simulationSteps = 1000;
+        bool enableVerbose = false;
+        bool enableProgressReporting = true;
+        bool enableReproducibleMode = true;
+        std::string outputFile = "";
+        std::string checkpointFile = "";
+        bool enableCheckpointing = false;
+        bool enableReplay = false;
+        std::string experimentType = "basic";
+        bool enableVisualization = false;
+        std::string visualizationPort = "8080";
+        uint32_t maxMemoryMB = 512;
+        uint32_t threadCount = 4;
+        std::string logFile = "nlm_simulation.log";
+    };
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";

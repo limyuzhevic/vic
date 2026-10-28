@@ -69,7 +69,181 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Scripting system for custom neural behaviors
+    struct ScriptCommand {
+        enum Type {
+            SET_PARAMETER,
+            SET_NEURON_TYPE,
+            SET_SYNAPSE_WEIGHT,
+            ENABLE_PLASTICITY,
+            DISABLE_PLASTICITY,
+            SET_DEVELOPMENT_STAGE,
+            SET_NEUROMODULATION,
+            SET_CURIOCITY,
+            SET_NOVELTY,
+            SET_PREDICTION_ERROR,
+            SET_REWARD_FUNCTION,
+            SET_LEARNING_RATE,
+            ADD_EVENT_HANDLER,
+            REMOVE_EVENT_HANDLER,
+            EXECUTE_SCRIPT,
+            JUMP_IF_TRUE,
+            JUMP_IF_FALSE,
+            CALL_FUNCTION,
+            RETURN,
+            COMMENT
+        };
+        
+        Type type;
+        std::string target;
+        std::string value;
+        std::string condition;
+        std::string script;
+        
+        ScriptCommand(Type t, const std::string& tgt, const std::string& val = "")
+            : type(t), target(tgt), value(val), condition(""), script("") {}
+        
+        ScriptCommand(Type t, const std::string& tgt, const std::string& val, const std::string& cond)
+            : type(t), target(tgt), value(val), condition(cond), script("") {}
+    };
+    
+    // Script interpreter for neural network behaviors
+    class ScriptEngine {
+    public:
+        ScriptEngine();
+        ~ScriptEngine();
+        
+        // Load script from file
+        bool loadScript(const std::string& filename);
+        
+        // Execute script with parameters
+        bool execute(const std::string& scriptName, const std::vector<std::string>& parameters);
+        
+        // Execute script from string
+        bool executeString(const std::string& script);
+        
+        // Add script command
+        void addCommand(const ScriptCommand& cmd);
+        
+        // Get script variable
+        std::string getVariable(const std::string& name) const;
+        
+        // Set script variable
+        void setVariable(const std::string& name, const std::string& value);
+        
+        // Get list of available scripts
+        std::vector<std::string> getAvailableScripts() const;
+        
+        // Get script documentation
+        std::string getScriptDocumentation(const std::string& name) const;
+        
+        // Check if script exists
+        bool hasScript(const std::string& name) const;
+        
+        // Get execution count for script
+        uint64_t getExecutionCount(const std::string& name) const;
+        
+        // Reset execution counts
+        void resetExecutionCounts();
+        
+        // Enable/disable scripting
+        void enableScripting(bool enable) { enabled_ = enable; }
+        bool isScriptingEnabled() const { return enabled_; }
+        
+        // Enable/disable debug mode
+        void setDebugMode(bool debug) { debugMode_ = debug; }
+        bool isDebugMode() const { return debugMode_; }
+        
+        // Get script status
+        std::string getStatus() const;
+        
+    private:
+        struct Script {
+            std::string name;
+            std::string description;
+            std::vector<ScriptCommand> commands;
+            std::string documentation;
+            uint64_t executionCount;
+            
+            Script(const std::string& n, const std::string& desc, const std::string& doc)
+                : name(n), description(desc), documentation(doc), executionCount(0) {}
+        };
+        
+        std::vector<Script> scripts_;
+        std::unordered_map<std::string, std::string> variables_;
+        bool enabled_;
+        bool debugMode_;
+        std::vector<std::string> callStack_;
+        
+        // Execute single command
+        bool executeCommand(const ScriptCommand& cmd);
+        
+        // Parse script line
+        ScriptCommand parseCommand(const std::string& line);
+        
+        // Get variable value as float
+        float getFloatVariable(const std::string& name, float defaultValue = 0.0f) const;
+        
+        // Get variable value as int
+        int getIntVariable(const std::string& name, int defaultValue = 0) const;
+        
+        // Get variable value as bool
+        bool getBoolVariable(const std::string& name, bool defaultValue = false) const;
+        
+        // Check condition
+        bool evaluateCondition(const std::string& condition);
+    };
+    
+    // Access to script engine
+    ScriptEngine& getScriptEngine() { return scriptEngine_; }
+    const ScriptEngine& getScriptEngine() const { return scriptEngine_; }
+    
+    // Enable/disable scripting
+    void enableScripting(bool enable) { scriptEngine_.enableScripting(enable); }
+    bool isScriptingEnabled() const { return scriptEngine_.isScriptingEnabled(); }
+    
+    // Execute script
+    bool executeScript(const std::string& scriptName, const std::vector<std::string>& parameters = std::vector<std::string>());
+    
+    // Add script command
+    void addScriptCommand(const ScriptCommand& cmd) { scriptEngine_.addCommand(cmd); }
+    
+    // Get script variable
+    std::string getScriptVariable(const std::string& name) const { return scriptEngine_.getVariable(name); }
+    
+    // Set script variable
+    void setScriptVariable(const std::string& name, const std::string& value) { scriptEngine_.setVariable(name, value); }
+    
+    // Get available scripts
+    std::vector<std::string> getAvailableScripts() const { return scriptEngine_.getAvailableScripts(); }
+    
+    // Get script documentation
+    std::string getScriptDocumentation(const std::string& name) const { return scriptEngine_.getScriptDocumentation(name); }
+    
+    // Check if script exists
+    bool hasScript(const std::string& name) const { return scriptEngine_.hasScript(name); }
+    
+    // Load scripts from directory
+    bool loadScriptsFromDirectory(const std::string& directory);
+    
+    // Save current script state
+    void saveScriptState(const std::string& filename);
+    
+    // Load script state from file
+    bool loadScriptState(const std::string& filename);
+    
+    // Get script execution status
+    std::string getScriptStatus() const { return scriptEngine_.getStatus(); }
+    
+    // Reset all scripts
+    void resetAllScripts() { scriptEngine_.resetExecutionCounts(); }
+    
+    // Enable debug mode
+    void setScriptDebugMode(bool debug) { scriptEngine_.setDebugMode(debug); }
+    
 private:
+    ScriptEngine scriptEngine_;  // Script interpreter for neural behaviors
+
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
@@ -113,5 +287,3 @@ private:
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
 };
-
-} // namespace nlm
