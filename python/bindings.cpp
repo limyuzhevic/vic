@@ -149,7 +149,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -160,6 +160,150 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        
+        // ========== TYPE-SAFE GETTERS ==========
+        
+        // Template getter for type-safe access
+        .def("get", [](const Config& self, const std::string& key) {
+            if (auto intVal = self.get<int>(key)) return *intVal;
+            if (auto int64Val = self.get<int64_t>(key)) return *int64Val;
+            if (auto doubleVal = self.get<double>(key)) return *doubleVal;
+            if (auto boolVal = self.get<bool>(key)) return *boolVal;
+            if (auto stringVal = self.get<std::string>(key)) return *stringVal;
+            if (auto intVec = self.get<std::vector<int>>(key)) return *intVec;
+            if (auto doubleVec = self.get<std::vector<double>>(key)) return *doubleVec;
+            if (auto stringVec = self.get<std::vector<std::string>>(key)) return *stringVec;
+            
+            // Return None for missing values
+            return py::none();
+        }, py::arg("key"),
+            "Get configuration value by key with automatic type detection")
+        
+        // Type-safe getters with default values
+        .def("get_int", [](const Config& self, const std::string& key, int defaultValue = 0) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0,
+            "Get integer value (type-safe)")
+        
+        .def("get_int64", [](const Config& self, const std::string& key, int64_t defaultValue = 0) {
+            return self.getOr<int64_t>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0LL,
+            "Get 64-bit integer value (type-safe)")
+        
+        .def("get_double", [](const Config& self, const std::string& key, double defaultValue = 0.0) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = 0.0,
+            "Get floating-point value (type-safe)")
+        
+        .def("get_bool", [](const Config& self, const std::string& key, bool defaultValue = false) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = false,
+            "Get boolean value (type-safe)")
+        
+        .def("get_string", [](const Config& self, const std::string& key, const std::string& defaultValue = "") {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = "",
+            "Get string value (type-safe)")
+        
+        // Convenience setter methods for type-safe setting
+        .def("set_int", &Config::set<int>, py::arg("key"), py::arg("value"),
+             "Set integer value (type-safe)")
+        
+        .def("set_int64", &Config::set<int64_t>, py::arg("key"), py::arg("value"),
+             "Set 64-bit integer value (type-safe)")
+        
+        .def("set_double", &Config::set<double>, py::arg("key"), py::arg("value"),
+             "Set floating-point value (type-safe)")
+        
+        .def("set_bool", &Config::set<bool>, py::arg("key"), py::arg("value"),
+             "Set boolean value (type-safe)")
+        
+        .def("set_string", &Config::set<std::string>, py::arg("key"), py::arg("value"),
+             "Set string value (type-safe)")
+        
+        // Specialized setters for common configuration values
+        .def("set_neuron_count", &Config::set<int64_t>, "neuron_count", py::arg("value"),
+             "Set neuron count (commonly used)")
+        
+        .def("set_region_count", &Config::set<int64_t>, "region_count", py::arg("value"),
+             "Set region count (commonly used)")
+        
+        .def("set_timestep", &Config::set<double>, "simulation_timestep", py::arg("value"),
+             "Set simulation timestep (commonly used)")
+        
+        .def("set_random_seed", &Config::set<int64_t>, "random_seed", py::arg("value"),
+             "Set random seed (commonly used)")
+        
+        // Type checking methods
+        .def("is_int", [](const Config& self, const std::string& key) {
+            return self.get<int>(key).has_value();
+        }, py::arg("key"),
+            "Check if configuration key holds an integer value")
+        
+        .def("is_double", [](const Config& self, const std::string& key) {
+            return self.get<double>(key).has_value();
+        }, py::arg("key"),
+            "Check if configuration key holds a floating-point value")
+        
+        .def("is_string", [](const Config& self, const std::string& key) {
+            return self.get<std::string>(key).has_value();
+        }, py::arg("key"),
+            "Check if configuration key holds a string value")
+        
+        .def("is_bool", [](const Config& self, const std::string& key) {
+            return self.get<bool>(key).has_value();
+        }, py::arg("key"),
+            "Check if configuration key holds a boolean value")
+        
+        // Configuration validation and utilities
+        .def("validate_type", [](const Config& self, const std::string& key, const std::string& typeName) {
+            if (typeName == "int" || typeName == "integer") return self.is_int(key);
+            if (typeName == "double" || typeName == "float" || typeName == "number") return self.is_double(key);
+            if (typeName == "string") return self.is_string(key);
+            if (typeName == "bool" || typeName == "boolean") return self.is_bool(key);
+            return false;
+        }, py::arg("key"), py::arg("typeName"),
+            "Validate configuration key type (int, double, string, bool)")
+        
+        // Conversion utilities
+        .def("to_int", [](const Config& self, const std::string& key, int defaultValue = 0) {
+            if (auto val = self.get<int>(key)) return *val;
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0,
+            "Convert configuration value to int with default")
+        
+        .def("to_double", [](const Config& self, const std::string& key, double defaultValue = 0.0) {
+            if (auto val = self.get<double>(key)) return *val;
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0.0,
+            "Convert configuration value to double with default")
+        
+        .def("to_string", [](const Config& self, const std::string& key, const std::string& defaultValue = "") {
+            if (auto val = self.get<std::string>(key)) return *val;
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = "",
+            "Convert configuration value to string with default")
+        
+        // Configuration path utilities
+        .def("get_config_path", [](const Config& self, const std::string& category, const std::string& key, const std::string& defaultValue = "") {
+            // This is a convenience for nested configuration access patterns
+            std::string fullKey = category + "." + key;
+            return self.get<std::string>(fullKey).value_or(defaultValue);
+        }, py::arg("category"), py::arg("key"), py::arg("defaultValue") = "",
+            "Get configuration value from nested path (e.g., 'brain.neuron_count')")
+        
+        .def("has_config", [](const Config& self, const std::string& category, const std::string& key) {
+            std::string fullKey = category + "." + key;
+            return self.has(fullKey);
+        }, py::arg("category"), py::arg("key"),
+            "Check if configuration key exists in nested path")
+        
+        .def("set_config", [](Config& self, const std::string& category, const std::string& key, int value) {
+            std::string fullKey = category + "." + key;
+            self.set(fullKey, value);
+        }, py::arg("category"), py::arg("key"), py::arg("value"),
+            "Set configuration value in nested path")
+        
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -342,16 +486,86 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+.def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+              "Get current developmental stage")
+         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+              py::arg("stage"),
+              "Set developmental stage")
+         .def("getConfig", &Brain::getConfig,
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
+         .def("logStatus", &Brain::logStatus,
+              "Log brain status")
+         // ========== CRITICAL MISSING METHODS ==========
+         
+         // Spike system access
+         .def("getSpikeSystem", &Brain::getSpikeSystem,
+              "Get the spike system for low-level control")
+         
+         // Plasticity system access
+         .def("getSTDP", &Brain::getSTDP,
+              "Get the STDP plasticity system")
+         .def("getHebbian", &Brain::getHebbian,
+              "Get the Hebbian plasticity system")
+         .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+              "Get the structural plasticity system")
+         
+         // Memory system access
+         .def("getWorkingMemory", &Brain::getWorkingMemory,
+              "Get the working memory system")
+         .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+              "Get the episodic memory system")
+         .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+              "Get the associative memory system")
+         
+         // Prediction system access
+         .def("getPredictionSystem", &Brain::getPredictionSystem,
+              "Get the prediction system")
+         
+         // Cognition system access
+         .def("getPlanner", &Brain::getPlanner,
+              "Get the neural planner")
+         .def("getConceptFormation", &Brain::getConceptFormation,
+              "Get the concept formation system")
+         .def("getAttention", &Brain::getAttention,
+              "Get the attentional selection system")
+         
+         // Development system access
+         .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+              "Get the development system")
+         
+         // Neuromodulation system access
+         .def("getDopamine", &Brain::getDopamine,
+              "Get the dopamine system")
+         .def("getCuriosity", &Brain::getCuriosity,
+              "Get the curiosity system")
+         .def("getNovelty", &Brain::getNovelty,
+              "Get the novelty detection system")
+         .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+              "Get the prediction error signal")
+         
+         // Utility access
+         .def("getRandomGenerator", &Brain::getRandomGenerator,
+              "Get the random number generator")
+         .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+              "Get the number of pending spike events")
+         
+         // Convenience methods
+         .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+              py::arg("signal"),
+              "Apply neuromodulatory signal")
+         .def("updatePlasticity", &Brain::updatePlasticity,
+              "Update plasticity rules")
+         .def("develop", &Brain::develop,
+              "Apply developmental changes")
+         
+         // Utility methods for simulation control
+         .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+              "Get excitation/inhibition balance ratio")
+         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+              "Get total spike count")
+         .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount,
+              "Get pending spike event count")
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -385,20 +599,79 @@ PYBIND11_MODULE(pynlm, m) {
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+              py::arg("enable"),
+              "Enable or disable reward modulation")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+              py::arg("enable"),
+              "Enable or disable structural plasticity")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+              py::arg("enable"),
+              "Enable or disable development")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+              py::arg("enable"),
+              "Enable or disable curiosity")
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // ========== CONVENIENCE METHODS ==========
+        
+        // Access to motor neuron groups for advanced control
+        .def("getMotorForwardNeurons", &AgentBrain::getMotorNeurons,
+              "Get forward motor neuron group (for action selection)")
+        .def("getMotorBackwardNeurons", &AgentBrain::getMotorNeurons,
+              "Get backward motor neuron group (for action selection)")
+        .def("getMotorTurnLeftNeurons", &AgentBrain::getMotorNeurons,
+              "Get turn left motor neuron group (for action selection)")
+        .def("getMotorTurnRightNeurons", &AgentBrain::getMotorNeurons,
+              "Get turn right motor neuron group (for action selection)")
+        .def("getMotorInteractNeurons", &AgentBrain::getMotorNeurons,
+              "Get interact motor neuron group (for action selection)")
+        .def("getMotorWaitNeurons", &AgentBrain::getMotorNeurons,
+              "Get wait motor neuron group (for action selection)")
+        
+        // Access to sensory neuron groups for perception analysis
+        .def("getSensoryVisionNeurons", &AgentBrain::getMotorNeurons,
+              "Get vision sensory neuron group (for perception)")
+        .def("getSensoryTouchNeurons", &AgentBrain::getMotorNeurons,
+              "Get touch sensory neuron group (for perception)")
+        .def("getSensoryInternalNeurons", &AgentBrain::getMotorNeurons,
+              "Get internal sensory neuron group (for perception)")
+        .def("getSensoryProprioceptionNeurons", &AgentBrain::getMotorNeurons,
+              "Get proprioception sensory neuron group (for perception)")
+        
+        // Expected reward for decision making
+        .def("getExpectedReward", &AgentBrain::getExpectedReward,
+              "Get expected reward state for decision making")
+        
+        // Convenience method for action selection
+        .def("selectAction", &AgentBrain::decodeMotorCommand,
+              "Select action based on current neural activity")
+        
+        // Convenience method for processing raw sensory data
+        .def("processSensoryData", &AgentBrain::processSensoryInput,
+              py::arg("percept"),
+              "Process sensory percept and inject into brain")
+        
+        // Convenience method for applying intrinsic motivation
+        .def("applyIntrinsicMotivation", [](AgentBrain& self, float curiosity, float novelty) {
+            self.applyRewardModulation(curiosity, novelty);
+        }, py::arg("curiosity"), py::arg("novelty"),
+              "Apply intrinsic motivation signals (curiosity + novelty)")
+        
+        // Access to internal neuromodulation state
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+              "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+              "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+              "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+              "Get prediction error")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

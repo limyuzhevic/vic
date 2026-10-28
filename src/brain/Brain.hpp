@@ -6,8 +6,13 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../development/DevelopmentSystem.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+
+// Include helper functions header
+#include "BrainHelpers.hpp"
 
 namespace nlm {
 
