@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Phase 6: Integrated neuromodulation effects on neural dynamics and plasticity
 
 class Neuromodulator {
 public:
@@ -21,15 +21,21 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Returns multiplier for plasticity strength (1.0 = normal)
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Initialize with brain reference (optional)
+    virtual void initialize(Brain* brain) {}
+    
 protected:
     Neuromodulator() = default;
 };
+
+// Forward declaration for composite neuromodulation
+class CompositeNeuromodulation;
 
 // Dopamine: Reward and reinforcement learning signal
 // PLACEHOLDER - Phase 2
