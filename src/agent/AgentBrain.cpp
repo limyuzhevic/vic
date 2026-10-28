@@ -7,6 +7,7 @@ namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
+    , planner_(nullptr)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -20,6 +21,16 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Try to get neural planner from brain
+    if (brain_) {
+        auto* brainPlanner = brain_->getPlanner();
+        if (brainPlanner) {
+            planner_ = std::make_shared<NeuralPlanner>();
+            planner_->initialize(brainPlanner);
+            NLM_LOG_INFO("AgentBrain: NeuralPlanner connected");
+        }
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -82,6 +93,42 @@ size_t AgentBrain::getSensoryInputSize() const {
 size_t AgentBrain::getMotorOutputSize() const {
     // One motor neuron per action
     return 6;
+}
+
+// NEW: Neural planning integration
+MotorCommand AgentBrain::getPlannedAction(const std::vector<float>& currentState, float targetReward) {
+    if (!planner_ || !brain_) {
+        return MotorCommand::Wait;
+    }
+    
+    // Get planned action from neural planner
+    MotorCommand planned = planner_->planAction(currentState, targetReward);
+    
+    // Update action quality based on current neural activity
+    auto* stdp = brain_->getSTDP();
+    if (stdp && planner_->getPlanningConfidence() > 0.3f) {
+        // Quality learning: successful planning improves action preferences
+        size_t actionIdx = static_cast<size_t>(planned);
+        if (actionIdx < actionQuality_.size()) {
+            actionQuality_[actionIdx] = std::min(actionQuality_[actionIdx] + 0.05f, 1.0f);
+        }
+    }
+    
+    return planned;
+}
+
+void AgentBrain::updatePlanner(const std::vector<MotorCommand>& plannedActions,
+                              const std::vector<MotorCommand>& actualActions,
+                              float actualReward) {
+    if (!planner_) return;
+    
+    // Update planner with actual outcomes for learning
+    planner_->updatePlanQuality(plannedActions, actualActions, actualReward);
+}
+
+float AgentBrain::getPlannerConfidence() const {
+    if (!planner_) return 0.0f;
+    return planner_->getPlanningConfidence();
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
@@ -154,8 +201,33 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+    // Check if we have a planned action
+    MotorCommand planned = MotorCommand::Wait;
+    if (planner_ && !brain_->getRegions().empty()) {
+        // Get current sensory state as neural activity pattern
+        // For now, use a simple pattern - in full implementation this would
+        // convert actual neural state to a state vector for planning
+        std::vector<float> currentState;
+        currentState.reserve(getSensoryInputSize());
+        
+        // Simple encoding: use previous vision as state proxy
+        currentState = previousVision_;
+        while (currentState.size() < getSensoryInputSize()) {
+            currentState.push_back(0.0f);
+        }
+        
+        // Get planned action (goal-directed planning)
+        planned = getPlannedAction(currentState, 0.5f);
+        
+        // If planner has high confidence, use planned action instead
+        if (planner_->getPlanningConfidence() > 0.7f) {
+            decoded = planned;
+            NLM_LOG_INFO("Using planned action: " + std::to_string(static_cast<int>(decoded)));
+        }
+    }
+    
+    // Apply curiosity-based exploration (override planning if high curiosity)
+    if (curiosityEnabled_ && curiosityLevel_ > 0.5f) {
         decoded = selectWithCuriosity(decoded);
     }
     
@@ -264,6 +336,27 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
                 syn->decayEligibilityTrace(0.1f);
             }
         }
+    }
+    
+    // Update neural planner with reward prediction error
+    if (planner_ && std::abs(predictionError_) > 0.1f) {
+        // Large prediction errors indicate planning mistakes or missed goals
+        float planningUpdate = std::abs(predictionError_) * 0.1f;
+        
+        // Reduce confidence in recent plans if prediction error is large
+        if (predictionError_ < -0.2f) {
+            // We overestimated reward - reduce plan quality
+            for (size_t i = 0; i < actionQuality_.size(); ++i) {
+                actionQuality_[i] *= 0.95f;
+            }
+        } else if (predictionError_ > 0.2f) {
+            // We underestimated reward - increase plan quality for successful actions
+            // Find which action led to this reward
+            // This is simplified - in full implementation would track planned actions
+        }
+        
+        NLM_LOG_INFO("Planner updated with reward prediction error: " + 
+                    std::to_string(predictionError_));
     }
     
     // Modulate plasticity based on dopamine

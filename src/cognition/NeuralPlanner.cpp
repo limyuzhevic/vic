@@ -28,8 +28,8 @@ void NeuralPlanner::initialize(Brain* brain) {
     NLM_LOG_INFO("NeuralPlanner initialized");
 }
 
-ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
-                                    float targetReward) {
+MotorCommand NeuralPlanner::planAction(const std::vector<float>& currentState,
+                                     float targetReward) {
     // Generate possible action sequences
     auto sequences = generateActionSequences(planningDepth_);
     
@@ -62,10 +62,10 @@ ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
     }
     
     // Default: wait if no good option
-    return ActionType::Wait;
+    return MotorCommand::Wait;
 }
 
-PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>& actions,
+PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<MotorCommand>& actions,
                                                  const std::vector<float>& startState) {
     PlanningCandidate candidate;
     candidate.actions = actions;
@@ -76,7 +76,7 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
     float confidence = 1.0f;
     
     for (size_t i = 0; i < actions.size(); ++i) {
-        ActionType action = actions[i];
+        MotorCommand action = actions[i];
         
         // Evaluate this action
         float actionValue = evaluateAction(action, currentState);
@@ -107,34 +107,34 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
     return candidate;
 }
 
-std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size_t depth) {
-    std::vector<std::vector<ActionType>> result;
+std::vector<std::vector<MotorCommand>> NeuralPlanner::generateActionSequences(size_t depth) {
+    std::vector<std::vector<MotorCommand>> result;
     
     // Simple enumeration of action sequences
-    std::vector<ActionType> baseActions = {
-        ActionType::MoveForward, ActionType::MoveBackward,
-        ActionType::TurnLeft, ActionType::TurnRight,
-        ActionType::Interact, ActionType::Wait
+    std::vector<MotorCommand> baseActions = {
+        MotorCommand::MoveForward, MotorCommand::MoveBackward,
+        MotorCommand::TurnLeft, MotorCommand::TurnRight,
+        MotorCommand::Interact, MotorCommand::Wait
     };
     
     // For now, generate sequences of depth actions
     // This could be optimized with pruning
     
-    std::function<void(std::vector<ActionType>&, size_t)> generate = 
-        [&](std::vector<ActionType>& current, size_t remaining) {
+    std::function<void(std::vector<MotorCommand>&, size_t)> generate = 
+        [&](std::vector<MotorCommand>& current, size_t remaining) {
             if (remaining == 0) {
                 result.push_back(current);
                 return;
             }
             
-            for (ActionType action : baseActions) {
+            for (MotorCommand action : baseActions) {
                 current.push_back(action);
                 generate(current, remaining - 1);
                 current.pop_back();
             }
         };
     
-    std::vector<ActionType> current;
+    std::vector<MotorCommand> current;
     generate(current, depth);
     
     // Limit number of sequences
@@ -145,7 +145,7 @@ std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size
     return result;
 }
 
-float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>& state) {
+float NeuralPlanner::evaluateAction(MotorCommand action, const std::vector<float>& state) {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionQuality_.size()) return 0.0f;
     
@@ -169,8 +169,8 @@ float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>&
     return baseValue * 0.7f + goalBonus * 0.3f;
 }
 
-std::vector<float> NeuralPlanner::predictNextState(ActionType action,
-                                                  const std::vector<float>& currentState) {
+std::vector<float> NeuralPlanner::predictNextState(MotorCommand action,
+                                                   const std::vector<float>& currentState) {
     // Use simple action-consequence prediction
     // In a full implementation, this would use learned forward models
     
@@ -179,7 +179,7 @@ std::vector<float> NeuralPlanner::predictNextState(ActionType action,
     // Apply expected effect based on action
     // This is a simplified model - real implementation would use experience
     switch (action) {
-        case ActionType::MoveForward:
+        case MotorCommand::MoveForward:
             // Shift visual field forward
             if (nextState.size() > 10) {
                 for (size_t i = 10; i < nextState.size(); ++i) {
@@ -187,15 +187,15 @@ std::vector<float> NeuralPlanner::predictNextState(ActionType action,
                 }
             }
             break;
-        case ActionType::MoveBackward:
+        case MotorCommand::MoveBackward:
             if (nextState.size() > 10) {
                 for (size_t i = nextState.size() - 1; i >= 10; --i) {
                     nextState[i] = nextState[i-10] * 0.9f;
                 }
             }
             break;
-        case ActionType::TurnLeft:
-        case ActionType::TurnRight:
+        case MotorCommand::TurnLeft:
+        case MotorCommand::TurnRight:
             // Rotate pattern
             // Simplified: just add some noise
             for (auto& v : nextState) {
@@ -203,13 +203,13 @@ std::vector<float> NeuralPlanner::predictNextState(ActionType action,
                 v = std::clamp(v, 0.0f, 1.0f);
             }
             break;
-        case ActionType::Interact:
+        case MotorCommand::Interact:
             // Interaction changes state significantly
             for (auto& v : nextState) {
                 v = v > 0.5f ? 0.8f : 0.2f;
             }
             break;
-        case ActionType::Wait:
+        case MotorCommand::Wait:
         default:
             // No change
             break;
@@ -218,9 +218,9 @@ std::vector<float> NeuralPlanner::predictNextState(ActionType action,
     return nextState;
 }
 
-void NeuralPlanner::updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                                     const std::vector<ActionType>& actualActions,
-                                     float actualReward) {
+void NeuralPlanner::updatePlanQuality(const std::vector<MotorCommand>& plannedActions,
+                                      const std::vector<MotorCommand>& actualActions,
+                                      float actualReward) {
     // Update action quality based on how well plan worked
     size_t minLen = std::min(plannedActions.size(), actualActions.size());
     
@@ -275,7 +275,7 @@ void SelfModel::initialize(Brain* brain) {
     NLM_LOG_INFO("SelfModel initialized");
 }
 
-void SelfModel::recordSelfAction(ActionType action,
+void SelfModel::recordSelfAction(MotorCommand action,
                                 const std::vector<float>& beforeState,
                                 const std::vector<float>& afterState) {
     size_t actionIdx = static_cast<size_t>(action);
@@ -313,7 +313,7 @@ void SelfModel::recordSelfAction(ActionType action,
     }
 }
 
-std::vector<float> SelfModel::predictActionConsequence(ActionType action,
+std::vector<float> SelfModel::predictActionConsequence(MotorCommand action,
                                                        const std::vector<float>& currentState) {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionEffects_.size()) return currentState;
@@ -321,7 +321,7 @@ std::vector<float> SelfModel::predictActionConsequence(ActionType action,
     return findMatchingEffect(action, currentState);
 }
 
-float SelfModel::getSelfModelConfidence(ActionType action) const {
+float SelfModel::getSelfModelConfidence(MotorCommand action) const {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionEffects_.size()) return 0.0f;
     
@@ -337,7 +337,7 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
 
 float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
                                               const std::vector<float>& afterState,
-                                              ActionType action) const {
+                                              MotorCommand action) const {
     // If we have a good prediction for this action, it's likely self-generated
     auto predicted = findMatchingEffect(action, beforeState);
     
@@ -348,21 +348,26 @@ float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeS
 }
 
 ActionType SelfModel::getPreferredAction(const std::vector<float>& state) {
-    ActionType best = ActionType::Wait;
+    MotorCommand best = MotorCommand::Wait;
     float bestValue = -1000.0f;
     
     for (size_t i = 0; i < actionEffects_.size(); ++i) {
         if (actionEffects_[i].empty()) continue;
         
         // Check how well this action would work in current state
-        auto predicted = findMatchingEffect(static_cast<ActionType>(i), state);
+        auto predicted = findMatchingEffect(static_cast<MotorCommand>(i), state);
         if (!predicted.empty()) {
             // Value = how much the state changes toward reward
             float value = computeSimilarity(predicted, state);
             if (value > bestValue) {
                 bestValue = value;
-                best = static_cast<ActionType>(i);
+                best = static_cast<MotorCommand>(i);
             }
+        }
+    }
+    
+    return best;
+}
         }
     }
     
@@ -371,7 +376,7 @@ ActionType SelfModel::getPreferredAction(const std::vector<float>& state) {
 
 void SelfModel::updateSelfModel(const std::vector<float>& predicted,
                                const std::vector<float>& actual,
-                               ActionType action) {
+                               MotorCommand action) {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionEffects_.size()) return;
     
@@ -399,8 +404,8 @@ void SelfModel::clear() {
     capabilityLevel_ = 0.5f;
 }
 
-std::vector<float> SelfModel::findMatchingEffect(ActionType action,
-                                                const std::vector<float>& beforeState) const {
+std::vector<float> SelfModel::findMatchingEffect(MotorCommand action,
+                                                 const std::vector<float>& beforeState) const {
     size_t actionIdx = static_cast<size_t>(action);
     if (actionIdx >= actionEffects_.size()) return {};
     
@@ -460,7 +465,7 @@ void SocialLearning::initialize(Brain* brain) {
     NLM_LOG_INFO("SocialLearning initialized");
 }
 
-void SocialLearning::observeAgentAction(ActionType observedAction,
+void SocialLearning::observeAgentAction(MotorCommand observedAction,
                                        const std::vector<float>& observerState,
                                        const std::vector<float>& resultingState) {
     ObservedEffect effect;
@@ -477,7 +482,7 @@ void SocialLearning::observeAgentAction(ActionType observedAction,
     }
 }
 
-bool SocialLearning::canImitate(ActionType observedAction) const {
+bool SocialLearning::canImitate(MotorCommand observedAction) const {
     // Can imitate if we've seen this action before and know its effect
     for (const auto& pair : observedActions_) {
         if (pair.first == observedAction) {
@@ -487,8 +492,8 @@ bool SocialLearning::canImitate(ActionType observedAction) const {
     return false;
 }
 
-ActionType SocialLearning::getImitationAction(const std::vector<float>& currentState) {
-    ActionType best = ActionType::Wait;
+MotorCommand SocialLearning::getImitationAction(const std::vector<float>& currentState) {
+    MotorCommand best = MotorCommand::Wait;
     float bestSim = 0.0f;
     
     for (const auto& pair : observedActions_) {

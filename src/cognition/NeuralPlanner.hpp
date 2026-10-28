@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../agent/AgentBrain.hpp"
 #include <vector>
 #include <memory>
 #include <functional>
@@ -10,7 +11,7 @@ namespace nlm {
 
 // PlanningCandidate: A possible action sequence considered during planning
 struct PlanningCandidate {
-    std::vector<ActionType> actions;
+    std::vector<MotorCommand> actions;
     std::vector<std::vector<float>> predictedStates;
     float expectedReward;
     float confidence;
@@ -37,15 +38,15 @@ public:
     // Initialize with brain reference
     void initialize(Brain* brain);
 
-    // Plan next action given current state and goal
+// Plan next action given current state and goal
     // Returns the best action to take now
-    ActionType planAction(const std::vector<float>& currentState,
+    MotorCommand planAction(const std::vector<float>& currentState,
                          float targetReward = 0.5f);
 
     // Evaluate a potential action sequence
     // Returns expected total reward and confidence
-    PlanningCandidate evaluateSequence(const std::vector<ActionType>& actions,
-                                      const std::vector<float>& startState);
+    PlanningCandidate evaluateSequence(const std::vector<MotorCommand>& actions,
+                                       const std::vector<float>& startState);
 
     // Get number of steps to look ahead
     size_t getPlanningDepth() const { return planningDepth_; }
@@ -54,16 +55,16 @@ public:
     // Get planning confidence
     float getPlanningConfidence() const { return planningConfidence_; }
 
-    // Update plans based on actual outcome
-    void updatePlanQuality(const std::vector<ActionType>& plannedActions,
-                          const std::vector<ActionType>& actualActions,
-                          float actualReward);
+// Update plans based on actual outcome
+    void updatePlanQuality(const std::vector<MotorCommand>& plannedActions,
+                           const std::vector<MotorCommand>& actualActions,
+                           float actualReward);
 
     // Clear planning cache
     void clearCache();
 
     // Set action quality function (from experience)
-    void setActionQuality(ActionType action, float quality) {
+    void setActionQuality(MotorCommand action, float quality) {
         actionQuality_[static_cast<size_t>(action)] = quality;
     }
 
@@ -76,10 +77,10 @@ public:
 
 private:
     // Generate possible action sequences
-    std::vector<std::vector<ActionType>> generateActionSequences(size_t depth);
+    std::vector<std::vector<MotorCommand>> generateActionSequences(size_t depth);
 
     // Evaluate single action from state
-    float evaluateAction(ActionType action, const std::vector<float>& state);
+    float evaluateAction(MotorCommand action, const std::vector<float>& state);
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -116,31 +117,31 @@ public:
     void initialize(Brain* brain);
 
     // Record that taking an action caused a specific sensory change
-    void recordSelfAction(ActionType action,
+    void recordSelfAction(MotorCommand action,
                          const std::vector<float>& beforeState,
                          const std::vector<float>& afterState);
 
     // Predict sensory consequence of an action
     // This is the "forward model" of the self
-    std::vector<float> predictActionConsequence(ActionType action,
+    std::vector<float> predictActionConsequence(MotorCommand action,
                                                 const std::vector<float>& currentState);
 
     // Get confidence in self-model for a given action
-    float getSelfModelConfidence(ActionType action) const;
+    float getSelfModelConfidence(MotorCommand action) const;
 
     // Is this change likely caused by self (action) vs external?
     float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
-                                       ActionType action) const;
+                                       MotorCommand action) const;
 
     // Get the body schema (preferred actions in different states)
     // Returns map of state -> preferred action
-    ActionType getPreferredAction(const std::vector<float>& state);
+    MotorCommand getPreferredAction(const std::vector<float>& state);
 
     // Update self-model based on prediction error
     void updateSelfModel(const std::vector<float>& predicted,
                         const std::vector<float>& actual,
-                        ActionType action);
+                        MotorCommand action);
 
     // Get current capability level (0-1)
     float getCapabilityLevel() const { return capabilityLevel_; }
@@ -156,7 +157,7 @@ public:
 
 private:
     // Find best matching previous experience
-    std::vector<float> findMatchingEffect(ActionType action,
+    std::vector<float> findMatchingEffect(MotorCommand action,
                                           const std::vector<float>& beforeState) const;
 
     struct Impl;
@@ -173,7 +174,7 @@ private:
         size_t observationCount;
     };
     
-    std::vector<std::vector<ActionEffect>> actionEffects_;  // Indexed by ActionType
+    std::vector<std::vector<ActionEffect>> actionEffects_;  // Indexed by MotorCommand
 };
 
 // SocialLearning: Enables learning from observing other agents
@@ -194,15 +195,15 @@ public:
     void initialize(Brain* brain);
 
     // Record observation of another agent's action and effect
-    void observeAgentAction(ActionType observedAction,
+    void observeAgentAction(MotorCommand observedAction,
                            const std::vector<float>& observerState,
                            const std::vector<float>& resultingState);
 
     // Can I imitate this observed action?
-    bool canImitate(ActionType observedAction) const;
+    bool canImitate(MotorCommand observedAction) const;
 
     // Get the best action to imitate given current state
-    ActionType getImitationAction(const std::vector<float>& currentState);
+    MotorCommand getImitationAction(const std::vector<float>& currentState);
 
     // Learn simple communication signal from another agent
     // Signal is a neural pattern that predicts reward from other agent
@@ -244,7 +245,7 @@ private:
         float reward;
     };
     
-    std::vector<std::pair<ActionType, ObservedEffect>> observedActions_;
+    std::vector<std::pair<MotorCommand, ObservedEffect>> observedActions_;
     
     // Communication signal
     std::vector<float> signalPattern_;

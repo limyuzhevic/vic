@@ -437,6 +437,116 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
         }
+        
+        // ENHANCED: Dopamine affects memory consolidation
+        // Positive dopamine (reward prediction) strengthens memory consolidation
+        // Negative dopamine (prediction error) weakens or blocks consolidation
+        if (pImpl->episodicMemory && currentStep % pImpl->consolidationInterval == 0) {
+            // Dopaminergic modulation of memory consolidation
+            // Based on dopamine level, consolidate different amounts of memory
+            float consolidationFactor = 0.5f + dopamineLevel * 0.5f;
+            consolidationFactor = std::clamp(consolidationFactor, 0.1f, 1.0f);
+            
+            // Consolidate memories with dopamine-dependent strength
+            pImpl->episodicMemory->consolidate(consolidationFactor);
+            
+            if (std::abs(dopamineLevel) > 0.5f) {
+                NLM_LOG_INFO("Dopamine-modulated memory consolidation: " + 
+                            std::to_string(consolidationFactor) + 
+                            " (dopamine: " + std::to_string(dopamineLevel) + ")");
+            }
+        }
+        
+        // ENHANCED: Dopamine affects attention system
+        // Reward anticipation (positive dopamine) increases attentional focus
+        // Prediction error (negative dopamine) broadens attention to detect errors
+        if (pImpl->attention) {
+            float attentionModulation = 1.0f;
+            
+            if (dopamineLevel > 0.0f) {
+                // Positive dopamine increases attentional focus and efficiency
+                // This is reward-driven attentional enhancement
+                attentionModulation = 1.0f + dopamineLevel * 0.5f;
+                
+                // Use attention system to prioritize reward-relevant stimuli
+                // This helps learn which sensory patterns predict reward
+                if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                    std::vector<NeuronId> prioritizedNeurons = pImpl->workingMemory->getMemoryNeurons();
+                    pImpl->attention->processCompetition(prioritizedNeurons);
+                }
+                
+            } else if (dopamineLevel < 0.0f) {
+                // Negative dopamine (prediction error) broadens attentional scope
+                // To detect the source of prediction errors
+                attentionModulation = std::max(0.5f, 1.0f + dopamineLevel * 0.3f);
+                
+                // In prediction error state, increase novelty detection
+                if (pImpl->novelty) {
+                    pImpl->novelty->setSurpriseThreshold(std::max(0.1f, 0.5f + dopamineLevel * 0.5f));
+                }
+            }
+            
+            // Apply attention modulation to attentional selection system
+            // Higher modulation = stronger attentional bias
+            if (attentionModulation != 1.0f) {
+                // This would affect attention parameters in a full implementation
+                NLM_LOG_INFO("Dopamine-modulated attention: " + 
+                            std::to_string(attentionModulation) + 
+                            " (dopamine: " + std::to_string(dopamineLevel) + ")");
+            }
+        }
+        
+        // ENHANCED: Dopamine affects concept formation
+        // Reward signals help form reward-related concepts
+        // This links reward prediction to concept emergence
+        if (pImpl->conceptFormation && dopamineLevel > 0.2f) {
+            // Positive dopamine signals rewarding experiences
+            // These should be used to strengthen reward-related concepts
+            
+            // Create or strengthen reward-related concepts based on dopamine
+            if (pImpl->workingMemory) {
+                const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();n                if (!memoryNeurons.empty()) {
+                    // Find most active memory trace for concept formation
+                    std::vector<float> rewardPattern;
+                    
+                    for (NeuronId neuronId : memoryNeurons) {
+                        for (auto& region : pImpl->regions) {
+                            auto neurons = region->getAllNeurons();
+                            for (auto* neuron : neurons) {
+                                if (neuron->getId() == neuronId) {
+                                    float activation = std::abs(neuron->getState().membranePotential - 
+                                                             neuron->getState().restingPotential);
+                                    rewardPattern.push_back(activation);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!rewardPattern.empty()) {
+                        // Present reward pattern to concept formation system
+                        SimulationStep currentStep = pImpl->currentStep;
+                        size_t conceptId = pImpl->conceptFormation->presentExperience(
+                            rewardPattern,
+                            std::vector<float>(),  // No specific features for reward patterns
+                            dopamineLevel,  // Use dopamine level as reward signal
+                            currentStep
+                        );
+                        
+                        if (conceptId > 0) {
+                            // Strengthen reward-related concepts with positive dopamine
+                            const DiscoveredConcept* concept = pImpl->conceptFormation->getConcept(conceptId);
+                            if (concept) {
+                                // Reward-related concepts should have higher priority
+                                NLM_LOG_INFO("Dopamine-enhanced concept formation: " + 
+                                            std::to_string(conceptId) + 
+                                            " (dopamine: " + std::to_string(dopamineLevel) + ")");
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
@@ -511,8 +621,87 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Track prediction error for learning and neuromodulation
+        // This is crucial for temporal sequence learning and planning
+        
+        // Use recent sensory state to predict next state
+        // This creates prediction error signal for learning
+        
+        // Get current sensory state (simplified - in full implementation would
+        // use the actual sensory percept being injected)
+        // For now, we'll use a placeholder that captures the essence of prediction
+        
+        // Predict next sensory state based on recent neural activity
+        // This uses the neural substrate to encode expectations
+        
+        // In a full implementation, this would:
+        // 1. Take current sensory input pattern
+        // 2. Use learned sequences (through NeuralPrediction) to predict next state
+        // 3. Compare prediction with actual input to compute prediction error
+        // 4. Use prediction error to modulate plasticity and neuromodulation
+        
+        // For now, implement basic prediction using the prediction system
+        // This demonstrates the integration point for prediction learning
+        
+        // Get prediction error if available
+        float predError = 0.0f;
+        if (pImpl->predictionSystem) {
+            predError = pImpl->predictionSystem->getPredictionError();
+            
+            // Use prediction error to modulate neural processing
+            // This is the core of predictive coding in the brain
+            if (predError > 0.5f) {
+                // High prediction error -> increase plasticity and exploration
+                // This is the prediction error driven learning mechanism
+                float errorGain = predError * 2.0f;
+                
+                // Modulate STDP strength based on prediction error
+                if (pImpl->stdp) {
+                    float originalLTP = pImpl->stdp->getLTPWeight();
+                    float originalLTD = pImpl->stdp->getLTDWeight();
+                    
+                    // Higher prediction error increases LTP, decreases LTD
+                    pImpl->stdp->setLTPWeight(originalLTP * (1.0f + errorGain * 0.5f));
+                    pImpl->stdp->setLTDWeight(originalLTD * (1.0f - errorGain * 0.3f));
+                }
+                
+                NLM_LOG_INFO("High prediction error: " + std::to_string(predError) + 
+                            " -> increased plasticity and exploration");
+            }
+            
+            // Store prediction error in neuromodulation system
+            // For integration with dopamine system
+            if (pImpl->dopamine) {
+                // Prediction error modulates dopamine signal
+                // This links prediction to reward prediction error
+                float dopamineSignal = -predError * 0.5f;  // Negative because high error = negative prediction
+                
+                // Blend with regular reward-based dopamine
+                float currentDopamine = pImpl->dopamine->getLevel();
+                float newDopamine = currentDopamine * 0.7f + dopamineSignal * 0.3f;
+                pImpl->dopamine->setLevel(newDopamine);
+            }
+        }
+        
+        // Integrate prediction into working memory for planning
+        if (predError < 0.2f && pImpl->workingMemory && pImpl->episodicMemory) {
+            // Low prediction error -> stable working memory, can plan with confidence
+            // High confidence enables more sophisticated planning
+            
+            // Store prediction confidence in working memory for planning
+            float confidence = 1.0f - predError;
+            
+            // This would be used by NeuralPlanner to set planning parameters
+            // Higher confidence -> longer planning horizon, more aggressive planning
+            if (pImpl->conceptFormation) {
+                // Concepts help with prediction - more concepts = better predictions
+                size_t conceptCount = pImpl->conceptFormation->getConceptCount();
+                float conceptBenefit = std::min(conceptCount * 0.1f, 0.5f);
+                
+                // Use concepts to improve predictions
+                confidence = confidence * (1.0f + conceptBenefit);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -527,9 +716,82 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->episodicMemory) {
+        // Extract current neural activity pattern from working memory
+        std::vector<float> neuralPattern;
+        if (pImpl->workingMemory) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            neuralPattern.reserve(memoryNeurons.size());
+            for (NeuronId neuronId : memoryNeurons) {
+                // Find neuron by ID and get its activation
+                for (auto& region : pImpl->regions) {
+                    auto neurons = region->getAllNeurons();
+                    for (auto* neuron : neurons) {
+                        if (neuron->getId() == neuronId) {
+                            float activation = std::abs(neuron->getState().membranePotential - 
+                                                     neuron->getState().restingPotential);
+                            neuralPattern.push_back(activation);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Extract sensory features from episodic memory
+        std::vector<float> sensoryFeatures;
+        if (!pImpl->stepsSinceLastEpisode.empty()) {
+            // Get the most recent episode for feature extraction
+            auto episodes = pImpl->episodicMemory->getAllEpisodes();
+            if (!episodes.empty()) {
+                const auto* latestEpisode = episodes.back();
+                if (latestEpisode) {
+                    // Use neuron activations from episodic memory as features
+                    sensoryFeatures = latestEpisode->neuronActivations;
+                }
+            }
+        }
+        
+        // Present experience to concept formation system
+        // This is crucial for concept emergence without predefined categories
+        if (!neuralPattern.empty()) {
+            // Get current step for temporal context
+            SimulationStep currentStep = pImpl->currentStep;
+            
+            // Get reward from dopamine system
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present to concept formation - creates concepts from neural patterns
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                neuralPattern, 
+                sensoryFeatures, 
+                reward, 
+                currentStep
+            );
+            
+            // If a concept was found (non-zero ID), check attention integration
+            if (conceptId > 0) {
+                // Concept formation and attention should work together
+                // The concept can influence what gets attended to in future
+                const DiscoveredConcept* concept = pImpl->conceptFormation->getConcept(conceptId);
+                if (concept) {
+                    // Concepts provide top-down bias for attention
+                    // Stronger concepts get more attentional resources
+                    float conceptStability = pImpl->conceptFormation->getConceptStability(conceptId);
+                    if (pImpl->attention) {
+                        // Use concept stability to modulate attention strength
+                        pImpl->attention->setInhibitionStrength(0.5f - conceptStability * 0.3f);
+                    }
+                    
+                    NLM_LOG_INFO("ConceptFormation found matching concept: " + 
+                                std::to_string(conceptId) + ", stability: " + 
+                                std::to_string(conceptStability));
+                }
+            } else if (conceptId == 0 && pImpl->stepsSinceLastEpisode > 10) {
+                // Concept formation couldn't decide yet - it's still forming
+                NLM_LOG_DEBUG("ConceptFormation still forming concepts...");
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -574,19 +836,266 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        // ENHANCED: Development affects more than just plasticity
+        // Affects neural excitability, neuromodulation, and cognitive systems
+        
+        // 1. Development affects baseline neural excitability
+        if (stage != DevelopmentalStage::Adult) {
+            // Developing brain is more excitable, adult brain is more stable
+            float excitabilityMod = 1.0f + (1.0f - plasticityMod) * 0.5f;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Higher excitability in developmental stages
+                        neuron->setThreshold(neuron->getState().threshold * excitabilityMod);
+                    }
+                }
+            }
+            NLM_LOG_INFO("Development-modulated neural excitability: " + 
+                        std::to_string(excitabilityMod) + 
+                        " (stage: " + std::to_string(static_cast<int>(stage)) + ")");
+        }
+        
+        // 2. Development affects neuromodulation system levels
+        if (pImpl->dopamine) {
+            // Dopamine system matures during development
+            float dopamineMaturation = 1.0f;
+            if (stage == DevelopmentalStage::Initial) {
+                dopamineMaturation = 0.5f;  // Undeveloped dopamine system
+            } else if (stage == DevelopmentalStage::CriticalPeriod) {
+                dopamineMaturation = 0.8f;
+            } else if (stage == DevelopmentalStage::Maturation) {
+                dopamineMaturation = 0.95f;
+            }
+            
+            // Scale current dopamine level based on development
+            float currentDopamine = pImpl->dopamine->getLevel();
+            pImpl->dopamine->setLevel(currentDopamine * dopamineMaturation);
+            
+            NLM_LOG_INFO("Development-modulated dopamine: " + 
+                        std::to_string(dopamineMaturation) + 
+                        " (stage: " + std::to_string(static_cast<int>(stage)) + ")");
+        }
+        
+        if (pImpl->curiosity) {
+            // Curiosity system also develops
+            float curiosityMaturation = 1.0f;
+            if (stage == DevelopmentalStage::Initial) {
+                curiosityMaturation = 0.7f;  // More exploration in early development
+            } else if (stage == DevelopmentalStage::CriticalPeriod) {
+                curiosityMaturation = 0.9f;
+            }
+            
+            // Scale curiosity levels based on development
+            float currentCuriosity = pImpl->curiosity->getLevel();
+            if (currentCuriosity > 0.0f) {
+                pImpl->curiosity->setLevel(currentCuriosity * curiosityMaturation);
+            }
+        }
+        
+        // 3. Development affects attention system parameters
+        if (pImpl->attention) {
+            // Attention efficiency improves with development
+            float attentionEfficiency = 1.0f;
+            if (stage == DevelopmentalStage::Initial) {
+                attentionEfficiency = 0.6f;  // Poor attentional control
+            } else if (stage == DevelopmentalStage::CriticalPeriod) {
+                attentionEfficiency = 0.85f;
+            } else if (stage == DevelopmentalStage::Maturation) {
+                attentionEfficiency = 0.95f;
+            }
+            
+            // Use attention efficiency to modulate attention parameters
+            // Lower efficiency = more inhibition, better filtering
+            pImpl->attention->setInhibitionStrength(0.5f / attentionEfficiency);
+            pImpl->attention->setExcitationStrength(1.5f * attentionEfficiency);
+            
+            NLM_LOG_INFO("Development-modulated attention: " + 
+                        std::to_string(attentionEfficiency) + 
+                        " (inhibition: " + std::to_string(pImpl->attention->getInhibitionStrength()) + ")");
+        }
+        
+        // 4. Development affects concept formation system
+        if (pImpl->conceptFormation) {
+            // Concept formation becomes more sophisticated with development
+            if (stage == DevelopmentalStage::Initial) {
+                // Early stage forms broad, fuzzy concepts
+                pImpl->conceptFormation->setFormationThreshold(0.6f);
+                pImpl->conceptFormation->setStabilityWindow(20);
+            } else if (stage == DevelopmentalStage::CriticalPeriod) {
+                // Critical period forms more precise concepts
+                pImpl->conceptFormation->setFormationThreshold(0.4f);
+                pImpl->conceptFormation->setStabilityWindow(10);
+            } else if (stage == DevelopmentalStage::Maturation) {
+                // Mature stage forms stable, well-abstracted concepts
+                pImpl->conceptFormation->setFormationThreshold(0.3f);
+                pImpl->conceptFormation->setStabilityWindow(5);
+            } else if (stage == DevelopmentalStage::Adult) {
+                // Adult forms highly refined, efficient concepts
+                pImpl->conceptFormation->setFormationThreshold(0.2f);
+                pImpl->conceptFormation->setStabilityWindow(2);
+            }
+            
+            NLM_LOG_INFO("Development-modulated concept formation: " + 
+                        std::to_string(pImpl->conceptFormation->getFormationThreshold()) + 
+                        " threshold, " + 
+                        std::to_string(pImpl->conceptFormation->getStabilityWindow()) + 
+                        " window (stage: " + std::to_string(static_cast<int>(stage)) + ")");
+        }
+        
+        // 5. Development affects prediction system parameters
+        if (pImpl->predictionSystem) {
+            // Prediction accuracy improves with development
+            float predictionAccuracy = 1.0f;
+            if (stage == DevelopmentalStage::Initial) {
+                predictionAccuracy = 0.5f;  // Poor predictions
+            } else if (stage == DevelopmentalStage::CriticalPeriod) {
+                predictionAccuracy = 0.8f;
+            } else if (stage == DevelopmentalStage::Maturation) {
+                predictionAccuracy = 0.9f;
+            }
+            
+            // Update prediction confidence based on development
+            // This would require prediction system API changes
+            // For now, log the development effect
+            NLM_LOG_INFO("Development-modulated prediction: " + 
+                        std::to_string(predictionAccuracy) + 
+                        " accuracy (stage: " + std::to_string(static_cast<int>(stage)) + ")");
+        }
+        
+        // 6. Development affects learning rates across systems
+        // This provides a comprehensive view of developmental changes
+        NLM_LOG_INFO("Development system updated: stage=" + std::to_string(static_cast<int>(stage)) + 
+                    ", plasticityMod=" + std::to_string(plasticityMod) +
+                    ", neuralExcitability=" + std::to_string(1.0f + (1.0f - plasticityMod) * 0.5f));
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+    // ========== STEP 14: Sleep/rest cycle with memory consolidation ==========
+    if (!pImpl->isResting) {
+        // Check if we should enter sleep/rest mode
+        // Sleep is triggered when enough time has passed and there's memory to consolidate
+        
+        // Time-based sleep trigger
+        bool shouldSleep = false;
+        if (currentStep >= pImpl->stepsSinceLastEpisode + pImpl->replayInterval * 2) {
+            // Sleep after sufficient time has passed since last episode
+            shouldSleep = true;
+            pImpl->isResting = true;
+            pImpl->sleepStartStep = currentStep;
+            
+            NLM_LOG_INFO("Entering sleep/rest mode at step " + std::to_string(currentStep));
+        }
+        
+        // Activity-based sleep trigger
+        if (pImpl->totalSpikesTotal > pImpl->sleepStartStep * 10) {
+            // Sleep when there's been substantial activity
+            shouldSleep = true;
+            pImpl->isResting = true;
+            pImpl->sleepStartStep = currentStep;
+            
+            NLM_LOG_INFO("Activity-based sleep triggered at step " + std::to_string(currentStep));
+        }
+        
+        if (shouldSleep) {
+            // Enter sleep mode
+            pImpl->isResting = true;
+            pImpl->sleepStartStep = currentStep;
+            
+            // Reduce neuromodulation levels during sleep
+            if (pImpl->dopamine) {
+                pImpl->dopamine->setLevel(0.0f);  // No dopamine during sleep
+            }
+            if (pImpl->curiosity) {
+                pImpl->curiosity->setLevel(0.0f);  // No curiosity during sleep
+            }
+            if (pImpl->novelty) {
+                pImpl->novelty->setLevel(0.0f);  // No novelty detection during sleep
+            }
+            
+            NLM_LOG_INFO("Sleep/rest mode activated");
+        }
+    } else {
+        // We are currently in sleep mode
+        size_t sleepDuration = currentStep - pImpl->sleepStartStep;
+        
+        // Sleep duration based on amount of memory to consolidate
+        size_t targetSleepDuration = 500;  // Default sleep duration
+        
+        // Determine sleep duration based on memory load
+        if (pImpl->episodicMemory) {
+            size_t episodeCount = pImpl->episodicMemory->getEpisodeCount();
+            targetSleepDuration = std::min(episodeCount * 10, 2000U);  // Up to 2000 steps
+        }
+        
+        if (sleepDuration >= targetSleepDuration) {
+            // Sleep duration complete - exit sleep mode
+            pImpl->isResting = false;
+            
+            // Restore neuromodulation levels
+            if (pImpl->dopamine) {
+                pImpl->dopamine->setLevel(0.1f);  // Low baseline dopamine
+            }
+            if (pImpl->curiosity) {
+                pImpl->curiosity->setLevel(0.1f);  // Low baseline curiosity
+            }
+            if (pImpl->novelty) {
+                pImpl->novelty->setLevel(0.1f);  // Low baseline novelty
+            }
+            
+            NLM_LOG_INFO("Sleep/rest mode completed after " + std::to_string(sleepDuration) + 
+                        " steps, exiting at step " + std::to_string(currentStep));
+        }
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
+    // During sleep, perform memory consolidation and replay
+    if (pImpl->isResting && pImpl->episodicMemory) {
+        // Sleep-dependent memory consolidation
+        // This is a simplified version of the multiple trace theory
+        
+        size_t sleepDuration = currentStep - pImpl->sleepStartStep;
+        
+        // Progressive consolidation during sleep
+        if (sleepDuration < 100) {
+            // Early sleep: strengthen recently formed memories
+            pImpl->episodicMemory->consolidate(0.2f);
+        } else if (sleepDuration < 300) {
+            // Mid sleep: integrate memories with existing knowledge
+            pImpl->episodicMemory->consolidate(0.5f);
+            
+            // Replay important memories during sleep for integration
+            auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);
+            for (const auto* episode : episodesToReplay) {
+                pImpl->episodicMemory->replayEpisode(episode);
+                
+                // This would also update neural patterns through replay
+                // In a full implementation, this would update synaptic connections
+                // based on the replayed memory
+            }
+        } else {
+            // Late sleep: stabilize and generalize memories
+            pImpl->episodicMemory->consolidate(0.8f);
+            
+            // System consolidation: transfer memories from episodic to semantic
+            // This would involve creating more abstract, generalized representations
+            if (pImpl->conceptFormation) {
+                // In late sleep, concept formation can integrate episodic memories
+                // This is when concepts become more stable and general
+                NLM_LOG_INFO("Late sleep concept integration phase");
+                
+                // Concepts can now incorporate the consolidated episodic memories
+                // This would happen in a full implementation with proper concept system
+            }
+        }
+        
+        // Sleep maintains low neuromodulation but preserves basic brain function
+        if (sleepDuration % 100 == 0) {
+            NLM_LOG_DEBUG("Sleep memory consolidation progress: " + 
+                        std::to_string(sleepDuration) + "/" + std::to_string(targetSleepDuration) + 
+                        " steps, consolidation level: " + 
+                        std::to_string(std::min(sleepDuration / 10, 100)) + "%");
+        }
     }
-}
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input

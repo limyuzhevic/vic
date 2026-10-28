@@ -4,6 +4,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
 #include <memory>
 #include <vector>
 
@@ -30,6 +31,21 @@ public:
     
     // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
+    
+    // NEW: Neural planning integration
+    // Get planned action from neural planner (if available)
+    MotorCommand getPlannedAction(const std::vector<float>& currentState, float targetReward = 0.5f);
+    
+    // Update planner with actual outcomes
+    void updatePlanner(const std::vector<MotorCommand>& plannedActions,
+                      const std::vector<MotorCommand>& actualActions,
+                      float actualReward);
+    
+    // Check if planning system is available and active
+    bool hasPlanner() const { return planner_ != nullptr; }
+    
+    // Get planner confidence
+    float getPlannerConfidence() const;
     
     // Apply neuromodulation based on reward
     void applyRewardModulation(float reward, float predictedReward);
@@ -77,6 +93,9 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    
+    // Neural planner integration (if available)
+    std::shared_ptr<NeuralPlanner> planner_;
     
     // Motor neuron groups
     std::vector<Neuron*> motorForward_;
