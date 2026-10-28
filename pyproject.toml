@@ -1,6 +1,6 @@
 [build-system]
 requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
-build-backend = "scikit_build_core.build"
+build-backend = "scikit-build-core.build"
 
 [project]
 name = "pynlm"
@@ -27,13 +27,24 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest-cov",
+    "black",
+    "ruff",
+    "mypy",
 ]
+
+[project.scripts]
+pynlm-cli = "pynlm.__main__:main"
+
+[project.gui-scripts]
+pynlm-demo = "pynlm.demo:main"
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
@@ -55,3 +66,69 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | docs
+  | examples
+  | __pycache__
+  | .pytest_cache
+)/
+'''
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "I", "W", "B", "Q"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+exclude = [
+    "./.venv",
+    "./build",
+    "./dist",
+]
+
+[tool.pylint.master]
+load-plugins = ["pylint.extensions.docparams"]
+max-line-length = 88
+ignore = ["./.venv", "./build", "./dist"]
+
+[tool.coverage.run]
+source = ["pynlm"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == __main__:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+
+[tool.ruff.format]
+quote-style = "double"

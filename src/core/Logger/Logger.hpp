@@ -6,6 +6,10 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include <queue>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 namespace nlm {
 
@@ -37,16 +41,24 @@ public:
     virtual LogLevel getLevel() const = 0;
 };
 
-// Console logger implementation
-class ConsoleLogger : public ILogger {
+// File logger implementation
+class FileLogger : public ILogger {
 public:
-    ConsoleLogger();
-    explicit ConsoleLogger(LogLevel level);
-    ~ConsoleLogger() override;
+    FileLogger();
+    explicit FileLogger(const std::string& filepath, LogLevel level = LogLevel::Info, bool append = true);
+    ~FileLogger();
     
     void log(const LogEntry& entry) override;
     void setLevel(LogLevel level) override;
     LogLevel getLevel() const override;
+    
+    // File management
+    void open();
+    void close();
+    void setFilepath(const std::string& filepath, bool append = true);
+    
+    // Formatting
+    void setFormat(const std::string& format);
     
     // Enable/disable colors
     void setUseColors(bool useColors);
@@ -60,8 +72,7 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
-    std::string levelToString(LogLevel level) const;
-    std::string levelToColor(LogLevel level) const;
+    static std::string levelToString(LogLevel level);
 };
 
 // Main Logger class
@@ -83,6 +94,11 @@ public:
     // Set minimum level for all loggers
     void setLevel(LogLevel level);
     
+    // Enable/disable async logging
+    void setAsyncEnabled(bool enabled);
+    bool isAsyncEnabled() const;
+    void setMaxQueueSize(size_t maxSize);
+    
     // Global logging functions
     void log(LogLevel level, const std::string& message, 
              const std::string& file = "", int line = 0, 
@@ -103,10 +119,17 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Internal log method (synchronous)
+    void doLog(LogLevel level, const std::string& message,
+               const std::string& file, int line, const std::string& function);
+    
+    // Async worker thread
+    void logWorker();
 };
 
 // Convenience macro for file/line/function info
