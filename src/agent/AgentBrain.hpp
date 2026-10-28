@@ -2,6 +2,7 @@
 
 #include "AgentBody.hpp"
 #include "SensoryPercept.hpp"
+#include "AgentConstants.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include <memory>
@@ -58,6 +59,23 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // Configuration methods - allow overriding defaults
+    void setVisionWidth(size_t width) { visionWidth_ = width; }
+    void setVisionHeight(size_t height) { visionHeight_ = height; }
+    void setTouchSize(size_t size) { touchSize_ = size; }
+    void setInternalSize(size_t size) { internalSize_ = size; }
+    void setProprioceptionSize(size_t size) { proprioceptionSize_ = size; }
+    
+    // Get current configuration values
+    size_t getVisionWidth() const { return visionWidth_; }
+    size_t getVisionHeight() const { return visionHeight_; }
+    size_t getTouchSize() const { return touchSize_; }
+    size_t getInternalSize() const { return internalSize_; }
+    size_t getProprioceptionSize() const { return proprioceptionSize_; }
+    
+    // Load configuration from Config object
+    void loadConfiguration(const class Config& config);
+    
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
@@ -112,6 +130,13 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Configuration values (can be overridden from config file)
+    size_t visionWidth_ = AgentConstants::SENSE_VISUAL_WIDTH;
+    size_t visionHeight_ = AgentConstants::SENSE_VISUAL_HEIGHT;
+    size_t touchSize_ = AgentConstants::TOUCH_INPUT_SIZE;
+    size_t internalSize_ = AgentConstants::INTERNAL_INPUT_SIZE;
+    size_t proprioceptionSize_ = AgentConstants::PROPRIOCEPTION_INPUT_SIZE;
 };
 
 } // namespace nlm
