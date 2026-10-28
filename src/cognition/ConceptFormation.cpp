@@ -19,6 +19,7 @@ ConceptFormation::ConceptFormation()
     , formationThreshold_(0.75f)
     , stabilityThreshold_(0.7f)
     , stabilityWindow_(5)
+    , modulationFactor_(1.0f)  // Initialize modulation factor (dopamine influence)
 {
 }
 
@@ -543,6 +544,15 @@ float TemporalRelation::getPredictionConfidence(const std::vector<float>& event)
 
 void TemporalRelation::clear() {
     sequences_.clear();
+}
+
+// ConceptFormation modulation methods
+void ConceptFormation::setModulation(float mod) {
+    modulationFactor_ = mod;
+}
+
+float ConceptFormation::getModulation() const {
+    return modulationFactor_;
 }
 
 } // namespace nlm

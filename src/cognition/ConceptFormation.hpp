@@ -137,6 +137,10 @@ public:
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    
+    // Set modulation factors (dopamine, neuromodulation)
+    void setModulation(float mod) { modulationFactor_ = mod; }
+    float getModulation() const { return modulationFactor_; }
 
 private:
     // Create new concept from pattern

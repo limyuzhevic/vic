@@ -57,11 +57,30 @@ private:
 // PLACEHOLDER - Phase 2
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Signal attention-related events
+    void signalAttention(float attentionLevel);
+    
+    // Signal memory consolidation events
+    void signalMemoryEvent(float memoryEventStrength);
+    
+    // Get attention modulation factor for attention system
+    float getAttentionBoost() const;
+    
+    // Get memory consolidation factor for memory systems
+    float getMemoryConsolidationFactor() const;
+
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
