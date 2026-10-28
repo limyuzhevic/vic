@@ -1,4 +1,6 @@
 #include "PredictionSystem.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/Types/Types.hpp"
 
 namespace nlm {
 
@@ -6,13 +8,19 @@ struct PredictionSystem::Impl {
     float predictionError;
     float confidence;
     std::vector<float> errorHistory;
+    Brain* brain;  // Reference to the brain for integration
     
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
+    Impl() : predictionError(0.0f), confidence(0.5f), brain(nullptr) {}
 };
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
+
+void PredictionSystem::initialize(Brain* brain) {
+    pImpl->brain = brain;
+    NLM_LOG_INFO("PredictionSystem initialized");
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
@@ -53,8 +61,24 @@ void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+void PredictionSystem::update(float timestep) {
+    // Update prediction system state
+    // Placeholder implementation - could update confidence based on error history
+    if (!pImpl->errorHistory.empty()) {
+        // Simple confidence calculation based on prediction error variance
+        float sumErrors = 0.0f;
+        float sumSquares = 0.0f;
+        for (float error : pImpl->errorHistory) {
+            sumErrors += error;
+            sumSquares += error * error;
+        }
+        
+        float meanError = sumErrors / pImpl->errorHistory.size();
+        float variance = sumSquares / pImpl->errorHistory.size() - meanError * meanError;
+        
+        // Confidence inversely related to prediction error variance
+        pImpl->confidence = 1.0f / (1.0f + variance);
+        // Clamp confidence between 0.1 and 1.0
+        pImpl->confidence = std::max(0.1f, std::min(1.0f, pImpl->confidence));
+    }
 }
-
-} // namespace nlm

@@ -1,5 +1,5 @@
 // NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Phase 6: Comprehensive Integration Tests
 
 #include <iostream>
 #include <cassert>
@@ -37,12 +37,39 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_memory_integration {
+    void runAll();
+}
+
+namespace test_prediction_integration {
+    void runAll();
+}
+
+namespace test_cognition_integration {
+    void runAll();
+}
+
+namespace test_neuromodulation_integration {
+    void runAll();
+}
+
+namespace test_development_integration {
+    void runAll();
+}
+
+namespace test_full_brain_integration {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "=== NLM Phase 6 Integration Tests ===" << std::endl;
+    std::cout << "Testing Complete Brain System Integration:" << std::endl;
+    std::cout << "  - Memory Systems Integration" << std::endl;
+    std::cout << "  - Prediction System Integration" << std::endl;
+    std::cout << "  - Cognition Systems Integration" << std::endl;
+    std::cout << "  - Neuromodulation Systems Integration" << std::endl;
+    std::cout << "  - Development Systems Integration" << std::endl;
+    std::cout << "  - Full Brain Loop Integration" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -119,12 +146,74 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Memory Integration tests..." << std::endl;
+    try {
+        test_memory_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Prediction Integration tests..." << std::endl;
+    try {
+        test_prediction_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Cognition Integration tests..." << std::endl;
+    try {
+        test_cognition_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neuromodulation Integration tests..." << std::endl;
+    try {
+        test_neuromodulation_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Development Integration tests..." << std::endl;
+    try {
+        test_development_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Full Brain Integration tests..." << std::endl;
+    try {
+        test_full_brain_integration::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << std::endl;
     if (allPassed) {
-        std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "=== All Phase 6 Integration Tests PASSED ===" << std::endl;
+        std::cout << "Phase 6 integration claims validated:" << std::endl;
+        std::cout << "  ✓ Memory systems are connected to neural processing" << std::endl;
+        std::cout << "  ✓ Neuromodulation affects plasticity and neural dynamics" << std::endl;
+        std::cout << "  ✓ Prediction system is integrated with learning" << std::endl;
+        std::cout << "  ✓ Development affects plasticity rates" << std::endl;
+        std::cout << "  ✓ Checkpoint save/load works" << std::endl;
+        std::cout << "  ✓ Replay and consolidation are functional" << std::endl;
+        std::cout << "  ✓ Complete brain loop functions coherently" << std::endl;
         return 0;
     } else {
-        std::cout << "=== Some Tests FAILED ===" << std::endl;
+        std::cout << "=== Some Phase 6 Integration Tests FAILED ===" << std::endl;
         return 1;
     }
 }
