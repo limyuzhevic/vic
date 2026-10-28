@@ -41,6 +41,18 @@ void Dopamine::update(TimestepDuration dt) {
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
+float Dopamine::getPlasticityFactor() const {
+    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
+    // PLACEHOLDER: Higher dopamine increases plasticity
+    return 0.5f + 0.5f * pImpl->level;
+}
+
+void Dopamine::update(TimestepDuration dt) {
+    // TODO PHASE 2: Implement real dopamine dynamics
+    // PLACEHOLDER: Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+}
+
 void Dopamine::signalReward(float reward) {
     // TODO PHASE 2: Implement real reward signaling
     // PLACEHOLDER: Burst of dopamine on reward
@@ -51,6 +63,12 @@ void Dopamine::signalRewardPredictionError(float error) {
     // TODO PHASE 2: Implement reward prediction error signaling
     // PLACEHOLDER: Dopamine responds to prediction error
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+}
+
+void Dopamine::initialize(Brain* brain) {
+    // TODO PHASE 2: Initialize dopamine with brain reference
+    // PLACEHOLDER: Store brain reference for future integration
+    // NLM_LOG_INFO("Dopamine system initialized with brain reference");
 }
 
 } // namespace nlm

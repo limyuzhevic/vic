@@ -28,6 +28,10 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
+class SpatialRepresentation;
+class TemporalRelation;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -163,6 +167,18 @@ public:
     
     // Attentional selection for focus
     AttentionalSelection* getAttention();
+    
+    // Self-model: internal representation of the agent itself
+    SelfModel* getSelfModel();
+    
+    // Social learning: learning from observing others
+    SocialLearning* getSocialLearning();
+    
+    // Spatial representation: spatial relationships and place cells
+    SpatialRepresentation* getSpatialRepresentation();
+    
+    // Temporal relation: temporal sequences and predictions
+    TemporalRelation* getTemporalRelation();
     
     // ========== DEVELOPMENT SYSTEM ==========
     

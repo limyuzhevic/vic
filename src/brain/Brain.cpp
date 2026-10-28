@@ -40,6 +40,10 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
+    std::unique_ptr<SpatialRepresentation> spatialRepresentation;
+    std::unique_ptr<TemporalRelation> temporalRelation;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -120,6 +124,10 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
+        spatialRepresentation = std::make_unique<SpatialRepresentation>();
+        temporalRelation = std::make_unique<TemporalRelation>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -243,7 +251,8 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    // (PredictionSystem now has initialize method)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -255,9 +264,19 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
+    pImpl->selfModel->initialize(this);
+    
+    pImpl->socialLearning->initialize(this);
+    
+    pImpl->spatialRepresentation->initialize(this);
+    
+    pImpl->temporalRelation->initialize(this);
+    
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
+    pImpl->dopamine->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->novelty->initialize(this);
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {

@@ -65,6 +65,10 @@ add_library(nlm_core STATIC
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    src/cognition/SelfModel.cpp
+    src/cognition/SocialLearning.cpp
+    src/cognition/SpatialRepresentation.cpp
+    src/cognition/TemporalRelation.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp

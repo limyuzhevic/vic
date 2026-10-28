@@ -14,6 +14,12 @@ PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
 
+void PredictionSystem::initialize(class Brain* brain) {
+    // TODO PHASE 2: Initialize prediction system with brain reference
+    // PLACEHOLDER: Store brain reference for future integration
+    // NLM_LOG_INFO("Prediction system initialized with brain reference");
+}
+
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     // PLACEHOLDER: Just return a copy of current state
@@ -55,6 +61,8 @@ void PredictionSystem::clearHistory() {
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+    // PLACEHOLDER: Simple training by updating error history
+    pImpl->confidence = 1.0f - pImpl->getPredictionError();  // Simple confidence calculation
 }
 
 } // namespace nlm

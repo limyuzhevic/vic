@@ -27,6 +27,9 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
+    // Initialize with brain reference for integration
+    virtual void initialize(class Brain* brain) = 0;
+    
 protected:
     Neuromodulator() = default;
 };
@@ -43,6 +46,9 @@ public:
     void setLevel(float level) override;
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
+    
+    // Initialize with brain reference for integration
+    void initialize(Brain* brain) override;
     
     // Reward signaling
     void signalReward(float reward);
