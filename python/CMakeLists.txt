@@ -43,6 +43,7 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/memory/Memory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
     ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/NeuralAssociativeMemory.cpp
     ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
     ${NLM_SOURCE_DIR}/cognition/NeuralPlanner.cpp
     ${NLM_SOURCE_DIR}/sensory/SensoryInput.cpp

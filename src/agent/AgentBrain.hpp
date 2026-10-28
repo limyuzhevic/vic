@@ -69,6 +69,11 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // ========== ASSOCIATIVE MEMORY SUPPORT ==========
+    
+    // Get associative memory interface
+    NeuralAssociativeMemory* getAssociativeMemory();
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +117,12 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // ========== ASSOCIATIVE MEMORY ==========
+    
+    // Associative memory interface
+    std::unique_ptr<NeuralAssociativeMemory> associativeMemory_;
+    
 };
 
 } // namespace nlm

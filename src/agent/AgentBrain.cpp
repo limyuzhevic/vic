@@ -19,7 +19,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
-{
+    , associativeMemory_(std::make_unique<NeuralAssociativeMemory>()) {
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -58,6 +58,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 }
             }
         }
+    }
+    
+    // Initialize associative memory
+    if (brain_) {
+        associativeMemory_->initialize(brain_.get());
     }
 }
 
@@ -345,6 +350,11 @@ void AgentBrain::reset() {
     
     // Clear previous vision
     std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+}
+
+// NeuralAssociativeMemory accessor implementation
+NeuralAssociativeMemory* AgentBrain::getAssociativeMemory() {
+    return associativeMemory_.get();
 }
 
 } // namespace nlm
