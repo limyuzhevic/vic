@@ -272,6 +272,15 @@ brain.step(step_number)           # Run one simulation step
 brain.step(step_number, time)    # Run step with timestamp
 brain.reset()                     # Reset brain state
 
+# Enhanced convenience methods
+brain.runEpisode(world, agent, num_steps)                    # Run complete episode
+brain.runEpisodeWithLearning(world, agent, num_steps)       # Run with learning
+brain.runBasicLearningExperiment(steps)                    # Run learning experiment
+brain.getBrainStatistics()                                   # Get comprehensive stats
+brain.getActivitySummary()                                   # Get activity summary
+brain.saveBrainWithTimestamp("brain_checkpoint")           # Save with timestamp
+```
+
 # Input/Output
 brain.receiveSensoryInput(sensory_input)  # Inject sensory data
 action = brain.produceAction()             # Get motor action

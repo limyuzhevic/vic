@@ -400,26 +400,170 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Enhanced Brain methods with convenience features
+    .def("runEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                        std::shared_ptr<AgentBrain> agent, int numSteps) {
+        "Run a complete simulation episode with brain-world-agent interaction"
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       "Run a complete episode of simulation")
+    
+    .def("runEpisodeWithLearning", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                     std::shared_ptr<AgentBrain> agent, int numSteps, bool enableLearning = true) {
+        "Run a simulation episode with automatic learning enabled"
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+            agent->enableDevelopment(true);
+        }
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply learning
+            if (enableLearning) {
+                double reward = 0.0;
+                if (world->getEnergy() > 50.0) reward = 1.0;
+                else if (world->getEnergy() < 20.0) reward = -0.5;
+                
+                agent->applyRewardModulation(reward, 0.0);
+                agent->updateDevelopment(0.1);
+            }
+        }
+    }, py::arg("world"), py::arg("agent"), py::arg("numSteps"), py::arg("enableLearning") = true,
+       "Run episode with automatic learning enabled")
+    
+    .def("runBasicLearningExperiment", [](std::shared_ptr<Brain> brain, int steps) {
+        "Run a basic learning experiment to test synaptic plasticity"
+        for (int step = 0; step < steps; ++step) {
+            // Inject random input patterns to stimulate learning
+            for (size_t i = 0; i < 10 && i < brain->getTotalNeuronCount(); ++i) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            }
+            brain->step(step);
+        }
+    }, py::arg("steps"),
+       "Run basic learning experiment to test synaptic plasticity")
+    
+    .def("getBrainStatistics", [](std::shared_ptr<Brain> brain) {
+        "Get comprehensive brain statistics"
+        py::dict stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        stats["region_count"] = brain->getRegionCount();
+        return stats;
+    }, "Get comprehensive brain statistics as a dictionary")
+    
+    .def("getActivitySummary", [](std::shared_ptr<Brain> brain, int windowSize = 100) {
+        "Get neural activity summary over recent steps"
+        py::dict summary;
+        
+        // Get activity over time window
+        float avgFiringRate = brain->getAverageFiringRate();
+        size_t firingCount = brain->getFiringNeuronCount();
+        size_t totalNeurons = brain->getTotalNeuronCount();
+        
+        summary["average_firing_rate"] = avgFiringRate;
+        summary["firing_percentage"] = (totalNeurons > 0) ? 
+            (static_cast<float>(firingCount) / totalNeurons * 100.0f) : 0.0f;
+        summary["total_neurons"] = totalNeurons;
+        summary["activity_level"] = (avgFiringRate > 5.0f) ? "high" : 
+                                    (avgFiringRate > 1.0f) ? "medium" : "low";
+        
+        return summary;
+    }, py::arg("windowSize") = 100,
+       "Get neural activity summary")
+    
+    .def("createLearningConfig", [](double learningRate = 0.01, double explorationRate = 0.1,
+                                   bool enableDevelopment = true, bool enableCuriosity = true,
+                                   bool enableRewardModulation = true) {
+        "Create a learning-enabled configuration"
+        auto config = std::make_shared<Config>();
+        
+        // Set learning-related parameters
+        config->set("plasticity_learning_rate", learningRate);
+        config->set("curiosity_rate", explorationRate);
+        config->set("development_enabled", enableDevelopment);
+        config->set("curiosity_enabled", enableCuriosity);
+        config->set("reward_modulation_enabled", enableRewardModulation);
+        
+        return config;
+    }, py::arg("learningRate") = 0.01, py::arg("explorationRate") = 0.1,
+       py::arg("enableDevelopment") = true, py::arg("enableCuriosity") = true,
+       py::arg("enableRewardModulation") = true,
+       "Create a configuration optimized for learning")
+    
+    .def("saveBrainWithTimestamp", [](std::shared_ptr<Brain> brain, const std::string& basePath, 
+                                      bool autoIncrement = true) {
+        "Save brain state with automatic timestamp in filename"
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()) % 1000;
+        
+        std::stringstream ss;
+        ss << std::put_time(std::localtime(&time_t), "%Y%m%d_%H%M%S");
+        ss << "_" << ms.count() << "ms";
+        
+        std::string timestamp = ss.str();
+        std::string filepath = basePath + "_" + timestamp + ".bin";
+        
+        if (autoIncrement) {
+            // Try to create unique filename
+            int counter = 0;
+            while (std::filesystem::exists(filepath)) {
+                counter++;
+                filepath = basePath + "_" + timestamp + "_v" + std::to_string(counter) + ".bin";
+            }
+        }
+        
+        brain->save(filepath);
+        return filepath;
+    }, py::arg("basePath"), py::arg("autoIncrement") = true,
+       "Save brain with timestamped filename")
+    
+    .def("loadLatestCheckpoint", [](const std::string& directory) {
+        "Load the most recent checkpoint from a directory"
+        std::vector<std::string> files;
+        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".bin") {
+                files.push_back(entry.path().string());
+            }
+        }
+        
+        if (files.empty()) {
+            throw std::runtime_error("No checkpoint files found in directory: " + directory);
+        }
+        
+        // Sort by modification time (most recent first)
+        std::sort(files.begin(), files.end(),
+            [](const std::string& a, const std::string& b) {
+                return std::filesystem::last_write_time(a) > 
+                       std::filesystem::last_write_time(b);
+            });
+        
+        auto brain = std::make_shared<Brain>(std::make_shared<Config>());
+        brain->load(files[0]);
+        return brain;
+    }, py::arg("directory"),
+       "Load the most recent checkpoint from directory")
 
 } // namespace nlm

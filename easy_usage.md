@@ -42,6 +42,37 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
+### Example 1b: Using Convenience Methods (NEW!)
+
+```python
+import pynlm
+
+# Create components
+brain = pynlm.createBrain(pynlm.createLearningConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run complete episode with learning
+brain.runEpisodeWithLearning(world, agent, 100)
+
+# Get statistics
+stats = brain.getBrainStatistics()
+print(f"Neurons: {stats['neuron_count']}")
+print(f"Average firing rate: {stats['average_firing_rate']:.2f} Hz")
+print(f"Total spikes: {stats['total_spikes']}")
+```
+
 ### Example 2: Brain in a Simple World
 
 ```python
