@@ -14,8 +14,10 @@
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
 #include "cognition/NeuralPlanner.hpp"
+#include "core/Constants.hpp"
 
 using namespace nlm;
+using namespace nlm::constants;
 
 void printHeader(const std::string& title) {
     std::cout << "\n" << std::string(60, '=') << "\n";
@@ -48,13 +50,13 @@ int main(int argc, char* argv[]) {
     
     // Create configuration
     auto config = std::make_shared<Config>();
-    config->set("neuron_count", size_t(1000));
-    config->set("region_count", size_t(2));
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", uint64_t(42));
-    config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
+    config->set("neuron_count", DEFAULT_NEURON_COUNT);
+    config->set("region_count", DEFAULT_REGION_COUNT);
+    config->set("connection_probability", DEFAULT_CONNECTION_PROBABILITY);
+    config->set("random_seed", uint64_t(DEFAULT_RANDOM_SEED));
+    config->set("simulation_timestep", DEFAULT_SIMULATION_TIMESTEP);
+    config->set("stdp_ltp_weight", DEFAULT_STDP_LTP_WEIGHT);
+    config->set("stdp_ltd_weight", DEFAULT_STDP_LTD_WEIGHT);
     
     // Create brain
     std::cout << "Initializing brain...\n";

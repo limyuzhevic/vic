@@ -7,9 +7,11 @@
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
+#include "core/Constants.hpp"
 #include <iostream>
 
 using namespace nlm;
+using namespace nlm::constants;
 
 int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
@@ -54,7 +56,7 @@ int main(int argc, char* argv[]) {
     // Run full experiment with smaller settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
+    config.neuronCount = DEFAULT_NEURON_COUNT;
     config.maxSteps = 2000;
     config.enableCheckpointing = true;
     config.enableReplay = true;

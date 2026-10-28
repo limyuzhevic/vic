@@ -5,11 +5,13 @@
 #include "../brain/Brain.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Constants.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 
 namespace nlm {
+using namespace nlm::constants;
 
 // Main Phase 3 demonstration
 // Shows: experience -> neural activity -> action -> consequence -> learning
@@ -195,23 +197,23 @@ public:
     
 private:
     void configureEnvironment(std::shared_ptr<Config> config) {
-        config->set("environment_width", 20);
-        config->set("environment_height", 20);
-        config->set("vision_width", 16);
-        config->set("vision_height", 16);
+        config->set("environment_width", DEFAULT_ENVIRONMENT_WIDTH);
+        config->set("environment_height", DEFAULT_ENVIRONMENT_HEIGHT);
+        config->set("vision_width", DEFAULT_VISION_WIDTH);
+        config->set("vision_height", DEFAULT_VISION_HEIGHT);
     }
     
     void configureBrain(std::shared_ptr<Config> config) {
-        config->set("neuron_count", 500);
-        config->set("region_count", 2);
-        config->set("connection_probability", 0.1f);
-        config->set("random_seed", 42u);
-        config->set("simulation_timestep", 0.001);
-        config->set("stdp_ltp_weight", 0.01f);
-        config->set("stdp_ltd_weight", 0.012f);
-        config->set("stdp_tau", 20.0f);
-        config->set("synaptogenesis_rate", 0.0001f);
-        config->set("pruning_rate", 0.00001f);
+        config->set("neuron_count", DEFAULT_NEURON_COUNT);
+        config->set("region_count", DEFAULT_REGION_COUNT);
+        config->set("connection_probability", DEFAULT_CONNECTION_PROBABILITY);
+        config->set("random_seed", DEFAULT_RANDOM_SEED);
+        config->set("simulation_timestep", DEFAULT_SIMULATION_TIMESTEP);
+        config->set("stdp_ltp_weight", DEFAULT_STDP_LTP_WEIGHT);
+        config->set("stdp_ltd_weight", DEFAULT_STDP_LTD_WEIGHT);
+        config->set("stdp_tau", DEFAULT_STDP_TAU);
+        config->set("synaptogenesis_rate", DEFAULT_SYNAPTOGENESIS_RATE);
+        config->set("pruning_rate", DEFAULT_PRUNING_RATE);
     }
     
     const char* motorCommandToString(MotorCommand cmd) {
