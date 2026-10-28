@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <limits>
 
 namespace nlm {
 
@@ -92,6 +93,11 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getIssues() const;
+    bool autoCorrect();
     
 private:
     struct Impl;

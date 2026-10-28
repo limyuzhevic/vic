@@ -366,7 +366,26 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Validate configuration
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Validating configuration...");
+    if (!config->validate()) {
+        NLM_LOG_WARNING("Configuration validation completed with warnings");
+    }
+    
+    // Check for and auto-correct configuration issues
+    if (config->autoCorrect()) {
+        NLM_LOG_INFO("Auto-corrected configuration issues");
+    }
+    
+    // Log configuration issues if any
+    auto issues = config->getIssues();
+    if (!issues.empty()) {
+        NLM_LOG_WARNING("Configuration issues found:");
+        for (const auto& issue : issues) {
+            NLM_LOG_WARNING("  - " + issue);
+        }
+    }
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
