@@ -95,7 +95,24 @@ if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
+# Enhanced Python bindings with type hints and Pythonic APIs
+pybind11_add_module(pynlm_enhanced
+    bindings_enhanced.cpp
+)
+target_link_libraries(pynlm_enhanced PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm_enhanced PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+if(MSVC)
+    target_compile_options(pynlm_enhanced PRIVATE /permissive-)
+endif()
+
 install(TARGETS pynlm
+    LIBRARY DESTINATION pynlm
+    ARCHIVE DESTINATION pynlm
+    RUNTIME DESTINATION pynlm
+)
+
+install(TARGETS pynlm_enhanced
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm

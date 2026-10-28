@@ -5,11 +5,22 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <stdexcept>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+
+// Exception class for configuration errors
+class ConfigException : public std::runtime_error {
+public:
+    explicit ConfigException(const std::string& message) 
+        : std::runtime_error("Config Error: " + message) {}
+    
+    ConfigException(const std::string& message, const std::string& details)
+        : std::runtime_error("Config Error: " + message + ". Details: " + details) {}
+};
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -55,7 +66,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/toml format support planned)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -64,14 +75,14 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values with validation
     template<typename T>
     std::optional<T> get(const std::string& key) const;
     
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -93,6 +104,18 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation methods
+    void validateKey(const std::string& key) const;
+    template<typename T>
+    void validateValue(const std::string& key, const T& value) const;
+    
+    // Get configuration statistics
+    size_t getEntryCount() const;
+    size_t getDefaultEntryCount() const;
+    size_t getFileEntryCount() const;
+    size_t getCommandLineEntryCount() const;
+    size_t getRuntimeEntryCount() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +123,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helper functions
+    static void validateKeyFormat(const std::string& key);
+    static void validateNumericType(const std::string& key, const ConfigValue& value);
+    static void validateStringType(const std::string& key, const ConfigValue& value);
+    static void validateVectorType(const std::string& key, const ConfigValue& value);
 };
 
 } // namespace nlm
