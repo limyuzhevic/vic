@@ -400,26 +400,405 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Version information
+    m.attr("__version__") = "0.1.0";
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Pythonic configuration helpers
+    m.def("configureBrainDefaults", [](std::shared_ptr<Config> config) {
+        if (!config) return;
+        // Set sensible defaults for brain configuration
+        config->set("brain.neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("brain.region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("brain.connection_probability", 0.05f, ConfigSource::Default);
+        config->set("brain.v_thresh", -50.0f, ConfigSource::Default);
+        config->set("brain.v_rest", -70.0f, ConfigSource::Default);
+        config->set("brain.v_reset", -75.0f, ConfigSource::Default);
+    }, py::arg("config"), "Apply default brain configuration values");
+
+    m.def("configureFastSimulation", [](std::shared_ptr<Config> config) {
+        if (!config) return;
+        // Optimized configuration for fast simulation
+        config->set("brain.neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("brain.region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("brain.connection_probability", 0.02f, ConfigSource::Default);
+        config->set("brain.v_thresh", -45.0f, ConfigSource::Default);
+        config->set("brain.v_rest", -65.0f, ConfigSource::Default);
+        config->set("brain.v_reset", -70.0f, ConfigSource::Default);
+    }, py::arg("config"), "Configure for fast simulation with fewer neurons");
+
+    // Convenience factory methods
+    m.def("createBrainWithDefaults", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, "Create a brain with default configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("createSimpleWorldConfigured", [](size_t width, size_t height,
+                                           size_t visionWidth = 8, size_t visionHeight = 8) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+       "Create and configure a simple world with specified dimensions");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Advanced simulation helpers
+    m.def("run_agent_simulation", [](std::shared_ptr<Brain> brain,
+                                    std::shared_ptr<SimpleWorld> world,
+                                    std::shared_ptr<AgentBrain> agent,
+                                    size_t num_steps,
+                                    double timestep = 0.1,
+                                    bool enable_learning = false,
+                                    bool enable_development = false) {
+        if (!brain || !world || !agent) return;
+
+        brain->initialize();
+        world->reset();
+        agent->initialize(*world);
+
+        // Enable subsystems if requested
+        if (enable_learning) {
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+        }
+        if (enable_development) {
+            agent->enableDevelopment(true);
+        }
+
+        for (size_t step = 0; step < num_steps; ++step) {
+            world->update(timestep);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"),
+       py::arg("timestep") = 0.1, py::arg("enable_learning") = false, py::arg("enable_development") = false,
+       "Run a complete agent simulation with brain, world, and agent brain interface");
+
+    m.def("create_brain_and_world", [](size_t width = 20, size_t height = 20,
+                                      size_t visionWidth = 8, size_t visionHeight = 8,
+                                      size_t neuronCount = 1000) -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+
+        auto agent = std::make_shared<AgentBrain>(brain);
+
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("width") = 20, py::arg("height") = 20, py::arg("visionWidth") = 8, py::arg("visionHeight") = 8, py::arg("neuronCount") = 1000,
+       "Create a complete brain-world-agent setup with sensible defaults");
+
+    m.def("run_development_simulation", [](std::shared_ptr<Brain> brain,
+                                           std::shared_ptr<SimpleWorld> world,
+                                           std::shared_ptr<AgentBrain> agent,
+                                           size_t num_steps = 500,
+                                           double timestep = 0.1) {
+        if (!brain || !world || !agent) return;
+
+        brain->initialize();
+        world->reset();
+        agent->initialize(*world);
+
+        // Enable development features
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+
+        for (size_t step = 0; step < num_steps; ++step) {
+            world->update(timestep);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            agent->updateDevelopment(timestep);
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps") = 500,
+       py::arg("timestep") = 0.1, "Run a development simulation focusing on brain maturation");
+
+    m.def("quick_test_simulation", [](std::shared_ptr<Brain> brain, size_t num_steps = 50) {
+        if (!brain) return;
+
+        brain->initialize();
+
+        for (size_t step = 0; step < num_steps; ++step) {
+            brain->step(step);
+        }
+    }, py::arg("brain"), py::arg("num_steps") = 50, "Run a quick test simulation with just the brain");
+
+    // World configuration helpers
+    m.def("createRichWorld", [](size_t width = 30, size_t height = 30) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 12, 12);
+        world->setRandomSeed(42);
+        return world;
+    }, py::arg("width") = 30, py::arg("height") = 30, "Create a rich world with random seed for reproducible experiments");
+
+    // Visualization integration helpers
+    m.def("create_visualization", []() -> std::shared_ptr<VisualizationInterface> {
+        return std::make_shared<VisualizationInterface>();
+    }, "Create a visualization interface for brain state visualization");
+
+    m.def("visualize_brain", [](std::shared_ptr<Brain> brain,
+                               std::shared_ptr<VisualizationInterface> viz,
+                               bool show_network = true,
+                               bool show_activity = true,
+                               bool show_spikes = true,
+                               bool show_weights = false) {
+        if (!brain || !viz) return;
+
+        viz->visualizeNetwork(*brain);
+        viz->visualizeActivity(*brain);
+        viz->visualizeWeights(*brain);
+        // Note: spike visualization requires spike event collection
+        // viz->visualizeSpikes(brain->getSpikeSystem()->getRecentSpikes());
+    }, py::arg("brain"), py::arg("viz"), py::arg("show_network") = true,
+       py::arg("show_activity") = true, py::arg("show_spikes") = true, py::arg("show_weights") = false,
+       "Visualize brain state using the visualization interface");
+
+    // Experiment management helpers
+    m.def("create_experiment", [](const std::string& name = "") -> std::shared_ptr<Experiment> {
+        return std::make_shared<Experiment>(name);
+    }, py::arg("name") = "", "Create an experiment for recording data");
+
+    m.def("create_experiment_with_seed", [](uint64_t seed, const std::string& name = "") -> std::shared_ptr<Experiment> {
+        auto exp = std::make_shared<Experiment>(name);
+        exp->setSeed(seed);
+        return exp;
+    }, py::arg("seed"), py::arg("name") = "", "Create an experiment with random seed for reproducible results");
+
+    m.def("run_experiment", [](std::shared_ptr<Brain> brain,
+                               std::shared_ptr<Experiment> experiment,
+                               size_t num_steps,
+                               bool enable_visualization = false,
+                               std::shared_ptr<VisualizationInterface> viz = nullptr) {
+        if (!brain || !experiment) return;
+
+        brain->initialize();
+        experiment->setStartStep(0);
+
+        if (enable_visualization && viz) {
+            viz->initialize();
+        }
+
+        for (size_t step = 0; step < num_steps; ++step) {
+            brain->step(step);
+
+            // Record experiment metrics
+            auto activeNeurons = brain->getActiveNeuronCount();
+            auto firingNeurons = brain->getFiringNeuronCount();
+            auto totalSpikes = brain->getTotalSpikeCount();
+            auto avgFiringRate = brain->getAverageFiringRate();
+
+            experiment->recordStep(step, brain->getTotalNeuronCount(),
+                                  brain->getTotalSynapseCount(),
+                                  firingNeurons, avgFiringRate);
+
+            // Record additional metrics
+            experiment->recordMetric("active_neurons", static_cast<double>(activeNeurons));
+            experiment->recordMetric("firing_neurons", static_cast<double>(firingNeurons));
+            experiment->recordMetric("total_spikes", static_cast<double>(totalSpikes));
+            experiment->recordMetric("firing_rate", static_cast<double>(avgFiringRate));
+
+            // Update visualization if requested
+            if (enable_visualization && viz) {
+                viz->update();
+            }
+        }
+
+        experiment->setEndStep(num_steps - 1);
+
+        if (enable_visualization && viz) {
+            viz->close();
+        }
+    }, py::arg("brain"), py::arg("experiment"), py::arg("num_steps"),
+       py::arg("enable_visualization") = false, py::arg("viz") = nullptr,
+       "Run an experiment recording brain metrics and optionally visualization");
+
+    // High-level experiment helpers
+    m.def("run_development_experiment", [](size_t neuron_count = 500,
+                                           size_t steps = 200,
+                                           uint64_t seed = 42) -> std::shared_ptr<Experiment> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuron_count), ConfigSource::Default);
+        config->set("brain.connection_probability", 0.02f, ConfigSource::Default);
+
+        auto brain = std::make_shared<Brain>(config);
+        auto experiment = std::make_shared<Experiment>("Development Experiment");
+        experiment->setSeed(seed);
+
+        brain->initialize();
+        experiment->setStartStep(0);
+
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step);
+
+            experiment->recordStep(step, brain->getTotalNeuronCount(),
+                                  brain->getTotalSynapseCount(),
+                                  brain->getFiringNeuronCount(),
+                                  brain->getAverageFiringRate());
+
+            // Record development metrics
+            experiment->recordMetric("developmental_stage", static_cast<double>(brain->getDevelopmentalStage()));
+            experiment->recordMetric("neurons_active", static_cast<double>(brain->getActiveNeuronCount()));
+        }
+
+        experiment->setEndStep(steps - 1);
+        return experiment;
+    }, py::arg("neuron_count") = 500, py::arg("steps") = 200, py::arg("seed") = 42,
+       "Run a complete development experiment and return results");
+
+    m.def("run_agent_experiment", [](std::shared_ptr<Brain> brain,
+                                    std::shared_ptr<SimpleWorld> world,
+                                    std::shared_ptr<AgentBrain> agent,
+                                    size_t num_steps = 300,
+                                    uint64_t seed = 42) -> std::shared_ptr<Experiment> {
+        if (!brain || !world || !agent) return nullptr;
+
+        auto experiment = std::make_shared<Experiment>("Agent Experiment");
+        experiment->setSeed(seed);
+
+        brain->initialize();
+        world->reset();
+        agent->initialize(*world);
+
+        // Enable learning features
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+
+        for (size_t step = 0; step < num_steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+
+            // Record agent metrics
+            experiment->recordStep(step, brain->getTotalNeuronCount(),
+                                  brain->getTotalSynapseCount(),
+                                  brain->getFiringNeuronCount(),
+                                  brain->getAverageFiringRate());
+
+            experiment->recordMetric("step_count", static_cast<double>(step));
+            experiment->recordMetric("curiosity", agent->getCuriosityLevel());
+            experiment->recordMetric("novelty", agent->getNoveltyLevel());
+            experiment->recordMetric("reward_modulation", agent->getNeuromodulationLevel());
+            experiment->recordMetric("action_success", 1.0); // Simplified
+        }
+
+        experiment->setEndStep(num_steps - 1);
+        return experiment;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps") = 300,
+       py::arg("seed") = 42, "Run an agent experiment and return recorded data");
+
+    // Utility functions for experiment analysis
+    m.def("analyze_experiment_metrics", [](const std::shared_ptr<Experiment>& experiment) {
+        if (!experiment) {
+            py::print("Error: Invalid experiment");
+            return py::dict();
+        }
+
+        auto metrics = experiment->getMetrics();
+        py::dict result;
+
+        for (const auto& metric : metrics) {
+            result[metric.first] = metric.second;
+        }
+
+        result["step_count"] = static_cast<double>(experiment->getEndStep() - experiment->getStartStep() + 1);
+        return result;
+    }, py::arg("experiment"), "Analyze experiment metrics and return summary statistics");
+
+    m.def("export_experiment_results", [](const std::shared_ptr<Experiment>& experiment,
+                                          const std::string& filename) -> bool {
+        if (!experiment) return false;
+
+        // Create a simple text export
+        std::ofstream file(filename);
+        if (!file.is_open()) return false;
+
+        file << "Experiment Results\n";
+        file << "==================\n\n";
+
+        file << "Name: " << experiment->getName() << "\n";
+        file << "Seed: " << experiment->getSeed() << "\n";
+        file << "Steps: " << (experiment->getEndStep() - experiment->getStartStep() + 1) << "\n\n";
+
+        file << "Metrics:\n";
+        auto metrics = experiment->getMetrics();
+        for (const auto& metric : metrics) {
+            file << "  " << metric.first << ": " << metric.second << "\n";
+        }
+
+        file << "\nStep Data:\n";
+        auto stepData = experiment->getStepData();
+        for (const auto& step : stepData) {
+            file << "  Step " << step.step << ": "
+                 << "neurons=" << step.neuronCount
+                 << " synapses=" << step.synapseCount
+                 << " firing=" << step.firingCount
+                 << " rate=" << step.avgFiringRate << "\n";
+        }
+
+        file.close();
+        return true;
+    }, py::arg("experiment"), py::arg("filename"), "Export experiment results to a text file");
+
+    // Error handling and validation
+    m.def("validate_simulation_setup", [](std::shared_ptr<Brain> brain,
+                                         std::shared_ptr<SimpleWorld> world,
+                                         std::shared_ptr<AgentBrain> agent) -> std::string {
+        std::vector<std::string> errors;
+
+        if (!brain) errors.push_back("Brain is null or not initialized");
+        if (!world) errors.push_back("World is null or not initialized");
+        if (!agent) errors.push_back("Agent is null or not initialized");
+
+        if (brain && brain->getTotalNeuronCount() == 0) {
+            errors.push_back("Brain has no neurons");
+        }
+
+        if (world && (world->getWidth() == 0 || world->getHeight() == 0)) {
+            errors.push_back("World has invalid dimensions");
+        }
+
+        if (errors.empty()) {
+            return "Setup is valid";
+        } else {
+            std::string result = "Setup validation errors:\n";
+            for (const auto& error : errors) {
+                result += "  - " + error + "\n";
+            }
+            return result;
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), "Validate simulation setup and return error messages");
+
+    m.def("quick_benchmark", [](size_t neuron_count = 1000, size_t steps = 100) -> double {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuron_count), ConfigSource::Default);
+
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+
+        auto start_time = std::chrono::high_resolution_clock::now();
+
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end_time - start_time);
+
+        return duration.count();
+    }, py::arg("neuron_count") = 1000, py::arg("steps") = 100,
+       "Run a quick benchmark and return execution time in seconds");
 }
 
 } // namespace nlm
