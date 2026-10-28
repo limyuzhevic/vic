@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <fstream>
 
 namespace nlm {
 
@@ -93,6 +94,10 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Internal access for metadata
+    ConfigEntry& getEntry(const std::string& key);
+    const ConfigEntry& getEntry(const std::string& key) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +105,17 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Load from specific formats
+    bool loadFromSimple(std::ifstream& file);
+    bool loadFromJson(std::ifstream& file);
+    bool loadFromYaml(std::ifstream& file);
+    
+    // Helper function to convert JSON to ConfigValue
+    static ConfigValue jsonToConfigValue(const nlohmann::json& jsonValue);
+    
+    // Friend declaration for the implementation
+    friend std::string Config::configValueToJson(const ConfigValue& value);
 };
 
 } // namespace nlm
