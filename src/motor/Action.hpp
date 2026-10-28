@@ -18,6 +18,8 @@ enum class ActionType {
     Look,
     LookUp,
     LookDown,
+    TurnUp,
+    TurnDown,
     Interact,
     Eat,
     Drink,
