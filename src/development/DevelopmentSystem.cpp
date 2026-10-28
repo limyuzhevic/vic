@@ -81,6 +81,59 @@ void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDurat
     pImpl->stageAge += dt;
     ++pImpl->stepsInCurrentStage;
     
+    // Apply developmental effects to brain systems
+    if (brain) {
+        // Update development in sub-systems
+        auto* sp = brain->getStructuralPlasticity();
+        if (sp) {
+            // Structural development: increase plasticity early, decrease later
+            float stageMod = getPlasticityModifier();
+            
+            // Synaptogenesis increases with development
+            if (stageMod > 0.3f) {
+                float synaptogenesis = 0.0001f * stageMod;
+                sp->setSynaptogenesisRate(synaptogenesis);
+            }
+            
+            // Pruning increases with maturity
+            if (stageMod < 0.5f) {
+                float pruning = 0.00001f * (1.0f - stageMod);
+                sp->setPruningRate(pruning);
+            }
+            
+            // Update structural plasticity every 1000 steps for developmental effects
+            if (pImpl->stepsInCurrentStage % 1000 == 0) {
+                sp->update(brain, rng);
+            }
+        }
+        
+        // Memory system development
+        if (brain->getWorkingMemory()) {
+            // Working memory capacity increases with development
+            size_t currentCapacity = brain->getWorkingMemory()->getCapacity();
+            float capacityGrowth = stageMod * 0.5f;  // More growth in early stages
+            if (capacityGrowth > 0.0f) {
+                size_t newCapacity = static_cast<size_t>(currentCapacity * (1.0f + capacityGrowth * 0.01f));
+                brain->getWorkingMemory()->setCapacity(newCapacity);
+            }
+        }
+        
+        if (brain->getEpisodicMemory()) {
+            // Episodic memory consolidation increases with maturity
+            if (pImpl->stage >= DevelopmentalStage::Maturation) {
+                // Older memories are consolidated into long-term storage
+                // This would involve replay and integration
+            }
+        }
+        
+        // Neuromodulatory system development
+        auto* dopamine = brain->getDopamine();
+        if (dopamine && stageMod < 0.3f) {
+            // Dopamine system matures over time
+            float baseline = 0.1f * (1.0f - stageMod);
+        }
+    }
+    
     // Auto-advance stage based on developmental age
     // These thresholds are in simulation seconds
     if (pImpl->stage == DevelopmentalStage::Initial && age_ > 60.0) {

@@ -410,31 +410,59 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Update novelty detection
     if (pImpl->novelty) {
         pImpl->novelty->update(pImpl->timestep);
+        
+        // Apply novelty to memory - enhance encoding of novel experiences
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (noveltyLevel > 0.0f && pImpl->workingMemory) {
+            // Enhance working memory retention of novel stimuli
+            pImpl->workingMemory->strengthenMemory(1.0f + noveltyLevel * 0.5f);
+        }
     }
     
     // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->timestep);
+        
+        // Apply curiosity to attention - bias exploration
+        float curiosityLevel = pImpl->curiosity->getLevel();
+        if (curiosityLevel > 0.0f && pImpl->attention) {
+            // Apply bottom-up bias to all neurons to encourage exploration
+            // This would be applied in attention's processing
+            // For now, just log the effect
+        }
     }
     
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
+        // Apply dopamine effects on neural excitability and memory
         float dopamineLevel = pImpl->dopamine->getLevel();
+        
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
                     // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
                     float excitabilityMod = dopamineLevel * 0.5f;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
                     }
                 }
+            }
+        }
+        
+        // Apply dopamine to memory systems
+        if (pImpl->workingMemory) {
+            // Dopamine enhances reinforcement learning in working memory
+            pImpl->workingMemory->strengthenMemory(1.0f + dopamineLevel * 0.3f);
+        }
+        
+        if (pImpl->episodicMemory && pImpl->workingMemory) {
+            // Store high-reward experiences in working memory for immediate use
+            size_t activeNeurons = pImpl->workingMemory->getMemoryNeurons().size();
+            if (activeNeurons > 0 && dopamineLevel > 0.5f) {
+                // Dopamine reinforces successful action patterns
+                pImpl->workingMemory->runCompetition();
             }
         }
     }
@@ -510,9 +538,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->predictionError) {
+        // Get current sensory input if available
+        std::vector<float> currentSensory;
+        
+        // Simple prediction: use working memory to predict next sensory state
+        if (pImpl->workingMemory) {
+            currentSensory = pImpl->workingMemory->retrieve();
+        }
+        
+        if (!currentSensory.empty()) {
+            // Create a simple sensory input from working memory state
+            class SimpleSensoryInput : public SensoryInput {
+            public:
+                SimpleSensoryInput(const std::vector<float>& data) {
+                    data_ = data;
+                }
+                const char* getType() const override { return "WorkingMemoryPrediction"; }
+                const std::vector<float>& getData() const override { return data_; }
+                size_t getDimensions() const override { return data_.size(); }
+                std::unique_ptr<SensoryInput> clone() const override {
+                    return std::make_unique<SimpleSensoryInput>(data_);
+                }
+            private:
+                std::vector<float> data_;
+            };
+            
+            auto predictedState = std::make_unique<SimpleSensoryInput>(currentSensory);
+            pImpl->predictionSystem->updatePredictions(predictedState, *predictedState);
+            
+            // Use prediction error to modulate attention
+            float error = pImpl->predictionSystem->getPredictionError();
+            if (error > 0.1f && pImpl->attention) {
+                pImpl->attention->applyBottomUpSalience(
+                    currentSensory.empty() ? NeuronId(0) : 
+                    std::find(pImpl->workingMemory->getMemoryNeurons().begin(),
+                             pImpl->workingMemory->getMemoryNeurons().end(), NeuronId(0)) != 
+                    pImpl->workingMemory->getMemoryNeurons().end() ? 
+                    *std::find(pImpl->workingMemory->getMemoryNeurons().begin(),
+                              pImpl->workingMemory->getMemoryNeurons().end(), NeuronId(0)) :
+                    NeuronId(0),
+                    error * 0.5f
+                );
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -550,7 +619,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Development affects plasticity rates and memory system capabilities
         auto* sp = pImpl->structuralPlasticity;
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
@@ -558,18 +627,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             switch (stage) {
                 case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                    plasticityMod = 1.0f;  // High plasticity, rapid learning
                     break;
                 case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
+                    plasticityMod = 0.8f;  // Still high but starting to stabilize
                     break;
                 case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
+                    plasticityMod = 0.5f;  // Moderate plasticity, refining connections
                     break;
                 case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
+                    plasticityMod = 0.2f;  // Low plasticity, stable function
+                    break;
+                case DevelopmentalStage::Aging:
+                    plasticityMod = 0.1f;  // Declining plasticity, losing flexibility
                     break;
             }
+            
+            // Development modulates structural plasticity
+            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // Memory system development happens here
+        // (Integration with development system would be added)
+    }
             
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));

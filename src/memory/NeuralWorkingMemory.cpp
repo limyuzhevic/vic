@@ -122,7 +122,7 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         float activation = memoryActivations_[i];
         
         if (activation > 0.1f) {
-            // Inject maintenance current
+            // Inject maintenance current to sustain activity
             brain_->injectCurrent(neuron, activation * 2.0f);
             
             // Age the trace
@@ -140,8 +140,11 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     // Decay weak traces
     decayWeakTraces();
     
-    // Run competition to select winners
+    // Run competition to select winners for attention
     runCompetition();
+    
+    // Create maintenance connections for persistent activity
+    updateRecurrentConnections();
 }
 
 void NeuralWorkingMemory::clear() {
