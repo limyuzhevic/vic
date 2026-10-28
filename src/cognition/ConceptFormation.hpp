@@ -115,11 +115,11 @@ public:
 
     // Update concept with new instance
     void updateConcept(size_t conceptId, const std::vector<float>& newPattern,
-                      const std::vector<float>& features, float reward);
+                       const std::vector<float>& features, float reward);
 
     // Compute similarity between two patterns
     float computeSimilarity(const std::vector<float>& a,
-                          const std::vector<float>& b) const;
+                           const std::vector<float>& b) const;
 
     // Check if pattern is novel (doesn't belong to any existing concept)
     bool isNovel(const std::vector<float>& pattern,
@@ -153,7 +153,6 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
-    Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
     

@@ -14,6 +14,7 @@ find_package(pybind11 CONFIG REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
+# NLM Core Library Sources
 set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
@@ -60,43 +61,82 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
 )
 
+# NLM Agent Library Sources
 set(NLM_AGENT_SOURCES
     ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
     ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
 )
 
+# NLM World Library Sources
 set(NLM_WORLD_SOURCES
     ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
 )
 
+# Python Bindings Sources
+set(NLM_PYTHON_SOURCES
+    bindings.cpp
+    bindings_basic_types.cpp
+    bindings_core_classes.cpp
+    bindings_sensory_motor.cpp
+)
+
+# Build NLM Core Library
 add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>
     $<INSTALL_INTERFACE:include>
 )
 target_compile_options(nlm_core PRIVATE
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
-    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Werror>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
 )
 
+# Build NLM Agent Library
 add_library(nlm_agent STATIC ${NLM_AGENT_SOURCES})
 target_include_directories(nlm_agent PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
+# Build NLM World Library
 add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+# Build Python Extension Module
+pybind11_add_module(pynlm ${NLM_PYTHON_SOURCES})
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_compile_options(pynlm PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Werror>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
 
+# Installation
 install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+# Package configuration for find_package support
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    pynlm-config-version.cmake
+    VERSION 0.1.0
+    COMPATIBILITY AnyNewerVersion
+)
+
+configure_package_config_file(
+    pynlm-config.cmake.in
+    pynlm-config.cmake
+    INSTALL_DESTINATION lib/cmake/pynlm
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/pynlm-config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/pynlm-config-version.cmake
+    DESTINATION lib/cmake/pynlm
 )

@@ -26,7 +26,7 @@ ConceptFormation::~ConceptFormation() = default;
 
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // Remove redundant brain_ pointer since it's already stored in pImpl->brain
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 

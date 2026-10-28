@@ -328,6 +328,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
+
+    // Execute all integrated brain subsystems
+    processDelayedSpikes(currentStep, currentTime);
+    updateNeuronDynamics(currentTime);
+    detectAndScheduleSpikes(currentStep, currentTime);
+    updateWorkingMemory();
+    applyNeuromodulation();
+    applyPlasticity();
+    updateEpisodicMemory(currentStep);
+    updatePredictionSystem();
+    updateAttentionSystem();
+    updateConceptFormation();
+    applyStructuralPlasticity(currentStep);
+    replayMemories(currentStep);
+    applyDevelopmentEffects(currentStep);
+    consolidateMemories(currentStep);
+    manageCheckpoints(currentStep, currentTime);
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
@@ -551,8 +568,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
+        if (pImpl->structuralPlasticity) {
             DevelopmentalStage stage = pImpl->developmentalStage;
             float plasticityMod = 1.0f;
             
@@ -571,8 +587,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     break;
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            pImpl->structuralPlasticity->setSynaptogenesisRate(0.0001f * plasticityMod);
+            pImpl->structuralPlasticity->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
     }
     
