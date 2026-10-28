@@ -61,6 +61,9 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Load from simple key=value file (backward compatibility)
+    bool loadFromKeyValue(const std::string& filepath);
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
@@ -93,13 +96,67 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Advanced features for power users
+    
+    // Get configuration source for a key
+    ConfigSource getSource(const std::string& key) const;
+    
+    // Check if key was modified from file
+    bool isFileModified(const std::string& key) const;
+    
+    // Get all keys from a specific source
+    std::vector<std::string> getKeysFromSource(ConfigSource source) const;
+    
+    // Validate configuration against schema
+    bool validate(const std::string& schemaFile = "") const;
+    
+    // Get configuration as JSON string
+    std::string toJSON() const;
+    
+    // Get configuration as YAML string
+    std::string toYAML() const;
+    
+    // Load from environment variables (prefix)
+    void loadFromEnv(const std::string& prefix = "NLM_");
+    
+    // Merge another configuration
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    
+    // Export configuration to simple key=value format
+    void exportKeyValue(std::ostream& output) const;
+    
+    // Import configuration from simple key=value format
+    bool importKeyValue(std::istream& input, ConfigSource source = ConfigSource::File);
+    
+    // Configuration templates for common patterns
+    static Config getDefaultConfig();
+    static Config getProductionConfig();
+    static Config getDebugConfig();
+    
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Direct implementation instead of Pimpl for better performance and simplicity
+    std::vector<ConfigEntry> entries_;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parsing helpers
+    void flattenJSON(const nlohmann::json& json, const std::string& prefix, ConfigSource source);
+    void flattenYAML(const YAML::Node& node, const std::string& prefix, ConfigSource source);
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Validation helpers
+    bool validateSchema(const std::string& schema) const;
+    void validateValueTypes() const;
+    
+    // Environment variable helpers
+    void processEnvVariable(const std::string& name, const std::string& value);
+    
+    // JSON/YAML export helpers
+    void toJSONImpl(nlohmann::json& json) const;
+    void toYAMLImpl(YAML::Emitter& emitter) const;
 };
 
 } // namespace nlm
