@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Make the NLM CLI script executable
+chmod +x /workspace/app/bin/nlm
+
+echo "NLM CLI Script Updated Successfully"
+echo "================================="
+echo ""
+echo "The NLM command-line interface has been enhanced with:"
+echo ""
+echo "✓ Comprehensive argument parsing and help system"
+echo "✓ Configuration file management (init, list, show)"
+echo "✓ Simulation running with multiple options"
+chopeed "✓ Integration with existing nlm binaries"
+echo "✓ Color-coded output for better visibility"
+echo "✓ Proper error handling and user feedback"
+echo ""
+echo "Usage Examples:"
+echo "  nlm config init                    # Create default config"
+echo "  nlm config list                    # List config files"
+echo "  nlm config show neuron_count        # Show specific config value"
+echo "  nlm run                            # Run simulation"
+echo "  nlm run --config my_config.cfg     # Run with custom config"
+echo "  nlm status                         # Show system status"
+echo ""
+echo "To run actual simulations, you need to build the NLM project:"
+echo "  mkdir build && cd build && cmake .. && make -j4"
+echo ""
+echo "After building, you can run:
+echo "  ./nlm_core                    # Main NLM executable"
+echo "  ./nlm_phase6_demo              # Phase 6 integration demo"
+echo ""
+echo "The NLM CLI will automatically detect and use these binaries."

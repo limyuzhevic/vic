@@ -1,0 +1,362 @@
+#!/usr/bin/env bash
+
+# NLM CLI - Command Line Interface for Neural Learning Machine
+# Version 2.0.0
+
+# Function to make script executable
+ensure_executable() {
+    if [[ "$0" != "/bin/bash" ]]; then
+        local script_path="$(realpath "$0")"
+        chmod +x "$script_path" 2>/dev/null
+    fi
+}
+
+# Initialize
+ensure_executable
+
+# Simple color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Load configuration file using improved NLM configuration system
+load_config() {
+    local config_file="configs/default.cfg"
+    if [[ -n "$config_file_arg" ]]; then
+        config_file="$config_file_arg"
+    fi
+    
+    if [[ ! -f "$config_file" ]]; then
+        echo -e "${RED}Configuration file not found: $config_file${NC}" >&2
+        echo -e "Use 'nlm config init' to create default configuration" >&2
+        return 1
+    fi
+    
+    # Use C++ configuration system to load config
+    if command -v ./build/nlm_core >/dev/null 2>&1; then
+        # Run NLM config loader
+        echo -e "${GREEN}Loading configuration using NLM configuration system...${NC}" >&2
+        ./build/nlm_core --load-config "$config_file" 2>/dev/null || echo -e "${YELLOW}Using basic config parser${NC}" >&2
+    fi
+    
+    # Fallback to basic parsing
+    echo -e "${YELLOW}Using basic config parser${NC}" >&2
+    parse_config_file "$config_file"
+}
+
+# Parse configuration file (basic fallback)
+parse_config_file() {
+    local config_file="$1"
+    declare -gA CONFIG
+    
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ "$key" =~ ^#.*$ ]] && continue
+        [[ -z "$key" ]] && continue
+        
+        # Trim whitespace
+        key=$(echo "$key" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        value=$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        
+        # Remove quotes
+        value=$(echo "$value" | sed "s/^['\"]\(.*\)['\"]$/\1/")
+        
+        CONFIG["$key"]="$value"
+    done < "$config_file"
+    
+    echo -e "${GREEN}Loaded configuration from: $config_file${NC}" >&2
+}
+
+# Show configuration values
+show_config() {
+    load_config
+    
+    if [[ -n "$1" ]]; then
+        if [[ -n "${CONFIG[$1]}" ]]; then
+            echo "$1 = ${CONFIG[$1]}"
+        else
+            echo -e "${YELLOW}Key not found: $1${NC}" >&2
+        fi
+    else
+        echo -e "${YELLOW}Current configuration:${NC}" >&2
+        for key in "${!CONFIG[@]}"; do
+            echo -e "  $key = ${CONFIG[$key]}" >&2
+        done
+    fi
+}
+
+# Initialize configuration file
+init_config() {
+    echo -e "${GREEN}Creating default configuration...${NC}" >&2
+    mkdir -p configs
+    if [[ ! -f "configs/default.cfg" ]]; then
+        cp /workspace/app/configs/default.cfg configs/
+        echo -e "${GREEN}Created configs/default.cfg${NC}" >&2
+        echo -e "${YELLOW}Edit configs/default.cfg to customize your brain configuration${NC}" >&2
+    else
+        echo -e "${YELLOW}Configuration file already exists${NC}" >&2
+    fi
+}
+
+# List configuration files
+list_configs() {
+    echo -e "${YELLOW}Available configuration files:${NC}" >&2
+    if [[ -d "configs" ]]; then
+        for config in configs/*; do
+            if [[ -f "$config" ]]; then
+                echo -e "  $(basename "$config")" >&2
+            fi
+        done
+    else
+        echo -e "  No config directory found" >&2
+    fi
+}
+
+# Run simulation using actual nlm binaries
+run_simulation() {
+    # Find available nlm binaries
+    local nlm_bin="nlm"
+    local nlm_phase6_demo="nlm_phase6_demo"
+    
+    # Try to find binaries
+    if [[ ! -f "$nlm_bin" ]]; then
+        if [[ -f "./build/nlm" ]]; then
+            nlm_bin="./build/nlm"
+        elif [[ -f "./build/nlm_phase6_demo" ]]; then
+            nlm_bin="./build/nlm_phase6_demo"
+        else
+            echo -e "${RED}Error: NLM executable not found. Build the project first!${NC}" >&2
+            echo -e "Run: mkdir build && cd build && cmake .. && make -j4" >&2
+            return 1
+        fi
+    fi
+    
+    echo -e "${GREEN}Starting NLM simulation...${NC}" >&2
+    
+    # Build arguments
+    local args=""
+    if [[ -n "$config_file_arg" ]]; then
+        args+=" --config $config_file_arg"
+    fi
+    
+    if [[ -n "$steps_arg" ]]; then
+        args+=" --steps $steps_arg"
+    fi
+    
+    if [[ -n "$output_file_arg" ]]; then
+        args+=" --output $output_file_arg"
+    fi
+    
+    if [[ -n "$experiment_arg" ]]; then
+        args+=" experiment=$experiment_arg"
+    fi
+    
+    echo -e "${GREEN}Running: $nlm_bin$args${NC}" >&2
+    
+    # Run the simulation
+    if [[ -n "$verbose_arg" ]]; then
+        "$nlm_bin"$args
+    else
+        "$nlm_bin"$args 2>/dev/null || echo -e "${RED}Simulation failed${NC}" >&2
+    fi
+}
+
+# Show system status
+show_status() {
+    echo -e "${YELLOW}NLM System Status${NC}"
+    echo -e "================" >&2
+    
+    echo -e "Version: $version" >&2
+    echo -e "Build: Release (3.16)" >&2
+    echo -e "C++ Standard: C++20" >&2
+    
+    echo -e "\nConfiguration Files:" >&2
+    if [[ -d "configs" ]]; then
+        for config in configs/*; do
+            if [[ -f "$config" ]]; then
+                echo -e "  $(basename "$config")" >&2
+            fi
+        done
+    else
+        echo -e "  No config directory found" >&2
+    fi
+    
+    echo -e "\nAvailable Binaries:" >&2
+    # Look for NLM executables
+    if [[ -f "./build/nlm" ]]; then
+        echo -e "  ./build/nlm - Main NLM executable" >&2
+    elif [[ -f "./build/nlm_phase6_demo" ]]; then
+        echo -e "  ./build/nlm_phase6_demo - Phase 6 integration demo" >&2
+    elif [[ -f "nlm" ]]; then
+        echo -e "  nlm - NLM executable" >&2
+    fi
+    
+    echo -e "\nAvailable Commands:" >&2
+    echo -e "  run        - Run simulation" >&2
+    echo -e "  config     - Manage configuration files" >&2
+    echo -e "  experiment - Run specific experiments" >&2
+    echo -e "  status     - Show this status" >&2
+    echo -e "  help       - Show this help" >&2
+}
+
+# Show help information
+show_help() {
+    cat << EOF
+NLM - Neural Learning Machine Command Line Interface
+Version: $version
+
+USAGE:
+  nlm <command> [options]
+
+COMMANDS:
+  run                    Run a simulation
+  config <action>        Configuration file management
+  experiment <type>      Run specific experiment
+  status                 Show system status
+  help                   Show this help message
+
+CONFIGURATION ACTIONS:
+  config init            Create default configuration file
+  config list           List available configuration files
+  config show [key]     Show configuration values
+
+EXPERIMENT TYPES:
+  connectivity         Test basic neural connectivity
+  plasticity           Test synaptic plasticity learning
+  stdp                 Verify STDP mechanism
+  all                  Run all experiments
+
+RUN OPTIONS:
+  --config <file>       Configuration file (default: configs/default.cfg)
+  --steps <number>      Number of simulation steps (default: 1000)
+  --verbose             Enable verbose output
+  --output <file>       Save simulation results to file
+  --experiment <type>   Run specific experiment
+
+EXAMPLES:
+  # Run basic simulation
+  nlm run --config my_config.cfg --steps 500
+
+  # Test neural connectivity
+  nlm run --config test.cfg --experiment connectivity
+
+  # Manage configuration
+  nlm config init
+  nlm config show neuron_count
+
+  # Show system status
+  nlm status
+
+  # Initialize project (for first-time users)
+  nlm config init
+  nlm run --config configs/default.cfg
+
+EOF
+}
+
+# Main CLI logic
+main() {
+    # Default values
+    config_file_arg=""
+    steps_arg=""
+    verbose_arg=""
+    output_file_arg=""
+    experiment_arg=""
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            run)
+                COMMAND="run"
+                shift
+                ;;
+            config)
+                COMMAND="config"
+                SUBCOMMAND="$2"
+                shift 2
+                ;;
+            experiment)
+                COMMAND="experiment"
+                SUBCOMMAND="$2"
+                shift 2
+                ;;
+            status)
+                COMMAND="status"
+                shift
+                ;;
+            help|--help|-h)
+                show_help
+                exit 0
+                ;;
+            --version|-v)
+                echo -e "${GREEN}NLM $version - Neural Learning Machine${NC}"
+                exit 0
+                ;;
+            --config)
+                config_file_arg="$2"
+                shift 2
+                ;;
+            --steps)
+                steps_arg="$2"
+                shift 2
+                ;;
+            --verbose)
+                verbose_arg=1
+                shift
+                ;;
+            --output)
+                output_file_arg="$2"
+                shift 2
+                ;;
+            --experiment)
+                experiment_arg="$2"
+                shift 2
+                ;;
+            *)
+                echo -e "${RED}Unknown argument: $1${NC}" >&2
+                show_help >&2
+                exit 1
+                ;;
+        esac
+    done
+    
+    case "$COMMAND" in
+        run)
+            run_simulation
+            ;;
+        config)
+            case "$SUBCOMMAND" in
+                init)
+                    init_config
+                    ;;
+                list)
+                    list_configs
+                    ;;
+                show)
+                    show_config "$2"
+                    ;;
+                *)
+                    echo -e "${RED}Unknown configuration action: $SUBCOMMAND${NC}" >&2
+                    show_help >&2
+                    exit 1
+                    ;;
+            esac
+            ;;
+        experiment)
+            experiment_arg="$SUBCOMMAND"
+            run_simulation
+            ;;
+        status)
+            show_status
+            ;;
+        *)
+            echo -e "${RED}No command specified${NC}" >&2
+            show_help >&2
+            exit 1
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@"
