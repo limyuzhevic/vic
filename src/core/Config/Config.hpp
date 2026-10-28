@@ -1,10 +1,10 @@
 #pragma once
 
+#include <functional>
+#include <vector>
 #include <string>
 #include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
+#include <limits>
 
 namespace nlm {
 
@@ -64,37 +64,48 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get vector values
     template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    std::optional<std::vector<T>> get(const std::string& key) const;
     
+    // Set vector values
     template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-    
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
-    
-    // Check existence
-    bool has(const std::string& key) const;
+    void set(const std::string& key, const std::vector<T>& value, ConfigSource source = ConfigSource::Runtime);
     
     // Remove key
     void remove(const std::string& key);
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Get configuration value with validation and error handling
+    template<typename T>
+    std::optional<T> getValidated(const std::string& key, std::function<bool(const T&)> validator = nullptr) const;
     
-    // Clear all
-    void clear();
+    // Get multiple configuration values
+    std::vector<std::pair<std::string, std::string>> getConfigValues(const std::vector<std::string>& keys) const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration merging
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    
+    // Configuration path resolution for relative paths
+    std::string resolvePath(const std::string& path) const;
+    
+    // Configuration validation interface
+    void addValidator(const std::string& key, std::shared_ptr<Validator> validator);
+    bool validateAll() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Convenience validation methods
+    bool isValid(const std::string& key) const;
+    bool isRequired(const std::string& key) const;
+    
+    // Configuration summary with filtering
+    std::string summary(const std::string& filter = "") const;
     
 private:
-    struct Impl;
+    struct Impl {
+        std::vector<ConfigEntry> entries;
+        std::unordered_map<std::string, std::shared_ptr<Validator>> validators;
+        std::vector<std::string> validationErrors;
+    };
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
