@@ -6,11 +6,117 @@ NLM is a **brain simulator** for computers. It lets you create virtual brains th
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
+- **Synapses** = Connections between brain cells  
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
 That's it! NLM simulates all of this.
+
+## NEW: Using the Enhanced Python API
+
+With the recent improvements, NLM now has a more comprehensive Python API with better organization, utilities, and advanced features. Here's how to use the enhanced version:
+
+### Quick Start with Enhanced API
+
+```python
+import pynlm
+
+# Create a brain with preset configuration
+brain = pynlm.create_simple_brain(1000, enable_plasticity=True)
+
+# Initialize the brain
+brain.initialize()
+
+# Run simulation with progress tracking
+print("Starting simulation...")
+for step in range(100):
+    brain.step(step)
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+
+print(f"Simulation complete! Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+### Advanced: Using Presets and Utilities
+
+```python
+import pynlm
+
+# Create a research-grade brain with optimized configuration
+brain = pynlm.create_brain_from_preset('research')
+
+# Create world and agent
+world, agent = pynlm.create_agent_environment(brain, width=30, height=30)
+
+# Enable learning subsystems
+agent.enable_reward_modulation(True)
+agent.enable_curiosity(True)
+agent.enable_development(True)
+
+# Run a learning episode
+steps_completed = pynlm.run_simulation_episode(world, agent, brain, 500)
+print(f"Episode completed in {steps_completed} steps")
+
+# Validate configuration
+warnings = pynlm.validate_configuration(brain.getConfig())
+if warnings:
+    print("Configuration warnings:", warnings)
+```
+
+### Performance Monitoring
+
+```python
+import pynlm
+import time
+
+# Create brain
+brain = pynlm.create_brain_from_preset('performance_test')
+
+# Monitor performance
+start_time = time.time()
+steps = 1000
+
+for step in range(steps):
+    brain.step(step)
+
+end_time = time.time()
+elapsed = end_time - start_time
+
+print(f"Performance: {steps/elapsed:.1f} steps/second")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+```
+
+### Parallel Simulations
+
+```python
+import pynlm
+from pynlm.commands import ExecutionMode
+
+# Create base configuration
+brain_config = pynlm.createDefaultConfig()
+brain_config.set("brain.neuron_count", 500)
+
+world_config = {
+    'width': 20,
+    'height': 20,
+    'enable_reward_modulation': True,
+    'enable_curiosity': True,
+    'enable_development': True,
+}
+
+# Run parallel simulations
+results = pynlm.run_parallel_simulations(
+    brain_config, world_config, 
+    num_simulations=4, steps=500,
+    mode=ExecutionMode.PARALLEL
+)
+
+# Analyze results
+analysis = pynlm.analyze_simulation_results(results)
+print(f"Best configuration: {analysis['best_performing_config']}")
+print(f"Average performance: {analysis['average_performance']}")
+```
 
 ---
 
