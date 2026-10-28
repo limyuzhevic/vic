@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <filesystem>
 
 namespace nlm {
 
@@ -12,6 +13,11 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    std::string logFilePath;
+    size_t maxFileSize = 10 * 1024 * 1024;  // 10MB
+    size_t currentFileSize = 0;
+    bool rotateLogs = false;
+    size_t maxLogFiles = 5;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -32,15 +38,20 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp with milliseconds
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        entry.timestamp.time_since_epoch()) % 1000;
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    oss << "." << std::setfill('0') << std::setw(3) << ms.count();
     
-    oss << " " << entry.message;
+    oss << " [" << entry.file << ":" << entry.line << "] ";
+    oss << entry.function << ": ";
+    oss << entry.message;
     
     std::string output = oss.str();
     
-    // Console output
+    // Console output with enhanced formatting
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
     } else {
@@ -50,8 +61,44 @@ void ConsoleLogger::log(const LogEntry& entry) {
     // File output if set
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
+        pImpl->currentFileSize += output.size() + 1;  // +1 for newline
+        
+        // Check file size and rotate if needed
+        if (pImpl->rotateLogs && pImpl->currentFileSize >= pImpl->maxFileSize) {
+            rotateLogFile();
+        }
+        
         pImpl->fileOut.flush();
     }
+}
+
+void ConsoleLogger::rotateLogFile() {
+    if (!pImpl->rotateLogs) return;
+    
+    // Close current file
+    pImpl->fileOut.close();
+    
+    // Rotate existing log files
+    std::vector<std::string> logFiles;
+    std::string baseName = pImpl->logFilePath;
+    
+    for (size_t i = pImpl->maxLogFiles - 1; i > 0; --i) {
+        std::string oldName = baseName + "." + std::to_string(i - 1);
+        std::string newName = baseName + "." + std::to_string(i);
+        
+        if (std::filesystem::exists(oldName)) {
+            std::filesystem::rename(oldName, newName);
+        }
+    }
+    
+    // Rename current file
+    if (std::filesystem::exists(baseName)) {
+        std::filesystem::rename(baseName, baseName + ".0");
+    }
+    
+    // Open new file
+    pImpl->fileOut.open(baseName, std::ios::app);
+    pImpl->currentFileSize = 0;
 }
 
 void ConsoleLogger::setLevel(LogLevel level) {
@@ -71,7 +118,20 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    pImpl->logFilePath = filepath;
+    
+    // Ensure directory exists
+    std::filesystem::path path(filepath);
+    std::filesystem::create_directories(path.parent_path());
+    
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    // Open new file
     pImpl->fileOut.open(filepath, std::ios::app);
+    pImpl->currentFileSize = 0;
 }
 
 void ConsoleLogger::closeOutputFile() {
@@ -97,7 +157,7 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
         case LogLevel::Info: return "\033[32m";      // Green
         case LogLevel::Warning: return "\033[33m";   // Yellow
         case LogLevel::Error: return "\033[31m";     // Red
-        case LogLevel::Critical: return "\033[35m"; // Magenta
+        case LogLevel::Critical: return "\033[35m\033[1m"; // Magenta + Bold
         default: return "\033[0m";
     }
 }
@@ -168,7 +228,7 @@ void Logger::critical(const std::string& message, const std::string& file, int l
 
 bool Logger::isEnabled(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
+    for (const auto& logger : pImpl->loggers) {
         if (logger->getLevel() <= level) {
             return true;
         }
@@ -177,21 +237,12 @@ bool Logger::isEnabled(LogLevel level) const {
 }
 
 Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
+    static std::shared_ptr<Logger> globalLogger = std::make_shared<Logger>();
+    return *globalLogger;
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
-}
-
-// LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
-
-LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    getGlobal() = *logger;
 }
 
 } // namespace nlm
