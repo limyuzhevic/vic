@@ -3,12 +3,114 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    nlohmann::json jsonConfig;  // For JSON parsing
+    YAML::Node yamlConfig;      // For YAML parsing
 };
+
+// Helper function to convert ConfigValue to JSON
+nlohmann::json configValueToJson(const ConfigValue& value) {
+    nlohmann::json result;
+    std::visit([&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            result = arg;
+        }
+    }, value);
+    return result;
+}
+
+// Helper function to convert JSON to ConfigValue
+ConfigValue jsonToConfigValue(const nlohmann::json& json) {
+    ConfigValue result;
+    if (json.is_number_integer()) {
+        result = json.get<int>();
+    } else if (json.is_number_unsigned()) {
+        result = json.get<int64_t>();
+    } else if (json.is_number_float()) {
+        result = json.get<double>();
+    } else if (json.is_boolean()) {
+        result = json.get<bool>();
+    } else if (json.is_string()) {
+        result = json.get<std::string>();
+    } else if (json.is_array()) {
+        // Check array element type
+        if (!json.empty()) {
+            auto firstType = json[0].type();
+            if (firstType == nlohmann::json::value_t::number_integer) {
+                std::vector<int> vec = json.get<std::vector<int>>();
+                result = vec;
+            } else if (firstType == nlohmann::json::value_t::number_float) {
+                std::vector<double> vec = json.get<std::vector<double>>();
+                result = vec;
+            } else if (firstType == nlohmann::json::value_t::string) {
+                std::vector<std::string> vec = json.get<std::vector<std::string>>();
+                result = vec;
+            }
+        }
+    }
+    return result;
+}
+
+// Helper function to convert YAML to ConfigValue
+ConfigValue yamlToConfigValue(const YAML::Node& node) {
+    ConfigValue result;
+    if (node.IsScalar()) {
+        if (node.IsInteger()) {
+            result = node.as<int>();
+        } else if (node.IsDouble()) {
+            result = node.as<double>();
+        } else if (node.IsBoolean()) {
+            result = node.as<bool>();
+        } else {
+            result = node.as<std::string>();
+        }
+    } else if (node.IsSequence()) {
+        if (!node.empty()) {
+            auto firstNode = node[0];
+            if (firstNode.IsInteger()) {
+                std::vector<int> vec;
+                for (const auto& elem : node) {
+                    vec.push_back(elem.as<int>());
+                }
+                result = vec;
+            } else if (firstNode.IsDouble()) {
+                std::vector<double> vec;
+                for (const auto& elem : node) {
+                    vec.push_back(elem.as<double>());
+                }
+                result = vec;
+            } else if (firstNode.IsScalar()) {
+                std::vector<std::string> vec;
+                for (const auto& elem : node) {
+                    vec.push_back(elem.as<std::string>());
+                }
+                result = vec;
+            }
+        }
+    }
+    return result;
+}
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
@@ -19,15 +121,54 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    // Read first line to detect format
+    if (!std::getline(file, line)) {
+        return false;
+    }
+    
+    file.clear();
+    file.seekg(0);
+    
+    // Determine file format
+    if (line.find('{') != std::string::npos && line.find('}') != std::string::npos) {
+        // Try JSON parsing
+        file.clear();
+        file.seekg(0);
+        try {
+            pImpl->jsonConfig = nlohmann::json::parse(file);
+            // Convert JSON to Config entries
+            pImpl->entries.clear();
+            convertJsonToConfig(pImpl->jsonConfig, ConfigSource::File);
+            return true;
+        } catch (const nlohmann::json::parse_error& e) {
+            // Fall back to simple format
+        }
+    }
+    
+    if (line.find(": ") != std::string::npos || line.find("- ") != std::string::npos) {
+        // Try YAML parsing
+        file.clear();
+        file.seekg(0);
+        try {
+            pImpl->yamlConfig = YAML::Load(file);
+            // Convert YAML to Config entries
+            pImpl->entries.clear();
+            convertYamlToConfig(pImpl->yamlConfig, ConfigSource::File);
+            return true;
+        } catch (const YAML::ParserException& e) {
+            // Fall back to simple format
+        }
+    }
+    
+    // Fall back to simple key=value format (original implementation)
+    file.clear();
+    file.seekg(0);
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
@@ -186,17 +327,74 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Helper function to convert JSON to ConfigEntry
+void Config::convertJsonToConfig(const nlohmann::json& json, ConfigSource source) {
+    if (json.is_object()) {
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            ConfigValue value = jsonToConfigValue(it.value());
+            std::string description = "";
+            
+            // Try to extract description if present
+            if (it.value().is_object() && it.value().contains("_description")) {
+                description = it.value()["_description"].get<std::string>();
+            }
+            
+            pImpl->entries.emplace_back(key, value, source, description);
+        }
+    }
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+// Helper function to convert YAML to ConfigEntry
+void Config::convertYamlToConfig(const YAML::Node& node, ConfigSource source) {
+    if (node.IsMap()) {
+        for (auto it = node.begin(); it != node.end(); ++it) {
+            std::string key = it->first.as<std::string>();
+            ConfigValue value = yamlToConfigValue(it->second);
+            std::string description = "";
+            
+            // Try to extract description if present
+            if (it->second.IsMap() && it->second["_description"]) {
+                description = it->second["_description"].as<std::string>();
+            }
+            
+            pImpl->entries.emplace_back(key, value, source, description);
+        }
+    }
+// Helper function to convert JSON to Config entries (public version)
+void Config::convertJsonToConfig(const nlohmann::json& json, ConfigSource source) {
+    if (json.is_object()) {
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            ConfigValue value = jsonToConfigValue(it.value());
+            std::string description = "";
+            
+            // Try to extract description if present
+            if (it.value().is_object() && it.value().contains("_description")) {
+                description = it.value()["_description"].get<std::string>();
+            }
+            
+            pImpl->entries.emplace_back(key, value, source, description);
+        }
+    }
+}
+
+// Helper function to convert YAML to Config entries (public version)
+void Config::convertYamlToConfig(const YAML::Node& node, ConfigSource source) {
+    if (node.IsMap()) {
+        for (auto it = node.begin(); it != node.end(); ++it) {
+            std::string key = it->first.as<std::string>();
+            ConfigValue value = yamlToConfigValue(it->second);
+            std::string description = "";
+            
+            // Try to extract description if present
+            if (it->second.IsMap() && it->second["_description"]) {
+                description = it->second["_description"].as<std::string>();
+            }
+            
+            pImpl->entries.emplace_back(key, value, source, description);
+        }
+    }
 }
 
 // Explicit template instantiations
