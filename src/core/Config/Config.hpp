@@ -5,6 +5,8 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace nlm {
 
@@ -41,6 +43,24 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Configuration schema definition
+struct ConfigSchema {
+    std::string key;
+    std::string description;
+    std::string type;  // "int", "double", "bool", "string", "array"
+    std::string defaultValue;
+    bool required;
+    double minValue;
+    double maxValue;
+    std::vector<std::string> allowedValues;
+    std::string validationRegex;
+    
+    ConfigSchema(const std::string& k, const std::string& desc, const std::string& t = "string",
+                 const std::string& def = "", bool req = false, double min = -1e9, double max = 1e9)
+        : key(k), description(desc), type(t), defaultValue(def), required(req),
+          minValue(min), maxValue(max) {}
 };
 
 // Main configuration class
@@ -93,13 +113,23 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation helpers
+    bool isValidJson(const std::string& json) const;
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    ConfigValue parseJsonValue(const std::string& value) const;
+    bool validateConfigEntry(const std::string& key, const ConfigValue& value) const;
+    bool validateType(const std::string& key, const ConfigValue& value, const std::string& expectedType) const;
+    bool validateRange(const std::string& key, const ConfigValue& value, const ConfigSchema& schema) const;
+    bool validateStringWithRegex(const std::string& value, const std::string& regex) const;
+    bool loadFromJson(const std::string& jsonContent);
+    bool loadFromSimpleFormat(const std::string& content);
 };
 
 } // namespace nlm
