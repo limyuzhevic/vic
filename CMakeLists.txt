@@ -121,7 +121,15 @@ add_library(nlm_phase4 STATIC
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# CLI system (advanced command-line interface)
+add_executable(nlm_advanced
+    src/cli/AdvancedCLI.cpp
+    src/cli/AdvancedCLI.hpp
+    src/main.cpp
+)
+target_link_libraries(nlm_advanced PUBLIC nlm_core)
+
+# Main executable (legacy)
 add_executable(nlm
     src/main.cpp
 )

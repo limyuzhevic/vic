@@ -7,32 +7,39 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
-
-class Neuromodulator {
-public:
-    virtual ~Neuromodulator() = default;
+    // PLACEHOLDER - Phase 2 will implement real neuromodulation effects
     
-    // Get modulator name
-    virtual const char* getName() const = 0;
-    
-    // Get current concentration/level
-    virtual float getLevel() const = 0;
-    virtual void setLevel(float level) = 0;
-    
-    // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
-    virtual float getPlasticityFactor() const = 0;
-    
-    // Update neuromodulator state
-    virtual void update(TimestepDuration dt) = 0;
-    
+    class Neuromodulator {
+    public:
+        virtual ~Neuromodulator() = default;
+        
+        // Get modulator name
+        virtual const char* getName() const = 0;
+        
+        // Get current concentration/level
+        virtual float getLevel() const = 0;
+        virtual void setLevel(float level) = 0;
+        
+        // Apply neuromodulatory effect to plasticity
+        // TODO PHASE 2: Implement real modulation
+        virtual float getPlasticityFactor() const = 0;
+        
+        // Update neuromodulator state
+        virtual void update(TimestepDuration dt) = 0;
+        
+        // Neuromodulation integration functions
+        static void applyAllNeuromodulators(Brain* brain);
+        static void processNeuromodulation(Brain* brain, TimestepDuration dt);
+        static void integrateNeuromodulationWithMemory(Brain* brain);
+        static void integrateNeuromodulationWithAttention(Brain* brain);
+        static void integrateNeuromodulationWithPlasticity(Brain* brain);
+        
 protected:
-    Neuromodulator() = default;
-};
-
+        Neuromodulator() = default;
+    };
 // Dopamine: Reward and reinforcement learning signal
 // PLACEHOLDER - Phase 2
+
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -44,9 +51,18 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    
+    // Plasticity modulation
+    void modulatePlasticity(class STDP* stdpSystem, class Hebbian* hebbianSystem);
+    
+    // Reward prediction error computation
+    float getRewardPredictionError(float expectedReward, float actualReward);
     
 private:
     struct Impl;
