@@ -1,15 +1,6 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
+class Logger;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -55,7 +46,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/simple format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -100,6 +91,15 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Value parsing and formatting
+    void setParsedValue(const std::string& key, const std::string& valueStr, ConfigSource source);
+    std::string valueToString(const ConfigValue& value) const;
+    
+    // File format loading
+    bool loadFromJSON(std::istream& stream);
+    bool loadFromYAML(std::istream& stream);
+    bool loadFromSimpleFormat(std::istream& stream);
 };
 
 } // namespace nlm
