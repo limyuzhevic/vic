@@ -3,14 +3,169 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <typeinfo>
 
 namespace nlm {
 
+// Type name to string mapping for serialization
+std::string TypeNameMapper::toString(const ConfigValue& value) {
+    std::visit([](const auto& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, int>) return "int";
+        else if constexpr (std::is_same_v<T, int64_t>) return "int64_t";
+        else if constexpr (std::is_same_v<T, double>) return "double";
+        else if constexpr (std::is_same_v<T, bool>) return "bool";
+        else if constexpr (std::is_same_v<T, std::string>) return "string";
+        else if constexpr (std::is_same_v<T, std::vector<int>>) return "std::vector<int>";
+        else if constexpr (std::is_same_v<T, std::vector<double>>) return "std::vector<double>";
+        else if constexpr (std::is_same_v<T, std::vector<std::string>>) return "std::vector<std::string>";
+        else return "unknown";
+    }, value);
+}
+
+std::optional<ConfigValue> TypeNameMapper::fromString(const std::string& typeName, const std::string& value) {
+    if (typeName == "int") {
+        try { return std::stoi(value); } catch (...) { return std::nullopt; }
+    } else if (typeName == "int64_t") {
+        try { return static_cast<int64_t>(std::stoll(value)); } catch (...) { return std::nullopt; }
+    } else if (typeName == "double") {
+        try { return std::stod(value); } catch (...) { return std::nullopt; }
+    } else if (typeName == "bool") {
+        if (value == "true" || value == "1") return true;
+        if (value == "false" || value == "0") return false;
+    } else if (typeName == "string") {
+        return value;
+    }
+    return std::nullopt;
+}
+
+// Configuration schema validation
+void ConfigSchema::addField(const Field& field) {
+    fields_.push_back(field);
+}
+
+bool ConfigSchema::validate(const Config& config) const {
+    validationError_.clear();
+    
+    for (const auto& field : fields_) {
+        if (field.required && !config.has(field.name)) {
+            validationError_ = "Missing required field: " + field.name;
+            return false;
+        }
+        
+        if (config.has(field.name)) {
+            auto value = config.get(field.name);
+            if (value.has_value()) {
+                // Type validation would go here
+                if (field.validator && !field.validator(value.value())) {
+                    validationError_ = "Validation failed for field: " + field.name;
+                    return false;
+                }
+            }
+        }
+    }
+    
+    return true;
+}
+
+std::string ConfigSchema::getValidationError() const {
+    return validationError_;
+}
+
+// Configuration validation
+bool ConfigValidator::validate(const std::string& key, const ConfigValue& value) {
+    // Basic validation - can be extended
+    if (key.empty()) return false;
+    return true;
+}
+
+std::string ConfigValidator::getValidationError(const std::string& key, const ConfigValue& value) {
+    if (key.empty()) return "Key cannot be empty";
+    if (std::holds_alternative<std::monostate>(value)) return "Value is empty";
+    return "";
+}
+
+// JSON serialization helper
+nlohmann::json configValueToJson(const ConfigValue& value) {
+    std::visit([&](const auto& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            // Return as integer
+        } else if constexpr (std::is_same_v<T, double>) {
+            // Return as float/double
+        } else if constexpr (std::is_same_v<T, bool>) {
+            // Return as boolean
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            // Return as string
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            // Return as array
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            // Return as array
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            // Return as array
+        }
+    }, value);
+    return nlohmann::json(nullptr); // Placeholder
+}
+
+// YAML serialization helper (if YAML support is needed)
+// Can be implemented similarly
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    ConfigSchema schema;  // Schema for validation
+    std::unordered_map<std::string, std::type_index> typeMap;  // Type information for each key
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize type mapping for validation
+    pImpl->typeMap["random_seed"] = typeid(int64_t);
+    pImpl->typeMap["simulation_timestep"] = typeid(double);
+    pImpl->typeMap["neuron_count"] = typeid(size_t);
+    pImpl->typeMap["region_count"] = typeid(size_t);
+    pImpl->typeMap["connection_probability"] = typeid(float);
+    pImpl->typeMap["stdp_ltp_weight"] = typeid(float);
+    pImpl->typeMap["stdp_ltd_weight"] = typeid(float);
+    pImpl->typeMap["stdp_tau"] = typeid(float);
+    pImpl->typeMap["synaptogenesis_rate"] = typeid(float);
+    pImpl->typeMap["pruning_rate"] = typeid(float);
+    pImpl->typeMap["replay_interval"] = typeid(size_t);
+    pImpl->typeMap["consolidation_interval"] = typeid(size_t);
+    pImpl->typeMap["checkpoint_dir"] = typeid(std::string);
+    
+    // Create default schema
+    ConfigSchema::Field seedField("random_seed", typeid(int64_t), "42", true, "Random seed for reproducible results", nullptr);
+    pImpl->schema.addField(seedField);
+    
+    ConfigSchema::Field timestepField("simulation_timestep", typeid(double), "0.001", true, "Simulation timestep in seconds", nullptr);
+    pImpl->schema.addField(timestepField);
+    
+    ConfigSchema::Field neuronCountField("neuron_count", typeid(size_t), "1000", true, "Number of neurons in brain", nullptr);
+    pImpl->schema.addField(neuronCountField);
+    
+    ConfigSchema::Field regionCountField("region_count", typeid(size_t), "1", true, "Number of brain regions", nullptr);
+    pImpl->schema.addField(regionCountField);
+    
+    ConfigSchema::Field connProbField("connection_probability", typeid(float), "0.1", false, "Probability of synaptic connections", nullptr);
+    pImpl->schema.addField(connProbField);
+    
+    ConfigSchema::Field stdpLtpField("stdp_ltp_weight", typeid(float), "0.01", false, "STDP long-term potentiation weight", nullptr);
+    pImpl->schema.addField(stdpLtpField);
+    
+    ConfigSchema::Field stdpLtdField("stdp_ltd_weight", typeid(float), "0.012", false, "STDP long-term depression weight", nullptr);
+    pImpl->schema.addField(stdpLtdField);
+    
+    ConfigSchema::Field stdpTauField("stdp_tau", typeid(float), "20.0", false, "STDP time constant", nullptr);
+    pImpl->schema.addField(stdpTauField);
+
+    // Type name to string mapping for serialization
+    pImpl->typeMap["enable_checkpointing"] = typeid(bool);
+    pImpl->typeMap["enable_replay"] = typeid(bool);
+    pImpl->typeMap["enable_development"] = typeid(bool);
+    
+    // Add more fields as needed
+}
 
 Config::~Config() = default;
 
@@ -115,6 +270,11 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate the key-value pair
+    if (!ConfigValidator::validate(key, value)) {
+        throw std::invalid_argument("Invalid key-value pair: " + key);
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     

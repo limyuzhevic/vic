@@ -5,11 +5,47 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+
+// Type name to string mapping for serialization
+class TypeNameMapper {
+public:
+    static std::string toString(const ConfigValue& value);
+    static std::optional<ConfigValue> fromString(const std::string& typeName, const std::string& value);
+};
+
+// Configuration schema validation
+class ConfigSchema {
+public:
+    struct Field {
+        std::string name;
+        std::type_index type;
+        std::string defaultValue;
+        bool required;
+        std::string description;
+        std::function<bool(const ConfigValue&)> validator;
+    };
+    
+    void addField(const Field& field);
+    bool validate(const Config& config) const;
+    std::string getValidationError() const;
+    
+private:
+    std::vector<Field> fields_;
+    std::string validationError_;
+};
+
+class ConfigValidator {
+public:
+    static bool validate(const std::string& key, const ConfigValue& value);
+    static std::string getValidationError(const std::string& key, const ConfigValue& value);
+};
 
 // Configuration value types
 using ConfigValue = std::variant<

@@ -25,27 +25,73 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+// Command-line option parsing and help
+void printHelp() {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "=====================================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: nlm_phase2 [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Tests and Experiments:" << std::endl;
+    std::cout << "  --basic                 Run basic connectivity test (default)" << std::endl;
+    std::cout << "  --plasticity            Run plasticity learning experiment" << std::endl;
+    std::cout << "  --stdp                  Run STDP verification test" << std::endl;
+    std::cout << "  --all                   Run all tests" << std::endl;
+    std::cout << "  --single-test <name>    Run a single test (basic|plasticity|stdp)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration Options:" << std::endl;
+    std::cout << "  --config <file>         Load configuration from file" << std::endl;
+    std::cout << "  --neurons <n>           Number of neurons (default: 500)" << std::endl;
+    std::cout << "  --regions <n>           Number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --timestep <t>          Simulation timestep in seconds (default: 0.001)" << std::endl;
+    std::cout << "  --seed <s>              Random seed for reproducible results (default: 42)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Advanced Options:" << std::endl;
+    std::cout << "  --duration <steps>      Number of simulation steps (default: 1000)" << std::endl;
+    std::cout << "  --verbose               Enable verbose logging" << std::endl;
+    std::cout << "  --debug                 Enable debug logging" << std::endl;
+    std::cout << "  --profile               Enable performance profiling" << std::endl;
+    std::cout << "  --checkpoints <dir>     Directory for checkpoint files" << std::endl;
+    std::cout << "  --load <file>           Load brain state from checkpoint" << std::endl;
+    std::cout << "  --save <file>           Save brain state to checkpoint" << std::endl;
+    std::cout << "  --help                  Show this help message" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Performance Options:" << std::endl;
+    std::cout << "  --threads <n>           Number of threads for parallel processing (default: 4)" << std::endl;
+    std::cout << "  --vectorize             Enable SIMD vectorization" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Plasticity Options:" << std::endl;
+    std::cout << "  --hebbian-on            Enable Hebbian plasticity (default: enabled)" << std::endl;
+    std::cout << "  --hebbian-off           Disable Hebbian plasticity" << std::endl;
+    std::cout << "  --stdp-on               Enable STDP (default: enabled)" << std::endl;
+    std::cout << "  --stdp-off              Disable STDP" << std::endl;
+    std::cout << "  --structural-on         Enable structural plasticity (default: enabled)" << std::endl;
+    std::cout << "  --structural-off        Disable structural plasticity" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Neuromodulation Options:" << std::endl;
+    std::cout << "  --dopamine <level>      Set dopamine level (0.0-1.0, default: 0.1)" << std::endl;
+    std::cout << "  --curiosity <level>     Set curiosity level (0.0-1.0, default: 0.05)" << std::endl;
+    std::cout << "  --novelty <level>       Set novelty level (0.0-1.0, default: 0.01)" << std::endl;
+    std::cout << "  --neuromodulation-on     Enable neuromodulation (default: enabled)" << std::endl;
+    std::cout << "  --neuromodulation-off    Disable neuromodulation" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Development Options:" << std::endl;
+    std::cout << "  --development-on        Enable developmental stages (default: enabled)" << std::endl;
+    std::cout << "  --development-off       Disable developmental stages" << std::endl;
+    std::cout << "  --stage <stage>         Set developmental stage (Initial|CriticalPeriod|Maturation|Adult|Aging)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Output Options:" << std::endl;
+    std::cout << "  --quiet                 Minimal output" << std::endl;
+    std::cout << "  --results <file>        Save results to file" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Example Usage:" << std::endl;
+    std::cout << "  nlm_phase2 --all --neurons 1000 --timestep 0.002 --save brain_state.bin" << std::endl;
+    std::cout << "  nlm_phase2 --plasticity --seed 12345 --verbose" << std::endl;
+    std::cout << "  nlm_phase2 --stdp --stdp-ltp-weight 0.03 --stdp-ltd-weight 0.02" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
