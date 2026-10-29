@@ -321,8 +321,79 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void printUsage(const char* programName) {
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "NLM - Neural Learning Machine (Phase 2: Real Neural Computation)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "OPTIONS:" << std::endl;
+    std::cout << "  --config <file>          Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --neuron_count <N>       Number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region_count <N>       Number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --connection_prob <p>    Connection probability (default: 0.15)" << std::endl;
+    std::cout << "  --simulation_timestep <t> Simulation timestep in seconds (default: 0.001)" << std::endl;
+    std::cout << "  --random_seed <seed>      Random seed for reproducibility (default: 42)" << std::endl;
+    std::cout << "  --stdp_ltp <w>           STDP LTP weight (default: 0.02)" << std::endl;
+    std::cout << "  --stdp_ltd <w>           STDP LTD weight (default: 0.015)" << std::endl;
+    std::cout << "  --stdp_tau <t>           STDP time constant (default: 20.0)" << std::endl;
+    std::cout << "  --synaptogenesis <r>     Synaptogenesis rate (default: 0.0001)" << std::endl;
+    std::cout << "  --pruning <r>            Pruning rate (default: 0.00001)" << std::endl;
+    std::cout << "  --log_level <level>      Log level (DEBUG, INFO, WARNING, ERROR, FATAL)" << std::endl;
+    std::cout << "  --log_to_file             Enable logging to file" << std::endl;
+    std::cout << "  --log_file <file>        Log file name (default: nlm.log)" << std::endl;
+    std::cout << "  --test_mode <mode>       Test mode: basic, plasticity, stdp, all (default: all)" << std::endl;
+    std::cout << "  --help, -h               Show this help message" << std::endl;
+    std::cout << "  --version                Show version information" << std::endl;
+    std::cout << std::endl;
+    std::cout << "EXAMPLES:" << std::endl;
+    std::cout << "  " << programName << " --neuron_count 1000 --region_count 2" << std::endl;
+    std::cout << "  " << programName << " --config myconfig.cfg --log_level DEBUG" << std::endl;
+    std::cout << "  " << programName << " --test_mode basic --random_seed 123" << std::endl;
+    std::cout << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Version: 2.0 (Enhanced)" << std::endl;
+    std::cout << "Phase: 2 - Real Neural Computation" << std::endl;
+    std::cout << "Features:" << std::endl;
+    std::cout << "  - Leaky Integrate-and-Fire (LIF) neuron dynamics" << std::endl;
+    std::cout << "  - Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  - STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "  - Advanced logging and configuration system" << std::endl;
+    std::cout << "  - Enhanced command-line interface" << std::endl;
+}
+
+std::string parseLogLevel(const std::string& level) {
+    std::string upperLevel = level;
+    for (char& c : upperLevel) {
+        c = std::toupper(c);
+    }
+    
+    if (upperLevel == "DEBUG") return "DEBUG";
+    if (upperLevel == "INFO") return "INFO";
+    if (upperLevel == "WARNING") return "WARNING";
+    if (upperLevel == "ERROR") return "ERROR";
+    if (upperLevel == "FATAL") return "FATAL";
+    
+    return "INFO"; // Default
+}
+
 int main(int argc, char** argv) {
     printBanner();
+    
+    // Handle help and version options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        }
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
@@ -361,6 +432,60 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
+    }
+    
+    // Handle additional command line arguments
+    std::string testMode = "all";
+    bool logToFile = false;
+    std::string logFilename = "nlm.log";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle key=value pairs
+        if (arg.find('=') != std::string::npos) {
+            size_t pos = arg.find('=');
+            std::string key = arg.substr(0, pos);
+            std::string value = arg.substr(pos + 1);
+            
+            // Remove leading --
+            if (key.substr(0, 2) == "--") {
+                key = key.substr(2);
+            }
+            
+            // Set configuration values
+            if (key == "neuron_count") {
+                config->set("neuron_count", std::stoi(value), ConfigSource::CommandLine);
+            } else if (key == "region_count") {
+                config->set("region_count", std::stoi(value), ConfigSource::CommandLine);
+            } else if (key == "connection_prob") {
+                config->set("connection_probability", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "simulation_timestep") {
+                config->set("simulation_timestep", std::stod(value), ConfigSource::CommandLine);
+            } else if (key == "random_seed") {
+                config->set("random_seed", std::stoll(value), ConfigSource::CommandLine);
+            } else if (key == "stdp_ltp") {
+                config->set("stdp_ltp_weight", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "stdp_ltd") {
+                config->set("stdp_ltd_weight", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "stdp_tau") {
+                config->set("stdp_time_constant", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "synaptogenesis") {
+                config->set("synaptogenesis_rate", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "pruning") {
+                config->set("pruning_rate", std::stof(value), ConfigSource::CommandLine);
+            } else if (key == "log_level") {
+                config->set("log_level", parseLogLevel(value), ConfigSource::CommandLine);
+            } else if (key == "log_to_file") {
+                logToFile = (value == "true" || value == "1" || value == "yes");
+                config->set("log_to_file", logToFile, ConfigSource::CommandLine);
+            } else if (key == "log_file") {
+                logFilename = value;
+                config->set("log_filename", logFilename, ConfigSource::CommandLine);
+            } else if (key == "test_mode") {
+                testMode = value;
+            }
+        }
     }
     
     // Override with command line args

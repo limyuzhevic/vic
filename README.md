@@ -20,149 +20,244 @@ NLM IS intended to become:
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 2: REAL NEURAL COMPUTATION**
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+Phase 2 implements real spiking neural computation with:
 
-### Phase 6 Integration Achievements
+- **Leaky Integrate-and-Fire (LIF) neuron dynamics**
+- **Event-driven spike propagation with synaptic delays**
+- **STDP and Hebbian plasticity**
+- **Structural plasticity (synaptogenesis/pruning)**
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+### Phase 2 Achievements
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+#### Core Neural Computation
+- Real LIF neuron dynamics with membrane potentials and spike generation
+- Event-driven spike propagation through synaptic connections
+- Spike timing-dependent plasticity (STDP) for learning
+- Hebbian learning for co-activation strengthening
+- Structural plasticity for synapse formation and elimination
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+#### Enhanced Configuration System
+- Advanced configuration with type conversion and validation
+- Comprehensive parameter support for all neural systems
+- Command-line argument support with key=value format
+- File-based configuration with JSON-like key=value pairs
+- Default configuration templates for different use cases
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+#### Python Bindings
+- Comprehensive Python API with advanced features
+- Enhanced type conversion and error handling
+- Pythonic design with convenient methods
+- Performance monitoring and benchmarking tools
+- Complete integration with C++ neural simulation framework
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
+#### Command-Line Interface
+- Extended command-line options for all configuration parameters
+- Support for key=value format for easy configuration
+- Help and version information
+- Test mode options for different simulation scenarios
+- Enhanced logging control
 
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
-
-## Building
+### Build Instructions
 
 ```bash
-mkdir build
+# Navigate to the project directory
+cd /path/to/nlm
+
+# Create a build directory
+mkdir -p build
 cd build
+
+# Configure with CMake (Release build for best performance)
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+
+# Build all targets
+make -j$(nproc)
+
+# Run the main simulation executable
+./nlm
+
+# Or run with specific options
+./nlm --neuron_count 1000 --region_count 2 --test_mode basic
 ```
 
-## Running
+### Running the Main Simulation
 
-### Phase 6 Demo (Integration Test)
+The main executable (`nlm`) runs a comprehensive demonstration of Phase 2 capabilities:
+
 ```bash
-./nlm_phase6_demo
+# Run with default configuration
+./nlm
+
+# Run with custom configuration
+./nlm --config myconfig.cfg
+
+# Run with specific parameters
+./nlm --neuron_count 2000 --region_count 3 --connection_prob 0.2
+
+# Enable debug logging
+./nlm --log_level DEBUG
+
+# Run specific test mode
+./nlm --test_mode basic
+./nlm --test_mode plasticity
+./nlm --test_mode stdp
+./nlm --test_mode all
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+### Python Usage
 
-## Project Structure
+The enhanced Python bindings provide comprehensive access to the NLM framework:
+
+```python
+import pynlm
+
+# Create brain with default configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation for 1000 steps
+for step in range(1000):
+    brain.step(step)
+
+print(f"Simulation complete! Total spikes: {brain.getTotalSpikeCount()}")
+
+# Example with advanced configuration
+config = pynlm.createDefaultConfig()
+config.setString("brain.neuron_count", "2000")
+config.setFloat("brain.connection_probability", 0.15)
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create agent and world setup
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run agent episode
+for step in range(500):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+### Configuration Options
+
+The enhanced configuration system supports extensive parameters organized by category:
+
+#### Brain Configuration
+- `brain.neuron_count`: Total number of neurons
+- `brain.region_count`: Number of brain regions
+- `brain.connection_probability`: Connectivity density
+- `brain.initial_weight_mean`: Mean initial synaptic weight
+- `brain.initial_weight_std`: Standard deviation of initial weights
+- `brain.v_thresh`: Neuron threshold potential
+- `brain.v_rest`: Resting potential
+- `brain.v_reset`: Reset potential after spike
+- `brain.tau_mem`: Membrane time constant
+- `brain.tau_ref`: Refractory period
+
+#### Plasticity Configuration
+- `plasticity.stdp.enable`: Enable STDP
+- `plasticity.stdp.learning_rate`: STDP learning rate
+- `plasticity.stdp.tau_plus`: STDP LTP time constant
+- `plasticity.stdp.tau_minus`: STDP LTD time constant
+- `plasticity.hebbian.enable`: Enable Hebbian learning
+- `plasticity.structural.enable`: Enable structural plasticity
+- `plasticity.stdp.ltp_weight`: STDP LTP weight
+- `plasticity.stdp.ltd_weight`: STDP LTD weight
+
+#### Neuromodulation Configuration
+- `neuromod.dopamine.scale`: Dopamine modulation scale
+- `neuromod.curiosity.enable`: Enable curiosity-driven exploration
+- `neuromod.novelty.enable`: Enable novelty detection
+
+#### Development Configuration
+- `development.synaptogenesis_rate`: Synaptogenesis rate
+- `development.pruning_rate`: Pruning rate
+- `development.maturation_rate`: Maturation rate
+
+#### Environment Configuration
+- `environment.width`: Environment width
+- `environment.height`: Environment height
+- `environment.vision_width`: Vision width
+- `environment.vision_height`: Vision height
+
+### Test Modes
+
+The enhanced command-line interface supports multiple test modes:
+
+#### `--test_mode basic`
+- Tests basic neural connectivity
+- Injects current into neurons and verifies spike propagation
+- Checks neuron dynamics and membrane potential changes
+
+#### `--test_mode plasticity`
+- Tests plasticity learning experiment
+- Demonstrates synaptic weight changes through Hebbian and STDP learning
+- Shows measurable learning effects from experience
+
+#### `--test_mode stdp`
+- Tests STDP verification specifically
+- Creates correlated pre-post activity to trigger long-term potentiation
+- Verifies pre-before-post produces potentiation
+
+#### `--test_mode all`
+- Runs all tests sequentially
+- Comprehensive integration test of all neural systems
+- Demonstrates complete Phase 2 functionality
+
+### Project Structure
 
 ```
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
+├── docs/                    # Documentation
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   └── LIMITATIONS.md
+├── src/                   # Source code
+│   ├── core/              # Core utilities
+│   ├── brain/             # Neural components
+│   ├── dynamics/          # Neural dynamics
+│   ├── plasticity/        # Plasticity rules
+│   ├── development/       # Developmental system
+│   ├── neuromodulation/    # Neuromodulators
+│   ├── memory/            # Memory systems
+│   ├── prediction/        # Prediction systems
+│   ├── cognition/         # Cognitive mechanisms
+│   ├── sensory/           # Sensory processing
+│   ├── motor/             # Motor system
+│   ├── environment/       # Environment interface
+│   ├── experiments/       # Experiment framework
+│   └── visualization/     # Visualization
+├── python/                # Python bindings
+│   └── bindings.cpp       # Enhanced Python bindings
+├── configs/               # Configuration files
+│   └── default.cfg        # Default configuration
+├── tests/                 # Test suite
+│   ├── test_*.cpp         # C++ unit tests
+└── build/                 # Build directory (generated)
 ```
 
-## Phase Summary
+### Scientific Background
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+NLM is an experimental artificial developmental brain project. The Phase 2 implementation focuses on:
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+1. **Real Neural Computation**: Implementing biologically inspired neuron models that can actually produce spikes and learn from experience
+2. **Learning Mechanisms**: Demonstrating multiple learning rules (STDP, Hebbian, structural plasticity) that work together
+3. **Integration**: Showing how different neural systems can work together as a cohesive brain
+4. **Development**: Exploring how neural systems can change and adapt over time
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
+### Scientific Limitations
 
 NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
 
@@ -173,58 +268,23 @@ NLM is a research project investigating computational brain-like systems. We mak
 - No claim of consciousness, intelligence, or human-like cognition
 - Limited to what can be simulated with available computing resources
 
-Phase 6 does NOT claim:
+Phase 2 does NOT claim:
 - Human intelligence
 - Consciousness or sentience
 - Human-like reasoning
 - Genuine subjective experience
 
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
+Phase 2 DOES investigate:
+- Whether neural dynamics can support learning
+- Whether plasticity rules can produce meaningful changes
+- Whether networks can show activity-dependent synaptic modification
+- Whether simple learning can emerge from spiking neurons
 
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
-```
-
-## License
+### License
 
 MIT
 
-## Authors
+### Authors
 
 Research project — See docs for scientific background.
+

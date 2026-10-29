@@ -58,6 +58,12 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from config file with type conversion
+    bool loadFromConfigFile(const std::string& filepath);
+    
+    // Get all configuration descriptions
+    static const std::vector<std::pair<std::string, std::string>>& getDefaultDescriptions();
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     

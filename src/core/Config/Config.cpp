@@ -8,6 +8,61 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    static const std::vector<std::pair<std::string, std::string>> defaultDescriptions;
+};
+
+// Implementation of defaultDescriptions - defined in a separate .cpp file
+const std::vector<std::pair<std::string, std::string>> Config::Impl::defaultDescriptions = {
+    // Random seed for reproducible experiments
+    {"random_seed", "Random seed for reproducible experiments"},
+    
+    // Simulation timestep in seconds
+    {"simulation_timestep", "Simulation timestep in seconds"},
+    
+    // Number of neurons in the brain
+    {"neuron_count", "Number of neurons in the brain"},
+    
+    // Number of brain regions
+    {"region_count", "Number of brain regions"},
+    
+    // Connection probability for random connectivity
+    {"connection_probability", "Connection probability for random connectivity"},
+    
+    // Plasticity learning rate
+    {"plasticity_learning_rate", "Plasticity learning rate"},
+    
+    // STDP parameters
+    {"stdp_ltp_weight", "STDP long-term potentiation weight"},
+    {"stdp_ltd_weight", "STDP long-term depression weight"},
+    {"stdp_time_constant", "STDP time constant"},
+    
+    // Development settings
+    {"development_synaptogenesis_rate", "Development synaptogenesis rate"},
+    {"development_pruning_rate", "Development pruning rate"},
+    
+    // Neuromodulation settings
+    {"dopamine_baseline", "Dopamine baseline level"},
+    
+    // Reward settings
+    {"reward_discount_factor", "Reward discount factor"},
+    
+    // Environment settings
+    {"environment_name", "Environment name"},
+    {"environment_width", "Environment width"},
+    {"environment_height", "Environment height"},
+    
+    // Logging settings
+    {"log_level", "Log level"},
+    {"log_to_file", "Log to file"},
+    {"log_filename", "Log filename"},
+    
+    // Simulation settings
+    {"max_simulation_steps", "Maximum simulation steps"},
+    {"simulation_time_limit", "Simulation time limit"},
+    
+    // Visualization settings
+    {"visualization_enabled", "Visualization enabled"},
+    {"visualization_update_rate", "Visualization update rate"}
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -43,12 +98,47 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
             set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromConfigFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '\"' && value.back() == '\"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            // Try to convert to appropriate type based on key
+            setFromConfigString(key, value);
         }
     }
     
@@ -78,6 +168,61 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
+const std::vector<std::pair<std::string, std::string>>& Config::getDefaultDescriptions() {
+    return Config::Impl::defaultDescriptions;
+}
+
+void Config::setFromConfigString(const std::string& key, const std::string& value) {
+    // Determine type based on key or value content
+    // Boolean values
+    if (value == "true" || value == "false") {
+        bool boolValue = (value == "true");
+        set(key, boolValue, ConfigSource::File);
+        return;
+    }
+    
+    // Integer values
+    bool isInt = true;
+    for (char c : value) {
+        if (!std::isdigit(c) && c != '-') {
+            isInt = false;
+            break;
+        }
+    }
+    if (isInt && !value.empty()) {
+        try {
+            int intValue = std::stoi(value);
+            set(key, intValue, ConfigSource::File);
+            return;
+        } catch (...) {
+            // Fall through to double
+        }
+    }
+    
+    // Double values
+    bool isDouble = true;
+    size_t decimalCount = 0;
+    for (char c : value) {
+        if (!std::isdigit(c) && c != '.' && c != '-') {
+            isDouble = false;
+            break;
+        }
+        if (c == '.') decimalCount++;
+    }
+    if (isDouble && decimalCount <= 1) {
+        try {
+            double doubleValue = std::stod(value);
+            set(key, doubleValue, ConfigSource::File);
+            return;
+        } catch (...) {
+            // Fall through to string
+        }
+    }
+    
+    // Default to string
+    set(key, value, ConfigSource::File);
+}
+
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
@@ -86,7 +231,13 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        std::visit([&file](auto&& arg) {
+            if constexpr (std::is_same_v<decltype(arg), std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -122,7 +273,15 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         it->value = value;
         it->source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // Find description for this key
+        std::string description = "";
+        auto descIt = std::find_if(Impl::defaultDescriptions.begin(), Impl::defaultDescriptions.end(),
+            [&key](const auto& pair) { return pair.first == key; });
+        if (descIt != Impl::defaultDescriptions.end()) {
+            description = descIt->second;
+        }
+        
+        pImpl->entries.emplace_back(key, value, source, description);
     }
 }
 
