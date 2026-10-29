@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -58,6 +59,15 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON file
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML file
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Load from simple key=value format (backward compatibility)
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
@@ -100,6 +110,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    void flattenJSON(const char* prefix, const nlohmann::json& j);
 };
 
 } // namespace nlm

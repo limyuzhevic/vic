@@ -16,7 +16,22 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Validate input parameters
+    if (std::isnan(value)) {
+        NLM_LOG_ERROR("Invalid value in WorkingMemory::store: NaN is not allowed");
+        return;
+    }
+    if (std::isinf(value)) {
+        NLM_LOG_ERROR("Invalid value in WorkingMemory::store: infinity is not allowed");
+        return;
+    }
+    
+    // Check if neuron ID is valid
+    if (neuron.index() == std::numeric_limits<size_t>::max()) {
+        NLM_LOG_ERROR("Invalid neuron ID in WorkingMemory::store");
+        return;
+    }
+    
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
@@ -25,6 +40,11 @@ void WorkingMemory::store(NeuronId neuron, float value) {
     }
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+    } else if (!pImpl->items.empty()) {
+        // Implement competitive replacement: find neuron with lowest activation
+        auto weakestIt = std::min_element(pImpl->items.begin(), pImpl->items.end(),
+            [](const auto& a, const auto& b) { return a.second < b.second; });
+        *weakestIt = {neuron, value};
     }
 }
 
@@ -108,7 +128,34 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Implement memory consolidation: remove less relevant episodes and strengthen important ones
+    if (pImpl->episodes.empty()) return;
+    
+    std::vector<EpisodicMemoryItem> importantEpisodes;
+    for (const auto& episode : pImpl->episodes) {
+        // Calculate relevance based on reward and activation patterns
+        float relevance = episode.reward;
+        if (!episode.activeNeurons.empty()) {
+            // Normalize activations
+            float sumActivations = 0.0f;
+            for (float activation : episode.neuronActivations) {
+                sumActivations += activation;
+            }
+            if (sumActivations > 0.0f) {
+                relevance += sumActivations / episode.neuronActivations.size() * 0.5f;
+            }
+        }
+        
+        if (relevance > relevanceThreshold) {
+            // Increase consolidation strength (store multiple times)
+            for (int i = 0; i < 2; ++i) {
+                importantEpisodes.push_back(episode);
+            }
+        }
+    }
+    
+    // Replace episodes with consolidated versions
+    pImpl->episodes = std::move(importantEpisodes);
 }
 
 // Semantic Memory Implementation

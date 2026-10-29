@@ -123,26 +123,168 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Custom", ActionType::Custom)
         .export_values();
 
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
+    // Add memory system bindings
+    py::class_<WorkingMemory>(m, "WorkingMemory", R"pbdoc(Working memory system for short-term storage)pbdoc")
+        .def("store", &WorkingMemory::store, py::arg("neuron"), py::arg("value"),
+             "Store neuron activation in working memory")
+        .def("retrieve", &WorkingMemory::retrieve, py::arg("neuron"),
+             "Retrieve neuron activation from working memory")
+        .def("contains", &WorkingMemory::contains, py::arg("neuron"),
+             "Check if neuron exists in working memory")
+        .def("clear", &WorkingMemory::clear,
+             "Clear all working memory contents")
+        .def("getCapacity", &WorkingMemory::getCapacity,
+             "Get working memory capacity")
+        .def("getCurrentSize", &WorkingMemory::getCurrentSize,
+             "Get current number of items in working memory")
+        .def("decay", &WorkingMemory::decay, py::arg("decayRate"),
+             "Apply decay to all working memory items");
 
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
+    py::class_<EpisodicMemory>(m, "EpisodicMemory", R"pbdoc(Episodic memory system for storing experiences)pbdoc")
+        .def("storeEpisode", &EpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store an episode in episodic memory")
+        .def("retrieveEpisode", &EpisodicMemory::retrieveEpisode, py::arg("index"),
+             "Retrieve an episode by index")
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount,
+             "Get number of stored episodes")
+        .def("getRecentEpisodes", &EpisodicMemory::getRecentEpisodes, py::arg("count"),
+             "Get recent episodes")
+        .def("clear", &EpisodicMemory::clear,
+             "Clear all episodic memory")
+        .def("consolidate", &EpisodicMemory::consolidate, py::arg("relevanceThreshold"),
+             "Consolidate important memories");
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+    py::class_<SemanticMemory>(m, "SemanticMemory", R"pbdoc(Semantic memory system for storing facts and knowledge)pbdoc")
+        .def("storeFact", &SemanticMemory::storeFact, py::arg("key"), py::arg("value"),
+             "Store a fact in semantic memory")
+        .def("retrieveFact", &SemanticMemory::retrieveFact, py::arg("key"),
+             "Retrieve a fact from semantic memory")
+        .def("hasFact", &SemanticMemory::hasFact, py::arg("key"),
+             "Check if fact exists in semantic memory")
+        .def("getAllFacts", &SemanticMemory::getAllFacts,
+             "Get all facts from semantic memory")
+        .def("clear", &SemanticMemory::clear,
+             "Clear all semantic memory contents");
+
+    py::class_<AssociativeMemory>(m, "AssociativeMemory", R"pbdoc(Associative memory system for forming connections between concepts)pbdoc")
+        .def("associate", &AssociativeMemory::associate, py::arg("a"), py::arg("b"), py::arg("strength"),
+             "Create an association between two neurons")
+        .def("getAssociations", &AssociativeMemory::getAssociations, py::arg("neuron"),
+             "Get all neurons associated with the given neuron")
+        .def("getAssociationStrength", &AssociativeMemory::getAssociationStrength, 
+             py::arg("a"), py::arg("b"), "Get strength of association between two neurons")
+        .def("updateAssociation", &AssociativeMemory::updateAssociation,
+             py::arg("a"), py::arg("b"), py::arg("delta"), "Update association strength")
+        .def("clear", &AssociativeMemory::clear,
+             "Clear all associative memory");
+
+    // Add PredictionSystem bindings
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(Prediction system for anticipating future states)pbdoc")
+        .def("predictNextState", &PredictionSystem::predictNextState, py::arg("currentState"),
+             "Predict the next state based on current state")
+        .def("updatePredictions", &PredictionSystem::updatePredictions, 
+             py::arg("predicted"), py::arg("actual"), "Update predictions based on actual outcomes")
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get current prediction error")
+        .def("getConfidence", &PredictionSystem::getConfidence,
+             "Get prediction confidence")
+        .def("getErrorHistory", &PredictionSystem::getErrorHistory,
+             "Get prediction error history")
+        .def("clearHistory", &PredictionSystem::clearHistory,
+             "Clear prediction history")
+        .def("train", &PredictionSystem::train, py::arg("observation"), "Train prediction system");
+
+    // Add cognition system bindings
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(Neural planning system for action selection)pbdoc")
+        .def("planAction", &NeuralPlanner::planAction, py::arg("currentState"), py::arg("targetReward"),
+             "Plan an action based on current state and target reward")
+        .def("getConfidence", &NeuralPlanner::getConfidence,
+             "Get planning confidence")
+        .def("wasRecentPlanSuccessful", &NeuralPlanner::wasRecentPlanSuccessful,
+             "Check if recent plans were successful")
+        .def("reset", &NeuralPlanner::reset,
+             "Reset planning system")
+        .def("clearCache", &NeuralPlanner::clearCache,
+             "Clear planning cache");
+
+    py::class_<SelfModel>(m, "SelfModel", R"pbdoc(Self-model system for body awareness and action prediction)pbdoc")
+        .def("recordSelfAction", &SelfModel::recordSelfAction,
+             py::arg("action"), py::arg("beforeState"), py::arg("afterState"),
+             "Record self-generated action and its consequences")
+        .def("predictActionConsequence", &SelfModel::predictActionConsequence,
+             py::arg("action"), py::arg("currentState"),
+             "Predict the consequence of an action")
+        .def("getSelfModelConfidence", &SelfModel::getSelfModelConfidence, py::arg("action"),
+             "Get confidence in prediction for a specific action")
+        .def("getBodyAwareness", &SelfModel::getBodyAwareness,
+             "Get body awareness level")
+        .def("clear", &SelfModel::clear,
+             "Clear self-model memory");
+
+    py::class_<SocialLearning>(m, "SocialLearning", R"pbdoc(Social learning system for imitation and cultural transmission)pbdoc")
+        .def("observeAgentAction", &SocialLearning::observeAgentAction,
+             py::arg("observedAction"), py::arg("observerState"), py::arg("resultingState"),
+             "Observe an agent's action and its effects")
+        .def("canImitate", &SocialLearning::canImitate, py::arg("observedAction"),
+             "Check if agent can imitate a specific action")
+        .def("getImitationAction", &SocialLearning::getImitationAction, py::arg("currentState"),
+             "Get an action to imitate based on current state")
+        .def("learnCommunicationSignal", &SocialLearning::learnCommunicationSignal,
+             py::arg("signalPattern"), py::arg("signalReward"),
+             "Learn a new communication signal")
+        .def("detectSignal", &SocialLearning::detectSignal, py::arg("neuralPattern"),
+             "Detect if a neural pattern matches known signals")
+        .def("getSignalPattern", &SocialLearning::getSignalPattern,
+             "Get the current learned signal pattern")
+        .def("getSignalMeaning", &SocialLearning::getSignalMeaning,
+             "Get the meaning of the current signal")
+        .def("clear", &SocialLearning::clear,
+             "Clear social learning memory");
+
+    // Add accessors to brain for memory and cognition systems
+    py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        .def("getSelfModel", &Brain::getSelfModel,
+             py::return_value_policy::reference_internal,
+             "Get self-model system")
+        .def("getSocialLearning", &Brain::getSocialLearning,
+             py::return_value_policy::reference_internal,
+             "Get social learning system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty detection system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal system")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine system");
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")

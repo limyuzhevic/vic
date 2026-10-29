@@ -26,6 +26,18 @@
 #include <iomanip>
 #include <numeric>
 
+// Forward declarations for helper functions
+void printBanner();
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+void runStdpVerification(std::shared_ptr<Brain> brain);
+void printResultsSummary(const std::shared_ptr<Brain>& brain, const std::string& phase);
+
+// Configuration helper functions
+void configureDefaultSettings(std::shared_ptr<Config> config);
+void applyCommandLineOverrides(std::shared_ptr<Config> config, int argc, char** argv);
+bool loadConfigurationFile(std::shared_ptr<Config> config, const std::string& configFile);
+
 using namespace nlm;
 
 void printBanner() {
