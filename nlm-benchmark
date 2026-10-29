@@ -1,0 +1,492 @@
+#!/usr/bin/env python3
+"""
+NLM Performance Benchmark Tool
+
+This tool provides comprehensive performance benchmarking for NLM simulations,
+including timing measurements, memory usage tracking, and performance analysis.
+
+Features:
+- Simulation timing measurements
+- Memory usage monitoring
+- Performance profiling
+- Comparison of different configurations
+- Performance optimization recommendations
+- Benchmarking across different simulation modes
+
+Usage:
+    nlm-benchmark [options] <configuration_file>
+
+Options:
+    --mode <mode>                Simulation mode: basic, advanced, debug (default: basic)
+    --steps <n>                   Number of simulation steps (default: 1000)
+    --timestep <t>                Simulation timestep (default: 0.001)
+    --repeats <n>                 Number of repeats for averaging (default: 3)
+    --memory-report              Generate memory usage report
+    --profile <file>              Write profiling data to file
+    --compare <config_file>       Compare with another configuration
+    --output <file>               Write benchmark results to file
+    --format <format>             Output format: json, csv, markdown (default: json)
+    --verbose                      Enable verbose output
+    --save-profile                 Save performance profile data
+
+Examples:
+    # Basic benchmark
+    ./nlm-benchmark config.json
+
+    # Advanced benchmark with memory tracking
+    ./nlm-benchmark --mode advanced --steps 5000 --memory-report --verbose config.json
+
+    # Compare two configurations
+    ./nlm-benchmark --compare config1.json config2.json
+
+    # Save detailed profile
+    ./nlm-benchmark --save-profile --profile benchmark.prof config.json
+"""
+
+import pynlm
+import time
+import sys
+import json
+import csv
+import argparse
+from typing import Dict, List, Any, Optional, Tuple
+from pathlib import Path
+from datetime import datetime
+from collections import defaultdict
+import psutil
+import os
+
+class PerformanceMetrics:
+    """Container for performance metrics."""
+    
+    def __init__(self):
+        self.wall_time = 0.0
+        self.cpu_time = 0.0
+        self.memory_start = 0.0
+        self.memory_end = 0.0
+        self.memory_peak = 0.0
+        self.simulated_steps = 0
+        self.spikes_per_step = 0.0
+        self.firing_rate = 0.0
+        self.plasticity_updates = 0
+        self.synapse_operations = 0
+        self.neuron_steps = 0
+        
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert metrics to dictionary."""
+        return {
+            'wall_time': self.wall_time,
+            'cpu_time': self.cpu_time,
+            'memory_start_mb': self.memory_start,
+            'memory_end_mb': self.memory_end,
+            'memory_peak_mb': self.memory_peak,
+            'simulated_steps': self.simulated_steps,
+            'spikes_per_step': self.spikes_per_step,
+            'firing_rate': self.firing_rate,
+            'plasticity_updates': self.plasticity_updates,
+            'synapse_operations': self.synapse_operations,
+            'neuron_steps': self.neuron_steps
+        }
+class BenchmarkResult:
+    """Container for benchmark results."""
+    
+    def __init__(self, name: str, metrics: PerformanceMetrics, config: Dict[str, Any]):
+        self.name = name
+        self.metrics = metrics
+        self.config = config
+        self.timestamp = datetime.now()
+        self.success = True
+        self.error = None
+        
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert result to dictionary."""
+        return {
+            'name': self.name,
+            'timestamp': self.timestamp.isoformat(),
+            'success': self.success,
+            'error': self.error,
+            'metrics': self.metrics.to_dict(),
+            'config': self.config
+        }
+class NLMBenchmark:
+    """NLM performance benchmarking tool."""
+    
+    def __init__(self, verbose: bool = False):
+        self.verbose = verbose
+        self.results: List[BenchmarkResult] = []
+        
+    def get_memory_usage(self) -> float:
+        """Get current memory usage in MB."""
+        process = psutil.Process(os.getpid())
+        return process.memory_info().rss / 1024 / 1024
+    
+    def run_benchmark(self, config_file: str, mode: str = "basic", 
+                     steps: int = 1000, timestep: float = 0.001,
+                     repeats: int = 3) -> BenchmarkResult:
+        """Run a single benchmark."""
+        if self.verbose:
+            print(f"Loading configuration from {config_file}...")
+        
+        # Load configuration
+        config = pynlm.Config.createDefaultConfig()
+        if not config.loadFromFile(config_file):
+            raise RuntimeError(f"Failed to load configuration from {config_file}")
+        
+        # Override with command line arguments
+        config.set("simulation_timestep", timestep)
+        config.set("neuron_count", steps // 10)  # Adjust neuron count based on steps
+        
+        # Create brain
+        brain = pynlm.createBrain(config)
+        
+        if self.verbose:
+            print(f"Brain initialized with {brain.getTotalNeuronCount()} neurons")
+            print(f"Total synapses: {brain.getTotalSynapseCount()}")
+        
+        # Run simulation
+        if self.verbose:
+            print(f"Running {mode} simulation with {steps} steps...")
+        
+        start_wall = time.time()
+        start_cpu = time.process_time()
+        memory_start = self.get_memory_usage()
+        memory_peak = memory_start
+        
+        spikes_total = 0
+        
+        for step in range(steps):
+            brain.step(step, step * timestep)
+            
+            # Track memory usage
+            current_memory = self.get_memory_usage()
+            if current_memory > memory_peak:
+                memory_peak = current_memory
+            
+            # Track spikes
+            spikes_in_step = brain.getFiringNeuronCount()
+            spikes_total += spikes_in_step
+            
+            if step % 100 == 0 and self.verbose:
+                print(f"  Step {step}: {spikes_in_step} neurons firing")
+        
+        end_wall = time.time()
+        end_cpu = time.process_time()
+        memory_end = self.get_memory_usage()
+        
+        # Calculate metrics
+        metrics = PerformanceMetrics()
+        metrics.wall_time = end_wall - start_wall
+        metrics.cpu_time = end_cpu - start_cpu
+        metrics.memory_start = memory_start
+        metrics.memory_end = memory_end
+        metrics.memory_peak = memory_peak
+        metrics.simulated_steps = steps
+        metrics.spikes_per_step = spikes_total / steps if steps > 0 else 0
+        metrics.firing_rate = brain.getAverageFiringRate()
+        
+        # Get system statistics
+        process = psutil.Process(os.getpid())
+        metrics.plasticity_updates = 0  # This would require more detailed tracking
+        metrics.synapse_operations = 0   # This would require more detailed tracking
+        metrics.neuron_steps = steps
+        
+        if self.verbose:
+            print(f"  Simulation completed in {metrics.wall_time:.2f} seconds")
+            print(f"  Wall time per step: {metrics.wall_time / steps:.4f}s")
+            print(f"  CPU time per step: {metrics.cpu_time / steps:.4f}s")
+            print(f"  Memory start: {metrics.memory_start:.1f} MB")
+            print(f"  Memory end: {metrics.memory_end:.1f} MB")
+            print(f"  Memory peak: {metrics.memory_peak:.1f} MB")
+            print(f"  Average firing rate: {metrics.firing_rate:.2f} Hz")
+        
+        # Create result
+        result = BenchmarkResult(f"{mode}_benchmark", metrics, {
+            'config_file': config_file,
+            'mode': mode,
+            'steps': steps,
+            'timestep': timestep,
+            'repeats': repeats
+        })
+        
+        return result
+    
+    def run_benchmark_suite(self, config_files: List[str], **kwargs) -> List[BenchmarkResult]:
+        """Run benchmark suite with multiple configurations."""
+        results = []
+        
+        for config_file in config_files:
+            try:
+                if self.verbose:
+                    print(f"Running benchmark for {config_file}...")
+                
+                result = self.run_benchmark(config_file, **kwargs)
+                results.append(result)
+                
+            except Exception as e:
+                print(f"Error running benchmark for {config_file}: {e}")
+                # Create failed result
+                metrics = PerformanceMetrics()
+                result = BenchmarkResult(config_file, metrics, {
+                    'config_file': config_file,
+                    'error': str(e)
+                })
+                result.success = False
+                result.error = str(e)
+                results.append(result)
+        
+        return results
+    
+    def compare_results(self, result1: BenchmarkResult, result2: BenchmarkResult) -> Dict[str, Any]:
+        """Compare two benchmark results."""
+        comparison = {
+            'result1': result1.name,
+            'result2': result2.name,
+            'wall_time_improvement': (result2.metrics.wall_time - result1.metrics.wall_time) / result1.metrics.wall_time * 100,
+            'cpu_time_improvement': (result2.metrics.cpu_time - result1.metrics.cpu_time) / result1.metrics.cpu_time * 100,
+            'memory_improvement': (result1.metrics.memory_peak - result2.metrics.memory_peak) / result1.metrics.memory_peak * 100,
+            'firing_rate_diff': result2.metrics.firing_rate - result1.metrics.firing_rate,
+            'performance_score': 0.0  # Would need more sophisticated calculation
+        }
+        
+        return comparison
+    
+    def generate_report(self, results: List[BenchmarkResult], format: str = "json") -> str:
+        """Generate benchmark report."""
+        if format == "json":
+            return self._generate_json_report(results)
+        elif format == "csv":
+            return self._generate_csv_report(results)
+        elif format == "markdown":
+            return self._generate_markdown_report(results)
+        else:
+            raise ValueError(f"Unsupported output format: {format}")
+    
+    def _generate_json_report(self, results: List[BenchmarkResult]) -> str:
+        """Generate JSON report."""
+        report = {
+            'benchmark_date': datetime.now().isoformat(),
+            'total_benchmarks': len(results),
+            'successful_benchmarks': sum(1 for r in results if r.success),
+            'failed_benchmarks': sum(1 for r in results if not r.success),
+            'results': [r.to_dict() for r in results]
+        }
+        
+        return json.dumps(report, indent=2, default=str)
+    
+    def _generate_csv_report(self, results: List[BenchmarkResult]) -> str:
+        """Generate CSV report."""
+        import io
+        import csv
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Header
+        writer.writerow([
+            'Benchmark Name', 'Status', 'Wall Time (s)', 'CPU Time (s)',
+            'Memory Start (MB)', 'Memory End (MB)', 'Memory Peak (MB)',
+            'Steps', 'Spikes per Step', 'Firing Rate (Hz)',
+            'Success', 'Error'
+        ])
+        
+        # Data
+        for result in results:
+            metrics = result.metrics
+            writer.writerow([
+                result.name,
+                'SUCCESS' if result.success else 'FAILED',
+                metrics.wall_time,
+                metrics.cpu_time,
+                metrics.memory_start,
+                metrics.memory_end,
+                metrics.memory_peak,
+                metrics.simulated_steps,
+                metrics.spikes_per_step,
+                metrics.firing_rate,
+                result.success,
+                result.error or ''
+            ])
+        
+        return output.getvalue()
+    
+    def _generate_markdown_report(self, results: List[BenchmarkResult]) -> str:
+        """Generate Markdown report."""
+        lines = [
+            "# NLM Performance Benchmark Report",
+            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"Total Benchmarks: {len(results)}",
+            f"Successful: {sum(1 for r in results if r.success)}",
+            f"Failed: {sum(1 for r in results if not r.success)}",
+            "",
+            "## Benchmark Results",
+            "",
+            "| Benchmark Name | Status | Wall Time (s) | CPU Time (s) | Memory Peak (MB) | Steps | Firing Rate (Hz) |",
+            "|----------------|--------|---------------|--------------|------------------|-------|------------------|"
+        ]
+        
+        for result in results:
+            if result.success:
+                metrics = result.metrics
+                lines.append(f"| {result.name} | SUCCESS | {metrics.wall_time:.2f} | {metrics.cpu_time:.2f} | {metrics.memory_peak:.1f} | {metrics.simulated_steps} | {metrics.firing_rate:.2f} |")
+            else:
+                lines.append(f"| {result.name} | FAILED | - | - | - | - | - | {result.error or ''} |")
+        
+        return "\n".join(lines)
+    
+    def print_summary(self, results: List[BenchmarkResult]):
+        """Print summary of benchmark results."""
+        print("\n=== Benchmark Summary ===")
+        print(f"Total benchmarks: {len(results)}")
+        print(f"Successful: {sum(1 for r in results if r.success)}")
+        print(f"Failed: {sum(1 for r in results if not r.success)}")
+        
+        if len(results) > 0:
+            print("\n=== Best Performance ===")
+            successful_results = [r for r in results if r.success]
+            if successful_results:
+                fastest = min(successful_results, key=lambda r: r.metrics.wall_time)
+                print(f"Fastest: {fastest.name} ({fastest.metrics.wall_time:.2f}s)")
+                
+                lowest_memory = min(successful_results, key=lambda r: r.metrics.memory_peak)
+                print(f"Lowest memory: {lowest_memory.name} ({lowest_memory.metrics.memory_peak:.1f} MB)")
+                
+                highest_firing = max(successful_results, key=lambda r: r.metrics.firing_rate)
+                print(f"Highest firing rate: {highest_firing.name} ({highest_firing.metrics.firing_rate:.2f} Hz)")
+        
+        print("\n=== Individual Results ===")
+        for result in results:
+            status = "SUCCESS" if result.success else "FAILED"
+            print(f"{result.name}: {status}")
+            if result.success:
+                metrics = result.metrics
+                print(f"  Time: {metrics.wall_time:.2f}s, Memory: {metrics.memory_peak:.1f} MB, Firing: {metrics.firing_rate:.2f} Hz")
+            else:
+                print(f"  Error: {result.error}")
+        
+        print("\n=== Recommendations ===")
+        if len(results) > 0:
+            successful_results = [r for r in results if r.success]
+            if len(successful_results) > 1:
+                # Compare configurations
+                fastest = min(successful_results, key=lambda r: r.metrics.wall_time)
+                lowest_memory = min(successful_results, key=lambda r: r.metrics.memory_peak)
+                
+                print(f"For speed: Use configuration from {fastest.name}")
+                print(f"For memory efficiency: Use configuration from {lowest_memory.name}")
+                
+                # Check if there are significant differences
+                time_diff = abs(fastest.metrics.wall_time - lowest_memory.metrics.wall_time) / fastest.metrics.wall_time * 100
+                memory_diff = abs(fastest.metrics.memory_peak - lowest_memory.metrics.memory_peak) / fastest.metrics.memory_peak * 100
+                
+                if time_diff > 20:
+                    print(f"Significant time difference ({time_diff:.1f}%)")
+                if memory_diff > 20:
+                    print(f"Significant memory difference ({memory_diff:.1f}%)")
+        
+        print("\n=== Notes ===")
+        print("Benchmarks should be interpreted in context of your specific use case.")
+        print("Performance depends on hardware, system load, and other factors.")
+        print("For production use, run multiple benchmarks and average results.")
+def main():
+    """Main function for the benchmark tool."""
+    parser = argparse.ArgumentParser(
+        description="NLM Performance Benchmark Tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__
+    )
+    
+    # Required arguments
+    parser.add_argument("config_file", help="Configuration file to benchmark")
+    
+    # Optional arguments
+    parser.add_argument("--mode", choices=["basic", "advanced", "debug"], 
+                       default="basic", help="Simulation mode (default: basic)")
+    parser.add_argument("--steps", type=int, default=1000, help="Number of simulation steps (default: 1000)")
+    parser.add_argument("--timestep", type=float, default=0.001, help="Simulation timestep (default: 0.001)")
+    parser.add_argument("--repeats", type=int, default=3, help="Number of repeats for averaging (default: 3)")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+    parser.add_argument("--memory-report", action="store_true", help="Generate memory usage report")
+    parser.add_argument("--profile", help="Write profiling data to file")
+    parser.add_argument("--compare", help="Compare with another configuration")
+    parser.add_argument("--output", help="Write benchmark results to file")
+    parser.add_argument("--format", choices=["json", "csv", "markdown"], default="json", help="Output format (default: json)")
+    parser.add_argument("--save-profile", action="store_true", help="Save performance profile data")
+    
+    args = parser.parse_args()
+    
+    # Check if compare mode
+    if args.compare:
+        if not os.path.exists(args.compare):
+            print(f"Error: Compare file not found: {args.compare}", file=sys.stderr)
+            sys.exit(2)
+    
+    # Create benchmark tool
+    benchmark = NLMBenchmark(verbose=args.verbose)
+    
+    try:
+        # Run single benchmark
+        print(f"Running benchmark for {args.config_file}...")
+        result = benchmark.run_benchmark(
+            args.config_file,
+            mode=args.mode,
+            steps=args.steps,
+            timestep=args.timestep,
+            repeats=args.repeats
+        )
+        
+        # Compare if requested
+        if args.compare:
+            print(f"\nComparing with {args.compare}...")
+            compare_result = benchmark.run_benchmark(args.compare, mode=args.mode, steps=args.steps, timestep=args.timestep)
+            comparison = benchmark.compare_results(result, compare_result)
+            
+            print("\n=== Comparison Results ===")
+            print(f"Wall Time Improvement: {comparison['wall_time_improvement']:.1f}%")
+            print(f"CPU Time Improvement: {comparison['cpu_time_improvement']:.1f}%")
+            print(f"Memory Improvement: {comparison['memory_improvement']:.1f}%")
+            print(f"Firing Rate Difference: {comparison['firing_rate_diff']:.3f}")
+            
+            # Add comparison to results
+            result.metrics.comparison = comparison
+        
+        # Add to results
+        benchmark.results.append(result)
+        
+        # Save profile if requested
+        if args.save_profile and args.profile:
+            try:
+                with open(args.profile, 'w') as f:
+                    json.dump(benchmark.generate_report(benchmark.results, args.format), f, indent=2)
+                print(f"\nProfile saved to: {args.profile}")
+            except Exception as e:
+                print(f"Error saving profile: {e}", file=sys.stderr)
+        
+        # Generate and print report
+        report = benchmark.generate_report(benchmark.results, args.format)
+        
+        print("\n=== Benchmark Report ===")
+        print(report)
+        
+        # Write to output file if requested
+        if args.output:
+            try:
+                with open(args.output, 'w') as f:
+                    f.write(report)
+                print(f"\nReport written to: {args.output}")
+            except Exception as e:
+                print(f"Error writing report to {args.output}: {e}", file=sys.stderr)
+        
+        # Print summary
+        benchmark.print_summary(benchmark.results)
+        
+        # Exit with appropriate code
+        if result.success:
+            sys.exit(0)
+        else:
+            sys.exit(1)
+        
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(5)
+if __name__ == "__main__":
+    main()

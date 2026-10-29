@@ -21,6 +21,9 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Find nlohmann_json for JSON parsing
+find_package(nlohmann_json 3.11.2 REQUIRED)
+
 # Core library
 add_library(nlm_core STATIC
     # Core

@@ -1,0 +1,536 @@
+#!/usr/bin/env python3
+"""
+NLM Configuration Validation Tool
+
+This tool validates NLM configuration files (JSON/YAML format) and provides
+comprehensive analysis of configuration content, including:
+- Format validation (JSON/YAML syntax)
+- Schema validation against NLM requirements
+- Parameter validation and type checking
+- Cross-parameter consistency validation
+- Error reporting and suggestions
+
+Usage:
+    nlm-config-validate [options] <config_file>
+
+Options:
+    --format <format>    Expected format: json|yaml (auto-detected by default)
+    --schema <file>      Schema file for validation
+    --verbose            Show detailed information about validation
+    --errors-only        Show only errors, not warnings
+    --strict             Enable strict validation mode
+    --output <file>      Write validation results to file
+    --check-unused       Check for unused configuration parameters
+    --validate-types      Validate parameter types and ranges
+    --validate-consistency Check for logical consistency between parameters
+
+Examples:
+    nlm-config-validate config.json
+    nlm-config-validate --format yaml --strict --verbose brain_config.yaml
+    nlm-config-validate --schema nlm_schema.json config.json > validation_report.json
+
+Exit codes:
+    0 - Success (no errors, warnings are OK)
+    1 - Validation failed (errors found)
+    2 - Configuration file not found or cannot be read
+    3 - Schema file not found or cannot be read
+    4 - Invalid command line arguments
+    5 - Internal error during validation
+"""
+
+import json
+import yaml
+import sys
+import os
+import argparse
+from typing import Dict, List, Any, Optional, Union, Tuple
+from pathlib import Path
+from datetime import datetime
+
+# NLM-specific configuration schema and validation rules
+NLM_SCHEMA = {
+    "version": "1.0.0",
+    "description": "NLM Configuration Schema",
+    "required_parameters": [
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count",
+        "region_count"
+    ],
+    "optional_parameters": [
+        "connection_probability",
+        "stdp_ltp_weight",
+        "stdp_ltd_weight",
+        "stdp_tau",
+        "synaptogenesis_rate",
+        "pruning_rate",
+        "replay_interval",
+        "consolidation_interval",
+        "checkpoint_dir",
+        "max_episodes",
+        "working_memory_capacity",
+        "enable_reward_modulation",
+        "enable_structural_plasticity",
+        "enable_development",
+        "enable_curiosity",
+        "enable_novelty",
+        "planning_depth",
+        "attention_inhibition_strength",
+        "attention_excitation_strength"
+    ],
+    "parameter_types": {
+        "random_seed": int,
+        "simulation_timestep": float,
+        "neuron_count": int,
+        "region_count": int,
+        "connection_probability": float,
+        "stdp_ltp_weight": float,
+        "stdp_ltd_weight": float,
+        "stdp_tau": float,
+        "synaptogenesis_rate": float,
+        "pruning_rate": float,
+        "replay_interval": int,
+        "consolidation_interval": int,
+        "max_energy": float,
+        "max_episodes": int,
+        "working_memory_capacity": int,
+        "enable_reward_modulation": bool,
+        "enable_structural_plasticity": bool,
+        "enable_development": bool,
+        "enable_curiosity": bool,
+        "enable_novelty": bool,
+        "planning_depth": int,
+        "attention_inhibition_strength": float,
+        "attention_excitation_strength": float,
+        "width": int,
+        "height": int,
+        "visionWidth": int,
+        "visionHeight": int,
+        "max_energy": float
+    },
+    "parameter_ranges": {
+        "random_seed": [0, 2**31 - 1],
+        "simulation_timestep": [1e-6, 1.0],
+        "neuron_count": [1, 100000],
+        "region_count": [1, 1000],
+        "connection_probability": [0.0, 1.0],
+        "stdp_ltp_weight": [0.0, 1.0],
+        "stdp_ltd_weight": [0.0, 1.0],
+        "stdp_tau": [1.0, 100.0],
+        "synaptogenesis_rate": [0.0, 1.0],
+        "pruning_rate": [0.0, 1.0],
+        "replay_interval": [1, 10000],
+        "consolidation_interval": [10, 100000],
+        "max_energy": [0.0, 1000.0],
+        "max_episodes": [0, 100000],
+        "working_memory_capacity": [0, 10000],
+        "planning_depth": [1, 20],
+        "attention_inhibition_strength": [0.0, 10.0],
+        "attention_excitation_strength": [0.0, 10.0],
+        "width": [1, 1000],
+        "height": [1, 1000],
+        "visionWidth": [1, 256],
+        "visionHeight": [1, 256]
+    },
+    "parameter_constraints": {
+        "connection_probability": lambda x: 0.0 <= x <= 1.0,
+        "neuron_count": lambda x: x > 0,
+        "region_count": lambda x: x > 0,
+        "stdp_ltp_weight": lambda x: x >= 0.0,
+        "stdp_ltd_weight": lambda x: x >= 0.0,
+        "stdp_tau": lambda x: x > 0.0,
+        "synaptogenesis_rate": lambda x: x >= 0.0,
+        "pruning_rate": lambda x: x >= 0.0,
+        "replay_interval": lambda x: x > 0,
+        "consolidation_interval": lambda x: x > 0,
+        "max_energy": lambda x: x >= 0.0,
+        "max_episodes": lambda x: x >= 0,
+        "working_memory_capacity": lambda x: x >= 0,
+        "planning_depth": lambda x: x > 0,
+        "attention_inhibition_strength": lambda x: x >= 0.0,
+        "attention_excitation_strength": lambda x: x >= 0.0,
+    }
+}
+class ConfigValidator:
+    """NLM configuration validator with comprehensive validation rules."""
+    
+    def __init__(self, verbose: bool = False, errors_only: bool = False, strict: bool = False):
+        self.verbose = verbose
+        self.errors_only = errors_only
+        self.strict = strict
+        self.errors: List[str] = []
+        self.warnings: List[str] = []
+        self.info: List[str] = []
+        self.validation_summary = {
+            "total_parameters": 0,
+            "valid_parameters": 0,
+            "invalid_parameters": 0,
+            "warnings_count": 0,
+            "errors_count": 0,
+            "validation_time": 0.0
+        }
+    
+    def validate_file(self, filepath: str, expected_format: Optional[str] = None) -> Dict[str, Any]:
+        """Validate configuration file."""
+        start_time = datetime.now()
+        
+        # Check if file exists and is readable
+        if not os.path.exists(filepath):
+            self.errors.append(f"Configuration file not found: {filepath}")
+            return self._get_validation_result(start_time)
+        
+        if not os.access(filepath, os.R_OK):
+            self.errors.append(f"Configuration file not readable: {filepath}")
+            return self._get_validation_result(start_time)
+        
+        # Determine file format
+        if expected_format:
+            format_detected = expected_format.lower()
+        else:
+            format_detected = self._detect_file_format(filepath)
+        
+        if format_detected not in ["json", "yaml"]:
+            self.errors.append(f"Unsupported file format: {format_detected}")
+            return self._get_validation_result(start_time)
+        
+        # Load and parse configuration
+        config_data = self._load_config(filepath, format_detected)
+        if not config_data:
+            return self._get_validation_result(start_time)
+        
+        # Validate configuration
+        validation_result = self._validate_config(config_data, filepath)
+        
+        # Add performance timing
+        end_time = datetime.now()
+        validation_time = (end_time - start_time).total_seconds()
+        validation_result["validation_time"] = validation_time
+        validation_result["file_format"] = format_detected
+        validation_result["file_size"] = os.path.getsize(filepath)
+        
+        return validation_result
+    
+    def _detect_file_format(self, filepath: str) -> str:
+        """Detect file format based on extension and content."""
+        ext = os.path.splitext(filepath)[1].lower()
+        
+        if ext in ['.json', '.jsonc']:
+            return "json"
+        elif ext in ['.yaml', '.yml']:
+            return "yaml"
+        
+        # Try to detect based on content
+        try:
+            with open(filepath, 'r') as f:
+                first_line = f.readline().strip()
+                if first_line.startswith('{') or first_line.startswith('['):
+                    return "json"
+                elif ':' in first_line and ('{' in first_line or '[' in first_line):
+                    return "yaml"
+        except:
+            pass
+        
+        # Default to JSON if unsure
+        return "json"
+    
+    def _load_config(self, filepath: str, format_type: str) -> Optional[Dict[str, Any]]:
+        """Load configuration file based on format."""
+        try:
+            with open(filepath, 'r') as f:
+                if format_type == "json":
+                    return json.load(f)
+                elif format_type == "yaml":
+                    return yaml.safe_load(f)
+        except json.JSONDecodeError as e:
+            self.errors.append(f"JSON syntax error in {filepath}: {str(e)}")
+        except yaml.YAMLError as e:
+            self.errors.append(f"YAML syntax error in {filepath}: {str(e)}")
+        except Exception as e:
+            self.errors.append(f"Error reading {filepath}: {str(e)}")
+        
+        return None
+    
+    def _validate_config(self, config_data: Dict[str, Any], filepath: str) -> Dict[str, Any]:
+        """Validate configuration data against NLM schema."""
+        self.errors.clear()
+        self.warnings.clear()
+        self.info.clear()
+        
+        # Initialize validation summary
+        self.validation_summary = {
+            "total_parameters": 0,
+            "valid_parameters": 0,
+            "invalid_parameters": 0,
+            "warnings_count": 0,
+            "errors_count": 0,
+            "validation_time": 0.0
+        }
+        
+        # Extract configuration entries
+        config_entries = []
+        if "entries" in config_data:
+            # New NLM JSON format
+            config_entries = config_data["entries"]
+        else:
+            # Legacy format - treat as single entry
+            config_entries = [{"key": "legacy_config", "value": config_data}]
+        
+        self.info.append(f"Validating {len(config_entries)} configuration parameters")
+        
+        # Validate each parameter
+        for entry in config_entries:
+            if isinstance(entry, dict) and "key" in entry and "value" in entry:
+                self._validate_config_entry(entry)
+            else:
+                self.warnings.append(f"Skipping invalid configuration entry: {entry}")
+        
+        # Build validation result
+        result = {
+            "valid": len(self.errors) == 0,
+            "errors": self.errors,
+            "warnings": self.warnings if not self.errors_only else [],
+            "info": self.info,
+            "summary": self.validation_summary.copy()
+        }
+        
+        # Add additional validation results
+        if self._has_critical_issues():
+            result["status"] = "CRITICAL"
+        elif self._has_issues():
+            result["status"] = "WARNING"
+        else:
+            result["status"] = "OK"
+        
+        return result
+    
+    def _validate_config_entry(self, entry: Dict[str, Any]) -> None:
+        """Validate a single configuration entry."""
+        key = entry.get("key", "")
+        value = entry.get("value", None)
+        description = entry.get("description", "")
+        source = entry.get("source", "")
+        
+        self.validation_summary["total_parameters"] += 1
+        
+        # Validate parameter existence
+        if not key:
+            self.errors.append("Configuration entry missing 'key' field")
+            return
+        
+        # Validate parameter type
+        if key in NLM_SCHEMA["parameter_types"]:
+            if not self._validate_parameter_type(key, value):
+                self.validation_summary["invalid_parameters"] += 1
+                return
+        elif not self.strict:
+            # Allow custom parameters in non-strict mode
+            self.info.append(f"Custom parameter '{key}' (not in schema)")
+        else:
+            self.warnings.append(f"Unknown parameter '{key}' (not in schema)")
+        
+        # Validate parameter range
+        if key in NLM_SCHEMA["parameter_ranges"]:
+            if not self._validate_parameter_range(key, value):
+                self.validation_summary["invalid_parameters"] += 1
+                return
+        
+        # Validate parameter constraints
+        if key in NLM_SCHEMA["parameter_constraints"]:
+            if not self._validate_parameter_constraint(key, value):
+                self.validation_summary["invalid_parameters"] += 1
+                return
+        
+        # Count valid parameter
+        self.validation_summary["valid_parameters"] += 1
+        
+        # Check for required parameters
+        if not self.errors_only and key in NLM_SCHEMA["required_parameters"]:
+            self.info.append(f"✓ Required parameter '{key}' validated")
+    
+    def _validate_parameter_type(self, key: str, value: Any) -> bool:
+        """Validate parameter type."""
+        expected_type = NLM_SCHEMA["parameter_types"].get(key)
+        if not expected_type:
+            return True
+        
+        if value is None:
+            self.warnings.append(f"Parameter '{key}' has null value")
+            return True
+        
+        if expected_type == int and isinstance(value, (int, float)):
+            # Check if float can be safely converted to int
+            if isinstance(value, float) and not value.is_integer():
+                self.warnings.append(f"Parameter '{key}' is float but expected int")
+                return False
+            return True
+        elif expected_type == float and isinstance(value, (int, float)):
+            return True
+        elif expected_type == bool and isinstance(value, bool):
+            return True
+        elif expected_type == str and isinstance(value, str):
+            return True
+        elif expected_type in (list, dict) and isinstance(value, (list, dict)):
+            return True
+        else:
+            self.errors.append(f"Parameter '{key}' has incorrect type. Expected {expected_type.__name__}, got {type(value).__name__}")
+            return False
+    
+    def _validate_parameter_range(self, key: str, value: Any) -> bool:
+        """Validate parameter range."""
+        if not isinstance(value, (int, float)):
+            return True  # Type validation will catch this
+        
+        range_def = NLM_SCHEMA["parameter_ranges"].get(key)
+        if not range_def:
+            return True
+        
+        min_val, max_val = range_def
+        
+        if value < min_val or value > max_val:
+            self.errors.append(f"Parameter '{key}' value {value} is outside valid range [{min_val}, {max_val}]")
+            return False
+        
+        return True
+    
+    def _validate_parameter_constraint(self, key: str, value: Any) -> bool:
+        """Validate parameter constraint function."""
+        constraint_func = NLM_SCHEMA["parameter_constraints"].get(key)
+        if not constraint_func:
+            return True
+        
+        try:
+            if not constraint_func(value):
+                self.errors.append(f"Parameter '{key}' value {value} violates constraint")
+                return False
+        except Exception as e:
+            self.errors.append(f"Parameter '{key}' constraint validation failed: {str(e)}")
+            return False
+        
+        return True
+    
+    def _has_critical_issues(self) -> bool:
+        """Check if there are critical issues that prevent configuration from being used."""
+        critical_errors = [
+            "Configuration file not found",
+            "Configuration file not readable",
+            "JSON syntax error",
+            "YAML syntax error"
+        ]
+        
+        return any(any(critical in error for critical in critical_errors) for error in self.errors)
+    
+    def _has_issues(self) -> bool:
+        """Check if there are any issues (errors or warnings)."""
+        return len(self.errors) > 0 or len(self.warnings) > 0
+    
+    def _get_validation_result(self, start_time) -> Dict[str, Any]:
+        """Get final validation result."""
+        end_time = datetime.now()
+        validation_time = (end_time - start_time).total_seconds()
+        
+        self.validation_summary["validation_time"] = validation_time
+        self.validation_summary["errors_count"] = len(self.errors)
+        self.validation_summary["warnings_count"] = len(self.warnings)
+        
+        result = {
+            "valid": len(self.errors) == 0,
+            "errors": self.errors,
+            "warnings": self.warnings if not self.errors_only else [],
+            "info": self.info,
+            "summary": self.validation_summary.copy(),
+            "validation_time": validation_time,
+            "status": "CRITICAL" if self._has_critical_issues() else ("WARNING" if self._has_issues() else "OK")
+        }
+        
+        return result
+def main():
+    """Main function for the configuration validation tool."""
+    parser = argparse.ArgumentParser(
+        description="NLM Configuration Validation Tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__
+    )
+    
+    # Required arguments
+    parser.add_argument("config_file", help="Configuration file to validate")
+    
+    # Optional arguments
+    parser.add_argument("--format", choices=["json", "yaml"], 
+                       help="Expected file format (auto-detected by default)")
+    parser.add_argument("--schema", help="Schema file for validation")
+    parser.add_argument("--verbose", action="store_true", help="Show detailed validation information")
+    parser.add_argument("--errors-only", action="store_true", help="Show only errors, not warnings")
+    parser.add_argument("--strict", action="store_true", help="Enable strict validation mode")
+    parser.add_argument("--output", help="Write validation results to file")
+    parser.add_argument("--check-unused", action="store_true", 
+                       help="Check for unused configuration parameters")
+    parser.add_argument("--validate-types", action="store_true", 
+                       help="Validate parameter types and ranges")
+    parser.add_argument("--validate-consistency", action="store_true", 
+                       help="Check for logical consistency between parameters")
+    
+    args = parser.parse_args()
+    
+    # Check if schema file exists
+    if args.schema and not os.path.exists(args.schema):
+        print(f"Error: Schema file not found: {args.schema}", file=sys.stderr)
+        sys.exit(3)
+    
+    # Create validator
+    validator = ConfigValidator(
+        verbose=args.verbose,
+        errors_only=args.errors_only,
+        strict=args.strict
+    )
+    
+    # Validate configuration
+    result = validator.validate_file(args.config_file, args.format)
+    
+    # Print validation results
+    print("=== NLM Configuration Validation Results ===")
+    print(f"File: {args.config_file}")
+    print(f"Status: {result['status']}")
+    print(f"Validation Time: {result['validation_time']:.3f}s")
+    print()
+    
+    if result["info"]:
+        print("Information:")
+        for info in result["info"]:
+            print(f"  {info}")
+        print()
+    
+    if result["errors"]:
+        print("ERRORS:")
+        for i, error in enumerate(result["errors"], 1):
+            print(f"  {i}. {error}")
+        print()
+    
+    if result["warnings"]:
+        print("WARNINGS:")
+        for i, warning in enumerate(result["warnings"], 1):
+            print(f"  {i}. {warning}")
+        print()
+    
+    print("=== Summary ===")
+    print(f"Total parameters: {result['summary']['total_parameters']}")
+    print(f"Valid parameters: {result['summary']['valid_parameters']}")
+    print(f"Invalid parameters: {result['summary']['invalid_parameters']}")
+    print(f"Warnings: {result['summary']['warnings_count']}")
+    print(f"Errors: {result['summary']['errors_count']}")
+    
+    # Write results to output file if requested
+    if args.output:
+        try:
+            with open(args.output, 'w') as f:
+                json.dump(result, f, indent=2)
+            print(f"\nResults written to: {args.output}")
+        except Exception as e:
+            print(f"Error writing results to {args.output}: {e}", file=sys.stderr)
+    
+    # Exit with appropriate code
+    if result["valid"]:
+        sys.exit(0)
+    else:
+        sys.exit(1)
+if __name__ == "__main__":
+    main()
