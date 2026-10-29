@@ -1,0 +1,28 @@
+NLM Command Line Interface
+===========================
+
+A comprehensive command-line interface for NLM (Neural Learning Machine)
+
+Usage: nlm [OPTIONS] [COMMAND] [ARGS]...
+
+Commands:
+    run           Run a simulation or experiment
+    config        Configuration management
+    experiment    Manage experiments
+    checkpoint    Checkpoint management
+    visualize     Visualization tools
+    benchmark     Performance benchmarking
+    profile        Performance profiling
+    help          Show help information
+
+Options:
+    --version     Show version information
+    --help, -h    Show this help message
+    --verbose, -v Enable verbose output
+    --quiet, -q   Suppress non-essential output
+
+Environment:
+    NLM_HOME      Custom NLM installation directory
+    NLM_CONFIG    Default configuration file path
+
+For detailed help on any command, use: nlm help <COMMAND>

@@ -1,0 +1,179 @@
+# NLM Configuration Templates - YAML Format
+
+---
+# Simple neural network configuration
+name: SimpleNetwork
+description: Basic neural network with 1000 neurons
+neuron_count: 1000
+region_count: 2
+connection_probability: 0.1
+simulation_timestep: 0.001
+plasticity_learning_rate: 0.01
+stdp_ltp_weight: 0.01
+stdp_ltd_weight: 0.012
+stdp_time_constant: 20.0
+development_synaptogenesis_rate: 0.001
+development_pruning_rate: 0.0001
+dopamine_baseline: 0.1
+reward_discount_factor: 0.99
+environment_name: GridWorld
+environment_width: 10
+environment_height: 10
+log_level: INFO
+log_to_file: false
+log_filename: nlm.log
+max_simulation_steps: 10000
+visualization_enabled: false
+visualization_update_rate: 30.0
+
+---
+# High-performance configuration
+name: HighPerformance
+description: Optimized for maximum performance with 5000 neurons
+neuron_count: 5000
+region_count: 4
+connection_probability: 0.15
+simulation_timestep: 0.0005
+plasticity_learning_rate: 0.005
+stdp_ltp_weight: 0.005
+stdp_ltd_weight: 0.006
+stdp_time_constant: 10.0
+development_synaptogenesis_rate: 0.0005
+development_pruning_rate: 0.00005
+dopamine_baseline: 0.2
+reward_discount_factor: 0.95
+environment_name: ComplexWorld
+environment_width: 20
+environment_height: 20
+log_level: WARNING
+log_to_file: true
+log_filename: nlm_highperf.log
+max_simulation_steps: 50000
+enable_structural_plasticity: true
+enable_development: true
+enable_curiosity: true
+enable_reward_modulation: true
+
+---
+# Learning-focused configuration
+name: LearningFocused
+description: Optimized for learning and plasticity
+neuron_count: 2000
+region_count: 3
+connection_probability: 0.2
+simulation_timestep: 0.001
+plasticity_learning_rate: 0.02
+stdp_ltp_weight: 0.02
+stdp_ltd_weight: 0.024
+stdp_time_constant: 30.0
+development_synaptogenesis_rate: 0.002
+development_pruning_rate: 0.0002
+dopamine_baseline: 0.15
+reward_discount_factor: 0.9
+environment_name: LearningWorld
+environment_width: 15
+environment_height: 15
+log_level: INFO
+log_to_file: true
+log_filename: nlm_learning.log
+max_simulation_steps: 20000
+enable_structural_plasticity: true
+enable_development: true
+enable_curiosity: true
+enable_reward_modulation: true
+enable_novelty_detection: true
+curiosity_strength: 0.5
+novelty_threshold: 0.3
+
+---
+# Developmental configuration
+name: Developmental
+description: Optimized for developmental processes
+neuron_count: 3000
+region_count: 2
+connection_probability: 0.05
+simulation_timestep: 0.002
+plasticity_learning_rate: 0.03
+stdp_ltp_weight: 0.03
+stdp_ltd_weight: 0.036
+stdp_time_constant: 50.0
+development_synaptogenesis_rate: 0.005
+development_pruning_rate: 0.001
+dopamine_baseline: 0.1
+reward_discount_factor: 0.98
+environment_name: DevelopmentalWorld
+environment_width: 25
+environment_height: 25
+log_level: DEBUG
+log_to_file: true
+log_filename: nlm_developmental.log
+max_simulation_steps: 100000
+enable_structural_plasticity: true
+enable_development: true
+enable_curiosity: true
+enable_reward_modulation: true
+development_stage_duration: 3600.0
+plasticity_modulation_by_age: true
+
+---
+# Testing configuration
+name: Testing
+description: Configuration optimized for testing and validation
+neuron_count: 100
+region_count: 1
+connection_probability: 0.3
+simulation_timestep: 0.001
+plasticity_learning_rate: 0.1
+stdp_ltp_weight: 0.1
+stdp_ltd_weight: 0.12
+stdp_time_constant: 5.0
+development_synaptogenesis_rate: 0.1
+development_pruning_rate: 0.01
+dopamine_baseline: 0.05
+reward_discount_factor: 0.8
+environment_name: TestWorld
+environment_width: 5
+environment_height: 5
+log_level: ERROR
+log_to_file: false
+max_simulation_steps: 1000
+enable_structural_plasticity: true
+enable_development: true
+enable_curiosity: true
+enable_reward_modulation: true
+checkpoint_path: ./test_checkpoint.bin
+enable_checkpointing: true
+replay_episodes: 10
+
+---
+# Research configuration
+name: Research
+description: Configuration for research and experimentation
+neuron_count: 10000
+region_count: 6
+connection_probability: 0.08
+simulation_timestep: 0.0001
+plasticity_learning_rate: 0.001
+stdp_ltp_weight: 0.001
+stdp_ltd_weight: 0.0012
+stdp_time_constant: 100.0
+development_synaptogenesis_rate: 0.00001
+development_pruning_rate: 0.000001
+dopamine_baseline: 0.01
+reward_discount_factor: 0.999
+environment_name: ResearchWorld
+environment_width: 50
+environment_height: 50
+log_level: INFO
+log_to_file: true
+log_filename: nlm_research.log
+max_simulation_steps: 1000000
+enable_structural_plasticity: true
+enable_development: true
+enable_curiosity: true
+enable_reward_modulation: true
+enable_prediction: true
+enable_memory_systems: true
+enable_cognition_systems: true
+reproduction_mode: true
+debug_mode: false
