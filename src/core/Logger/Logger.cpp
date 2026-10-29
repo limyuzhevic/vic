@@ -34,7 +34,23 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // Add timestamp
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Thread-safe timestamp conversion
+    {
+        std::tm tm_buf;
+        std::tm* tm_ptr = nullptr;
+        
+#ifdef _WIN32
+        tm_ptr = std::localtime(&time);
+#else
+        tm_ptr = std::localtime_r(&time, &tm_buf);
+#endif
+        
+        if (tm_ptr) {
+            oss << std::put_time(tm_ptr, "%Y-%m-%d %H:%M:%S");
+        } else {
+            oss << "1970-01-01 00:00:00"; // Fallback
+        }
+    }
     
     oss << " " << entry.message;
     
@@ -88,17 +104,6 @@ std::string ConsoleLogger::levelToString(LogLevel level) const {
         case LogLevel::Error: return "ERROR";
         case LogLevel::Critical: return "CRIT";
         default: return "UNKNOWN";
-    }
-}
-
-std::string ConsoleLogger::levelToColor(LogLevel level) const {
-    switch (level) {
-        case LogLevel::Debug: return "\033[36m";    // Cyan
-        case LogLevel::Info: return "\033[32m";      // Green
-        case LogLevel::Warning: return "\033[33m";   // Yellow
-        case LogLevel::Error: return "\033[31m";     // Red
-        case LogLevel::Critical: return "\033[35m"; // Magenta
-        default: return "\033[0m";
     }
 }
 

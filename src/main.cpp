@@ -357,14 +357,69 @@ int main(int argc, char** argv) {
     }
     
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    if (!configFile.empty()) {
+        NLM_LOG_INFO("Attempting to load configuration from: " + configFile);
+        if (config->loadFromFile(configFile)) {
+            NLM_LOG_INFO("Successfully loaded configuration from: " + configFile);
+        } else {
+            NLM_LOG_WARNING("Could not load configuration file: " + configFile);
+            NLM_LOG_INFO("Using default configuration.");
+        }
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (!config->loadFromArgs(argc, argv)) {
+        NLM_LOG_WARNING("Failed to parse some command line arguments");
+    } else {
+        NLM_LOG_INFO("Command line arguments processed successfully");
+    }
+    
+    // Display help information if requested
+    if (config->has("help") || config->has("--help") || config->has("-h")) {
+        printBanner();
+        std::cout << "\nNLM Phase 2 Command Line Options:\n";
+        std::cout << "  --config=<file>     Specify configuration file (default: configs/default.cfg)\n";
+        std::cout << "  --help, -h          Display this help information\n";
+        std::cout << "  --version           Display version information\n";
+        std::cout << "  --verbose           Enable verbose logging\n";
+        std::cout << "  --quiet             Disable informational logging\n";
+        std::cout << "  --test=<number>     Run specific test (1, 2, or 3)\n";
+        std::cout << "  --no-plasticity     Disable plasticity rules\n";
+        std::cout << "  --no-development     Disable development system\n";
+        std::cout << "  --no-neuromodulation Disable neuromodulation\n";
+        std::cout << "  --checkpoint=<file> Save checkpoint to file\n";
+        std::cout << "  --load=<file>       Load checkpoint from file\n";
+        std::cout << "\nExamples:\n";
+        std::cout << "  ./nlm --config=myconfig.cfg --verbose\n";
+        std::cout << "  ./nlm --test=2 --checkpoint=checkpoint.bin\n";
+        std::cout << "  ./nlm --help\n";
+        
+        return 0;
+    }
+    
+    // Display version information if requested
+    if (config->has("version")) {
+        printBanner();
+        std::cout << "\nNLM Phase 2 - Real Neural Computation\n";
+        std::cout << "Version: 0.1.0\n";
+        std::cout << "Build: " << __DATE__ << " " << __TIME__ << "\n";
+        std::cout << "C++ Standard: C++20\n";
+        std::cout << "\nPhase 2 Features:\n";
+        std::cout << "  ✓ Leaky Integrate-and-Fire (LIF) neurons\n";
+        std::cout << "  ✓ Event-driven spike propagation with delays\n";
+        std::cout << "  ✓ Spike-Timing-Dependent Plasticity (STDP)\n";
+        std::cout << "  ✓ Hebbian plasticity rules\n";
+        std::cout << "  ✓ Structural plasticity (synaptogenesis/pruning)\n";
+        std::cout << "  ✓ Learning experiments\n";
+        std::cout << "\nFor more information, visit: https://github.com/nlm-project/nlm\n";
+        
+        return 0;
+    }
+    
+    // Enable quiet mode if requested
+    if (config->has("quiet")) {
+        consoleLogger->setLevel(LogLevel::Error);
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -407,21 +462,72 @@ int main(int argc, char** argv) {
         return 1;
     }
     
+    // Initialize brain
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Initializing NLM Brain...");
+    auto brain = std::make_shared<Brain>(config);
+    
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("Brain initialization failed. This may be due to invalid configuration.");
+        NLM_LOG_ERROR("Please check your configuration settings and try again.");
+        return 1;
+    }
+    
+    NLM_LOG_INFO("Brain initialized successfully.");
     brain->logStatus();
     
+    // Verify brain state after initialization
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Verifying brain state...");
+    NLM_LOG_INFO("  Neuron count: " + std::to_string(brain->getTotalNeuronCount()));
+    NLM_LOG_INFO("  Synapse count: " + std::to_string(brain->getTotalSynapseCount()));
+    NLM_LOG_INFO("  Firing neurons: " + std::to_string(brain->getFiringNeuronCount()));
+    
+    if (brain->getTotalNeuronCount() == 0) {
+        NLM_LOG_WARNING("WARNING: Brain has no neurons! Check configuration.");
+    }
+    
     // Run Test 1: Basic connectivity
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Running Test 1: Basic Neural Connectivity ===");
+    if (!brain->getRegion(RegionId(1))) {
+        NLM_LOG_ERROR("ERROR: Brain has no regions! Test cannot proceed.");
+        return 1;
+    }
+    
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Resetting brain for plasticity experiment...");
     brain->reset();
-    brain->initialize();
+    
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to re-initialize brain after reset!");
+        NLM_LOG_ERROR("Brain reset and re-initialization failed. This indicates a serious issue.");
+        return 1;
+    }
+    
+    NLM_LOG_INFO("Brain reset and re-initialized successfully.");
     
     // Run Test 2: Plasticity learning experiment
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Running Test 2: Plasticity Learning Experiment ===");
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Resetting brain for STDP verification...");
     brain->reset();
-    brain->initialize();
+    
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to re-initialize brain for STDP test!");
+        NLM_LOG_ERROR("Brain re-initialization failed before STDP test.");
+        return 1;
+    }
+    
+    NLM_LOG_INFO("Brain reset and initialized for STDP test.");
     runStdpVerification(brain);
     
     // Final brain status

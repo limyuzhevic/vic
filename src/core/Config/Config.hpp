@@ -31,16 +31,41 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
+// Configuration metadata for documentation and validation
+struct ConfigMetadata {
+    std::string description;
+    std::string category;  // e.g., "Brain", "Plasticity", "Neuromodulation", "Development", "Memory"
+    std::string type;      // e.g., "int", "double", "bool", "string", "vector"
+    std::string unit;      // e.g., "ms", "Hz", "mV", "%", "count"
+    std::string validation; // e.g., "positive", "range(0,100)", "non-negative"
+    std::string defaultValue; // String representation of default value
+    
+    ConfigMetadata()
+        : description(), category(), type(), unit(), validation(), defaultValue() {}
+    
+    ConfigMetadata(const std::string& desc, const std::string& cat, const std::string& typ,
+                  const std::string& un = "", const std::string& val = "",
+                  const std::string& def = "")
+        : description(desc), category(cat), type(typ), unit(un), validation(val), defaultValue(def) {}
+};
+
+// Configuration entry with metadata
 struct ConfigEntry {
     std::string key;
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::optional<ConfigMetadata> metadata;  // Optional metadata for documentation and validation
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry()
+        : key(), value(), source(ConfigSource::Default), description(), metadata() {}
+    
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+        : key(k), value(v), source(s), description(desc), metadata() {}
+    
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, 
+                const ConfigMetadata& meta, const std::string& desc = "")
+        : key(k), value(v), source(s), description(desc), metadata(meta) {}
 };
 
 // Main configuration class
@@ -78,14 +103,20 @@ public:
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Get metadata for a configuration key
+    std::optional<ConfigMetadata> getMetadata(const std::string& key) const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Validate configuration values based on metadata
+    std::vector<std::string> validateConfiguration() const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Get configuration category
+    std::vector<std::string> getCategories() const;
+    
+    // Get configuration keys by category
+    std::vector<std::string> getKeysByCategory(const std::string& category) const;
+    
+    // Get configuration summary with metadata
+    std::string summaryWithMetadata() const;
     
     // Clear all
     void clear();
