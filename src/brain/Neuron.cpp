@@ -13,7 +13,13 @@ struct Neuron::Impl {
     PopulationId populationId;
     MembranePotential totalCurrent;  // Total synaptic current input this step
     MembranePotential synapticInput;  // Accumulated synaptic input
+    
+    // Optimized spike history with circular buffer for O(1) operations
     std::vector<Timestamp> spikeHistory;
+    size_t spikeHistoryHead;  // Index for next insertion (circular buffer)
+    size_t spikeHistorySize;  // Number of active entries
+    size_t maxSpikeHistory;  // Maximum capacity
+    
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
@@ -24,7 +30,9 @@ struct Neuron::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             spikeHistory(MAX_SPIKE_HISTORY), spikeHistoryHead(0), spikeHistorySize(0),
+             maxSpikeHistory(MAX_SPIKE_HISTORY) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -37,15 +45,12 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
 
 Neuron::~Neuron() = default;
 
-Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+Neuron::Neuron(Neuron&& other) noexcept : pImpl(std::move(other.pImpl)) {
 }
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -148,14 +153,62 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    // Circular buffer implementation - O(1) operation
+    if (pImpl->spikeHistorySize < pImpl->maxSpikeHistory) {
+        // Buffer not full - add at head
+        pImpl->spikeHistory[pImpl->spikeHistoryHead] = timestamp;
+        pImpl->spikeHistoryHead = (pImpl->spikeHistoryHead + 1) % pImpl->maxSpikeHistory;
+        pImpl->spikeHistorySize++;
+    } else {
+        // Buffer full - overwrite oldest
+        pImpl->spikeHistory[pImpl->spikeHistoryHead] = timestamp;
+        pImpl->spikeHistoryHead = (pImpl->spikeHistoryHead + 1) % pImpl->maxSpikeHistory;
+        // Size remains at max (we overwrite oldest)
     }
 }
 
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    // Return a vector view of spike history (for compatibility)
+    // This creates a temporary vector - optimization would be to return
+    // a view or iterator if the API can be changed
+    static std::vector<Timestamp> result;
+    result.clear();
+    
+    if (pImpl->spikeHistorySize == 0) {
+        return result; // Empty
+    }
+    
+    // Build result vector from circular buffer
+    result.reserve(pImpl->spikeHistorySize);
+    
+    if (pImpl->spikeHistoryHead == 0) {
+        // Simple case - no wrap around
+        result.assign(pImpl->spikeHistory.begin(), 
+                     pImpl->spikeHistory.begin() + pImpl->spikeHistorySize);
+    } else {
+        // Handle wrap around
+        size_t elementsFromStart = pImpl->maxSpikeHistory - pImpl->spikeHistoryHead;
+        if (pImpl->spikeHistorySize <= elementsFromStart) {
+            // All elements are in the wrapped part
+            result.assign(pImpl->spikeHistory.begin() + pImpl->spikeHistoryHead,
+                         pImpl->spikeHistory.begin() + pImpl->spikeHistoryHead + pImpl->spikeHistorySize);
+        } else {
+            // Elements span both wrapped and unwrapped sections
+            result.assign(pImpl->spikeHistory.begin() + pImpl->spikeHistoryHead,
+                         pImpl->spikeHistory.end());
+            size_t remaining = pImpl->spikeHistorySize - elementsFromStart;
+            result.insert(result.end(), pImpl->spikeHistory.begin(), 
+                         pImpl->spikeHistory.begin() + remaining);
+        }
+    }
+    
+    return result;
+}
+
 void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
+    // Reset circular buffer
+    pImpl->spikeHistoryHead = 0;
+    pImpl->spikeHistorySize = 0;
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
@@ -268,7 +321,9 @@ void Neuron::step(Timestamp currentTime) {
 void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
+    // Reset circular buffer
+    pImpl->spikeHistoryHead = 0;
+    pImpl->spikeHistorySize = 0;
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
@@ -294,9 +349,8 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
     
-    // Clear any residual state
+    // Reset any residual state (circular buffer already reset by clear() call)
     pImpl->synapticInput = 0.0f;
-    pImpl->spikeHistory.clear();
 }
 
 } // namespace nlm
