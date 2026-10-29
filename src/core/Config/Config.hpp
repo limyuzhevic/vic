@@ -93,6 +93,28 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    bool validate(const std::string& key) const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Schema management
+    void addSchema(const std::string& key, const std::string& type, 
+                   bool required = false, const std::string& description = "",
+                   const ConfigValue& defaultValue = std::monostate{});
+    void removeSchema(const std::string& key);
+    
+    // Configuration presets
+    static std::shared_ptr<Config> createDefaultConfig();
+    static std::shared_ptr<Config> createPhase2Config();
+    static std::shared_ptr<Config> createPhase3Config();
+    static std::shared_ptr<Config> createPhase4Config();
+    static std::shared_ptr<Config> createPhase6Config();
+    
+    // Configuration templates
+    void setPreset(const std::string& presetName);
+    std::vector<std::string> getAvailablePresets() const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +122,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string escapeString(const std::string& str);
+    static bool validateType(const ConfigValue& schemaValue, const ConfigValue& actualValue);
+    static bool validateValue(const std::string& key, const ConfigValue& value);
+    static bool validateKeySpecific(const std::string& key, const ConfigValue& value);
+    static std::string getTypeString(const std::string& type);
+    static std::string getTypeString(const ConfigValue& value);
 };
 
 } // namespace nlm
