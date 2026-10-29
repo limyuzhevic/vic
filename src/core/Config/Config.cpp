@@ -3,6 +3,15 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <vector>
+#include <string>
+#include <map>
+
+// Try to include nlohmann/json for JSON parsing
+#ifdef HAVE_NLOHMANN_JSON
+#include <nlohmann/json.hpp>
+#define HAS_JSON_SUPPORT
+#endif
 
 namespace nlm {
 
@@ -19,16 +28,27 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Try to parse as JSON first
+#ifdef HAS_JSON_SUPPORT
+    try {
+        auto json = nlohmann::json::parse(content);
+        return loadFromJson(json);
+    } catch (const nlohmann::json::parse_error& e) {
+        // Fall back to key=value format if JSON parsing fails
+    }
+#endif
+    
+    // Try to parse as simple key=value format
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,7 +63,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -51,6 +71,126 @@ bool Config::loadFromFile(const std::string& filepath) {
             set(key, value, ConfigSource::File);
         }
     }
+    
+    return true;
+}
+
+bool Config::loadFromJson(const nlohmann::json& json) {
+    clear();
+    
+    if (!json.is_object()) {
+        return false;
+    }
+    
+    for (auto it = json.begin(); it != json.end(); ++it) {
+        const std::string& key = it.key();
+        const nlohmann::json& value = it.value();
+        
+        try {
+            setFromJsonValue(key, value, ConfigSource::File);
+        } catch (const std::exception& e) {
+            // Skip invalid entries but continue processing
+            continue;
+        }
+    }
+    
+    return true;
+}
+
+void Config::setFromJsonValue(const std::string& key, const nlohmann::json& value, ConfigSource source) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), source);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int64_t>(), source);
+    } else if (value.is_number_unsigned()) {
+        set(key, value.get<uint64_t>(), source);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), source);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), source);
+    } else if (value.is_array()) {
+        // Convert array to string representation for now
+        // In the future, we could support vector types
+        std::vector<std::string> stringArray;
+        for (const auto& item : value) {
+            stringArray.push_back(item.dump());
+        }
+        set(key, "[" + joinStrings(stringArray, ", ") + "]", source);
+    } else {
+        // For any other type, convert to string
+        set(key, value.dump(), source);
+    }
+}
+
+std::string Config::joinStrings(const std::vector<std::string>& strings, const std::string& delimiter) {
+    if (strings.empty()) return "";
+    std::string result = strings[0];
+    for (size_t i = 1; i < strings.size(); ++i) {
+        result += delimiter + strings[i];
+    }
+    return result;
+}
+
+nlohmann::json Config::toJson() const {
+    nlohmann::json json;
+    
+    for (const auto& entry : pImpl->entries) {
+        try {
+            json[entry.key] = toJsonValue(entry.value);
+        } catch (const std::exception& e) {
+            // Skip invalid entries but continue processing
+            continue;
+        }
+    }
+    
+    return json;
+}
+
+nlohmann::json Config::toJsonValue(const ConfigValue& value) {
+    return std::visit([](const auto& val) -> nlohmann::json {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, int>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, double>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return val;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            // Convert vector to JSON array
+            nlohmann::json jsonArray = nlohmann::json::array();
+            for (const auto& item : val) {
+                jsonArray.push_back(item);
+            }
+            return jsonArray;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            nlohmann::json jsonArray = nlohmann::json::array();
+            for (const auto& item : val) {
+                jsonArray.push_back(item);
+            }
+            return jsonArray;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            return val; // pybind11 handles std::vector<string> conversion
+        } else {
+            return "unknown_type";
+        }
+    }, value);
+}
+
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Create JSON representation for modern file format
+    nlohmann::json json = toJson();
+    
+    // Write JSON with indentation for readability
+    file << json.dump(2);
     
     return true;
 }

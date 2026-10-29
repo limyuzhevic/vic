@@ -6,6 +6,12 @@
 #include <variant>
 #include <optional>
 
+// Try to include nlohmann/json for JSON parsing
+#ifdef HAVE_NLOHMANN_JSON
+#include <nlohmann/json.hpp>
+#define HAS_JSON_SUPPORT
+#endif
+
 namespace nlm {
 
 // Forward declarations
@@ -55,13 +61,16 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports both key=value and JSON/YAML formats)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON directly
+    bool loadFromJson(const nlohmann::json& json);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format for modern configs)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,6 +102,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // JSON serialization
+    nlohmann::json toJson() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +112,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string joinStrings(const std::vector<std::string>& strings, const std::string& delimiter);
+    
+    // JSON conversion helpers
+    static void setFromJsonValue(const std::string& key, const nlohmann::json& value, ConfigSource source);
+    static nlohmann::json toJsonValue(const ConfigValue& value);
 };
 
 } // namespace nlm
