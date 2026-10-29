@@ -392,13 +392,35 @@ PYBIND11_MODULE(pynlm, m) {
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
              py::arg("enable"))
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Advanced configuration for power users
+        .def("setSensoryNoveltyDecay", &AgentBrain::setSensoryNoveltyDecay,
+              py::arg("decay"), "Set sensory novelty decay rate")
+        .def("setCuriosityThreshold", &AgentBrain::setCuriosityThreshold,
+              py::arg("threshold"), "Set curiosity threshold for action triggering")
+        .def("setExplorationThreshold", &AgentBrain::setExplorationThreshold,
+              py::arg("threshold"), "Set exploration threshold for curiosity-based actions")
+        .def("setActivityThreshold", &AgentBrain::setActivityThreshold,
+              py::arg("threshold"), "Set minimum activity threshold for motor commands")
+        .def("setMaxExplorationChance", &AgentBrain::setMaxExplorationChance,
+              py::arg("chance"), "Set maximum exploration probability (0-1)")
+        // Get advanced configuration
+        .def("getSensoryNoveltyDecay", &AgentBrain::getSensoryNoveltyDecay,
+              "Get current sensory novelty decay rate")
+        .def("getCuriosityThreshold", &AgentBrain::getCuriosityThreshold,
+              "Get current curiosity threshold")
+        .def("getExplorationThreshold", &AgentBrain::getExplorationThreshold,
+              "Get current exploration threshold")
+        .def("getActivityThreshold", &AgentBrain::getActivityThreshold,
+              "Get current activity threshold")
+        .def("getMaxExplorationChance", &AgentBrain::getMaxExplorationChance,
+              "Get current maximum exploration chance");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

@@ -181,6 +181,60 @@ Reads the brain's motor neurons to decide what action to take.
 
 ---
 
+## Advanced Agent Configuration
+
+### Power User Features
+
+The AgentBrain class provides advanced configuration options for fine-tuning agent behavior:
+
+```python
+# Configure curiosity and exploration thresholds
+agent.setCuriosityThreshold(0.2)      # Lower threshold = easier to trigger actions
+agent.setExplorationThreshold(0.3)    # Lower threshold = more exploration
+agent.setActivityThreshold(0.3)       # Lower threshold = less activity needed for action
+agent.setMaxExplorationChance(0.5)    # Higher = more random exploration
+agent.setSensoryNoveltyDecay(0.995)   # Slower decay = longer memory of sensory patterns
+```
+
+### Example: Fine-Tuned Agent
+
+```python
+import pynlm
+
+# Create and configure agent with custom parameters
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=16, visionHeight=16)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Custom configuration for specific behavior
+agent.setCuriosityThreshold(0.15)      # Quick responsiveness
+agent.setExplorationThreshold(0.4)    # Moderate exploration
+agent.setActivityThreshold(0.4)       # Requires stronger signals
+agent.setMaxExplorationChance(0.25)   # Balanced exploration
+agent.setSensoryNoveltyDecay(0.99)    # Quick sensory adaptation
+
+# Enable learning systems
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+print("Advanced agent configured:")
+print(f"  Curiosity threshold: {agent.getCuriosityThreshold()}")
+print(f"  Exploration threshold: {agent.getExplorationThreshold()}")
+print(f"  Activity threshold: {agent.getActivityThreshold()}")
+print(f"  Max exploration chance: {agent.getMaxExplorationChance()}")
+print(f"  Sensory novelty decay: {agent.getSensoryNoveltyDecay()}")
+```
+
+---
+
 ## Mini Projects
 
 ### Project 1: Silent Brain (Just Neurons)

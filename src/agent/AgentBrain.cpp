@@ -19,8 +19,12 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , curiosityThreshold_(0.3f)
+    , explorationThreshold_(0.5f)
+    , activityThreshold_(0.5f)
+    , maxExplorationChance_(0.3f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups with robust distribution logic
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
@@ -29,30 +33,65 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                 if (type == NeuronType::Motor) {
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                        // Use balanced distribution to ensure all motor groups get populated
+                        if (motorForward_.size() <= motorWait_.size()) {
+                            motorForward_.push_back(n);
+                        } else if (motorBackward_.size() <= motorWait_.size()) {
+                            motorBackward_.push_back(n);
+                        } else if (motorTurnLeft_.size() <= motorWait_.size()) {
+                            motorTurnLeft_.push_back(n);
+                        } else if (motorTurnRight_.size() <= motorWait_.size()) {
+                            motorTurnRight_.push_back(n);
+                        } else if (motorInteract_.size() <= motorWait_.size()) {
+                            motorInteract_.push_back(n);
+                        } else {
+                            motorWait_.push_back(n);
                         }
                     }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                        // Distribute sensory neurons based on system requirements
+                        // Vision (256), Touch (8), Internal (4), Proprioception (6)
+                        if (sensoryVision_.size() < DEFAULT_VISION_NEURONS) {
+                            sensoryVision_.push_back(n);
+                        } else if (sensoryTouch_.size() < DEFAULT_TOUCH_NEURONS) {
+                            sensoryTouch_.push_back(n);
+                        } else if (sensoryInternal_.size() < DEFAULT_INTERNAL_NEURONS) {
+                            sensoryInternal_.push_back(n);
+                        } else if (sensoryProprioception_.size() < DEFAULT_PROPRIOCEPTION_NEURONS) {
+                            sensoryProprioception_.push_back(n);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("AgentBrain initialized with " + 
+                 std::to_string(motorForward_.size()) + " forward, " +
+                 std::to_string(motorBackward_.size()) + " backward, " +
+                 std::to_string(motorTurnLeft_.size()) + " left, " +
+                 std::to_string(motorTurnRight_.size()) + " right, " +
+                 std::to_string(motorInteract_.size()) + " interact, " +
+                 std::to_string(motorWait_.size()) + " wait motor neurons, " +
+                 std::to_string(sensoryVision_.size()) + " vision, " +
+                 std::to_string(sensoryTouch_.size()) + " touch, " +
+                 std::to_string(sensoryInternal_.size()) + " internal, " +
+                 std::to_string(sensoryProprioception_.size()) + " proprioception sensory neurons");
+}
+                    }
+                } else if (type == NeuronType::Sensory) {
+                    for (Neuron* n : pop->getNeurons()) {
+                        // Distribute sensory neurons based on sensory system needs
+                        // Priority: Vision (256), Touch (8), Internal (4), Proprioception (6)
+                        if (sensoryVision_.size() < 256) {
+                            sensoryVision_.push_back(n);
+                        } else if (sensoryTouch_.size() < 8) {
+                            sensoryTouch_.push_back(n);
+                        } else if (sensoryInternal_.size() < 4) {
+                            sensoryInternal_.push_back(n);
+                        } else {
+                            sensoryProprioception_.push_back(n);
                         }
                     }
                 }
@@ -146,6 +185,11 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        
+        // Apply curiosity threshold
+        if (curiosityLevel_ < curiosityThreshold_) {
+            curiosityLevel_ = 0.0f;
+        }
     }
 }
 
@@ -155,7 +199,7 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     MotorCommand decoded = decodeFromMotorNeurons();
     
     // Apply curiosity-based exploration
-    if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
+    if (curiosityEnabled_ && curiosityLevel_ > curiosityThreshold_) {
         decoded = selectWithCuriosity(decoded);
     }
     
@@ -202,7 +246,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     }
     
     // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    if (bestActivity < activityThreshold_) {
         return MotorCommand::Wait;
     }
     
@@ -211,9 +255,9 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // Exploration: occasionally choose random action when curiosity is high
-    if (curiosityLevel_ > 0.5f) {
+    if (curiosityLevel_ > explorationThreshold_) {
         // Higher curiosity = more exploration
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+        float exploreChance = curiosityLevel_ * maxExplorationChance_;  // Up to 30% random
         
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
@@ -248,7 +292,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     dopamineLevel_ = predictionError_;
     
     // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    dopamineLevel_ = std::clamp(dopamineLevel_, DEFAULT_DOPAMINE_CLAMP_MIN, DEFAULT_DOPAMINE_CLAMP_MAX);
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -268,8 +312,8 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Modulate plasticity based on dopamine
     // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    float plasticityFactor = DEFAULT_PLASTICITY_FACTOR_BASE + DEFAULT_PLASTICITY_FACTOR_BASE * dopamineLevel_;
+    plasticityFactor = std::clamp(plasticityFactor, DEFAULT_PLASTICITY_CLAMP_MIN, DEFAULT_PLASTICITY_CLAMP_MAX);
     
     // Apply to STDP
     auto* stdp = brain_->getSTDP();

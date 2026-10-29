@@ -208,14 +208,21 @@ def run_agent_simulation(num_steps=1000):
     world.reset()
     world.setAgentStart(10.0, 10.0)
     
-    # 5. Initialize agent with world
+# 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
+    # 6. Enable subsystems with advanced configuration
     agent.enableRewardModulation(True)
     agent.enableStructuralPlasticity(True)
     agent.enableDevelopment(True)
     agent.enableCuriosity(True)
+    
+    # Advanced configuration for fine-tuned behavior
+    agent.setCuriosityThreshold(0.2)        # Quick responsiveness
+    agent.setExplorationThreshold(0.4)      # Moderate exploration
+    agent.setActivityThreshold(0.5)         # Requires meaningful activity
+    agent.setMaxExplorationChance(0.3)      # Controlled exploration
+    agent.setSensoryNoveltyDecay(0.98)      # Slower novelty decay for memory
     
     # 7. Run simulation loop
     for step in range(num_steps):
@@ -251,7 +258,8 @@ def run_agent_simulation(num_steps=1000):
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
             print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
-
+            print(f"  Advanced Config - Thresholds: {agent.getCuriosityThreshold():.3f}/{agent.getExplorationThreshold():.3f}/{agent.getActivityThreshold():.3f}")
+    
 # Run the simulation
 run_agent_simulation(1000)
 ```
@@ -334,16 +342,30 @@ agent.updateDevelopment(timestep)
 agent.getDevelopmentalStage()
 
 # Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+    agent.enableRewardModulation(True/False)
+    agent.enableStructuralPlasticity(True/False)
+    agent.enableDevelopment(True/False)
+    agent.enableCuriosity(True/False)
+    
+    # Advanced configuration for power users
+    agent.setCuriosityThreshold(float)           # Threshold for curiosity-based actions
+    agent.setExplorationThreshold(float)        # Threshold for exploration behavior
+    agent.setActivityThreshold(float)           # Minimum activity for motor commands
+    agent.setMaxExplorationChance(float)        # Maximum probability of random exploration (0-1)
+    agent.setSensoryNoveltyDecay(float)          # Decay rate for sensory novelty
+    
+    # Get advanced configuration values
+    agent.getCuriosityThreshold()
+    agent.getExplorationThreshold()
+    agent.getActivityThreshold()
+    agent.getMaxExplorationChance()
+    agent.getSensoryNoveltyDecay()
+    
+    # Statistics
+    agent.getCuriosityLevel()
+    agent.getNoveltyLevel()
+    agent.getPredictionError()
+    agent.getNeuromodulationLevel()
 ```
 
 #### SimpleWorld Class

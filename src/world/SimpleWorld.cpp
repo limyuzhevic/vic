@@ -92,15 +92,14 @@ void SimpleWorld::update(double timestep) {
     while (agent_.orientation > M_PI) agent_.orientation -= 2.0f * M_PI;
     while (agent_.orientation < -M_PI) agent_.orientation += 2.0f * M_PI;
     
-    // Boundary collision
+    // Boundary collision with improved precision handling
     if (agent_.x < 0.0f) { agent_.x = 0.0f; agent_.velocityX = 0.0f; }
-    if (agent_.x >= width_) { agent_.x = width_ - 0.01f; agent_.velocityX = 0.0f; }
+    else if (agent_.x > width_) { agent_.x = width_; agent_.velocityX = 0.0f; }
     if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
-    if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
+    else if (agent_.y > height_) { agent_.y = height_; agent_.velocityY = 0.0f; }
     
-    // Energy decay
-    agent_.energy -= energyDecayRate_;
-    if (agent_.energy < 0.0f) agent_.energy = 0.0f;
+    // Energy decay with optimized calculation
+    agent_.energy = std::max(0.0f, agent_.energy - energyDecayRate_);
     
     // Update age
     agent_.age += timestep;
@@ -120,9 +119,14 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     ActionResult result;
     const float moveSpeed = 3.0f;
     const float turnSpeed = 2.0f;
+    const float timestep = 0.1f;
+    const float actionCooldown = 0.1f;
+    const float movementCost = 0.01f;
+    const float movementFailureCost = 0.05f;
+    const float backwardMovementFactor = 0.5f;
     
-    // Only allow one action per step
-    if (currentTime - agent_.lastActionTime < 0.1) {
+    // Only allow one action per step - optimized with early return
+    if (currentTime - agent_.lastActionTime < actionCooldown) {
         return ActionResult(0.0f, false, "too soon");
     }
     
@@ -133,37 +137,37 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             float dx = std::cos(agent_.orientation) * moveSpeed;
             float dy = std::sin(agent_.orientation) * moveSpeed;
             
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
+            float newX = agent_.x + dx * timestep;
+            float newY = agent_.y + dy * timestep;
             
             if (isValidPosition(newX, newY)) {
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
+                result.reward = -movementCost;  // Small cost for movement
                 result.success = true;
             } else {
-                result.reward = -0.05f;  // Cost for hitting wall
+                result.reward = -movementFailureCost;  // Cost for hitting wall
                 result.success = false;
             }
             break;
         }
         
         case MotorCommand::MoveBackward: {
-            float dx = -std::cos(agent_.orientation) * moveSpeed * 0.5f;
-            float dy = -std::sin(agent_.orientation) * moveSpeed * 0.5f;
+            float dx = -std::cos(agent_.orientation) * moveSpeed * backwardMovementFactor;
+            float dy = -std::sin(agent_.orientation) * moveSpeed * backwardMovementFactor;
             
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
+            float newX = agent_.x + dx * timestep;
+            float newY = agent_.y + dy * timestep;
             
             if (isValidPosition(newX, newY)) {
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.02f;
+                result.reward = -movementCost * 2.0f;  // Higher cost for backward
                 result.success = true;
             } else {
-                result.reward = -0.05f;
+                result.reward = -movementFailureCost;
                 result.success = false;
             }
             break;
@@ -238,10 +242,11 @@ ActionResult SimpleWorld::interact() {
                 result.success = true;
                 result.message = "consumed_resource";
             } else if (obj.type == WorldObjectType::Hazard) {
-                agent_.health -= 0.2f;
+                agent_.energy -= std::abs(obj.value) * 2.0f;  // Hazards cause more damage
+                if (agent_.energy < 0.0f) agent_.energy = 0.0f;
                 result.reward = obj.value;  // Negative reward
                 result.success = true;
-                result.message = "hit_hazard";
+                result.message = "avoided_hazard";
             }
             
             // Only interact with one object at a time

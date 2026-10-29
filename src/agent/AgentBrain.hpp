@@ -13,6 +13,26 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
+    // Configuration constants
+    static constexpr size_t DEFAULT_MOTOR_GROUP_COUNT = 6;
+    static constexpr size_t DEFAULT_VISION_NEURONS = 256;
+    static constexpr size_t DEFAULT_TOUCH_NEURONS = 8;
+    static constexpr size_t DEFAULT_INTERNAL_NEURONS = 4;
+    static constexpr size_t DEFAULT_PROPRIOCEPTION_NEURONS = 6;
+    static constexpr float DEFAULT_NOVELTY_DECAY = 0.99f;
+    static constexpr float DEFAULT_CURIOUSITY_THRESHOLD = 0.3f;
+    static constexpr float DEFAULT_EXPLORATION_THRESHOLD = 0.5f;
+    static constexpr float DEFAULT_ACTIVITY_THRESHOLD = 0.5f;
+    static constexpr float DEFAULT_MAX_EXPLORATION_CHANCE = 0.3f;
+    static constexpr float DEFAULT_DOPAMINE_CLAMP_MIN = -1.0f;
+    static constexpr float DEFAULT_DOPAMINE_CLAMP_MAX = 1.0f;
+    static constexpr float DEFAULT_PLASTICITY_FACTOR_BASE = 0.5f;
+    static constexpr float DEFAULT_PLASTICITY_CLAMP_MIN = 0.1f;
+    static constexpr float DEFAULT_PLASTICITY_CLAMP_MAX = 2.0f;
+    static constexpr double INITIAL_DEVELOPMENT_AGE = 60.0; // ~1 minute
+    static constexpr double CRITICAL_PERIOD_AGE = 300.0;   // ~5 minutes
+    static constexpr double MATURATION_AGE = 900.0;       // ~15 minutes
+
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
@@ -69,6 +89,19 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Enhanced configuration methods for advanced users
+    void setSensoryNoveltyDecay(float decay) { sensoryNoveltyDecay_ = decay; }
+    void setCuriosityThreshold(float threshold) { curiosityThreshold_ = threshold; }
+    void setExplorationThreshold(float threshold) { explorationThreshold_ = threshold; }
+    void setActivityThreshold(float threshold) { activityThreshold_ = threshold; }
+    void setMaxExplorationChance(float chance) { maxExplorationChance_ = chance; }
+    
+    float getSensoryNoveltyDecay() const { return sensoryNoveltyDecay_; }
+    float getCuriosityThreshold() const { return curiosityThreshold_; }
+    float getExplorationThreshold() const { return explorationThreshold_; }
+    float getActivityThreshold() const { return activityThreshold_; }
+    float getMaxExplorationChance() const { return maxExplorationChance_; }
+
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -112,6 +145,12 @@ private:
     // Previous sensory state for novelty detection
     std::vector<float> previousVision_;
     float sensoryNoveltyDecay_;
+    
+    // Advanced configuration parameters
+    float curiosityThreshold_;
+    float explorationThreshold_;
+    float activityThreshold_;
+    float maxExplorationChance_;
 };
 
 } // namespace nlm
