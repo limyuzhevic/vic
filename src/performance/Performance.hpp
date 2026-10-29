@@ -75,11 +75,40 @@
 #define NLM_MEMORY_POOL_PAGE_SIZE 4096
 #define NLM_MAX_POOL_SIZE (1024 * 1024)  // Max objects per pool
 
+// Conditional includes for performance modules
+#if NLM_USE_MEMORY_POOL
+    #include "performance/MemoryPoolBase.hpp"
+    #include "performance/MemoryPool/NeuronPool.hpp"
+    #include "performance/MemoryPool/SynapsePool.hpp"
+#endif
+
+#if NLM_USE_EVENT_QUEUE
+    #include "performance/EventQueue/SpikeRingBuffer.hpp"
+    #include "performance/EventQueue/DelayedSpikeQueue.hpp"
+    #include "performance/EventQueue/PriorityEventQueue.hpp"
+#endif
+
+#if NLM_USE_SIMD
+    #include "performance/SIMD/SIMDUtils.hpp"
+#endif
+
 namespace nlm {
 
 // Forward declarations
 class Neuron;
 class Synapse;
+
+// Performance configuration
+struct PerformanceConfig {
+    bool enableMemoryPool = NLM_USE_MEMORY_POOL;
+    bool enableSOA = NLM_USE_SOA;
+    bool enableEventQueue = NLM_USE_EVENT_QUEUE;
+    bool enableSparseConnectivity = NLM_USE_SPARE_CONNECTIVITY;
+    bool enableMultithreading = NLM_USE_MULTITHREADING;
+    bool enableSIMD = NLM_USE_SIMD;
+    size_t numThreads = NLM_NUM_THREADS;
+    size_t simdWidth = NLM_SIMD_WIDTH;
+};
 
 } // namespace nlm
 
