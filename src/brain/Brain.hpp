@@ -25,9 +25,35 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+class Serotonin;
+class Norepinephrine;
+// Simple sensory input for prediction system
+class SimpleSensoryInput {
+public:
+    SimpleSensoryInput(const std::vector<float>& data);
+    
+    const char* getType() const;
+    const std::vector<float>& getData() const;
+    size_t getDimensions() const;
+    std::unique_ptr<SensoryInput> clone() const;
+    
+private:
+    std::vector<float> data_;
+};
+
+// Simple sensory input for prediction system
+class SimpleSensoryInput {
+public:
+    SimpleSensoryInput(const std::vector<float>& data);
+    
+    const char* getType() const;
+    const std::vector<float>& getData() const;
+    size_t getDimensions() const;
+    std::unique_ptr<SensoryInput> clone() const;
+    
+private:
+    std::vector<float> data_;
+};
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -181,10 +207,24 @@ public:
     // Novelty - novelty detection
     Novelty* getNovelty();
     
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+class Acetylcholine;
+class Curiosity;
+class Novelty;
+class PredictionError;
+
+// Simple sensory input for prediction system
+class SimpleSensoryInput {
+public:
+    SimpleSensoryInput(const std::vector<float>& data);
     
-    // Get current configuration
+    const char* getType() const;
+    const std::vector<float>& getData() const;
+    size_t getDimensions() const;
+    std::unique_ptr<SensoryInput> clone() const;
+    
+private:
+    std::vector<float> data_;
+};
     std::shared_ptr<const Config> getConfig() const;
     
     // Get random generator

@@ -102,9 +102,7 @@ public:
     std::vector<float> getConceptPrototype(size_t conceptId) const;
 
     // Get concept instances
-    const std::vector<ConceptInstance>& getConceptInstances(size_t conceptId) const;
-
-    // Measure concept stability (0-1)
+    // Get concept stability (0-1)
     float getConceptStability(size_t conceptId) const;
 
     // Get number of concepts discovered
@@ -137,6 +135,15 @@ public:
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+
+    // Update concept flexibility (serotonin effects)
+    void updateConceptFlexibility(size_t conceptId, float flexibility);
+
+    // Update concept formation speed (norepinephrine effects)
+    void updateConceptFormationSpeed(size_t conceptId, float speed);
+
+    // Update concept memory (acetylcholine effects)
+    void updateConceptMemory(size_t conceptId, float memory);
 
 private:
     // Create new concept from pattern
