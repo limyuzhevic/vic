@@ -6,6 +6,9 @@
 #include <variant>
 #include <optional>
 
+// JSON library for configuration support
+#include <nlohmann/json.hpp>
+
 namespace nlm {
 
 // Forward declarations

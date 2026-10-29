@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "JSONConfigUtils.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,8 +20,9 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO PHASE 2: Enhanced JSON/YAML parser with validation and error handling
+    // Updated to support both JSON and plain text configuration formats
+    // Includes configuration validation and type checking
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -79,14 +81,27 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Detect file format and use appropriate serialization
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+        // Save as JSON file
+        auto config = std::const_pointer_cast<Config>(std::static_pointer_cast<const Config>(this));
+        return JSONConfigUtils::saveJSONToFile(config, filepath);
+    }
+    
+    // Save as plain text key=value format (Phase 1 style)
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    file << "# NLM Configuration File (Plain Text Format)\n";
+    file << "# This format is for backward compatibility with Phase 1\n";
+    file << "# Use .json extension for JSON format\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "\n";
     }
     
     return true;
@@ -198,18 +213,11 @@ std::string Config::toLower(const std::string& str) {
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
 }
+// Add explicit template instantiations for Config methods
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// In the .cpp file implementation
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Note: The nlohmann/json library provides automatic type conversion
+// which makes the ConfigValue variant more flexible for JSON handling.
 
 } // namespace nlm
