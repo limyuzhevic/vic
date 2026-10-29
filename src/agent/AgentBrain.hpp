@@ -58,18 +58,53 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
+    // Advanced features for power users
+    
+    // Performance monitoring and statistics
+    void enablePerformanceMonitoring(bool enable);
+    PerformanceStats getPerformanceStats() const;
+    void recordStep(double dt);
+    
+    // Simulation control
+    void setSimulationSpeed(double speed);
+    void pauseSimulation();
+    void resumeSimulation();
+    bool isSimulationPaused() const;
+    
+    // Debugging and logging
+    void enableDebugLogging(bool enable);
+    void logDetailedStatus() const;
+    
+    // Action sequence recording and replay
+    void recordAction(MotorCommand action);
+    std::vector<MotorCommand> getActionSequence() const;
+    void setReplaySpeed(size_t speed);
+    void replayActions(const std::vector<MotorCommand>& actions, double speed);
+    
+    // Batch processing
+    void batchProcessSensoryInput(const std::vector<SensoryPercept>& percepts);
+    
+    // Episode management
+    void startEpisode();
+    size_t runEpisode(SimpleWorld& world, size_t maxSteps);
+    void updateEpisodeReward(float reward);
+    void updateEpisodeNovelty(float novelty);
+    float getEpisodeReward() const;
+    float getEpisodeNovelty() const;
+    
+    // System status and reset
+    void resetSystem();
+    SystemStatus getSystemStatus() const;
+    
+    // Legacy methods (for backward compatibility)
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
-    
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
-    
-private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     

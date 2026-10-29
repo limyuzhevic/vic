@@ -398,7 +398,45 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Advanced features for power users
+        .def("batchProcessSensoryInput", [](AgentBrain& self, const std::vector<SensoryPercept>& percepts) {
+            for (const auto& percept : percepts) {
+                self.processSensoryInput(percept);
+            }
+        }, py::arg("percepts"), "Batch process multiple sensory inputs")
+        .def("runEpisode", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world, size_t steps) {
+            world->reset();
+            for (size_t t = 0; t < steps; ++t) {
+                auto percept = world->getSensoryPercept();
+                self.processSensoryInput(percept);
+                world->update(0.001);
+            }
+            return steps;
+        }, py::arg("world"), py::arg("steps"), "Run complete episode simulation")
+        .def("enablePerformanceMonitoring", &AgentBrain::enablePerformanceMonitoring, py::arg("enable"),
+             "Enable performance monitoring")
+        .def("getPerformanceStats", &AgentBrain::getPerformanceStats,
+             "Get performance statistics")
+        .def("setSimulationSpeed", [](AgentBrain& self, double speed) {
+            // This would set a global simulation speed multiplier
+            // for time-based operations
+            self.getBrain()->setSimulationSpeed(speed);
+        }, py::arg("speed"), "Set simulation speed multiplier")
+        .def("pauseSimulation", &AgentBrain::pauseSimulation, "Pause simulation")
+        .def("resumeSimulation", &AgentBrain::resumeSimulation, "Resume simulation")
+        .def("isSimulationPaused", &AgentBrain::isSimulationPaused, "Check if simulation is paused")
+        .def("getActionSequence", &AgentBrain::getActionSequence,
+             "Get recorded action sequence for replay")
+        .def("setReplaySpeed", &AgentBrain::setReplaySpeed, py::arg("speed"),
+             "Set replay speed for action sequences")
+        .def("replayActions", &AgentBrain::replayActions, py::arg("actions"), py::arg("speed"),
+             "Replay recorded actions")
+        .def("enableDebugLogging", &AgentBrain::enableDebugLogging, py::arg("enable"),
+             "Enable detailed debug logging")
+        .def("getSystemStatus", &AgentBrain::getSystemStatus,
+             "Get comprehensive system status report")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

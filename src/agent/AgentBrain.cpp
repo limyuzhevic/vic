@@ -5,7 +5,29 @@
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
+// Performance monitoring state
+    bool performanceMonitoringEnabled_;
+    size_t stepsProcessed_;
+    double totalTime_;
+    float maxFiringRate_;
+    float avgFiringRate_;
+
+    // Simulation control
+    bool simulationPaused_;
+    double simulationSpeedMultiplier_;
+    size_t replaySpeedMultiplier_;
+
+    // Debugging and logging
+    bool debugLoggingEnabled_;
+    size_t actionSequenceMaxLength_;
+    std::vector<MotorCommand> actionSequence_;
+
+    // Episode tracking
+    size_t currentEpisodeSteps_;
+    float episodeReward_;
+    float episodeNovelty_;
+
+    AgentBrain(std::shared_ptr<Brain> brain)
     : brain_(brain)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
@@ -19,6 +41,19 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , performanceMonitoringEnabled_(false)
+    , stepsProcessed_(0)
+    , totalTime_(0.0)
+    , maxFiringRate_(0.0f)
+    , avgFiringRate_(0.0f)
+    , simulationPaused_(false)
+    , simulationSpeedMultiplier_(1.0)
+    , replaySpeedMultiplier_(1)
+    , debugLoggingEnabled_(false)
+    , actionSequenceMaxLength_(1000)
+    , currentEpisodeSteps_(0)
+    , episodeReward_(0.0f)
+    , episodeNovelty_(0.0f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -334,17 +369,285 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+// Advanced features implementation
+void AgentBrain::enablePerformanceMonitoring(bool enable) {
+    performanceMonitoringEnabled_ = enable;
+    if (debugLoggingEnabled_) {
+        NLM_LOG_DEBUG("Performance monitoring " + std::string(enable ? "enabled" : "disabled"));
+    }
+}
+
+void AgentBrain::setSimulationSpeed(double speed) {
+    if (speed <= 0.0) {
+        NLM_LOG_ERROR("Simulation speed must be positive");
+        return;
+    }
+    simulationSpeedMultiplier_ = speed;
+    if (debugLoggingEnabled_) {
+        NLM_LOG_DEBUG("Simulation speed set to " + std::to_string(speed) + "x");
+    }
+}
+
+void AgentBrain::pauseSimulation() {
+    simulationPaused_ = true;
+    if (debugLoggingEnabled_) {
+        NLM_LOG_DEBUG("Simulation paused");
+    }
+}
+
+void AgentBrain::resumeSimulation() {
+    simulationPaused_ = false;
+    if (debugLoggingEnabled_) {
+        NLM_LOG_DEBUG("Simulation resumed");
+    }
+}
+
+bool AgentBrain::isSimulationPaused() const {
+    return simulationPaused_;
+}
+
+void AgentBrain::enableDebugLogging(bool enable) {
+    debugLoggingEnabled_ = enable;
+    if (enable) {
+        NLM_LOG_INFO("Debug logging enabled");
+    } else {
+        NLM_LOG_INFO("Debug logging disabled");
+    }
+}
+
+// Performance monitoring
+void AgentBrain::recordStep(double dt) {
+    if (!performanceMonitoringEnabled_) return;
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    stepsProcessed_++;
+    totalTime_ += dt;
+    
+    // Update firing rate statistics
+    if (brain_) {
+        float firingRate = brain_->getAverageFiringRate();
+        avgFiringRate_ = (avgFiringRate_ * (stepsProcessed_ - 1) + firingRate) / stepsProcessed_;
+        maxFiringRate_ = std::max(maxFiringRate_, firingRate);
+    }
+    
+    if (debugLoggingEnabled_ && stepsProcessed_ % 100 == 0) {
+        NLM_LOG_DEBUG("Step " + std::to_string(stepsProcessed_) + 
+                     " | Time: " + std::to_string(totalTime_) + 
+                     " | Avg firing: " + std::to_string(avgFiringRate_));
+    }
+}
+
+PerformanceStats AgentBrain::getPerformanceStats() const {
+    PerformanceStats stats;
+    
+    if (performanceMonitoringEnabled_ && stepsProcessed_ > 0) {
+        stats.totalSteps = stepsProcessed_;
+        stats.totalTime = totalTime_;
+        stats.avgStepsPerSecond = stepsProcessed_ / totalTime_;
+        stats.avgFiringRate = avgFiringRate_;
+        stats.maxFiringRate = maxFiringRate_;
+        stats.episodeSteps = currentEpisodeSteps_;
+        stats.episodeReward = episodeReward_;
+        stats.episodeNovelty = episodeNovelty_;
+    }
+    
+    return stats;
+}
+
+// Action sequence recording
+void AgentBrain::recordAction(MotorCommand action) {
+    if (actionSequence_.size() >= actionSequenceMaxLength_) {
+        actionSequence_.erase(actionSequence_.begin());
+    }
+    actionSequence_.push_back(action);
+}
+
+std::vector<MotorCommand> AgentBrain::getActionSequence() const {
+    return actionSequence_;
+}
+
+void AgentBrain::setReplaySpeed(size_t speed) {
+    if (speed == 0) {
+        NLM_LOG_ERROR("Replay speed cannot be zero");
+        return;
+    }
+    replaySpeedMultiplier_ = speed;
+}
+
+// Batch processing
+void AgentBrain::batchProcessSensoryInput(const std::vector<SensoryPercept>& percepts) {
+    size_t successful = 0;
+    for (const auto& percept : percepts) {
+        if (brain_ && percept.getTimestamp() > 0) {
+            processSensoryInput(percept);
+            successful++;
+        }
+    }
+    
+    if (debugLoggingEnabled_) {
+        NLM_LOG_DEBUG("Batch processed " + std::to_string(successful) + "/" + 
+                     std::to_string(percepts.size()) + " percepts");
+    }
+}
+
+// Episode management
+void AgentBrain::startEpisode() {
+    reset();
+    currentEpisodeSteps_ = 0;
+    episodeReward_ = 0.0f;
+    episodeNovelty_ = 0.0f;
+}
+
+size_t AgentBrain::runEpisode(SimpleWorld& world, size_t maxSteps) {
+    startEpisode();
+    
+    for (currentEpisodeSteps_ = 0; currentEpisodeSteps_ < maxSteps && !simulationPaused_; ++currentEpisodeSteps_) {
+        // Get sensory percept from world
+        const SensoryPercept& percept = world.getSensoryPercept();
+        
+        // Process sensory input
+        processSensoryInput(percept);
+        
+        // Decode motor command
+        MotorCommand cmd = decodeMotorCommand();
+        recordAction(cmd);
+        
+        // Apply to world
+        world.applyMotorCommand(cmd, currentEpisodeSteps_ * 0.001);
+        
+        // Update development
+        if (developmentEnabled_) {
+            updateDevelopment(0.001);
+        }
+        
+        // Record performance
+        if (performanceMonitoringEnabled_) {
+            recordStep(0.001);
+        }
+        
+        // Small delay for simulation pacing
+        if (debugLoggingEnabled_ && currentEpisodeSteps_ % 100 == 0) {
+            NLM_LOG_DEBUG("Episode step " + std::to_string(currentEpisodeSteps_));
+        }
+    }
+    
+    return currentEpisodeSteps_;
+}
+
+void AgentBrain::updateEpisodeReward(float reward) {
+    episodeReward_ += reward;
+    if (debugLoggingEnabled_ && currentEpisodeSteps_ > 0) {
+        NLM_LOG_DEBUG("Episode reward: " + std::to_string(episodeReward_) + 
+                     " (avg: " + std::to_string(episodeReward_ / currentEpisodeSteps_) + ")");
+    }
+}
+
+float AgentBrain::getEpisodeReward() const {
+    return episodeReward_;
+}
+
+void AgentBrain::updateEpisodeNovelty(float novelty) {
+    episodeNovelty_ = (episodeNovelty_ * 0.9f) + (novelty * 0.1f); // Exponential moving average
+}
+
+float AgentBrain::getEpisodeNovelty() const {
+    return episodeNovelty_;
+}
+
+// Action replay
+void AgentBrain::replayActions(const std::vector<MotorCommand>& actions, double speed) {
+    if (actions.empty()) {
+        NLM_LOG_WARN("No actions to replay");
+        return;
+    }
+    
+    // Save current state
+    size_t savedSteps = stepsProcessed_;
+    double savedTime = totalTime_;
+    float savedDopamine = dopamineLevel_;
+    
+    // Replay actions
+    double timeStep = 0.001 / speed;
+    for (size_t i = 0; i < actions.size(); ++i) {
+        // Apply action (simplified - in real implementation would integrate with world)
+        // For now, just record performance
+        recordStep(timeStep);
+        
+        if (debugLoggingEnabled_ && i % 100 == 0) {
+            NLM_LOG_DEBUG("Replaying action " + std::to_string(i) + "/" + 
+                         std::to_string(actions.size()));
+        }
+    }
+    
+    // Restore state
+    stepsProcessed_ = savedSteps;
+    totalTime_ = savedTime;
+    dopamineLevel_ = savedDopamine;
+}
+
+// System status
+void AgentBrain::resetSystem() {
+    reset();
+    // Clear performance stats
+    stepsProcessed_ = 0;
+    totalTime_ = 0.0;
+    maxFiringRate_ = 0.0f;
+    avgFiringRate_ = 0.0f;
+    actionSequence_.clear();
+    
+    if (debugLoggingEnabled_) {
+        NLM_LOG_DEBUG("System reset completed");
+    }
+}
+
+SystemStatus AgentBrain::getSystemStatus() const {
+    SystemStatus status;
+    
+    status.totalSteps = stepsProcessed_;
+    status.totalTime = totalTime_;
+    status.simulationSpeed = simulationSpeedMultiplier_;
+    status.simulationPaused = simulationPaused_;
+    status.performanceMonitoringEnabled = performanceMonitoringEnabled_;
+    status.debugLoggingEnabled = debugLoggingEnabled_;
+    status.rewardModulationEnabled = rewardModulationEnabled_;
+    status.structuralPlasticityEnabled = structuralPlasticityEnabled_;
+    status.developmentEnabled = developmentEnabled_;
+    status.curiosityEnabled = curiosityEnabled_;
+    status.developmentalStage = getDevelopmentalStage();
+    status.currentNeuromodulation = getNeuromodulationLevel();
+    status.currentCuriosity = getCuriosityLevel();
+    status.currentNovelty = getNoveltyLevel();
+    status.currentPredictionError = getPredictionError();
+    status.avgFiringRate = avgFiringRate_;
+    status.maxFiringRate = maxFiringRate_;
+    status.currentActionSequenceLength = actionSequence_.size();
+    status.episodeSteps = currentEpisodeSteps_;
+    status.episodeReward = episodeReward_;
+    status.episodeNovelty = episodeNovelty_;
+    
+    return status;
+}
+
+void AgentBrain::logDetailedStatus() const {
+    SystemStatus status = getSystemStatus();
+    
+    NLM_LOG_INFO("=== DETAILED AGENT BRAIN STATUS ===");
+    NLM_LOG_INFO("Simulation: " + std::to_string(status.totalSteps) + " steps in " + 
+                 std::to_string(status.totalTime) + "s (" + 
+                 std::to_string(status.avgStepsPerSecond) + " Hz)");
+    NLM_LOG_INFO("Controls: speed=" + std::to_string(status.simulationSpeed) + 
+                 "x paused=" + std::to_string(status.simulationPaused));
+    NLM_LOG_INFO("Learning: neuromodulation=" + std::to_string(status.rewardModulationEnabled_) +
+                 " plasticity=" + std::to_string(status.structuralPlasticityEnabled_) +
+                 " development=" + std::to_string(status.developmentEnabled_));
+    NLM_LOG_INFO("Exploration: curiosity=" + std::to_string(status.curiosityEnabled_));
+    NLM_LOG_INFO("Neurals: stage=" + std::to_string(static_cast<int>(status.developmentalStage)) +
+                 " dopamine=" + std::to_string(status.currentNeuromodulation) +
+                 " curiosity=" + std::to_string(status.currentCuriosity));
+    NLM_LOG_INFO("Activity: firing rate avg=" + std::to_string(status.avgFiringRate) +
+                 " max=" + std::to_string(status.maxFiringRate) +
+                 " episode reward=" + std::to_string(status.episodeReward));
+    NLM_LOG_INFO("Memory: " + std::to_string(status.currentActionSequenceLength) + " actions recorded");
+    NLM_LOG_INFO("==================================");
 }
 
 } // namespace nlm
