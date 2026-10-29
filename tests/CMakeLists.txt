@@ -13,6 +13,7 @@ add_executable(nlm_test
     test_neuron.cpp
     test_synapse.cpp
     test_stdp.cpp
+    test_enhanced_plasticity.cpp
     test_brain.cpp
 )
 

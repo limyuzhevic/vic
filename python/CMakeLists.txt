@@ -29,7 +29,12 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
     ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
     ${NLM_SOURCE_DIR}/plasticity/Hebbian.cpp
+    ${NLM_SOURCE_DIR}/plasticity/HebbianRule.cpp
+    ${NLM_SOURCE_DIR}/plasticity/AntiHebbianRule.cpp
+    ${NLM_SOURCE_DIR}/plasticity/BCMRule.cpp
     ${NLM_SOURCE_DIR}/plasticity/STDP.cpp
+    ${NLM_SOURCE_DIR}/plasticity/RewardModulatedSTDP.cpp
+    ${NLM_SOURCE_DIR}/plasticity/TripletSTDP.cpp
     ${NLM_SOURCE_DIR}/plasticity/StructuralPlasticity.cpp
     ${NLM_SOURCE_DIR}/development/DevelopmentSystem.cpp
     ${NLM_SOURCE_DIR}/development/Synaptogenesis.cpp
