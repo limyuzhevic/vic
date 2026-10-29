@@ -22,6 +22,11 @@ bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
+    // Null pointer safety check
+    if (!pImpl) {
+        return false;
+    }
+    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -31,7 +36,13 @@ bool Config::loadFromFile(const std::string& filepath) {
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        
+        // Additional validation: check for empty line after trimming
+        if (line.empty()) {
+            continue;
+        }
+        
+        if (line[0] == '#' || line[0] == '/') {
             continue;
         }
         
@@ -40,6 +51,16 @@ bool Config::loadFromFile(const std::string& filepath) {
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Additional validation: ensure key is not empty
+            if (key.empty()) {
+                continue;
+            }
+            
+            // Additional validation: ensure value is not empty
+            if (value.empty()) {
+                continue;
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -56,29 +77,52 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Null pointer safety checks
+    if (!pImpl || !argv) {
+        return false;
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        // Check for null pointer in argv
+        if (!argv[i]) {
+            continue;
+        }
+        
         std::string arg(argv[i]);
         
         // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        if (arg.size() >= 2 && arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                // Additional validation: ensure key is not empty
+                if (!key.empty()) {
+                    set(key, value, ConfigSource::CommandLine);
+                }
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (!arg.empty() && arg[0] == '-' && i + 1 < argc && argv[i + 1]) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            // Additional validation: ensure key is not empty
+            if (!key.empty()) {
+                set(key, value, ConfigSource::CommandLine);
+            }
         }
     }
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Null pointer safety check
+    if (!pImpl) {
+        return false;
+    }
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,7 +130,23 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Improved: Save actual value instead of placeholder
+        std::visit([&file, &entry](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, int64_t> || 
+                                 std::is_same_v<T, int> || 
+                                 std::is_same_v<T, double> || 
+                                 std::is_same_v<T, float>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;

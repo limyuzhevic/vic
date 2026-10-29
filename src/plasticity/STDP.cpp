@@ -24,6 +24,16 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
+    // Null pointer safety checks
+    if (!pImpl || !synapse || preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    // Validate timestep duration
+    if (dt <= 0.0) {
+        return;
+    }
+    
     /*
      * Real STDP implementation based on spike-timing correlation
      * 
@@ -51,54 +61,89 @@ void STDP::update(Synapse* synapse,
      *   - Assumes single exponential window (more complex in biology)
      *   - Doesn't account for synaptic eligibility traces
      */
-    
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
-    
-    float totalDelta = 0.0f;
-    float tau = pImpl->timeConstant;
-    
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
-            }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
-        }
-    }
-    
-    // Apply weight change with bounds
-    if (std::abs(totalDelta) > 1e-6f) {
-        // Scale by synaptic efficacy if available
-        float efficacy = synapse->getEfficacy();
-        totalDelta *= efficacy;
-        
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
-        
-        // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
-    }
+     
+     float totalDelta = 0.0f;
+     float tau = pImpl->timeConstant;
+     
+     // Validate time constant before using it
+     if (tau <= 0.0f) {
+         return;
+     }
+     
+     for (Timestamp preTime : preSpikes) {
+         for (Timestamp postTime : postSpikes) {
+             float deltaTime = static_cast<float>(postTime - preTime);  // Δt in ms
+             
+             if (deltaTime > 0) {
+                 // Pre before post: POTENTIATION
+                 // "Cells that fire together, wire together" - but only if pre fires before post
+                 float delta = pImpl->ltpWeight * std::exp(-deltaTime / tau);
+                 totalDelta += delta;
+             } else if (deltaTime < 0) {
+                 // Post before pre: DEPRESSION
+                 // "Anti-Hebbian" - connection weakens if post fires without pre
+                 float delta = -pImpl->ltdWeight * std::exp(deltaTime / tau);  // deltaTime is negative, so this subtracts
+                 totalDelta += delta;
+             }
+             // deltaTime == 0: no change (simultaneous spikes - rare in practice)
+         }
+     }
+     
+     // Apply weight change with bounds
+     if (std::abs(totalDelta) > 1e-6f) {
+         // Scale by synaptic efficacy if available
+         float efficacy = synapse->getEfficacy();
+         
+         // Validate efficacy before using it
+         if (std::isnan(efficacy) || efficacy < 0.0f) {
+             efficacy = 1.0f;
+         }
+         
+         totalDelta *= efficacy;
+         
+         // Apply weight change
+         synapse->addToWeight(totalDelta);
+         
+         // Update eligibility trace for reward-modulated learning
+         float currentTrace = synapse->getEligibilityTrace();
+         synapse->setEligibilityTrace(currentTrace + totalDelta);
+     }
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    // Null pointer safety checks
+    if (!pImpl || !synapse) {
+        return;
+    }
+    
+    // Validate delta parameter
+    if (std::isnan(delta)) {
+        return;
+    }
     
     // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
+    float currentWeight = synapse->getWeight();
+    
+    // Validate current weight
+    if (std::isnan(currentWeight)) {
+        currentWeight = 0.0f;
+    }
+    
+    float newWeight = currentWeight + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+    
+    // Validate min/max weights before clamping
+    if (pImpl->minWeight > pImpl->maxWeight) {
+        // Swap min/max to ensure valid bounds
+        std::swap(pImpl->minWeight, pImpl->maxWeight);
+    }
+    
+    // Final validation before setting weight
+    if (newWeight < pImpl->minWeight || newWeight > pImpl->maxWeight ||
+        std::isnan(newWeight)) {
+        return;
+    }
+    
     synapse->setWeight(newWeight);
 }
 
@@ -107,7 +152,11 @@ const char* STDP::getName() const {
 }
 
 void STDP::setLTPWeight(float weight) {
-    pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    // Bounds checking: weight must be in valid range [0.0, 1.0]
+    if (std::isnan(weight) || weight < 0.0f || weight > 1.0f) {
+        return; // Silently reject invalid values
+    }
+    pImpl->ltpWeight = weight;
 }
 
 float STDP::getLTPWeight() const {
@@ -115,7 +164,11 @@ float STDP::getLTPWeight() const {
 }
 
 void STDP::setLTDWeight(float weight) {
-    pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    // Bounds checking: weight must be in valid range [0.0, 1.0]
+    if (std::isnan(weight) || weight < 0.0f || weight > 1.0f) {
+        return; // Silently reject invalid values
+    }
+    pImpl->ltdWeight = weight;
 }
 
 float STDP::getLTDWeight() const {
@@ -123,7 +176,11 @@ float STDP::getLTDWeight() const {
 }
 
 void STDP::setTimeConstant(float tau) {
-    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    // Bounds checking: time constant must be in valid range [1.0, 100.0] ms
+    if (std::isnan(tau) || tau < 1.0f || tau > 100.0f) {
+        return; // Silently reject invalid values
+    }
+    pImpl->timeConstant = tau;
 }
 
 float STDP::getTimeConstant() const {

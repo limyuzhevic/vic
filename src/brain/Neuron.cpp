@@ -148,6 +148,16 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
+    // Null pointer safety check
+    if (!pImpl) {
+        return;
+    }
+    
+    // Validate timestamp
+    if (std::isnan(timestamp) || timestamp < 0.0) {
+        return;
+    }
+    
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
@@ -155,36 +165,72 @@ void Neuron::recordSpike(Timestamp timestamp) {
 }
 
 void Neuron::clearSpikeHistory() {
+    // Null pointer safety check
+    if (!pImpl) {
+        return;
+    }
     pImpl->spikeHistory.clear();
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    // Null pointer safety check
+    if (!pImpl) {
+        return;
+    }
     pImpl->incomingSynapses.push_back(handle);
 }
 
 void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    // Null pointer safety check
+    if (!pImpl) {
+        return;
+    }
     pImpl->outgoingSynapses.push_back(handle);
 }
 
 NeuronState& Neuron::getState() {
+    // Null pointer safety check
+    if (!pImpl) {
+        // Return a static empty state as fallback
+        static NeuronState emptyState;
+        return emptyState;
+    }
     return pImpl->state;
 }
 
 PlasticityFlags& Neuron::getPlasticityFlags() {
+    // Null pointer safety check
+    if (!pImpl) {
+        // Return a static empty flags as fallback
+        static PlasticityFlags emptyFlags;
+        return emptyFlags;
+    }
     return pImpl->plasticityFlags;
 }
 
 void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
+    // Null pointer safety check
+    if (!pImpl) {
+        return;
+    }
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
 }
 
 void Neuron::setRegionId(RegionId region) {
+    // Null pointer safety check
+    if (!pImpl) {
+        return;
+    }
     pImpl->regionId = region;
 }
 
 void Neuron::setPopulationId(PopulationId population) {
+    // Null pointer safety check
+    if (!pImpl) {
+        return;
+    }
     pImpl->populationId = population;
 }
 
@@ -213,11 +259,29 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Validate physical constants
+    if (tau <= 0.0f || C <= 0.0f) {
+        // Reset to resting potential if constants are invalid
+        V = V_rest;
+    } else {
+        // Synaptic input contributes to membrane potential change
+        float synapticContribution = pImpl->synapticInput / C;
+        
+        // Leak contribution
+        float leakContribution = (V_rest - V) / tau;
+        
+        // Update membrane potential using exponential Euler integration
+        V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    }
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        V -= pImpl->state.adaptationVariable * 0.01f;
+        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    }
+    
+    // Clamp membrane potential to prevent instability
+    V = std::clamp(V, -100.0f, 50.0f); else {
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
@@ -297,6 +361,34 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+}
+
+}
+
+// Add missing getSpikeHistory function
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const {
+    // Null pointer safety check
+    if (!pImpl) {
+        // Return a static empty vector as fallback
+        static const std::vector<Timestamp> emptyHistory;
+        return emptyHistory;
+    }
+    return pImpl->spikeHistory;
+}
+
+// Add getTotalCurrent and clearTotalCurrent implementations
+MembranePotential Neuron::getTotalCurrent() const {
+    if (!pImpl) {
+        return 0.0f;
+    }
+    return pImpl->totalCurrent;
+}
+
+void Neuron::clearTotalCurrent() {
+    if (!pImpl) {
+        return;
+    }
+    pImpl->totalCurrent = 0.0f;
 }
 
 } // namespace nlm

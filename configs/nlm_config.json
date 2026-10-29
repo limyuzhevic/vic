@@ -1,0 +1,140 @@
+// NLM Configuration File
+// JSON configuration format for enhanced configuration management
+// Supports advanced configuration with inheritance and validation
+
+{
+    "nlm_version": "0.1.0",
+    "phase": "6",
+    "description": "Neural Learning Machine Configuration - Phase 6 Final Integration",
+    
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    
+    "plasticity": {
+        "learning_rate": 0.01,
+        "stdp": {
+            "ltp_weight": 0.01,
+            "ltd_weight": 0.012,
+            "time_constant": 20.0
+        },
+        "hebbian": {
+            "learning_rate": 0.05,
+            "max_weight": 1.0
+        },
+        "structural": {
+            "synaptogenesis_rate": 0.001,
+            "pruning_rate": 0.0001
+        }
+    },
+    
+    "development": {
+        "synaptogenesis_rate": 0.001,
+        "pruning_rate": 0.0001,
+        "maturation_rate": 0.0005,
+        "plasticity_decay_rate": 0.9
+    },
+    
+    "neuromodulation": {
+        "dopamine_baseline": 0.1,
+        "dopamine_sensitivity": 1.0,
+        "curiosity_rate": 0.05,
+        "novelty_threshold": 0.3
+    },
+    
+    "reward": {
+        "discount_factor": 0.99,
+        "exploration_rate": 0.1,
+        "exploitation_rate": 0.9
+    },
+    
+    "environment": {
+        "name": "GridWorld",
+        "width": 10,
+        "height": 10,
+        "max_steps": 10000
+    },
+    
+    "logging": {
+        "level": "INFO",
+        "log_to_file": false,
+        "log_filename": "nlm.log",
+        "console_colors": true,
+        "file_output": true,
+        "log_source": true,
+        "log_timestamps": true
+    },
+    
+    "visualization": {
+        "enabled": false,
+        "update_rate": 30.0,
+        "window_width": 1920,
+        "window_height": 1080,
+        "show_neurons": true,
+        "show_synapses": true,
+        "show_spikes": true
+    },
+    
+    "performance": {
+        "checkpoint_interval": 100,
+        "memory_pool_size": 10000,
+        "event_queue_size": 10000,
+        "simd_enabled": true,
+        "parallel_processing": true,
+        "multithreading": true
+    },
+    
+    "memory": {
+        "working_memory_capacity": 100,
+        "episodic_memory_capacity": 1000,
+        "semantic_memory_capacity": 500,
+        "procedural_memory_capacity": 200,
+        "associative_memory_capacity": 1000,
+        "replay_frequency": 10.0,
+        "consolidation_threshold": 0.8
+    },
+    
+    "prediction": {
+        "prediction_horizon": 50,
+        "prediction_error_threshold": 0.1,
+        "confidence_decay_rate": 0.95,
+        "prediction_window": 10
+    },
+    
+    "cognition": {
+        "planning_horizon": 20,
+        "concept_formation_rate": 0.01,
+        "attention_span": 5.0,
+        "working_memory_capacity": 100,
+        "planning_depth": 3
+    },
+    
+    "experiments": {
+        "default_experiment": "integration_test",
+        "experiment_directory": "experiments/",
+        "results_directory": "results/",
+        "save_results": true,
+        "auto_save": true
+    },
+    
+    "validation": {
+        "validate_parameters": true,
+        "parameter_ranges": {
+            "random_seed": [0, 2147483647],
+            "simulation_timestep": [0.0001, 1.0],
+            "neuron_count": [1, 1000000],
+            "region_count": [1, 100],
+            "connection_probability": [0.0, 1.0],
+            "plasticity_learning_rate": [0.0, 1.0],
+            "stdp_ltp_weight": [0.0, 1.0],
+            "stdp_ltd_weight": [0.0, 1.0],
+            "stdp_time_constant": [1.0, 100.0],
+            "dopamine_baseline": [0.0, 1.0],
+            "reward_discount_factor": [0.0, 1.0],
+            "environment_width": [1, 1000],
+            "environment_height": [1, 1000]
+        }
+    }
+}

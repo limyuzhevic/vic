@@ -11,6 +11,7 @@
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
+#include "core/ConfigFormatManager.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -326,22 +327,58 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
+    // Demonstrate configuration format manager
+    NLM_LOG_INFO("=== Configuration Format Manager Demo ===");
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    // Create config manager
+    auto& configManager = ConfigFormatManager::getInstance();
     
-    // Load configuration
+    // Create a sample config
     auto config = std::make_shared<Config>();
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // Demonstrate JSON export
+    std::string jsonConfig = configManager.exportConfig(*config, ConfigFormatManager::Format::JSON);
+    NLM_LOG_INFO("JSON Configuration exported (first 200 chars):");
+    if (jsonConfig.size() > 200) {
+        NLM_LOG_INFO(jsonConfig.substr(0, 200) + "...");
+    } else {
+        NLM_LOG_INFO(jsonConfig);
+    }
+    
+    // Demonstrate YAML export
+    std::string yamlConfig = configManager.exportConfig(*config, ConfigFormatManager::Format::YAML);
+    NLM_LOG_INFO("YAML Configuration exported (first 200 chars):");
+    if (yamlConfig.size() > 200) {
+        NLM_LOG_INFO(yamlConfig.substr(0, 200) + "...");
+    } else {
+        NLM_LOG_INFO(yamlConfig);
+    }
+    
+    // Demonstrate INI export
+    std::string iniConfig = configManager.exportConfig(*config, ConfigFormatManager::Format::INI);
+    NLM_LOG_INFO("INI Configuration exported (first 200 chars):");
+    if (iniConfig.size() > 200) {
+        NLM_LOG_INFO(iniConfig.substr(0, 200) + "...");
+    } else {
+        NLM_LOG_INFO(iniConfig);
+    }
+    
+    // Demonstrate format detection
+    std::string testJson = "{\"key\": \"value\"}";
+    std::string testYaml = "key: value\n  subkey: subvalue";
+    std::string testIni = "key = value";
+    
+    NLM_LOG_INFO("Format detection test:");
+    NLM_LOG_INFO("  JSON content detected as: " + std::to_string(static_cast<int>(configManager.detectFormatFromContent(testJson))));
+    NLM_LOG_INFO("  YAML content detected as: " + std::to_string(static_cast<int>(configManager.detectFormatFromContent(testYaml))));
+    NLM_LOG_INFO("  INI content detected as: " + std::to_string(static_cast<int>(configManager.detectFormatFromContent(testIni))));
+    
+    NLM_LOG_INFO("=== Configuration Format Manager Demo Complete ===");
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";

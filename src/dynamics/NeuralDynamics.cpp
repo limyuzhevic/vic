@@ -18,6 +18,16 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     // PLACEHOLDER: Simple leaky integrator
     
+    // Null pointer safety checks
+    if (!pImpl || !neuron) {
+        return;
+    }
+    
+    // Validate timestep
+    if (dt <= 0.0) {
+        return;
+    }
+    
     const auto& state = neuron->getState();
     
     // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
@@ -29,6 +39,18 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     float I = neuron->getTotalCurrent();
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
+    
+    // Validate physical constants
+    if (tau <= 0.0f || R <= 0.0f) {
+        // Reset to resting potential if constants are invalid
+        neuron->setMembranePotential(V_rest);
+        return;
+    }
+    
+    // Validate current input
+    if (std::isnan(I)) {
+        I = 0.0f;
+    }
     
     // Simple Euler integration
     float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
@@ -52,13 +74,36 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
     // TODO PHASE 2: Implement real synaptic dynamics
     // PLACEHOLDER: Synapse decay
+    
+    // Null pointer safety checks
+    if (!pImpl || !synapse) {
+        return;
+    }
+    
+    // Validate timestep
+    if (dt <= 0.0) {
+        return;
+    }
+    
     synapse->step(0.0);
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
     // TODO PHASE 2: Implement real synaptic input
     // PLACEHOLDER: Simple additive input
+    
+    // Null pointer safety checks
+    if (!pImpl || !neuron || !synapse) {
+        return;
+    }
+    
     SynapticWeight weight = synapse->getWeight();
+    
+    // Validate synaptic weight
+    if (std::isnan(weight)) {
+        weight = 0.0f;
+    }
+    
     if (synapse->isExcitatory()) {
         neuron->receiveExcitatoryInput(weight);
     } else {
@@ -75,6 +120,16 @@ void IntegrateAndFireDynamics::reset() {
 }
 
 void IntegrateAndFireDynamics::setMembraneTimeConstant(float tau) {
+    // Null pointer safety check
+    if (!pImpl) {
+        return;
+    }
+    
+    // Validate time constant
+    if (std::isnan(tau) || tau <= 0.0f) {
+        return; // Silently reject invalid values
+    }
+    
     pImpl->membraneTimeConstant = tau;
 }
 
