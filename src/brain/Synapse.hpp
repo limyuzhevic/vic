@@ -83,6 +83,11 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Helper functions for internal operations
+    void validateAndClampWeight();
+    void validateDelay();
+    void cleanupSpikeHistory();
 };
 
 } // namespace nlm

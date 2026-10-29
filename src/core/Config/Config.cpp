@@ -59,8 +59,24 @@ bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        // Handle --help
+        if (arg == "--help") {
+            printHelpAndExit();
+        }
+        
+        // Handle --set=value format
+        if (arg.substr(0, 6) == "--set=") {
+            std::string keyValue = arg.substr(6);
+            size_t eqPos = keyValue.find('=');
+            if (eqPos != std::string::npos) {
+                std::string key = trim(keyValue.substr(0, eqPos));
+                std::string value = trim(keyValue.substr(eqPos + 1));
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        
+        // Handle --key=value format (standard)
+        else if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
@@ -69,10 +85,15 @@ bool Config::loadFromArgs(int argc, char** argv) {
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg[0] == '-' && i + 1 < argc && argv[i + 1][0] != '-') {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+        }
+        // Handle --key (boolean flags)
+        else if (arg[0] == '-' && arg.size() > 1) {
+            std::string key = arg.substr(1);
+            set(key, "true", ConfigSource::CommandLine);
         }
     }
     return true;

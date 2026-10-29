@@ -197,29 +197,30 @@ void Synapse::step(Timestamp currentTime) {
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
-    
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
-    if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
-    }
+    // Decay short-term depression with clearer logic
+    float timeSincePost = pImpl->lastPostSpikeTime >= 0.0f ? 
+        static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f;
+    float timeSincePre = pImpl->lastPreSpikeTime >= 0.0f ? 
+        static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f;
+    float timeSinceActivity = std::max(timeSincePost, timeSincePre);
+    
+    // Recovery from depression toward 1.0
+    pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Validate and clamp weight
+    validateAndClampWeight();
+    
+    // Clean up spike history if needed
+    cleanupSpikeHistory();
 }
 
 void Synapse::reset() {
@@ -228,6 +229,10 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
@@ -260,6 +265,45 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     // Initialize last spike times
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+}
+
+// Helper function to validate and clamp synapse weight
+void Synapse::validateAndClampWeight() {
+    // Apply synapse-specific validation and clamping
+    // Each synapse type can have different constraints
+    float minWeight = pImpl->type == SynapseType::Inhibitory ? -0.5f : -1.0f;
+    float maxWeight = pImpl->type == SynapseType::Excitatory ? 1.0f : 0.5f;
+    
+    // Ensure weight stays within biologically plausible bounds
+    if (pImpl->weight < minWeight || pImpl->weight > maxWeight) {
+        pImpl->weight = std::clamp(pImpl->weight, minWeight, maxWeight);
+    }
+    
+    // Additional stability check based on synaptic efficacy
+    float efficacyFactor = pImpl->efficacy / 2.0f;  // Normalize efficacy
+    float adjustedMaxWeight = maxWeight * efficacyFactor;
+    pImpl->weight = std::min(pImpl->weight, adjustedMaxWeight);
+}
+
+// Helper function to validate delay values
+void Synapse::validateDelay() {
+    // Ensure delay is within reasonable bounds for real neural transmission
+    if (pImpl->delay < 1) {
+        pImpl->delay = 1;  // Minimum 1 step (baseline synaptic delay)
+    } else if (pImpl->delay > 100) {  // Maximum 100 steps (~100ms at 1ms timestep)
+        pImpl->delay = 100;
+    }
+}
+
+// Helper function to handle spike history cleanup
+void Synapse::cleanupSpikeHistory() {
+    // Ensure spike history doesn't exceed maximum size
+    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+    }
+    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+    }
 }
 
 } // namespace nlm

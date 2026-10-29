@@ -1,3 +1,6 @@
+// Brain.hpp - Simplified Brain class with system components
+// This provides a clean interface while implementation is properly organized
+
 #pragma once
 
 #include "../core/Types/Types.hpp"

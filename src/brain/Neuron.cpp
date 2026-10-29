@@ -229,7 +229,15 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Use configurable bounds with safe defaults
+    float minV = -100.0f;
+    float maxV = 50.0f;
+    if (pImpl->state.leakConductance > 0.0f) {
+        // Allow tighter bounds based on leak conductance
+        minV = std::max(-150.0f, V_rest - 50.0f / pImpl->state.leakConductance);
+        maxV = std::min(50.0f, V_rest + 50.0f / pImpl->state.leakConductance);
+    }
+    V = std::clamp(V, minV, maxV);
     
     // Check for spike
     if (V >= threshold) {

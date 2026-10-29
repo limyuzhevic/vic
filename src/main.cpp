@@ -159,6 +159,8 @@ struct LearningExperiment {
     }
 };
 
+void printHelpAndExit();
+
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
@@ -321,6 +323,58 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void printHelpAndExit() {
+    std::cout << R"(
+NLM (熙然) - Neural Learning Machine
+
+Usage: nlm [--config=FILE] [--help] [OPTIONS]
+
+Options:
+  --config=FILE     Load configuration from file
+  --help            Show this help message
+
+Common configuration options (can be set via --set=value):
+  simulation_timestep      Simulation timestep in seconds (default: 0.001)
+  neuron_count             Number of neurons (default: 500)
+  region_count             Number of neural regions (default: 1)
+  connection_probability   Probability of connections (default: 0.1)
+  random_seed              Random seed for reproducibility (default: 42)
+  replay_interval          Memory replay interval (default: 100)
+  consolidation_interval   Memory consolidation interval (default: 1000)
+
+Phase 2: Real Neural Computation:
+  stdp_ltp_weight          STDP LTP learning rate (default: 0.01)
+  stdp_ltd_weight          STDP LTD learning rate (default: 0.012)
+  stdp_tau                STDP time constant (default: 20.0)
+  synaptogenesis_rate      Structural plasticity rate (default: 0.0001)
+  pruning_rate             Structural plasticity pruning rate (default: 0.00001)
+
+Phase 6: Integrated Brain (Advanced):
+  enable_memory_systems    Enable memory systems (0/1, default: 1)
+  enable_prediction        Enable prediction system (0/1, default: 1)
+  enable_cognition         Enable cognition systems (0/1, default: 1)
+  enable_neuromodulation   Enable neuromodulation (0/1, default: 1)
+  enable_development       Enable developmental changes (0/1, default: 1)
+  enable_checkpoints       Enable checkpointing (0/1, default: 1)
+
+Examples:
+  nlm                           Run with default settings
+  nlm --config=production.cfg    Use production configuration
+  nlm --set=neuron_count=2000    Run with 2000 neurons
+  nlm --set=simulation_timestep=0.0001 --set=random_seed=12345
+
+Quick test modes:
+  --test_mode=quick           Fast validation with small network
+  --test_mode=plasticity      Test learning capabilities
+  --test_mode=complete        Full integrated test (Phase 6)
+  --test_mode=replay          Test memory replay functionality
+
+Note: Run with --enable_memory_systems=0 to disable all memory systems
+for performance-critical applications.
+    )" << std::endl;
+    exit(0);
+}
+
 int main(int argc, char** argv) {
     printBanner();
     
@@ -366,12 +420,46 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
+    // Print help if requested
+    if (config->getOr<bool>("help", false)) {
+        printHelpAndExit();
+    }
+    
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Log configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("");
+    
+    // Initialize simulation clock
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    SimulationClock clock(timestep);
+    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    
+    // Initialize brain
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Initializing NLM Brain...");
+    auto brain = std::make_shared<Brain>(config);
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
