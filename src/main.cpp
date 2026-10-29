@@ -1,11 +1,16 @@
 // NLM (熙然) - Neural Learning Machine
-// Phase 2: Real Neural Computation
+// Phase 2.5: Integrated Neural Computation
 //
-// This phase implements real spiking neural computation with:
+// This phase implements real spiking neural computation with integrated cognitive and memory systems:
 // - Leaky Integrate-and-Fire (LIF) neurons
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+// - Integrated memory systems (Working, Episodic, Semantic, Procedural, Associative)
+// - Neuromodulation (Dopamine, Curiosity, PredictionError, Novelty)
+// - Prediction and cognition systems
+// - Development and structural plasticity
+// - World interaction and agent interface
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -366,30 +371,30 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2.5
+    config->set<std::string>({"random_seed"}, static_cast<int64_t>(42), ConfigSource::Default, "Random seed for reproducible experiments");
+    config->set<std::string>({"simulation_timestep"}, 0.001, ConfigSource::Default, "Simulation timestep in seconds");
+    config->set<std::string>({"brain", "neuron_count"}, static_cast<int64_t>(500), ConfigSource::Default, "Total number of neurons");  // Smaller for faster test
+    config->set<std::string>({"brain", "region_count"}, static_cast<int64_t>(1), ConfigSource::Default, "Number of brain regions");
+    config->set<std::string>({"brain", "connection_probability"}, 0.15f, ConfigSource::Default, "Connection probability for random connectivity");
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set<std::string>({"plasticity", "stdp", "ltp_weight"}, 0.02f, ConfigSource::Default, "STDP LTP weight");
+    config->set<std::string>({"plasticity", "stdp", "ltd_weight"}, 0.015f, ConfigSource::Default, "STDP LTD weight");
+    config->set<std::string>({"plasticity", "stdp", "tau"}, 20.0f, ConfigSource::Default, "STDP time constant");
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set<std::string>({"development", "synaptogenesis_rate"}, 0.0001f, ConfigSource::Default, "Synaptogenesis rate");
+    config->set<std::string>({"development", "pruning_rate"}, 0.00001f, ConfigSource::Default, "Pruning rate");
     
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("brain.neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("brain.region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("brain.connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

@@ -5,23 +5,11 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
+using json = nlohmann::json;
 
 // Configuration source
 enum class ConfigSource {
@@ -31,19 +19,19 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
+// Configuration entry with structured path
 struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+    std::vector<std::string> path;  // e.g., {"brain", "neuron_count"}
+    json value;                    // JSON value for the configuration
+    ConfigSource source;            // Where this config came from
+    std::string description;        // Human-readable description
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : source(ConfigSource::Default) {}
+    ConfigEntry(const std::vector<std::string>& p, const json& v, ConfigSource s, const std::string& desc = "")
+        : path(p), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class with JSON support
 class Config {
 public:
     Config();
@@ -55,34 +43,83 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from JSON file
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
+    // Load from JSON string
+    bool loadFromString(const std::string& jsonString);
+    
+    // Load from command line arguments (supports --section.key=value)
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to JSON file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
+    // Get values with template support for basic types
     template<typename T>
-    std::optional<T> get(const std::string& key) const;
+    std::optional<T> get(const std::vector<std::string>& path) const;
     
     template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
+    T getOr(const std::vector<std::string>& path, const T& defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const {
+        // Legacy support for dot-separated keys
+        std::vector<std::string> path;
+        size_t pos = 0;
+        std::string token;
+        std::string remaining = key;
+        while ((pos = remaining.find('.')) != std::string::npos) {
+            token = remaining.substr(0, pos);
+            path.push_back(token);
+            remaining.erase(0, pos + 1);
+        }
+        path.push_back(remaining);
+        return getOr<T>(path, defaultValue);
+    }
+    
+    // Set values with structured path
+    template<typename T>
+    void set(const std::vector<std::string>& path, const T& value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    
+    // Convenience methods for legacy compatibility
+    void set(const std::string& key, const json& value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
     
     // Check existence
-    bool has(const std::string& key) const;
+    bool has(const std::vector<std::string>& path) const;
+    bool has(const std::string& key) const {
+        std::vector<std::string> path;
+        size_t pos = 0;
+        std::string token;
+        std::string remaining = key;
+        while ((pos = remaining.find('.')) != std::string::npos) {
+            token = remaining.substr(0, pos);
+            path.push_back(token);
+            remaining.erase(0, pos + 1);
+        }
+        path.push_back(remaining);
+        return has(path);
+    }
     
     // Remove key
-    void remove(const std::string& key);
+    void remove(const std::vector<std::string>& path);
+    void remove(const std::string& key) {
+        std::vector<std::string> path;
+        size_t pos = 0;
+        std::string token;
+        std::string remaining = key;
+        while ((pos = remaining.find('.')) != std::string::npos) {
+            token = remaining.substr(0, pos);
+            path.push_back(token);
+            remaining.erase(0, pos + 1);
+        }
+        path.push_back(remaining);
+        remove(path);
+    }
     
     // Get all keys
     std::vector<std::string> getKeys() const;
@@ -93,13 +130,20 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get the underlying JSON for advanced access
+    json& getRoot() { return root_; }
+    const json& getRoot() const { return root_; }
+    
+    // Merge another configuration
+    void merge(const Config& other);
+    
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    json root_;
+    std::vector<ConfigEntry> entries_;
     
     // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    std::vector<std::string> parseKey(const std::string& key) const;
+    std::string joinPath(const std::vector<std::string>& path) const;
 };
 
 } // namespace nlm
