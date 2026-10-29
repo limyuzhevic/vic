@@ -220,7 +220,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + static_cast<float>(dt) * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -297,6 +297,81 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+void Neuron::initializeRandom(RandomGenerator& rng) {
+    // Real random initialization with biological constraints
+    // Membrane potential starts near resting potential
+    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    
+    // Threshold is typically -55mV with small variation
+    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    
+    // Resting potential typically -70mV
+    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    
+    // Reset potential is usually close to resting
+    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    
+    // Refractory period: 2-10ms typical
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    
+    // Initial state
+    pImpl->state.firingState = FiringState::Resting;
+    pImpl->state.refractoryRemaining = 0;
+    pImpl->state.adaptationVariable = 0.0f;
+    pImpl->state.lastSpikeTime = -1.0f;
+    
+    // Clear any residual state
+    pImpl->synapticInput = 0.0f;
+    pImpl->spikeHistory.clear();
+}
+
+// Advanced methods for improved usability
+void Neuron::setTimestep(TimestepDuration dt) {
+    pImpl->state.leakConductance = static_cast<MembranePotential>(1.0f / (Impl::TIME_CONSTANT * dt));
+}
+
+TimestepDuration Neuron::getTimestep() const {
+    if (pImpl->state.leakConductance == 0.0f) {
+        return 0.001; // Default 1ms
+    }
+    return 1.0 / (Impl::TIME_CONSTANT * static_cast<float>(pImpl->state.leakConductance));
+}
+
+void Neuron::enableAdaptation(bool enable) {
+    if (enable) {
+        pImpl->state.adaptationVariable = 1.0f; // Start adaptation
+    } else {
+        pImpl->state.adaptationVariable = 0.0f; // Disable adaptation
+    }
+}
+
+bool Neuron::isAdaptationEnabled() const {
+    return pImpl->state.adaptationVariable > 0.0f;
+}
+
+size_t Neuron::getSpikeCount(Timestamp fromTime) const {
+    size_t count = 0;
+    for (const auto& spikeTime : pImpl->spikeHistory) {
+        if (spikeTime >= fromTime) {
+            count++;
+        }
+    }
+    return count;
+}
+
+float Neuron::getAverageFiringRate(Timestamp fromTime, Timestamp toTime) const {
+    size_t spikeCount = getSpikeCount(fromTime);
+    
+    if (toTime < 0.0) {
+        toTime = fromTime + 1.0; // Default 1 second window
+    }
+    
+    float duration = toTime - fromTime;
+    if (duration <= 0.0f) {
+        return 0.0f;
+    }
+    
+    return static_cast<float>(spikeCount) / duration;
 }
 
 } // namespace nlm

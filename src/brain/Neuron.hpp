@@ -143,6 +143,16 @@ public:
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
     
+    // Advanced methods for improved usability
+    void setTimestep(TimestepDuration dt);
+    TimestepDuration getTimestep() const;
+    void enableAdaptation(bool enable);
+    bool isAdaptationEnabled() const;
+    
+    // Statistics and monitoring
+    size_t getSpikeCount(Timestamp fromTime = 0.0) const;
+    float getAverageFiringRate(Timestamp fromTime = 0.0, Timestamp toTime = -1.0) const;
+    
 private:
     struct Impl;
     Impl* pImpl;

@@ -66,6 +66,41 @@ public:
     // Get object at position (if any)
     WorldObject* getObjectAt(float x, float y);
     
+    // Get current sensory percept for the agent
+    const SensoryPercept& getSensoryPercept() const { return sensory_; }
+    
+    // Get agent body state
+    const AgentBody& getAgentBody() const { return agent_; }
+    
+    // Add object to world
+    void addObject(const WorldObject& obj);
+    
+    // Remove object at position
+    void removeObject(float x, float y);
+    
+    // Check if position is valid (not wall)
+    bool isValidPosition(float x, float y) const;
+    
+    // Get object at position (if any)
+    WorldObject* getObjectAt(float x, float y);
+    
+    // Get agent's current brain region for processing
+    const NeuralRegion* getBrainRegion(size_t index) const { 
+        if (index < brainRegions_.size()) {
+            return brainRegions_[index].get();
+        }
+        return nullptr;
+    }
+    
+    // Apply action to brain region (legacy compatibility)
+    ActionResult applyAction(const NeuralRegion* brainRegion, MotorCommand cmd);
+    
+    // Compute reward for brain region (legacy compatibility)  
+    float computeReward(const NeuralRegion* brainRegion);
+    
+    // Observe environment for brain region (legacy compatibility)
+    SensoryPercept observe(const NeuralRegion* brainRegion);
+    
     // World dimensions
     float getWidth() const { return width_; }
     float getHeight() const { return height_; }
@@ -75,6 +110,8 @@ public:
     void setMaxEnergy(float e) { maxEnergy_ = e; }
     float getEnergyDecayRate() const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
+    float getEnergyGainRate() const { return energyGainRate_; }
+    void setEnergyGainRate(float r) { energyGainRate_ = r; }
     
     // Time
     double getSimulationTime() const { return simTime_; }
@@ -82,6 +119,10 @@ public:
     // Seed for reproducibility
     void setRandomSeed(uint64_t seed);
     uint64_t getRandomSeed() const { return rngSeed_; }
+    
+    // Brain region management for NLM
+    void addBrainRegion(std::unique_ptr<NeuralRegion> region);
+    size_t getBrainRegionCount() const { return brainRegions_.size(); }
     
 private:
     // Generate vision from current view
@@ -113,7 +154,7 @@ private:
     // Energy system
     float maxEnergy_;
     float energyDecayRate_;
-    float resourceEnergyGain_;
+    float energyGainRate_;
     
     // Simulation time
     double simTime_;
@@ -124,6 +165,11 @@ private:
     // Simple RNG state
     uint64_t rngState_;
     uint64_t nextRandom();
+    
+    // Brain regions for NLM processing
+    std::vector<std::unique_ptr<NeuralRegion>> brainRegions_;
 };
+
+} // namespace nlm
 
 } // namespace nlm
