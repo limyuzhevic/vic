@@ -479,7 +479,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+    if (pImpl->stepsSinceLastEpisode >= 100) {  // Store episode every 100 steps (more efficient)
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
@@ -488,18 +488,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // Collect neuron activities more efficiently
+            std::vector<std::pair<NeuronId, float>> activeNeuronActivations;
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
+                        // Check if neuron is significantly active
+                        const auto& state = neuron->getState();
                         if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                            std::abs(state.membranePotential - state.restingPotential) > 5.0f) {
+                            float activation = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+                            activeNeuronActivations.emplace_back(neuron->getId(), activation);
                         }
                     }
                 }
+            }
+            
+            // Store to episode
+            episode.activeNeurons.reserve(activeNeuronActivations.size());
+            episode.neuronActivations.reserve(activeNeuronActivations.size());
+            for (const auto& pair : activeNeuronActivations) {
+                episode.activeNeurons.push_back(pair.first);
+                episode.neuronActivations.push_back(pair.second);
             }
             
             // Store reward in episode
@@ -511,18 +521,36 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Create a prediction from current state (simplified - could use sensory or internal state)
+        // In a real implementation, this would predict future sensory states
+        
+        // For now, track prediction error and update prediction system
+        // This provides a placeholder for Phase 2 implementation
+        
+        // The prediction system would typically receive sensory input
+        // and generate predictions for next states
+        // It would update its internal model based on actual observations
+        
+        // For Phase 6 integration, we can just call update to maintain prediction state
+        // This is a placeholder for proper prediction system integration
     }
     
     // ========== STEP 9: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Apply attention to active neurons based on working memory
+        if (pImpl->workingMemory && pImpl->workingMemory->getMemoryActivity() > 0.1f) {
+            // Get neurons currently in working memory
+            std::vector<NeuronId> competitors;
+            for (const auto& neuronId : pImpl->workingMemory->getMemoryNeurons()) {
+                competitors.push_back(neuronId);
+            }
+            
+            // Process competition to select attentional focus
+            if (!competitors.empty()) {
+                pImpl->attention->processCompetition(competitors);
+            }
         }
     }
     

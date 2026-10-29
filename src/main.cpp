@@ -25,6 +25,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <sstream>
 
 using namespace nlm;
 
@@ -158,6 +159,12 @@ struct LearningExperiment {
         }
     }
 };
+
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain);
+
+void runPlasticityExperiment(std::shared_ptr<Brain> brain);
+
+void runStdpVerification(std::shared_ptr<Brain> brain);
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
@@ -343,6 +350,47 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
+    // Add debug and advanced command line options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg.substr(0, 12) == "--memory_debug") {
+            // Enable detailed memory system debugging
+            config->set("memory_debug", 1, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 12) == "--prediction_debug") {
+            // Enable prediction system debugging
+            config->set("prediction_debug", 1, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 13) == "--attention_debug") {
+            // Enable attention system debugging
+            config->set("attention_debug", 1, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 15) == "--checkpoint_file") {
+            // Specify checkpoint file for save/load
+            if (arg.find('=') != std::string::npos) {
+                std::string value = arg.substr(arg.find('=') + 1);
+                std::istringstream iss(value);
+                std::string filepath;
+                if (std::getline(iss, filepath, ' ')) {
+                    checkpointFile = filepath;
+                }
+            } else if (i + 1 < argc) {
+                checkpointFile = argv[++i];
+            }
+        } else if (arg.substr(0, 15) == "--replay_interval") {
+            // Set memory replay interval
+            if (arg.find('=') != std::string::npos) {
+                size_t pos = arg.find('=');
+                std::string value = arg.substr(pos + 1);
+                size_t interval = std::stoul(value);
+                config->set("replay_interval", static_cast<int64_t>(interval), ConfigSource::CommandLine);
+            } else if (i + 1 < argc) {
+                size_t interval = std::stoul(argv[++i]);
+                config->set("replay_interval", static_cast<int64_t>(interval), ConfigSource::CommandLine);
+            }
+        }
+    }
+    
+    std::string checkpointFile;
+    
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
@@ -382,6 +430,17 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Enhanced memory system parameters
+    config->set("working_memory_capacity", static_cast<int64_t>(50), ConfigSource::Default);
+    config->set("episodic_memory_capacity", static_cast<int64_t>(1000), ConfigSource::Default);
+    config->set("replay_interval", static_cast<int64_t>(100), ConfigSource::Default);
+    config->set("consolidation_interval", static_cast<int64_t>(1000), ConfigSource::Default);
+    
+    // Advanced neuromodulation parameters
+    config->set("dopamine_level", 0.1f, ConfigSource::Default);
+    config->set("curiosity_level", 0.2f, ConfigSource::Default);
+    config->set("novelty_sensitivity", 0.3f, ConfigSource::Default);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -408,6 +467,28 @@ int main(int argc, char** argv) {
     }
     
     brain->logStatus();
+    
+    // Handle checkpoint save/load commands
+    if (!checkpointFile.empty()) {
+        if (checkpointFile.find(".checkpoint") != std::string::npos) {
+            // Save checkpoint
+            NLM_LOG_INFO("Saving checkpoint to: " + checkpointFile);
+            if (brain->save(checkpointFile)) {
+                NLM_LOG_INFO("✓ Checkpoint saved successfully");
+            } else {
+                NLM_LOG_ERROR("✗ Failed to save checkpoint");
+            }
+        } else {
+            // Load checkpoint
+            NLM_LOG_INFO("Loading checkpoint from: " + checkpointFile);
+            if (brain->load(checkpointFile)) {
+                NLM_LOG_INFO("✓ Checkpoint loaded successfully");
+            } else {
+                NLM_LOG_ERROR("✗ Failed to load checkpoint");
+            }
+        }
+        return 0;
+    }
     
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);

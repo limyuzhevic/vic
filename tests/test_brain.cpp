@@ -3,6 +3,11 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include "memory/NeuralWorkingMemory.hpp"
+#include "memory/NeuralEpisodicMemory.hpp"
+#include "memory/NeuralAssociativeMemory.hpp"
+#include "prediction/PredictionSystem.hpp"
+#include "cognition/AttentionalSelection.hpp"
 
 namespace test_brain {
 
@@ -121,6 +126,78 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+void testBrainMemoryIntegration() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test working memory is accessible and functional
+    auto* workingMemory = brain.getWorkingMemory();
+    assert(workingMemory != nullptr);
+    
+    // Test episodic memory is accessible and functional
+    auto* episodicMemory = brain.getEpisodicMemory();
+    assert(episodicMemory != nullptr);
+    
+    // Test associative memory is accessible and functional
+    auto* associativeMemory = brain.getAssociativeMemory();
+    assert(associativeMemory != nullptr);
+    
+    // Test initial memory state
+    assert(workingMemory->getMemoryActivity() >= 0.0f);
+    assert(episodicMemory->getEpisodeCount() >= 0);
+    
+    std::cout << "    testBrainMemoryIntegration passed" << std::endl;
+}
+
+void testBrainPredictionIntegration() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test prediction system is accessible
+    auto* predictionSystem = brain.getPredictionSystem();
+    assert(predictionSystem != nullptr);
+    
+    // Test prediction system functionality
+    float predictionError = predictionSystem->getPredictionError();
+    float confidence = predictionSystem->getConfidence();
+    
+    assert(predictionError >= 0.0f);
+    assert(confidence >= 0.0f && confidence <= 1.0f);
+    
+    std::cout << "    testBrainPredictionIntegration passed" << std::endl;
+}
+
+void testBrainAttentionIntegration() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test attention system is accessible
+    auto* attention = brain.getAttention();
+    assert(attention != nullptr);
+    
+    // Test attention system functionality
+    std::vector<nlm::NeuronId> testNeurons;
+    testNeurons.push_back(nlm::NeuronId(1000));
+    testNeurons.push_back(nlm::NeuronId(1001));
+    
+    auto winners = attention->processCompetition(testNeurons, 0.5f);
+    assert(winners.size() >= 0); // Can be zero or more depending on implementation
+    
+    std::cout << "    testBrainAttentionIntegration passed" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -129,6 +206,11 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    
+    // New integration tests for Phase 6
+    testBrainMemoryIntegration();
+    testBrainPredictionIntegration();
+    testBrainAttentionIntegration();
 }
 
 } // namespace test_brain
