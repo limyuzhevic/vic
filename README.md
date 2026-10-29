@@ -63,7 +63,6 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
 
 ```bash
@@ -75,12 +74,49 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Core Executables
+
+| Executable | Description | Purpose |
+|------------|-------------|---------|
+| `nlm` | Main neural computation engine (Phase 2) | Real LIF neuron dynamics, STDP, plasticity |
+| `nlm_phase3_demo` | Phase 3 demonstration | Working memory and concept formation |
+| `nlm_phase4_demo` | Phase 4 demonstration | Prediction and planning capabilities |
+| `nlm_phase6_demo` | **Phase 6 integration demo** | Final integration test of all systems |
+
+### Running Phase 6 Demo (Integration Test)
+
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs the comprehensive integration test verifying all brain systems are properly connected.
+
+### Python Bindings
+
+The Python bindings `pynlm` can be built using:
+
+```bash
+# Using scikit-build-core (recommended)
+pip install scikit-build-core pybind11
+pip install .
+
+# Or in development mode
+pip install -e .
+```
+
+After installation, you can import and use the Python API:
+
+```python
+import pynlm
+
+# Create and initialize brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+```
 
 ## Project Structure
 
@@ -88,30 +124,30 @@ This runs a comprehensive integration test verifying all brain systems are conne
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
+├── docs/                           # Scientific documentation
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
 │   ├── ROADMAP.md
 │   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   └── PHASE6_FINAL_AUDIT.md       # Phase 6 audit
+├── src/                           # C++ source code
+│   ├── core/                     # Core utilities
+│   ├── brain/                    # Neural components (integrated)
+│   ├── dynamics/                 # Neural dynamics
+│   ├── plasticity/               # Plasticity rules
+│   ├── development/              # Developmental system
+│   ├── neuromodulation/          # Neuromodulators (integrated)
+│   ├── memory/                   # Memory systems (integrated)
+│   ├── prediction/               # Prediction systems (integrated)
+│   ├── cognition/                # Cognitive mechanisms (integrated)
+│   ├── sensory/                  # Sensory processing
+│   ├── motor/                    # Motor system
+│   ├── environment/              # Environment interface
+│   ├── experiments/              # Experiment framework
+│   └── visualization/            # Visualization
+├── tests/                        # Unit tests
+├── python/                       # Python bindings source
+└── build/                        # Build artifacts
 ```
 
 ## Phase Summary
@@ -128,13 +164,6 @@ NLM/
 - Structural plasticity
 
 ### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
 - Neural prediction system
 - Working memory
 - Episodic-like memory
@@ -145,7 +174,7 @@ NLM/
 - Social learning
 - Continual learning
 
-### Phase 5 (Complete)
+### Phase 4 (Complete)
 - Performance optimizations
 - Memory pools and event queues
 - SIMD vectorization
@@ -186,45 +215,3 @@ Phase 6 DOES investigate:
 - Whether developmental stages can modulate learning
 - Whether replay can reinforce memory consolidation
 - Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
-```
-
-## License
-
-MIT
-
-## Authors
-
-Research project — See docs for scientific background.

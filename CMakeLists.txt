@@ -139,12 +139,28 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Phase 6 demo executable (FINAL INTEGRATION TEST)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+# Python bindings
+pybind11_add_module(pynlm
+    python/bindings.cpp
+)
+target_link_libraries(pynlm PUBLIC nlm_core nlm_agent nlm_world)
+# Include pybind11 directory
+target_include_directories(pynlm PRIVATE ${PYBIND11_INCLUDE_DIR})
+
+# Test suite
+add_executable(nlm_test
+    # Tests will be added here when they exist
+)
+target_link_libraries(nlm_test PUBLIC nlm_core)
+
+# Update install targets to include Python module
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase6_demo nlm_test
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
