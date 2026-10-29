@@ -347,11 +347,55 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+    // Add cognitive system access
+    .def("getWorkingMemory", &Brain::getWorkingMemory,
+         py::return_value_policy::reference_internal,
+         "Get working memory system")
+    .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+         py::return_value_policy::reference_internal,
+         "Get episodic memory system")
+    .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+         py::return_value_policy::reference_internal,
+         "Get associative memory system")
+    .def("getPredictionSystem", &Brain::getPredictionSystem,
+         py::return_value_policy::reference_internal,
+         "Get prediction system")
+    .def("getPlanner", &Brain::getPlanner,
+         py::return_value_policy::reference_internal,
+         "Get neural planner")
+    .def("getConceptFormation", &Brain::getConceptFormation,
+         py::return_value_policy::reference_internal,
+         "Get concept formation system")
+    .def("getAttention", &Brain::getAttention,
+         py::return_value_policy::reference_internal,
+         "Get attentional selection system")
+    .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+         py::return_value_policy::reference_internal,
+         "Get development system")
+    .def("getDopamine", &Brain::getDopamine,
+         py::return_value_policy::reference_internal,
+         "Get dopamine neuromodulator")
+    .def("getCuriosity", &Brain::getCuriosity,
+         py::return_value_policy::reference_internal,
+         "Get curiosity neuromodulator")
+    .def("getNovelty", &Brain::getNovelty,
+         py::return_value_policy::reference_internal,
+         "Get novelty neuromodulator")
+    .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+         py::return_value_policy::reference_internal,
+         "Get prediction error neuromodulator")
+    .def("getAcetylcholine", [](std::shared_ptr<Brain> brain) {
+         return brain->getDopamine(); // Temporary - cholinergic system
+     }, py::return_value_policy::reference_internal,
+         "Get acetylcholine neuromodulator (placeholder)")
+    .def("getNorepinephrine", [](std::shared_ptr<Brain> brain) {
+         return brain->getDopamine(); // Temporary - noradrenergic system
+     }, py::return_value_policy::reference_internal,
+         "Get norepinephrine neuromodulator (placeholder)")
+    .def("getSerotonin", [](std::shared_ptr<Brain> brain) {
+         return brain->getDopamine(); // Temporary - serotonergic system
+     }, py::return_value_policy::reference_internal,
+         "Get serotonin neuromodulator (placeholder)");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -400,26 +444,380 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
-
-} // namespace nlm
+    m.def("run_advanced_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                     std::shared_ptr<AgentBrain> agent, size_t num_steps) {
+        
+        // Advanced simulation with full cognitive integration
+        NLM_LOG_INFO("Running advanced simulation with cognitive integration");
+        
+        for (size_t step = 0; step < num_steps; ++step) {
+            // 1. Update world
+            world->update(0.1);
+            
+            // 2. Get sensory percept
+            auto percept = world->getSensoryPercept();
+            
+            // 3. Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // 4. Apply neuromodulation based on prediction error
+            float reward = 0.0f;
+            if (world->getSensoryPercept().getInternal().size() > 0) {
+                reward = world->getSensoryPercept().getInternal()[0];
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // 5. Run brain simulation
+            brain->step(step);
+            
+            // 6. Update development
+            agent->updateDevelopment(0.1);
+            
+            // 7. Get action from agent
+            auto action = agent->decodeMotorCommand();
+            
+            // 8. Apply action to world
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // 9. Log progress periodically
+            if (step % 100 == 0) {
+                NLM_LOG_INFO("Step " + std::to_string(step) + 
+                             ": " + std::to_string(brain->getFiringNeuronCount()) + " firing neurons, " +
+                             std::to_string(agent->getCuriosityLevel()) + " curiosity, " +
+                             std::to_string(agent->getNoveltyLevel()) + " novelty");
+            }
+        }
+        
+        // Return final statistics
+        return py::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            agent->getCuriosityLevel(),
+            agent->getNoveltyLevel(),
+            agent->getPredictionError()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"),
+         "Run an advanced simulation with full cognitive integration");
+    
+    m.def("create_cognitive_agent", [](std::shared_ptr<Config> config, 
+                                       std::shared_ptr<SimpleWorld> world,
+                                       bool enable_planning = true,
+                                       bool enable_concept_formation = true,
+                                       bool enable_self_model = true,
+                                       bool enable_social_learning = false) {
+        
+        // Create brain with enhanced configuration
+        auto brain = pynlm::createBrain(config);
+        brain->initialize();
+        
+        // Create agent brain interface
+        auto agent = pynlm::createAgentBrain(brain);
+        
+        // Initialize with world
+        agent->initialize(*world);
+        
+        // Enable advanced cognitive systems
+        if (enable_planning) {
+            agent->getPlanner(); // Access planner to enable it
+        }
+        if (enable_concept_formation) {
+            agent->getConceptFormation(); // Access concept formation
+        }
+        if (enable_self_model) {
+            // Self-model is accessible through brain
+            agent->getBrain()->getSelfModel(); // Placeholder for self-model access
+        }
+        if (enable_social_learning) {
+            // Social learning system
+            agent->getBrain()->getSocialLearning(); // Placeholder
+        }
+        
+        // Enable all neuromodulators
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return agent;
+    }, py::arg("config"), py::arg("world"), py::arg("enable_planning") = true,
+         py::arg("enable_concept_formation") = true, py::arg("enable_self_model") = true,
+         py::arg("enable_social_learning") = false,
+         "Create an advanced cognitive agent with planning and concept formation");
+    
+    m.def("configure_for_task", [](std::shared_ptr<Config> config, 
+                                   const std::string& task_type) {
+        
+        // Configure brain for specific tasks
+        if (task_type == "exploration") {
+            config->set("brain.neuron_count", 2000);
+            config->set("brain.synapse_density", 0.15f);
+            config->set("neuromod.dopamine.scale", 1.5f);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+            config->set("plasticity.stdp.enable", true);
+        } 
+        else if (task_type == "exploitation") {
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.synapse_density", 0.08f);
+            config->set("neuromod.dopamine.scale", 0.8f);
+            config->set("neuromod.curiosity.enable", false);
+            config->set("neuromod.novelty.enable", false);
+            config->set("plasticity.stdp.enable", true);
+        }
+        else if (task_type == "social_learning") {
+            config->set("brain.neuron_count", 3000);
+            config->set("brain.synapse_density", 0.12f);
+            config->set("neuromod.dopamine.scale", 1.2f);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("social_learning.enabled", true);
+        }
+        
+        return config;
+    }, py::arg("config"), py::arg("task_type"),
+         "Configure brain for specific task types");
+    
+    m.def("export_brain_to_file", [](std::shared_ptr<Brain> brain, 
+                                     const std::string& filepath) {
+        // Save brain configuration to file
+        if (brain->getConfig()) {
+            brain->getConfig()->saveToFile(filepath);
+            NLM_LOG_INFO("Brain configuration saved to: " + filepath);
+        } else {
+            NLM_LOG_ERROR("Brain has no configuration to save");
+        }
+    }, py::arg("brain"), py::arg("filepath"),
+         "Save brain configuration to file");
+    
+    m.def("import_brain_from_file", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        // Load brain configuration from file
+        auto config = pynlm::createDefaultConfig();
+        if (config->loadFromFile(filepath)) {
+            NLM_LOG_INFO("Brain configuration loaded from: " + filepath);
+            return pynlm::createBrain(config);
+        } else {
+            NLM_LOG_ERROR("Failed to load brain configuration from: " + filepath);
+            return nullptr;
+        }
+    }, py::arg("filepath"), "Load brain configuration from file");
+    
+    m.def("compute_brain_metrics", [](std::shared_ptr<Brain> brain) {
+        // Compute comprehensive brain metrics
+        auto metrics = py::dict();
+        
+        metrics["total_neurons"] = brain->getTotalNeuronCount();
+        metrics["total_synapses"] = brain->getTotalSynapseCount();
+        metrics["active_neurons"] = brain->getActiveNeuronCount();
+        metrics["firing_neurons"] = brain->getFiringNeuronCount();
+        metrics["total_spikes"] = brain->getTotalSpikeCount();
+        metrics["average_firing_rate"] = brain->getAverageFiringRate();
+        metrics["excitement_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        metrics["predicted_reward"] = 0.5f; // Placeholder
+        
+        // Get neuromodulation levels
+        if (auto* dopamine = brain->getDopamine()) {
+            metrics["dopamine_level"] = dopamine->getLevel();
+        }
+        if (auto* curiosity = brain->getCuriosity()) {
+            metrics["curiosity_level"] = curiosity->getLevel();
+        }
+        if (auto* novelty = brain->getNovelty()) {
+            metrics["novelty_level"] = novelty->getLevel();
+        }
+        
+        return metrics;
+    }, py::arg("brain"), "Compute comprehensive brain metrics");
+    
+    m.def("run_development_experiment", [](std::shared_ptr<Brain> brain, 
+                                             std::shared_ptr<SimpleWorld> world,
+                                             std::shared_ptr<AgentBrain> agent,
+                                             double duration_minutes) {
+        
+        // Run development experiment simulating brain maturation
+        NLM_LOG_INFO("Running development experiment for " + 
+                     std::to_string(duration_minutes) + " minutes");
+        
+        double currentTime = 0.0;
+        size_t steps_per_minute = 600; // 10 steps per second
+        size_t total_steps = static_cast<size_t>(duration_minutes * steps_per_minute);
+        
+        for (size_t step = 0; step < total_steps && currentTime < duration_minutes * 60.0; ++step) {
+            // Update world
+            world->update(0.1);
+            currentTime += 0.1;
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // Run brain simulation
+            brain->step(step);
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            // Get action
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Log developmental stage every 10 minutes
+            if (step % (steps_per_minute * 10) == 0) {
+                NLM_LOG_INFO("Developmental stage: " + 
+                             std::to_string(static_cast<int>(agent->getDevelopmentalStage())) +
+                             " (" + std::to_string(currentTime / 60.0) + " minutes)");
+            }
+        }
+        
+        return py::make_tuple(
+            agent->getDevelopmentalStage(),
+            brain->getAverageFiringRate(),
+            agent->getCuriosityLevel(),
+            currentTime
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("duration_minutes"),
+         "Run a development experiment simulating brain maturation");
+    
+    m.def("create_research_brain", [](size_t neuron_count = 5000) {
+        
+        // Create a research-grade brain with advanced settings
+        auto config = pynlm::createDefaultConfig();
+        
+        config->set("brain.neuron_count", neuron_count);
+        config->set("brain.region_count", 3);
+        config->set("brain.connection_probability", 0.1f);
+        config->set("random_seed", static_cast<int64_t>(42));
+        
+        // Advanced plasticity settings
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001f);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.hebbian.learning_rate", 0.01f);
+        config->set("plasticity.structural.enable", true);
+        config->set("plasticity.structural.synaptogenesis_rate", 0.0005f);
+        config->set("plasticity.structural.pruning_rate", 0.00005f);
+        
+        // Advanced neuromodulation
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.curiosity.novelty_weight", 0.7f);
+        config->set("neuromod.curiosity.prediction_error_weight", 0.3f);
+        config->set("neuromod.novelty.enable", true);
+        config->set("neuromod.prediction_error.enable", true);
+        
+        // Advanced development
+        config->set("development.synaptogenesis_rate", 0.001f);
+        config->set("development.pruning_rate", 0.0001f);
+        config->set("development.maturation_period", 300.0f);
+        
+        auto brain = pynlm::createBrain(config);
+        brain->initialize();
+        
+        return brain;
+    }, py::arg("neuron_count") = 5000,
+         "Create a research-grade brain with advanced settings");
+    
+    m.def("run_research_protocol", [](std::shared_ptr<Brain> brain, 
+                                      std::shared_ptr<SimpleWorld> world,
+                                      std::shared_ptr<AgentBrain> agent,
+                                      const std::string& protocol_name) {
+        
+        // Run standardized research protocols
+        NLM_LOG_INFO("Running research protocol: " + protocol_name);
+        
+        if (protocol_name == "learning_curve") {
+            // Run learning curve experiment
+            NLM_LOG_INFO("Running learning curve protocol");
+            
+            for (size_t epoch = 0; epoch < 100; ++epoch) {
+                // Reset brain each epoch for clean measurement
+                brain->reset();
+                brain->initialize();
+                
+                // Run episode
+                for (size_t step = 0; step < 500; ++step) {
+                    world->update(0.1);
+                    auto percept = world->getSensoryPercept();
+                    agent->processSensoryInput(percept);
+                    brain->step(step);
+                    auto action = agent->decodeMotorCommand();
+                    world->applyMotorCommand(action, world->getSimulationTime());
+                    
+                    if (step % 100 == 0) {
+                        NLM_LOG_INFO("Epoch " + std::to_string(epoch) + 
+                                     ", Step " + std::to_string(step) +
+                                     ", Firing rate: " + 
+                                     std::to_string(brain->getAverageFiringRate()));
+                    }
+                }
+            }
+            
+            NLM_LOG_INFO("Learning curve protocol complete");
+            
+        } else if (protocol_name == "novelty_detection") {
+            // Run novelty detection experiment
+            NLM_LOG_INFO("Running novelty detection protocol");
+            
+            std::vector<float> baseline_variation(10, 0.5f);
+            
+            for (size_t trial = 0; trial < 50; ++trial) {
+                // Vary input patterns
+                for (size_t i = 0; i < baseline_variation.size(); ++i) {
+                    baseline_variation[i] = 0.3f + static_cast<float>(rand()) / RAND_MAX * 0.5f;
+                }
+                
+                // Create world state with variation
+                // (Simplified for demonstration)
+                
+                // Run brain with varying input
+                brain->reset();
+                brain->initialize();
+                
+                for (size_t step = 0; step < 200; ++step) {
+                    world->update(0.1);
+                    agent->processSensoryInput(world->getSensoryPercept());
+                    brain->step(step);
+                }
+                
+                NLM_LOG_INFO("Novelty trial " + std::to_string(trial) +
+                             ", Novelty level: " + std::to_string(agent->getNoveltyLevel()));
+            }
+            
+            NLM_LOG_INFO("Novelty detection protocol complete");
+            
+        } else if (protocol_name == "reward_prediction") {
+            // Run reward prediction experiment
+            NLM_LOG_INFO("Running reward prediction protocol");
+            
+            float expected_reward = 0.5f;
+            float actual_reward = 0.5f;
+            
+            for (size_t trial = 0; trial < 30; ++trial) {
+                // Introduce prediction errors
+                if (trial % 5 == 0) {
+                    expected_reward = 0.3f;
+                } else {
+                    expected_reward = 0.7f;
+                }
+                
+                actual_reward = expected_reward + static_cast<float>(rand()) / RAND_MAX * 0.4f - 0.2f;
+                actual_reward = std::clamp(actual_reward, 0.0f, 1.0f);
+                
+                // Apply reward with prediction error
+                agent->applyRewardModulation(actual_reward, expected_reward);
+                
+                NLM_LOG_INFO("Reward trial " + std::to_string(trial) +
+                             ", Expected: " + std::to_string(expected_reward) +
+                             ", Actual: " + std::to_string(actual_reward) +
+                             ", Error: " + std::to_string(agent->getPredictionError()));
+            }
+            
+            NLM_LOG_INFO("Reward prediction protocol complete");
+            
+        } else {
+            NLM_LOG_ERROR("Unknown research protocol: " + protocol_name);
+        }
+        
+        return protocol_name;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("protocol_name"),
+         "Run standardized research protocols");

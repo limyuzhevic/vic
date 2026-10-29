@@ -4,6 +4,10 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/SelfModel.hpp"
+#include "../cognition/SocialLearning.hpp"
 #include <memory>
 #include <vector>
 
@@ -70,11 +74,22 @@ public:
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:
+    // Cognitive systems integration
+    NeuralPlanner* planner_;
+    ConceptFormation* conceptFormation_;
+    SelfModel* selfModel_;
+    SocialLearning* socialLearning_;
+    
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
     
     // Motor command selection with curiosity/exploration
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    // Cognitive integration helpers
+    MotorCommand actionToMotorCommand(ActionType action) const;
+    ActionType actionFromMotorCommand(MotorCommand cmd) const;
+    MotorCommand adjustActionForConcept(MotorCommand action, const std::string& concept) const;
     
     std::shared_ptr<Brain> brain_;
     

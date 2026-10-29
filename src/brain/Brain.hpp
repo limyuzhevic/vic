@@ -182,8 +182,6 @@ public:
     Novelty* getNovelty();
     
     // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
-    
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
@@ -192,6 +190,72 @@ public:
     
     // Logging
     void logStatus() const;
+    
+    // Performance infrastructure integration
+    void integrateMemoryPools();
+    void integrateEventQueue();
+    void integrateSoAMemory(size_t neuronCount);
+    void integrateSparseConnectivity();
+    void integrateMultithreading();
+    void integrateSimdOptimization();
+    
+    void initializeOptimizedBrain(size_t neuronCount, float connectionProbability);
+    void initializeStandardBrain(size_t neuronCount, float connectionProbability);
+    
+    void logPerformanceStats() const;
+    
+    // Performance statistics structure
+    struct PerformanceStats {
+        size_t totalSteps;
+        size_t memoryAllocations;
+        size_t memoryDeallocations;
+        size_t eventQueueInits;
+        size_t soaInits;
+        size_t sparseConnInits;
+        size_t multithreadingInits;
+        size_t simdInits;
+        size_t eventQueueOps;
+        size_t soaAccesses;
+        size_t sparseConnLookups;
+        size_t threadWorkItems;
+        size_t simdOps;
+        size_t optimizedInits;
+        size_t standardInits;
+        
+        PerformanceStats()
+            : totalSteps(0)
+            , memoryAllocations(0)
+            , memoryDeallocations(0)
+            , eventQueueInits(0)
+            , soaInits(0)
+            , sparseConnInits(0)
+            , multithreadingInits(0)
+            , simdInits(0)
+            , eventQueueOps(0)
+            , soaAccesses(0)
+            , sparseConnLookups(0)
+            , threadWorkItems(0)
+            , simdOps(0)
+            , optimizedInits(0)
+            , standardInits(0) {}
+    };
+    
+    PerformanceStats performanceStats;
+    
+    // Timer for performance monitoring
+    struct PerformanceTimer {
+        void start();
+        void stop();
+        double elapsedSeconds() const;
+    private:
+        // Timer implementation details
+        // Would use std::chrono or platform-specific timing
+        double startTime;
+        double elapsed;
+        bool running;
+    };
+    
+    PerformanceTimer performanceTimer;
     
 private:
     struct Impl;
