@@ -5,11 +5,33 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <unordered_map>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+
+// Nested configuration structure
+struct NestedConfig {
+    std::unordered_map<std::string, ConfigValue> values;
+    
+    void merge(const NestedConfig& other);
+    nlohmann::json toJson() const;
+    static NestedConfig fromJson(const nlohmann::json& j);
+    std::string getString(const std::string& key) const;
+    int getInt(const std::string& key) const;
+    double getDouble(const std::string& key) const;
+    bool getBool(const std::string& key) const;
+    std::vector<std::string> getStringArray(const std::string& key) const;
+    std::vector<int> getIntArray(const std::string& key) const;
+    std::vector<double> getDoubleArray(const std::string& key) const;
+    
+private:
+    template<typename T>
+    T getValue(const std::string& key, const std::string& typeName) const;
+};
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -20,7 +42,8 @@ using ConfigValue = std::variant<
     std::string,
     std::vector<int>,
     std::vector<double>,
-    std::vector<std::string>
+    std::vector<std::string>,
+    NestedConfig
 >;
 
 // Configuration source
@@ -42,6 +65,13 @@ struct ConfigEntry {
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// Helper functions for JSON serialization/deserialization
+namespace json_utils {
+    nlohmann::json toJson(const ConfigValue& value);
+    ConfigValue fromJson(const nlohmann::json& j);
+    std::string valueToString(const ConfigValue& value);
+}} // namespace json_utils
 
 // Main configuration class
 class Config {
