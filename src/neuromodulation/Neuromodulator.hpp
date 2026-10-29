@@ -75,15 +75,57 @@ public:
     void update(TimestepDuration dt) override {}
 };
 
-// Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Acetylcholine: Attention and memory consolidation
+class Acetylcholine : public Neuromodulator {
+public:
+    const char* getName() const override { return "ACh"; }
+    float getLevel() const override { return pImpl->level; }
+    void setLevel(float level) override { pImpl->level = level; }
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Memory consolidation
+    void triggerMemoryConsolidation();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Norepinephrine: Arousal and vigilance
+class Norepinephrine : public Neuromodulator {
+public:
+    const char* getName() const override { return "NE"; }
+    float getLevel() const override { return pImpl->level; }
+    void setLevel(float level) override { pImpl->level = level; }
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Alerting and focus
+    void increaseAlertness(float amount);
+    float getAlertness() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Serotonin: Mood regulation and behavioral inhibition
 class Serotonin : public Neuromodulator {
 public:
     const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    float getLevel() const override { return pImpl->level; }
+    void setLevel(float level) override { pImpl->level = level; }
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Behavioral inhibition
+    void inhibitBehavior(float strength);
+    bool isBehaviorInhibited() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
