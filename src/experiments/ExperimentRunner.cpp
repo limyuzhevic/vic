@@ -112,9 +112,99 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
     pImpl->globalSeed = seed;
 }
 
-bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
-}
+// Save experiment results to file
+    // Implements CSV and JSON output formats for analysis
+    bool ExperimentRunner::saveResults(const std::string& filepath) const {
+        if (filepath.empty()) {
+            NLM_LOG_ERROR("Cannot save results: empty file path");
+            return false;
+        }
+        
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
+            return false;
+        }
+        
+        // Write header
+        file << "experiment_name,start_step,end_step,total_reward,total_steps,avg_firing_rate,total_neurons,total_synapses\n";
+        
+        // Write experiment data
+        bool allSuccessful = true;
+        for (const auto& exp : pImpl->experiments) {
+            std::string name = exp->getName();
+            SimulationStep startStep = exp->getStartStep();
+            SimulationStep endStep = exp->getEndStep();
+            float totalReward = 0.0f;
+            SimulationStep totalSteps = endStep - startStep;
+            float avgFiringRate = exp->getAverageFiringRate();
+            size_t totalNeurons = exp->getTotalNeuronCount();
+            size_t totalSynapses = exp->getTotalSynapseCount();
+            
+            // Extract metrics from experiment
+            // In a real implementation, you'd have proper getter methods
+            if (exp->hasMetric("total_reward")) {
+                totalReward = exp->getMetric("total_reward");
+            }
+            
+            file << name << "," << startStep << "," << endStep << ","
+                 << totalReward << "," << totalSteps << "," 
+                 << avgFiringRate << "," << totalNeurons << "," << totalSynapses << "\n";
+        }
+        
+        file.close();
+        
+        NLM_LOG_INFO("Successfully saved experiment results to: " + filepath);
+        return true;
+    }
+    
+    bool ExperimentRunner::saveResultsJSON(const std::string& filepath) const {
+        if (filepath.empty()) {
+            NLM_LOG_ERROR("Cannot save results: empty file path");
+            return false;
+        }
+        
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
+            return false;
+        }
+        
+        file << "{\n";
+        file << "  \"experiments\": [\n";
+        
+        for (size_t i = 0; i < pImpl->experiments.size(); ++i) {
+            const auto& exp = pImpl->experiments[i];
+            file << "    {\n";
+            file << "      \"name\": \"" << exp->getName() << "\",\n";
+            file << "      \"start_step\": " << exp->getStartStep() << ",\n";
+            file << "      \"end_step\": " << exp->getEndStep() << ",\n";
+            
+            float totalReward = 0.0f;
+            if (exp->hasMetric("total_reward")) {
+                totalReward = exp->getMetric("total_reward");
+            }
+            file << "      \"total_reward\": " << totalReward << ",\n";
+            
+            file << "      \"total_steps\": " << (exp->getEndStep() - exp->getStartStep()) << ",\n";
+            file << "      \"avg_firing_rate\": " << exp->getAverageFiringRate() << ",\n";
+            file << "      \"total_neurons\": " << exp->getTotalNeuronCount() << ",\n";
+            file << "      \"total_synapses\": " << exp->getTotalSynapseCount();
+            
+            if (i < pImpl->experiments.size() - 1) {
+                file << ",\n";
+            }
+            file << "\n    }";
+        }
+        
+        file << "\n  ],\n";
+        file << "  \"global_seed\": " << pImpl->globalSeed << "\n";
+        file << "}\n";
+        
+        file.close();
+        
+        NLM_LOG_INFO("Successfully saved experiment results (JSON) to: " + filepath);
+        return true;
+    }
 
 } // namespace nlm

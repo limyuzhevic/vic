@@ -54,6 +54,22 @@ public:
     void setLearningRate(float rate);
     float getLearningRate() const;
     
+    // STDP parameters
+    void setLTPTimeConstant(float tau);
+    float getLTPTimeConstant() const;
+    
+    void setLTDTimeConstant(float tau);
+    float getLTDTimeConstant() const;
+    
+    void setMaxWeight(float maxWeight);
+    float getMaxWeight() const;
+    
+    void setMinWeight(float minWeight);
+    float getMinWeight() const;
+    
+    void setMaxWeightChange(float maxChange);
+    float getMaxWeightChange() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

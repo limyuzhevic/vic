@@ -37,6 +37,43 @@ namespace test_brain {
     void runAll();
 }
 
+// Forward declarations of test functions
+namespace test_types {
+    void runAll();
+}
+
+namespace test_config {
+    void runAll();
+}
+
+namespace test_random {
+    void runAll();
+}
+
+namespace test_clock {
+    void runAll();
+}
+
+namespace test_neuron {
+    void runAll();
+}
+
+namespace test_synapse {
+    void runAll();
+}
+
+namespace test_stdp {
+    void runAll();
+}
+
+namespace test_brain {
+    void runAll();
+}
+
+namespace test_advanced_commands {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -113,6 +150,15 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Advanced Commands tests..." << std::endl;
+    try {
+        test_advanced_commands::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

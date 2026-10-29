@@ -44,6 +44,7 @@ public:
     
     // Save experiment results
     bool saveResults(const std::string& filepath) const;
+    bool saveResultsJSON(const std::string& filepath) const;
     
 private:
     struct Impl;
