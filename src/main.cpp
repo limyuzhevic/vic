@@ -373,14 +373,14 @@ int main(int argc, char** argv) {
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Plasticity parameters
+    config->set("plasticity.stdp.ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("plasticity.stdp.ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("plasticity.stdp.time_constant", 20.0f, ConfigSource::Default);
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set("plasticity.structural.synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("plasticity.structural.pruning_rate", 0.00001f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");

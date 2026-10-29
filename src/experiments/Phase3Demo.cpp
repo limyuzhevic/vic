@@ -195,10 +195,10 @@ public:
     
 private:
     void configureEnvironment(std::shared_ptr<Config> config) {
-        config->set("environment_width", 20);
-        config->set("environment_height", 20);
-        config->set("vision_width", 16);
-        config->set("vision_height", 16);
+    config->set("environment.width", 20);
+    config->set("environment.height", 20);
+    config->set("environment.vision_width", 16);
+    config->set("environment.vision_height", 16);
     }
     
     void configureBrain(std::shared_ptr<Config> config) {
@@ -207,11 +207,11 @@ private:
         config->set("connection_probability", 0.1f);
         config->set("random_seed", 42u);
         config->set("simulation_timestep", 0.001);
-        config->set("stdp_ltp_weight", 0.01f);
-        config->set("stdp_ltd_weight", 0.012f);
-        config->set("stdp_tau", 20.0f);
-        config->set("synaptogenesis_rate", 0.0001f);
-        config->set("pruning_rate", 0.00001f);
+    config->set("plasticity.stdp.ltp_weight", 0.01f);
+    config->set("plasticity.stdp.ltd_weight", 0.012f);
+    config->set("plasticity.stdp.time_constant", 20.0f);
+    config->set("plasticity.structural.synaptogenesis_rate", 0.0001f);
+    config->set("plasticity.structural.pruning_rate", 0.00001f);
     }
     
     const char* motorCommandToString(MotorCommand cmd) {
