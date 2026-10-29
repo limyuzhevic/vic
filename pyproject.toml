@@ -35,10 +35,19 @@ dev = [
     "numpy>=1.20",
 ]
 
+# Add extra dependencies for enhanced features
+extras = [
+    "enhanced = [dev]",
+]
+
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+
+[project.scripts]
+nlm = "pynlm.main:main"
+nlm-enhanced = "pynlm_enhanced.main:main"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
