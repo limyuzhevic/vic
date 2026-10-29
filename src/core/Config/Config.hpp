@@ -71,12 +71,32 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Set values with description
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source, 
+             const std::string& description = "");
+    void set(const std::string& key, const std::string& value, ConfigSource source,
+             const std::string& description = "");
+    void set(const std::string& key, int value, ConfigSource source,
+             const std::string& description = "");
+    void set(const std::string& key, double value, ConfigSource source,
+             const std::string& description = "");
+    void set(const std::string& key, bool value, ConfigSource source,
+             const std::string& description = "");
+    void set(const std::string& key, const std::vector<int>& value, ConfigSource source,
+             const std::string& description = "");
+    void set(const std::string& key, const std::vector<double>& value, ConfigSource source,
+             const std::string& description = "");
+    void set(const std::string& key, const std::vector<std::string>& value, ConfigSource source,
+             const std::string& description = "");
+    
+    // Validate configuration
+    bool validate() const;
+    std::string getValidationErrors() const;
+    
+    // Configuration sections (for hierarchical organization)
+    void setSection(const std::string& key, const std::string& section);
+    std::string getSection(const std::string& key) const;
+    std::vector<std::string> getAllSections() const;
     
     // Check existence
     bool has(const std::string& key) const;

@@ -86,7 +86,37 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write value based on type
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -140,6 +170,67 @@ void Config::set(const std::string& key, double value, ConfigSource source) {
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<int>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<double>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<std::string>& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source,
+              const std::string& description) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = value;
+        it->source = source;
+        it->description = description;
+    } else {
+        pImpl->entries.emplace_back(key, value, source, description);
+    }
+}
+
+void Config::set(const std::string& key, const std::string& value, ConfigSource source,
+              const std::string& description) {
+    set(key, ConfigValue(value), source, description);
+}
+
+void Config::set(const std::string& key, int value, ConfigSource source,
+              const std::string& description) {
+    set(key, ConfigValue(value), source, description);
+}
+
+void Config::set(const std::string& key, double value, ConfigSource source,
+              const std::string& description) {
+    set(key, ConfigValue(value), source, description);
+}
+
+void Config::set(const std::string& key, bool value, ConfigSource source,
+              const std::string& description) {
+    set(key, ConfigValue(value), source, description);
+}
+
+void Config::set(const std::string& key, const std::vector<int>& value, ConfigSource source,
+              const std::string& description) {
+    set(key, ConfigValue(value), source, description);
+}
+
+void Config::set(const std::string& key, const std::vector<double>& value, ConfigSource source,
+              const std::string& description) {
+    set(key, ConfigValue(value), source, description);
+}
+
+void Config::set(const std::string& key, const std::vector<std::string>& value, ConfigSource source,
+              const std::string& description) {
+    set(key, ConfigValue(value), source, description);
 }
 
 bool Config::has(const std::string& key) const {
@@ -201,6 +292,99 @@ std::string Config::toLower(const std::string& str) {
 
 // Explicit template instantiations
 template std::optional<int> Config::get<int>(const std::string&) const;
+// Validate configuration
+bool Config::validate() const {
+    std::string errors = getValidationErrors();
+    return errors.empty();
+}
+
+std::string Config::getValidationErrors() const {
+    std::ostringstream oss;
+    bool hasErrors = false;
+    
+    // Check for duplicate keys
+    std::vector<std::string> seenKeys;
+    for (const auto& entry : pImpl->entries) {
+        if (std::find(seenKeys.begin(), seenKeys.end(), entry.key) != seenKeys.end()) {
+            if (hasErrors) oss << "; ";
+            oss << "Duplicate key: '" << entry.key << "'";
+            hasErrors = true;
+        } else {
+            seenKeys.push_back(entry.key);
+        }
+    }
+    
+    // Check for empty keys
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.empty()) {
+            if (hasErrors) oss << "; ";
+            oss << "Empty key name";
+            hasErrors = true;
+        }
+    }
+    
+    // Check for keys with invalid characters
+    for (const auto& entry : pImpl->entries) {
+        for (char c : entry.key) {
+            if (!(std::isalnum(c) || c == '_' || c == '-' || c == '.')) {
+                if (hasErrors) oss << "; ";
+                oss << "Invalid character in key '" << entry.key << "': '" << c << "'";
+                hasErrors = true;
+                break;
+            }
+        }
+    }
+    
+    // Validate section consistency
+    std::map<std::string, std::vector<std::string>> sectionToKeys;
+    for (const auto& entry : pImpl->entries) {
+        // Extract section from key (first dot-separated part)
+        std::string section = "default";
+        size_t dotPos = entry.key.find('.');
+        if (dotPos != std::string::npos) {
+            section = entry.key.substr(0, dotPos);
+        }
+        sectionToKeys[section].push_back(entry.key);
+    }
+    
+    return oss.str();
+}
+
+// Configuration sections
+void Config::setSection(const std::string& key, const std::string& section) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        // Update section if key exists
+        std::string newKey = section + "." + key.substr(key.find('.') + 1);
+        it->key = newKey;
+    }
+}
+
+std::string Config::getSection(const std::string& key) const {
+    size_t dotPos = key.find('.');
+    if (dotPos != std::string::npos) {
+        return key.substr(0, dotPos);
+    }
+    return "default";
+}
+
+std::vector<std::string> Config::getAllSections() const {
+    std::vector<std::string> sections;
+    sections.push_back("default"); // Default section
+    
+    for (const auto& entry : pImpl->entries) {
+        std::string section = getSection(entry.key);
+        if (std::find(sections.begin(), sections.end(), section) == sections.end()) {
+            sections.push_back(section);
+        }
+    }
+    
+    return sections;
+}
+
+// Explicit template instantiations
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;

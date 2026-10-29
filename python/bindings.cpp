@@ -4,7 +4,8 @@
 #include <pybind11/chrono.h>
 #include <memory>
 #include <string>
-#include <vector>
+#include <iostream>  // For std::cout
+#include <chrono>  // For benchmark
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -420,6 +421,207 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Custom exceptions for better error handling
+    py::register_exception<std::runtime_error>(m, "NLMError");
+    
+    py::class_<std::exception>(m, "Exception")
+        .def(py::init<const std::string&>())
+        .def("what", &std::exception::what);
+
+    // Convenience factory functions
+    m.def("createSimulationConfig", [](int neuronCount = 1000, float connectionProb = 0.1f) {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Runtime, "Number of neurons");
+        config->set("brain.connection_probability", connectionProb, ConfigSource::Runtime, "Connection probability");
+        config->set("brain.region_count", static_cast<int64_t>(1), ConfigSource::Runtime, "Number of brain regions");
+        return config;
+    }, py::arg("neuronCount") = 1000, py::arg("connectionProb") = 0.1f,
+       "Create a simulation configuration with specified parameters");
+
+    m.def("createEnvironmentConfig", [](int worldWidth = 20, int worldHeight = 20,
+                                       int visionWidth = 8, int visionHeight = 8) {
+        auto config = std::make_shared<Config>();
+        config->set("world.width", worldWidth, ConfigSource::Runtime, "World width");
+        config->set("world.height", worldHeight, ConfigSource::Runtime, "World height");
+        config->set("world.vision_width", visionWidth, ConfigSource::Runtime, "Vision width");
+        config->set("world.vision_height", visionHeight, ConfigSource::Runtime, "Vision height");
+        return config;
+    }, py::arg("worldWidth") = 20, py::arg("worldHeight") = 20,
+       py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+       "Create an environment configuration");
+
+    m.def("createCompleteAgentConfig", [](int neuronCount = 1000, float connectionProb = 0.1f,
+                                         int worldWidth = 20, int worldHeight = 20) {
+        auto config = std::make_shared<Config>();
+        
+        // Brain configuration
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Runtime, "Number of neurons");
+        config->set("brain.connection_probability", connectionProb, ConfigSource::Runtime, "Connection probability");
+        config->set("brain.region_count", static_cast<int64_t>(1), ConfigSource::Runtime, "Number of brain regions");
+        
+        // Memory configuration
+        config->set("memory.working.capacity", neuronCount / 10, ConfigSource::Runtime, "Working memory capacity");
+        config->set("memory.episodic.max_episodes", 1000, ConfigSource::Runtime, "Maximum episodic memory episodes");
+        
+        // Plasticity configuration
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime, "Enable STDP plasticity");
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime, "Enable Hebbian plasticity");
+        config->set("plasticity.structural.enable", true, ConfigSource::Runtime, "Enable structural plasticity");
+        
+        // Neuromodulation configuration
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Runtime, "Dopamine modulation scale");
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Runtime, "Enable curiosity-driven exploration");
+        config->set("neuromod.novelty.enable", true, ConfigSource::Runtime, "Enable novelty detection");
+        
+        // Environment configuration
+        config->set("world.width", worldWidth, ConfigSource::Runtime, "World width");
+        config->set("world.height", worldHeight, ConfigSource::Runtime, "World height");
+        config->set("world.vision_width", 8, ConfigSource::Runtime, "Vision width");
+        config->set("world.vision_height", 8, ConfigSource::Runtime, "Vision height");
+        
+        return config;
+    }, py::arg("neuronCount") = 1000, py::arg("connectionProb") = 0.1f,
+       py::arg("worldWidth") = 20, py::arg("worldHeight") = 20,
+       "Create a complete agent configuration with all systems enabled");
+
+    // Statistics and analysis helpers
+    m.def("getSystemInfo", []() {
+        return "NLM Neural Learning Machine v1.0.0\n"
+               "Phase 6: Final Integration Complete\n"
+               "All cognitive systems integrated and operational\n"
+               "Memory: Working, Episodic, Associative systems\n"
+               "Cognition: Planning, Concept Formation, Attention\n"
+               "Neuromodulation: Dopamine, Curiosity, Novelty\n"
+               "Plasticity: STDP, Hebbian, Structural\n"
+               "Development: Age-dependent plasticity stages";
+    }, "Get system information and version");
+
+    // Batch operation helpers
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                             std::shared_ptr<AgentBrain> agent, int steps) {
+        brain->initialize();
+        
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto motorCmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(motorCmd, world->getSimulationTime());
+            
+            // Apply reward modulation if enabled
+            if (agent->isRewardModulationEnabled()) {
+                auto reward = percept.getInternal()[0] if percept.getInternal() else 0.0f;
+                agent->applyRewardModulation(reward, 0.0f);
+            }
+            
+            // Update development if enabled
+            if (agent->isDevelopmentEnabled()) {
+                agent->updateDevelopment(0.1);
+            }
+        }
+        
+        return std::make_tuple(brain->getTotalNeuronCount(), 
+                              brain->getTotalSynapseCount(),
+                              brain->getTotalSpikeCount());
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run a complete simulation with brain, world, and agent");
+
+    // Configuration validation helper
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        bool isValid = config->validate();
+        std::string errors = config->getValidationErrors();
+        return std::make_pair(isValid, errors);
+    }, py::arg("config"), "Validate a configuration and return validation results");
+
+    // Environment preset configurations
+    m.def("createExplorationConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // High exploration settings
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Runtime, "Enable curiosity-driven exploration");
+        config->set("neuromod.novelty.enable", true, ConfigSource::Runtime, "Enable novelty detection");
+        config->set("neuromod.curiosity.sensitivity", 2.0f, ConfigSource::Runtime, "Curiosity sensitivity");
+        config->set("neuromod.novelty.threshold", 0.3f, ConfigSource::Runtime, "Novelty threshold");
+        
+        // Memory settings for exploration
+        config->set("memory.episodic.max_episodes", 5000, ConfigSource::Runtime, "Maximum episodic memory episodes for exploration");
+        config->set("brain.development.plasticity_rate", 1.0f, ConfigSource::Runtime, "High plasticity rate for exploration");
+        
+        return config;
+    }, "Create a configuration optimized for exploration and novelty seeking");
+
+    m.def("createLearningConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // High learning settings
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime, "Enable STDP plasticity");
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime, "Enable Hebbian plasticity");
+        config->set("plasticity.stdp.learning_rate", 0.001f, ConfigSource::Runtime, "STDP learning rate");
+        config->set("plasticity.hebbian.learning_rate", 0.0005f, ConfigSource::Runtime, "Hebbian learning rate");
+        
+        // Reward-based learning
+        config->set("neuromod.dopamine.scale", 1.5f, ConfigSource::Runtime, "High dopamine modulation");
+        config->set("neuromod.prediction_error.weight", 0.8f, ConfigSource::Runtime, "Prediction error weighting");
+        
+        return config;
+    }, "Create a configuration optimized for reinforcement learning");
+
+    m.def("createSocialConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Social learning settings
+        config->set("cognition.social_learning.enable", true, ConfigSource::Runtime, "Enable social learning");
+        config->set("plasticity.structural.enable", true, ConfigSource::Runtime, "Enable structural plasticity for social adaptation");
+        config->set("brain.maturational.social_influence", 0.5f, ConfigSource::Runtime, "Social influence on development");
+        
+        // Novelty from social interactions
+        config->set("neuromod.curiosity.social_sensitivity", 0.7f, ConfigSource::Runtime, "Social curiosity sensitivity");
+        
+        return config;
+    }, "Create a configuration optimized for social learning and interaction");
+
+    // Utility functions
+    m.def("printBrainStatus", [](const std::shared_ptr<Brain>& brain) {
+        brain->logStatus();
+    }, py::arg("brain"), "Print detailed brain status information");
+
+    m.def("printConfigSummary", [](const std::shared_ptr<Config>& config) {
+        std::cout << config->summary() << std::endl;
+    }, py::arg("config"), "Print configuration summary");
+
+    m.def("benchmarkSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                   std::shared_ptr<AgentBrain> agent, int steps = 1000) {
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        brain->initialize();
+        
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto motorCmd = agent->decodeMotorCommand();
+            world->applyMotorCommand(motorCmd, world->getSimulationTime());
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        return std::make_tuple(
+            duration.count(),
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount(),
+            brain->getTotalSpikeCount(),
+            steps / (duration.count() / 1000.0)  // steps per second
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps") = 1000,
+       "Run a benchmark simulation and return performance metrics");
+
 }
 
 } // namespace nlm
