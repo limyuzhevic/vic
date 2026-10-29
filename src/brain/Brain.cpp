@@ -511,8 +511,51 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Extract sensory neural activity for prediction
+        std::vector<float> sensoryPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                if (type == NeuronType::Sensory) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        float activation = std::abs(state.membranePotential - state.restingPotential);
+                        sensoryPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        if (!sensoryPattern.empty()) {
+            // Create a simple internal signal from neural activity
+            class SimpleSensoryInput : public nlm::SensoryInput {
+            public:
+                SimpleSensoryInput(const std::vector<float>& data) : data_(data) {}
+                
+                const char* getType() const override { return "Simple"; }
+                const std::vector<float>& getData() const override { return data_; }
+                size_t getDimensions() const override { return data_.size(); }
+                std::unique_ptr<nlm::SensoryInput> clone() const override {
+                    return std::make_unique<SimpleSensoryInput>(data_);
+                }
+            
+            private:
+                std::vector<float> data_;
+            };
+            
+            auto simpleInput = std::make_unique<SimpleSensoryInput>(sensoryPattern);
+            
+            // Update prediction system
+            pImpl->predictionSystem->train(*simpleInput);
+            
+            // Make prediction for next state
+            auto prediction = pImpl->predictionSystem->predictNextState(*simpleInput);
+            
+            // Update prediction with actual input (if available)
+            if (prediction) {
+                pImpl->predictionSystem->updatePredictions(*prediction, *simpleInput);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +571,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract neural activity pattern for concept formation
+        std::vector<float> neuralPattern;
+        float totalReward = 0.0f;
+        
+        // Collect average neural activation across all neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    float activation = std::abs(state.membranePotential - state.restingPotential);
+                    neuralPattern.push_back(activation);
+                }
+            }
+        }
+        
+        // Get reward level from dopamine for concept formation
+        if (pImpl->dopamine) {
+            totalReward = pImpl->dopamine->getLevel();
+        }
+        
+        // Also collect features from working memory
+        std::vector<float> features;
+        if (pImpl->workingMemory) {
+            // Extract some features from working memory for concept formation
+            // For now, just use some basic metrics
+            features.push_back(pImpl->workingMemory->getActiveTraces());
+        }
+        
+        if (!neuralPattern.empty()) {
+            // Present the neural pattern to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                neuralPattern, features, totalReward, currentStep);
+            
+            // Log if a new concept was formed
+            if (conceptId > 0 && pImpl->conceptFormation->getConceptCount() > 0) {
+                // Just log occasionally to avoid spam
+                if (currentStep % 1000 == 0) {
+                    NLM_LOG_INFO("Concept formation: Processing neural pattern at step " + 
+                                std::to_string(currentStep) +
+                                " (concepts: " + std::to_string(pImpl->conceptFormation->getConceptCount()) + ")");
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -546,33 +630,49 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    // ========== STEP 13.5: Sleep/rest cycle ==========
+    // Determine if brain should enter resting/sleep phase
+    if (!pImpl->isResting) {
+        // Enter resting phase after prolonged activity or at specific developmental stages
+        if (currentStep > 5000 || 
+            (pImpl->developmentSystem && pImpl->developmentSystem->getDevelopmentalStage() == DevelopmentalStage::Maturation)) {
+            pImpl->isResting = true;
+            NLM_LOG_INFO("Brain entering resting phase for memory consolidation and development");
+        }
+    } else {
+        // Brain is resting - perform sleep/rest cycle activities
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+        // Enhanced memory replay during rest
+        if (pImpl->episodicMemory) {
+            // Rehearse all episodes more extensively during rest
+            auto allEpisodes = pImpl->episodicMemory->getEpisodesForReplay(10);  // More episodes during rest
+            for (const auto* episode : allEpisodes) {
+                pImpl->episodicMemory->replayEpisode(episode);
             }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            NLM_LOG_INFO("Rest cycle: Replaying " + std::to_string(allEpisodes.size()) + " episodes");
+        }
+        
+        // Enhanced consolidation during rest
+        if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+            // Stronger consolidation during rest
+            float consolidationStrength = 0.5f;  // Higher during rest
+            pImpl->episodicMemory->consolidate(consolidationStrength);
+            NLM_LOG_INFO("Rest cycle: Enhanced memory consolidation (strength: " + std::to_string(consolidationStrength) + ")");
+        }
+        
+        // Developmental maturation during rest
+        if (pImpl->developmentSystem) {
+            // More significant development updates during rest
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 10000);
+            NLM_LOG_INFO("Rest cycle: Accelerated developmental maturation");
+        }
+        
+        // Eventually wake up from rest
+        if (currentStep % 5000 == 0) {  // Wake every 5000 steps
+            pImpl->isResting = false;
+            NLM_LOG_INFO("Brain waking from resting phase");
+        }
+    }
         }
     }
     
