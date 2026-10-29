@@ -28,24 +28,29 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+// Command-line interface
+void printUsage(const std::string& programName) {
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << "\nNLM (熙然) - Neural Learning Machine - Command Line Interface" << std::endl;
+    std::cout << "================================================================\n";
+    
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help                    Show this help message and exit" << std::endl;
+    std::cout << "  --version                 Show version information and exit" << std::endl;
+    std::cout << "  --validate [FILE]         Validate configuration file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --generate [FILE]         Generate default configuration file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --validate-all            Validate all configuration files in configs/ directory" << std::endl;
+    std::cout << "  --stats [FILE]            Generate statistics about configuration file" << std::endl;
+    std::cout << "  --check-compatibility [FILE] Check compatibility with all subsystems" << std::endl;
+    std::cout << "\nAdvanced Options:" << std::endl;
+    std::cout << "  --export-config [FILE]     Export configuration in JSON format" << std::endl;
+    std::cout << "  --import-config [FILE]     Import configuration from JSON format" << std::endl;
+    std::cout << "  --analyze-config [FILE]    Analyze configuration for optimization opportunities" << std::endl;
+    std::cout << "  --benchmark [FILE]         Run performance benchmark with configuration" << std::endl;
+    std::cout << "\nInformation:" << std::endl;
+    std::cout << "  --about                   Show detailed information about NLM" << std::endl;
+    std::cout << "  --subsystems              Show status of all integrated subsystems" << std::endl;
+    std::cout << "  --requirements            Show hardware/software requirements" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -322,6 +327,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Check for CLI commands
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            printUsage(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            std::cout << "NLM (熙然) Neural Learning Machine v0.1.0" << std::endl;
+            std::cout << "Phase 2: Real Neural Computation" << std::endl;
+            std::cout << "Copyright (c) 2026 NLM Project" << std::endl;
+            return 0;
+        }
+    }
+    
+    // If no CLI commands, run the standard simulation
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;

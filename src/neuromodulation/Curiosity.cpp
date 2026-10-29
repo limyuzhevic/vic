@@ -1,5 +1,5 @@
 #include "Curiosity.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "core/Logger/Logger.hpp"
 
 namespace nlm {
 
