@@ -18,38 +18,86 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Helper functions for type conversion
+namespace {
     
+    std::string convertValueToString(const ConfigValue& value) {
+        std::ostringstream oss;
+        std::visit([&oss](auto&& arg) {
+            oss << arg;
+        }, value);
+        return oss.str();
+    }
+    
+    bool isValidKey(const std::string& key) {
+        return !key.empty() && key.find('=') == std::string::npos && 
+               key.find(' ') == std::string::npos;
+    }
+    
+    // Parse different value types from string
+    ConfigValue parseStringValue(const std::string& value) {
+        if (value == "true" || value == "false") {
+            return value == "true";
+        }
+        
+        try {
+            if (value.find('.') != std::string::npos) {
+                return std::stod(value);
+            } else {
+                size_t pos;
+                long long_val = std::stoll(value, &pos);
+                if (pos == value.size()) {
+                    return long_val;
+                }
+                return std::stod(value);
+            }
+        } catch (...) {
+            return value;
+        }
+    }
+    
+} // anonymous namespace
+
+// Enhanced loadFromFile with better error handling and format support
+bool Config::loadFromFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        lineNum++;
         line = trim(line);
+        
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with better error handling
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            continue; // Skip malformed lines
         }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (!isValidKey(key)) {
+            continue; // Skip invalid keys
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Parse and set the value
+        ConfigValue parsedValue = parseStringValue(value);
+        set(key, parsedValue, ConfigSource::File);
     }
     
     return true;
@@ -59,6 +107,17 @@ bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
+        // Handle --config=file format
+        if (arg.substr(0, 8) == "--config=") {
+            configFile = arg.substr(8);
+            continue;
+        }
+        // Handle --config file format
+        else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+            continue;
+        }
+        
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
@@ -66,13 +125,24 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                // Handle boolean flags
+                std::string key = arg.substr(2);
+                set(key, "true", ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg[0] == '-' && i + 1 < argc && argv[i + 1][0] != '-') {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+        }
+        // Handle boolean short flags
+        else if (arg[0] == '-' && arg.size() > 1) {
+            for (size_t j = 1; j < arg.size(); ++j) {
+                std::string key = std::string(1, arg[j]);
+                set(key, "true", ConfigSource::CommandLine);
+            }
         }
     }
     return true;
@@ -84,9 +154,29 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write configuration with proper formatting
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write comment if present
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write the key=value pair
+        file << entry.key << " = ";
+        
+        // Format the value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -127,7 +217,87 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    // Handle event system configuration
+    if (key == "event_system.enabled") {
+        set("event_system", ConfigValue(std::stoi(value)), source);
+        return;
+    }
+    
+    // Handle event filter configuration
+    if (key.find("event_filter.") == 0) {
+        set(key, ConfigValue(value), source);
+        return;
+    }
+    
+    // Handle event callback configuration
+    if (key.find("event_callback.") == 0) {
+        set(key, ConfigValue(value), source);
+        return;
+    }
+    
+    // Handle event priority configuration
+    if (key.find("event_priority.") == 0) {
+        set(key, ConfigValue(value), source);
+        return;
+    }
+    
+    // Handle event limit configuration
+    if (key == "event.limit") {
+        set("event", ConfigValue(std::stoll(value)), source);
+        return;
+    }
+    
+    // Handle event type configuration
+    if (key.find("event.type.") == 0) {
+        set(key, ConfigValue(value), source);
+        return;
+    }
+    
+    // Handle event timestamp configuration
+    if (key == "event.min_timestamp" || key == "event.max_timestamp") {
+        set(key, ConfigValue(std::stod(value)), source);
+        return;
+    }
+    
+    // Handle event generator configuration
+    if (key == "event.generator") {
+        set(key, ConfigValue(value), source);
+        return;
+    }
+    
+    // Handle event callback configuration
+    if (key == "event.callback") {
+        set(key, ConfigValue(value), source);
+        return;
+    }
+    
+    // Handle event filter configuration
+    if (key == "event.filter") {
+        set(key, ConfigValue(value), source);
+        return;
+    }
+    
+    // Handle event statistics configuration
+    if (key.find("event.stats.") == 0) {
+        set(key, ConfigValue(value), source);
+        return;
+    }
+    
+    // Standard key-value handling for other configuration options
+    std::string normalizedKey = key;
+    for (char& c : normalizedKey) {
+        c = std::tolower(c);
+    }
+    
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&normalizedKey](const ConfigEntry& e) { return toLower(e.key) == normalizedKey; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = ConfigValue(value);
+        it->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, ConfigValue(value), source);
+    }
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {

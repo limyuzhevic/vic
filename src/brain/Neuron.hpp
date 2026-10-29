@@ -11,20 +11,29 @@ class Synapse;
 class RandomGenerator;
 
 // Neuron state structure for efficient storage
+// Organized by functional domains for better readability and maintainability
 struct NeuronState {
-    MembranePotential membranePotential;    // Current membrane potential (mV)
-    MembranePotential restingPotential;    // Resting potential (mV)
+    // Electrical properties (mV)
+    MembranePotential membranePotential;    // Current membrane potential
+    MembranePotential restingPotential;    // Baseline membrane potential
     MembranePotential threshold;           // Firing threshold (mV)
     MembranePotential resetPotential;       // Post-spike reset value (mV)
-    MembranePotential leakConductance;      // Leak conductance (nS)
-    MembranePotential synapseConductance;   // Synaptic conductance (nS)
-    FiringRate firingRate;                 // Current firing rate (Hz)
-    FiringState firingState;               // Current firing state
-    uint32_t refractoryRemaining;          // Steps remaining in refractory period
-    uint32_t refractoryPeriod;             // Total refractory period (steps)
-    float adaptationVariable;              // For spike-frequency adaptation
-    float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
+    // Conductance properties (nS) - synaptic and passive
+    MembranePotential leakConductance;      // Passive membrane conductance
+    MembranePotential synapseConductance;   // Total synaptic conductance
+    
+    // Dynamic properties
+    FiringRate firingRate;                 // Instantaneous firing rate (Hz)
+    FiringState firingState;               // Current firing state (resting, active, refractory)
+    uint32_t refractoryRemaining;          // Remaining refractory period steps
+    uint32_t refractoryPeriod;             // Total refractory period (steps)
+    
+    // Adaptive properties
+    float adaptationVariable;              // Spike-frequency adaptation variable
+    float lastSpikeTime;                   // Timestamp of last spike (-1.0f if none)
+    
+    // Initialization with optimized defaults for LIF neurons
     NeuronState()
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)

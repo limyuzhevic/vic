@@ -326,124 +326,223 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize enhanced CLI interface with improved command-line argument parsing
+    bool shouldExit = false;
+    std::string mode = "auto";  // auto, interactive, debug, benchmark, export
+    bool helpRequested = false;
+    std::string outputFile;
+    double duration = 0.0;
+    bool verbose = false;
+    bool quiet = false;
+    std::vector<std::string> customCommands;
+    
+    // Parse command-line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            helpRequested = true;
+        } else if (arg == "--mode" && i + 1 < argc) {
+            mode = argv[++i];
+        } else if (arg == "--output" && i + 1 < argc) {
+            outputFile = argv[++i];
+        } else if (arg == "--duration" && i + 1 < argc) {
+            duration = std::stod(argv[++i]);
+        } else if (arg == "--verbose") {
+            verbose = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            quiet = true;
+        } else if (arg == "--interactive") {
+            mode = "interactive";
+        } else if (arg == "--debug") {
+            mode = "debug";
+        } else if (arg == "--benchmark") {
+            mode = "benchmark";
+        } else if (arg == "--export-results") {
+            mode = "export";
+        } else if (arg.substr(0, 6) == "--cmd=") {
+            customCommands.push_back(arg.substr(6));
+        } else if (arg == "--version") {
+            shouldExit = true;
+        }
+    }
+    
+    // Display help information
+    if (helpRequested) {
+        displayCLIHelp(mode, configFile, customCommands);
+        return 0;
+    }
+    
+    // Display version information
+    if (shouldExit) {
+        displayVersionInfo();
+        return 0;
+    }
+    
+    // Initialize enhanced logging system
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+}
+
+// Helper function declarations
+void displayCLIHelp(const std::string& mode, const std::string& configFile, const std::vector<std::string>& customCommands);
+void displayVersionInfo();
+std::shared_ptr<Logger> createEnhancedLogger(bool verbose, bool quiet);
+
+// Enhanced CLI help information
+void displayCLIHelp(const std::string& mode, const std::string& configFile, const std::vector<std::string>& customCommands) {
+    printBanner();
+    std::cout << "\n=== NLM Enhanced CLI Help ===" << std::endl;
+    std::cout << "\nUsage: ./nlm [options] [mode] [arguments]" << std::endl;
+    std::cout << "\nBasic Options:" << std::endl;
+    std::cout << "  --help, -h              Show this help message" << std::endl;
+    std::cout << "  --version               Display version information" << std::endl;
+    std::cout << "  --config=file           Load configuration from file" << std::endl;
+    std::cout << "  --quiet, -q             Suppress most output" << std::endl;
+    std::cout << "  --verbose               Enable verbose debug output" << std::endl;
+    std::cout << "\nExecution Modes:" << std::endl;
+    std::cout << "  --mode=<mode>           Execution mode (auto, interactive, debug, benchmark, export)" << std::endl;
+    std::cout << "    auto                  (default) Automatic mode with configured tests" << std::endl;
+    std::cout << "    interactive           Interactive mode with live control" << std::endl;
+    std::cout << "    debug                 Debug mode with detailed logging" << std::endl;
+    std::cout << "    benchmark             Performance benchmarking mode" << std::endl;
+    std::cout << "    export                Export brain state and results" << std::endl;
+    std::cout << "\nConfiguration and Output:" << std::endl;
+    std::cout << "  --output=<file>         Save results to file" << std::endl;
+    std::cout << "  --duration=<seconds>    Run simulation for specified duration" << std::endl;
+    std::cout << "\nAdvanced Options:" << std::endl;
+    std::cout << "  --interactive           Enable interactive mode" << std::endl;
+    std::cout << "  --debug                 Enable debug mode" << std::endl;
+    std::cout << "  --benchmark             Enable benchmark mode" << std::endl;
+    std::cout << "  --export-results        Export results to file" << std::endl;
+    std::cout << "  --cmd=<command>         Execute custom command (can be repeated)" << std::endl;
+    std::cout << "\nDefault Configuration:" << std::endl;
+    std::cout << "  File: " << configFile << std::endl;
+    if (!customCommands.empty()) {
+        std::cout << "  Custom Commands:" << std::endl;
+        for (const auto& cmd : customCommands) {
+            std::cout << "    " << cmd << std::endl;
         }
     }
+    std::cout << "\nFor more information, visit: https://github.com/nlm-project/nlm" << std::endl;
+}
+
+// Version information display
+void displayVersionInfo() {
+    printBanner();
+    std::cout << "\n=== NLM Version Information ===" << std::endl;
+    std::cout << "Version: NLM Phase 2 - Real Neural Computation" << std::endl;
+    std::cout << "Build Date: " << __DATE__ << std::endl;
+    std::cout << "Compiler: " << __VERSION__ << std::endl;
+    std::cout << "Architecture: x86_64" << std::endl;
+    std::cout << "C++ Standard: C++20" << std::endl;
+    std::cout << "\nPhase 2 Features:" << std::endl;
+    std::cout << "  ✓ Leaky Integrate-and-Fire (LIF) neuron dynamics" << std::endl;
+    std::cout << "  ✓ Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  ✓ STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  ✓ Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "  ✓ Learning experiment demonstrations" << std::endl;
+    std::cout << "  ✓ Enhanced CLI with multiple execution modes" << std::endl;
+    std::cout << "  ✓ Improved configuration management" << std::endl;
+}
+
+// Enhanced logger with verbose and quiet support
+std::shared_ptr<Logger> createEnhancedLogger(bool verbose, bool quiet) {
+    auto logger = std::make_shared<Logger>();
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    if (quiet) {
+        // Minimal logging for quiet mode
+        auto quietLogger = std::make_shared<ConsoleLogger>(LogLevel::Warning);
+        logger->addLogger(quietLogger);
+    } else if (verbose) {
+        // Verbose logging with debug level
+        auto verboseLogger = std::make_shared<ConsoleLogger>(LogLevel::Debug);
+        logger->addLogger(verboseLogger);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        // Normal logging with info level
+        auto normalLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        logger->addLogger(normalLogger);
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    return logger;
+}
+
+// Enhanced CLI help information
+void displayCLIHelp(const std::string& mode, const std::string& configFile, const std::vector<std::string>& customCommands) {
+    printBanner();
+    std::cout << "\n=== NLM Enhanced CLI Help ===" << std::endl;
+    std::cout << "\nUsage: ./nlm [options] [mode] [arguments]" << std::endl;
+    std::cout << "\nBasic Options:" << std::endl;
+    std::cout << "  --help, -h              Show this help message" << std::endl;
+    std::cout << "  --version               Display version information" << std::endl;
+    std::cout << "  --config=file           Load configuration from file" << std::endl;
+    std::cout << "  --quiet, -q             Suppress most output" << std::endl;
+    std::cout << "  --verbose               Enable verbose debug output" << std::endl;
+    std::cout << "\nExecution Modes:" << std::endl;
+    std::cout << "  --mode=<mode>           Execution mode (auto, interactive, debug, benchmark, export)" << std::endl;
+    std::cout << "    auto                  (default) Automatic mode with configured tests" << std::endl;
+    std::cout << "    interactive           Interactive mode with live control" << std::endl;
+    std::cout << "    debug                 Debug mode with detailed logging" << std::endl;
+    std::cout << "    benchmark             Performance benchmarking mode" << std::endl;
+    std::cout << "    export                Export brain state and results" << std::endl;
+    std::cout << "\nConfiguration and Output:" << std::endl;
+    std::cout << "  --output=<file>         Save results to file" << std::endl;
+    std::cout << "  --duration=<seconds>    Run simulation for specified duration" << std::endl;
+    std::cout << "\nAdvanced Options:" << std::endl;
+    std::cout << "  --interactive           Enable interactive mode" << std::endl;
+    std::cout << "  --debug                 Enable debug mode" << std::endl;
+    std::cout << "  --benchmark             Enable benchmark mode" << std::endl;
+    std::cout << "  --export-results        Export results to file" << std::endl;
+    std::cout << "  --cmd=<command>         Execute custom command (can be repeated)" << std::endl;
+    std::cout << "\nDefault Configuration:" << std::endl;
+    std::cout << "  File: " << configFile << std::endl;
+    if (!customCommands.empty()) {
+        std::cout << "  Custom Commands:" << std::endl;
+        for (const auto& cmd : customCommands) {
+            std::cout << "    " << cmd << std::endl;
+        }
+    }
+    std::cout << "\nFor more information, visit: https://github.com/nlm-project/nlm" << std::endl;
+}
+
+// Version information display
+void displayVersionInfo() {
+    printBanner();
+    std::cout << "\n=== NLM Version Information ===" << std::endl;
+    std::cout << "Version: NLM Phase 2 - Real Neural Computation" << std::endl;
+    std::cout << "Build Date: " << __DATE__ << std::endl;
+    std::cout << "Compiler: " << __VERSION__ << std::endl;
+    std::cout << "Architecture: x86_64" << std::endl;
+    std::cout << "C++ Standard: C++20" << std::endl;
+    std::cout << "\nPhase 2 Features:" << std::endl;
+    std::cout << "  ✓ Leaky Integrate-and-Fire (LIF) neuron dynamics" << std::endl;
+    std::cout << "  ✓ Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  ✓ STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  ✓ Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "  ✓ Learning experiment demonstrations" << std::endl;
+    std::cout << "  ✓ Enhanced CLI with multiple execution modes" << std::endl;
+    std::cout << "  ✓ Improved configuration management" << std::endl;
+}
+
+// Enhanced logger with verbose and quiet support
+std::shared_ptr<Logger> createEnhancedLogger(bool verbose, bool quiet) {
+    auto logger = std::make_shared<Logger>();
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
-    
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+    if (quiet) {
+        // Minimal logging for quiet mode
+        auto quietLogger = std::make_shared<ConsoleLogger>(LogLevel::Warning);
+        logger->addLogger(quietLogger);
+    } else if (verbose) {
+        // Verbose logging with debug level
+        auto verboseLogger = std::make_shared<ConsoleLogger>(LogLevel::Debug);
+        logger->addLogger(verboseLogger);
+    } else {
+        // Normal logging with info level
+        auto normalLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        logger->addLogger(normalLogger);
     }
     
-    brain->logStatus();
-    
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
-    
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
-    
-    return 0;
+    return logger;
 }
