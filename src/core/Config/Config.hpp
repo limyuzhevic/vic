@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <functional>
 
 namespace nlm {
 
@@ -43,6 +44,16 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Type validation function
+using ValidationFunc = std::function<bool(const ConfigValue&)>;
+
+// Validation rule
+struct ValidationRule {
+    std::string key;
+    ValidationFunc validator;
+    std::string errorMessage;
+};
+
 // Main configuration class
 class Config {
 public:
@@ -55,14 +66,20 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or key=value format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON string
+    bool loadFromJsonString(const std::string& jsonString);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to JSON string
+    std::string saveToJsonString() const;
     
     // Get values
     template<typename T>
@@ -77,6 +94,11 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Validation
+    bool validate(const std::vector<ValidationRule>& rules) const;
+    void addValidationRule(const ValidationRule& rule);
+    void clearValidationRules();
     
     // Check existence
     bool has(const std::string& key) const;
@@ -100,6 +122,29 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Friend declaration for loadFromJsonString method
+    friend bool Config::loadFromJsonString(const std::string& jsonString);
 };
 
+// JSON utility functions
+namespace JsonUtils {
+    bool parseBool(const std::string& str);
+    std::string escapeString(const std::string& str);
+    std::string formatNumber(double value);
+}
+
 } // namespace nlm
+
+// Explicit template instantiations
+template std::optional<int> nlm::Config::get<int>(const std::string&) const;
+template std::optional<int64_t> nlm::Config::get<int64_t>(const std::string&) const;
+template std::optional<double> nlm::Config::get<double>(const std::string&) const;
+template std::optional<bool> nlm::Config::get<bool>(const std::string&) const;
+template std::optional<std::string> nlm::Config::get<std::string>(const std::string&) const;
+
+template int nlm::Config::getOr<int>(const std::string&, const int&) const;
+template int64_t nlm::Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template double nlm::Config::getOr<double>(const std::string&, const double&) const;
+template bool nlm::Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string nlm::Config::getOr<std::string>(const std::string&, const std::string&) const;

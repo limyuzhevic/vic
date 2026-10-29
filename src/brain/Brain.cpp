@@ -895,9 +895,38 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match checkpoint synapses with actual brain synapses
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    // Find matching synapse in checkpoint data
+                    if (synapseData.sourceNeuron[synapseIdx] == syn->getSourceNeuron().index() &&
+                        synapseData.destinationNeuron[synapseIdx] == syn->getDestinationNeuron().index()) {
+                        
+                        // Restore synapse properties
+                        syn->setWeight(synapseData.weight[synapseIdx]);
+                        syn->setDelay(synapseData.delay[synapseIdx]);
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                        syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIdx]));
+                        
+                        // Re-enable plasticity based on flags
+                        // (We could store plasticity flags in the checkpoint, but for now we preserve the current state)
+                        
+                        synapseIdx++;
+                    }
+                }
+            }
+        }
+        
+        // If there are remaining synapses in checkpoint that weren't matched,
+        // we could log a warning (this shouldn't happen in normal operation)
+        if (synapseIdx < synapseData.weight.size()) {
+            NLM_LOG_WARN("Some checkpoint synapses were not matched with actual brain synapses " +
+                        std::to_string(synapseData.weight.size() - synapseIdx) + " synapses unmatched");
+        }
+        
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseIdx) + " synapses from checkpoint");
         
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
