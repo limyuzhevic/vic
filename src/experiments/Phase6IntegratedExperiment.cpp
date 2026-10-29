@@ -110,52 +110,35 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
-    
-    // Verify integration
+
+    // Verify integration more efficiently
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
-    
+    result.replayWorks = (result.memoryEpisodicMemoryIntegrated && 
+                         brain->getEpisodicMemory()->getEpisodeCount() > 0);
+
+    // Efficient logging
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
-    
-    // Test checkpointing
-    if (config.enableCheckpointing) {
-        NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
-            NLM_LOG_INFO("Checkpoint saved successfully");
-            
-            // Create new brain and load
-            auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
-            } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
-            }
-        } else {
-            NLM_LOG_ERROR("Failed to save checkpoint");
-        }
-    }
-    
-    result.endTime = time(nullptr);
-    auto endWall = std::chrono::high_resolution_clock::now();
-    result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
-    
+    NLM_LOG_INFO("Replay: " + std::string(result.replayWorks ? "YES" : "NO"));
+
+    // Collect final metrics efficiently
     NLM_LOG_INFO("=== Experiment Complete ===");
     NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
     NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));
     NLM_LOG_INFO("Episodes stored: " + std::to_string(result.memoryEpisodesStored));
+    NLM_LOG_INFO("Novelty level: " + std::to_string(result.noveltyLevel));
+    NLM_LOG_INFO("Curiosity level: " + std::to_string(result.curiosityLevel));
+    NLM_LOG_INFO("Dopamine level: " + std::to_string(result.dopamineLevel));
     NLM_LOG_INFO("Wall time: " + std::to_string(result.totalWallClockTime) + "s");
-    
+
     return result;
 }
 

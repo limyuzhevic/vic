@@ -1,5 +1,3 @@
-#include "PlasticityRule.hpp"
-
 namespace nlm {
 
 bool PlasticityRule::isEnabled() const {
@@ -7,7 +5,9 @@ bool PlasticityRule::isEnabled() const {
 }
 
 void PlasticityRule::setEnabled(bool enabled) {
-    enabled_ = enabled;
+    if (enabled_ != enabled) {
+        enabled_ = enabled;
+    }
 }
 
 struct HebbianRule::Impl {
@@ -27,7 +27,7 @@ void HebbianRule::update(Synapse* synapse,
     // TODO PHASE 2: Implement real Hebbian learning
     // PLACEHOLDER: Simple correlated firing increases weight
     
-    if (preSpikes.empty() || postSpikes.empty()) {
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
@@ -48,7 +48,9 @@ void HebbianRule::update(Synapse* synapse,
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    synapse->addToWeight(delta);
+    if (synapse) {
+        synapse->addToWeight(delta);
+    }
 }
 
 const char* HebbianRule::getName() const {
@@ -56,7 +58,9 @@ const char* HebbianRule::getName() const {
 }
 
 void HebbianRule::setLearningRate(float rate) {
-    pImpl->learningRate = rate;
+    if (rate >= 0.0f) {
+        pImpl->learningRate = rate;
+    }
 }
 
 float HebbianRule::getLearningRate() const {

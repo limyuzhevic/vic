@@ -68,6 +68,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
     std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
+    std::cout << "Novelty level: " << result.noveltyLevel << std::endl;
+    std::cout << "Curiosity level: " << result.curiosityLevel << std::endl;
     std::cout << std::endl;
     
     std::cout << "=== INTEGRATION STATUS ===" << std::endl;
@@ -81,5 +83,6 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
     
+    // Return success code
     return 0;
 }

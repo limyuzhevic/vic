@@ -1,0 +1,245 @@
+#!/usr/bin/env python3
+
+"""
+NLM Configuration File Generator
+
+Generate example configuration files for NLM experiments.
+This provides starting templates for different experiment types.
+"""
+
+import argparse
+import json
+import sys
+
+def generate_basic_config():
+    """Generate basic experiment configuration."""
+    config = {
+        "name": "basic_neural_simulation",
+        "experiment_type": "basic",
+        "simulation_mode": "balanced",
+        "neurons": 1000,
+        "regions": 1,
+        "connection_probability": 0.1,
+        "max_steps": 10000,
+        "timestep": 0.001,
+        "neuron_config": {
+            "v_thresh": -50.0,
+            "v_rest": -70.0,
+            "v_reset": -75.0,
+            "tau_mem": 20.0,
+            "tau_ref": 2.0,
+            "conductance": 10.0
+        },
+        "plasticity_config": {
+            "stdp_enabled": True,
+            "stdp_ltp_weight": 0.01,
+            "stdp_ltd_weight": 0.012,
+            "stdp_time_constant": 20.0,
+            "hebbian_enabled": True,
+            "hebbian_learning_rate": 0.01,
+            "structural_enabled": True,
+            "synaptogenesis_rate": 0.0001,
+            "pruning_rate": 0.00001
+        },
+        "neuromodulation_config": {
+            "dopamine_enabled": True,
+            "dopamine_scale": 1.0,
+            "curiosity_enabled": True,
+            "curiosity_sensitivity": 1.0,
+            "novelty_enabled": True,
+            "novelty_threshold": 0.1
+        },
+        "memory_config": {
+            "working_memory_capacity": 1000,
+            "working_memory_decay": 0.95,
+            "episodic_memory_max_episodes": 1000,
+            "episodic_memory_consolidation_threshold": 0.3
+        },
+        "development_config": {
+            "developmental_stages": 5,
+            "critical_period_multiplier": 0.8,
+            "maturation_factor": 0.5,
+            "aging_decay": 0.2
+        },
+        "enable_checkpointing": True,
+        "enable_replay": True,
+        "enable_development": True,
+        "enable_structural_plasticity": True,
+        "collect_statistics": True,
+        "verbose": False
+    }
+    return config
+
+def generate_stdp_config():
+    """Generate STDP-focused experiment configuration."""
+    config = {
+        "name": "stdp_focused_experiment",
+        "experiment_type": "stdp_reverification",
+        "simulation_mode": "accuracy",
+        "neurons": 500,
+        "regions": 2,
+        "connection_probability": 0.15,
+        "max_steps": 5000,
+        "timestep": 0.001,
+        "neuron_config": {
+            "v_thresh": -45.0,
+            "v_rest": -70.0,
+            "v_reset": -75.0,
+            "tau_mem": 15.0,
+            "tau_ref": 3.0,
+            "conductance": 8.0
+        },
+        "plasticity_config": {
+            "stdp_enabled": True,
+            "stdp_ltp_weight": 0.02,
+            "stdp_ltd_weight": 0.018,
+            "stdp_time_constant": 25.0,
+            "hebbian_enabled": False,
+            "hebbian_learning_rate": 0.001,
+            "structural_enabled": False,
+            "synaptogenesis_rate": 0.00005,
+            "pruning_rate": 0.000005
+        },
+        "neuromodulation_config": {
+            "dopamine_enabled": True,
+            "dopamine_scale": 1.5,
+            "curiosity_enabled": False,
+            "novelty_enabled": False,
+            "prediction_error_enabled": True
+        },
+        "enable_checkpointing": True,
+        "enable_replay": False,
+        "enable_development": False,
+        "collect_statistics": True,
+        "verbose": True
+    }
+    return config
+
+def generate_advanced_config():
+    """Generate advanced experiment configuration."""
+    config = {
+        "name": "advanced_integration_experiment",
+        "experiment_type": "integration_test",
+        "simulation_mode": "balanced",
+        "neurons": 2000,
+        "regions": 4,
+        "connection_probability": 0.08,
+        "max_steps": 20000,
+        "timestep": 0.0005,
+        "neuron_config": {
+            "v_thresh": -55.0,
+            "v_rest": -70.0,
+            "v_reset": -75.0,
+            "tau_mem": 25.0,
+            "tau_ref": 2.0,
+            "conductance": 12.0,
+            "adaptation_strength": 1.5
+        },
+        "plasticity_config": {
+            "stdp_enabled": True,
+            "stdp_ltp_weight": 0.015,
+            "stdp_ltd_weight": 0.014,
+            "stdp_time_constant": 30.0,
+            "hebbian_enabled": True,
+            "hebbian_learning_rate": 0.02,
+            "structural_enabled": True,
+            "synaptogenesis_rate": 0.0002,
+            "pruning_rate": 0.00002,
+            "reward_modulated": True,
+            "eligibility_decay": 0.05
+        },
+        "neuromodulation_config": {
+            "dopamine_enabled": True,
+            "dopamine_scale": 2.0,
+            "dopamine_plasticity_factor": True,
+            "curiosity_enabled": True,
+            "curiosity_sensitivity": 1.5,
+            "novelty_enabled": True,
+            "novelty_threshold": 0.05,
+            "prediction_error_enabled": True,
+            "prediction_error_decay": 0.05
+        },
+        "memory_config": {
+            "working_memory_capacity": 2000,
+            "working_memory_decay": 0.9,
+            "episodic_memory_max_episodes": 5000,
+            "episodic_memory_consolidation_threshold": 0.4,
+            "associative_memory_enabled": True,
+            "associative_memory_strength": 0.8,
+            "procedural_memory_enabled": True,
+            "procedural_memory_learning_rate": 0.02
+        },
+        "development_config": {
+            "developmental_stages": 8,
+            "critical_period_multiplier": 0.7,
+            "maturation_factor": 0.4,
+            "aging_decay": 0.15,
+            "structural_plasticity_rate": 0.0003,
+            "synaptic_pruning_rate": 0.00003
+        },
+        "enable_checkpointing": True,
+        "enable_replay": True,
+        "enable_development": True,
+        "enable_structural_plasticity": True,
+        "collect_statistics": True,
+        "verbose": True
+    }
+    return config
+
+def save_config(config, filename):
+    """Save configuration to file."""
+    try:
+        with open(filename, 'w') as f:
+            json.dump(config, f, indent=2)
+        print(f"✓ Configuration saved to {filename}")
+        return True
+    except Exception as e:
+        print(f"✗ Error saving configuration: {e}")
+        return False
+
+def main():
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description="NLM Configuration File Generator",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Generate example configuration files for NLM experiments.
+
+Examples:
+  python3 nlm-config generate basic > basic_config.json
+  python3 nlm-config generate stdp > stdp_config.json
+  python3 nlm-config generate advanced > advanced_config.json
+  python3 nlm-config save basic basic_config.json
+        """
+    )
+    
+    parser.add_argument("type", choices=["basic", "stdp", "advanced"],
+                       help="Type of configuration to generate")
+    parser.add_argument("--output", "-o", dest="output_file",
+                       help="Output file path (default: stdout)")
+    
+    args = parser.parse_args()
+    
+    # Generate configuration
+    if args.type == "basic":
+        config = generate_basic_config()
+        print("Basic NLM Configuration")
+        print("=" * 50)
+    elif args.type == "stdp":
+        config = generate_stdp_config()
+        print("STDP-focused NLM Configuration")
+        print("=" * 50)
+    elif args.type == "advanced":
+        config = generate_advanced_config()
+        print("Advanced NLM Configuration")
+        print("=" * 50)
+    
+    # Output configuration
+    if args.output_file:
+        save_config(config, args.output_file)
+    else:
+        # Print to stdout
+        print(json.dumps(config, indent=2))
+
+if __name__ == "__main__":
+    main()

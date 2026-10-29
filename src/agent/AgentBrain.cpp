@@ -42,19 +42,17 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                             case 5: motorWait_.push_back(n); break;
                         }
                     }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
+        } else if (type == NeuronType::Sensory) {
+            for (Neuron* n : pop->getNeurons()) {
+                // Distribute sensory neurons
+                size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
+                            sensoryInternal_.size() + sensoryProprioception_.size();
+                
+                switch (idx % 4) {
+                    case 0: sensoryVision_.push_back(n); break;
+                    case 1: sensoryTouch_.push_back(n); break;
+                    case 2: sensoryInternal_.push_back(n); break;
+                    case 3: sensoryProprioception_.push_back(n); break;
                 }
             }
         }
@@ -124,12 +122,15 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
     
-    // Compute novelty (difference from previous vision)
+    // Compute novelty (difference from previous vision) with optimization
     if (!vision.empty()) {
         float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size() && i < previousVision_.size(); ++i) {
-            float diff = std::abs(vision[i] - previousVision_[i]);
-            totalDiff += diff;
+        const size_t limit = std::min(vision.size(), previousVision_.size());
+        
+        // Use optimized loop for computing differences
+        for (size_t i = 0; i < limit; ++i) {
+            const float diff = vision[i] - previousVision_[i];
+            totalDiff += std::abs(diff);
         }
         
         // Normalize
@@ -141,7 +142,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         // Store for next time
         previousVision_ = vision;
     }
-    
+
     // Update curiosity based on novelty
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f;

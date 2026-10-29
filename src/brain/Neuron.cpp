@@ -134,7 +134,9 @@ void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     // Modulatory input affects plasticity but not directly integrated
     // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
+    if (std::abs(amplitude) > 0.0f) {
+        pImpl->state.adaptationVariable += amplitude * 0.1f;
+    }
 }
 
 void Neuron::injectCurrent(MembranePotential current) {

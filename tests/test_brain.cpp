@@ -110,13 +110,20 @@ void testBrainStatus() {
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
     
     nlm::Brain brain(config);
-    brain.initialize();
+    bool initSuccess = brain.initialize();
+    
+    // Test that brain is properly initialized
+    assert(initSuccess);
     
     // Verify statistics are accessible
     assert(brain.getTotalNeuronCount() > 0);
     assert(brain.getTotalSynapseCount() >= 0);
     assert(brain.getFiringNeuronCount() >= 0);
     assert(brain.getAverageFiringRate() >= 0.0f);
+    
+    // Test other accessible methods
+    assert(brain.getRegionCount() > 0);
+    assert(!brain.getRegionIds().empty());
     
     std::cout << "    testBrainStatus passed" << std::endl;
 }

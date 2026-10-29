@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+
+"""
+NLM Command Line Interface
+
+A user-friendly command-line interface for the Neural Learning Machine (NLM).
+This provides easy access to brain creation, simulation, and configuration.
+
+Usage Examples:
+    # Run a simple brain simulation
+    python3 nlm-cli run --neurons 1000 --steps 1000
+    
+    # Create a brain with custom configuration
+    python3 nlm-cli create --neurons 500 --config my_config.json
+    
+    # List available configurations
+    python3 nlm-cli list-configs
+    
+    # Save brain state
+    python3 nlm-cli save brain_state.bin --neurons 100
+    
+    # Load brain state
+    python3 nlm-cli load brain_state.bin --steps 500
+"""
+
+import argparse
+import json
+import sys
+import os
+from typing import Optional, Dict, Any
+
+# Add the parent directory to the path so we can import pynlm
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    import pynlm
+except ImportError:
+    print("Error: pynlm module not found. Please install NLM first.")
+    print("See README.md for installation instructions.")
+    sys.exit(1)
+
+class NLMCLI:
+    """Command line interface for NLM operations."""
+    
+    def __init__(self):
+        self.brain = None
+        self.config = None
+    
+    def create_brain(self, neurons: int = 1000, regions: int = 1, 
+                     connection_prob: float = 0.1, config_file: Optional[str] = None) -> None:
+        """Create a new brain with specified configuration."""
+        print(f"Creating brain with {neurons} neurons...")
+        
+        # Load config file if provided
+        if config_file and os.path.exists(config_file):
+            print(f"Loading configuration from {config_file}")
+            self.config = self._load_config(config_file)
+        else:
+            # Create default config
+            self.config = pynlm.createDefaultConfig()
+            self.config.set("brain.neuron_count", neurons)
+            self.config.set("brain.region_count", regions)
+            self.config.set("brain.connection_probability", connection_prob)
+        
+        # Create brain
+        self.brain = pynlm.createBrain(self.config)
+        self.brain.initialize()
+        
+        print(f"Brain created successfully!")
+        print(f"  - Neurons: {self.brain.getTotalNeuronCount()}")
+        print(f"  - Regions: {self.brain.getRegionCount()}")
+        print(f"  - Synapses: {self.brain.getTotalSynapseCount()}")
+    
+    def run_simulation(self, steps: int = 1000, timestep: float = 0.001,
+                      world_enabled: bool = False) -> None:
+        """Run a brain simulation."""
+        if not self.brain:
+            print("Error: No brain created. Use 'create' command first.")
+            return
+        
+        print(f"Running simulation for {steps} steps...")
+        
+        # Run simulation
+        for step in range(steps):
+            self.brain.step(step, step * timestep)
+            
+            # Print progress every 100 steps
+            if step % 100 == 0:
+                print(f"  Step {step}: "
+                      f"{self.brain.getFiringNeuronCount()} firing, "
+                      f"{self.brain.getAverageFiringRate():.2f} Hz avg rate")
+        
+        print(f"Simulation complete!")
+        print(f"Total spikes: {self.brain.getTotalSpikeCount()}")
+        print(f"Average firing rate: {self.brain.getAverageFiringRate():.2f} Hz")
+        print(f"E/I ratio: {self.brain.getExcitationInhibitionRatio():.2f}")
+    
+    def save_brain(self, filepath: str) -> None:
+        """Save brain state to file."""
+        if not self.brain:
+            print("Error: No brain to save. Use 'create' command first.")
+            return
+        
+        print(f"Saving brain state to {filepath}...")
+        
+        if self.brain.save(filepath):
+            print(f"Brain saved successfully!")
+        else:
+            print(f"Error: Failed to save brain state.")
+    
+    def load_brain(self, filepath: str, reset: bool = True) -> None:
+        """Load brain state from file."""
+        if not os.path.exists(filepath):
+            print(f"Error: File '{filepath}' not found.")
+            return
+        
+        print(f"Loading brain state from {filepath}...")
+        
+        # Create new brain
+        if reset:
+            # Reinitialize the existing brain
+            self.brain.reset()
+            self.brain.initialize()
+        else:
+            # Create new brain
+            if self.config:
+                self.brain = pynlm.createBrain(self.config)
+                self.brain.initialize()
+            else:
+                print("Error: No config file to reload from.")
+                return
+        
+        # Load state
+        if self.brain.load(filepath):
+            print(f"Brain loaded successfully!")
+        else:
+            print(f"Error: Failed to load brain state.")
+    
+    def list_configs(self) -> None:
+        """List available configuration options."""
+        print("Available NLM Configuration Options:")
+        print("=" * 50)
+        
+        configs = {
+            "brain.neuron_count": "Total number of neurons (default: 1000)",
+            "brain.region_count": "Number of brain regions (default: 1)",
+            "brain.connection_probability": "Synapse connection probability (default: 0.1)",
+            "brain.v_thresh": "Neuron threshold potential (default: -50.0 mV)",
+            "brain.v_rest": "Resting potential (default: -70.0 mV)",
+            "brain.tau_mem": "Membrane time constant (default: 20.0 ms)",
+            "stdp_ltp_weight": "STDP LTP weight (default: 0.01)",
+            "stdp_ltd_weight": "STDP LTD weight (default: 0.012)",
+            "stdp_tau": "STDP time constant (default: 20.0 ms)",
+            "plasticity.enable": "Enable plasticity (default: true)",
+            "neuromod.dopamine.scale": "Dopamine scale (default: 1.0)",
+            "random_seed": "Random seed (default: 42)",
+        }
+        
+        for key, description in configs.items():
+            print(f"{key:30} - {description}")
+        
+        print("\nExample configuration file:")
+        print(json.dumps({
+            "brain.neuron_count": 500,
+            "brain.region_count": 2,
+            "brain.connection_probability": 0.15,
+            "stdp_ltp_weight": 0.02,
+            "random_seed": 123
+        }, indent=2))
+    
+    def _load_config(self, config_file: str) -> Any:
+        """Load configuration from file."""
+        try:
+            with open(config_file, 'r') as f:
+                config_data = json.load(f)
+            
+            config = pynlm.createDefaultConfig()
+            
+            # Apply configuration from file
+            for key, value in config_data.items():
+                if isinstance(value, int):
+                    config.set(key, value)
+                elif isinstance(value, float):
+                    config.set(key, value)
+                elif isinstance(value, str):
+                    config.set(key, value)
+                else:
+                    print(f"Warning: Unsupported value type for {key}, skipping")
+            
+            return config
+        except Exception as e:
+            print(f"Error loading config file: {e}")
+            return None
+    
+    def run_experiment(self, neurons: int = 1000, steps: int = 1000,
+                      enable_checkpointing: bool = False) -> None:
+        """Run a complete NLM experiment."""
+        print("Running NLM Phase 6 Integration Experiment...")
+        print(f"Configuration: {neurons} neurons, {steps} steps")
+        
+        # Create configuration
+        config = pynlm.createDefaultConfig()
+        config.set("brain.neuron_count", neurons)
+        config.set("brain.region_count", 1)
+        config.set("brain.connection_probability", 0.1)
+        
+        # Create brain
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Enable learning subsystems
+        # Note: This is a simplified version - full integration would require
+        # proper agent and world setup
+        
+        # Run simulation
+        for step in range(steps):
+            brain.step(step, step * 0.001)
+            
+            if step % 100 == 0:
+                print(f"  Step {step}: "
+                      f"{brain.getFiringNeuronCount()} firing, "
+                      f"{brain.getAverageFiringRate():.2f} Hz")
+        
+        print("\nExperiment Results:")
+        print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+        print(f"  Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+        print(f"  E/I ratio: {brain.getExcitationInhibitionRatio():.2f}")
+
+def main():
+    """Main CLI entry point."""
+    cli = NLMCLI()
+    
+    parser = argparse.ArgumentParser(
+        description="NLM (Neural Learning Machine) Command Line Interface",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  nlm-cli create --neurons 500 --regions 2
+  nlm-cli run --steps 1000 --world
+  nlm-cli save brain_state.bin
+  nlm-cli load brain_state.bin
+  nlm-cli list-configs
+  nlm-cli run-experiment --neurons 1000 --steps 5000
+        """
+    )
+    
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Create command
+    create_parser = subparsers.add_parser("create", help="Create a new brain")
+    create_parser.add_argument("--neurons", type=int, default=1000,
+                               help="Number of neurons (default: 1000)")
+    create_parser.add_argument("--regions", type=int, default=1,
+                               help="Number of regions (default: 1)")
+    create_parser.add_argument("--connection-prob", type=float, default=0.1,
+                               help="Connection probability (default: 0.1)")
+    create_parser.add_argument("--config", dest="config_file",
+                               help="Configuration file (JSON format)")
+    
+    # Run command
+    run_parser = subparsers.add_parser("run", help="Run brain simulation")
+    run_parser.add_argument("--steps", type=int, default=1000,
+                           help="Number of simulation steps (default: 1000)")
+    run_parser.add_argument("--timestep", type=float, default=0.001,
+                           help="Simulation timestep (default: 0.001)")
+    run_parser.add_argument("--world", action="store_true",
+                           help="Enable world interaction (advanced)")
+    
+    # Save command
+    save_parser = subparsers.add_parser("save", help="Save brain state")
+    save_parser.add_argument("filepath", help="Output file path")
+    
+    # Load command
+    load_parser = subparsers.add_parser("load", help="Load brain state")
+    load_parser.add_argument("filepath", help="Input file path")
+    load_parser.add_argument("--no-reset", action="store_true",
+                           help="Don't reset brain before loading")
+    
+    # List configs command
+    subparsers.add_parser("list-configs", help="List available configuration options")
+    
+    # Run experiment command
+    exp_parser = subparsers.add_parser("run-experiment", help="Run complete experiment")
+    exp_parser.add_argument("--neurons", type=int, default=1000,
+                           help="Number of neurons (default: 1000)")
+    exp_parser.add_argument("--steps", type=int, default=1000,
+                           help="Number of steps (default: 1000)")
+    exp_parser.add_argument("--checkpoint", action="store_true",
+                           help="Enable checkpointing")
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Execute commands
+    if args.command == "create":
+        cli.create_brain(args.neurons, args.regions, args.connection_prob, args.config_file)
+    elif args.command == "run":
+        cli.run_simulation(args.steps, args.timestep, args.world)
+    elif args.command == "save":
+        cli.save_brain(args.filepath)
+    elif args.command == "load":
+        cli.load_brain(args.filepath, not args.no_reset)
+    elif args.command == "list-configs":
+        cli.list_configs()
+    elif args.command == "run-experiment":
+        cli.run_experiment(args.neurons, args.steps, args.checkpoint)
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
