@@ -1,10 +1,24 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
-# C++20 standard
-set(CMAKE_CXX_STANDARD 20)
+# C++23 standard (using latest stable features)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Modern C++ flags
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(
+        -Wall -Wextra -Wpedantic -Werror
+        -Wshadow -Wnon-virtual-dtor -Wold-style-cast
+        -Wcast-align -Wunused -Woverloaded-virtual
+        -Wconversion -Wsign-conversion -Wnull-dereference
+        -Wimplicit-fallthrough -Wduplicated-cond -Wduplicated-branches
+        -Wlogical-op -Wmisleading-indentation -Wcovered-switch-default
+        -Wdeprecated-declarations -Wimplicit-const-init
+        -Wduplicate-decl-specifier -Wformat=2
+    )
+endif()
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -133,6 +147,32 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
+# Phase 3 experiments
+add_library(nlm_phase3 STATIC
+    src/experiments/Phase3Experiment.cpp
+)
+target_include_directories(nlm_phase3 PUBLIC src)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 4 experiments
+add_library(nlm_phase4 STATIC
+    src/experiments/Phase4Experiment.cpp
+)
+target_include_directories(nlm_phase4 PUBLIC src)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Enhanced main executable (new Phase 7)
+add_executable(nlm_enhanced
+    src/main_enhanced.cpp
+)
+target_link_libraries(nlm_enhanced PUBLIC nlm_core)
+
+# Phase 3 demo executable
+add_executable(nlm_phase3_demo
+    src/experiments/Phase3Demo.cpp
+)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
@@ -144,7 +184,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_enhanced
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
