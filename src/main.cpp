@@ -324,8 +324,6 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
     // Initialize logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
@@ -409,20 +407,11 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run experiments using improved modular test functions
+    if (!runAllTests(brain, config)) {
+        NLM_LOG_ERROR("Tests failed!");
+        return 1;
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -446,4 +435,32 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// Main test orchestration function
+bool runAllTests(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config) {
+    bool allPassed = true;
+    
+    NLM_LOG_INFO("=== Running Phase 2 Neural Computation Tests ===");
+    
+    // Run Test 1: Basic connectivity
+    NLM_LOG_INFO("\n--- Test 1: Basic Neural Connectivity ---");
+    runBasicConnectivityTest(brain);
+    
+    // Reset brain for plasticity experiment
+    brain->reset();
+    brain->initialize();
+    
+    // Run Test 2: Plasticity learning experiment
+    NLM_LOG_INFO("\n--- Test 2: Plasticity Learning Experiment ---");
+    runPlasticityExperiment(brain);
+    
+    // Reset and run Test 3: STDP verification
+    brain->reset();
+    brain->initialize();
+    
+    NLM_LOG_INFO("\n--- Test 3: STDP Verification ---");
+    runStdpVerification(brain);
+    
+    return allPassed;
 }
