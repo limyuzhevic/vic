@@ -34,7 +34,14 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // Add timestamp
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    std::tm tm_buf;
+    std::tm* tm_time = std::localtime(&time);
+    if (tm_time == nullptr) {
+        // Failed to get local time, use placeholder
+        oss << "[unknown-time]";
+    } else {
+        oss << std::put_time(tm_time, "%Y-%m-%d %H:%M:%S");
+    }
     
     oss << " " << entry.message;
     

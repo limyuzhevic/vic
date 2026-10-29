@@ -37,13 +37,35 @@ void printSection(const std::string& title) {
 }
 
 int main(int argc, char* argv[]) {
+    // Handle help and version flags before any other processing
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i] == nullptr) continue;
+        std::string arg(argv[i]);
+        if (arg == "--help") {
+            printHelp(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        }
+    }
+    
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
     
-    // Parse command line arguments
+    // Parse and validate command line arguments with bounds checking
     size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+    if (argc > 1 && argv[1] != nullptr) {
+        try {
+            int trials = std::stoi(argv[1]);
+            if (trials > 0 && trials <= 1000000) {
+                numTrials = static_cast<size_t>(trials);
+            } else {
+                std::cerr << "Warning: numTrials must be between 1 and 1000000, using default (50)\n";
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Warning: Invalid numTrials value: " << e.what() << ", using default (50)\n";
+        }
     }
     
     // Create configuration
@@ -222,4 +244,24 @@ int main(int argc, char* argv[]) {
     std::cout << std::string(60, '=') << "\n";
     
     return 0;
+}
+
+void printHelp(const std::string& programName) {
+    std::cout << "NLM Phase 4: Emerging Cognition" << std::endl;
+    std::cout << "================================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [numTrials]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Arguments:" << std::endl;
+    std::cout << "  numTrials      Number of trials to run (default: 50)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Phase 4 demonstrates the emergence of advanced cognitive capabilities" << std::endl;
+    std::cout << "through neural learning, including prediction, working memory, episodic" << std::endl;
+    std::cout << "memory, concept formation, attention, planning, and self-modeling." << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 4 - Emerging Cognition" << std::endl;
+    std::cout << "Version: 1.0.0" << std::endl;
+    std::cout << "Built: " << __DATE__ << " at " << __TIME__ << std::endl;
 }

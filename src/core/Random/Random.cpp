@@ -1,5 +1,6 @@
 #include "Random.hpp"
 #include <stdexcept>
+#include <limits>
 
 namespace nlm {
 
@@ -40,10 +41,13 @@ uint64_t RandomGenerator::getSeed() const {
 
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
     if (min > max) {
-        throw std::invalid_argument("min must be <= max");
+        throw std::invalid_argument("min must be <= max (got min=" + std::to_string(min) + ", max=" + std::to_string(max) + ")");
     }
     if (min == max) {
         return min;
+    }
+    if (min > std::numeric_limits<uint32_t>::max() - (max - min)) {
+        throw std::invalid_argument("Range too large for uniformInt (potential overflow)");
     }
     std::uniform_int_distribution<uint32_t> dist(min, max);
     return dist(pImpl->gen);
@@ -51,10 +55,13 @@ uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
 
 uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
     if (min > max) {
-        throw std::invalid_argument("min must be <= max");
+        throw std::invalid_argument("min must be <= max (got min=" + std::to_string(min) + ", max=" + std::to_string(max) + ")");
     }
     if (min == max) {
         return min;
+    }
+    if (min > std::numeric_limits<uint64_t>::max() - (max - min)) {
+        throw std::invalid_argument("Range too large for uniformInt (potential overflow)");
     }
     std::uniform_int_distribution<uint64_t> dist(min, max);
     return dist(pImpl->gen);
@@ -62,7 +69,7 @@ uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
 
 double RandomGenerator::uniformReal(double min, double max) {
     if (min >= max) {
-        throw std::invalid_argument("min must be < max");
+        throw std::invalid_argument("min must be < max (got min=" + std::to_string(min) + ", max=" + std::to_string(max) + ")");
     }
     std::uniform_real_distribution<double> dist(min, max);
     return dist(pImpl->gen);
@@ -70,7 +77,7 @@ double RandomGenerator::uniformReal(double min, double max) {
 
 float RandomGenerator::uniformReal(float min, float max) {
     if (min >= max) {
-        throw std::invalid_argument("min must be < max");
+        throw std::invalid_argument("min must be < max (got min=" + std::to_string(min) + ", max=" + std::to_string(max) + ")");
     }
     std::uniform_real_distribution<float> dist(min, max);
     return dist(pImpl->gen);
@@ -112,6 +119,9 @@ uint32_t RandomGenerator::randomBit() {
 uint64_t RandomGenerator::pickRandomIndex(uint64_t n) {
     if (n == 0) {
         throw std::invalid_argument("Cannot pick from zero items");
+    }
+    if (n > std::numeric_limits<uint64_t>::max() / 2) {
+        throw std::invalid_argument("Cannot generate random index for large range (potential overflow)");
     }
     return uniformInt(0, n - 1);
 }

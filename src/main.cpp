@@ -48,6 +48,32 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printHelp(const std::string& programName) {
+    std::cout << "NLM Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "=================================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config=FILE        Load configuration from FILE (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --help               Print this help message and exit" << std::endl;
+    std::cout << "  --version            Print version information and exit" << std::endl;
+    std::cout << std::endl;
+    std::cout << "The program runs three neural network tests:" << std::endl;
+    std::cout << "  1. Basic connectivity test" << std::endl;
+    std::cout << "  2. Plasticity learning experiment" << std::endl;
+    std::cout << "  3. STDP verification" << std::endl;
+    std::cout << std::endl;
+    std::cout << "For more information, visit: https://github.com/your-org/nlm" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 2 - Neural Learning Machine" << std::endl;
+    std::cout << "Version: 2.0.0" << std::endl;
+    std::cout << "Built: " << __DATE__ << " at " << __TIME__ << std::endl;
+    std::cout << "Author: NLM Development Team" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -75,7 +101,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
         if (!initialWeights.empty()) {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
+            float mean = sum / static_cast<float>(initialWeights.size());
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
         }
     }
@@ -96,7 +122,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
         if (!finalWeights.empty()) {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
+            float mean = sum / static_cast<float>(finalWeights.size());
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
         }
     }
@@ -114,8 +140,8 @@ struct LearningExperiment {
         // Compute weight changes
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
+        float initialMean = initialSum / static_cast<float>(initialWeights.size());
+        float finalMean = finalSum / static_cast<float>(finalWeights.size());
         
         NLM_LOG_INFO("Weight Statistics:");
         NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
@@ -322,6 +348,19 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Handle help and version flags before any other processing
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i] == nullptr) continue;
+        std::string arg(argv[i]);
+        if (arg == "--help") {
+            printHelp(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -345,22 +384,42 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configFileProvided = false;
+    
+    // Validate argv before accessing
+    if (argv == nullptr) {
+        NLM_LOG_ERROR("Invalid command line arguments");
+        return 1;
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        if (argv[i] == nullptr) {
+            NLM_LOG_WARNING("Skipping null command line argument at position " + std::to_string(i));
+            continue;
+        }
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
+                configFileProvided = true;
+            } else if (i + 1 < argc && argv[i + 1] != nullptr) {
                 configFile = argv[++i];
+                configFileProvided = true;
+            } else {
+                NLM_LOG_WARNING("Missing config file value after --config flag");
             }
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file (with error reporting)
+    NLM_LOG_INFO("Attempting to load configuration from: " + configFile);
     if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        NLM_LOG_INFO("Successfully loaded configuration from: " + configFile);
+    } else if (configFileProvided) {
+        NLM_LOG_ERROR("Failed to load configuration from: " + configFile + " - file not found or invalid");
+        return 1;
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration (no config file provided).");
     }
     
     // Override with command line args

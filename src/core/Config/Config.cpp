@@ -56,7 +56,16 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Validate input parameters
+    if (argv == nullptr) {
+        return false;
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        if (argv[i] == nullptr) {
+            // Skip null arguments but log warning if logging is available
+            continue;
+        }
         std::string arg(argv[i]);
         
         // Handle --key=value format
@@ -65,14 +74,27 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                // Validate key and value are not empty
+                if (!key.empty()) {
+                    set(key, value, ConfigSource::CommandLine);
+                } else {
+                    // Invalid argument, skip
+                    continue;
+                }
+            } else {
+                // Malformed --key=value argument, skip
+                continue;
             }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        } else if (arg[0] == '-' && i + 1 < argc && argv[i + 1] != nullptr) {
+            // Handle -key value format
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            if (!key.empty() && !value.empty()) {
+                set(key, value, ConfigSource::CommandLine);
+            } else {
+                // Invalid key or value, skip this argument
+                continue;
+            }
         }
     }
     return true;

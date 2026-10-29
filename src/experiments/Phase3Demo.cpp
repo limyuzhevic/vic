@@ -240,19 +240,85 @@ private:
     }
 };
 
-} // namespace nlm
+void printHelp(const std::string& programName) {
+    std::cout << "NLM Phase 3: World Interaction Demo" << std::endl;
+    std::cout << "=================================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [numEpisodes] [stepsPerEpisode]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Arguments:" << std::endl;
+    std::cout << "  numEpisodes    Number of episodes to run (default: 5)" << std::endl;
+    std::cout << "  stepsPerEpisode Number of steps per episode (default: 200)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "The demo simulates an agent receiving sensory input from a world," << std::endl;
+    std::cout << "making decisions based on neural processing, and learning through" << std::endl;
+    std::cout << "experience via synaptic plasticity." << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Phase 3 - World Interaction Demo" << std::endl;
+    std::cout << "Version: 1.0.0" << std::endl;
+    std::cout << "Built: " << __DATE__ << " at " << __TIME__ << std::endl;
+}
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
+    // Handle help and version flags
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i] == nullptr) continue;
+        std::string arg(argv[i]);
+        if (arg == "--help") {
+            printHelp(argv[0]);
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        }
+    }
+    
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+    // Parse and validate command line arguments
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i] == nullptr) continue;
+        std::string arg(argv[i]);
+        
+        // Skip flags we've already handled
+        if (arg == "--help" || arg == "--version") {
+            continue;
+        }
+        
+        if (i < argc - 1 && argv[i + 1] != nullptr) {
+            try {
+                int value = std::atoi(argv[i + 1]);
+                if (i == 1 && numEpisodes == 5) {  // First positional arg
+                    if (value > 0 && value <= 1000) {
+                        numEpisodes = value;
+                    } else {
+                        std::cerr << "Warning: numEpisodes must be between 1 and 1000, using default (5)\n";
+                    }
+                } else if (i == 2 && stepsPerEpisode == 200) {  // Second positional arg
+                    if (value > 0 && value <= 10000) {
+                        stepsPerEpisode = value;
+                    } else {
+                        std::cerr << "Warning: stepsPerEpisode must be between 1 and 10000, using default (200)\n";
+                    }
+                } else {
+                    std::cerr << "Warning: Unexpected argument " << arg << std::endl;
+                }
+                i++; // Skip next argument since we consumed it
+            } catch (...) {
+                std::cerr << "Warning: Invalid argument " << arg << std::endl;
+            }
+        } else {
+            std::cerr << "Warning: Invalid argument " << arg << std::endl;
+        }
     }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
-    }
+    
+    // Ensure valid ranges
+    if (numEpisodes <= 0) numEpisodes = 5;
+    if (stepsPerEpisode <= 0) stepsPerEpisode = 200;
     
     nlm::Phase3Demo demo;
     demo.run(numEpisodes, stepsPerEpisode);
