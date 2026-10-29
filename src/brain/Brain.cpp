@@ -243,7 +243,13 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    if (pImpl->predictionSystem) {
+        if (!pImpl->predictionSystem->initialize(*pImpl->config)) {
+            NLM_LOG_WARNING("Prediction system initialization failed - predictions will not work");
+        }
+        // Enable prediction system
+        pImpl->predictionSystem->enable(true);
+    }
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -510,9 +516,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->predictionSystem->isEnabled()) {
+        // Get sensory observation for prediction
+        SensoryInput sensoryObs;
+        // Create sensory observation from current brain state
+        // For now, use a simple implementation that can be expanded
+        size_t featureSize = 64;
+        std::vector<float> sensoryData(featureSize, 0.0f);
+        
+        // Extract features from active neurons
+        size_t neuronIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuronIdx < featureSize) {
+                        // Use neuron activation as feature
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                        sensoryData[neuronIdx] = activation;
+                        neuronIdx++;
+                    }
+                }
+            }
+        }
+        
+        sensoryObs.setData(sensoryData);
+        
+        // Make prediction for next state
+        auto predictedObs = pImpl->predictionSystem->predictNextState(sensoryObs);
+        
+        // Update predictions with actual observation (will be called later with real sensory input)
+        // For now, we track prediction error history
+        
+        // Update prediction system with error metrics
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float predictionConfidence = pImpl->predictionSystem->getConfidence();
+        
+        // Apply prediction error to neuromodulation if available
+        if (pImpl->predictionError) {
+            // Apply prediction error to learning signals
+            pImpl->predictionError->setPredictionError(predictionError);
+        }
+        
+        // Log prediction status
+        if (predictionError > 0.0f) {
+            NLM_LOG_DEBUG("Prediction System - Error: " + std::to_string(predictionError) + 
+                         ", Confidence: " + std::to_string(predictionConfidence));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========

@@ -58,11 +58,21 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from JSON string
+    bool loadFromJson(const std::string& jsonString);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Load from simple key=value format
+    bool loadFromSimpleFormat(const std::string& content);
+    
+    // Validate configuration
+    bool validate() const;
+    
+    // Get configuration parameter with type safety
+    template<typename T>
+    bool getRequired(const std::string& key, T& outValue) const;
+    
+    // Check if configuration value is valid
+    bool isValidType(const std::string& key, const std::string& expectedType) const;
     
     // Get values
     template<typename T>
@@ -77,6 +87,16 @@ public:
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Check existence
+    bool has(const std::string& key) const;
+    
+    // Remove key
+    void remove(const std::string& key);
+    
+    
+    // Convert ConfigValue to string for logging
+    static std::string toString(const ConfigValue& value);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -100,6 +120,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string toString(const ConfigValue& value);
 };
 
 } // namespace nlm
