@@ -97,6 +97,9 @@ public:
     // Produce motor/action output based on motor neuron activity
     std::unique_ptr<class Action> produceAction();
     
+    // Get current neural state for planning
+    std::vector<float> getCurrentStateForPlanning() const;
+    
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
     
