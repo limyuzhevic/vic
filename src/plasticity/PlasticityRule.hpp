@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_PLASTICITYRULE_HPP
+#define NLM_PLASTICITYRULE_HPP
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Synapse.hpp"
@@ -6,7 +7,7 @@
 namespace nlm {
 
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// TODO: Phase 2 will implement real plasticity rules
 
 class PlasticityRule {
 public:
@@ -37,7 +38,7 @@ private:
 };
 
 // Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
+// TODO: Phase 2 will implement real Hebbian learning
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();
@@ -60,7 +61,7 @@ private:
 };
 
 // Anti-Hebbian rule: decrease weight when neurons fire together
-// PLACEHOLDER - Phase 2
+// TODO: Phase 2 implementation
 class AntiHebbianRule : public PlasticityRule {
 public:
     void update(Synapse* synapse,
@@ -72,7 +73,7 @@ public:
 };
 
 // Bienenstock-Cooper-Munro (BCM) rule
-// PLACEHOLDER - Phase 2
+// TODO: Phase 2 implementation
 class BCMRule : public PlasticityRule {
 public:
     void update(Synapse* synapse,
@@ -82,5 +83,7 @@ public:
     void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
     const char* getName() const override { return "BCM"; }
 };
+
+#endif // NLM_PLASTICITYRULE_HPP
 
 } // namespace nlm

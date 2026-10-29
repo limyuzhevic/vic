@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_SYNAPSE_HPP
+#define NLM_SYNAPSE_HPP
 
 #include "../core/Types/Types.hpp"
 
@@ -70,7 +71,6 @@ public:
     float getEfficacy() const;
     void setEfficacy(float efficacy);
     
-    // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
     void step(Timestamp currentTime);
     
@@ -84,5 +84,7 @@ private:
     struct Impl;
     Impl* pImpl;
 };
+
+#endif // NLM_SYNAPSE_HPP
 
 } // namespace nlm

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_CONFIG_HPP
+#define NLM_CONFIG_HPP
 
 #include <string>
 #include <memory>
@@ -93,13 +94,16 @@ public:
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    std::string valueToString(const ConfigValue& value) const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
+
+#endif // NLM_CONFIG_HPP
 
 } // namespace nlm

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NLM_NEURON_HPP
+#define NLM_NEURON_HPP
 
 #include "../core/Types/Types.hpp"
 #include <vector>
@@ -133,7 +134,6 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
@@ -147,5 +147,7 @@ private:
     struct Impl;
     Impl* pImpl;
 };
+
+#endif // NLM_NEURON_HPP
 
 } // namespace nlm
