@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "Validation/ConfigurationValidator.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -8,9 +9,13 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    ConfigurationValidator validator;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize validator with default rules
+    pImpl->validator = ConfigurationValidator();
+}
 
 Config::~Config() = default;
 
@@ -28,6 +33,8 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    std::map<std::string, ConfigValue> tempConfig;
+    
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
@@ -48,14 +55,27 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Convert string value to appropriate type
             set(key, value, ConfigSource::File);
+            tempConfig[key] = getConfigValueFromString(value);
         }
+    }
+    
+    // Validate configuration
+    try {
+        pImpl->validator.validate(tempConfig);
+    } catch (const ValidationError& e) {
+        // Log validation error but don't fail the operation
+        // In a real implementation, this would be logged properly
+        std::cerr << "Configuration validation warning: " << e.what() << std::endl;
     }
     
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    std::map<std::string, ConfigValue> tempConfig;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -66,6 +86,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+                tempConfig[key] = getConfigValueFromString(value);
             }
         }
         // Handle -key value format
@@ -73,8 +94,18 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+            tempConfig[key] = getConfigValueFromString(value);
         }
     }
+    
+    // Validate configuration
+    try {
+        pImpl->validator.validate(tempConfig);
+    } catch (const ValidationError& e) {
+        // Log validation error but don't fail the operation
+        std::cerr << "Configuration validation warning: " << e.what() << std::endl;
+    }
+    
     return true;
 }
 
@@ -86,10 +117,55 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = [";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "]\n";
     }
     
     return true;
+}
+
+ConfigValue Config::getConfigValueFromString(const std::string& str) const {
+    // Simple type detection based on content
+    // In a real implementation, this would be more sophisticated
+    
+    if (str.empty()) return std::string();
+    
+    // Try boolean
+    if (str == "true" || str == "false") {
+        return str == "true";
+    }
+    
+    // Try integer
+    try {
+        size_t pos;
+        int intVal = std::stoi(str, &pos);
+        if (pos == str.size()) return intVal;
+    } catch (...) {}
+    
+    // Try double
+    try {
+        size_t pos;
+        double doubleVal = std::stod(str, &pos);
+        if (pos == str.size()) return doubleVal;
+    } catch (...) {}
+    
+    // Try int64_t
+    try {
+        size_t pos;
+        int64_t int64Val = std::stoll(str, &pos);
+        if (pos == str.size()) return int64Val;
+    } catch (...) {}
+    
+    // Default to string
+    return str;
 }
 
 template<typename T>
@@ -115,6 +191,18 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate before setting
+    std::map<std::string, ConfigValue> tempConfig;
+    tempConfig[key] = value;
+    
+    try {
+        pImpl->validator.validate(tempConfig);
+    } catch (const ValidationError& e) {
+        // In a real implementation, this would provide detailed error messages
+        throw ValidationError("Invalid configuration value for key '" + key + 
+                            "': " + e.what(), ValidationErrorType::ValidationFailed);
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     

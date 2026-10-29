@@ -139,13 +139,32 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Validation module
+add_library(nlm_validation STATIC
+    src/core/Validation/ConfigurationValidator.cpp
+)
+target_include_directories(nlm_validation PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core/Validation>
+    $<INSTALL_INTERFACE:include/core/Validation>
+)
+
+# Link validation to core
+add_dependencies(nlm_core nlm_validation)
+target_link_libraries(nlm_core PUBLIC nlm_validation)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo nlm_validation
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Install validation headers
+install(DIRECTORY src/core/Validation/
+    DESTINATION include/core/Validation
+    FILES_MATCHING PATTERN "*.hpp"
 )
