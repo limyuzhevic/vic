@@ -124,6 +124,9 @@ public:
     // Replay multiple episodes (for sleep-like consolidation)
     void replaySequence(const std::vector<size_t>& episodeIds);
 
+// Store self-model in episodic memory
+    void storeSelfModel(const EpisodicMemoryItem& selfModelEpisode);
+
 private:
     // Compute similarity between query and stored episode
     float computeSimilarity(const std::vector<float>& query,

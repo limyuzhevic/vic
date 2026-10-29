@@ -574,4 +574,17 @@ float NeuralAssociativeMemory::computeSimilarity(const std::vector<float>& a,
     return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
+// Store self-model in episodic memory
+void NeuralEpisodicMemory::storeSelfModel(const EpisodicMemoryItem& selfModelEpisode) {
+    // Store as a special type of episode
+    storeEpisode(selfModelEpisode);
+    
+    // Mark as self-model episode for special retrieval
+    if (!episodes_.empty()) {
+        // The last stored episode is our self-model
+        // Could add a flag or separate field for this
+        NLM_LOG_INFO("Self-model stored in episodic memory");
+    }
+}
+
 } // namespace nlm

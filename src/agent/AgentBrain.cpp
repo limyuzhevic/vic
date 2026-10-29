@@ -103,6 +103,18 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         if (sensoryTouch_[i]) {
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
+            
+            // Detect potential social interaction (collision with another agent)
+            if (current > 10.0f) {
+                // This could be social learning - another agent is nearby
+                if (brain_ && brain_->getConceptFormation()) {
+                    // Social learning - observe and learn from other agent's behavior
+                    // Note: currentTime would need to be tracked in AgentBrain
+                    // For now, use a placeholder
+                    float currentTime = developmentalAge_;
+                    brain_->getConceptFormation()->observeSocialBehavior(current, currentTime);
+                }
+            }
         }
     }
     
@@ -154,9 +166,14 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     
     MotorCommand decoded = decodeFromMotorNeurons();
     
-    // Apply curiosity-based exploration
+    // Apply curiosity-based exploration (existing)
     if (curiosityEnabled_ && curiosityLevel_ > 0.3f) {
         decoded = selectWithCuriosity(decoded);
+    }
+    
+    // NEW: Apply prediction-based action selection
+    if (brain_ && brain_->getPredictionSystem()) {
+        decoded = selectWithPrediction(decoded);
     }
     
     return decoded;
@@ -229,6 +246,35 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
                 case 6: return MotorCommand::Interact;
                 default: return MotorCommand::Wait;
             }
+        }
+    }
+    
+    return defaultCmd;
+}
+
+MotorCommand AgentBrain::selectWithPrediction(MotorCommand defaultCmd) {
+    // Apply prediction-based action selection
+    // Get prediction from brain system
+    if (brain_ && brain_->getPredictionSystem()) {
+        // Get current prediction
+        float prediction = brain_->getPredictionSystem()->getCurrentPrediction();
+        float predictionConfidence = brain_->getPredictionSystem()->getPredictionConfidence();
+        
+        // High confidence predictions should lead to more deterministic actions
+        if (predictionConfidence > 0.8f) {
+            // Choose action that matches prediction if possible
+            if (prediction < 0.3f) {
+                // Low expected reward - exploratory action
+                return selectWithCuriosity(defaultCmd);
+            } else if (prediction > 0.7f) {
+                // High expected reward - deterministic action
+                return defaultCmd;
+            }
+        }
+        
+        // Medium confidence - balanced exploration/exploitation
+        if (curiosityLevel_ > 0.5f) {
+            return selectWithCuriosity(defaultCmd);
         }
     }
     
