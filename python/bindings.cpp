@@ -400,26 +400,237 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+    // Add logging configuration to Python bindings
+    m.def("configureLogger", &Logger::getGlobal().setLevel, py::arg("level"),
+          "Configure the global logger level");
+    
+    m.def("getLoggerLevel", []() {
+        return Logger::getGlobal().getLevel();
+    }, "Get the current global logger level");
+    
+    // Add configuration utilities
+    m.def("createConfig", []() {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+    }, "Create a new configuration object");
+    
+    // Add utility functions for experiment configuration
+    m.def("createPhase6Config", []() {
+        Phase6Config config;
+        config.neuronCount = 500;
+        config.maxSteps = 2000;
+        config.enableCheckpointing = true;
+        config.enableReplay = true;
+        config.enableDevelopment = true;
+        return config;
+    }, "Create a default Phase 6 configuration");
+    
+    // Add more comprehensive world creation
+    m.def("createWorld", []() {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    }, "Create a new world");
+    
+    // Add world configuration helper
+    m.def("configureWorld", [](std::shared_ptr<SimpleWorld> world, int width, int height) {
+        world->configure(width, height, 16, 16);
+        return world;
+    }, py::arg("world"), py::arg("width"), py::arg("height"),
+       "Configure a world with dimensions");
+    
+    // Add sensory input creation helpers
+    m.def("createVisionInput", [](size_t width, size_t height, size_t channels) {
+        return std::make_shared<Vision>(width, height, channels);
+    }, py::arg("width"), py::arg("height"), py::arg("channels") = 3,
+       "Create a vision sensory input");
+    
+    m.def("createAudioInput", [](size_t sampleRate, size_t numSamples) {
+        return std::make_shared<Audio>(sampleRate, numSamples);
+    }, py::arg("sampleRate"), py::arg("numSamples"),
+       "Create an audio sensory input");
+    
+    // Add agent configuration helpers
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    }, py::arg("brain"), "Create an agent brain interface");
+    
+    // Add convenience methods for agent configuration
+    m.def("configureAgentForWorld", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world) {
+        agent->initialize(*world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        agent->enableStructuralPlasticity(true);
+        return agent;
+    }, py::arg("agent"), py::arg("world"),
+       "Configure an agent brain for world interaction");
+    
+    // Add simulation helper functions
+    m.def("runSimulationStep", [](std::shared_ptr<Brain> brain, uint64_t step, double time) {
+        brain->step(step, time);
+        return brain;
+    }, py::arg("brain"), py::arg("step"), py::arg("time"),
+       "Perform a simulation step");
+    
+    // Add metrics collection
+    m.def("getBrainMetrics", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> metrics;
+        metrics["firingRate"] = brain->getAverageFiringRate();
+        metrics["excitationInhibitionRatio"] = brain->getExcitationInhibitionRatio();
+        metrics["totalSpikes"] = static_cast<double>(brain->getTotalSpikeCount());
+        metrics["activeNeurons"] = static_cast<double>(brain->getActiveNeuronCount());
+        metrics["firingNeurons"] = static_cast<double>(brain->getFiringNeuronCount());
+        return metrics;
+    }, py::arg("brain"), "Get brain performance metrics");
+    
+    // Add simulation experiment helpers
+    m.def("runPhase6Experiment", [](Phase6Config config) {
+        Phase6IntegratedExperiment experiment;
+        return experiment.run(config);
+    }, py::arg("config"), "Run a Phase 6 integration experiment");
+    
+    // Add utility functions for creating common configurations
+    m.def("createDefaultPhase6Config", []() {
+        Phase6Config config;
+        config.neuronCount = 1000;
+        config.maxSteps = 5000;
+        config.enableCheckpointing = true;
+        config.enableReplay = true;
+        config.enableDevelopment = true;
+        return config;
+    }, "Create a default Phase 6 configuration with default parameters");
+    
+    // Add serialization helpers
+    m.def("saveBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to file");
+    
+    m.def("loadBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->load(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Load brain state from file");
+    
+    // Add development system helpers
+    m.def("getDevelopmentalStageName", [](DevelopmentalStage stage) {
+        switch (stage) {
+            case DevelopmentalStage::Initial: return "Initial";
+            case DevelopmentalStage::CriticalPeriod: return "CriticalPeriod";
+            case DevelopmentalStage::Maturation: return "Maturation";
+            case DevelopmentalStage::Adult: return "Adult";
+            case DevelopmentalStage::Aging: return "Aging";
+            default: return "Unknown";
+        }
+    }, py::arg("stage"), "Get string representation of developmental stage");
+    
+    // Add neuromodulation level helpers
+    m.def("getNeuromodulationSummary", [](std::shared_ptr<AgentBrain> agent) {
+        std::map<std::string, double> levels;
+        levels["dopamine"] = agent->getNeuromodulationLevel();
+        levels["curiosity"] = agent->getCuriosityLevel();
+        levels["novelty"] = agent->getNoveltyLevel();
+        levels["predictionError"] = agent->getPredictionError();
+        return levels;
+    }, py::arg("agent"), "Get current neuromodulation levels");
+    
+    // Add action utilities
+    m.def("createAction", [](ActionType type, std::vector<float> parameters) {
+        auto action = std::make_shared<Action>(type);
+        action->setParameters(parameters);
+        return action;
+    }, py::arg("type"), py::arg("parameters"), "Create an action with parameters");
+    
+    m.def("getActionName", &Action::getName, py::arg("action"), "Get action name");
+    
+    // Add world object utilities
+    m.def("createWorldObject", [](WorldObjectType type, float x, float y, float radius, float value) {
+        return std::make_shared<WorldObject>(x, y, type, value, radius);
+    }, py::arg("type"), py::arg("x"), py::arg("y"), py::arg("radius") = 0.5f, py::arg("value") = 0.0f,
+       "Create a world object");
+    
+    m.def("addObjectToWorld", [](std::shared_ptr<SimpleWorld> world, std::shared_ptr<WorldObject> obj) {
+        world->addObject(*obj);
+        return world;
+    }, py::arg("world"), py::arg("obj"), "Add an object to the world");
+    
+    // Add simulation control
+    m.def("setWorldRandomSeed", &SimpleWorld::setRandomSeed, py::arg("world"), py::arg("seed"),
+          "Set random seed for world simulation");
+    
+    // Add metrics collection for experiments
+    m.def("formatPhase6Result", [](const Phase6IntegrationResult& result) {
+        std::ostringstream oss;
+        oss << "=== Phase 6 Integration Results ===\n";
+        oss << "Total Reward: " << result.totalReward << "\n";
+        oss << "Avg Firing Rate: " << result.avgFiringRate << "\n";
+        oss << "Episodes Stored: " << result.memoryEpisodesStored << "\n";
+        oss << "Dopamine Level: " << result.dopamineLevel << "\n";
+        oss << "Working Memory Integrated: " << (result.memoryWorkingMemoryIntegrated ? "YES" : "NO") << "\n";
+        oss << "Episodic Memory Integrated: " << (result.memoryEpisodicMemoryIntegrated ? "YES" : "NO") << "\n";
+        oss << "Neuromodulation Integrated: " << (result.neuromodulationIntegrated ? "YES" : "NO") << "\n";
+        oss << "Prediction Integrated: " << (result.predictionIntegrated ? "YES" : "NO") << "\n";
+        oss << "Development Integrated: " << (result.developmentIntegrated ? "YES" : "NO") << "\n";
+        oss << "Checkpointing Works: " << (result.checkpointingWorks ? "YES" : "NO") << "\n";
+        oss << "Replay Works: " << (result.replayWorks ? "YES" : "NO") << "\n";
+        oss << "Wall Clock Time: " << result.totalWallClockTime << "s\n";
+        return oss.str();
+    }, py::arg("result"), "Format Phase 6 experiment results for display");
+    
+    // Add convenience functions for common experiment setups
+    m.def("setupDefaultExperiment", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->initialize(16, 16);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(config, brain, world, agent);
+    }, "Set up a default experiment configuration");
+    
+    // Add experiment configuration templates
+    m.def("getPhase6ExperimentTemplates", []() {
+        std::vector<std::string> templates;
+        templates.push_back("default");
+        templates.push_back("large_brain");
+        templates.push_back("detailed_memory");
+        templates.push_back("minimal_resources");
+        return templates;
+    }, "Get available Phase 6 experiment configuration templates");
+    
+    m.def("getExperimentTemplateConfig", [](const std::string& name) {
+        Phase6Config config;
+        
+        if (name == "default") {
+            config.neuronCount = 500;
+            config.maxSteps = 2000;
+            config.enableCheckpointing = true;
+            config.enableReplay = true;
+            config.enableDevelopment = true;
+        } else if (name == "large_brain") {
+            config.neuronCount = 2000;
+            config.maxSteps = 5000;
+            config.enableCheckpointing = true;
+            config.enableReplay = true;
+            config.enableDevelopment = true;
+        } else if (name == "detailed_memory") {
+            config.neuronCount = 1000;
+            config.maxSteps = 10000;
+            config.enableCheckpointing = true;
+            config.enableReplay = true;
+            config.enableDevelopment = true;
+        } else if (name == "minimal_resources") {
+            config.neuronCount = 100;
+            config.maxSteps = 500;
+            config.enableCheckpointing = false;
+            config.enableReplay = false;
+            config.enableDevelopment = false;
+        }
+        
+        return config;
+    }, py::arg("name"), "Get configuration for a specific experiment template");
 
 } // namespace nlm
