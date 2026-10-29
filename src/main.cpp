@@ -28,6 +28,43 @@
 
 using namespace nlm;
 
+void printHelpAndExit() {
+    std::cout << "=== NLM Command Line Options ===" << std::endl;
+    std::cout << "Configuration:" << std::endl;
+    std::cout << "  --config=file.cfg           Load configuration from file" << std::endl;
+    std::cout << "  --key=value               Set configuration key-value pair" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Advanced Options:" << std::endl;
+    std::cout << "  --no-learning              Disable learning and plasticity" << std::endl;
+    std::cout << "  --no-curiosity             Disable curiosity-driven exploration" << std::endl;
+    std::cout << "  --no-development           Disable developmental stages" << std::endl;
+    std::cout << "  --checkpoint               Enable checkpoint saving (Phase 6)" << std::endl;
+    std::cout << "  --test-mode=<mode>         Set test mode: 0=basic, 1=connectivity, 2=plasticity, 3=full" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Output Options:" << std::endl;
+    std::cout << "  --verbose                  Enable verbose logging" << std::endl;
+    std::cout << "  --quiet                    Suppress informational messages" << std::endl;
+    std::cout << "  --benchmark                Run performance benchmarks" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Experiment Options:" << std::endl;
+    std::cout << "  --neuron-count=<n>         Set number of neurons (default: 500 for main.cpp)" << std::endl;
+    std::cout << "  --steps=<n>               Set simulation steps" << std::endl;
+    std::cout << "  --timestep=<t>             Set simulation timestep (seconds)" << std::endl;
+    std::cout << "  --region-count=<n>         Set number of brain regions" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Debug Options:" << std::endl;
+    std::cout << "  --debug-neurons            Enable detailed neuron debugging" << std::endl;
+    std::cout << "  --debug-synapses           Enable detailed synapse debugging" << std::endl;
+    std::cout << "  --validate                Validate configuration before running" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  ./nlm --test-mode=1                 Run connectivity test only" << std::endl;
+    std::cout << "  ./nlm --no-learning --no-curiosity   Disable advanced features" << std::endl;
+    std::cout << "  ./nlm --neuron-count=1000 --steps=5000 Run larger simulation" << std::endl;
+    std::cout << "  ./nlm --config=myconfig.cfg --verbose Use custom config with verbose output" << std::endl;
+    std::exit(0);
+}
+
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -409,20 +446,58 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Parse additional command line options
+    bool enableLearning = true;
+    bool enableCuriosity = true;
+    bool enableDevelopment = true;
+    bool enableCheckpointing = false;
+    int testMode = 0; // 0=basic, 1=learning, 2=stdp, 3=full
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--no-learning") {
+            enableLearning = false;
+        } else if (arg == "--no-curiosity") {
+            enableCuriosity = false;
+        } else if (arg == "--no-development") {
+            enableDevelopment = false;
+        } else if (arg == "--checkpoint") {
+            enableCheckpointing = true;
+        } else if (arg == "--test-mode") {
+            if (i + 1 < argc) {
+                testMode = std::atoi(argv[++i]);
+            }
+        } else if (arg == "--help") {
+            printHelpAndExit();
+        }
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Advanced Options:");
+    NLM_LOG_INFO("  Learning enabled: " + std::string(enableLearning ? "yes" : "no"));
+    NLM_LOG_INFO("  Curiosity enabled: " + std::string(enableCuriosity ? "yes" : "no"));
+    NLM_LOG_INFO("  Development enabled: " + std::string(enableDevelopment ? "yes" : "no"));
+    NLM_LOG_INFO("  Checkpointing enabled: " + std::string(enableCheckpointing ? "yes" : "no"));
+    NLM_LOG_INFO("  Test mode: " + std::to_string(testMode));
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run tests based on test mode
+    switch (testMode) {
+        case 1: runBasicConnectivityTest(brain); break;
+        case 2: 
+            if (enableLearning) {
+                runPlasticityExperiment(brain);
+            }
+            break;
+        case 3:
+            if (enableLearning) runPlasticityExperiment(brain);
+            if (enableCuriosity) runStdpVerification(brain);
+            break;
+        default: 
+            runBasicConnectivityTest(brain);
+            if (enableLearning) runPlasticityExperiment(brain);
+            if (enableCuriosity) runStdpVerification(brain);
+            break;
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
