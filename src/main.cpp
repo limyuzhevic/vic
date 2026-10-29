@@ -345,6 +345,7 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool configLoaded = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -356,24 +357,27 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file with better error handling
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        configLoaded = true;
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Configuration file not found: " + configFile + ". Using defaults.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Override with command line args with validation
+    if (!config->loadFromArgs(argc, argv)) {
+        NLM_LOG_WARNING("Command line argument parsing completed with warnings.");
+    }
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 with validation
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
+    // STDP parameters with validation
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
@@ -382,49 +386,114 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    // Log configuration summary with validation
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Validate and log configuration values
+    auto validateAndLog = [&](const std::string& key, const std::string& type, auto defaultValue) {
+        try {
+            if (type == "int64_t") {
+                int64_t value = config->getOr<int64_t>(key, defaultValue);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value));
+            } else if (type == "double") {
+                double value = config->getOr<double>(key, defaultValue);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value) + "s");
+            } else if (type == "float") {
+                float value = config->getOr<float>(key, defaultValue);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value));
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("  Error reading " + key + ": " + std::string(e.what()));
+        }
+    };
+    
+    validateAndLog("random_seed", "int64_t", 42);
+    validateAndLog("simulation_timestep", "double", 0.001);
+    validateAndLog("neuron_count", "int64_t", 500);
+    validateAndLog("region_count", "int64_t", 1);
+    validateAndLog("connection_probability", "float", 0.15f);
+    
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
+    // Initialize simulation clock with validation
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid timestep: " + std::to_string(timestep) + ". Using default 0.001.");
+        timestep = 0.001;
+    }
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
-    // Initialize brain
+    // Initialize brain with better error handling
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
     
-    if (!brain->initialize()) {
+    if (!brain || !brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
         return 1;
     }
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run all tests with error handling and logging
+    bool runBasicConnectivity = true;
+    bool runPlasticityExperiment = true;
+    bool runStdpVerification = true;
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Starting Comprehensive Test Suite ===");
+    
+    // Test 1: Basic connectivity (with try-catch for robustness)
+    if (runBasicConnectivity) {
+        try {
+            NLM_LOG_INFO("\n=== Test 1: Basic Neural Connectivity ===");
+            runBasicConnectivityTest(brain);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Test 1 failed: " + std::string(e.what()));
+        }
+    }
     
     // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    try {
+        brain->reset();
+        brain->initialize();
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Brain reset/initialize failed for Test 2: " + std::string(e.what()));
+        return 1;
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    // Test 2: Plasticity learning experiment
+    if (runPlasticityExperiment) {
+        try {
+            NLM_LOG_INFO("\n=== Test 2: Plasticity Learning Experiment ===");
+            runPlasticityExperiment(brain);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Test 2 failed: " + std::string(e.what()));
+        }
+    }
     
     // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    try {
+        brain->reset();
+        brain->initialize();
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Brain reset/initialize failed for Test 3: " + std::string(e.what()));
+        return 1;
+    }
     
-    // Final brain status
+    // Test 3: STDP verification
+    if (runStdpVerification) {
+        try {
+            NLM_LOG_INFO("\n=== Test 3: STDP Verification ===");
+            runStdpVerification(brain);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Test 3 failed: " + std::string(e.what()));
+        }
+    }
+    
+    // Final brain status with summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();

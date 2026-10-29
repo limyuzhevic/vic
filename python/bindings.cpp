@@ -170,7 +170,40 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        // Convenience methods for sensory input
+        .def("isEmpty", [](const SensoryInput& self) {
+            return self.getDimensions() == 0;
+        }, "Check if sensory input is empty")
+        .def("hasData", [](const SensoryInput& self) {
+            return !self.getData().empty();
+        }, "Check if sensory input contains data")
+        .def("getChannelCount", [](const SensoryInput& self) {
+            auto dims = self.getDimensions();
+            return dims >= 3 ? dims - 2 : 0;  // Simplified: assume last 2 dims are H,W
+        }, "Get number of channels (if applicable)")
+        .def("scaleInput", [](SensoryInput& self, float factor) {
+            auto data = self.getData();
+            for (auto& val : data) {
+                val = std::max(0.0f, std::min(1.0f, val * factor));
+            }
+            self.setData(data);
+        }, py::arg("factor"), "Scale all input values by a factor (0-1 range)")
+        .def("normalizeInput", [](SensoryInput& self, float min = 0.0f, float max = 1.0f) {
+            auto data = self.getData();
+            if (data.empty()) return;
+            
+            float actualMin = *std::min_element(data.begin(), data.end());
+            float actualMax = *std::max_element(data.begin(), data.end());
+            
+            if (actualMax > actualMin) {
+                for (auto& val : data) {
+                    val = min + (max - min) * (val - actualMin) / (actualMax - actualMin);
+                }
+                self.setData(data);
+            }
+        }, py::arg("min") = 0.0f, py::arg("max") = 1.0f,
+           "Normalize input data to specified range [min, max]");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -181,7 +214,34 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        // Convenience methods for Vision
+        .def("createFromArray", [](size_t width, size_t height, size_t channels, const py::array_t<float>& arr) {
+            Vision vision(width, height, channels);
+            if (arr.ndim() == 2 && arr.shape()[2] == static_cast<size_t>(channels)) {
+                auto buf = arr.mutable_unchecked<2>();
+                std::vector<float> data(buf.shape(0) * buf.shape(1));
+                for (ssize_t i = 0; i < buf.shape(0); ++i) {
+                    for (ssize_t j = 0; j < buf.shape(1); ++j) {
+                        data[i * buf.shape(1) + j] = buf(i, j);
+                    }
+                }
+                vision.setData(data);
+            }
+            return vision;
+        }, py::arg("width"), py::arg("height"), py::arg("channels"), py::arg("array"),
+             "Create Vision from numpy array")
+        .def("getAsArray", [](const Vision& self) {
+            auto data = self.getData();
+            return py::array_t<float>(data.size(), data.data());
+        }, "Get vision data as numpy array")
+        .def("applyFilter", [](Vision& self, const std::function<float(float)>& filter) {
+            auto data = self.getData();
+            for (auto& val : data) {
+                val = filter(val);
+            }
+            self.setData(data);
+        }, py::arg("filter"), "Apply filter function to all vision pixels");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -207,7 +267,54 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        // Convenience methods for Action
+        .def("createMovement", [](ActionType type, float speed) {
+            Action action(type);
+            action.setParameters({speed});
+            return action;
+        }, py::arg("type"), py::arg("speed"),
+             "Create a movement action with speed parameter")
+        .def("createInteraction", [](ActionType type, float strength) {
+            Action action(type);
+            action.setParameters({strength});
+            return action;
+        }, py::arg("type"), py::arg("strength"),
+             "Create an interaction action with strength parameter")
+        .def("isMovement", [](const Action& self) {
+            return self.getType() == ActionType::MoveForward ||
+                   self.getType() == ActionType::MoveBackward ||
+                   self.getType() == ActionType::MoveLeft ||
+                   self.getType() == ActionType::MoveRight ||
+                   self.getType() == ActionType::TurnLeft ||
+                   self.getType() == ActionType::TurnRight;
+        }, "Check if action is a movement")
+        .def("isLook", [](const Action& self) {
+            return self.getType() == ActionType::Look ||
+                   self.getType() == ActionType::LookUp ||
+                   self.getType() == ActionType::LookDown ||
+                   self.getType() == ActionType::LookLeft ||
+                   self.getType() == ActionType::LookRight;
+        }, "Check if action is a look action")
+        .def("isInteract", [](const Action& self) {
+            return self.getType() == ActionType::Interact ||
+                   self.getType() == ActionType::Eat ||
+                   self.getType() == ActionType::Drink;
+        }, "Check if action is an interaction")
+        .def("setSpeed", &Action::setParameters,
+             py::arg("speed") = 1.0f,
+             "Set movement speed (convenience for movement actions)")
+        .def("setStrength", &Action::setParameters,
+             py::arg("strength") = 1.0f,
+             "Set interaction strength (convenience for interaction actions)")
+        .def("getSpeed", [](const Action& self) {
+            const auto& params = self.getParameters();
+            return params.empty() ? 1.0f : params[0];
+        }, "Get speed parameter (convenience for movement actions)")
+        .def("getStrength", [](const Action& self) {
+            const auto& params = self.getParameters();
+            return params.empty() ? 1.0f : params[0];
+        }, "Get strength parameter (convenience for interaction actions)");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -351,7 +458,45 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Convenience methods for Brain
+        .def("runSimulation", [](Brain& self, int steps, float timestep = 0.001f) {
+            for (int i = 0; i < steps; ++i) {
+                self.step(i, i * timestep);
+            }
+        }, py::arg("steps"), py::arg("timestep") = 0.001f,
+             "Run a simple simulation for a number of steps")
+        .def("simulateInputPattern", [](Brain& self, const std::vector<float>& pattern, float intensity = 1.0f, int steps = 10) {
+            for (int i = 0; i < steps; ++i) {
+                // Create a simple sensory input from pattern
+                Vision vision(pattern.size() / 3, pattern.size() / 3, 3);
+                vision.setData(pattern);
+                self.receiveSensoryInput(vision);
+                self.step(i, i * 0.001f);
+            }
+        }, py::arg("pattern"), py::arg("intensity") = 1.0f, py::arg("steps") = 10,
+             "Simulate with a given input pattern (legacy method - use processSensoryInput for new code)")
+        .def("getNetworkStats", [](const Brain& self) {
+            py::dict stats;
+            stats["neuron_count"] = self.getTotalNeuronCount();
+            stats["synapse_count"] = self.getTotalSynapseCount();
+            stats["spike_count"] = self.getTotalSpikeCount();
+            stats["firing_count"] = self.getFiringNeuronCount();
+            stats["active_count"] = self.getActiveNeuronCount();
+            stats["avg_firing_rate"] = self.getAverageFiringRate();
+            stats["excitement_ratio"] = self.getExcitationInhibitionRatio();
+            return stats;
+        }, "Get comprehensive network statistics as dictionary")
+        .def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a default configuration")
+        .def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+            return std::make_shared<Brain>(config);
+        }, py::arg("config"), "Create a new brain with configuration")
+        .def("isHealthy", [](const Brain& self) {
+            return self.getTotalSpikeCount() > 0 || 
+                   self.getTotalNeuronCount() > 0;
+        }, "Check if brain is in a valid state");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -398,7 +543,41 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Convenience methods for AgentBrain
+        .def("runEpisode", [](AgentBrain& self, const SensoryPercept& initialPercept, int maxSteps) {
+            self.processSensoryInput(initialPercept);
+            for (int i = 0; i < maxSteps; ++i) {
+                MotorCommand action = self.decodeMotorCommand();
+                // In a real implementation, this would send action to world
+                // For Python bindings, this is a simplified interface
+                self.updateDevelopment(0.001f);
+                if (action == MotorCommand::Wait) {
+                    break; // End episode if agent chooses to wait
+                }
+            }
+        }, py::arg("initialPercept"), py::arg("maxSteps"),
+             "Run an episode with initial perception and max steps")
+        .def("getStateInfo", [](const AgentBrain& self) {
+            py::dict state;
+            state["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            state["neuromodulation_level"] = self.getNeuromodulationLevel();
+            state["curiosity_level"] = self.getCuriosityLevel();
+            state["novelty_level"] = self.getNoveltyLevel();
+            state["prediction_error"] = self.getPredictionError();
+            state["enabled_features"] = py::dict()
+                .def("reward_modulation", self.isRewardModulationEnabled())
+                .def("structural_plasticity", self.isStructuralPlasticityEnabled())
+                .def("development", self.isDevelopmentEnabled())
+                .def("curiosity", self.isCuriosityEnabled());
+            return state;
+        }, "Get agent brain state as dictionary")
+        .def("createDefaultWorld", []() -> std::shared_ptr<SimpleWorld> {
+            return std::make_shared<SimpleWorld>();
+        }, "Create a new simple world")
+        .def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+            return std::make_shared<AgentBrain>(brain);
+        }, py::arg("brain"), "Create a new agent brain interface");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
