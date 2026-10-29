@@ -19,7 +19,7 @@ public:
     Phase3Demo() {}
     ~Phase3Demo() {}
     
-    void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
+    void run(int numEpisodes = 5, int stepsPerEpisode = 200) {}
         std::cout << "===========================================\n";
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
@@ -244,14 +244,56 @@ private:
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
+    // Parse command line arguments
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    bool showHelp = false;
     
     if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+        if (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h") {
+            showHelp = true;
+        } else {
+            // Parse number of episodes
+            try {
+                numEpisodes = std::stoi(argv[1]);
+                if (numEpisodes < 0) {
+                    std::cerr << "ERROR: Number of episodes must be non-negative" << std::endl;
+                    return 1;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "ERROR: Invalid number of episodes: " << argv[1] << std::endl;
+                return 1;
+            }
+        }
     }
+    
     if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+        if (std::string(argv[2]) == "--help" || std::string(argv[2]) == "-h") {
+            showHelp = true;
+        } else {
+            // Parse steps per episode
+            try {
+                stepsPerEpisode = std::stoi(argv[2]);
+                if (stepsPerEpisode < 0) {
+                    std::cerr << "ERROR: Steps per episode must be non-negative" << std::endl;
+                    return 1;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "ERROR: Invalid steps per episode: " << argv[2] << std::endl;
+                return 1;
+            }
+        }
+    }
+    
+    if (showHelp) {
+        std::cout << "===========================================\n";
+        std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
+        std::cout << "===========================================\n\n";
+        std::cout << "Usage: ./nlm_phase3_demo [num_episodes] [steps_per_episode]\n";
+        std::cout << "  num_episodes     Number of episodes to run (default: 5)\n";
+        std::cout << "  steps_per_episode Steps per episode (default: 200)\n";
+        std::cout << "  --help, -h       Show this help message\n";
+        return 0;
     }
     
     nlm::Phase3Demo demo;

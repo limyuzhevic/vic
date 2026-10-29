@@ -37,14 +37,40 @@ void printSection(const std::string& title) {
 }
 
 int main(int argc, char* argv[]) {
-    std::cout << "NLM Phase 4: Emerging Cognition\n";
-    std::cout << "================================\n\n";
-    
     // Parse command line arguments
     size_t numTrials = 50;
+    bool showHelp = false;
+    
     if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+        if (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h") {
+            showHelp = true;
+        } else {
+            // Parse number of trials
+            try {
+                numTrials = std::stoull(argv[1]);
+                if (numTrials == 0) {
+                    std::cerr << "ERROR: Number of trials must be positive" << std::endl;
+                    return 1;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "ERROR: Invalid number of trials: " << argv[1] << std::endl;
+                return 1;
+            }
+        }
     }
+    
+    if (showHelp) {
+        std::cout << "NLM Phase 4: Emerging Cognition\n";
+        std::cout << "================================\n\n";
+        std::cout << "Usage: ./nlm_phase4_demo [num_trials]\n";
+        std::cout << "  num_trials    Number of trials to run for each experiment (default: 50)\n";
+        std::cout << "  --help, -h    Show this help message\n";
+        return 0;
+    }
+    
+    std::cout << "NLM Phase 4: Emerging Cognition\n";
+    std::cout << "================================\n\n";
+    std::cout << "Running " << numTrials << " trials for each experiment...\n\n";
     
     // Create configuration
     auto config = std::make_shared<Config>();

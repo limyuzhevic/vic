@@ -75,14 +75,62 @@ make -j4
 
 ## Running
 
-### Phase 6 Demo (Integration Test)
+### Available Demos
+
+#### Phase 2 Demo (Basic Neural Computation)
+```bash
+./nlm
+```
+
+This demonstrates basic LIF neuron dynamics, STDP plasticity, and structural plasticity. Good for understanding the core neural mechanisms.
+
+#### Phase 3 Demo (World Interaction)
+```bash
+./nlm_phase3_demo
+```
+
+This shows experience -> neural activity -> action -> consequence -> learning loop with environmental interaction, reward prediction error, and basic neuromodulation.
+
+#### Phase 4 Demo (Emerging Cognition)
+```bash
+./nlm_phase4_demo [num_trials]
+```
+
+This demonstrates neural prediction, working memory, episodic memory, concept formation, attention, and planning. Accepts optional number of trials (default: 50).
+
+#### Phase 6 Demo (Integration Test - RECOMMENDED)
 ```bash
 ./nlm_phase6_demo
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+This runs a comprehensive integration test verifying all brain systems are connected and working together. Tests memory integration, neuromodulation, checkpointing, replay, and runs a full complete brain simulation.
 
-## Project Structure
+### Additional Features
+
+The Phase 6 demo includes comprehensive system integration tests:
+- **Integration Verification**: Confirms all brain systems are properly connected
+- **Memory Integration**: Tests working and episodic memory systems
+- **Neuromodulation Integration**: Validates dopamine, curiosity, and novelty systems
+- **Persistence**: Tests checkpoint save/load functionality
+- **Replay**: Validates memory consolidation and replay mechanisms
+- **Full Simulation**: Runs a complete 500-neuron brain for 2000 steps
+
+## Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+After building, all demo executables will be available:
+- `nlm` - Phase 2 basic demo
+- `nlm_phase3_demo` - Phase 3 world interaction demo
+- `nlm_phase4_demo` - Phase 4 cognitive demo
+- `nlm_phase6_demo` - Phase 6 integration demo
+
+The Phase 6 integration demo is the recommended starting point as it verifies that all previous phases work together in a coherent artificial brain system.
 
 ```
 NLM/
