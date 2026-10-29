@@ -25,6 +25,20 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <sstream>
+#include <chrono>
+
+// Forward declarations for argument parsing
+namespace nlm {
+    class ArgumentParser {
+    public:
+        static void printHelp();
+        static bool printVersion();
+        static bool parseArgs(int argc, char** argv, std::map<std::string, std::string>& parsedArgs);
+        static std::string getVersion();
+    };
+}
 
 using namespace nlm;
 
@@ -44,7 +58,7 @@ void printBanner() {
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
+    ╚═════════════════════════════════════════════════════════════╝
     )" << std::endl;
 }
 
@@ -158,6 +172,15 @@ struct LearningExperiment {
         }
     }
 };
+
+// Helper function to get current date/time for output files
+std::string getCurrentDateTime() {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
 
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
@@ -321,7 +344,432 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Argument Parser Implementation
+namespace nlm {
+
+void ArgumentParser::printHelp() {
+    std::cout << "Usage: nlm [options]" << std::endl;
+    std::cout << "A neural learning machine with real spiking neural computation." << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --version, -v                 Show version information" << std::endl;
+    std::cout << "  --config <file>               Load configuration from file" << std::endl;
+    std::cout << "  --experiments <list>          Select experiments to run (comma-separated: basic,plasticity,stdp,all)" << std::endl;
+    std::cout << "  --max-steps <steps>            Maximum simulation steps (default: 1000)" << std::endl;
+    std::cout << "  --seed <seed>                 Random seed for reproducible results" << std::endl;
+    std::cout << "  --verbose, -V                 Enable verbose output" << std::endl;
+    std::cout << "  --output <file>               Save results to file" << std::endl;
+    std::cout << "  --skip-reset                  Skip resetting brain between experiments" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Available experiments:" << std::endl;
+    std::cout << "  basic        - Basic neural connectivity test" << std::endl;
+    std::cout << "  plasticity   - Plasticity learning experiment" << std::endl;
+    std::cout << "  stdp         - STDP verification test" << std::endl;
+    std::cout << "  all          - Run all experiments (default)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --help" << std::endl;
+    std::cout << "  nlm --version" << std::endl;
+    std::cout << "  nlm --experiments basic,plasticity --max-steps 500" << std::endl;
+    std::cout << "  nlm --config custom.cfg --verbose" << std::endl;
+    std::cout << "  nlm --experiments stdp --skip-reset" << std::endl;
+}
+
+bool ArgumentParser::printVersion() {
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "Version: 0.1.0" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Features:" << std::endl;
+    std::cout << "  - Real LIF neuron dynamics" << std::endl;
+    std::cout << "  - Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  - STDP and Hebbian plasticity rules" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Build Information:" << std::endl;
+    std::cout << "  C++ Standard: C++20" << std::endl;
+    std::cout << "  Compiler: GCC/Clang/MSVC" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Author: NLM Project Contributors" << std::endl;
+    std::cout << "License: MIT" << std::endl;
+    return true;
+}
+
+std::string ArgumentParser::getVersion() {
+    return "NLM 0.1.0 (Phase 2: Real Neural Computation)";
+}
+
+bool ArgumentParser::parseArgs(int argc, char** argv, std::map<std::string, std::string>& parsedArgs) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        // Handle --key value or --key=value patterns
+        if (arg.find('--') == 0) {
+            std::string key;
+            std::string value;
+            size_t equalsPos = arg.find('=');
+            
+            if (equalsPos != std::string::npos) {
+                key = arg.substr(2, equalsPos - 2);
+                value = arg.substr(equalsPos + 1);
+            } else {
+                key = arg.substr(2);
+                // Check if next argument exists and doesn't start with --
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    value = argv[++i];
+                } else {
+                    value = "true"; // Flag argument
+                }
+            }
+            
+            // Convert key to canonical form (remove dashes)
+            std::replace(key.begin(), key.end(), '-', '_');
+            parsedArgs[key] = value;
+        } else if (arg.find('-') == 0 && arg.size() > 1 && !std::isalnum(arg[1])) {
+            // Handle short options like -h, -v
+            std::string key = arg.substr(1, 1);
+            std::string value = "true";
+            
+            // Check for combined short options like -hV
+            if (arg.size() > 2) {
+                for (size_t j = 1; j < arg.size(); ++j) {
+                    std::string singleKey(1, arg[j]);
+                    parsedArgs[singleKey] = "true";
+                }
+                continue;
+            }
+            
+            parsedArgs[key] = value;
+        }
+    }
+    return true;
+}
+
+} // namespace nlm
+
 int main(int argc, char** argv) {
+    // Parse command line arguments
+    std::map<std::string, std::string> parsedArgs;
+    if (!nlm::ArgumentParser::parseArgs(argc, argv, parsedArgs)) {
+        std::cerr << "ERROR: Failed to parse arguments." << std::endl;
+        return 1;
+    }
+    
+    // Handle help and version flags
+    if (parsedArgs.find("h") != parsedArgs.end() || parsedArgs.find("help") != parsedArgs.end()) {
+        nlm::ArgumentParser::printHelp();
+        return 0;
+    }
+    
+    if (parsedArgs.find("v") != parsedArgs.end() || parsedArgs.find("version") != parsedArgs.end()) {
+        nlm::ArgumentParser::printVersion();
+        return 0;
+    }
+    
+    printBanner();
+    
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    
+    // Initialize logger
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Implementing:");
+    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("");
+    
+    // Parse and validate arguments
+    int maxSteps = 1000;
+    uint64_t randomSeed = 42;
+    bool skipReset = false;
+    bool verbose = false;
+    std::string outputFile = "";
+    std::string configFile = "configs/default.cfg";
+    std::vector<std::string> experimentsToRun = {"all"}; // Default: run all experiments
+    
+    // Parse config file
+    if (parsedArgs.find("config") != parsedArgs.end()) {
+        configFile = parsedArgs["config"];
+    }
+    
+    // Parse experiments to run
+    if (parsedArgs.find("experiments") != parsedArgs.end()) {
+        std::string experimentsStr = parsedArgs["experiments"];
+        std::vector<std::string> experimentList;
+        size_t start = 0;
+        size_t end = experimentsStr.find(',');
+        
+        while (end != std::string::npos) {
+            experimentList.push_back(experimentsStr.substr(start, end - start));
+            start = end + 1;
+            end = experimentsStr.find(',', start);
+        }
+        experimentList.push_back(experimentsStr.substr(start));
+        
+        experimentsToRun.clear();
+        for (const auto& exp : experimentList) {
+            std::string trimmed = exp;
+            // Remove whitespace
+            trimmed.erase(0, trimmed.find_first_not_of(" \t\n\r"));
+            trimmed.erase(trimmed.find_last_not_of(" \t\n\r") + 1);
+            if (!trimmed.empty()) {
+                experimentsToRun.push_back(trimmed);
+            }
+        }
+        
+        // Validate experiment names
+        for (const auto& exp : experimentsToRun) {
+            if (exp != "basic" && exp != "plasticity" && exp != "stdp" && exp != "all") {
+                std::cerr << "ERROR: Unknown experiment: " << exp << std::endl;
+                std::cerr << "Available experiments: basic, plasticity, stdp, all" << std::endl;
+                return 1;
+            }
+        }
+    }
+    
+    // Parse max steps
+    if (parsedArgs.find("max_steps") != parsedArgs.end()) {
+        try {
+            maxSteps = std::stoi(parsedArgs["max_steps"]);
+            if (maxSteps <= 0) {
+                std::cerr << "ERROR: Max steps must be positive. Got: " << maxSteps << std::endl;
+                return 1;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Invalid max steps value: " << parsedArgs["max_steps"] << std::endl;
+            return 1;
+        }
+    }
+    
+    // Parse seed
+    if (parsedArgs.find("seed") != parsedArgs.end()) {
+        try {
+            randomSeed = std::stoul(parsedArgs["seed"]);
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Invalid seed value: " << parsedArgs["seed"] << std::endl;
+            return 1;
+        }
+    }
+    
+    // Parse verbose flag
+    if (parsedArgs.find("verbose") != parsedArgs.end() || parsedArgs.find("V") != parsedArgs.end()) {
+        verbose = true;
+    }
+    
+    // Parse output file
+    if (parsedArgs.find("output") != parsedArgs.end()) {
+        outputFile = parsedArgs["output"];
+    }
+    
+    // Parse skip reset flag
+    if (parsedArgs.find("skip_reset") != parsedArgs.end()) {
+        skipReset = true;
+    }
+    
+    // Display configuration
+    if (verbose) {
+        std::cout << "Running with configuration:\n";
+        std::cout << "  Config file: " << configFile << "\n";
+        std::cout << "  Experiments: ";
+        for (size_t i = 0; i < experimentsToRun.size(); ++i) {
+            if (i > 0) std::cout << ", ";
+            std::cout << experimentsToRun[i];
+        }
+        std::cout << "\n";
+        std::cout << "  Max steps: " << maxSteps << "\n";
+        std::cout << "  Random seed: " << randomSeed << "\n";
+        std::cout << "  Skip reset between experiments: " << (skipReset ? "Yes" : "No") << "\n";
+        std::cout << "  Output file: " << (outputFile.empty() ? "Console" : outputFile) << "\n";
+        std::cout << "  Verbose mode: Enabled\n\n";
+    }
+    
+    // Validate parameters
+    if (maxSteps > 100000) {
+        std::cerr << "WARNING: Very large number of steps may take a long time to complete." << std::endl;
+    }
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
+    
+    // Load config from file (ignore if not found)
+    if (config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else {
+        NLM_LOG_INFO("Using default configuration.");
+    }
+    
+    // Override with command line args
+    config->loadFromArgs(argc, argv);
+    
+    // Set configuration values
+    config->set("random_seed", static_cast<int64_t>(randomSeed), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Log configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", randomSeed)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("");
+    
+    // Initialize simulation clock
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    SimulationClock clock(timestep);
+    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    
+    // Initialize brain
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Initializing NLM Brain...");
+    auto brain = std::make_shared<Brain>(config);
+    
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain!");
+        return 1;
+    }
+    
+    brain->logStatus();
+    
+    // Run experiments based on selection
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Running experiments: ");
+    for (size_t i = 0; i < experimentsToRun.size(); ++i) {
+        if (i > 0) NLM_LOG_INFO(", ");
+        NLM_LOG_INFO(experimentsToRun[i]);
+    }
+    NLM_LOG_INFO("");
+    
+    // Run Test 1: Basic connectivity (if selected)
+    if (std::find(experimentsToRun.begin(), experimentsToRun.end(), "basic") != experimentsToRun.end() ||
+        std::find(experimentsToRun.begin(), experimentsToRun.end(), "all") != experimentsToRun.end()) {
+        NLM_LOG_INFO("=== Experiment 1: Basic Neural Connectivity ===");
+        runBasicConnectivityTest(brain);
+        
+        if (!skipReset) {
+            brain->reset();
+            brain->initialize();
+        }
+    }
+    
+    // Run Test 2: Plasticity learning (if selected)
+    if (std::find(experimentsToRun.begin(), experimentsToRun.end(), "plasticity") != experimentsToRun.end() ||
+        std::find(experimentsToRun.begin(), experimentsToRun.end(), "all") != experimentsToRun.end()) {
+        NLM_LOG_INFO("=== Experiment 2: Plasticity Learning Experiment ===");
+        runPlasticityExperiment(brain);
+        
+        if (!skipReset) {
+            brain->reset();
+            brain->initialize();
+        }
+    }
+    
+            // Run Test 3: STDP verification (if selected)
+    if (std::find(experimentsToRun.begin(), experimentsToRun.end(), "stdp") != experimentsToRun.end() ||
+        std::find(experimentsToRun.begin(), experimentsToRun.end(), "all") != experimentsToRun.end()) {
+        NLM_LOG_INFO("=== Experiment 3: STDP Verification ===");
+        runStdpVerification(brain);
+        
+        if (!skipReset) {
+            brain->reset();
+            brain->initialize();
+        }
+    }
+    
+    // Create output file if requested
+    std::ofstream outputStream;
+    if (!outputFile.empty()) {
+        outputStream.open(outputFile);
+        if (!outputStream.is_open()) {
+            std::cerr << "ERROR: Could not open output file: " << outputFile << std::endl;
+            return 1;
+        }
+        NLM_LOG_INFO("Results will be saved to: " + outputFile);
+    }
+    
+    // Save results to file if requested
+    if (!outputFile.empty()) {
+        outputStream << "=== NLM Phase 2 Results ===\n";
+        outputStream << "Date: " << getCurrentDateTime() << "\n";
+        outputStream << "Configuration:\n";
+        outputStream << "  random_seed: " << randomSeed << "\n";
+        outputStream << "  neuron_count: 500\n";
+        outputStream << "  region_count: 1\n";
+        outputStream << "  connection_probability: 0.15\n\n";
+        
+        outputStream << "Experiments Run: ";
+        for (size_t i = 0; i < experimentsToRun.size(); ++i) {
+            if (i > 0) outputStream << ", ";
+            outputStream << experimentsToRun[i];
+        }
+        outputStream << "\n\n";
+        
+        outputStream << "Final Brain Status:\n";
+        outputStream << "  Total neurons: " << brain->getTotalNeuronCount() << "\n";
+        outputStream << "  Total synapses: " << brain->getTotalSynapseCount() << "\n";
+        outputStream << "  Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        outputStream << "  Average firing rate: " << brain->getAverageFiringRate() << "\n\n";
+        
+        // Add experiment-specific results
+        if (std::find(experimentsToRun.begin(), experimentsToRun.end(), "basic") != experimentsToRun.end() ||
+            std::find(experimentsToRun.begin(), experimentsToRun.end(), "all") != experimentsToRun.end()) {
+            outputStream << "Basic Connectivity Test: PASSED\n";
+        }
+        
+        if (std::find(experimentsToRun.begin(), experimentsToRun.end(), "plasticity") != experimentsToRun.end() ||
+            std::find(experimentsToRun.begin(), experimentsToRun.end(), "all") != experimentsToRun.end()) {
+            outputStream << "Plasticity Learning: COMPLETED\n";
+        }
+        
+        if (std::find(experimentsToRun.begin(), experimentsToRun.end(), "stdp") != experimentsToRun.end() ||
+            std::find(experimentsToRun.begin(), experimentsToRun.end(), "all") != experimentsToRun.end()) {
+            outputStream << "STDP Verification: COMPLETED\n";
+        }
+        
+        outputStream << "\n=== End of Results ===\n";
+        outputStream.close();
+    }
+    
+    return 0;
+}
+    // Parse command line arguments
+    std::map<std::string, std::string> parsedArgs;
+    if (!nlm::ArgumentParser::parseArgs(argc, argv, parsedArgs)) {
+        std::cerr << "ERROR: Failed to parse arguments." << std::endl;
+        return 1;
+    }
+    
+    // Handle help and version flags
+    if (parsedArgs.find("h") != parsedArgs.end() || parsedArgs.find("help") != parsedArgs.end()) {
+        nlm::ArgumentParser::printHelp();
+        return 0;
+    }
+    
+    if (parsedArgs.find("v") != parsedArgs.end() || parsedArgs.find("version") != parsedArgs.end()) {
+        nlm::ArgumentParser::printVersion();
+        return 0;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;

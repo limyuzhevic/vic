@@ -2,6 +2,9 @@
 #include <memory>
 #include <iomanip>
 #include <sstream>
+#include <map>
+#include <string>
+#include <algorithm>
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
@@ -13,9 +16,17 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-#include "cognition/NeuralPlanner.hpp"
 
-using namespace nlm;
+// Forward declarations for argument parsing
+namespace nlm {
+    class ArgumentParser {
+    public:
+        static void printHelp();
+        static bool printVersion();
+        static bool parseArgs(int argc, char** argv, std::map<std::string, std::string>& parsedArgs);
+        static std::string getVersion();
+    };
+}
 
 void printHeader(const std::string& title) {
     std::cout << "\n" << std::string(60, '=') << "\n";
@@ -36,14 +47,137 @@ void printSection(const std::string& title) {
     std::cout << "\n--- " << title << " ---\n";
 }
 
+namespace nlm {
+
+void ArgumentParser::printHelp() {
+    std::cout << "Usage: nlm_phase4_demo [options]" << std::endl;
+    std::cout << "Neural learning machine Phase 4 demonstration - Emerging cognition" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --version, -v                 Show version information" << std::endl;
+    std::cout << "  --trials <count>               Number of trials per experiment (default: 50)" << std::endl;
+    std::cout << "  --verbose, -V                 Enable verbose output" << std::endl;
+    std::cout << "  --output <file>               Save results to file" << std::endl;
+    std::cout << "  --seed <seed>                 Random seed for reproducible results" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm_phase4_demo --help" << std::endl;
+    std::cout << "  nlm_phase4_demo --version" << std::endl;
+    std::cout << "  nlm_phase4_demo --trials 100" << std::endl;
+    std::cout << "  nlm_phase4_demo --seed 12345" << std::endl;
+}
+
+bool ArgumentParser::printVersion() {
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "Version: 0.1.0" << std::endl;
+    std::cout << "Phase 4: Emerging Cognition" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Features demonstrated:" << std::endl;
+    std::cout << "  - Temporal prediction: Learning cause-effect relationships" << std::endl;
+    std::cout << "  - Working memory: Maintaining information across delays" << std::endl;
+    std::cout << "  - Episodic memory: Storing and recalling experiences" << std::endl;
+    std::cout << "  - Concept formation: Discovering patterns without labels" << std::endl;
+    std::cout << "  - Neural attention: Selective processing through competition" << std::endl;
+    std::cout << "  - Multi-step planning: Using predictions to select actions" << std::endl;
+    std::cout << "  - Self-model: Learning body schema and action consequences" << std::endl;
+    std::cout << "  - Social learning: Observing and imitating others" << std::endl;
+    std::cout << "  - Continual learning: Adapting to new tasks" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Build Information:" << std::endl;
+    std::cout << "  C++ Standard: C++20" << std::endl;
+    std::cout << "  Author: NLM Project Contributors" << std::endl;
+    std::cout << "  License: MIT" << std::endl;
+    return true;
+}
+
+std::string ArgumentParser::getVersion() {
+    return "NLM 0.1.0 (Phase 4: Emerging Cognition)";
+}
+
+bool ArgumentParser::parseArgs(int argc, char** argv, std::map<std::string, std::string>& parsedArgs) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        // Handle --key value or --key=value patterns
+        if (arg.find('--') == 0) {
+            std::string key;
+            std::string value;
+            size_t equalsPos = arg.find('=');
+            
+            if (equalsPos != std::string::npos) {
+                key = arg.substr(2, equalsPos - 2);
+                value = arg.substr(equalsPos + 1);
+            } else {
+                key = arg.substr(2);
+                // Check if next argument exists and doesn't start with --
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    value = argv[++i];
+                } else {
+                    value = "true"; // Flag argument
+                }
+            }
+            
+            // Convert key to canonical form (remove dashes)
+            std::replace(key.begin(), key.end(), '-', '_');
+            parsedArgs[key] = value;
+        } else if (arg.find('-') == 0 && arg.size() > 1 && !std::isalnum(arg[1])) {
+            // Handle short options like -h, -v
+            std::string key = arg.substr(1, 1);
+            std::string value = "true";
+            
+            // Check for combined short options like -hV
+            if (arg.size() > 2) {
+                for (size_t j = 1; j < arg.size(); ++j) {
+                    std::string singleKey(1, arg[j]);
+                    parsedArgs[singleKey] = "true";
+                }
+                continue;
+            }
+            
+            parsedArgs[key] = value;
+        }
+    }
+    return true;
+}
+
+} // namespace nlm
+
 int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    std::map<std::string, std::string> parsedArgs;
+    if (!nlm::ArgumentParser::parseArgs(argc, argv, parsedArgs)) {
+        std::cerr << "ERROR: Failed to parse arguments." << std::endl;
+        return 1;
+    }
+    
+    // Handle help and version flags
+    if (parsedArgs.find("h") != parsedArgs.end() || parsedArgs.find("help") != parsedArgs.end()) {
+        nlm::ArgumentParser::printHelp();
+        return 0;
+    }
+    
+    if (parsedArgs.find("v") != parsedArgs.end() || parsedArgs.find("version") != parsedArgs.end()) {
+        nlm::ArgumentParser::printVersion();
+        return 0;
+    }
+    
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
     
-    // Parse command line arguments
+    // Parse and validate trials argument
     size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+    if (parsedArgs.find("trials") != parsedArgs.end()) {
+        try {
+            numTrials = std::stoul(parsedArgs["trials"]);
+            if (numTrials == 0) {
+                std::cerr << "ERROR: Number of trials must be positive. Got: " << numTrials << std::endl;
+                return 1;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR: Invalid trials value: " << parsedArgs["trials"] << std::endl;
+            return 1;
+        }
     }
     
     // Create configuration
