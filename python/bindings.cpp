@@ -289,6 +289,219 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Add advanced integration systems for power users
+    py::class_<Brain::Impl>(m, "BrainImpl", R"pbdoc(Internal brain implementation structure)pbdoc")
+        .def_readonly("workingMemory", &Brain::Impl::workingMemory)
+        .def_readonly("episodicMemory", &Brain::Impl::episodicMemory)
+        .def_readonly("associativeMemory", &Brain::Impl::associativeMemory)
+        .def_readonly("predictionSystem", &Brain::Impl::predictionSystem)
+        .def_readonly("planner", &Brain::Impl::planner)
+        .def_readonly("conceptFormation", &Brain::Impl::conceptFormation)
+        .def_readonly("attention", &Brain::Impl::attention)
+        .def_readonly("developmentSystem", &Brain::Impl::developmentSystem)
+        .def_readonly("dopamine", &Brain::Impl::dopamine)
+        .def_readonly("curiosity", &Brain::Impl::curiosity)
+        .def_readonly("novelty", &Brain::Impl::novelty)
+        .def_readonly("predictionError", &Brain::Impl::predictionError);
+
+    // Advanced memory systems bindings
+    py::class_<NeuralWorkingMemory>(m, "NeuralWorkingMemory", R"pbdoc(Neural working memory system)pbdoc")
+        .def("store", &NeuralWorkingMemory::store, py::arg("pattern"), py::arg("strength") = 1.0f)
+        .def("storeToNeuron", &NeuralWorkingMemory::storeToNeuron, py::arg("neuron"), py::arg("activation"))
+        .def("retrieve", &NeuralWorkingMemory::retrieve)
+        .def("contains", &NeuralWorkingMemory::contains, py::arg("neuron"))
+        .def("getNeuronActivation", &NeuralWorkingMemory::getNeuronActivation, py::arg("neuron"))
+        .def("update", &NeuralWorkingMemory::update, py::arg("dt"))
+        .def("clear", &NeuralWorkingMemory::clear)
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces);
+
+    py::class_<NeuralEpisodicMemory>(m, "NeuralEpisodicMemory", R"pbdoc(Neural episodic memory system)pbdoc")
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode, py::arg("episode"))
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount)
+        .def("getEpisodesForReplay", &NeuralEpisodicMemory::getEpisodesForReplay, py::arg("maxEpisodes"))
+        .def("replayEpisode", &NeuralEpisodicMemory::replayEpisode, py::arg("episode"))
+        .def("consolidate", &NeuralEpisodicMemory::consolidate, py::arg("threshold"))
+        .def("clear", &NeuralEpisodicMemory::clear)
+        .def("getMaxEpisodes", &NeuralEpisodicMemory::getMaxEpisodes)
+        .def("setMaxEpisodes", &NeuralEpisodicMemory::setMaxEpisodes, py::arg("max"));
+
+    py::class_<NeuralAssociativeMemory>(m, "NeuralAssociativeMemory", R"pbdoc(Neural associative memory system)pbdoc")
+        .def("storeAssociation", &NeuralAssociativeMemory::storeAssociation, 
+             py::arg("pattern1"), py::arg("pattern2"), py::arg("strength") = 1.0f)
+        .def("recallAssociation", &NeuralAssociativeMemory::recallAssociation, 
+             py::arg("pattern"), py::arg("threshold") = 0.5f)
+        .def("getAssociationStrength", &NeuralAssociativeMemory::getAssociationStrength,
+             py::arg("pattern1"), py::arg("pattern2"))
+        .def("update", &NeuralAssociativeMemory::update, py::arg("dt"))
+        .def("clear", &NeuralAssociativeMemory::clear);
+
+    // Advanced prediction system bindings
+    py::class_<PredictionSystem>(m, "PredictionSystem", R"pbdoc(High-level prediction system interface)pbdoc")
+        .def("predictNextState", &PredictionSystem::predictNextState, py::arg("currentState"))
+        .def("updatePredictions", &PredictionSystem::updatePredictions, 
+             py::arg("predicted"), py::arg("actual"))
+        .def("getPredictionError", &PredictionSystem::getPredictionError)
+        .def("getConfidence", &PredictionSystem::getConfidence)
+        .def("getErrorHistory", &PredictionSystem::getErrorHistory)
+        .def("clearHistory", &PredictionSystem::clearHistory)
+        .def("train", &PredictionSystem::train, py::arg("observation"));
+
+    py::class_<NeuralPrediction>(m, "NeuralPrediction", R"pbdoc(Neural prediction system using spiking dynamics)pbdoc")
+        .def("initialize", &NeuralPrediction::initialize, py::arg("brain"))
+        .def("recordSensoryState", &NeuralPrediction::recordSensoryState,
+             py::arg("sensoryState"), py::arg("currentStep"))
+        .def("generatePrediction", &NeuralPrediction::generatePrediction, py::arg("currentStep"))
+        .def("updateWithObservation", &NeuralPrediction::updateWithObservation,
+             py::arg("actualState"), py::arg("currentStep"))
+        .def("predictActionConsequence", &NeuralPrediction::predictActionConsequence,
+             py::arg("action"), py::arg("currentState"))
+        .def("getPredictionError", &NeuralPrediction::getPredictionError)
+        .def("getPredictionConfidence", &NeuralPrediction::getPredictionConfidence)
+        .def("predictMultipleSteps", &NeuralPrediction::predictMultipleSteps,
+             py::arg("currentStep"), py::arg("numSteps"))
+        .def("recordAction", &NeuralPrediction::recordAction, py::arg("action"), py::arg("step"))
+        .def("getErrorHistory", &NeuralPrediction::getErrorHistory)
+        .def("clearHistory", &NeuralPrediction::clearHistory)
+        .def("enableTemporalPrediction", &NeuralPrediction::enableTemporalPrediction, py::arg("enable"))
+        .def("enableActionConsequencePrediction", &NeuralPrediction::enableActionConsequencePrediction, py::arg("enable"))
+        .def("setSequenceMemorySize", &NeuralPrediction::setSequenceMemorySize, py::arg("size"))
+        .def("setPredictionHorizon", &NeuralPrediction::setPredictionHorizon, py::arg("steps"))
+        .def("getPredictionNeurons", &NeuralPrediction::getPredictionNeurons)
+        .def("getSequenceNeurons", &NeuralPrediction::getSequenceNeurons);
+
+    // Advanced cognition system bindings
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(Neural planning system for action selection)pbdoc")
+        .def("initialize", &NeuralPlanner::initialize, py::arg("brain"))
+        .def("evaluateActionSequence", &NeuralPlanner::evaluateActionSequence,
+             py::arg("sequence"), py::arg("currentState"))
+        .def("planActions", &NeuralPlanner::planActions, py::arg("currentState"), py::arg("horizon"))
+        .def("getActionPriority", &NeuralPlanner::getActionPriority, 
+             py::arg("action"), py::arg("currentState"))
+        .def("getPlanningConfidence", &NeuralPlanner::getPlanningConfidence)
+        .def("setPlanningDepth", &NeuralPlanner::setPlanningDepth, py::arg("depth"))
+        .def("getActionSequence", &NeuralPlanner::getActionSequence);
+
+    py::class_<ConceptFormation>(m, "ConceptFormation", R"pbdoc(Concept formation from sensory patterns)pbdoc")
+        .def("initialize", &ConceptFormation::initialize, py::arg("brain"))
+        .def("processPattern", &ConceptFormation::processPattern,
+             py::arg("pattern"), py::arg("step"))
+        .def("getConcept", &ConceptFormation::getConcept, py::arg("conceptId"))
+        .def("getConceptCount", &ConceptFormation::getConceptCount)
+        .def("getConceptSimilarity", &ConceptFormation::getConceptSimilarity,
+             py::arg("conceptId1"), py::arg("conceptId2"))
+        .def("getConcepts", &ConceptFormation::getConcepts);
+
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Attentional selection system)pbdoc")
+        .def("initialize", &AttentionalSelection::initialize, py::arg("brain"))
+        .def("update", &AttentionalSelection::update, py::arg("dt"))
+        .def("processCompetition", &AttentionalSelection::processCompetition,
+             py::arg("competitors"))
+        .def("getCurrentFocus", &AttentionalSelection::getCurrentFocus)
+        .def("setInhibitionStrength", &AttentionalSelection::setInhibitionStrength, py::arg("strength"))
+        .def("setExcitationStrength", &AttentionalSelection::setExcitationStrength, py::arg("strength"))
+        .def("getAttentionLevel", &AttentionalSelection::getAttentionLevel);
+
+    // Advanced development system bindings
+    py::class_<DevelopmentSystem>(m, "DevelopmentSystem", R"pbdoc(Development and maturation system)pbdoc")
+        .def("initialize", &DevelopmentSystem::initialize, py::arg("brain"))
+        .def("update", &DevelopmentSystem::update, py::arg("brain"), py::arg("rng"), py::arg("dt"))
+        .def("getDevelopmentalStage", &DevelopmentSystem::getDevelopmentalStage)
+        .def("setDevelopmentalStage", &DevelopmentSystem::setDevelopmentalStage, py::arg("stage"))
+        .def("getPlasticityRate", &DevelopmentSystem::getPlasticityRate, py::arg("stage"))
+        .def("getCriticalPeriodActive", &DevelopmentSystem::getCriticalPeriodActive)
+        .def("getMaturationProgress", &DevelopmentSystem::getMaturationProgress);
+
+    // Advanced neuromodulation system bindings
+    py::class_<Dopamine>(m, "Dopamine", R"pbdoc(Dopamine neuromodulation system)pbdoc")
+        .def("initialize", &Dopamine::initialize, py::arg("brain"))
+        .def("update", &Dopamine::update, py::arg("dt"))
+        .def("getLevel", &Dopamine::getLevel)
+        .def("getPlasticityFactor", &Dopamine::getPlasticityFactor)
+        .def("getExcitabilityFactor", &Dopamine::getExcitabilityFactor)
+        .def("getCoherenceLevel", &Dopamine::getCoherenceLevel);
+
+    py::class_<Curiosity>(m, "Curiosity", R"pbdoc(Curiosity neuromodulation system)pbdoc")
+        .def("initialize", &Curiosity::initialize, py::arg("brain"))
+        .def("update", &Curiosity::update, py::arg("dt"))
+        .def("getLevel", &Curiosity::getLevel)
+        .def("getExplorationBias", &Curiosity::getExplorationBias)
+        .def("getNoveltyThreshold", &Curiosity::getNoveltyThreshold)
+        .def("getSurpriseLevel", &Curiosity::getSurpriseLevel);
+
+    py::class_<Novelty>(m, "Novelty", R"pbdoc(Novelty detection system)pbdoc")
+        .def("initialize", &Novelty::initialize, py::arg("brain"))
+        .def("update", &Novelty::update, py::arg("dt"))
+        .def("getLevel", &Novelty::getLevel)
+        .def("getNoveltyPattern", &Novelty::getNoveltyPattern)
+        .def("getSurpriseScore", &Novelty::getSurpriseScore);
+
+    py::class_<PredictionError>(m, "PredictionError", R"pbdoc(Prediction error signal system)pbdoc")
+        .def("initialize", &PredictionError::initialize, py::arg("brain"))
+        .def("update", &PredictionError::update, py::arg("dt"))
+        .def("computeError", &PredictionError::computeError,
+             py::arg("predicted"), py::arg("actual"))
+        .def("getModulationSignal", &PredictionError::getModulationSignal)
+        .def("recordError", &PredictionError::recordError, py::arg("error"), py::arg("step"))
+        .def("getErrorHistory", &PredictionError::getErrorHistory);
+
+    // Advanced configuration for power users
+    py::class_<Phase6Config>(m, "Phase6Config", R"pbdoc(Phase 6 integration configuration)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("neuronCount", &Phase6Config::neuronCount)
+        .def_readwrite("regionCount", &Phase6Config::regionCount)
+        .def_readwrite("connectionProbability", &Phase6Config::connectionProbability)
+        .def_readwrite("maxSteps", &Phase6Config::maxSteps)
+        .def_readwrite("enableCheckpointing", &Phase6Config::enableCheckpointing)
+        .def_readwrite("enableReplay", &Phase6Config::enableReplay)
+        .def_readwrite("enableDevelopment", &Phase6Config::enableDevelopment)
+        .def_readwrite("checkpointPath", &Phase6Config::checkpointPath);
+
+    py::class_<Phase6IntegrationResult>(m, "Phase6IntegrationResult", R"pbdoc(Phase 6 integration test results)pbdoc")
+        .def_readonly("totalReward", &Phase6IntegrationResult::totalReward)
+        .def_readonly("avgFiringRate", &Phase6IntegrationResult::avgFiringRate)
+        .def_readonly("memoryEpisodesStored", &Phase6IntegrationResult::memoryEpisodesStored)
+        .def_readonly("noveltyLevel", &Phase6IntegrationResult::noveltyLevel)
+        .def_readonly("curiosityLevel", &Phase6IntegrationResult::curiosityLevel)
+        .def_readonly("dopamineLevel", &Phase6IntegrationResult::dopamineLevel)
+        .def_readonly("memoryWorkingMemoryIntegrated", &Phase6IntegrationResult::memoryWorkingMemoryIntegrated)
+        .def_readonly("memoryEpisodicMemoryIntegrated", &Phase6IntegrationResult::memoryEpisodicMemoryIntegrated)
+        .def_readonly("neuromodulationIntegrated", &Phase6IntegrationResult::neuromodulationIntegrated)
+        .def_readonly("predictionIntegrated", &Phase6IntegrationResult::predictionIntegrated)
+        .def_readonly("developmentIntegrated", &Phase6IntegrationResult::developmentIntegrated)
+        .def_readonly("checkpointingWorks", &Phase6IntegrationResult::checkpointingWorks)
+        .def_readonly("totalWallClockTime", &Phase6IntegrationResult::totalWallClockTime);
+
+    // Advanced utility functions for power users
+    m.def("createPhase6Config", []() -> Phase6Config {
+        return Phase6Config();
+    }, "Create Phase 6 configuration with defaults");
+
+    m.def("createBrainFromConfig", [](const Phase6Config& config) -> std::shared_ptr<Brain> {
+        auto cfg = std::make_shared<Config>();
+        cfg->set("neuron_count", config.neuronCount);
+        cfg->set("region_count", config.regionCount);
+        cfg->set("connection_probability", config.connectionProbability);
+        return std::make_shared<Brain>(cfg);
+    }, py::arg("config"), "Create brain from Phase 6 configuration");
+
+    // Advanced simulation control
+    m.def("runPhase6Integration", [](std::shared_ptr<Brain> brain, const Phase6Config& config) {
+        Phase6IntegratedExperiment experiment;
+        return experiment.run(config);
+    }, py::arg("brain"), py::arg("config"), "Run Phase 6 integration experiment");
+
+    m.def("runQuickIntegrationTest", []() {
+        Phase6IntegratedExperiment experiment;
+        bool success = experiment.verifyIntegration();
+        if (success) {
+            experiment.testMemoryIntegration();
+            experiment.testNeuromodulationIntegration();
+            experiment.testCheckpointing();
+            experiment.testReplay();
+        }
+        return success;
+    }, "Run quick integration test");
+
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -415,6 +628,66 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Advanced utility functions for power users
+    m.def("createAdvancedConfig", [](int neuronCount, int regionCount, float connectionProbability,
+                                    bool enablePlasticity, bool enableDevelopment, bool enableCuriosity) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", regionCount);
+        config->set("connection_probability", connectionProbability);
+        config->set("plasticity.stdp.enable", enablePlasticity);
+        config->set("plasticity.hebbian.enable", enablePlasticity);
+        config->set("plasticity.structural.enable", enablePlasticity);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", enableCuriosity);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.enabled", enableDevelopment);
+        
+        return config;
+    }, py::arg("neuronCount") = 1000, py::arg("regionCount") = 1,
+         py::arg("connectionProbability") = 0.1f, py::arg("enablePlasticity") = true,
+         py::arg("enableDevelopment") = true, py::arg("enableCuriosity") = true,
+         "Create advanced configuration with specified parameters");
+
+    // Learning and adaptation utilities
+    m.def("enableLearningMode", [](std::shared_ptr<AgentBrain> agent, bool enable) {
+        agent->enableRewardModulation(enable);
+        agent->enableStructuralPlasticity(enable);
+        agent->enableDevelopment(enable);
+        agent->enableCuriosity(enable);
+        return true;
+    }, py::arg("agent"), py::arg("enable"), "Enable or disable all learning subsystems");
+
+    m.def("getSystemReadinessStatus", [](std::shared_ptr<Brain> brain,
+                                        std::shared_ptr<AgentBrain> agent) {
+        std::unordered_map<std::string, bool> status;
+        
+        // Check core systems
+        status["brain_initialized"] = brain->getTotalNeuronCount() > 0;
+        status["working_memory"] = brain->getWorkingMemory() != nullptr;
+        status["episodic_memory"] = brain->getEpisodicMemory() != nullptr;
+        status["prediction_system"] = brain->getPredictionSystem() != nullptr;
+        status["planner"] = brain->getPlanner() != nullptr;
+        status["concept_formation"] = brain->getConceptFormation() != nullptr;
+        status["attention"] = brain->getAttention() != nullptr;
+        status["development"] = brain->getDevelopmentSystem() != nullptr;
+        
+        // Check neuromodulation systems
+        status["dopamine"] = brain->getDopamine() != nullptr;
+        status["curiosity"] = brain->getCuriosity() != nullptr;
+        status["novelty"] = brain->getNovelty() != nullptr;
+        status["prediction_error"] = brain->getPredictionErrorSignal() != nullptr;
+        
+        // Check agent systems
+        status["agent_brain"] = agent != nullptr;
+        status["reward_modulation"] = agent ? agent->isRewardModulationEnabled() : false;
+        status["structural_plasticity"] = agent ? agent->isStructuralPlasticityEnabled() : false;
+        status["development_enabled"] = agent ? agent->isDevelopmentEnabled() : false;
+        status["curiosity_enabled"] = agent ? agent->isCuriosityEnabled() : false;
+        
+        return status;
+    }, py::arg("brain"), py::arg("agent"), "Get comprehensive system readiness status");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
