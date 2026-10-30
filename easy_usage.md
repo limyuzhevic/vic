@@ -155,104 +155,197 @@ agent.enableCuriosity(True)             # Explore new things
 
 ---
 
+## Enhanced Examples with New Features
+
+### New Feature 1: Quick Training with runEpisode
+
+```python
+import pynlm
+
+# Create a brain and agent with a resource collection world
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+agent = pynlm.createAgentBrain(brain)
+
+# Create a world with resources and start position
+world = pynlm.createResourceWorld(width=30, height=30, numResources=15, numHazards=5)
+agent.initialize(world)
+
+# Run a complete episode (100 steps) with learning enabled
+total_reward, curiosity_events, prediction_error = agent.runEpisode(world, steps=100, enableLearning=True)
+
+print(f"Episode completed!")
+print(f"  Total reward: {total_reward:.2f}")
+print(f"  Curiosity events: {curiosity_events}")
+print(f"  Prediction error: {prediction_error:.3f}")
+```
+
+### New Feature 2: Advanced Training with train Method
+
+```python
+import pynlm
+import random
+
+# Create agent and world
+agent = pynlm.createAgentBrain(pynlm.createBrain(pynlm.createDefaultConfig()))
+
+# Use different world scenarios
+for scenario in ["simple", "resource_collection", "obstacle_course"]:
+    world = pynlm.createTrainingWorld(scenario)
+    agent.initialize(world)
+    
+    print(f"\nTraining with {scenario} world...")
+    
+    # Train for 50 episodes with verbose output
+    episode_rewards, curiosity_levels, avg_reward, avg_curiosity, best_episode, best_reward = agent.train(
+        world, episodes=50, stepsPerEpisode=100, verbose=True
+    )
+    
+    print(f"  Average reward: {avg_reward:.2f}")
+    print(f"  Average curiosity: {avg_curiosity:.3f}")
+    print(f"  Best reward: {best_reward:.2f} (episode {best_episode})")
+```
+
+### New Feature 3: Quick Training with trainSimple
+
+```python
+import pynlm
+
+# Very simple training method for beginners
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=6, visionHeight=6)
+agent.initialize(world)
+
+# Quick training with just one line
+total_reward = agent.trainSimple(world)
+print(f"Simple training completed with total reward: {total_reward:.2f}")
+```
+
+### New Feature 4: Configuration Presets
+
+```python
+import pynlm
+
+# Young brain (high plasticity, fast learning)
+young_brain = pynlm.createBrain(pynlm.createYoungConfig())
+
+# Adult brain (stable, mature performance)
+adult_brain = pynlm.createBrain(pynlm.createAdultConfig())
+
+# Compare them
+print("Young brain:", young_brain.getTotalNeuronCount(), "neurons")
+print("Adult brain:", adult_brain.getTotalNeuronCount(), "neurons")
+```
+
+### New Feature 5: Complete Agent Setup
+
+```python
+import pynlm
+
+# One-line creation of complete agent setup
+brain, world, agent = pynlm.createAgent()
+
+# Use the agent
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+print(f"Simulation complete! Firing neurons: {brain.getFiringNeuronCount()}")
+```
+
+### New Feature 6: Advanced World Creation
+
+```python
+import pynlm
+
+# Arena world (empty space for exploration)
+arena_world = pynlm.createArenaWorld(width=50, height=50, visionWidth=10, visionHeight=10)
+
+# Maze world (complex with predefined layout)
+maze_layout = [
+    "##################",
+    "#             #",
+    "# #############",
+    "# #           #",
+    "# # ########## #",
+    "# # #         # #",
+    "# # # #####   # #",
+    "# # #   #     # #",
+    "# # ##### ##### #",
+    "# #           # #",
+    "# ############# #",
+    "#             #",
+    "##################"
+]
+maze_world = pynlm.createMazeWorld(width=20, height=12, mazeLayout=maze_layout)
+
+# Obstacle course world (challenges for agent)
+obstacle_world = pynlm.createObstacleWorld(width=60, height=30, visionWidth=12, visionHeight=8)
+```
+
+### New Feature 7: Combined Advanced Training
+
+```python
+import pynlm
+
+# Create agent with young brain (more plastic)
+agent = pynlm.createAgentBrain(pynlm.createBrain(pynlm.createYoungConfig()))
+
+# Training loop with different scenarios
+scenarios = ["simple", "resource_collection", "obstacle_course"]
+for scenario in scenarios:
+    print(f"\nTraining with {scenario} scenario...")
+    
+    # Create fresh world for each scenario
+    world = pynlm.createTrainingWorld(scenario)
+    
+    # Quick training session
+    reward = agent.trainSimple(world)
+    print(f"  Got reward: {reward:.2f}")
+    
+    # Reset for next scenario
+    agent.reset()
+    agent.initialize(world)
+
+print("\nTraining complete!")
+```
+
+---
+
 ## What Each Part Does
 
 ### `pynlm.createBrain(config)`
 Creates a virtual brain with neurons and synapses.
 - `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
 
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
+### `pynlm.createSimpleWorld()`
+Creates a basic world with random objects.
 
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
+### `pynlm.createResourceWorld(width, height, numResources, numHazards)`
+Creates a world with collectible resources and hazards.
 
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
+### `pynlm.createAgentBrain(brain)`
+Creates an agent interface that connects the brain to the world.
 
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
+### `pynlm.createAgent()`
+Creates a complete agent setup (brain, world, agent) in one line.
 
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
+### `agent.runEpisode(world, steps=100, enableLearning=True)`
+Run a complete training episode and return statistics.
 
----
+### `agent.train(world, episodes=100, stepsPerEpisode=100, verbose=False)`
+Advanced training method with detailed statistics and learning curve analysis.
 
-## Mini Projects
+### `agent.trainSimple(world)`
+Quick training method for common scenarios.
 
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
-
-```python
-import pynlm
-
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
-
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
-
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
-
-print("Agent simulation complete!")
-```
+### `pynlm.createYoungConfig()` and `pynlm.createAdultConfig()`
+Create brains with different development characteristics.
 
 ---
 
@@ -260,11 +353,14 @@ print("Agent simulation complete!")
 
 | What you want | Code |
 |--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
+| Create basic brain | `pynlm.createBrain(pynlm.createDefaultConfig())` |
+| Create complete agent | `pynlm.createAgent()` |
+| Create resource world | `pynlm.createResourceWorld()` |
+| Run training episode | `agent.runEpisode(world)` |
+| Quick training | `agent.trainSimple(world)` |
+| Advanced training | `agent.train(world, episodes=50)` |
+| Young brain | `pynlm.createBrain(pynlm.createYoungConfig())` |
+| Adult brain | `pynlm.createBrain(pynlm.createAdultConfig())` |
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
@@ -276,22 +372,28 @@ print("Agent simulation complete!")
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?
 - Try increasing the number of steps
+- Check if learning features are enabled
 
 **"The agent isn't moving"**
 - Did you call `world.applyMotorCommand()`?
 - Check that `world.update()` is being called
+- Make sure the world has a valid starting position
 
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+- Check if the world has objects to interact with
 
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+1. Experiment with different configuration presets (young vs adult)
+2. Try the advanced training methods (`train`, `runEpisode`)
+3. Create custom worlds with different scenarios
+4. Use the convenience functions for quick setup
+5. Read `HOW_TO_USE.md` for more detailed documentation
+6. Read `docs/ARCHITECTURE.md` to understand how it all works
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with all its enhanced features.
