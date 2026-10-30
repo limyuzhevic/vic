@@ -19,16 +19,35 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced configuration file loading with validation and error handling
     
+    // Check if file exists and is readable
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Configuration file not found: " + filepath);
+        return false;
+    }
+    
+    // Check file size to avoid memory issues with large files
+    file.seekg(0, std::ios::end);
+    size_t fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+    
+    const size_t maxFileSize = 1024 * 1024; // 1MB limit
+    if (fileSize > maxFileSize) {
+        NLM_LOG_ERROR("Configuration file too large: " + filepath + " (" + 
+                     std::to_string(fileSize) + " bytes, max " + 
+                     std::to_string(maxFileSize) + " bytes)");
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    size_t errorCount = 0;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,25 +56,55 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
+        if (pos == std::string::npos) {
+            NLM_LOG_ERROR("Invalid configuration format at line " + 
+                         std::to_string(lineNumber) + ": " + line);
+            ++errorCount;
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key
+        if (key.empty()) {
+            NLM_LOG_ERROR("Empty configuration key at line " + std::to_string(lineNumber));
+            ++errorCount;
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        try {
             set(key, value, ConfigSource::File);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error parsing configuration at line " + 
+                         std::to_string(lineNumber) + ": " + std::string(e.what()));
+            ++errorCount;
         }
     }
     
-    return true;
+    if (errorCount > 0) {
+        NLM_LOG_WARNING("Configuration file loaded with " + 
+                       std::to_string(errorCount) + " errors from " + filepath);
+    } else {
+        NLM_LOG_INFO("Successfully loaded configuration from: " + filepath);
+    }
+    
+    return errorCount == 0;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Enhanced command-line argument parsing with better error handling
+    if (argc < 2) {
+        return true;  // No arguments to process
+    }
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,14 +114,32 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key format
+                if (key.empty()) {
+                    NLM_LOG_ERROR("Empty configuration key in command line argument: " + arg);
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_ERROR("Invalid command line argument format: " + arg);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            if (key.empty()) {
+                NLM_LOG_ERROR("Empty configuration key in command line argument: -");
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+        }
+        else {
+            NLM_LOG_ERROR("Unrecognized command line argument: " + arg);
         }
     }
     return true;
@@ -81,14 +148,17 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to save configuration to: " + filepath);
         return false;
     }
     
+    // Write configuration with descriptions
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
     }
     
+    NLM_LOG_INFO("Configuration saved to: " + filepath);
     return true;
 }
 

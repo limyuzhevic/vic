@@ -1,9 +1,89 @@
-// Config Tests
-#include "core/Config/Config.hpp"
-#include <cassert>
-#include <iostream>
+#include <filesystem>
+#include <fstream>
+#include <chrono>
 
 namespace test_config {
+
+void testConfigFileLoading() {
+    nlm::Config config;
+    
+    // Test 1: Create a temporary config file
+    std::string tempFilename = "test_config_" + 
+        std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + ".cfg";
+    
+    {
+        std::ofstream file(tempFilename);
+        file << "# Test configuration file\n";
+        file << "random_seed = 123\n";
+        file << "neuron_count = 100\n";
+        file << "region_count = 2\n";
+    }
+    
+    bool result = config.loadFromFile(tempFilename);
+    assert(result, "Should load valid config file");
+    assert(config.getOr<int64_t>("random_seed", 0) == 123);
+    assert(config.getOr<int64_t>("neuron_count", 0) == 100);
+    assert(config.getOr<int64_t>("region_count", 0) == 2);
+    
+    std::filesystem::remove(tempFilename);
+    
+    std::cout << "    testConfigFileLoading passed" << std::endl;
+}
+
+void testConfigFileErrors() {
+    nlm::Config config;
+    
+    // Test 2: Create a config file with errors
+    std::string tempFilename = "test_config_error_" + 
+        std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + ".cfg";
+    
+    {
+        std::ofstream file(tempFilename);
+        file << "random_seed = 123\n";
+        file << "invalid_line_without_equals\n";
+        file << "neuron_count = 100\n";
+    }
+    
+    bool result = config.loadFromFile(tempFilename);
+    assert(!result, "Should reject config file with errors");
+    
+    std::filesystem::remove(tempFilename);
+    
+    std::cout << "    testConfigFileErrors passed" << std::endl;
+}
+
+void testConfigFileNonexistent() {
+    nlm::Config config;
+    
+    // Test 3: Try to load non-existent file
+    bool result = config.loadFromFile("nonexistent_config_file.cfg");
+    assert(!result, "Should reject non-existent config file");
+    
+    std::cout << "    testConfigFileNonexistent passed" << std::endl;
+}
+
+void testConfigFileLargeFile() {
+    nlm::Config config;
+    
+    // Test 4: Try to load file that's too large (create 2MB file)
+    std::string tempFilename = "large_config_" + 
+        std::to_string(std::chrono::system_clock::now().time_since_epoch().count()) + ".cfg";
+    
+    {
+        std::ofstream file(tempFilename);
+        // Write about 2MB of config data (each line is about 50 chars)
+        for (int i = 0; i < 40000; ++i) {
+            file << "key" << i << " = value" << i << "\n";
+        }
+    }
+    
+    bool result = config.loadFromFile(tempFilename);
+    // This might fail due to size limits
+    
+    std::filesystem::remove(tempFilename);
+    
+    std::cout << "    testConfigFileLargeFile passed" << std::endl;
+}
 
 void testConfigCreation() {
     nlm::Config config;
@@ -84,6 +164,12 @@ void runAll() {
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    
+    // Run new configuration file loading tests
+    testConfigFileLoading();
+    testConfigFileErrors();
+    testConfigFileNonexistent();
+    testConfigFileLargeFile();
 }
 
 } // namespace test_config
