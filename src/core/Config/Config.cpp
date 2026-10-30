@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "Logger.hpp"
 
 namespace nlm {
 
@@ -24,6 +25,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Configuration file not found or could not be opened: " + filepath);
         return false;
     }
     
