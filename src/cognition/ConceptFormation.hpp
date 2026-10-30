@@ -138,29 +138,89 @@ public:
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
-private:
-    // Create new concept from pattern
-    size_t createConcept(const std::vector<float>& pattern,
-                        const std::vector<float>& features,
-                        float reward);
-
-    // Update concept prototype using Hebbian averaging
-    void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
-
-    // Check if concept is stable enough to be considered "discovered"
-    bool isConceptStable(size_t conceptId) const;
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
+    
+    // New advanced features
+    bool conceptMergingEnabled_;
+    bool conceptCreationEnabled_;
+    
+    // Emotional valence tracking
+    std::unordered_map<size_t, float> conceptEmotions_;
+    
+    // Planning value tracking  
+    std::unordered_map<size_t, float> conceptPlanningValues_;
+    
+    // Complexity tracking
+    std::unordered_map<size_t, float> conceptComplexity_;
+    
+    // Drift tracking
+    std::unordered_map<size_t, float> conceptDrift_;
     
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable
     size_t stabilityWindow_;    // How many observations to consider for stability
+    
+    // Get patterns from concept for visualization/analysis
+    const std::vector<DiscoveredConcept>& getAllConcepts() const { return concepts_; }
+    
+    // Get concept activity statistics
+    struct ConceptActivity {
+        size_t conceptId;
+        float activation;
+        float stability;
+        float rewardValue;
+        SimulationStep lastObserved;
+    };
+    
+    std::vector<ConceptActivity> getConceptActivities() const;
+    
+    // Are concepts ready for stabilization?
+    bool areConceptsStable() const;
+    
+    // Get most active concept
+    size_t getMostActiveConcept() const;
+    
+    // Set formation parameters
+    void setFormationParameters(float threshold, float stabilityThreshold, size_t window) {
+        formationThreshold_ = threshold;
+        stabilityThreshold_ = stabilityThreshold;
+        stabilityWindow_ = window;
+    }
+    
+    // Enable/disable concept merging
+    void enableConceptMerging(bool enable) { conceptMergingEnabled_ = enable; }
+    bool isConceptMergingEnabled() const { return conceptMergingEnabled_; }
+    
+    // Get concept relationships (which concepts are similar)
+    std::vector<std::pair<size_t, size_t>> getSimilarConcepts(float similarityThreshold = 0.8f) const;
+    
+    // Update concept with emotional valence
+    void updateConceptEmotion(size_t conceptId, float emotionValue);
+    
+    // Get emotional valence of concepts
+    std::vector<std::pair<size_t, float>> getConceptEmotions() const { return conceptEmotions_; }
+    
+    // Is this concept emotionally significant?
+    bool isEmotionallySignificant(size_t conceptId, float threshold = 0.3f) const;
+    
+    // Get conceptual drift (how much concepts change over time)
+    std::vector<std::pair<size_t, float>> getConceptDrift() const { return conceptDrift_; }
+    
+    // Create concept from reinforcement learning perspective
+    size_t createRLConcept(const std::vector<float>& pattern, float qValue, ActionType preferredAction);
+    
+    // Update concept with planning experience
+    void updateConceptPlanning(size_t conceptId, const std::vector<ActionType>& plannedActions,
+                             const std::vector<float>& outcomes, float reward);
+    
+    // Get planning value of concepts
+    std::vector<std::pair<size_t, float>> getConceptPlanningValues() const { return conceptPlanningValues_; }
+    
+    // Get concept complexity (richness of representation)
+    std::vector<std::pair<size_t, float>> getConceptComplexity() const { return conceptComplexity_; }
 };
 
 // SpatialRepresentation: Learns spatial relationships from experience

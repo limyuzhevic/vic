@@ -26,26 +26,56 @@
 #include <iomanip>
 #include <numeric>
 
-using namespace nlm;
+void printHelp();
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+// Command-line option parsing functions
+bool parseBoolOption(const std::string& arg, bool& value);
+bool parseIntOption(const std::string& arg, int& value);
+bool parseFloatOption(const std::string& arg, float& value);
+bool parseStringOption(const std::string& arg, std::string& value);
+    printBanner();
+    std::cout << "NLM Phase 2 - Real Neural Computation" << std::endl;
+    std::cout << "=====================================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "USAGE: nlm [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config=FILE          Load configuration from FILE (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --neuron-count=COUNT   Number of neurons in the brain" << std::endl;
+    std::cout << "  --region-count=COUNT   Number of brain regions" << std::endl;
+    std::cout << "  --connection-prob=VAL  Connection probability (0.0-1.0)" << std::endl;
+    std::cout << "  --timestep=VAL         Simulation timestep in seconds" << std::endl;
+    std::cout << "  --random-seed=SEED     Random seed for reproducible experiments" << std::endl;
+    std::cout << "  --log-level=LEVEL      Logging level (DEBUG, INFO, WARN, ERROR)" << std::endl;
+    std::cout << "  --log-to-file=BOOL      Enable logging to file (true/false)" << std::endl;
+    std::cout << "  --help                 Print this help message and exit" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Advanced Options:" << std::endl;
+    std::cout << "  --stdp-ltp-weight=VAL   STDP LTP weight" << std::endl;
+    std::cout << "  --stdp-ltd-weight=VAL   STDP LTD weight" << std::endl;
+    std::cout << "  --stdp-tau=VAL          STDP time constant" << std::endl;
+    std::cout << "  --synaptogenesis-rate=VAL   Synaptogenesis rate" << std::endl;
+    std::cout << "  --pruning-rate=VAL      Pruning rate" << std::endl;
+    std::cout << "  --enable-neuromodulation Enable neuromodulation systems" << std::endl;
+    std::cout << "  --enable-memory-systems Enable memory systems (working, episodic, associative)" << std::endl;
+    std::cout << "  --enable-prediction Enable prediction system" << std::endl;
+    std::cout << "  --enable-cognition Enable cognitive systems (planner, concept formation, attention)" << std::endl;
+    std::cout << "  --enable-development Enable development system" << std::endl;
+    std::cout << "  --enable-curiosity Enable curiosity system" << std::endl;
+    std::cout << "  --enable-replay Enable replay system for episodic memory" << std::endl;
+    std::cout << "  --enable-checkpointing Enable checkpoint save/load" << std::endl;
+    std::cout << "  --checkpoint-path=PATH  Path for checkpoint files" << std::endl;
+    std::cout << "  --max-steps=COUNT       Maximum number of simulation steps" << std::endl;
+    std::cout << "  --simulation-time-limit=VAL Maximum simulation time in seconds" << std::endl;
+    std::cout << "  --visualization-enable=BOOL Enable visualization (experimental)" << std::endl;
+    std::cout << "  --visualization-rate=VAL Visualization update rate (Hz)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --neuron-count=1000 --region-count=2" << std::endl;
+    std::cout << "  nlm --config=my_config.cfg --log-level=DEBUG" << std::endl;
+    std::cout << "  nlm --enable-memory-systems --enable-prediction --enable-cognition" << std::endl;
+    std::cout << "  nlm --enable-neuromodulation --enable-curiosity --enable-replay" << std::endl;
+    std::cout << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience

@@ -511,8 +511,40 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get sensory state from working memory or input
+        std::vector<float> currentSensoryState;
+        if (pImpl->workingMemory) {
+            currentSensoryState = pImpl->workingMemory->retrieve();
+        }
+        
+        // Also include current active neurons as part of state
+        std::vector<float> neuralActivityState;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || neuron->getState().membranePotential > neuron->getState().restingPotential + 5.0f) {
+                        neuralActivityState.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    } else {
+                        neuralActivityState.push_back(0.0f);
+                    }
+                }
+            }
+        }
+        
+        // Record sensory state for prediction
+        pImpl->predictionSystem->train(SensoryInput(combinedState));
+        
+        // Generate prediction for next timestep
+        auto predictedState = pImpl->predictionSystem->predictNextState(SensoryInput(combinedState));
+        
+        // Store prediction for attention and concept formation
+        if (pImpl->novelty) {
+            pImpl->novelty->updatePrediction(predictedState);
+        }
+        
+        if (pImpl->curiosity) {
+            pImpl->curiosity->updatePrediction(predictedState);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +556,56 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Use prediction error to modulate attention
+        if (pImpl->predictionSystem && pImpl->curiosity) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.5f) {
+                // High prediction error increases attention to novel patterns
+                pImpl->attention->applyBottomUpSalience(0, predictionError * 0.5f);
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Get current sensory state from working memory
+        std::vector<float> sensoryPattern;
+        if (pImpl->workingMemory) {
+            sensoryPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        // Also include active neural patterns
+        std::vector<float> neuralPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || neuron->getState().membranePotential > neuron->getState().restingPotential + 5.0f) {
+                        neuralPattern.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                    } else {
+                        neuralPattern.push_back(0.0f);
+                    }
+                }
+            }
+        }
+        
+        // Combine patterns for concept formation
+        std::vector<float> combinedPattern;
+        combinedPattern.reserve(sensoryPattern.size() + neuralPattern.size());
+        combinedPattern.insert(combinedPattern.end(), sensoryPattern.begin(), sensoryPattern.end());
+        combinedPattern.insert(combinedPattern.end(), neuralPattern.begin(), neuralPattern.end());
+        
+        // Process pattern for concept formation
+        pImpl->conceptFormation->processPattern(combinedPattern, currentTime);
+        
+        // Apply prediction influence to concept formation
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.3f) {
+                // High prediction error triggers new concept formation
+                pImpl->conceptFormation->triggerNewConcept();
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -895,8 +971,35 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
+        // Apply synapse states
+        // Create mapping from source-destination pairs to saved synapse properties
+        std::unordered_map<std::pair<NeuronId, NeuronId>, SynapseCheckpointData> synapseStates;
+        
+        for (size_t i = 0; i < synapseData.sourceNeuron.size(); ++i) {
+            NeuronId source = NeuronId(synapseData.sourceNeuron[i]);
+            NeuronId destination = NeuronId(synapseData.destinationNeuron[i]);
+            
+            synapseStates[std::make_pair(source, destination)] = {
+                synapseData.weight[i], synapseData.delay[i], synapseData.synapseType[i], synapseData.eligibilityTrace[i]
+            };
+        }
+        
+        // Apply saved states to existing synapses
+        for (auto& region : pImpl->regions) {
+            for (auto* syn : region->getSynapses()) {
+                std::pair<NeuronId, NeuronId> synKey(syn->getSourceNeuron(), syn->getDestinationNeuron());
+                
+                auto it = synapseStates.find(synKey);
+                if (it != synapseStates.end()) {
+                    // Restore synapse properties
+                    syn->setWeight(it->second.weight);
+                    syn->setDelay(it->second.delay);
+                    syn->setType(static_cast<SynapseType>(it->second.synapseType));
+                    syn->setEligibilityTrace(it->second.eligibilityTrace);
+                }
+            }
+        }
+        
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");
