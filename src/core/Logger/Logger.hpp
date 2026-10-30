@@ -44,21 +44,25 @@ public:
     explicit ConsoleLogger(LogLevel level);
     ~ConsoleLogger() override;
     
-    void log(const LogEntry& entry) override;
+void log(const LogEntry& entry) override;
     void setLevel(LogLevel level) override;
     LogLevel getLevel() const override;
     
-    // Enable/disable colors
-    void setUseColors(bool useColors);
-    bool getUseColors() const;
+    // Enable/disable log rotation
+    void setEnableRotation(bool enable);
+    bool getEnableRotation() const;
+    
+    // Set maximum file size for rotation
+    void setMaxFileSize(size_t maxSize);
+    size_t getMaxFileSize() const;
     
     // Set output file (in addition to console)
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Enable/disable colors
+    void setUseColors(bool useColors);
+    bool getUseColors() const;
     
     std::string levelToString(LogLevel level) const;
     std::string levelToColor(LogLevel level) const;

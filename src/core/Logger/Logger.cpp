@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <filesystem>
 
 namespace nlm {
 
@@ -12,7 +13,22 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    // Log rotation
+    std::string filepath;
+    size_t maxFileSize = 10 * 1024 * 1024;  // 10 MB
+    size_t currentFileSize = 0;
+    int fileNumber = 0;
+    bool enableRotation = true;
 };
+
+// Helper function to get directory path from file path
+static std::string getDirectoryPath(const std::string& filepath) {
+    size_t pos = filepath.find_last_of("/\\");
+    if (pos == std::string::npos) {
+        return ".";
+    }
+    return filepath.substr(0, pos);
+}
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
 
@@ -47,10 +63,28 @@ void ConsoleLogger::log(const LogEntry& entry) {
         std::cout << output << "\n";
     }
     
-    // File output if set
+    // File output with rotation support
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        // Check if rotation is needed
+        if (pImpl->enableRotation && pImpl->currentFileSize + output.size() + 1 > pImpl->maxFileSize) {
+            // Close current file
+            pImpl->fileOut.close();
+            
+            // Rotate file
+            std::string rotatedPath = pImpl->filepath;
+            if (pImpl->fileNumber > 0) {
+                rotatedPath = pImpl->filepath + "." + std::to_string(pImpl->fileNumber);
+            }
+            pImpl->fileOut.open(rotatedPath, std::ios::trunc);
+            pImpl->fileNumber++;
+            pImpl->currentFileSize = 0;
+        }
+        
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut << output << "\n";
+            pImpl->currentFileSize += output.size() + 1;
+            pImpl->fileOut.flush();
+        }
     }
 }
 
@@ -71,13 +105,53 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
-}
-
-void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Close existing file if open
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
+    
+    pImpl->filepath = filepath;
+    pImpl->fileNumber = 0;
+    pImpl->currentFileSize = 0;
+    
+    // Ensure directory exists
+    std::string dir = getDirectoryPath(filepath);
+    if (!dir.empty() && !std::filesystem::exists(dir)) {
+        std::filesystem::create_directories(dir);
+    }
+    
+    // Open file for appending
+    pImpl->fileOut.open(filepath, std::ios::app);
+    if (pImpl->fileOut.is_open()) {
+        // Try to get file size to support rotation
+        std::error_code ec;
+        pImpl->currentFileSize = std::filesystem::file_size(filepath, ec);
+    }
+}
+
+void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+}
+
+void ConsoleLogger::setEnableRotation(bool enable) {
+    pImpl->enableRotation = enable;
+}
+
+bool ConsoleLogger::getEnableRotation() const {
+    return pImpl->enableRotation;
+}
+
+void ConsoleLogger::setMaxFileSize(size_t maxSize) {
+    pImpl->maxFileSize = maxSize;
+}
+
+size_t ConsoleLogger::getMaxFileSize() const {
+    return pImpl->maxFileSize;
 }
 
 std::string ConsoleLogger::levelToString(LogLevel level) const {
