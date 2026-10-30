@@ -291,9 +291,38 @@ float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
     return 1.0f - (totalVariance / concept->instances.size());
 }
 
-void ConceptFormation::clear() {
-    concepts_.clear();
-    nextConceptId_ = 1;
+void ConceptFormation::updateWithPattern(const std::vector<float>& pattern,
+                                        SimulationStep currentStep) {
+    if (pattern.empty() || !brain_) return;
+    
+    // Extract features from pattern (simplified - could use more sophisticated feature extraction)
+    std::vector<float> features;
+    features.reserve(pattern.size());
+    
+    // Feature extraction: compute basic statistics
+    float mean = 0.0f, stddev = 0.0f;
+    for (float val : pattern) {
+        mean += val;
+    }
+    mean /= pattern.size();
+    
+    for (float val : pattern) {
+        float diff = val - mean;
+        stddev += diff * diff;
+    }
+    stddev = std::sqrt(stddev / pattern.size());
+    
+    if (stddev > 0.001f) {
+        for (float val : pattern) {
+            features.push_back((val - mean) / stddev);  // Normalize
+        }
+    } else {
+        features = pattern;  // Use raw pattern if no variance
+    }
+    
+    // Present to concept formation system
+    // Use average reward as 0.5 for neural activity patterns
+    presentExperience(features, features, 0.5f, currentStep);
 }
 
 // SpatialRepresentation Implementation

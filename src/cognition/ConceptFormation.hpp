@@ -138,6 +138,9 @@ public:
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
 
+    // Update concept with neural activity pattern
+    void updateWithPattern(const std::vector<float>& pattern, SimulationStep currentStep);
+
 private:
     // Create new concept from pattern
     size_t createConcept(const std::vector<float>& pattern,
@@ -156,7 +159,7 @@ private:
     Brain* brain_;
     std::vector<DiscoveredConcept> concepts_;
     size_t nextConceptId_;
-    
+
     // Parameters
     float formationThreshold_;  // Similarity threshold for forming new concept
     float stabilityThreshold_;   // Stability needed to be considered stable

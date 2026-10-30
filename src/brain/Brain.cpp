@@ -15,6 +15,9 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/EventQueue.hpp"
+#include "../performance/SparseConnectivity.hpp"
 #include <fstream>
 #include <algorithm>
 #include <cmath>
@@ -27,6 +30,13 @@ struct Brain::Impl {
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // ========== PERFORMANCE INFRASTRUCTURE ==========
+    std::unique_ptr<MemoryPool<NeuronState>> neuronPool;
+    std::unique_ptr<MemoryPool<Synapse>> synapsePool;
+    std::unique_ptr<SpikeRingBuffer> spikeQueue;
+    std::unique_ptr<DelayedSpikeQueue> delayedSpikeQueue;
+    std::unique_ptr<SparseConnectivity> sparseConnectivity;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -245,7 +255,7 @@ bool Brain::initialize() {
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
-    // Initialize cognition systems
+    // Initialize cognitive systems
     pImpl->planner->initialize(this);
     pImpl->planner->setPlanningDepth(5);
     
@@ -254,6 +264,27 @@ bool Brain::initialize() {
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
+    
+    // ========== INITIALIZE PERFORMANCE INFRASTRUCTURE ==========
+    
+    // Initialize spike event queues
+    pImpl->spikeQueue = std::make_unique<SpikeRingBuffer>();
+    pImpl->delayedSpikeQueue = std::make_unique<DelayedSpikeQueue>();
+    
+    // Initialize memory pools
+    pImpl->neuronPool = std::make_unique<MemoryPool<NeuronState>>(1024, 4);
+    pImpl->synapsePool = std::make_unique<MemoryPool<Synapse>>(1024, 4);
+    
+    // Initialize sparse connectivity
+    pImpl->sparseConnectivity = std::make_unique<SparseConnectivity>();
+    pImpl->sparseConnectivity->reserveNeurons(neuronCount);
+    
+    // Register with spike system for event-driven processing
+    // This will replace the current inefficient spike handling
+    
+    // Configure event queues
+    size_t spikeBufferSize = pImpl->config->getOr<size_t>("spike_queue_capacity", 16384);
+    pImpl->spikeQueue->clear();
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -264,6 +295,13 @@ bool Brain::initialize() {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
+        
+        // Queue spike event for efficient processing
+        if (pImpl->spikeQueue) {
+            QueuedSpikeEvent qEvent(event.sourceNeuron, event.destinationNeuron, 
+                                   event.synapseId, event.weight, event.isExcitatory);
+            pImpl->spikeQueue->push(qEvent);
+        }
     });
     
     // Register delayed spike handler to deliver synaptic input
@@ -284,6 +322,13 @@ bool Brain::initialize() {
                 }
             }
         }
+        
+        // Also queue for delayed spike queue if available
+        if (pImpl->delayedSpikeQueue) {
+            pImpl->delayedSpikeQueue->schedule(
+                event.source_neuron, event.destination_neuron, event.synapse_id,
+                event.weight, event.is_excitatory, event.delivery_step);
+        }
     });
     
     // Configure checkpoint manager
@@ -295,6 +340,7 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    NLM_LOG_INFO("Spike queue capacity: " + std::to_string(pImpl->spikeQueue->capacity()));
     
     return true;
 }
@@ -511,8 +557,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with sensory input
+        // Convert sensory input to neural pattern for prediction
+        if (currentStep > 0) {
+            // Get last sensory input (stored from previous step)
+            // This would be updated in receiveSensoryInput()
+        }
+        
+        // Update prediction using current neural activity
+        auto* predictionSys = pImpl->predictionSystem.get();
+        if (predictionSys) {
+            // Get current sensory-like state from neural activity
+            std::vector<float> currentState;
+            currentState.reserve(pImpl->sensoryNeurons.size());
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                if (neuron->isFiring() || neuron->getState().firingState != FiringState::Idle) {
+                    currentState.push_back(std::abs(neuron->getState().membranePotential - 
+                                                 neuron->getState().restingPotential) / 20.0f);
+                } else {
+                    currentState.push_back(0.0f);
+                }
+            }
+            
+            if (!currentState.empty()) {
+                predictionSys->updateWithObservation(currentState, currentStep);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -528,8 +598,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This requires sensory state encoding and pattern clustering
+        std::vector<float> currentNeuralActivity;
+        
+        // Gather neural activity from sensory and internal neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    float activation = std::abs(neuron->getState().membranePotential - 
+                                              neuron->getState().restingPotential) / 20.0f;
+                    currentNeuralActivity.push_back(activation);
+                }
+            }
+        }
+        
+        if (!currentNeuralActivity.empty()) {
+            // Form concepts from neural patterns
+            // In a real implementation, this would use neural clustering algorithms
+            pImpl->conceptFormation->updateWithPattern(currentNeuralActivity, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -895,8 +983,27 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
+        // Apply synapse states - recreate synapses for each neuron pair
+        size_t synapseIdx = 0;
+        for (auto& region : pImpl->regions) {
+            for (auto* sourceNeuron : region->getAllNeurons()) {
+                // Find outgoing synapses for this source neuron
+                for (auto* syn : region->getSynapsesFrom(sourceNeuron->getId())) {
+                    if (synapseIdx < synapseData.weight.size()) {
+                        // Update existing synapse weight and properties
+                        syn->setWeight(synapseData.weight[synapseIdx]);
+                        syn->setDelay(synapseData.delay[synapseIdx]);
+                        syn->setType(static_cast<SynapseType>(synapseData.synapseType[synapseIdx]));
+                        syn->setEligibilityTrace(synapseData.eligibilityTrace[synapseIdx]);
+                        synapseIdx++;
+                    }
+                }
+            }
+        }
+        
+        // Restore spike system state if available
+        // This would require extending CheckpointSystem to include spike data
+        
         NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         
         NLM_LOG_INFO("Brain state loaded successfully");
