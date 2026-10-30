@@ -18,6 +18,14 @@ enum class LogLevel {
     Critical = 4
 };
 
+// Log format options
+enum class LogFormat {
+    Standard,
+    Detailed,
+    Compact,
+    JSON
+};
+
 // Log entry structure
 struct LogEntry {
     LogLevel level;
@@ -48,21 +56,30 @@ public:
     void setLevel(LogLevel level) override;
     LogLevel getLevel() const override;
     
-    // Enable/disable colors
-    void setUseColors(bool useColors);
-    bool getUseColors() const;
-    
     // Set output file (in addition to console)
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Configure log format
+    void setFormat(LogFormat format);
+    LogFormat getFormat() const;
+    
+    // Configure file rotation
+    void setMaxFileSize(size_t maxSize);
+    void setMaxFileCount(size_t maxCount);
+    
+    // Configure timestamps and file info
+    void setTimestamps(bool useTimestamps);
+    void setFileInfo(bool useFileInfo);
+    
+    // Async logging options (for Logger class)
+    void setAsync(bool enable);
+    size_t getAsyncQueueSize() const;
+    void setAsyncQueueSize(size_t size);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    std::string levelToString(LogLevel level) const;
-    std::string levelToColor(LogLevel level) const;
-};
 
 // Main Logger class
 class Logger {
@@ -82,6 +99,11 @@ public:
     
     // Set minimum level for all loggers
     void setLevel(LogLevel level);
+    
+    // Configure async logging
+    void setAsync(bool enable);
+    size_t getAsyncQueueSize() const;
+    void setAsyncQueueSize(size_t size);
     
     // Global logging functions
     void log(LogLevel level, const std::string& message, 
