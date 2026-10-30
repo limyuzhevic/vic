@@ -199,17 +199,117 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-// Explicit template instantiations
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm
+    // Add validation method to Config class
+    bool validate() const {
+        std::string errors;
+        
+        // Validate simulation_timestep
+        if (auto ts = get<double>("simulation_timestep")) {
+            if (*ts <= 0.0) {
+                errors += "simulation_timestep must be positive (got " + std::to_string(*ts) + ")\n";
+            }
+            if (*ts > 0.1) {  // Reasonable upper bound
+                errors += "simulation_timestep should be small (< 0.1s) for numerical stability (got " + std::to_string(*ts) + ")\n";
+            }
+        }
+        
+        // Validate neuron_count
+        if (auto nc = get<size_t>("neuron_count")) {
+            if (*nc == 0) {
+                errors += "neuron_count must be positive (got " + std::to_string(*nc) + ")\n";
+            }
+            if (*nc > 1000000) {
+                errors += "neuron_count seems too large for single simulation (got " + std::to_string(*nc) + ")\n";
+            }
+        }
+        
+        // Validate region_count
+        if (auto rc = get<size_t>("region_count")) {
+            if (*rc < 1) {
+                errors += "region_count must be at least 1 (got " + std::to_string(*rc) + ")\n";
+            }
+        }
+        
+        // Validate connection_probability
+        if (auto cp = get<double>("connection_probability")) {
+            if (*cp < 0.0 || *cp > 1.0) {
+                errors += "connection_probability must be between 0 and 1 (got " + std::to_string(*cp) + ")\n";
+            }
+        }
+        
+        // Validate dopamine_baseline
+        if (auto db = get<double>("dopamine_baseline")) {
+            if (*db < 0.0 || *db > 1.0) {
+                errors += "dopamine_baseline should be between 0.0 and 1.0 (got " + std::to_string(*db) + ")\n";
+            }
+        }
+        
+        // Validate reward_discount_factor
+        if (auto rdf = get<double>("reward_discount_factor")) {
+            if (*rdf < 0.0 || *rdf > 1.0) {
+                errors += "reward_discount_factor must be between 0 and 1 (got " + std::to_string(*rdf) + ")\n";
+            }
+        }
+        
+        // Validate environment dimensions
+        if (auto ew = get<size_t>("environment_width")) {
+            if (*ew == 0) {
+                errors += "environment_width must be positive (got " + std::to_string(*ew) + ")\n";
+            }
+        }
+        
+        if (auto eh = get<size_t>("environment_height")) {
+            if (*eh == 0) {
+                errors += "environment_height must be positive (got " + std::to_string(*eh) + ")\n";
+            }
+        }
+        
+        // Validate max_simulation_steps
+        if (auto max_steps = get<size_t>("max_simulation_steps")) {
+            if (*max_steps == 0) {
+                errors += "max_simulation_steps must be positive (got " + std::to_string(*max_steps) + ")\n";
+            }
+            if (*max_steps > 1000000000) {
+                errors += "max_simulation_steps seems too large (got " + std::to_string(*max_steps) + ")\n";
+            }
+        }
+        
+        // Validate development rates
+        if (auto sr = get<double>("synaptogenesis_rate")) {
+            if (*sr < 0.0) {
+                errors += "synaptogenesis_rate must be non-negative (got " + std::to_string(*sr) + ")\n";
+            }
+            if (*sr > 1.0) {
+                errors += "synaptogenesis_rate should be <= 1.0 (got " + std::to_string(*sr) + ")\n";
+            }
+        }
+        
+        if (auto pr = get<double>("pruning_rate")) {
+            if (*pr < 0.0) {
+                errors += "pruning_rate must be non-negative (got " + std::to_string(*pr) + ")\n";
+            }
+            if (*pr > 1.0) {
+                errors += "pruning_rate should be <= 1.0 (got " + std::to_string(*pr) + ")\n";
+            }
+        }
+        
+        // Validate plasticity parameters
+        if (auto ltp = get<double>("stdp_ltp_weight")) {
+            if (*ltp < 0.0) {
+                errors += "stdp_ltp_weight must be non-negative (got " + std::to_string(*ltp) + ")\n";
+            }
+        }
+        
+        if (auto ltd = get<double>("stdp_ltd_weight")) {
+            if (*ltd < 0.0) {
+                errors += "stdp_ltd_weight must be non-negative (got " + std::to_string(*ltd) + ")\n";
+            }
+        }
+        
+        if (!errors.empty()) {
+            std::cerr << "Configuration validation failed:\n" << errors;
+            return false;
+        }
+        
+        return true;
+    }
