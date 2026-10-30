@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+// Real terminal-based visualization implementation
 class VisualizationInterface {
 public:
     VisualizationInterface();
@@ -43,6 +43,19 @@ public:
     
     // Weight matrix visualization
     void visualizeWeights(const class Brain& brain);
+    
+    // Terminal-based visualization methods (private implementation details)
+    void visualizeNetworkTerminal();
+    void visualizeActivityTerminal();
+    void visualizeSpikesTerminal();
+    void visualizeWeightsTerminal();
+    
+    // Helper methods
+    std::string getColorCode(float value, const std::string& scheme);
+    std::string getNeuronSymbol(float activity);
+    void drawRectangle(int x, int y, int width, int height);
+    void drawText(int x, int y, const std::string& text);
+    void drawLine(int x1, int y1, int x2, int y2);
     
 private:
     struct Impl;

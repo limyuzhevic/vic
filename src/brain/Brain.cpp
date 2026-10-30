@@ -134,13 +134,34 @@ struct Brain::Impl {
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
         float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
         float tau = config->getOr<float>("stdp_tau", 20.0f);
+        float stdpLearningRate = config->getOr<float>("stdp_learning_rate", 0.01f);
         stdp->configure(ltpWeight, ltdWeight, tau);
+        stdp->setLearningRate(stdpLearningRate);
         
         // Configure structural plasticity
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
         structuralPlasticity->setPruningRate(pruningRate);
+        
+        // Configure neuromodulation with advanced settings
+        float dopamineBaseline = config->getOr<float>("dopamine_baseline", 0.1f);
+        float dopamineDecayRate = config->getOr<float>("dopamine_decay_rate", 0.01f);
+        float dopaminePeakLevel = config->getOr<float>("dopamine_peak_level", 1.0f);
+        pImpl->dopamine->configure(dopamineBaseline, dopamineDecayRate, dopaminePeakLevel);
+        
+        // Configure curiosity system
+        float curiosityBaseline = config->getOr<float>("curiosity_baseline", 0.05f);
+        float curiosityGain = config->getOr<float>("curiosity_gain", 0.1f);
+        pImpl->curiosity->configure(curiosityBaseline, curiosityGain);
+        
+        // Configure novelty detection
+        float noveltyThreshold = config->getOr<float>("novelty_threshold", 0.3f);
+        pImpl->novelty->setThreshold(noveltyThreshold);
+        
+        // Configure prediction error system
+        float predictionErrorWeight = config->getOr<float>("prediction_error_weight", 0.5f);
+        pImpl->predictionError->setWeight(predictionErrorWeight);
         
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -231,23 +252,26 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
+    // Initialize working memory with advanced configuration
     pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    pImpl->workingMemory->setCapacity(config->getOr<size_t>("working_memory_capacity", neuronCount / 10));
+    pImpl->workingMemory->setDecayRate(config->getOr<float>("working_memory_decay_rate", 0.01f));
     
-    // Initialize episodic memory
+    // Initialize episodic memory with advanced configuration
     pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    pImpl->episodicMemory->setMaxEpisodes(config->getOr<size_t>("episodic_memory_capacity", 1000));
+    pImpl->episodicMemory->setDecayRate(config->getOr<float>("episodic_memory_decay_rate", 0.001f));
     
-    // Initialize associative memory
+    // Initialize associative memory with strength configuration
     pImpl->associativeMemory->initialize(this);
+    pImpl->associativeMemory->setConnectionStrength(config->getOr<float>("associative_memory_strength", 0.8f));
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    pImpl->planner->setPlanningDepth(config->getOr<size_t>("prediction_horizon", 10));
     
     pImpl->conceptFormation->initialize(this);
     
