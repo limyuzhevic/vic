@@ -1,4 +1,3 @@
-// NLM (熙然) - Neural Learning Machine
 // Phase 2: Real Neural Computation
 //
 // This phase implements real spiking neural computation with:
@@ -25,6 +24,11 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
+#include <ctime>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
 
 using namespace nlm;
 

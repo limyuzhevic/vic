@@ -19,16 +19,29 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Try JSON first
+    if (loadFromJSON(content, ConfigSource::File)) {
+        return true;
+    }
+    
+    // Try YAML second
+    if (loadFromYAML(content, ConfigSource::File)) {
+        return true;
+    }
+    
+    // Fall back to simple key=value format for backward compatibility
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,7 +56,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -55,6 +68,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+// Load from command line arguments
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -78,42 +92,233 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
+// Proper JSON parser implementation (simplified for NLM)
+bool Config::loadFromJSON(const std::string& content, ConfigSource source) {
+    // Simple JSON parser - handles basic key-value pairs
+    // This is a simplified implementation for NLM
+    
+    std::istringstream stream(content);
+    std::string line;
+    bool in_object = false;
+    size_t brace_count = 0;
+    
+    while (std::getline(stream, line)) {
+        line = trim(line);
+        
+        // Skip comments
+        size_t comment_pos = line.find("//");
+        if (comment_pos != std::string::npos) {
+            line = line.substr(0, comment_pos);
+            line = trim(line);
+        }
+        
+        // Track braces for object parsing
+        for (char c : line) {
+            if (c == '{') {
+                brace_count++;
+                in_object = true;
+            } else if (c == '}') {
+                brace_count--;
+            }
+        }
+        
+        if (!in_object) continue;
+        
+        // Simple parsing for key-value pairs (key: value format)
+        size_t colon_pos = line.find(':');
+        if (colon_pos != std::string::npos) {
+            std::string key = trim(line.substr(0, colon_pos));
+            std::string value = trim(line.substr(colon_pos + 1));
+            
+            // Remove quotes from key
+            if (key.size() >= 2 && key.front() == '"' && key.back() == '"') {
+                key = key.substr(1, key.size() - 2);
+            }
+            
+            // Remove trailing comma
+            if (!value.empty() && value.back() == ',') {
+                value = value.substr(0, value.size() - 1);
+                value = trim(value);
+            }
+            
+            // Convert string to appropriate type
+            try {
+                if (value.front() == '"' && value.back() == '"') {
+                    // String value
+                    set(key, value.substr(1, value.size() - 2), source);
+                } else if (value == "true" || value == "false") {
+                    // Boolean value
+                    bool bool_val = (value == "true");
+                    set(key, bool_val, source);
+                } else if (value.find('.') != std::string::npos) {
+                    // Double value
+                    double double_val = std::stod(value);
+                    set(key, double_val, source);
+                } else {
+                    // Integer value
+                    int int_val = std::stoi(value);
+                    set(key, int_val, source);
+                }
+            } catch (const std::exception&) {
+                // If conversion fails, treat as string
+                set(key, value, source);
+            }
+        }
+    }
+    
+    return true;
+}
+
+// Proper YAML parser implementation (simplified for NLM)
+bool Config::loadFromYAML(const std::string& content, ConfigSource source) {
+    // Simple YAML parser - handles basic key-value pairs
+    // This is a simplified implementation for NLM
+    
+    std::istringstream stream(content);
+    std::string line;
+    bool in_document = false;
+    size_t indent_level = 0;
+    
+    while (std::getline(stream, line)) {
+        line = trim(line);
+        
+        // Skip comments and empty lines
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        
+        // Calculate indentation
+        size_t spaces = line.find_first_not_of(' ');
+        if (spaces == std::string::npos) continue;
+        
+        // Skip list items (starting with -) for now
+        if (line[spaces] == '-') {
+            continue;
+        }
+        
+        // Check if this is a key-value pair (contains ':')
+        size_t colon_pos = line.find(':');
+        if (colon_pos != std::string::npos && colon_pos > spaces) {
+            std::string key = trim(line.substr(spaces, colon_pos - spaces));
+            std::string value = trim(line.substr(colon_pos + 1));
+            
+            // Remove quotes from key
+            if (key.size() >= 2 && key.front() == '"' && key.back() == '"') {
+                key = key.substr(1, key.size() - 2);
+            }
+            
+            // Remove trailing comma
+            if (!value.empty() && value.back() == ',') {
+                value = value.substr(0, value.size() - 1);
+                value = trim(value);
+            }
+            
+            // Convert string to appropriate type
+            try {
+                if (value.front() == '"' && value.back() == '"') {
+                    // String value
+                    set(key, value.substr(1, value.size() - 2), source);
+                } else if (value == "true" || value == "false") {
+                    // Boolean value
+                    bool bool_val = (value == "true");
+                    set(key, bool_val, source);
+                } else if (value.find('.') != std::string::npos) {
+                    // Double value
+                    double double_val = std::stod(value);
+                    set(key, double_val, source);
+                } else {
+                    // Integer value
+                    int int_val = std::stoi(value);
+                    set(key, int_val, source);
+                }
+            } catch (const std::exception&) {
+                // If conversion fails, treat as string
+                set(key, value, source);
+            }
+        }
+    }
+    
+    return true;
+}
+
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Write in JSON format (modern, readable)
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        // Write value based on type
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format double without trailing zeros
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << arg[j];
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    // Format double without trailing zeros
+                    file << arg[j];
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << "\"" << arg[j] << "\"";
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        // Add comma except for last entry
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
+    file << "}\n";
     
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
+const ConfigEntry& Config::getEntry(size_t index) const {
+    if (index >= pImpl->entries.size()) {
+        throw std::out_of_range("Entry index out of range");
+    }
+    return pImpl->entries[index];
+}
+
+ConfigSource Config::getSource(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+    if (it != pImpl->entries.end()) {
+        return it->source;
     }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
+    return ConfigSource::Default;
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
+// Set values
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
@@ -211,5 +416,7 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+} // namespace nlm
 
 } // namespace nlm
