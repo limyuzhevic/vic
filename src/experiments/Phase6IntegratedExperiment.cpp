@@ -1,11 +1,13 @@
 #include "Phase6IntegratedExperiment.hpp"
+#include "Phase6Config.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
-#include "../brain/Brain.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../agent/AgentBrain.hpp"
 #include <chrono>
 #include <cmath>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+#include <algorithm>
 
 namespace nlm {
 
@@ -15,7 +17,7 @@ Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
 
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
     Phase6IntegrationResult result;
-    result.startTime = time(nullptr);
+    result.startTime = std::time(nullptr);
     
     auto startWall = std::chrono::high_resolution_clock::now();
     
@@ -23,27 +25,41 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
+    // Create configuration using constants
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", config.neuronCount);
-    cfg->set("region_count", config.regionCount);
-    cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
     
-    // Create brain
+    // Validate configuration using Phase6ConfigValidator
+    Phase6ConfigValidator validator;
+    if (!validator.validate(config)) {
+        NLM_LOG_ERROR("Configuration validation failed");
+        auto errors = validator.getValidationErrors();
+        for (const auto& error : errors) {
+            NLM_LOG_ERROR("  " + error);
+        }
+        result.endTime = std::time(nullptr);
+        return result;
+    }
+    
+    // Set configuration with validation
+    cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount), ConfigSource::Runtime);
+    cfg->set("region_count", static_cast<int64_t>(config.regionCount), ConfigSource::Runtime);
+    cfg->set("connection_probability", config.connectionProbability, ConfigSource::Runtime);
+    cfg->set("stdp_ltp_weight", Phase6Constants::DEFAULT_STDP_LTP_WEIGHT, ConfigSource::Runtime);
+    cfg->set("stdp_ltd_weight", Phase6Constants::DEFAULT_STDP_LTD_WEIGHT, ConfigSource::Runtime);
+    cfg->set("synaptogenesis_rate", Phase6Constants::DEFAULT_SYNAPTOGENESIS_RATE, ConfigSource::Runtime);
+    cfg->set("pruning_rate", Phase6Constants::DEFAULT_PRUNING_RATE, ConfigSource::Runtime);
+    
+    // Create brain with validated configuration
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain");
-        result.endTime = time(nullptr);
+        result.endTime = std::time(nullptr);
         return result;
     }
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.initialize(Phase6Constants::DEFAULT_REGION_COUNT * 2, Phase6Constants::DEFAULT_REGION_COUNT * 2);
     
     // Create agent
     AgentBrain agent(brain);
@@ -55,10 +71,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
+    // Run simulation with performance monitoring
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
+    size_t performanceSampleInterval = Phase6Constants::DEFAULT_PERFORMANCE_SAMPLE_INTERVAL;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
@@ -68,7 +85,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         agent.processSensoryInput(percept);
         
         // Brain step
-        brain->step(step, step * 0.001);
+        brain->step(step, step * Phase6Constants::DEFAULT_TIMESTEP);
         
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
@@ -85,20 +102,30 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         
         // Update development
         if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
+            agent.updateDevelopment(Phase6Constants::DEFAULT_TIMESTEP);
         }
         
         // Collect metrics
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
-        // Periodic status
-        if (step % 1000 == 0) {
+        // Periodic status and performance monitoring
+        if (step % performanceSampleInterval == 0) {
+            auto currentWall = std::chrono::high_resolution_clock::now();
+            double elapsedWall = std::chrono::duration<double>(currentWall - startWall).count();
+            
             NLM_LOG_INFO("Step " + std::to_string(step) + 
                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+                        " | Wall Time: " + std::to_string(elapsedWall) + "s" +
                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
                             brain->getWorkingMemory()->getActiveTraces() : 0));
+            
+            // Check for timeout
+            if (elapsedWall > Phase6Constants::MAX_WALL_CLOCK_TIME) {
+                NLM_LOG_WARNING("Wall clock time exceeded, stopping early");
+                break;
+            }
         }
     }
     
@@ -146,7 +173,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         }
     }
     
-    result.endTime = time(nullptr);
+    result.endTime = std::time(nullptr);
     auto endWall = std::chrono::high_resolution_clock::now();
     result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
     
@@ -162,10 +189,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
 bool Phase6IntegratedExperiment::verifyIntegration() {
     NLM_LOG_INFO("=== Phase 6 Integration Verification ===");
     
-    // Create minimal brain
+    // Create minimal brain using constants
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
-    cfg->set("region_count", 1);
+    cfg->set("neuron_count", Phase6Constants::MIN_NEURON_COUNT);
+    cfg->set("region_count", Phase6Constants::DEFAULT_REGION_COUNT);
     
     auto brain = std::make_shared<Brain>(cfg);
     if (!brain->initialize()) {
@@ -250,7 +277,7 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     NLM_LOG_INFO("=== Testing Memory Integration ===");
     
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    cfg->set("neuron_count", Phase6Constants::MIN_NEURON_COUNT);
     
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
@@ -290,7 +317,7 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
     NLM_LOG_INFO("=== Testing Neuromodulation Integration ===");
     
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    cfg->set("neuron_count", Phase6Constants::MIN_NEURON_COUNT);
     
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
@@ -320,7 +347,7 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("=== Testing Checkpoint Save/Load ===");
     
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    cfg->set("neuron_count", Phase6Constants::MIN_NEURON_COUNT);
     
     // Create and initialize brain
     auto brain1 = std::make_shared<Brain>(cfg);
@@ -367,7 +394,7 @@ bool Phase6IntegratedExperiment::testReplay() {
     NLM_LOG_INFO("=== Testing Replay System ===");
     
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    cfg->set("neuron_count", Phase6Constants::MIN_NEURON_COUNT);
     
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
