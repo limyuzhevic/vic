@@ -21,70 +21,48 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
-add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/WorkingMemory.cpp
-    src/memory/EpisodicMemory.cpp
-    src/memory/SemanticMemory.cpp
-    src/memory/ProceduralMemory.cpp
-    src/memory/AssociativeMemory.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/environment/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
-    # Visualization
-    src/visualization/VisualizationInterface.cpp
+# Modular build system - add all subdirectories
+add_subdirectory(src/core)
+add_subdirectory(src/brain)
+add_subdirectory(src/dynamics)
+add_subdirectory(src/plasticity)
+add_subdirectory(src/development)
+add_subdirectory(src/neuromodulation)
+add_subdirectory(src/memory)
+add_subdirectory(src/cognition)
+add_subdirectory(src/sensory)
+add_subdirectory(src/prediction)
+add_subdirectory(src/motor)
+add_subdirectory(src/environment)
+add_subdirectory(src/experiments)
+add_subdirectory(src/agent)
+add_subdirectory(src/world)
+add_subdirectory(src/visualization)
+add_subdirectory(src/performance)
+
+# Main executable
+add_executable(nlm
+    src/main.cpp
+)
+
+target_link_libraries(nlm PUBLIC
+    nlm_core
+    nlm_brain
+    nlm_dynamics
+    nlm_plasticity
+    nlm_development
+    nlm_neuromodulation
+    nlm_memory
+    nlm_cognition
+    nlm_sensory
+    nlm_prediction
+    nlm_motor
+    nlm_environment
+    nlm_experiments
+    nlm_agent
+    nlm_world
+    nlm_visualization
+    nlm_performance
 )
 
 target_include_directories(nlm_core PUBLIC
