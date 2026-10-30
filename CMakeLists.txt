@@ -26,15 +26,23 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/ConfigValidator.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/ErrorHandling/EnhancedErrorHandling.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
+    src/brain/BrainConstructor.cpp
+    src/brain/BrainImplementation.cpp
+    src/brain/BrainRegionManager.cpp
+    src/brain/BrainStatistics.cpp
+    src/brain/BrainPersistence.cpp
+    src/brain/BrainInitialization.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -127,6 +135,20 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
+# Advanced profiler library
+add_library(nlm_profiler STATIC
+    src/profiling/AdvancedProfiler.cpp
+)
+target_include_directories(nlm_profiler PUBLIC src)
+target_link_libraries(nlm_profiler PUBLIC nlm_core)
+
+# Script engine library
+add_library(nlm_scripting STATIC
+    src/scripting/ScriptEngine.cpp
+)
+target_include_directories(nlm_scripting PUBLIC src)
+target_link_libraries(nlm_scripting PUBLIC nlm_core)
+
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
@@ -142,6 +164,20 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Configuration validation test
+add_executable(config_validation_test test_config_validation.cpp)
+target_link_libraries(config_validation_test PUBLIC nlm_core)
+
+# Advanced profiler test
+add_executable(advanced_profiler_test
+    src/profiling/AdvancedProfiler.cpp
+)
+target_link_libraries(advanced_profiler_test PUBLIC nlm_core nlm_profiler)
+
+# Comprehensive improvements test
+add_executable(test_improvements test_improvements.cpp)
+target_link_libraries(test_improvements PUBLIC nlm_core nlm_profiler nlm_scripting)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
