@@ -8,6 +8,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <map>
 
 namespace nlm {
 
@@ -170,8 +171,8 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
@@ -183,6 +184,9 @@ public:
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
+    
+    // Get all neuromodulation levels for monitoring
+    std::map<std::string, float> getNeuromodulationLevels() const;
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

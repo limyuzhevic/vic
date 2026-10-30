@@ -104,7 +104,7 @@ void testBrainActionProduction() {
     std::cout << "    testBrainActionProduction passed" << std::endl;
 }
 
-void testBrainStatus() {
+void testBrainNeuromodulationLevels() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
@@ -112,13 +112,34 @@ void testBrainStatus() {
     nlm::Brain brain(config);
     brain.initialize();
     
-    // Verify statistics are accessible
-    assert(brain.getTotalNeuronCount() > 0);
-    assert(brain.getTotalSynapseCount() >= 0);
-    assert(brain.getFiringNeuronCount() >= 0);
-    assert(brain.getAverageFiringRate() >= 0.0f);
+    // Get neuromodulation levels
+    auto levels = brain.getNeuromodulationLevels();
     
-    std::cout << "    testBrainStatus passed" << std::endl;
+    // Verify we get a map with expected keys
+    assert(!levels.empty());
+    
+    // Check that common neuromodulators are present
+    if (brain.getDopamine()) {
+        assert(levels.find("dopamine") != levels.end());
+        assert(levels["dopamine"] >= 0.0f);
+    }
+    
+    if (brain.getCuriosity()) {
+        assert(levels.find("curiosity") != levels.end());
+        assert(levels["curiosity"] >= 0.0f);
+    }
+    
+    if (brain.getNovelty()) {
+        assert(levels.find("novelty") != levels.end());
+        assert(levels["novelty"] >= 0.0f);
+    }
+    
+    if (brain.getPredictionErrorSignal()) {
+        assert(levels.find("prediction_error") != levels.end());
+        assert(levels["prediction_error"] >= 0.0f);
+    }
+    
+    std::cout << "    testBrainNeuromodulationLevels passed" << std::endl;
 }
 
 void runAll() {
@@ -129,6 +150,7 @@ void runAll() {
     testBrainRegions();
     testBrainActionProduction();
     testBrainStatus();
+    testBrainNeuromodulationLevels();
 }
 
 } // namespace test_brain

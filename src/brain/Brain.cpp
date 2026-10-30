@@ -1069,6 +1069,29 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
+// Get all neuromodulation levels for monitoring
+std::map<std::string, float> Brain::getNeuromodulationLevels() const {
+    std::map<std::string, float> levels;
+    
+    if (pImpl->dopamine) {
+        levels["dopamine"] = pImpl->dopamine->getLevel();
+    }
+    
+    if (pImpl->curiosity) {
+        levels["curiosity"] = pImpl->curiosity->getLevel();
+    }
+    
+    if (pImpl->novelty) {
+        levels["novelty"] = pImpl->novelty->getLevel();
+    }
+    
+    if (pImpl->predictionError) {
+        levels["prediction_error"] = pImpl->predictionError->getLevel();
+    }
+    
+    return levels;
+}
+
 std::shared_ptr<const Config> Brain::getConfig() const {
     return pImpl->config;
 }
