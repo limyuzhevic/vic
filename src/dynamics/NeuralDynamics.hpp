@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
+// Implements various neural dynamics models (LIF, HH, FHN, etc.)
 
 class NeuralDynamics {
 public:

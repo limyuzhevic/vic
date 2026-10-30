@@ -84,6 +84,16 @@ public:
     // Remove key
     void remove(const std::string& key);
     
+    // Validate configuration values
+    bool validate() const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Set validation callback
+    using ValidationCallback = std::function<bool(const std::string&, const ConfigValue&)>;
+    void setValidationCallback(ValidationCallback callback);
+    
     // Get all keys
     std::vector<std::string> getKeys() const;
     

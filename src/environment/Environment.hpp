@@ -24,7 +24,7 @@ private:
 };
 
 // Environment interface
-// PLACEHOLDER - Phase 2 will connect to real environments
+// Base class for world environments in NLM simulation
 class Environment {
 public:
     Environment();
