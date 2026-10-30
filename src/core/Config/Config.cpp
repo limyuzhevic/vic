@@ -21,6 +21,7 @@ Config& Config::operator=(Config&&) noexcept = default;
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Phase 1b: Enhanced format handling for arrays and quoted strings
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -31,15 +32,106 @@ bool Config::loadFromFile(const std::string& filepath) {
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line[0] == '#') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs (comment lines with // are also allowed)
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Handle different value types
+            if (value.find('[') != std::string::npos) {
+                // Array value - simple parsing for now
+                if (value.substr(0, 1) == "[" && value.substr(value.size() - 1, 1) == "]") {
+                    // Parse array
+                    std::string arrayContent = value.substr(1, value.size() - 2);
+                    // For now, treat as string array
+                    if (!arrayContent.empty()) {
+                        // Parse comma-separated values
+                        size_t start = 0;
+                        size_t comma = arrayContent.find(',');
+                        std::vector<std::string> stringArray;
+                        
+                        while (comma != std::string::npos) {
+                            std::string item = trim(arrayContent.substr(start, comma - start));
+                            // Remove quotes if present
+                            if (item.size() >= 2 && 
+                                ((item.front() == '"' && item.back() == '"') ||
+                                 (item.front() == '\'' && item.back() == '\''))) {
+                                item = item.substr(1, item.size() - 2);
+                            }
+                            stringArray.push_back(item);
+                            start = comma + 1;
+                            comma = arrayContent.find(',', start);
+                        }
+                        std::string lastItem = trim(arrayContent.substr(start));
+                        if (lastItem.size() >= 2 && 
+                            ((lastItem.front() == '"' && lastItem.back() == '"') ||
+                             (lastItem.front() == '\'' && lastItem.back() == '\''))) {
+                            lastItem = lastItem.substr(1, lastItem.size() - 2);
+                        }
+                        stringArray.push_back(lastItem);
+                        
+                        set(key, stringArray, ConfigSource::File);
+                        continue;
+                    }
+                }
+            }
+            
+            // Handle boolean values
+            if (value == "true" || value == "false") {
+                set(key, value == "true", ConfigSource::File);
+                continue;
+            }
+            
+            // Handle numeric values
+            bool isNumber = true;
+            std::string temp = value;
+            bool hasDecimal = false;
+            bool hasSign = false;
+            
+            for (char c : value) {
+                if (c == '-' && !hasSign && temp.find('-') == 0) {
+                    hasSign = true;
+                    continue;
+                }
+                if (c == '.') {
+                    if (hasDecimal) {
+                        isNumber = false;
+                        break;
+                    }
+                    hasDecimal = true;
+                    continue;
+                }
+                if (!std::isdigit(c)) {
+                    isNumber = false;
+                    break;
+                }
+            }
+            
+            if (isNumber) {
+                // Try double first, then int64_t
+                try {
+                    size_t pos = 0;
+                    double doubleVal = std::stod(value, &pos);
+                    if (pos == value.size()) {
+                        set(key, doubleVal, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {}
+                
+                try {
+                    size_t pos = 0;
+                    int64_t intVal = std::stoll(value, &pos);
+                    if (pos == value.size()) {
+                        set(key, intVal, ConfigSource::File);
+                        continue;
+                    }
+                } catch (...) {}
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -86,7 +178,44 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Save the actual value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;

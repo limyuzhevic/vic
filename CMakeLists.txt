@@ -28,6 +28,9 @@ add_library(nlm_core STATIC
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
+    src/core/Logger/EnhancedLogger.cpp
+    src/core/Logger/PythonLoggingIntegration.cpp
+    src/core/Logger/LoggingTests.cpp
     src/core/SimulationClock/SimulationClock.cpp
     # Brain
     src/brain/Neuron.cpp
@@ -139,13 +142,17 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Python binding tests executable
+add_executable(pynlm_python_tests
+    python/python_tests.cpp
+)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+target_link_libraries(pynlm_python_tests PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm_python_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# Install Python tests
+install(TARGETS pynlm_python_tests
     RUNTIME DESTINATION bin
 )

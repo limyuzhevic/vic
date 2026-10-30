@@ -98,6 +98,7 @@ struct Brain::Impl {
         if (auto seedOpt = config->get<uint64_t>("random_seed")) {
             seed = *seedOpt;
         }
+        // Fix: Properly initialize rng instead of leaving it as nullptr
         rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems
@@ -167,7 +168,10 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Proper cleanup of current pImpl
+        if (pImpl) {
+            delete pImpl;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }

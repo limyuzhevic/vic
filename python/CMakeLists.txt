@@ -19,6 +19,9 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
     ${NLM_SOURCE_DIR}/core/Random/Random.cpp
     ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
+    ${NLM_SOURCE_DIR}/core/Logger/EnhancedLogger.cpp
+    ${NLM_SOURCE_DIR}/core/Logger/PythonLoggingIntegration.cpp
+    ${NLM_SOURCE_DIR}/core/Logger/LoggingTests.cpp
     ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
     ${NLM_SOURCE_DIR}/brain/Neuron.cpp
     ${NLM_SOURCE_DIR}/brain/Synapse.cpp
@@ -87,16 +90,31 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
-target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+# Add Python binding tests to the Python module target
+pybind11_add_module(pynlm_bindings bindings.cpp)
+target_link_libraries(pynlm_bindings PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm_bindings PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
 if(MSVC)
-    target_compile_options(pynlm PRIVATE /permissive-)
+    target_compile_options(pynlm_bindings PRIVATE /permissive-)
 endif()
 
-install(TARGETS pynlm
+# Create a separate test target for Python bindings
+add_executable(pynlm_python_tests
+    ${CMAKE_CURRENT_SOURCE_DIR}/python_tests.cpp
+)
+
+target_link_libraries(pynlm_python_tests PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm_python_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Install the Python module
+install(TARGETS pynlm_bindings
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+# Install Python tests
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/python_tests.cpp
+    DESTINATION pynlm/tests
 )
