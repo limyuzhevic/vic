@@ -28,55 +28,12 @@ struct Brain::Impl {
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
     
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
-    
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
-    
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
-    
-    // Phase 2: Real neural computation components
-    std::unique_ptr<SpikeSystem> spikeSystem;
-    std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
-    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
-    
-    // Simulation parameters
-    TimestepDuration timestep;
-    SimulationStep currentStep;
-    Timestamp currentTime;
-    
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
-    
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
-    
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
-    
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Sleep/rest cycle parameters
+    size_t sleepInterval;        // Steps between sleep cycles
+    size_t maxRestTime;          // Maximum time to stay in rest state
+    size_t stepsSinceLastSleep;  // Steps since last sleep cycle
+    float sleepSignature;       // Neuromodulatory signature for sleep
+    bool isResting;              // Is brain in rest/sleep state
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -92,6 +49,10 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , sleepInterval(5000)     // Sleep every 5000 steps
+        , maxRestTime(2000)       // Rest up to 2000 steps
+        , stepsSinceLastSleep(0)
+        , sleepSignature(0.0f)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -149,8 +110,13 @@ struct Brain::Impl {
         replayInterval = config->getOr<size_t>("replay_interval", 100);
         consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
         
+        // Get sleep parameters from config
+        sleepInterval = config->getOr<size_t>("sleep_interval", 5000);
+        maxRestTime = config->getOr<size_t>("max_rest_time", 2000);
+        
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+    }
     }
     
     DevelopmentalStage developmentalStage;
@@ -286,15 +252,77 @@ bool Brain::initialize() {
         }
     });
     
-    // Configure checkpoint manager
+    // Configure checkpoint manager with data providers
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    // Set checkpoint data providers
+    pImpl->checkpointManager->setNeuronProvider([this](NeuronCheckpointData& data) {
+        // Capture current neuron states for checkpointing
+        data.membranePotential.clear();
+        data.restingPotential.clear();
+        data.threshold.clear();
+        data.resetPotential.clear();
+        data.leakConductance.clear();
+        data.firingState.clear();
+        data.refractoryRemaining.clear();
+        data.refractoryPeriod.clear();
+        data.lastSpikeTime.clear();
+        data.neuronType.clear();
+        data.regionId.clear();
+        data.populationId.clear();
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    data.membranePotential.push_back(state.membranePotential);
+                    data.restingPotential.push_back(state.restingPotential);
+                    data.threshold.push_back(state.threshold);
+                    data.resetPotential.push_back(state.resetPotential);
+                    data.leakConductance.push_back(state.leakConductance);
+                    data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                    data.refractoryRemaining.push_back(state.refractoryRemaining);
+                    data.refractoryPeriod.push_back(state.refractoryPeriod);
+                    data.lastSpikeTime.push_back(state.lastSpikeTime);
+                    data.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                    data.regionId.push_back(region->getId().index());
+                    data.populationId.push_back(pop->getId().index());
+                }
+            }
+        }
+        return !data.membranePotential.empty();
+    });
+    
+    pImpl->checkpointManager->setSynapseProvider([this](SynapseCheckpointData& data) {
+        // Capture current synapse states for checkpointing
+        data.sourceNeuron.clear();
+        data.destinationNeuron.clear();
+        data.weight.clear();
+        data.delay.clear();
+        data.synapseType.clear();
+        data.plasticityFlags.clear();
+        data.eligibilityTrace.clear();
+        data.efficacy.clear();
+        data.shortTermDepression.clear();
+        data.shortTermFacilitation.clear();
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto* syn : region->getSynapses()) {
+                data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                data.weight.push_back(syn->getWeight());
+                data.delay.push_back(syn->getDelay());
+                data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                data.plasticityFlags.push_back(syn->getPlasticityFlags().getFlags());
+                data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                data.efficacy.push_back(syn->getEfficacy());
+                data.shortTermDepression.push_back(syn->getShortTermDepression());
+                data.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+            }
+        }
+        return !data.weight.empty();
+    });
     
     return true;
 }
@@ -303,31 +331,78 @@ void Brain::step(SimulationStep currentStep) {
     step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
 }
 
-void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
-    /*
-     * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
-     * 
-     * This implements the complete integrated brain simulation:
-     * 
-     * 1. Process pending delayed spike events (deliver synaptic input)
-     * 2. Update all neuron membrane potentials (LIF dynamics)
-     * 3. Detect spikes and schedule outgoing spike events
-     * 4. Update working memory (maintenance and competition)
-     * 5. Apply neuromodulation effects on neural excitability
-     * 6. Apply plasticity rules (STDP, Hebbian)
-     * 7. Update episodic memory with current experience
-     * 8. Update prediction system
-     * 9. Update attention system
-     * 10. Update concept formation
-     * 11. Apply structural plasticity (synaptogenesis, pruning)
-     * 12. Replay important memories (during rest or periodically)
-     * 13. Apply development effects
-     * 14. Collect statistics
-     */
+    // Check if it's time to enter sleep/rest cycle
+    pImpl->stepsSinceLastSleep++;
+    if (pImpl->stepsSinceLastSleep >= pImpl->sleepInterval && !pImpl->isResting) {
+        // Enter rest/sleep cycle
+        pImpl->isResting = true;
+        pImpl->sleepSignature = (pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f) * 0.3f + 
+                                (pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f) * 0.3f +
+                                (pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f) * 0.4f;
+        
+        NLM_LOG_INFO("Brain entering rest/sleep cycle - sleep signature: " + 
+                     std::to_string(pImpl->sleepSignature));
+    }
     
+    if (pImpl->isResting) {
+        // During rest, reduce neural activity significantly
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Sever recurrent connections to prevent activity spread
+                    neuron->setRefractoryRemaining(10);  // Temporary refractory
+                    // Apply sleep signature to reduce excitability
+                    float sleepEffect = pImpl->sleepSignature * 0.5f;
+                    neuron->injectCurrent(-sleepEffect);
+                }
+            }
+        }
+        
+        // Increment rest counter
+        pImpl->stepsSinceLastSleep++;
+        
+        // Check if rest time is over
+        if (pImpl->stepsSinceLastSleep >= pImpl->maxRestTime) {
+            // Wake up from rest
+            pImpl->isResting = false;
+            pImpl->stepsSinceLastSleep = 0;
+            
+            // Memory consolidation during sleep
+            if (pImpl->episodicMemory) {
+                // Higher sleep signature means more consolidation
+                pImpl->episodicMemory->consolidate(pImpl->sleepSignature * 0.5f);
+            }
+            
+            // Increase plasticity after rest
+            if (pImpl->dopamine) {
+                pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() * 1.2f);  // Boost after rest
+            }
+            
+            NLM_LOG_INFO("Brain waking up from rest/sleep cycle");
+        }
+        
+        // Skip most neural processing during rest
+        return;
+    }
+    
+    // Normal processing when awake
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
+    
+    // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    
+    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                neuron->stepLIF(currentTime, pImpl->timestep);
+            }
+        }
+    }
+    
+    // ========== STEP 3: Detect spikes and schedule spike events ==========
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
@@ -511,8 +586,37 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Get sensory input as prediction target
+        // For now, use simplified state representation
+        std::vector<float> sensoryState;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            if (pImpl->sensoryNeurons[i] && pImpl->sensoryNeurons[i]->isFiring()) {
+                sensoryState.push_back(1.0f);
+            } else {
+                float potential = pImpl->sensoryNeurons[i]->getState().membranePotential;
+                sensoryState.push_back((potential - pImpl->sensoryNeurons[i]->getState().restingPotential) / 20.0f);
+            }
+        }
+        
+        if (!sensoryState.empty()) {
+            // Create sensory input from neural state
+            class SensoryInput input;
+            input.setData(sensoryState);
+            
+            // Update predictions based on current neural activity
+            pImpl->predictionSystem->updatePredictions(input, input);
+            
+            // Get prediction error to drive learning
+            float error = pImpl->predictionSystem->getPredictionError();
+            
+            // Use prediction error to modulate learning
+            if (error > 0.1f) {
+                // Update dopamine with prediction error
+                if (pImpl->dopamine) {
+                    pImpl->dopamine->signalRewardPredictionError(error);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -524,12 +628,80 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Update attention based on prediction error
+        if (pImpl->predictionSystem) {
+            float error = pImpl->predictionSystem->getPredictionError();
+            if (error > 0.5f) {
+                // High prediction error increases attention to novel stimuli
+                // Focus on sensory regions when prediction error is high
+                if (pImpl->sensoryNeurons.size() > 0) {
+                    pImpl->attention->focusOnRegion(RegionId(1)); // Assume region 1 is sensory
+                }
+            }
+        }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Get current neural activity pattern for concept formation
+        std::vector<float> currentPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                        currentPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        if (!currentPattern.empty()) {
+            // Extract features from current pattern for concept formation
+            std::vector<float> features;
+            if (currentPattern.size() >= 4) {
+                // Simple feature extraction: intensity, variance, edge detection
+                float intensity = 0.0f;
+                for (float val : currentPattern) intensity += val;
+                features.push_back(intensity / currentPattern.size());
+                
+                float variance = 0.0f;
+                float mean = intensity / currentPattern.size();
+                for (float val : currentPattern) {
+                    variance += (val - mean) * (val - mean);
+                }
+                features.push_back(std::sqrt(variance / currentPattern.size()));
+                
+                // Add simple edge/feature information
+                if (currentPattern.size() >= 8) {
+                    for (size_t i = 0; i < std::min<size_t>(4, currentPattern.size()); ++i) {
+                        if (i < currentPattern.size() - 1) {
+                            features.push_back(std::abs(currentPattern[i] - currentPattern[i + 1]));
+                        }
+                    }
+                }
+            }
+            
+            // Present experience to concept formation
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentPattern, features, pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.5f, 
+                static_cast<SimulationStep>(pImpl->currentStep)
+            );
+            
+            // Update planning based on formed concepts
+            if (pImpl->planner && conceptId > 0) {
+                const DiscoveredConcept* concept = pImpl->conceptFormation->getConcept(conceptId);
+                if (concept) {
+                    // Convert concept prototype to goal
+                    std::vector<float> goal = concept->prototype;
+                    if (!goal.empty()) {
+                        pImpl->planner->setCurrentGoal(goal);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -744,6 +916,8 @@ void Brain::reset() {
     pImpl->totalSpikesTotal = 0;
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
+    pImpl->stepsSinceLastSleep = 0;
+    pImpl->sleepSignature = 0.0f;
     
     for (auto& region : pImpl->regions) {
         region->reset();
@@ -888,19 +1062,10 @@ bool Brain::load(const std::string& filepath) {
             }
         }
         
-        // Read synapses
-        SynapseCheckpointData synapseData;
-        if (!reader.readSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to read synapses from checkpoint");
-            return false;
-        }
-        
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
+    NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+    
+    NLM_LOG_INFO("Brain state loaded successfully");
+    return true;
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
