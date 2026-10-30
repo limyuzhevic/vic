@@ -48,6 +48,9 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Reset neuromodulator state
+    void reset();
+    
 private:
     struct Impl;
     Impl* pImpl;

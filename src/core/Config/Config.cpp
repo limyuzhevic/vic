@@ -92,6 +92,232 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
+// Configuration system with JSON/YAML support and validation
+
+// Helper function to parse string values
+ConfigValue parseValue(const std::string& str);
+ConfigValue jsonToConfigValue(const nlohmann::json& j);
+ConfigValue yamlToConfigValue(const YAML::Node& node);
+nlohmann::json configValueToJSON(const ConfigValue& value);
+YAML::Node configValueToYAML(const ConfigValue& value);
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+    // Schema for validation
+    std::unordered_map<std::string, std::function<bool(const ConfigValue&)>> validators;
+    
+    Impl() {
+        // Register default validators
+        registerValidators();
+    }
+    
+    void registerValidators() {
+        // Integer validators
+        validators["neuron_count"] = [](const ConfigValue& v) {
+            return std::holds_alternative<int64_t>(v) && std::get<int64_t>(v) > 0;
+        };
+        
+        validators["region_count"] = [](const ConfigValue& v) {
+            return std::holds_alternative<int64_t>(v) && std::get<int64_t>(v) > 0;
+        };
+        
+        validators["connection_probability"] = [](const ConfigValue& v) {
+            return std::holds_alternative<double>(v) && std::get<double>(v) >= 0.0 && std::get<double>(v) <= 1.0;
+        };
+        
+        validators["stdp_ltp_weight"] = [](const ConfigValue& v) {
+            return std::holds_alternative<double>(v) && std::get<double>(v) > 0.0;
+        };
+        
+        validators["stdp_ltd_weight"] = [](const ConfigValue& v) {
+            return std::holds_alternative<double>(v) && std::get<double>(v) > 0.0;
+        };
+        
+        validators["max_steps"] = [](const ConfigValue& v) {
+            return std::holds_alternative<int64_t>(v) && std::get<int64_t>(v) > 0;
+        };
+        
+        validators["simulation_timestep"] = [](const ConfigValue& v) {
+            return std::holds_alternative<double>(v) && std::get<double>(v) > 0.0 && std::get<double>(v) <= 0.01;
+        };
+    }
+    
+    bool validate(const std::string& key, const ConfigValue& value) const {
+        auto it = validators.find(key);
+        if (it != validators.end()) {
+            return it->second(value);
+        }
+        return true; // No validator, assume valid
+    }
+    
+    std::string getTypeName(const ConfigValue& value) const {
+        if (std::holds_alternative<int>(value)) return "int";
+        if (std::holds_alternative<int64_t>(value)) return "int64_t";
+        if (std::holds_alternative<double>(value)) return "double";
+        if (std::holds_alternative<bool>(value)) return "bool";
+        if (std::holds_alternative<std::string>(value)) return "string";
+        if (std::holds_alternative<std::vector<int>>(value)) return "vector<int>";
+        if (std::holds_alternative<std::vector<double>>(value)) return "vector<double>";
+        if (std::holds_alternative<std::vector<std::string>>(value)) return "vector<string>";
+        return "unknown";
+    }
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
+// Load from file with automatic format detection
+bool Config::loadFromFile(const std::string& filepath) {
+    // Determine file format from extension
+    std::filesystem::path path(filepath);
+    std::string extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    
+    try {
+        if (extension == ".json" || extension == ".jsonc") {
+            return loadFromJSON(filepath);
+        } else if (extension == ".yaml" || extension == ".yml") {
+            return loadFromYAML(filepath);
+        } else {
+            // Try to auto-detect format
+            return loadFromJSON(filepath);
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to load config from " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open JSON config file: " + filepath);
+        return false;
+    }
+    
+    try {
+        nlohmann::json j;
+        file >> j;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Parse JSON object
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = it.key();
+            const nlohmann::json& value = it.value();
+            
+            ConfigValue configValue = jsonToConfigValue(value);
+            
+            // Validate before adding
+            if (pImpl->validate(key, configValue)) {
+                pImpl->entries.emplace_back(key, configValue, ConfigSource::File, "");
+            } else {
+                NLM_LOG_WARNING("Config validation failed for key: " + key);
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded " + std::to_string(pImpl->entries.size()) + " configuration entries from JSON file");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("JSON parsing error: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open YAML config file: " + filepath);
+        return false;
+    }
+    
+    try {
+        YAML::Node doc = YAML::LoadFile(filepath);
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Parse YAML document
+        for (const auto& pair : doc) {
+            std::string key = pair.first.as<std::string>();
+            YAML::Node value = pair.second;
+            
+            ConfigValue configValue = yamlToConfigValue(value);
+            
+            // Validate before adding
+            if (pImpl->validate(key, configValue)) {
+                pImpl->entries.emplace_back(key, configValue, ConfigSource::File, "");
+            } else {
+                NLM_LOG_WARNING("Config validation failed for key: " + key);
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded " + std::to_string(pImpl->entries.size()) + " configuration entries from YAML file");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("YAML parsing error: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromArgs(int argc, char** argv) {
+    try {
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            
+            // Handle --key=value format
+            if (arg.substr(0, 2) == "--") {
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = arg.substr(2, pos - 2);
+                    std::string valueStr = arg.substr(pos + 1);
+                    
+                    ConfigValue configValue = parseValue(valueStr);
+                    if (pImpl->validate(key, configValue)) {
+                        pImpl->entries.emplace_back(key, configValue, ConfigSource::CommandLine, "");
+                    }
+                }
+            }
+            // Handle -key value format
+            else if (arg[0] == '-' && i + 1 < argc) {
+                std::string key = arg.substr(1);
+                std::string valueStr = argv[++i];
+                
+                ConfigValue configValue = parseValue(valueStr);
+                if (pImpl->validate(key, configValue)) {
+                    pImpl->entries.emplace_back(key, configValue, ConfigSource::CommandLine, "");
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Loaded " + std::to_string(pImpl->entries.size()) + " configuration entries from command line");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Command line parsing error: " + std::string(e.what()));
+        return false;
+    }
+}
+
+// Configuration value parsing helpers
+ConfigValue parseValue(const std::string& str);
+ConfigValue jsonToConfigValue(const nlohmann::json& j);
+ConfigValue yamlToConfigValue(const YAML::Node& node);
+nlohmann::json configValueToJSON(const ConfigValue& value);
+YAML::Node configValueToYAML(const ConfigValue& value);
+
+// Template getter implementations
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
