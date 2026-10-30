@@ -55,14 +55,23 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file
     bool loadFromFile(const std::string& filepath);
+    
+    // Enhanced file format support
+    bool tryLoadFromJSON(const std::string& filepath);
+    bool tryLoadFromYAML(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
+    bool saveToJSON(const std::string& filepath) const;
+    
+    // Enhanced value string conversion
+    std::string getValueString(const ConfigValue& value) const;
+    std::string getJSONValueString(const ConfigValue& value) const;
     
     // Get values
     template<typename T>
@@ -92,6 +101,10 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation (Phase 6+)
+    bool validate() const;
+    std::string validateErrors() const;
     
 private:
     struct Impl;

@@ -26,26 +26,120 @@
 #include <iomanip>
 #include <numeric>
 
-using namespace nlm;
+// Enumeration for experiment modes
+enum class ExperimentMode {
+    Basic,
+    Plasticity,
+    STDP,
+    Learning,
+    All
+};
 
-void printBanner() {
+// Enumeration for reward modes
+enum class RewardMode {
+    Basic,
+    Prediction,
+    Curiosity
+};
+
+// Enumeration for output formats
+enum class OutputFormat {
+    Text,
+    JSON,
+    YAML,
+    CSV
+};
+
+void printAdvancedUsage() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+=== Advanced NLM Command Line Options ===
+
+Configuration:
+  --config=file.cfg          Load configuration from file (JSON/YAML/key=value)
+  --set:key=value           Override configuration values
+  --set-json=file.json      Load configuration from JSON file
+
+Simulation Parameters:
+  --neuron-count=N          Number of neurons (default: 500)
+  --region-count=N          Number of brain regions (default: 1)
+  --steps=N                 Number of simulation steps (default: 10000)
+  --timestep=T              Simulation timestep in seconds (default: 0.001)
+  --seed=N                  Random seed for reproducible experiments (default: 42)
+
+Plasticity Control:
+  --plasticity-enabled       Enable synaptic plasticity
+  --plasticity-hebbian      Enable Hebbian plasticity (default: true)
+  --plasticity-stdp         Enable STDP plasticity (default: true)
+  --plasticity-rstdp        Enable Reward-modulated STDP (default: true)
+  --plasticity-triplet      Enable Triplet STDP (default: true)
+
+Learning/Experiment Modes:
+  --experiment-mode=MODE    Run specific experiment (basic, plasticity, stdp, learning, all)
+  --reward-mode=MODE        Reward computation mode (basic, prediction, curiosity)
+  --learning-rate=R         Learning rate (default: 0.01)
+
+Output & Logging:
+  --verbose                 Enable verbose logging (default: false)
+  --log-level=L             Log level (DEBUG, INFO, WARNING, ERROR)
+  --log-file=file.log       Log to file instead of console
+  --output-format=FORMAT    Output format for results (json, yaml, text, csv)
+  --results-file=file.json  Save results to file
+
+Network Topology:
+  --connection-prob=P       Connection probability (default: 0.15)
+  --delay-steps=N           Synaptic delay in steps (default: 1)
+  --excitation-ratio=R      Ratio of excitatory neurons (0.0-1.0, default: 0.8)
+  --region-size=N           Neurons per region (default: 100)
+
+Neuromodulation:
+  --dopamine-baseline=B     Baseline dopamine level (default: 0.1)
+  --curiosity-threshold=T   Novelty/curiosity detection threshold (default: 0.5)
+  --novelty-window=W        Novelty detection time window (default: 100)
+
+Visualization:
+  --visualize               Enable visualization (Phase 7+)
+  --viz-update-rate=FPS     Visualization update rate (default: 30.0)
+  --viz-file=file.viz       Save visualization data
+
+Performance:
+  --parallel                Use parallel processing (Phase 7+)
+  --num-threads=N          Number of threads (default: auto)
+  --profile                 Enable performance profiling
+
+Export Options:
+  --export-brain=file.bin    Export brain state to binary file
+  --import-brain=file.bin    Import brain state from binary file
+  --export-synapses=file.txt Export synapse connections (Phase 8+)
+
+Special Test Modes:
+  --test-connectivity       Run basic connectivity test
+  --test-plasticity         Run plasticity learning experiment
+  --test-stdp               Run STDP verification test
+  --test-reward             Run reward-modulated learning test
+  --test-all                Run all tests
+
+Development/Debugging:
+  --debug-neurons=N         Debug specific neurons by ID
+  --debug-synapses=N        Debug specific synapses by ID
+  --checkpoint-steps=N      Save checkpoint every N steps
+  --benchmark               Run performance benchmarks
+
+Example Usage:
+  nlm --config=my_config.json --neuron-count=1000 --steps=5000 --experiment-mode=learning
+  nlm --plasticity-enabled --learning-rate=0.05 --verbose --results-file=results.json
+  nlm --test-plasticity --benchmark --export-synapses=connections.txt
+
+Additional Options Available:
+  --help                    Show this help message
+  --version                 Show NLM version
+  --license                 Show license information
+
+Advanced Users:
+  --custom-config           Load custom configuration schema
+  --experimental-features   Enable experimental features
+  --research-mode           Optimize for research reproducibility
+
+  )" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -245,7 +339,92 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
+void parseAdvancedConfigOptions(Config& config, int argc, char** argv) {
+    // Parse advanced configuration options
+    ExperimentMode experimentMode = ExperimentMode::All;
+    RewardMode rewardMode = RewardMode::Basic;
+    OutputFormat outputFormat = OutputFormat::Text;
+    bool visualize = false;
+    bool profile = false;
+    bool benchmark = false;
+    bool testConnectivity = false;
+    bool testPlasticity = false;
+    bool testSTDP = false;
+    bool testReward = false;
+    
+    // Process command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Parse --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                
+                // Special configuration keys
+                if (key == "experiment-mode") {
+                    if (value == "basic") experimentMode = ExperimentMode::Basic;
+                    else if (value == "plasticity") experimentMode = ExperimentMode::Plasticity;
+                    else if (value == "stdp") experimentMode = ExperimentMode::STDP;
+                    else if (value == "learning") experimentMode = ExperimentMode::Learning;
+                    else if (value == "all") experimentMode = ExperimentMode::All;
+                } else if (key == "reward-mode") {
+                    if (value == "basic") rewardMode = RewardMode::Basic;
+                    else if (value == "prediction") rewardMode = RewardMode::Prediction;
+                    else if (value == "curiosity") rewardMode = RewardMode::Curiosity;
+                } else if (key == "output-format") {
+                    if (value == "json") outputFormat = OutputFormat::JSON;
+                    else if (value == "yaml") outputFormat = OutputFormat::YAML;
+                    else if (value == "csv") outputFormat = OutputFormat::CSV;
+                } else if (key == "visualize") {
+                    visualize = true;
+                } else if (key == "profile") {
+                    profile = true;
+                } else if (key == "benchmark") {
+                    benchmark = true;
+                } else if (key == "test-connectivity") {
+                    testConnectivity = true;
+                } else if (key == "test-plasticity") {
+                    testPlasticity = true;
+                } else if (key == "test-stdp") {
+                    testSTDP = true;
+                } else if (key == "test-reward") {
+                    testReward = true;
+                }
+                
+                // Generic config key-value
+                config.set(key, value, ConfigSource::CommandLine);
+            }
+        }
+    }
+    
+    // Apply derived settings based on experiment mode
+    switch (experimentMode) {
+        case ExperimentMode::Basic:
+            config.set("run_basic_test", true, ConfigSource::Runtime);
+            break;
+        case ExperimentMode::Plasticity:
+            config.set("run_plasticity_test", true, ConfigSource::Runtime);
+            break;
+        case ExperimentMode::STDP:
+            config.set("run_stdp_test", true, ConfigSource::Runtime);
+            break;
+        case ExperimentMode::Learning:
+            config.set("run_learning_experiment", true, ConfigSource::Runtime);
+            break;
+        case ExperimentMode::All:
+            config.set("run_all_tests", true, ConfigSource::Runtime);
+            break;
+    }
+    
+    config.set("reward_mode", static_cast<int>(rewardMode), ConfigSource::Runtime);
+    config.set("output_format", static_cast<int>(outputFormat), ConfigSource::Runtime);
+    config.set("visualize_enabled", visualize, ConfigSource::Runtime);
+    config.set("profile_enabled", profile, ConfigSource::Runtime);
+    config.set("benchmark_mode", benchmark, ConfigSource::Runtime);
+}
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     

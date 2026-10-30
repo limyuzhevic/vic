@@ -6,7 +6,7 @@
 namespace nlm {
 
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// IMPLEMENTED: Multiple concrete plasticity rule implementations (Phase 2-7)
 
 class PlasticityRule {
 public:

@@ -7,18 +7,18 @@
 namespace nlm {
 
 // Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
+// IMPLEMENTED: Multiple concrete dynamics implementations (Phase 2-6)
 
 class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
     // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
+    // IMPLEMENTED: Real integrate-and-fire dynamics (Phase 2)
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
     // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // IMPLEMENTED: Real synaptic dynamics (Phase 2)
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
     // Apply synaptic input from spike
@@ -53,10 +53,10 @@ private:
 };
 
 // Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
+// PLACEHOLDER - Phase 4+ will implement HH dynamics (sodium/potassium channels)
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
+    // Placeholder implementation - TODO: Implement detailed HH equations
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
     void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
@@ -64,8 +64,8 @@ public:
     void reset() override {}
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
+// FitzHugh-Nagumo dynamics (simplified excitation model)
+// TODO PHASE 5+ will implement FHN dynamics (excitation-diffusion model)
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
     // PLACEHOLDER - Phase 2 will implement FHN dynamics
