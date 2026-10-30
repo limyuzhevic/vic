@@ -19,16 +19,18 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    bool hasErrors = false;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,21 +39,74 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        if (pos == std::string::npos) {
+            NLM_LOG_ERROR("Invalid config syntax at line " + std::to_string(lineNumber) + ": " + line);
+            hasErrors = true;
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty()) {
+            NLM_LOG_ERROR("Empty key at line " + std::to_string(lineNumber));
+            hasErrors = true;
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        try {
+            // Try to infer type from value
+            if (value.empty()) {
+                NLM_LOG_ERROR("Empty value for key \"" + key + "\" at line " + std::to_string(lineNumber));
+                hasErrors = true;
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to parse as boolean
+            if (value == "true" || value == "false") {
+                bool boolVal = (value == "true");
+                set(key, boolVal, ConfigSource::File);
+            }
+            // Try to parse as integer
+            else if (value.find_first_not_of("0123456789") == std::string::npos) {
+                int intVal = std::stoi(value);
+                set(key, intVal, ConfigSource::File);
+            }
+            // Try to parse as double (but not integer)
+            else if (value.find('.') != std::string::npos || 
+                     value.find('e') != std::string::npos ||
+                     value.find('E') != std::string::npos) {
+                try {
+                    double doubleVal = std::stod(value);
+                    set(key, doubleVal, ConfigSource::File);
+                } catch (const std::exception& e) {
+                    NLM_LOG_ERROR("Invalid numeric value for key \"" + key + "\": " + value + " at line " + std::to_string(lineNumber));
+                    hasErrors = true;
+                }
+            }
+            // Assume it's a string
+            else {
+                set(key, value, ConfigSource::File);
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error parsing config at line " + std::to_string(lineNumber) + ": " + std::string(e.what()));
+            hasErrors = true;
         }
     }
     
+    if (hasErrors) {
+        NLM_LOG_ERROR("Configuration file \"" + filepath + "\" has parsing errors");
+        return false;
+    }
+    
+    NLM_LOG_INFO("Loaded configuration from: " + filepath);
     return true;
 }
 
@@ -81,14 +136,63 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
+    NLM_LOG_INFO("Saving configuration to: " + filepath);
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write comment if present
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write key and format value based on type
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Use precision that preserves floating point values
+                file.precision(6);
+                file << std::fixed << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file.precision(6);
+                    file << std::fixed << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; 
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << arg;  // Fallback for other types
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
+    NLM_LOG_INFO("Configuration saved successfully");
     return true;
 }
 
@@ -98,12 +202,22 @@ std::optional<T> Config::get(const std::string& key) const {
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it == pImpl->entries.end()) {
+        // Log debug message for missing key
+        if (!key.empty()) {
+            NLM_LOG_DEBUG("Configuration key not found: \"" + key + "\"");
+        }
         return std::nullopt;
     }
     
     try {
         return std::get<T>(it->value);
     } catch (const std::bad_variant_access&) {
+        // Log warning about type mismatch
+        NLM_LOG_WARNING("Configuration key \"" + key + "\" has wrong type for requested access");
+        return std::nullopt;
+    } catch (const std::exception& e) {
+        // Log error for unexpected exceptions
+        NLM_LOG_ERROR("Error accessing configuration key \"" + key + "\": " + std::string(e.what()));
         return std::nullopt;
     }
 }
@@ -111,18 +225,33 @@ std::optional<T> Config::get(const std::string& key) const {
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (val.has_value()) {
+        return val.value();
+    }
+    
+    // Log debug message when using default value
+    if (!key.empty()) {
+        NLM_LOG_DEBUG("Configuration key \"" + key + "\" not found, using default value: " + std::to_string(defaultValue));
+    }
+    return defaultValue;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (key.empty()) {
+        NLM_LOG_ERROR("Cannot set empty configuration key");
+        return;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        NLM_LOG_DEBUG("Updated configuration key: \"" + key + "\"");
     } else {
         pImpl->entries.emplace_back(key, value, source);
+        NLM_LOG_DEBUG("Added new configuration key: \"" + key + "\"");
     }
 }
 

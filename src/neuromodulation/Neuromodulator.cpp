@@ -17,6 +17,15 @@ Dopamine::Dopamine() : pImpl(new Impl) {}
 
 Dopamine::~Dopamine() = default;
 
+// Initialize with brain reference
+void Dopamine::initialize(class Brain* brain) {
+    // Dopamine can be initialized with brain reference if needed
+    // For now, just set baseline level
+    pImpl->baseline = 0.05f;  // Low baseline dopamine level
+    pImpl->level = pImpl->baseline;
+    NLM_LOG_INFO("Dopamine system initialized");
+}
+
 const char* Dopamine::getName() const {
     return "DA";
 }

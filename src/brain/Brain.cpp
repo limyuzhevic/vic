@@ -106,29 +106,30 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
+        // ========== INITIALIZE NEUROMODULATION SYSTEMS ==========
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Configure neuromodulation parameters from config
+        // Dopamine parameters
+        float dopamineScale = config->getOr<float>("neuromod.dopamine.scale", 1.0f);
+        dopamine->setLevel(dopamineScale * 0.5f);  // Start at medium level
+        
+        // Curiosity parameters
+        curiosity->setNoveltyWeight(config->getOr<float>("neuromod.curiosity.novelty_weight", 0.7f));
+        curiosity->setPredictionErrorWeight(config->getOr<float>("neuromod.curiosity.prediction_error_weight", 0.3f));
+        
+        // Novelty parameters
+        novelty->setSensitivity(config->getOr<float>("neuromod.novelty.sensitivity", 1.0f));
+        novelty->setDecayRate(config->getOr<float>("neuromod.novelty.decay_rate", 0.95f));
+        
+        // Prediction error parameters
+        predictionError->setSensitivity(config->getOr<float>("neuromod.prediction_error.sensitivity", 1.0f));
+        predictionError->setDecayRate(config->getOr<float>("neuromod.prediction_error.decay_rate", 0.9f));
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -258,6 +259,10 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
@@ -895,10 +900,56 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
+        // Apply synapse states - match by source/destination neuron IDs
+        size_t synapseIdx = 0;
+        for (const auto& region : pImpl->regions) {
+            for (auto& synapse : region->getSynapses()) {
+                if (synapseIdx < synapseData.weight.size()) {
+                    // Match synapse by source/destination neuron IDs
+                    NeuronId sourceId = synapse->getSourceNeuron();
+                    NeuronId destId = synapse->getDestinationNeuron();
+                    
+                    // Find matching synapse in checkpoint data
+                    for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+                        if (synapseData.sourceNeuron[i] == sourceId.value &&
+                            synapseData.destinationNeuron[i] == destId.value) {
+                            // Restore synapse properties from checkpoint
+                            synapse->setWeight(synapseData.weight[i]);
+                            synapse->setDelay(synapseData.delay[i]);
+                            
+                            // Restore synapse type
+                            SynapseType type = static_cast<SynapseType>(synapseData.synapseType[i]);
+                            synapse->setType(type);
+                            
+                            // Restore plasticity flags
+                            PlasticityFlags flags;
+                            flags.hebbian = synapseData.plasticityFlags[i] & 1;
+                            flags.stdp = (synapseData.plasticityFlags[i] >> 1) & 1;
+                            flags.reward_modulated = (synapseData.plasticityFlags[i] >> 2) & 1;
+                            flags.structural = (synapseData.plasticityFlags[i] >> 3) & 1;
+                            flags.eligible = (synapseData.plasticityFlags[i] >> 4) & 1;
+                            
+                            PlasticityFlags& synFlags = synapse->getPlasticityFlags();
+                            synFlags.hebbian = flags.hebbian;
+                            synFlags.stdp = flags.stdp;
+                            synFlags.reward_modulated = flags.reward_modulated;
+                            synFlags.structural = flags.structural;
+                            synFlags.eligible = flags.eligible;
+                            
+                            // Restore other properties
+                            synapse->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                            synapse->setEfficacy(synapseData.efficacy[i]);
+                            
+                            // Mark this synapse as processed
+                            synapseIdx = i + 1;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         
+        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         

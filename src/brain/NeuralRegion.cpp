@@ -58,17 +58,21 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
 }
 
 NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    // Convert to zero-based index
+    uint64_t idx = id.index();
+    if (idx == 0 || idx > pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    return pImpl->populations[idx - 1].get();
 }
 
 const NeuralPopulation* NeuralRegion::getPopulation(PopulationId id) const {
-    if (id.index() == 0 || id.index() > pImpl->populations.size()) {
+    // Convert to zero-based index
+    uint64_t idx = id.index();
+    if (idx == 0 || idx > pImpl->populations.size()) {
         return nullptr;
     }
-    return pImpl->populations[id.index() - 1].get();
+    return pImpl->populations[idx - 1].get();
 }
 
 size_t NeuralRegion::getPopulationCount() const {
@@ -94,6 +98,10 @@ SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
     auto synapse = std::make_unique<Synapse>(synId, source, destination);
     synapse->setWeight(weight);
     synapse->setDelay(delay);
+    
+    // Enable plasticity by default for all synapses
+    // This allows STDP, Hebbian, and reward-modulated learning
+    synapse->enablePlasticity(true, true, false);  // Enable STDP and Hebbian, but not reward-modulated by default
     
     pImpl->outgoingSynapses[source].push_back(synId);
     pImpl->incomingSynapses[destination].push_back(synId);

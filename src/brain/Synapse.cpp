@@ -60,6 +60,14 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    
+    // Initialize plasticity flags - enable by default for learning
+    // STDP and Hebbian learning enabled, reward-modulated disabled by default
+    pImpl->plasticityFlags.hebbian = true;
+    pImpl->plasticityFlags.stdp = true;
+    pImpl->plasticityFlags.reward_modulated = false;
+    pImpl->plasticityFlags.structural = false;
+    pImpl->plasticityFlags.eligible = false;
 }
 
 Synapse::~Synapse() = default;
