@@ -114,16 +114,20 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);
+    result.memoryAssociativeMemoryIntegrated = (brain->getAssociativeMemory() != nullptr);
     result.neuromodulationIntegrated = (brain->getDopamine() != nullptr);
     result.predictionIntegrated = (brain->getPredictionSystem() != nullptr);
     result.developmentIntegrated = (brain->getDevelopmentSystem() != nullptr);
+    result.cognitionIntegrated = (brain->getPlanner() != nullptr && brain->getConceptFormation() != nullptr && brain->getAttention() != nullptr);
     
     NLM_LOG_INFO("=== Integration Verification ===");
     NLM_LOG_INFO("Working Memory: " + std::string(result.memoryWorkingMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Episodic Memory: " + std::string(result.memoryEpisodicMemoryIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Associative Memory: " + std::string(result.memoryAssociativeMemoryIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Neuromodulation: " + std::string(result.neuromodulationIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
+    NLM_LOG_INFO("Cognition: " + std::string(result.cognitionIntegrated ? "YES" : "NO"));
     
     // Test checkpointing
     if (config.enableCheckpointing) {

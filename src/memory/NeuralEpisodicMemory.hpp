@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "NeuralAssociativeMemory.hpp"
 #include <vector>
 #include <memory>
 #include <deque>
