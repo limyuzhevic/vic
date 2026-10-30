@@ -146,8 +146,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
+        .def("loadFromArgs", [](Config& config, int argc, char** argv) {
+            return config.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
@@ -404,17 +404,107 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
+    // Convenience functions for common use cases
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
+    
+    // Convenience: Create brain with default config
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with default configuration");
+    
+    // Common configuration setup helper
+    m.def("setupDefaultBrainConfig", [](std::shared_ptr<Config> config, 
+                                      size_t neuronCount = 100,
+                                      size_t regionCount = 1,
+                                      double connectionProbability = 0.1) {
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionCount), nlm::ConfigSource::Default);
+        config->set("connection_probability", connectionProbability, nlm::ConfigSource::Default);
+    }, py::arg("config"), py::arg("neuronCount") = 100, py::arg("regionCount") = 1,
+       py::arg("connectionProbability") = 0.1, "Setup a default brain configuration");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
+    
+    // World configuration helper
+    m.def("setupSimpleWorld", [](std::shared_ptr<SimpleWorld> world,
+                               size_t width = 10, size_t height = 10,
+                               size_t visionWidth = 8, size_t visionHeight = 8) {
+        world->configure(width, height, visionWidth, visionHeight);
+    }, py::arg("world"), py::arg("width") = 10, py::arg("height") = 10,
+       py::arg("visionWidth") = 8, py::arg("visionHeight") = 8,
+       "Configure a simple world for agent simulation");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Agent setup helper
+    m.def("setupAgentBrain", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world) {
+        agent->initialize(world);
+    }, py::arg("agent"), py::arg("world"), "Initialize an agent brain in a world");
+    
+    // Batch processing for performance
+    m.def("stepBatch", [](std::shared_ptr<Brain> brain, size_t startStep, size_t endStep) {
+        for (nlm::SimulationStep step = startStep; step < endStep; ++step) {
+            brain->step(step);
+        }
+    }, py::arg("brain"), py::arg("startStep"), py::arg("endStep"), "Perform multiple simulation steps efficiently");
+    
+    // Enhanced configuration methods
+    m.def("getValueOrDefault", [](std::shared_ptr<Config> config, const std::string& key, 
+                                 const ConfigValue& defaultValue) {
+        if (config->has(key)) {
+            auto value = config->get<std::string>(key);
+            if (value.has_value()) {
+                return value.value();
+            }
+        }
+        return std::get<std::string>(defaultValue);
+    }, py::arg("config"), py::arg("key"), py::arg("defaultValue"), "Get config value or default string");
+    
+    // Configuration validation helper
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        auto keys = config->getKeys();
+        std::vector<std::string> errors;
+        
+        for (const auto& key : keys) {
+            auto value = config->get<std::string>(key);
+            if (!value.has_value()) {
+                errors.push_back("Key \"" + key + "\" has invalid value type");
+            }
+        }
+        
+        return errors;
+    }, py::arg("config"), "Validate configuration and return any errors");
+    
+    // Enhanced serialization with error checking
+    m.def("saveWithValidation", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (filepath.empty()) {
+            throw std::runtime_error("Filepath cannot be empty");
+        }
+        bool success = brain->save(filepath);
+        if (!success) {
+            throw std::runtime_error("Failed to save brain state to \"" + filepath + "\"");
+        }
+        return success;
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state with error checking");
+    
+    // Simulation state snapshot
+    m.def("snapshotState", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, std::variant<int, double, std::string>> snapshot;
+        snapshot["neuron_count"] = static_cast<int>(brain->getTotalNeuronCount());
+        snapshot["synapse_count"] = static_cast<int>(brain->getTotalSynapseCount());
+        snapshot["firing_count"] = static_cast<int>(brain->getFiringNeuronCount());
+        snapshot["avg_rate"] = brain->getAverageFiringRate();
+        snapshot["total_spikes"] = static_cast<int>(brain->getTotalSpikeCount());
+        snapshot["stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        return snapshot;
+    }, py::arg("brain"), "Create a snapshot of current brain state");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

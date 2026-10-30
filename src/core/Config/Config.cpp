@@ -19,9 +19,12 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON format first (Phase 2 enhanced)
+    if (loadFromJSONFile(filepath)) {
+        return true;
+    }
     
+    // Fallback to simple key=value format (Phase 1)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -84,11 +87,58 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Save in JSON format for better interoperability
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        // Format value based on type
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                // Simple array representation
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << arg[j];
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << arg[j];
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    file << "\"" << arg[j] << "\"";
+                    if (j < arg.size() - 1) file << ", ";
+                }
+                file << "]";
+            } else {
+                file << "null"; // Unknown type
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
     
+    file << "}\n";
     return true;
 }
 

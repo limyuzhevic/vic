@@ -139,7 +139,20 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
+# Python Bindings Test Suite
+add_executable(test_python_bindings
+    tests/test_python_bindings.cpp
+)
+target_link_libraries(test_python_bindings PUBLIC nlm_core nlm_agent nlm_world)
+add_test(NAME python_bindings_test COMMAND test_python_bindings)
+
+# Phase 2 integration tests
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 2: Real Neural Computation Tests
 enable_testing()
 add_subdirectory(tests)
 
