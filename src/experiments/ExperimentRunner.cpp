@@ -1,120 +1,140 @@
 #include "ExperimentRunner.hpp"
+#include <fstream>
+#include <sstream>
 
 namespace nlm {
 
-struct ExperimentRunner::Impl {
-    std::vector<std::shared_ptr<Experiment>> experiments;
-    uint64_t globalSeed;
+// Global experiment runner instance
+static ExperimentRunner& getExperimentRunner() {
+    static ExperimentRunner runner;
+    return runner;
+}
+
+// Phase 6 Integration Experiment implementation
+class Phase6IntegrationExperiment : public Experiment {
+public:
+    std::string getName() const override {
+        return "phase6_integration";
+    }
     
-    Impl() : globalSeed(42) {}
+    bool validateConfig(const ExperimentConfig& config) override {
+        if (config.neuronCount < 100 || config.neuronCount > 10000) {
+            return false;
+        }
+        if (config.maxSteps < 100 || config.maxSteps > 100000) {
+            return false;
+        }
+        return true;
+    }
+    
+    std::vector<std::string> getRequiredParameters() const override {
+        return {"neuronCount", "maxSteps"};
+    }
+    
+    std::vector<std::string> getOptionalParameters() const override {
+        return {"regionCount", "connectionProbability", "enableCheckpointing", 
+                "enableReplay", "enableDevelopment", "checkpointPath", "seed"};
+    }
+    
+    ExperimentResult run(const ExperimentConfig& config) override {
+        ExperimentResult result;
+        result.name = getName();
+        
+        try {
+            // Convert to Phase6Config
+            Phase6Config phase6Config;
+            phase6Config.neuronCount = config.neuronCount;
+            phase6Config.maxSteps = config.maxSteps;
+            phase6Config.enableCheckpointing = config.enableCheckpointing;
+            phase6Config.enableReplay = config.enableReplay;
+            phase6Config.enableDevelopment = config.enableDevelopment;
+            phase6Config.regionCount = config.regionCount;
+            phase6Config.connectionProbability = config.connectionProbability;
+            phase6Config.checkpointPath = config.checkpointPath;
+            
+            // Run the actual experiment
+            Phase6IntegratedExperiment phase6Experiment;
+            result = convertResult(phase6Experiment.run(phase6Config));
+            
+        } catch (const std::exception& e) {
+            result.customMetrics["error"] = 1.0;
+            result.customMetrics["error_message"] = e.what();
+        }
+        
+        return result;
+    }
+    
+private:
+    ExperimentResult convertResult(const Phase6IntegrationResult& phase6Result) {
+        ExperimentResult result;
+        result.name = getName();
+        result.totalReward = phase6Result.totalReward;
+        result.avgFiringRate = phase6Result.avgFiringRate;
+        result.memoryEpisodesStored = phase6Result.memoryEpisodesStored;
+        result.noveltyLevel = phase6Result.noveltyLevel;
+        result.curiosityLevel = phase6Result.curiosityLevel;
+        result.dopamineLevel = phase6Result.dopamineLevel;
+        result.totalWallClockTime = phase6Result.totalWallClockTime;
+        result.memoryWorkingMemoryIntegrated = phase6Result.memoryWorkingMemoryIntegrated;
+        result.memoryEpisodicMemoryIntegrated = phase6Result.memoryEpisodicMemoryIntegrated;
+        result.neuromodulationIntegrated = phase6Result.neuromodulationIntegrated;
+        result.predictionIntegrated = phase6Result.predictionIntegrated;
+        result.developmentIntegrated = phase6Result.developmentIntegrated;
+        result.checkpointingWorks = phase6Result.checkpointingWorks;
+        
+        return result;
+    }
 };
 
-ExperimentRunner::ExperimentRunner() : pImpl(new Impl) {}
+// Register the Phase 6 integration experiment
+REGISTER_EXPERIMENT(Phase6IntegrationExperiment)
 
-ExperimentRunner::~ExperimentRunner() = default;
-
-std::shared_ptr<Experiment> ExperimentRunner::createExperiment(const std::string& name) {
-    auto exp = std::make_shared<Experiment>(name);
-    exp->setSeed(pImpl->globalSeed++);
-    pImpl->experiments.push_back(exp);
-    return exp;
-}
-
-bool ExperimentRunner::runExperiment(std::shared_ptr<Experiment> experiment,
-                                     std::shared_ptr<Brain> brain,
-                                     std::shared_ptr<Environment> environment,
-                                     SimulationStep maxSteps) {
-    if (!experiment || !brain || !environment) {
-        return false;
+// Helper function to create experiment from command line arguments
+ExperimentConfig createConfigFromCLI(const std::map<std::string, std::string>& cliArgs) {
+    ExperimentConfig config;
+    
+    auto it = cliArgs.find("neurons");
+    if (it != cliArgs.end()) {
+        config.neuronCount = std::stoi(it->second);
     }
     
-    experiment->setStartStep(0);
-    
-    // Reset environment and brain
-    auto observation = environment->reset();
-    brain->receiveSensoryInput(*observation);
-    
-    // Run simulation loop
-    for (SimulationStep step = 0; step < maxSteps && !environment->isDone(); ++step) {
-        // Brain step
-        brain->step(step);
-        
-        // Record data
-        experiment->recordStep(
-            step,
-            brain->getTotalNeuronCount(),
-            brain->getTotalSynapseCount(),
-            brain->getFiringNeuronCount(),
-            brain->getAverageFiringRate()
-        );
-        
-        // Get action from brain
-        auto action = brain->produceAction();
-        
-        // Environment step
-        observation = environment->step(*action);
-        
-        // Send observation to brain
-        brain->receiveSensoryInput(*observation);
-        
-        // Record reward
-        float reward = environment->getLastReward();
-        experiment->recordMetric("total_reward", 
-            experiment->getMetric("total_reward") + reward);
+    it = cliArgs.find("steps");
+    if (it != cliArgs.end()) {
+        config.maxSteps = std::stoi(it->second);
     }
     
-    experiment->setEndStep(maxSteps);
-    return true;
-}
-
-std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
-    const std::vector<std::shared_ptr<Experiment>>& experiments,
-    std::shared_ptr<Brain> brainTemplate,
-    std::shared_ptr<Environment> environmentTemplate,
-    SimulationStep maxSteps) {
-    
-    std::vector<std::shared_ptr<Experiment>> results;
-    
-    for (auto& exp : experiments) {
-        // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
-        auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
-        brain->initialize();
-        
-        // Would also create fresh environment here
-        
-        if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
-            results.push_back(exp);
-        }
+    it = cliArgs.find("regions");
+    if (it != cliArgs.end()) {
+        config.regionCount = std::stoi(it->second);
     }
     
-    return results;
-}
-
-const std::vector<std::shared_ptr<Experiment>>& ExperimentRunner::getExperiments() const {
-    return pImpl->experiments;
-}
-
-std::shared_ptr<Experiment> ExperimentRunner::getExperiment(const std::string& name) const {
-    for (auto& exp : pImpl->experiments) {
-        if (exp->getName() == name) {
-            return exp;
-        }
+    it = cliArgs.find("connection_probability");
+    if (it != cliArgs.end()) {
+        config.connectionProbability = std::stof(it->second);
     }
-    return nullptr;
+    
+    it = cliArgs.find("checkpoint");
+    if (it != cliArgs.end()) {
+        config.enableCheckpointing = true;
+        config.checkpointPath = it->second;
+    }
+    
+    it = cliArgs.find("replay");
+    if (it != cliArgs.end()) {
+        config.enableReplay = true;
+    }
+    
+    it = cliArgs.find("development");
+    if (it != cliArgs.end()) {
+        config.enableDevelopment = true;
+    }
+    
+    it = cliArgs.find("seed");
+    if (it != cliArgs.end()) {
+        config.seed = std::stoi(it->second);
+    }
+    
+    return config;
 }
 
-void ExperimentRunner::clearExperiments() {
-    pImpl->experiments.clear();
 }
-
-void ExperimentRunner::setGlobalSeed(uint64_t seed) {
-    pImpl->globalSeed = seed;
-}
-
-bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
-}
-
-} // namespace nlm

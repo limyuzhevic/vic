@@ -29,6 +29,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/CLI.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -92,6 +93,24 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Phase 5 performance optimizations
+add_executable(nlm_optimized
+    src/performance/OptimizedBrainMain.cpp
+)
+target_link_libraries(nlm_optimized PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
+
+# Experiment demo executable
+add_executable(nlm_experiment_demo
+    src/experiments/ExperimentDemoMain.cpp
+)
+target_link_libraries(nlm_experiment_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Enhanced Phase 6 demo with CLI support
+add_executable(nlm_phase6_enhanced
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_enhanced PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -138,6 +157,18 @@ add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 6 demo executable (enhanced with CLI)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Experiment demo executable (new)
+add_executable(nlm_experiment_demo
+    src/experiments/ExperimentDemoMain.cpp
+)
+target_link_libraries(nlm_experiment_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Testing
 enable_testing()
