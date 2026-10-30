@@ -3,40 +3,61 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <memory>
+#include "NeuralPrediction.hpp"
+#include "../brain/Brain.hpp"
 
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
+// INTEGRATED WITH NEURAL PREDICTION
 
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
     
+    // Initialize with brain reference for neural prediction
+    void initialize(Brain* brain);
+    
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
-    std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
+    // Uses NeuralPrediction for real predictive coding
+    std::vector<float> predictNextState(const std::vector<float>& currentState);
     
     // Update predictions based on actual observation
-    void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
+    // Uses NeuralPrediction to learn from experience
+    void updatePredictions(const std::vector<float>& predicted, const std::vector<float>& actual);
     
     // Get prediction error
+    // Delegates to NeuralPrediction
     float getPredictionError() const;
     
     // Get prediction confidence
+    // Delegates to NeuralPrediction
     float getConfidence() const;
     
     // Get prediction history
-    const std::vector<float>& getErrorHistory() const;
+    // Delegates to NeuralPrediction
+    const std::deque<float>& getErrorHistory() const;
     void clearHistory();
     
     // Train prediction model
-    void train(const SensoryInput& observation);
+    // Delegates to NeuralPrediction
+    void train(const std::vector<float>& observation);
+    
+    // Enable/disable prediction mechanisms
+    void enableTemporalPrediction(bool enable) { neuralPrediction_.enableTemporalPrediction(enable); }
+    void enableActionConsequencePrediction(bool enable) { neuralPrediction_.enableActionConsequencePrediction(enable); }
+    
+    // Configuration
+    void setSequenceMemorySize(size_t size) { neuralPrediction_.setSequenceMemorySize(size); }
+    void setPredictionHorizon(size_t steps) { neuralPrediction_.setPredictionHorizon(steps); }
+    
+    // Get neural components involved in prediction
+    std::vector<NeuronId> getPredictionNeurons() const { return neuralPrediction_.getPredictionNeurons(); }
+    std::vector<NeuronId> getSequenceNeurons() const { return neuralPrediction_.getSequenceNeurons(); }
     
 private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    NeuralPrediction neuralPrediction_;
 };
 
 } // namespace nlm

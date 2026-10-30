@@ -1,60 +1,51 @@
+// PredictionSystem Implementation
+// Wraps NeuralPrediction to provide the PredictionSystem interface
+
 #include "PredictionSystem.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
 
 namespace nlm {
 
-struct PredictionSystem::Impl {
-    float predictionError;
-    float confidence;
-    std::vector<float> errorHistory;
-    
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
-};
+PredictionSystem::PredictionSystem() {}
 
-PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
+PredictionSystem::~PredictionSystem() {}
 
-PredictionSystem::~PredictionSystem() = default;
-
-std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
-    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
+void PredictionSystem::initialize(Brain* brain) {
+    neuralPrediction_.initialize(brain);
+    NLM_LOG_INFO("PredictionSystem initialized with NeuralPrediction");
 }
 
-void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
-    // TODO PHASE 2: Implement real prediction error computation
-    // PLACEHOLDER: Calculate simple error
-    const auto& predData = predicted.getData();
-    const auto& actualData = actual.getData();
-    
-    if (predData.size() == actualData.size() && !predData.empty()) {
-        float sumError = 0.0f;
-        for (size_t i = 0; i < predData.size(); ++i) {
-            float diff = predData[i] - actualData[i];
-            sumError += diff * diff;
-        }
-        pImpl->predictionError = sumError / predData.size();
-        pImpl->errorHistory.push_back(pImpl->predictionError);
-    }
+std::vector<float> PredictionSystem::predictNextState(const std::vector<float>& currentState) {
+    return neuralPrediction_.generatePrediction(0); // currentStep would be passed from Brain
+}
+
+void PredictionSystem::updatePredictions(const std::vector<float>& predicted, const std::vector<float>& actual) {
+    // NeuralPrediction has its own update mechanism via updateWithObservation
+    // For now, just delegate to train method
+    neuralPrediction_.train(actual);
 }
 
 float PredictionSystem::getPredictionError() const {
-    return pImpl->predictionError;
+    return neuralPrediction_.getPredictionError();
 }
 
 float PredictionSystem::getConfidence() const {
-    return pImpl->confidence;
+    return neuralPrediction_.getPredictionConfidence();
 }
 
-const std::vector<float>& PredictionSystem::getErrorHistory() const {
-    return pImpl->errorHistory;
+const std::deque<float>& PredictionSystem::getErrorHistory() const {
+    return neuralPrediction_.getErrorHistory();
 }
 
 void PredictionSystem::clearHistory() {
-    pImpl->errorHistory.clear();
+    neuralPrediction_.clearHistory();
 }
 
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+void PredictionSystem::train(const std::vector<float>& observation) {
+    // NeuralPrediction records sensory state internally during updateWithObservation
+    // So we just delegate to train method
+    neuralPrediction_.train(observation);
 }
 
 } // namespace nlm
