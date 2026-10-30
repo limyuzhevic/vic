@@ -142,18 +142,61 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](Config& self, const std::string& key) {
+            auto value = self.get<std::string>(key);
+            if (value) {
+                return *value;
+            }
+            return std::string();
+        }, py::arg("key"), "Get a configuration value as string (returns empty if not found)")
+        .def("getInt", [](Config& self, const std::string& key) {
+            auto value = self.get<int>(key);
+            if (value) {
+                return *value;
+            }
+            return 0;
+        }, py::arg("key"), "Get a configuration value as int (returns 0 if not found)")
+        .def("getFloat", [](Config& self, const std::string& key) {
+            auto value = self.get<double>(key);
+            if (value) {
+                return *value;
+            }
+            return 0.0;
+        }, py::arg("key"), "Get a configuration value as float (returns 0.0 if not found)")
+        .def("getBool", [](Config& self, const std::string& key) {
+            auto value = self.get<bool>(key);
+            if (value) {
+                return *value;
+            }
+            return false;
+        }, py::arg("key"), "Get a configuration value as bool (returns false if not found)")
+        .def("set", static_cast<void (Config::*)(const std::string&, const std::string&, ConfigSource)>(&Config::set),
+              py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+              "Set a configuration value as string")
+        .def("setInt", [](Config& self, const std::string& key, int value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set a configuration value as int")
+        .def("setFloat", [](Config& self, const std::string& key, float value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set a configuration value as float")
+        .def("setBool", [](Config& self, const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+           "Set a configuration value as bool")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -416,10 +459,166 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("createBrainFromConfig", [](const std::string& configFilepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(configFilepath)) {
+            py::raise_from<std::runtime_error>(std::runtime_error(
+                "Failed to load config file: " + configFilepath));
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("configFilepath"), "Create brain from config file");
+
+    m.def("createWorldWithConfig", [](const std::shared_ptr<Config>& config) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        if (config) {
+            // Extract world settings from config
+            auto width = config->getOr<size_t>("world.width", 100);
+            auto height = config->getOr<size_t>("world.height", 100);
+            auto visionWidth = config->getOr<size_t>("world.visionWidth", 8);
+            auto visionHeight = config->getOr<size_t>("world.visionHeight", 8);
+            world->configure(width, height, visionWidth, visionHeight);
+            
+            auto agentStartX = config->getOr<float>("world.agentStartX", width * 0.5f);
+            auto agentStartY = config->getOr<float>("world.agentStartY", height * 0.5f);
+            world->setAgentStart(agentStartX, agentStartY);
+        }
+        return world;
+    }, py::arg("config"), "Create world from configuration");
+
+    m.def("runAgentSimulation", [](
+        size_t numSteps,
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<SimpleWorld> world,
+        std::shared_ptr<AgentBrain> agent,
+        bool verbose = true,
+        const std::string& progressCallback = ""
+    ) {
+        if (!brain || !world || !agent) {
+            py::raise_from<std::runtime_error>(std::runtime_error(
+                "brain, world, and agent must all be provided"));
+        }
+        
+        brain->initialize();
+        agent->initialize(*world);
+        
+        float totalReward = 0.0f;
+        size_t firingCount = 0;
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            float reward = world->getSensoryPercept().getInternal()[0] if 
+                world->getSensoryPercept().getInternal() else 0.0f;
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            totalReward += reward;
+            if (brain->getFiringNeuronCount() > 0) firingCount++;
+            
+            if (verbose && step % 100 == 0) {
+                std::cout << "Step " << step << ": "
+                         << "Firing: " << brain->getFiringNeuronCount() << ", "
+                         << "Reward: " << totalReward / (step + 1) << std::endl;
+            }
+        }
+        
+        return std::make_tuple(
+            totalReward / numSteps,
+            static_cast<float>(firingCount) / numSteps,
+            brain->getAverageFiringRate(),
+            brain->getTotalSpikeCount()
+        );
+    }, py::arg("numSteps"), py::arg("brain"), py::arg("world"), py::arg("agent"),
+        py::arg("verbose") = true, py::arg("progressCallback") = "",
+        "Run a complete agent simulation and return statistics");
+
+    m.def("createLearningConfig", [](size_t neurons = 500, float learningRate = 0.01f, 
+                                   float plasticityRate = 0.1f) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neurons);
+        config->set("brain.synapse_density", 0.1f);
+        config->set("brain.connection_probability", 0.05f);
+        config->set("plasticity.stdp.learning_rate", learningRate);
+        config->set("plasticity.structural.plasticity_rate", plasticityRate);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.enable_critical_period", true);
+        return config;
+    }, py::arg("neurons") = 500, py::arg("learningRate") = 0.01f, py::arg("plasticityRate") = 0.1f,
+        "Create a configuration optimized for learning");
+
+    m.def("createExplorationConfig", [](size_t neurons = 1000, 
+                                       float curiosity = 0.5f,
+                                       float novelty = 0.5f) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neurons);
+        config->set("brain.synapse_density", 0.15f);
+        config->set("brain.connection_probability", 0.08f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.curiosity.scale", curiosity);
+        config->set("neuromod.novelty.enable", true);
+        config->set("neuromod.novelty.scale", novelty);
+        config->set("development.enable_synaptogenesis", true);
+        config->set("development.enable_pruning", true);
+        return config;
+    }, py::arg("neurons") = 1000, py::arg("curiosity") = 0.5f, py::arg("novelty") = 0.5f,
+        "Create a configuration optimized for exploration");
+
+    m.def("getVersion", []() {
+        return "NLM Python Bindings v0.1.0";
+    }, "Get the version of the Python bindings");
+
+    m.def("printBanner", []() {
+        std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Python Bindings v0.1.0                                  ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+        )" << std::endl;
+    }, "Print the NLM banner");
+
+    m.def("showExamples", []() {
+        std::cout << R"(
+    === NLM Python Examples ===
+    
+    # Basic brain usage:
+    import pynlm
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Agent simulation:
+    world = pynlm.createSimpleWorld()
+    world.configure(width=20, height=20)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    for step in range(1000):
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+    
+    # Save results:
+    brain.save("my_brain.bin")
+    world.save("my_world.bin")
+    
+    For more examples, visit: https://github.com/nlm-project/nlm
+        )" << std::endl;
+    }, "Show example usage patterns");
 
 } // namespace nlm
