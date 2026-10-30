@@ -2,173 +2,227 @@
 
 #include "../core/Types/Types.hpp"
 #include <vector>
-#include <functional>
+#include <unordered_map>
+#include <string>
 
 namespace nlm {
 
-// Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Working Memory: Neural working memory with persistent activity and plasticity
+// Implements working memory using neural dynamics, not just storage
+//
+// Key mechanisms:
+// - Persistent neural activity (reverberating activity)
+// - Activity-dependent synaptic facilitation/inhibition
+// - Trace aging and decay
+// - Consolidation to episodic memory
+// - Competition between traces
+//
+// This is NOT a simple buffer - it's an active neural system that maintains information
 
 class WorkingMemory {
 public:
     WorkingMemory();
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
-    void store(NeuronId neuron, float value);
+    // Initialize working memory with configuration
+    void initialize(std::shared_ptr<Config> config);
     
-    // Retrieve item
-    float retrieve(NeuronId neuron) const;
+    // Store neural pattern with automatic encoding and plasticity
+    void storePattern(const std::vector<float>& pattern, float strength = 1.0f);
     
-    // Check if item exists
-    bool contains(NeuronId neuron) const;
+    // Store specific neuron activation (for direct neural manipulation)
+    void storeActivation(NeuronId neuron, float activation, float importance = 1.0f);
     
-    // Clear all
+    // Retrieve current working memory as neural activity pattern
+    std::vector<float> retrievePattern() const;
+    
+    // Get activation level for a specific neuron
+    float getNeuronActivation(NeuronId neuron) const;
+    
+    // Check if neuron is currently active in working memory
+    bool containsNeuron(NeuronId neuron) const;
+    
+    // Update working memory (maintain persistent activity, apply plasticity)
+    void update(TimestepDuration dt);
+    
+    // Clear all memory traces
     void clear();
     
-    // Get capacity
-    size_t getCapacity() const;
-    size_t getCurrentSize() const;
+    // Get working memory statistics
+    size_t getTraceCount() const;
+    float getMemoryLoad() const;
+    float getAverageActivation() const;
+    float getMemoryStability() const;
     
-    // Decay all items
-    void decay(float decayRate);
+    // Competition and selection
+    std::vector<NeuronId> getActiveNeurons() const;
+    std::vector<NeuronId> getWinningNeurons(float threshold = 0.5f) const;
+    
+    // Consolidation to long-term memory
+    void consolidate(float threshold);
+    bool shouldConsolidate() const;
+    
+    // External integration
+    void integrateWith(NeuralWorkingMemory& other);
+    void decay(float rate);
+    
+    // Save/load functionality
+    bool save(const std::string& filepath) const;
+    bool load(const std::string& filepath);
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
-// Episodic memory: storage of events and experiences
-// PLACEHOLDER - Phase 2 will implement real episodic memory
+// Neural Episodic Memory: Storage of experienced events and episodes
+// Implements episodic memory using neural assemblies and pattern completion
+//
+// Key mechanisms:
+// - Episode encoding with temporal context
+// - Pattern completion and recall
+// - Memory replay during sleep/rest
+// - Emotional tagging (via neuromodulators)
+// - Spatial and temporal indexing
+//
+// Each episode is a distributed neural pattern that can be reactivated
 
-struct EpisodicMemoryItem {
-    SimulationStep timestamp;
-    std::vector<NeuronId> neurons;
-    std::vector<float> values;
-    std::string metadata;
-    
-    EpisodicMemoryItem() : timestamp(0) {}
-};
-
-class EpisodicMemory {
+class NeuralEpisodicMemory {
 public:
-    EpisodicMemory();
-    ~EpisodicMemory();
+    NeuralEpisodicMemory();
+    ~NeuralEpisodicMemory();
     
-    // Store episode
-    void storeEpisode(const EpisodicMemoryItem& episode);
+    void initialize(std::shared_ptr<Config> config);
     
-    // Retrieve episode
-    EpisodicMemoryItem retrieveEpisode(size_t index) const;
+    // Store an experienced episode with neural pattern
+    void storeEpisode(const std::vector<float>& sensoryPattern,
+                     const std::vector<float>& resultingPattern,
+                     ActionType action = ActionType::None,
+                     float reward = 0.0f,
+                     float emotionalValue = 0.0f);
     
-    // Get episode count
-    size_t getEpisodeCount() const;
+    // Retrieve similar episodes based on current sensory input
+    std::vector<EpisodicMemoryItem> retrieveSimilar(
+        const std::vector<float>& pattern,
+        size_t maxResults = 5) const;
     
-    // Get recent episodes
-    std::vector<EpisodicMemoryItem> getRecentEpisodes(size_t count) const;
+    // Retrieve episodes by time range
+    std::vector<EpisodicMemoryItem> retrieveTemporal(
+        SimulationStep startTime,
+        SimulationStep endTime,
+        size_t maxResults = 10) const;
     
-    // Clear all
-    void clear();
+    // Retrieve episodes by spatial location
+    std::vector<EpisodicMemoryItem> retrieveByLocation(
+        float x, float y, float radius = 10.0f,
+        size_t maxResults = 5) const;
     
-    // Memory consolidation (move to long-term)
+    // Retrieve episodes by action taken
+    std::vector<EpisodicMemoryItem> retrieveByAction(
+        ActionType action,
+        size_t maxResults = 5) const;
+    
+    // Activate memory replay for training/learning
+    void replayEpisode(const EpisodicMemoryItem& episode);
+    void replaySequence(const std::vector<size_t>& episodeIds);
+    void replayAll(float probability = 0.1f);
+    
+    // Update memory relevance and consolidation
+    void updateRelevance(size_t episodeId, float delta);
     void consolidate(float relevanceThreshold);
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-// Semantic memory: gradually acquired knowledge
-// PLACEHOLDER - Phase 2 will implement real semantic memory
-
-class SemanticMemory {
-public:
-    SemanticMemory();
-    ~SemanticMemory();
+    // Get stored episodes
+    const EpisodicMemoryItem* getEpisode(size_t index) const;
+    std::vector<const EpisodicMemoryItem*> getAllEpisodes() const;
+    std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;
     
-    // Store fact
-    void storeFact(const std::string& key, const std::string& value);
+    // Memory statistics
+    size_t getEpisodeCount() const;
+    float getAverageReward() const;
+    float getMemoryStrength() const;
     
-    // Retrieve fact
-    std::string retrieveFact(const std::string& key) const;
-    
-    // Check if fact exists
-    bool hasFact(const std::string& key) const;
-    
-    // Get all facts
-    std::vector<std::pair<std::string, std::string>> getAllFacts() const;
-    
-    // Clear all
+    // Memory management
     void clear();
+    bool isEmpty() const;
+    void pruneOldEpisodes(size_t maxCount);
+    
+    // Save/load functionality
+    bool save(const std::string& filepath) const;
+    bool load(const std::string& filepath);
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
-// Procedural memory: learned skills and habits
-// PLACEHOLDER - Phase 2 will implement real procedural memory
+// Neural Associative Memory: Network of pattern associations
+// Implements associative memory using neural assemblies and spreading activation
+//
+// Key mechanisms:
+// - Pattern completion from partial cues
+// - Spreading activation through association network
+// - Bidirectional associations (A->B and B->A)
+// - Strength-based learning (Hebbian-like)
+// - Interference management
+//
+// Each association is a bidirectional link between neural patterns
 
-struct Skill {
-    std::string name;
-    std::vector<NeuronId> neuralPattern;
-    float proficiency;
-    
-    Skill() : proficiency(0.0f) {}
-};
-
-class ProceduralMemory {
+class NeuralAssociativeMemory {
 public:
-    ProceduralMemory();
-    ~ProceduralMemory();
+    NeuralAssociativeMemory();
+    ~NeuralAssociativeMemory();
     
-    // Learn skill
-    void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
+    void initialize(std::shared_ptr<Config> config);
     
-    // Retrieve skill
-    Skill* getSkill(const std::string& name);
+    // Create association between two patterns
+    void associate(const std::vector<float>& patternA,
+                   const std::vector<float>& patternB,
+                   float strength = 1.0f);
     
-    // Get all skills
-    std::vector<Skill*> getAllSkills();
+    // Build associations from experiences
+    void buildFromExperience(const EpisodicMemoryItem& episode);
     
-    // Update proficiency
-    void updateProficiency(const std::string& name, float delta);
+    // Retrieve pattern given partial cue
+    std::vector<std::vector<float>> retrieve(
+        const std::vector<float>& cue,
+        size_t maxResults = 5) const;
     
-    // Clear all
+    // Get association strength between patterns
+    float getAssociationStrength(
+        const std::vector<float>& patternA,
+        const std::vector<float>& patternB) const;
+    
+    // Update association strength
+    void updateAssociation(const std::vector<float>& patternA,
+                          const std::vector<float>& patternB,
+                          float delta);
+    
+    // Spread activation through network
+    std::vector<std::vector<float>> spreadActivation(
+        const std::vector<float>& cue,
+        size_t steps = 5) const;
+    
+    // Get all associations for a pattern
+    std::vector<std::vector<float>> getAssociates(
+        const std::vector<float>& pattern) const;
+    
+    // Neural network operations
+    void reinforceAssociations(float factor);
+    void weakenAssociations(float factor);
+    
+    // Memory management
     void clear();
+    bool isEmpty() const;
+    size_t getAssociationCount() const;
+    float getNetworkActivity() const;
+    
+    // Save/load functionality
+    bool save(const std::string& filepath) const;
+    bool load(const std::string& filepath);
     
 private:
     struct Impl;
-    Impl* pImpl;
-};
-
-// Associative memory: relationships between representations
-// PLACEHOLDER - Phase 2 will implement real associative memory
-
-class AssociativeMemory {
-public:
-    AssociativeMemory();
-    ~AssociativeMemory();
-    
-    // Create association
-    void associate(NeuronId a, NeuronId b, float strength);
-    
-    // Get associated neurons
-    std::vector<NeuronId> getAssociations(NeuronId neuron) const;
-    
-    // Get association strength
-    float getAssociationStrength(NeuronId a, NeuronId b) const;
-    
-    // Update association
-    void updateAssociation(NeuronId a, NeuronId b, float delta);
-    
-    // Clear all
-    void clear();
-    
-private:
-    struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

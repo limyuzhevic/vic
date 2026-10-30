@@ -25,8 +25,9 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
-class Curiosity;
-class Novelty;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class PredictionError;
 
 // Inter-regional connection (long-range connectivity)

@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -22,6 +23,14 @@ using ConfigValue = std::variant<
     std::vector<double>,
     std::vector<std::string>
 >;
+
+// Helper functions for JSON conversion
+nlohmann::json configValueToJson(const ConfigValue& value);
+ConfigValue jsonToConfigValue(const nlohmann::json& jsonValue);
+std::string configValueToString(const ConfigValue& value);
+bool configValueToBool(const ConfigValue& value);
+int configValueToInt(const ConfigValue& value);
+double configValueToDouble(const ConfigValue& value);
 
 // Configuration source
 enum class ConfigSource {

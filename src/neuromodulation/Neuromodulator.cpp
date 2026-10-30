@@ -1,56 +1,66 @@
 #include "Neuromodulator.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
-struct Dopamine::Impl {
+struct Neuromodulator::Impl {
     float level;
     float baseline;
-    float peak;
-    float decayRate;
-    float releaseRate;
+    float targetLevel;
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl() 
+        : level(0.0f)
+        , baseline(0.0f)
+        , targetLevel(0.0f) {}
 };
 
-Dopamine::Dopamine() : pImpl(new Impl) {}
-
-Dopamine::~Dopamine() = default;
-
-const char* Dopamine::getName() const {
-    return "DA";
+Neuromodulator::Neuromodulator() : pImpl(std::make_unique<Impl>()) {
+    // Default implementation
 }
 
-float Dopamine::getLevel() const {
+Neuromodulator::~Neuromodulator() = default;
+
+float Neuromodulator::getLevel() const {
     return pImpl->level;
 }
 
-void Dopamine::setLevel(float level) {
-    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+void Neuromodulator::setLevel(float level) {
+    pImpl->level = level;
+    pImpl->targetLevel = pImpl->level;
 }
 
-float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+float Neuromodulator::getPlasticityFactor() const {
+    return 1.0f;  // Default: no modulation
 }
 
-void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+void Neuromodulator::update(TimestepDuration dt) {
+    // Default: decay towards baseline
+    if (pImpl->level > pImpl->baseline) {
+        pImpl->level = std::max(pImpl->baseline, 
+                              pImpl->level - 0.1f * static_cast<float>(dt));
+    } else {
+        pImpl->level = std::min(pImpl->targetLevel,
+                              pImpl->level + 0.05f * static_cast<float>(dt));
+    }
 }
 
-void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+float Neuromodulator::getBaselineLevel() const {
+    return pImpl->baseline;
 }
 
-void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+void Neuromodulator::setTargetLevel(float target) {
+    pImpl->targetLevel = target;
+}
+
+bool Neuromodulator::isActive() const {
+    return pImpl->level > pImpl->baseline + 0.01f;
+}
+
+void Neuromodulator::reset() {
+    pImpl->level = pImpl->baseline;
+    pImpl->targetLevel = pImpl->baseline;
 }
 
 } // namespace nlm

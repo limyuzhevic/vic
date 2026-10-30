@@ -4,7 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -20,6 +20,15 @@ endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# nlohmann/json dependency for configuration
+include(FetchContent)
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG v3.11.2
+)
+FetchContent_MakeAvailable(nlohmann_json)
 
 # Core library
 add_library(nlm_core STATIC
@@ -48,12 +57,12 @@ add_library(nlm_core STATIC
     src/development/Synaptogenesis.cpp
     src/development/Pruning.cpp
     src/development/Maturation.cpp
-    # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
+    # Neuromodulation (enhanced)
+src/neuromodulation/Dopamine.cpp
+    src/neuromodulation/Acetylcholine.cpp
+    src/neuromodulation/Norepinephrine.cpp
+    src/neuromodulation/Serotonin.cpp
+    src/neuromodulation/EnhancedReward.cpp
     # Memory
     src/memory/WorkingMemory.cpp
     src/memory/EpisodicMemory.cpp
@@ -91,6 +100,9 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Link with nlohmann/json for configuration parsing
+target_link_libraries(nlm_core PUBLIC nlohmann_json::nlohmann_json)
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC

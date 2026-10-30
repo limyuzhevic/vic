@@ -3,14 +3,21 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    nlohmann::json schema;  // JSON schema for validation
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with basic schema
+    pImpl->schema = nlohmann::json::object();
+    pImpl->schema["type"] = "object";
+    pImpl->schema["additionalProperties"] = false;
+}
 
 Config::~Config() = default;
 
@@ -18,41 +25,198 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+nlohmann::json configValueToJson(const ConfigValue& value) {
+    return std::visit([](const auto& v) -> nlohmann::json {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, int>) {
+            return v;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return v;
+        } else if constexpr (std::is_same_v<T, double>) {
+            return v;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return v;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return v;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            nlohmann::json arr = nlohmann::json::array();
+            for (const auto& item : v) {
+                arr.push_back(item);
+            }
+            return arr;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            nlohmann::json arr = nlohmann::json::array();
+            for (const auto& item : v) {
+                arr.push_back(item);
+            }
+            return arr;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            nlohmann::json arr = nlohmann::json::array();
+            for (const auto& item : v) {
+                arr.push_back(item);
+            }
+            return arr;
+        }
+        return nullptr;
+    }, value);
+}
+
+ConfigValue jsonToConfigValue(const nlohmann::json& jsonValue) {
+    if (jsonValue.is_number_integer()) {
+        return jsonValue.get<int>();
+    } else if (jsonValue.is_number_unsigned()) {
+        return jsonValue.get<uint64_t>();
+    } else if (jsonValue.is_number()) {
+        return jsonValue.get<double>();
+    } else if (jsonValue.is_boolean()) {
+        return jsonValue.get<bool>();
+    } else if (jsonValue.is_string()) {
+        return jsonValue.get<std::string>();
+    } else if (jsonValue.is_array()) {
+        if (!jsonValue.empty()) {
+            const auto& first = jsonValue[0];
+            if (first.is_number_integer()) {
+                std::vector<int> vec;
+                for (const auto& item : jsonValue) {
+                    vec.push_back(item.get<int>());
+                }
+                return vec;
+            } else if (first.is_number()) {
+                std::vector<double> vec;
+                for (const auto& item : jsonValue) {
+                    vec.push_back(item.get<double>());
+                }
+                return vec;
+            } else if (first.is_string()) {
+                std::vector<std::string> vec;
+                for (const auto& item : jsonValue) {
+                    vec.push_back(item.get<std::string>());
+                }
+                return vec;
+            }
+        }
+        // Default to empty vector
+        return std::vector<int>();
+    }
+    // Default to empty string
+    return std::string();
+}
+
+std::string configValueToString(const ConfigValue& value) {
+    return std::visit([](const auto& v) -> std::string {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            return v;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return v ? "true" : "false";
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            return std::to_string(v);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return std::to_string(v);
+        } else if constexpr (std::is_same_v<T, std::vector<int>> || 
+                           std::is_same_v<T, std::vector<double>> ||
+                           std::is_same_v<T, std::vector<std::string>>) {
+            return "[...]";
+        }
+        return "";
+    }, value);
+}
+
+bool configValueToBool(const ConfigValue& value) {
+    return std::visit([](const auto& v) -> bool {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, bool>) {
+            return v;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return v == "true" || v == "1" || v == "yes" || v == "on";
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            return v != 0;
+        } else if constexpr (std::is_same_v<T, double>) {
+            return v != 0.0;
+        }
+        return false;
+    }, value);
+}
+
+int configValueToInt(const ConfigValue& value) {
+    return std::visit([](const auto& v) -> int {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, int>) {
+            return v;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return static_cast<int>(v);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return static_cast<int>(v);
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            try {
+                return std::stoi(v);
+            } catch (...) {
+                return 0;
+            }
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return v ? 1 : 0;
+        }
+        return 0;
+    }, value);
+}
+
+double configValueToDouble(const ConfigValue& value) {
+    return std::visit([](const auto& v) -> double {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, double>) {
+            return v;
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            return static_cast<double>(v);
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            try {
+                return std::stod(v);
+            } catch (...) {
+                return 0.0;
+            }
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return v ? 1.0 : 0.0;
+        }
+        return 0.0;
+    }, value);
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
+        
+        // Clear existing entries
+        clear();
+        
+        // Parse JSON and populate entries
+        if (jsonConfig.is_object()) {
+            for (auto it = jsonConfig.begin(); it != jsonConfig.end(); ++it) {
+                std::string key = it.key();
+                ConfigValue value = jsonToConfigValue(it.value());
+                
+                // Try to get description from schema if available
+                std::string description = "";
+                if (pImpl->schema.is_object() && pImpl->schema.contains(key)) {
+                    auto& keySchema = pImpl->schema[key];
+                    if (keySchema.contains("description")) {
+                        description = keySchema["description"].get<std::string>();
+                    }
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        return true;
+    } catch (const std::exception& e) {
+        // Log error
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,12 +248,20 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        nlohmann::json jsonConfig = nlohmann::json::object();
+        
+        for (const auto& entry : pImpl->entries) {
+            jsonConfig[entry.key] = configValueToJson(entry.value);
+        }
+        
+        // Write JSON with pretty formatting
+        file << std::setw(2) << jsonConfig << std::endl;
+        return true;
+    } catch (const std::exception& e) {
+        // Log error
+        return false;
     }
-    
-    return true;
 }
 
 template<typename T>
@@ -102,10 +274,47 @@ std::optional<T> Config::get(const std::string& key) const {
     }
     
     try {
-        return std::get<T>(it->value);
+        // Try to convert to requested type
+        const ConfigValue& value = it->value;
+        if constexpr (std::is_same_v<T, int>) {
+            return configValueToInt(value);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return std::visit([](const auto& v) -> std::optional<int64_t> {
+                using U = std::decay_t<decltype(v)>;
+                if constexpr (std::is_same_v<U, int64_t>) {
+                    return v;
+                } else if constexpr (std::is_same_v<U, int>) {
+                    return static_cast<int64_t>(v);
+                } else if constexpr (std::is_same_v<U, double>) {
+                    return static_cast<int64_t>(v);
+                } else if constexpr (std::is_same_v<U, bool>) {
+                    return v ? 1 : 0;
+                } else if constexpr (std::is_same_v<U, std::string>) {
+                    try {
+                        return std::stoll(v);
+                    } catch (...) {
+                        return std::nullopt;
+                    }
+                }
+                return std::nullopt;
+            }, value);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return configValueToDouble(value);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return configValueToBool(value);
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return std::visit([](const auto& v) -> std::optional<std::string> {
+                using U = std::decay_t<decltype(v)>;
+                if constexpr (std::is_same_v<U, std::string>) {
+                    return v;
+                }
+                return std::nullopt;
+            }, value);
+        }
     } catch (const std::bad_variant_access&) {
         return std::nullopt;
     }
+    return std::nullopt;
 }
 
 template<typename T>
@@ -172,16 +381,7 @@ std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else {
-                oss << arg;
-            }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "  " << entry.key << " = " << configValueToString(entry.value) << " (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
 }
