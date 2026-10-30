@@ -5,11 +5,15 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <rapidjson/document.h>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
+// Forward declarations for rapidjson
+namespace rapidjson {
+    class Document;
+    class Value;
+}
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -55,13 +59,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (auto-detects format based on file extension)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,13 +97,24 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Helper functions for backward compatibility
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    bool loadJsonFromFile(const std::string& filepath);
+    bool loadSimpleFromFile(const std::string& filepath);
+    void extractJsonValue(const std::string& key, const rapidjson::Value& value);
+    bool saveJsonToFile(const std::string& filepath) const;
+    bool saveSimpleToFile(const std::string& filepath) const;
+    
+    // Backward compatibility
+    std::string trim(const std::string& str) const;
+    std::string toLower(const std::string& str) const;
 };
 
 } // namespace nlm

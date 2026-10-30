@@ -1,10 +1,9 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
-
-namespace nlm {
+#include <rapidjson/document.h>
+#include <rapidjson/istreamwrapper.h>
+#include <rapidjson/ostreamwrapper.h>
+#include <rapidjson/writer.h>
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/prettywriter.h>
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,16 +18,99 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced configuration file loader supporting both simple key=value and JSON formats
+    // Supports: .cfg, .txt (simple), .json, .yaml, .yml (structured)
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
         return false;
     }
     
+    // Try to detect file format by reading first few lines
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    bool isJsonFormat = false;
+    std::string ext = std::filesystem::path(filepath).extension().string();
+    
+    // Check file extension
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".json" || ext == ".yaml" || ext == ".yml") {
+        isJsonFormat = true;
+    } else if (!isJsonFormat) {
+        // Check content for JSON syntax
+        size_t firstNonSpace = firstLine.find_first_not_of(" \t\r\n");
+        if (firstNonSpace != std::string::npos && 
+            (firstLine[firstNonSpace] == '{' || firstLine[firstNonSpace] == '[')) {
+            isJsonFormat = true;
+        }
+    }
+    
+    if (isJsonFormat) {
+        // Use rapidjson for JSON parsing
+        return loadJsonFromFile(filepath);
+    } else {
+        // Use simple key=value parser (backward compatibility)
+        return loadSimpleFromFile(filepath);
+    }
+}
+
+bool Config::loadJsonFromFile(const std::string& filepath) {
+    // Load configuration from JSON file
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open JSON config file: " + filepath);
+        return false;
+    }
+    
+    rapidjson::IStreamWrapper isw(file);
+    pImpl->jsonDoc.ParseStream(isw);
+    
+    if (pImpl->jsonDoc.HasParseError()) {
+        NLM_LOG_ERROR("JSON parse error in config file: " + filepath);
+        return false;
+    }
+    
+    // Clear existing entries
+    clear();
+    pImpl->useJsonFormat = true;
+    
+    // Extract configuration from JSON
+    if (pImpl->jsonDoc.IsObject()) {
+        for (auto it = pImpl->jsonDoc.MemberBegin(); it != pImpl->jsonDoc.MemberEnd(); ++it) {
+            std::string key = it->name.GetString();
+            
+            // Recursively extract values
+            extractJsonValue(key, it->value);
+        }
+    }
+    
+    NLM_LOG_INFO("Loaded JSON configuration from: " + filepath);
+    return true;
+}
+
+bool Config::loadSimpleFromFile(const std::string& filepath) {
+    // Load configuration from simple key=value file (Phase 1 format)
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
+        return false;
+    }
+    
+    clear();
+    pImpl->useJsonFormat = false;
+    
     std::string line;
+    size_t lineNumber = 0;
+    bool success = true;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,11 +130,76 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Determine type and set value
+            try {
+                // Try boolean
+                if (value == "true") {
+                    set(key, true, ConfigSource::File);
+                } else if (value == "false") {
+                    set(key, false, ConfigSource::File);
+                } else if (value.find('.') == std::string::npos) {
+                    // Try integer
+                    long long intVal = std::stoll(value);
+                    set(key, intVal, ConfigSource::File);
+                } else {
+                    // Try float
+                    double floatVal = std::stod(value);
+                    set(key, floatVal, ConfigSource::File);
+                }
+            } catch (const std::exception& e) {
+                // Treat as string
+                set(key, value, ConfigSource::File);
+            }
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNumber) + ": " + line);
+            success = false;
         }
     }
     
+    if (!success) {
+        NLM_LOG_WARNING("Some config lines may have errors");
+    }
+    
+    NLM_LOG_INFO("Loaded configuration from: " + filepath);
     return true;
+}
+
+void Config::extractJsonValue(const std::string& key, const rapidjson::Value& value) {
+    // Recursively extract values from JSON
+    if (value.IsString()) {
+        set(key, value.GetString(), ConfigSource::File);
+    } else if (value.IsBool()) {
+        set(key, value.GetBool(), ConfigSource::File);
+    } else if (value.IsInt()) {
+        set(key, value.GetInt(), ConfigSource::File);
+    } else if (value.IsInt64()) {
+        set(key, value.GetInt64(), ConfigSource::File);
+    } else if (value.IsUint()) {
+        set(key, value.GetUint(), ConfigSource::File);
+    } else if (value.IsFloat()) {
+        set(key, value.GetFloat(), ConfigSource::File);
+    } else if (value.IsDouble()) {
+        set(key, value.GetDouble(), ConfigSource::File);
+    } else if (value.IsArray()) {
+        // Convert array to vector string representation
+        std::vector<std::string> arr;
+        for (const auto& item : value.GetArray()) {
+            if (item.IsString()) {
+                arr.push_back(item.GetString());
+            } else if (item.IsInt()) {
+                arr.push_back(std::to_string(item.GetInt()));
+            } else {
+                arr.push_back("");
+            }
+        }
+        set(key, arr, ConfigSource::File);
+    } else if (value.IsObject()) {
+        // Nested object - flatten with dot notation
+        for (auto it = value.MemberBegin(); it != value.MemberEnd(); ++it) {
+            std::string nestedKey = key + "." + it->name.GetString();
+            extractJsonValue(nestedKey, it->value);
+        }
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

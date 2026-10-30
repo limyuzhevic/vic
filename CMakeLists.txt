@@ -119,13 +119,31 @@ add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Main executable
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+    src/experiments/Phase6Demo.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Python bindings
+add_library(pynlm MODULE
+    python/bindings.cpp
+)
+target_include_directories(pynlm PUBLIC src)
+target_link_libraries(pynlm PUBLIC nlm_core nlm_agent nlm_world)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.20)
+    set_target_properties(pynlm PROPERTIES PREFIX "" SUFFIX ".so")
+endif()
+
+# Main executable (Phase 6 demo by default)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_phase6)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
