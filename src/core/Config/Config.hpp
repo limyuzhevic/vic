@@ -100,6 +100,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing (public for testing)
+    bool parseJSON(const std::string& json);
+    std::optional<ConfigValue> parseJSONValue(const std::string& json, size_t& pos);
+    static std::string escapeJSONString(const std::string& str);
 };
 
 } // namespace nlm
