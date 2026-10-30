@@ -28,6 +28,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SensoryInput;
+class Neuromodulator;
+class Action;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -136,6 +139,11 @@ public:
     size_t getActiveNeuronCount() const;
     size_t getFiringNeuronCount() const;
     float getAverageFiringRate() const;
+    
+    // Concept formation helpers
+    void extractNeuralPatternForConceptFormation(std::vector<float>& pattern) const;
+    std::unique_ptr<class SensoryInput> convertNeuralPatternToSensory(const std::vector<float>& neuralPattern) const;
+    std::vector<float> getSensoryFeaturesForConceptFormation() const;
     
     // ========== MEMORY SYSTEMS ==========
     
