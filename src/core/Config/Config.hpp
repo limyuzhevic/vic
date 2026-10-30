@@ -1,47 +1,26 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-
-namespace nlm {
-
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
 // Configuration entry
 struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+    std::string key;           // Configuration key name
+    ConfigValue value;          // Value (supports int, double, string, bool, arrays)
+    ConfigSource source;        // How the configuration was set
+    std::string description;   // Human-readable description of the setting
     
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// JSON parsing utilities (internal)
+namespace config_internal {
+    std::string trim(const std::string& str);
+    std::string toLower(const std::string& str);
+    std::string stripQuotes(const std::string& str);
+    ConfigValue parseJSONValue(const std::string& valueStr);
+};
+
+// Static helper functions (public API)
+std::string trim(const std::string& str);
+std::string toLower(const std::string& str);
 
 // Main configuration class
 class Config {
@@ -96,10 +75,6 @@ public:
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
 
 } // namespace nlm
