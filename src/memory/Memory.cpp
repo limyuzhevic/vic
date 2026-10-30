@@ -17,13 +17,29 @@ WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
     // TODO PHASE 2: Implement real storage with capacity limits
+    // Enhanced implementation with competition-based replacement
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
             return;
         }
     }
-    if (pImpl->items.size() < pImpl->capacity) {
+    
+    // If capacity reached, replace the least recently used item
+    if (pImpl->items.size() >= pImpl->capacity) {
+        if (!pImpl->items.empty()) {
+            // Find the neuron with minimum value (least important) for replacement
+            size_t minIndex = 0;
+            float minValue = pImpl->items[0].second;
+            for (size_t i = 1; i < pImpl->items.size(); ++i) {
+                if (pImpl->items[i].second < minValue) {
+                    minIndex = i;
+                    minValue = pImpl->items[i].second;
+                }
+            }
+            pImpl->items[minIndex] = std::make_pair(neuron, value);
+        }
+    } else {
         pImpl->items.emplace_back(neuron, value);
     }
 }
@@ -109,6 +125,60 @@ void EpisodicMemory::clear() {
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
     // TODO PHASE 2: Implement real consolidation
+    // Enhanced consolidation algorithm:
+    // 1. Calculate episode importance based on reward, activation strength, and recency
+    // 2. Sort episodes by importance
+    // 3. Keep only the most important episodes (relevanceThreshold % of max)
+    // 4. Remove less important episodes to maintain memory efficiency
+    
+    if (pImpl->episodes.empty()) return;
+    
+    // Calculate importance scores for each episode
+    std::vector<std::pair<size_t, float>> importanceScores;
+    importanceScores.reserve(pImpl->episodes.size());
+    
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        const auto& episode = pImpl->episodes[i];
+        float importance = 0.0f;
+        
+        // Factor 1: Reward value (higher reward = more important)
+        importance += episode.reward * 0.5f;
+        
+        // Factor 2: Activation strength (average of neuron activations)
+        if (!episode.neuronActivations.empty()) {
+            float totalActivation = 0.0f;
+            for (float activation : episode.neuronActivations) {
+                totalActivation += activation;
+            }
+            importance += (totalActivation / episode.neuronActivations.size()) * 0.3f;
+        }
+        
+        // Factor 3: Recency (more recent = more important)
+        // Assuming current step index (simplified for now)
+        float recencyFactor = 1.0f - (static_cast<float>(i) / pImpl->episodes.size());
+        importance += recencyFactor * 0.2f;
+        
+        importanceScores.emplace_back(i, importance);
+    }
+    
+    // Sort episodes by importance (descending)
+    std::sort(importanceScores.begin(), importanceScores.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });n
+    // Determine how many episodes to keep
+    size_t targetSize = static_cast<size_t>(pImpl->episodes.size() * relevanceThreshold);
+    if (targetSize < 1) targetSize = 1;  // Keep at least one episode
+    
+    // Create new episodes list with only the most important ones
+    std::vector<EpisodicMemoryItem> consolidatedEpisodes;
+    consolidatedEpisodes.reserve(targetSize);
+    
+    for (size_t i = 0; i < targetSize && i < importanceScores.size(); ++i) {
+        size_t originalIndex = importanceScores[i].first;
+        consolidatedEpisodes.push_back(pImpl->episodes[originalIndex]);
+    }
+    
+    // Replace the old episodes with consolidated ones
+    pImpl->episodes = std::move(consolidatedEpisodes);
 }
 
 // Semantic Memory Implementation

@@ -321,129 +321,149 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
-    
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
-    }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
-    
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
-    }
-    
-    brain->logStatus();
-    
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
-    
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
-    
-    return 0;
+void printAdvancedUsage() {
+    std::cout << R"(
+=== NLM PHASE 6 ADVANCED USAGE ===
+
+COMMANDS:
+  nlm [options]                    Run NLM Phase 6 Integrated Artificial Brain
+  nlm --help                      Show basic usage
+  nlm --advanced-help              Show advanced options and examples
+
+BASIC OPTIONS:
+  --config <file>                 Configuration file path (default: configs/default.cfg)
+  --help                          Show this help message
+  --advanced-help                  Show advanced usage and examples
+
+ADVANCED COMMAND-LINE OPTIONS:
+
+MEMORY SYSTEM CONTROL:
+  --memory-capacity <size>         Working memory capacity (default: 500 from config)
+  --episodic-episodes <size>       Episodic memory episode limit (default: 5000 from config)
+  --consolidation-threshold <float> Memory consolidation threshold (default: 0.3)
+
+PREDICTION SYSTEM CONTROL:
+  --prediction-enabled <bool>       Enable prediction system (default: true)
+  --prediction-history <size>       Prediction history size (default: 1000)
+  --prediction-error-threshold <f>  Prediction error threshold (default: 0.1)
+
+COGNITION SYSTEM CONTROL:
+  --neural-planner <depth>          Neural planner depth (default: 5)
+  --concept-formation <bool>        Enable concept formation (default: true)
+  --attention-system <bool>         Enable attention system (default: true)
+  --attention-inhibition <f>        Attention inhibition strength (default: 0.5)
+  --attention-excitation <f>        Attention excitation strength (default: 1.5)
+
+DEVELOPMENTAL CONTROL:
+  --development-stage <stage>       Set developmental stage (Initial|CriticalPeriod|Maturation|Adult)
+  --plasticity-modulation <f>       Development plasticity modulation (default: 0.5)
+  --development-interval <steps>    Development update interval (default: 1000)
+
+NEUROMODULATION CONTROL:
+  --dopamine-level <f>              Dopamine baseline level (default: 0.1)
+  --curiosity-threshold <f>         Curiosity threshold (default: 0.3)
+  --novelty-sensitivity <f>         Novelty sensitivity (default: 0.8)
+  --prediction-error-weight <f>     Prediction error signal weight (default: 1.0)
+
+ENVIRONMENTAL PARAMETERS:
+  --environment <name>              Environment name (default: IntegratedEnvironment)
+  --exploration-rate <f>            Exploration rate (default: 0.1)
+  --exploitation-rate <f>           Exploitation rate (default: 0.9)
+  --reward-discount <f>             Reward discount factor (default: 0.995)
+
+CHECKPOINTING OPTIONS:
+  --checkpoint-dir <path>            Checkpoint directory (default: ./checkpoints_phase6)
+  --checkpoint-interval <steps>      Checkpoint saving interval (default: 5000)
+  --checkpoint-compression <mode>    Checkpoint compression (Balanced|Fast|Best)
+  --save-brain <file>               Save brain state to file and exit
+  --load-brain <file>               Load brain state from file and exit
+
+EXPERIMENTAL MODES:
+  --experiment <mode>               Run specific experiment:
+                                     memory-test | prediction-test | cognition-test |
+                                     development-test | full-integration | neural-planner-test
+  --experiment-mode <mode>           Experiment execution mode: simulate | record | benchmark
+  --experiment-duration <steps>      Experiment duration in steps (default: 1000)
+
+VISUALIZATION OPTIONS:
+  --visualization <bool>            Enable visualization (default: true)
+  --visualization-output <file>      Visualization output file (default: brain_viz.mp4)
+  --visualization-update-rate <f>    Visualization update rate (default: 60.0 Hz)
+  --visualize-network <bool>         Enable network visualization (default: true)
+  --visualize-spikes <bool>          Enable spike raster visualization (default: true)
+  --visualize-weights <bool>          Enable weight matrix visualization (default: false)
+  --visualization-quality <quality>   Visualization quality (low|medium|high)
+
+PERFORMANCE OPTIONS:
+  --performance-monitoring <bool>    Enable performance monitoring (default: true)
+  --performance-sampling <rate>      Performance sampling rate (default: 100 Hz)
+  --memory-pool-size <size>          Memory pool size (default: 100000)
+  --event-queue-size <size>          Event queue size (default: 10000)
+
+LOGGING OPTIONS:
+  --log-level <level>               Logging level (DEBUG|INFO|WARNING|ERROR)
+  --log-to-file <bool>               Enable file logging (default: true)
+  --log-file <path>                  Log file path (default: nlm_phase6.log)
+  --log-rotation-size <bytes>        Log rotation size in bytes (default: 10485760 = 10MB)
+  --log-memory-debug <bool>          Enable memory system debug logging (default: false)
+  --log-prediction-debug <bool>      Enable prediction system debug logging (default: false)
+  --log-cognition-debug <bool>       Enable cognition system debug logging (default: false)
+  --log-neuromodulation-debug <bool>  Enable neuromodulation system debug logging (default: false)
+
+DEBUGGING OPTIONS:
+  --debug-mode                      Enable debug mode with enhanced output (default: false)
+  --debug-spike-timing              Debug spike timing and propagation (default: false)
+  --debug-plasticity <type>         Debug specific plasticity: STDP|Hebbian|Structural (default: none)
+  --debug-memory-neurons <ids>       Debug working memory for neurons (comma-separated IDs)
+  --debug-step-range <range>         Debug specific step range: start-end (default: none)
+  --debug-verbose                   Enable verbose debug output
+
+CONFIGURATION OVERRIDE:
+  --config-key <key>=<value>          Override configuration key with value
+  --config-file <file>               Alternative configuration file
+
+PRESET MODES:
+  --quick-test                      Fast test mode (reduced neurons, shorter duration)
+  --full-test                       Complete integration test (full scale)
+  --learning-test                   Focus on learning and plasticity demonstration
+  --memory-test                     Focus on memory system capabilities
+  --prediction-test                 Focus on prediction system capabilities
+  --development-test                Focus on developmental progression
+  --cognition-test                  Focus on cognitive system integration
+
+EXAMPLES:
+  # Quick integration test
+  nlm --quick-test --visualization
+  
+  # Save brain state for later loading
+  nlm --save-brain mybrain.checkpoint --development-stage Adult
+  
+  # Load and continue training
+  nlm --load-brain mybrain.checkpoint --experiment learning-test
+  
+  # Run prediction system benchmark
+  nlm --experiment prediction-test --experiment-mode benchmark --experiment-duration 5000
+  
+  # Debug memory system with visualization
+  nlm --debug-memory-neurons 1,2,3,4,5 --visualization --log-memory-debug
+  
+  # Development stage demonstration
+  nlm --development-stage Initial --plasticity-modulation 1.0
+  nlm --development-stage CriticalPeriod --plasticity-modulation 0.8
+  nlm --development-stage Maturation --plasticity-modulation 0.5
+  nlm --development-stage Adult --plasticity-modulation 0.2
+  
+  # Exploration vs exploitation balance
+  nlm --exploration-rate 0.3 --exploitation-rate 0.7
+  
+  # High-performance visualization
+  nlm --visualization --visualize-network --visualize-spikes --visualization-quality high
+  
+  # Comprehensive logging for research
+  nlm --log-level DEBUG --log-to-file --log-prediction-debug --log-cognition-debug
+  
+  # Performance benchmarking
+  nlm --experiment full-integration --experiment-mode benchmark --performance-monitoring
+  
+)" << std::endl;
 }
