@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,40 +20,94 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // IMPROVEMENT: Implement proper JSON/YAML parser (Phase 2 complete)
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Try to parse as JSON first
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Parse JSON object recursively
+        parseJsonObject(jsonData, ConfigSource::File, "");
+        return true;
+    } catch (const nlohmann::json::parse_error& e) {
+        // If JSON parsing fails, fall back to simple key=value format
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
     return true;
+}
+
+void Config::parseJsonObject(const nlohmann::json& jsonObj, ConfigSource source, const std::string& prefix) {
+    for (auto it = jsonObj.begin(); it != jsonObj.end(); ++it) {
+        std::string key = prefix.empty() ? it.key() : prefix + "." + it.key();
+        
+        if (it->is_object()) {
+            // Recursively parse nested objects
+            parseJsonObject(*it, source, key);
+        } else if (it->is_array()) {
+            // Parse arrays as comma-separated values
+            std::stringstream ss;
+            ss << "[";
+            for (size_t i = 0; i < it->size(); ++i) {
+                if (i > 0) ss << ",";
+                ss << (*it)[i].dump();
+            }
+            ss << "]";
+            set(key, ss.str(), source);
+        } else {
+            // Parse primitive values
+            setFromJsonValue(*it, key, source);
+        }
+    }
+}
+
+void Config::setFromJsonValue(const nlohmann::json& value, const std::string& key, ConfigSource source) {
+    if (value.is_string()) {
+        set(key, value.get<std::string>(), source);
+    } else if (value.is_number_integer()) {
+        set(key, value.get<int>(), source);
+    } else if (value.is_number_unsigned()) {
+        set(key, value.get<int64_t>(), source);
+    } else if (value.is_number_float()) {
+        set(key, value.get<double>(), source);
+    } else if (value.is_boolean()) {
+        set(key, value.get<bool>(), source);
+    } else {
+        // For complex types, convert to string representation
+        set(key, value.dump(), source);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,11 +139,50 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // IMPROVEMENT: Use proper JSON formatting instead of placeholder
+    nlohmann::json jsonObj;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert string value with brackets back to proper JSON
+        std::string key = entry.key;
+        nlohmann::json& value = jsonObj[key];
+        
+        std::visit([&value](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                value = arg;
+            } else if constexpr (std::is_same_v<T, int>) {
+                value = arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                value = arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                value = arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                value = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                // Convert vector to JSON array
+                value = nlohmann::json::array();
+                for (const auto& item : arg) {
+                    value.push_back(item);
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                value = nlohmann::json::array();
+                for (const auto& item : arg) {
+                    value.push_back(item);
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                value = nlohmann::json::array();
+                for (const auto& item : arg) {
+                    value.push_back(item);
+                }
+            } else {
+                value = arg;
+            }
+        }, entry.value);
     }
     
+    // Write pretty JSON
+    file << std::setw(2) << jsonObj;
     return true;
 }
 

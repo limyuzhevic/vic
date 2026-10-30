@@ -326,6 +326,29 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
+    // Display advanced commands section for experienced users
+    std::cout << "=== ADVANCED COMMANDS (for experienced users) ===" << std::endl;
+    std::cout << "  --config=file.cfg          Load advanced configuration from file" << std::endl;
+    std::cout << "  --neuron_count=N           Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region_count=N           Set number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --connection_probability=P Set connection probability (default: 0.15)" << std::endl;
+    std::cout << "  --enable_advanced_plasticity[=true|false] Enable advanced plasticity" << std::endl;
+    std::cout << "  --enable_neural_working_memory[=true|false] Enable neural working memory" << std::endl;
+    std::cout << "  --enable_episodic_memory[=true|false] Enable episodic memory" << std::endl;
+    std::cout << "  --enable_dopamine_modulation[=true|false] Enable dopamine modulation" << std::endl;
+    std::cout << "  --enable_curiosity_modulation[=true|false] Enable curiosity modulation" << std::endl;
+    std::cout << "  --enable_attention[=true|false] Enable attentional selection" << std::endl;
+    std::cout << "  --enable_development_system[=true|false] Enable development system" << std::endl;
+    std::cout << "  --plasticity_learning_rate=R Set plasticity learning rate (default: 0.05)" << std::endl;
+    std::cout << "  --working_memory_capacity=N Set working memory capacity (default: 100)" << std::endl;
+    std::cout << "  --working_memory_decay_rate=R Set working memory decay rate (default: 0.01)" << std::endl;
+    std::cout << "  --dopamine_decay_rate=R    Set dopamine decay rate (default: 0.05)" << std::endl;
+    std::cout << "  --curiosity_learning_rate=R Set curiosity learning rate (default: 0.1)" << std::endl;
+    std::cout << "  --novelty_sensitivity=R    Set novelty sensitivity (default: 0.5)" << std::endl;
+    std::cout << "  --maturation_rate=R        Set maturation rate (default: 0.1)" << std::endl;
+    std::cout << "  --memory_capacity=N        Set total memory capacity (default: 1000)" << std::endl;
+    std::cout << "" << std::endl;
+    
     // Initialize logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
@@ -338,6 +361,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Event-driven spike propagation with delays");
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  - Integrated memory and neuromodulation systems");
+    NLM_LOG_INFO("  - Advanced learning capabilities");
+    NLM_LOG_INFO("  - Integrated memory and neuromodulation systems");
+    NLM_LOG_INFO("  - Advanced learning capabilities");
     NLM_LOG_INFO("");
     
     // Load configuration
@@ -373,12 +400,40 @@ int main(int argc, char** argv) {
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
+    // Advanced configuration for experienced users
+    config->set("enable_advanced_plasticity", true, ConfigSource::Default);
+    config->set("plasticity_learning_rate", 0.05f, ConfigSource::Default);
+    config->set("memory_capacity", 1000, ConfigSource::Default);
+    config->set("enable_neural_working_memory", true, ConfigSource::Default);
+    config->set("enable_episodic_memory", true, ConfigSource::Default);
+    config->set("enable_semantic_memory", true, ConfigSource::Default);
+    config->set("enable_procedural_memory", true, ConfigSource::Default);
+    config->set("enable_associative_memory", true, ConfigSource::Default);
+    config->set("enable_dopamine_modulation", true, ConfigSource::Default);
+    config->set("enable_curiosity_modulation", true, ConfigSource::Default);
+    config->set("enable_novelty_detection", true, ConfigSource::Default);
+    config->set("enable_attention", true, ConfigSource::Default);
+    config->set("enable_concept_formation", true, ConfigSource::Default);
+    config->set("enable_planner", true, ConfigSource::Default);
+    config->set("enable_development_system", true, ConfigSource::Default);
+    
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
     
-    // Structural plasticity parameters
+    // Neural Working Memory parameters
+    config->set("working_memory_capacity", 100, ConfigSource::Default);
+    config->set("working_memory_decay_rate", 0.01f, ConfigSource::Default);
+    config->set("working_memory_threshold", 0.3f, ConfigSource::Default);
+    
+    // Neuromodulation parameters
+    config->set("dopamine_decay_rate", 0.05f, ConfigSource::Default);
+    config->set("curiosity_learning_rate", 0.1f, ConfigSource::Default);
+    config->set("novelty_sensitivity", 0.5f, ConfigSource::Default);
+    
+    // Development parameters
+    config->set("maturation_rate", 0.1f, ConfigSource::Default);
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
@@ -390,6 +445,33 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Advanced configuration summary for experienced users
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Advanced Configuration:");
+    NLM_LOG_INFO("  enable_advanced_plasticity: " + std::to_string(config->getOr<bool>("enable_advanced_plasticity", true)));
+    NLM_LOG_INFO("  plasticity_learning_rate: " + std::to_string(config->getOr<float>("plasticity_learning_rate", 0.05f)));
+    NLM_LOG_INFO("  memory_capacity: " + std::to_string(config->getOr<int>("memory_capacity", 1000)));
+    NLM_LOG_INFO("  enable_neural_working_memory: " + std::to_string(config->getOr<bool>("enable_neural_working_memory", true)));
+    NLM_LOG_INFO("  enable_episodic_memory: " + std::to_string(config->getOr<bool>("enable_episodic_memory", true)));
+    NLM_LOG_INFO("  enable_semantic_memory: " + std::to_string(config->getOr<bool>("enable_semantic_memory", true)));
+    NLM_LOG_INFO("  enable_procedural_memory: " + std::to_string(config->getOr<bool>("enable_procedural_memory", true)));
+    NLM_LOG_INFO("  enable_associative_memory: " + std::to_string(config->getOr<bool>("enable_associative_memory", true)));
+    NLM_LOG_INFO("  enable_dopamine_modulation: " + std::to_string(config->getOr<bool>("enable_dopamine_modulation", true)));
+    NLM_LOG_INFO("  enable_curiosity_modulation: " + std::to_string(config->getOr<bool>("enable_curiosity_modulation", true)));
+    NLM_LOG_INFO("  enable_novelty_detection: " + std::to_string(config->getOr<bool>("enable_novelty_detection", true)));
+    NLM_LOG_INFO("  enable_attention: " + std::to_string(config->getOr<bool>("enable_attention", true)));
+    NLM_LOG_INFO("  enable_concept_formation: " + std::to_string(config->getOr<bool>("enable_concept_formation", true)));
+    NLM_LOG_INFO("  enable_planner: " + std::to_string(config->getOr<bool>("enable_planner", true)));
+    NLM_LOG_INFO("  enable_development_system: " + std::to_string(config->getOr<bool>("enable_development_system", true)));
+    
+    NLM_LOG_INFO("  working_memory_capacity: " + std::to_string(config->getOr<int>("working_memory_capacity", 100)));
+    NLM_LOG_INFO("  working_memory_decay_rate: " + std::to_string(config->getOr<float>("working_memory_decay_rate", 0.01f)));
+    NLM_LOG_INFO("  working_memory_threshold: " + std::to_string(config->getOr<float>("working_memory_threshold", 0.3f)));
+    NLM_LOG_INFO("  dopamine_decay_rate: " + std::to_string(config->getOr<float>("dopamine_decay_rate", 0.05f)));
+    NLM_LOG_INFO("  curiosity_learning_rate: " + std::to_string(config->getOr<float>("curiosity_learning_rate", 0.1f)));
+    NLM_LOG_INFO("  novelty_sensitivity: " + std::to_string(config->getOr<float>("novelty_sensitivity", 0.5f)));
+    NLM_LOG_INFO("  maturation_rate: " + std::to_string(config->getOr<float>("maturation_rate", 0.1f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
