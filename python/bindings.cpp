@@ -27,19 +27,90 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Custom Python exceptions for better error handling
+    // Use std::runtime_error directly since RuntimeError is not defined in NLM namespace
+    
+    // Convenience functions for common operations
+    m.def("createDefaultConfig", []() {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+    
+    m.def("createBrain", [](std::shared_ptr<Config> config) {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+    
+    m.def("createSimpleWorld", []() {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+    
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Factory functions for common configurations
+    m.def("createSimulationConfig", [](size_t neuronCount, size_t regionCount,
+                                       float connectionProbability, uint64_t randomSeed) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::Default);
+        config->set("connection_probability", connectionProbability, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(randomSeed), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        return config;
+    }, py::arg("neuronCount"), py::arg("regionCount"), 
+          py::arg("connectionProbability") = 0.1f, py::arg("randomSeed") = 42,
+          "Create a simulation configuration with specified parameters");
+    
+    // Helper functions for common experiments
+    m.def("runSimpleExperiment", [](std::shared_ptr<Config> config, size_t steps) {
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        return brain;
+    }, py::arg("config"), py::arg("steps"),
+          "Run a simple simulation experiment and return the brain");
+    
+    // Utility functions for brain analysis
+    m.def("analyzeBrainActivity", [](const std::shared_ptr<Brain>& brain, size_t steps) {
+        if (!brain) {
+            throw std::runtime_error("Brain is not initialized");
+        }
+        
+        size_t totalSpikes = 0;
+        size_t maxFiring = 0;
+        float avgFiring = 0.0f;
+        
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step, step * 0.001);
+            totalSpikes += brain->getTotalSpikeCount();
+            size_t firing = brain->getFiringNeuronCount();
+            if (firing > maxFiring) maxFiring = firing;
+            avgFiring += static_cast<float>(firing);
+        }
+        
+        avgFiring /= steps;
+        
+        return std::make_tuple(totalSpikes, maxFiring, avgFiring);
+    }, py::arg("brain"), py::arg("steps"),
+          "Analyze brain activity over a given number of steps");
+    
+    // String constants for convenience
+    m.attr("VERSION") = "0.1.0 (Phase 6)";
+    m.attr("PHASE") = "6 - Final Integration";
+    
+    // Constants for common configurations
+    m.attr("DEFAULT_NEURON_COUNT") = 500;
+    m.attr("DEFAULT_REGION_COUNT") = 1;
+    m.attr("DEFAULT_CONNECTION_PROBABILITY") = 0.1f;
+    m.attr("DEFAULT_SIMULATION_TIMESTEP") = 0.001;
+    m.attr("DEFAULT_RANDOM_SEED") = 42;
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())

@@ -100,6 +100,14 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Additional file format loaders for improved compatibility
+    bool loadFromSimpleFormat(const std::string& filepath);
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Helper to parse JSON values
+    ConfigValue parseJSONValue(const std::string& valueStr);
+    std::vector<std::string> parseJSONArray(const std::string& arrayStr);
 };
 
 } // namespace nlm
