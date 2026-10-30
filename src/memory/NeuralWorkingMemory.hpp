@@ -55,6 +55,15 @@ public:
     size_t getCapacity() const { return capacity_; }
     void setCapacity(size_t cap) { capacity_ = cap; }
 
+    // Get recurrent connections for maintenance
+    const std::vector<std::pair<NeuronId, NeuronId>>& getRecurrentConnections() const { return recurrentConnections_; }
+
+    // Update recurrent connections for maintenance
+    void updateRecurrentConnections();
+
+    // Decay weak memory traces
+    void decayWeakTraces();
+
     // Decay rate for memory traces
     float getDecayRate() const { return decayRate_; }
     void setDecayRate(float rate) { decayRate_ = rate; }

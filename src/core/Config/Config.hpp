@@ -75,23 +75,36 @@ public:
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<int>& values, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& values, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<std::string>& values, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
     
+    // Get configuration source for a key
+    ConfigSource getConfigSource(const std::string& key) const;
+    
     // Remove key
     void remove(const std::string& key);
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Add default configuration values
+    void addDefaults(const std::string& key, const ConfigValue& value, const std::string& description = "");
     
-    // Clear all
-    void clear();
+    // Get default value for a key
+    std::optional<ConfigValue> getDefault(const std::string& key) const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Check if key has a default value
+    bool hasDefault(const std::string& key) const;
+    
+    // Get configuration keys with their sources
+    std::vector<std::pair<std::string, ConfigSource>> getKeySources() const;
+    
+    // Merge configuration from another config
+    void merge(const Config& other);
     
 private:
     struct Impl;
