@@ -139,9 +139,37 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Phase 2 demo (refactored from main.cpp)
+add_executable(nlm_phase2_demo
+    src/demo/BrainDemo.cpp
+)
+target_link_libraries(nlm_phase2_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Simple demo for beginners
+add_executable(nlm_demo
+    src/demo/SimpleBrainDemo.cpp
+)
+target_link_libraries(nlm_demo PUBLIC nlm_core)
+
+# Performance analysis tool
+add_executable(nlm_perf
+    src/performance/PerformanceAnalyzer.cpp
+)
+target_link_libraries(nlm_perf PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Comprehensive test suite (refactored from main.cpp)
+add_executable(nlm_test
+    src/tests/TestMain.cpp
+    tests/test_types.cpp
+    tests/test_config.cpp
+    tests/test_random.cpp
+    tests/test_clock.cpp
+    tests/test_neuron.cpp
+    tests/test_synapse.cpp
+    tests/test_stdp.cpp
+    tests/test_brain.cpp
+)
+target_link_libraries(nlm_test PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
