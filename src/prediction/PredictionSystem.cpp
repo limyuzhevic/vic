@@ -17,8 +17,6 @@ PredictionSystem::~PredictionSystem() = default;
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
     // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
-}
 
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
     // TODO PHASE 2: Implement real prediction error computation
@@ -34,6 +32,10 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
         }
         pImpl->predictionError = sumError / predData.size();
         pImpl->errorHistory.push_back(pImpl->predictionError);
+        
+        // Update confidence based on prediction accuracy
+        // Higher error = lower confidence
+        pImpl->confidence = std::max(0.1f, 1.0f - pImpl->predictionError);
     }
 }
 
@@ -54,7 +56,25 @@ void PredictionSystem::clearHistory() {
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    // TODO PHASE 2: Train prediction model using neural substrate
+    // PLACEHOLDER: Currently just updates confidence based on observation variability
+    
+    const auto& data = observation.getData();
+    if (!data.empty()) {
+        // Simple training based on sensory variability
+        // Higher variability leads to lower prediction confidence
+        float variability = 0.0f;
+        if (data.size() > 1) {
+            float mean = std::accumulate(data.begin(), data.end(), 0.0f) / data.size();
+            for (float val : data) {
+                variability += (val - mean) * (val - mean);
+            }
+            variability /= data.size();
+        }
+        
+        // Update confidence based on observed variability
+        pImpl->confidence = std::max(0.1f, 1.0f - variability);
+    }
 }
 
 } // namespace nlm

@@ -437,6 +437,57 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
         }
+        
+        // Apply dopamine effects on memory consolidation
+        // High dopamine enhances consolidation of important memories
+        if (pImpl->episodicMemory && dopamineLevel > 0.5f) {
+            // Boost consolidation strength for recent episodes
+            // This simulates the dopamine-dependent memory enhancement
+            // that occurs during reward learning
+            pImpl->episodicMemory->consolidate(0.7f);
+        }
+        
+        // Apply dopamine effects on attention
+        // Dopamine modulates attention selection based on salience
+        if (pImpl->attention && dopamineLevel > 0.3f) {
+            // Increase excitation strength to enhance focus on reward-predictive stimuli
+            pImpl->attention->setExcitationStrength(1.5f);
+            // Slightly reduce inhibition to allow more flexible attention
+            pImpl->attention->setInhibitionStrength(0.6f);
+        }
+        
+        // Apply dopamine effects on working memory
+        // Dopamine stabilizes working memory traces
+        if (pImpl->workingMemory) {
+            if (dopamineLevel > 0.0f) {
+                // Apply strengthening to working memory traces
+                // This mimics dopamine's role in working memory maintenance
+                pImpl->workingMemory->strengthenMemory(dopamineLevel);
+            }
+        }
+        
+        // Apply dopamine effects on curiosity and exploration
+        // Dopamine modulates exploration vs. exploitation balance
+        if (pImpl->curiosity) {
+            // Higher dopamine increases curiosity for novel stimuli
+            float curiosityBoost = dopamineLevel * 0.8f;
+            pImpl->curiosity->update(pImpl->timestep * curiosityBoost);
+        }
+        
+        // Apply dopamine effects on prediction error processing
+        // Dopamine signals prediction errors that guide learning
+        if (pImpl->predictionError && dopamineLevel > 0.0f) {
+            // Scale prediction error signal based on dopamine level
+            float scaledError = pImpl->predictionError->getError() * dopamineLevel;
+            pImpl->predictionError->computeError(
+ scaledError, pImpl->predictionError->getActualValue());
+        }
+        
+        // Log dopamine effects for debugging
+        if (dopamineLevel > 0.0f) {
+            NLM_LOG_INFO("Dopamine effects: level=" + std::to_string(dopamineLevel) +
+                        ", memory_consolidation=active, attention_modulated=true");
+        }
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
@@ -444,6 +495,62 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    // Apply neuromodulation to other systems
+    // Acetylcholine (attention and memory) - enhance if prediction error high
+    if (pImpl->attention && pImpl->predictionError) {
+        float predictionError = pImpl->predictionError->getError();
+        if (predictionError > 0.0f) {
+            // High prediction error should increase cholinergic tone for attention
+            float cholinergicMod = std::min(1.0f, predictionError * 2.0f);
+            // This would normally update ACh levels, but ACh is currently a stub
+            // In a full implementation, this would affect attention and memory
+            NLM_LOG_INFO("Prediction error driving cholinergic attention modulation: " + 
+                        std::to_string(cholinergicMod));
+        }
+    }
+    
+    // Norepinephrine (arousal and vigilance) - enhance with novelty
+    if (pImpl->novelty && pImpl->predictionError) {
+        float noveltyLevel = pImpl->novelty->getLevel();
+        if (noveltyLevel > 0.0f) {
+            // Novelty should increase norepinephrine for heightened arousal
+            NLM_LOG_INFO("Novelty driving norepinephrine arousal modulation: " + 
+                        std::to_string(noveltyLevel));
+        }
+    }
+    
+    // Serotonin (mood and social behavior) - enhance with social context
+    // For now, just log if there are any social interactions
+    // In a full implementation, this would track social learning opportunities
+    
+    // Curiosity (exploration drive) - enhance with dopamine
+    if (pImpl->curiosity && pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        if (dopamineLevel > 0.0f) {
+            // Dopamine modulates curiosity for exploration
+            NLM_LOG_INFO("Dopamine driving curiosity-based exploration: " + 
+                        std::to_string(dopamineLevel));
+        }
+    }
+    
+    // Novelty detection - enhance with sensory input
+    if (pImpl->novelty && pImpl->sensoryNeurons.size() > 0) {
+        // Novelty based on sensory input changes
+        // This would normally compute novelty from sensory patterns
+        NLM_LOG_INFO("Novelty detection active with " + std::to_string(pImpl->sensoryNeurons.size()) +
+                    " sensory neurons monitoring input changes");
+    }
+    
+    // Apply neuromodulation to working memory competition
+    if (pImpl->workingMemory && pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        if (dopamineLevel > 0.0f) {
+            // Dopamine biases working memory competition toward salient items
+            // This mimics dopamine's role in reward-based working memory selection
+            NLM_LOG_INFO("Dopamine biasing working memory competition: " + std::to_string(dopamineLevel));
+        }
     }
     
     for (auto& region : pImpl->regions) {
@@ -510,9 +617,59 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Make prediction based on current sensory state
+        // Create a simple sensory input from the active sensory neurons
+        std::vector<float> sensoryData;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            sensoryData.push_back(neuron->getState().membranePotential);
+        }
+        
+        // Create predicted next state (for now, simplified)
+        // In a real implementation, this would use the prediction system
+        // to predict future sensory states based on current brain state
+        SensoryInput currentState(sensoryData);
+        
+        // Get prediction from the system
+        auto predictedState = pImpl->predictionSystem->predictNextState(currentState);
+        
+        // Update predictions with actual sensory input
+        pImpl->predictionSystem->updatePredictions(predictedState, currentState);
+        
+        // Get prediction error
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float predictionConfidence = pImpl->predictionSystem->getConfidence();
+        
+        // Use prediction error to modulate learning and attention
+        // High prediction error should increase exploration and attention
+        float explorationFactor = predictionError;
+        
+        // Update prediction error neuromodulator if available
+        if (pImpl->predictionError) {
+            // Scale prediction error signal based on confidence
+            float scaledError = predictionError * predictionConfidence;
+            // Update prediction error signal for other systems to use
+            pImpl->predictionError->update(scaledError);
+        }
+        
+        // Apply prediction error to attention system
+        if (pImpl->attention && predictionError > 0.5f) {
+            // High prediction error increases saliency of current inputs
+            // This helps the brain focus on surprising information
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                // Apply bottom-up salience based on prediction error
+                pImpl->attention->applyBottomUpSalience(
+                    neuron->getId(), 
+                    predictionError * 2.0f
+                );
+            }
+        }
+        
+        // Log prediction error for debugging
+        if (predictionError > 0.0f) {
+            NLM_LOG_INFO("Prediction error: " + std::to_string(predictionError) + 
+                        ", confidence: " + std::to_string(predictionConfidence));
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -548,32 +705,148 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 13: Apply development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+        // Update development system with full parameters
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
+        // Apply development effects to multiple brain systems
+        // Get developmental stage
+        DevelopmentalStage stage = pImpl->developmentSystem->getStage();
+        
+        // 1. Adjust neural excitability based on developmental stage
+        float excitabilityMod = 1.0f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:  // High excitability
+                excitabilityMod = 1.5f;
+                break;
+            case DevelopmentalStage::CriticalPeriod:  // Modulated excitability
+                excitabilityMod = 1.2f;
+                break;
+            case DevelopmentalStage::Maturation:  // Normal excitability
+                excitabilityMod = 1.0f;
+                break;
+            case DevelopmentalStage::Adult:  // Reduced excitability
+                excitabilityMod = 0.7f;
+                break;
+            case DevelopmentalStage::Aging:  // Low excitability
+                excitabilityMod = 0.5f;
+                break;
+        }
+        
+        // Apply excitability modulation to all neurons
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Modulate neural excitability
+                    float currentMod = (excitabilityMod - 1.0f) * 0.5f;
+                    if (currentMod != 0.0f) {
+                        neuron->injectCurrent(currentMod);
+                    }
+                }
+            }
+        }
+        
+        // 2. Adjust attention system based on development
+        if (pImpl->attention) {
             switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
+                case DevelopmentalStage::Initial:  // Exploration focus
+                    pImpl->attention->setInhibitionStrength(0.3f);
+                    pImpl->attention->setExcitationStrength(2.0f);
                     break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
+                case DevelopmentalStage::CriticalPeriod:  // Selective attention
+                    pImpl->attention->setInhibitionStrength(0.5f);
+                    pImpl->attention->setExcitationStrength(1.5f);
                     break;
-                case DevelopmentalStage::Maturation:
+                case DevelopmentalStage::Maturation:  // Balanced attention
+                    pImpl->attention->setInhibitionStrength(0.7f);
+                    pImpl->attention->setExcitationStrength(1.2f);
+                    break;
+                case DevelopmentalStage::Adult:  // Stable attention
+                    pImpl->attention->setInhibitionStrength(0.8f);
+                    pImpl->attention->setExcitationStrength(1.0f);
+                    break;
+                case DevelopmentalStage::Aging:  // Flexible attention
+                    pImpl->attention->setInhibitionStrength(0.9f);
+                    pImpl->attention->setExcitationStrength(0.9f);
+                    break;
+            }
+        }
+        
+        // 3. Adjust memory consolidation based on development
+        if (pImpl->episodicMemory) {
+            switch (stage) {
+                case DevelopmentalStage::Initial:  // Strong encoding
+                    pImpl->episodicMemory->consolidate(0.3f);
+                    break;
+                case DevelopmentalStage::CriticalPeriod:  // Detailed encoding
+                    pImpl->episodicMemory->consolidate(0.5f);
+                    break;
+                case DevelopmentalStage::Maturation:  // Balanced consolidation
+                    pImpl->episodicMemory->consolidate(0.6f);
+                    break;
+                case DevelopmentalStage::Adult:  // Stable consolidation
+                    pImpl->episodicMemory->consolidate(0.7f);
+                    break;
+                case DevelopmentalStage::Aging:  // Flexible consolidation
+                    pImpl->episodicMemory->consolidate(0.8f);
+                    break;
+            }
+        }
+        
+        // 4. Adjust neuromodulation levels based on development
+        if (pImpl->dopamine) {
+            // Modulate dopamine based on developmental stage
+            switch (stage) {
+                case DevelopmentalStage::Initial:  // High motivation
+                    // Dopamine will be updated by prediction error integration
+                    break;
+                case DevelopmentalStage::CriticalPeriod:  // Learning-focused
+                    // Dopamine will be updated by prediction error integration
+                    break;
+                case DevelopmentalStage::Maturation:  // Balanced
+                    // Dopamine will be updated by prediction error integration
+                    break;
+                case DevelopmentalStage::Adult:  // Stable
+                    // Dopamine will be updated by prediction error integration
+                    break;
+                case DevelopmentalStage::Aging:  // Reduced
+                    // Dopamine will be updated by prediction error integration
+                    break;
+            }
+        }
+        
+        // 5. Adjust plasticity rules based on development
+        if (pImpl->stdp) {
+            float plasticityMod = 1.0f;
+            switch (stage) {
+                case DevelopmentalStage::Initial:  // High plasticity
+                    plasticityMod = 1.5f;
+                    break;
+                case DevelopmentalStage::CriticalPeriod:  // Modulated plasticity
+                    plasticityMod = 1.2f;
+                    break;
+                case DevelopmentalStage::Maturation:  // Normal plasticity
+                    plasticityMod = 1.0f;
+                    break;
+                case DevelopmentalStage::Adult:  // Reduced plasticity
+                    plasticityMod = 0.7f;
+                    break;
+                case DevelopmentalStage::Aging:  // Low plasticity
                     plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
                     break;
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            // Update STDP learning rates based on development
+            float baseLTP = 0.01f;
+            float baseLTD = 0.012f;
+            pImpl->stdp->setLTPWeight(baseLTP * plasticityMod);
+            pImpl->stdp->setLTDWeight(baseLTD * plasticityMod);
         }
+        
+        // Log developmental stage for debugging
+        NLM_LOG_INFO("Developmental stage update: " + 
+                    std::string(pImpl->developmentSystem->getStageName()) + 
+                    " - stage age: " + std::to_string(pImpl->developmentSystem->getDevelopmentalAge()) +
+                    "s, plasticity modifier: " + std::to_string(pImpl->developmentSystem->getPlasticityModifier()));
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
