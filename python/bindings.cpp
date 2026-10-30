@@ -398,7 +398,21 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Enhanced AgentBrain methods for Phase 6 integration
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel)
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel)
+        .def("getPredictionError", &AgentBrain::getPredictionError)
+        .def("getBrainStats", &AgentBrain::getBrainStats,
+             "Get comprehensive brain statistics")
+        .def("simulateEpisode", &AgentBrain::simulateEpisode,
+             py::arg("world"), py::arg("steps"), py::arg("enable_reward_modulation"),
+             "Simulate an episode with world interaction")
+        .def("getMemoryStats", &AgentBrain::getMemoryStats,
+             "Get memory system statistics")
+        .def("getNeuromodulationStats", &AgentBrain::getNeuromodulationStats,
+             "Get neuromodulation system statistics")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

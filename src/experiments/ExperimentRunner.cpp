@@ -113,8 +113,121 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    NLM_LOG_INFO("Saving experiment results to: " + filepath);
+    
+    try {
+        // Create a simple text-based results file for Phase 2 compatibility
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to create results file: " + filepath);
+            return false;
+        }
+        
+        // Write header
+        file << "NLM Experiment Results" << std::endl;
+        file << "=======================" << std::endl;
+        file << std::endl;
+        
+        // Write experiment count
+        size_t totalExperiments = pImpl->experiments.size();
+        file << "Total Experiments: " << totalExperiments << std::endl;
+        file << std::endl;
+        
+        // Write summary statistics
+        size_t totalSteps = 0;
+        double totalReward = 0.0;
+        
+        for (size_t i = 0; i < pImpl->experiments.size(); ++i) {
+            const auto& exp = pImpl->experiments[i];
+            
+            file << "Experiment " << i << ": " << exp->getName() << std::endl;
+            file << "  Seed: " << exp->getSeed() << std::endl;
+            file << "  Start Step: " << exp->getStartStep() << std::endl;
+            file << "  End Step: " << exp->getEndStep() << std::endl;
+            
+            size_t steps = exp->getEndStep() - exp->getStartStep();
+            totalSteps += steps;
+            file << "  Steps: " << steps << std::endl;
+            
+            double reward = exp->getMetric("total_reward");
+            totalReward += reward;
+            file << "  Total Reward: " << reward << std::endl;
+            file << "  Average Reward per Step: " << 
+                (steps > 0 ? reward / steps : 0.0) << std::endl;
+            
+            // Write metrics
+            const auto& metrics = exp->getMetrics();
+            if (!metrics.empty()) {
+                file << "  Metrics:" << std::endl;
+                for (const auto& metric : metrics) {
+                    file << "    " << metric.first << ": " << metric.second << std::endl;
+                }
+            }
+            
+            // Write step data summary
+            const auto& stepData = exp->getStepData();
+            if (!stepData.empty()) {
+                file << "  Step Data Summary:" << std::endl;
+                file << "    Total Steps Recorded: " << stepData.size() << std::endl;
+                
+                size_t minNeurons = SIZE_MAX, maxNeurons = 0;
+                size_t minSynapses = SIZE_MAX, maxSynapses = 0;
+                size_t minFiring = SIZE_MAX, maxFiring = 0;
+                double sumFiringRate = 0.0;
+                
+                for (const auto& step : stepData) {
+                    minNeurons = std::min(minNeurons, step.neuronCount);
+                    maxNeurons = std::max(maxNeurons, step.neuronCount);
+                    minSynapses = std::min(minSynapses, step.synapseCount);
+                    maxSynapses = std::max(maxSynapses, step.synapseCount);
+                    minFiring = std::min(minFiring, step.firingCount);
+                    maxFiring = std::max(maxFiring, step.firingCount);
+                    sumFiringRate += step.avgFiringRate;
+                }
+                
+                file << "    Neurons: " << minNeurons << " - " << maxNeurons << std::endl;
+                file << "    Synapses: " << minSynapses << " - " << maxSynapses << std::endl;
+                file << "    Firing: " << minFiring << " - " << maxFiring << std::endl;
+                file << "    Firing Rate: " << (stepData.size() > 0 ? 
+                    sumFiringRate / stepData.size() : 0.0) << std::endl;
+            }
+            
+            // Write notes
+            const auto& notes = exp->getNotes();
+            if (!notes.empty()) {
+                file << "  Notes:" << std::endl;
+                for (const auto& note : notes) {
+                    file << "    " << note << std::endl;
+                }
+            }
+            
+            file << std::endl;
+        }
+        
+        // Write summary statistics
+        file << "Global Summary:" << std::endl;
+        file << "  Total Steps: " << totalSteps << std::endl;
+        file << "  Total Reward: " << totalReward << std::endl;
+        file << "  Average Reward per Step: " << 
+            (totalSteps > 0 ? totalReward / totalSteps : 0.0) << std::endl;
+        file << std::endl;
+        
+        // Write experiment details for integration
+        file << "Integration Details:" << std::endl;
+        file << "  This file contains complete experiment data for Phase 2 integration." << std::endl;
+        file << "  Each experiment includes step-by-step neural activity data." << std::endl;
+        file << "  Metrics capture reward accumulation and system performance." << std::endl;
+        
+        file.close();
+        
+        NLM_LOG_INFO("Successfully saved " + std::to_string(totalExperiments) +
+                    " experiments to " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception saving results: ") + e.what());
+        return false;
+    }
 }
 
 } // namespace nlm

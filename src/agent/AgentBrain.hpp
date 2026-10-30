@@ -4,8 +4,10 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../core/Types/Types.hpp"  // For SimulationStep
 #include <memory>
 #include <vector>
+#include <string>
 
 namespace nlm {
 
@@ -55,7 +57,19 @@ public:
     // Reset agent for new episode
     void reset();
     
-    // Get brain pointer
+    // Get comprehensive brain statistics
+    std::string getBrainStats() const;
+    
+    // Simulate an episode with world interaction
+    bool simulateEpisode(const SimpleWorld& world, SimulationStep steps,
+                         bool enable_reward_modulation = true);
+    
+    // Get memory system statistics
+    std::string getMemoryStats() const;
+    
+    // Get neuromodulation system statistics
+    std::string getNeuromodulationStats() const;
+    
     Brain* getBrain() { return brain_.get(); }
     
     // Configuration

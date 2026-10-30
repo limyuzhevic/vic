@@ -46,6 +46,10 @@ struct Phase6IntegrationResult {
     float noveltyLevel;
     float curiosityLevel;
     float dopamineLevel;
+    float synapticWeightChange;
+    float totalStepsExecuted;
+    size_t activeNeuronCount;
+    size_t firingNeuronCount;
     
     // Timestamps
     time_t startTime;
@@ -67,6 +71,10 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , synapticWeightChange(0.0f)
+        , totalStepsExecuted(0.0f)
+        , activeNeuronCount(0)
+        , firingNeuronCount(0)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}
@@ -84,6 +92,15 @@ struct Phase6Config {
     bool enableReplay;
     bool enableDevelopment;
     std::string checkpointPath;
+    float stdpLtpWeight;  // STDP LTP weight parameter
+    float stdpLtdWeight;  // STDP LTD weight parameter
+    float synaptogenesisRate;  // Structural plasticity rate
+    float pruningRate;  // Structural plasticity pruning rate
+    bool enableMemorySystems;  // Enable memory system integration
+    bool enablePrediction;  // Enable prediction system
+    bool enableCognition;  // Enable cognition systems
+    bool enableNeuromodulation;  // Enable neuromodulation
+    std::string logLevel;  // Logging level (Debug, Info, Warning, Error)
     
     Phase6Config()
         : maxSteps(10000)
@@ -93,7 +110,16 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , stdpLtpWeight(0.01f)
+        , stdpLtdWeight(0.012f)
+        , synaptogenesisRate(0.0001f)
+        , pruningRate(0.00001f)
+        , enableMemorySystems(true)
+        , enablePrediction(true)
+        , enableCognition(true)
+        , enableNeuromodulation(true)
+        , logLevel("Info") {}
 };
 
 /**

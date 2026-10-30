@@ -334,17 +334,130 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+// Get comprehensive brain statistics
+std::string AgentBrain::getBrainStats() const {
+    if (!brain_) return "No brain initialized";
     
-    // Clear previous vision
-    std::fill(previousVision_.begin(), previousVision_.end(), 0.0f);
+    std::ostringstream stats;
+    stats << "Brain Statistics:" << std::endl;
+    stats << "  Total Neurons: " << brain_->getTotalNeuronCount() << std::endl;
+    stats << "  Total Synapses: " << brain_->getTotalSynapseCount() << std::endl;
+    stats << "  Regions: " << brain_->getRegionCount() << std::endl;
+    stats << "  Active Neurons: " << brain_->getActiveNeuronCount() << std::endl;
+    stats << "  Firing Neurons: " << brain_->getFiringNeuronCount() << std::endl;
+    stats << "  Total Spikes: " << brain_->getTotalSpikeCount() << std::endl;
+    stats << "  Average Firing Rate: " << brain_->getAverageFiringRate() << std::endl;
+    stats << "  E/I Ratio: " << brain_->getExcitationInhibitionRatio() << std::endl;
+    
+    return stats.str();
+}
+
+// Simulate an episode with world interaction
+bool AgentBrain::simulateEpisode(const SimpleWorld& world, SimulationStep steps, 
+                                 bool enable_reward_modulation) {
+    if (!brain_) return false;
+    
+    // Reset brain and agent for new episode
+    reset();
+    brain_->reset();
+    brain_->initialize();
+    
+    // Get initial observation
+    SensoryPercept percept = world.getSensoryPercept(brain_->getRegions()[0].get());
+    processSensoryInput(percept);
+    
+    float totalReward = 0.0f;
+    
+    for (SimulationStep step = 0; step < steps; ++step) {
+        // Brain step
+        brain_->step(step, step * 0.001);
+        
+        // Get motor command
+        MotorCommand cmd = decodeMotorCommand();
+        
+        // Apply action to world
+        world.applyMotorCommand(cmd, step * 0.001);
+        
+        // Compute reward
+        float reward = world.computeReward(brain_->getRegions()[0].get());
+        totalReward += reward;
+        
+        // Apply reward modulation
+        if (enable_reward_modulation) {
+            applyRewardModulation(reward, 0.0f);
+        }
+        
+        // Update development
+        updateDevelopment(0.001);
+        
+        // Get new observation
+        percept = world.getSensoryPercept(brain_->getRegions()[0].get());
+        processSensoryInput(percept);
+        
+        // Log progress
+        if (step % 500 == 0) {
+            NLM_LOG_INFO("Episode " << step << ": Reward = " << totalReward << 
+                        " | Neurons = " << brain_->getTotalNeuronCount() << 
+                        " | Spikes = " << brain_->getTotalSpikeCount());
+        }
+    }
+    
+    NLM_LOG_INFO("Episode complete: Total reward = " << totalReward << 
+                " over " << steps << " steps");
+    return true;
+}
+
+// Get memory system statistics
+std::string AgentBrain::getMemoryStats() const {
+    if (!brain_) return "No brain initialized";
+    
+    std::ostringstream stats;
+    stats << "Memory System Statistics:" << std::endl;
+    
+    auto* workingMem = brain_->getWorkingMemory();
+    if (workingMem) {
+        stats << "  Working Memory:" << std::endl;
+        stats << "    Active Traces: " << workingMem->getActiveTraces() << std::endl;
+        stats << "    Capacity: " << workingMem->getCapacity() << std::endl;
+    } else {
+        stats << "  Working Memory: Not available" << std::endl;
+    }
+    
+    auto* episodicMem = brain_->getEpisodicMemory();
+    if (episodicMem) {
+        stats << "  Episodic Memory:" << std::endl;
+        stats << "    Episodes Stored: " << episodicMem->getEpisodeCount() << std::endl;
+        stats << "    Max Episodes: " << episodicMem->getMaxEpisodes() << std::endl;
+    } else {
+        stats << "  Episodic Memory: Not available" << std::endl;
+    }
+    
+    auto* associativeMem = brain_->getAssociativeMemory();
+    if (associativeMem) {
+        stats << "  Associative Memory:" << std::endl;
+        stats << "    Associations: " << associativeMem->getAssociationCount() << std::endl;
+    } else {
+        stats << "  Associative Memory: Not available" << std::endl;
+    }
+    
+    return stats.str();
+}
+
+// Get neuromodulation system statistics
+std::string AgentBrain::getNeuromodulationStats() const {
+    std::ostringstream stats;
+    stats << "Neuromodulation System Statistics:" << std::endl;
+    stats << "  Dopamine Level: " << dopamineLevel_ << std::endl;
+    stats << "  Novelty Level: " << noveltyLevel_ << std::endl;
+    stats << "  Curiosity Level: " << curiosityLevel_ << std::endl;
+    stats << "  Prediction Error: " << predictionError_ << std::endl;
+    stats << "  Expected Reward: " << expectedReward_ << std::endl;
+    stats << "  Developmental Age: " << developmentalAge_ << std::endl;
+    stats << "  Plasticity Modifier: " << plasticityModifier_ << std::endl;
+    stats << "  Reward Modulation Enabled: " << (rewardModulationEnabled_ ? "Yes" : "No") << std::endl;
+    stats << "  Curiosity Enabled: " << (curiosityEnabled_ ? "Yes" : "No") << std::endl;
+    
+    return stats.str();
 }
 
 } // namespace nlm
