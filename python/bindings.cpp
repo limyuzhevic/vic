@@ -142,16 +142,48 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    py::class_<ConfigFormat>(m, "ConfigFormat", R"pbdoc(Configuration file format enumeration)pbdoc")
+        .value("Unknown", ConfigFormat::Unknown)
+        .value("INI", ConfigFormat::INI)
+        .value("JSON", ConfigFormat::JSON)
+        .value("YAML", ConfigFormat::YAML)
+        .export_values();
+
+    py::class_<ConfigError>(m, "ConfigError", R"pbdoc(Configuration error codes)pbdoc")
+        .value("None", ConfigError::None)
+        .value("FileNotFound", ConfigError::FileNotFound)
+        .value("ParseError", ConfigError::ParseError)
+        .value("InvalidFormat", ConfigError::InvalidFormat)
+        .value("KeyNotFound", ConfigError::KeyNotFound)
+        .value("TypeMismatch", ConfigError::TypeMismatch)
+        .value("InvalidValue", ConfigError::InvalidValue)
+        .export_values();
+
+    py::class_<ConfigResult>(m, "ConfigResult", R"pbdoc(Configuration operation result)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("success", &ConfigResult::success)
+        .def_readwrite("error", &ConfigResult::error)
+        .def_readwrite("errorMessage", &ConfigResult::errorMessage);
+
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
-            return self.loadFromArgs(argc, argv);
-        }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            ConfigResult result = self.loadFromFile(filepath);
+            return result.success;
+        }, py::arg("filepath"),
+             "Load configuration from a file (auto-detects format by extension)")
+        .def("loadFromFileWithFormat", [](Config& self, const std::string& filepath, ConfigFormat format) {
+            ConfigResult result = self.loadFromFile(filepath, format);
+            return result.success;
+        }, py::arg("filepath"), py::arg("format"),
+             "Load configuration from a file with explicit format")
+        .def("loadFromString", [](Config& self, const std::string& content, ConfigFormat format) {
+            ConfigResult result = self.loadFromString(content, format);
+            return result.success;
+        }, py::arg("content"), py::arg("format"),
+             "Load configuration from a string with specified format")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -160,6 +192,10 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("getLastError", &Config::getLastError,
+             "Get the last error message from configuration operations")
+        .def("detectFormat", &Config::detectFormat, py::arg("filepath"),
+             "Detect configuration file format from file extension")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

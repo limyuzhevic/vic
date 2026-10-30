@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <string>
 
 namespace nlm {
 
@@ -31,6 +32,40 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration file format
+enum class ConfigFormat {
+    Unknown,
+    INI,
+    JSON,
+    YAML
+};
+
+// Error codes for configuration operations
+enum class ConfigError {
+    None,
+    FileNotFound,
+    ParseError,
+    InvalidFormat,
+    KeyNotFound,
+    TypeMismatch,
+    InvalidValue
+};
+
+// Configuration result with error information
+struct ConfigResult {
+    bool success;
+    ConfigError error;
+    std::string errorMessage;
+    
+    ConfigResult() : success(true), error(ConfigError::None), errorMessage() {}
+    ConfigResult(bool s, ConfigError e, const std::string& msg = "") 
+        : success(s), error(e), errorMessage(msg) {}
+    
+    static ConfigResult Success() { return ConfigResult(true, ConfigError::None); }
+    static ConfigResult Error(ConfigError e, const std::string& msg) { 
+        return ConfigResult(false, e, msg); }
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -55,14 +90,18 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Load from file with format detection
+    ConfigResult loadFromFile(const std::string& filepath);
+    ConfigResult loadFromFile(const std::string& filepath, ConfigFormat format);
+    
+    // Load from string
+    ConfigResult loadFromString(const std::string& content, ConfigFormat format);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    ConfigResult saveToFile(const std::string& filepath) const;
     
     // Get values
     template<typename T>
@@ -71,7 +110,7 @@ public:
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
     
-    // Set values
+    // Set values with error handling
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -93,6 +132,12 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Get last error
+    const std::string& getLastError() const;
+    
+    // Get file format from extension
+    static ConfigFormat detectFormat(const std::string& filepath);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +145,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static ConfigError parseValue(const std::string& valueStr, ConfigValue& outValue);
+    static std::string configValueToString(const ConfigValue& value) const;
 };
+
+} // namespace nlm
 
 } // namespace nlm
