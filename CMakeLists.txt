@@ -100,12 +100,12 @@ add_library(nlm_agent STATIC
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
+# Visualization system
+add_library(nlm_visualization STATIC
+    src/visualization/VisualizationInterface.cpp
 )
-target_include_directories(nlm_world PUBLIC src)
-target_link_libraries(nlm_world PUBLIC nlm_core)
+target_include_directories(nlm_visualization PUBLIC src)
+target_link_libraries(nlm_visualization PUBLIC nlm_core)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
@@ -120,6 +120,12 @@ add_library(nlm_phase4 STATIC
 )
 target_include_directories(nlm_phase4 PUBLIC src)
 target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Profiling tools
+add_executable(nlm_profiler
+    src/profiler.cpp
+)
+target_link_libraries(nlm_profiler PUBLIC nlm_core)
 
 # Main executable
 add_executable(nlm
