@@ -400,26 +400,243 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Enhanced configuration API with parameter validation
+    .def("configure", &Config::configure, py::arg("key"), py::arg("value"),
+         "Set configuration parameter with type validation")
+    .def("get", py::overload_cast<const std::string&>(&Config::get),
+         py::arg("key"), "Get configuration parameter")
+    .def("getWithDefault", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+        auto result = self.get<std::string>(key);
+        return result.has_value() ? result.value() : defaultValue;
+    }, py::arg("key"), py::arg("defaultValue"),
+         "Get configuration parameter with default value")
+    .def("getInt", [](const Config& self, const std::string& key, int defaultValue) {
+        auto result = self.get<int>(key);
+        return result.has_value() ? result.value() : defaultValue;
+    }, py::arg("key"), py::arg("defaultValue"),
+         "Get integer configuration parameter with default value")
+    .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+        auto result = self.get<float>(key);
+        return result.has_value() ? result.value() : defaultValue;
+    }, py::arg("key"), py::arg("defaultValue"),
+         "Get float configuration parameter with default value")
+    .def("getBool", [](const Config& self, const std::string& key, bool defaultValue) {
+        auto result = self.get<bool>(key);
+        return result.has_value() ? result.value() : defaultValue;
+    }, py::arg("key"), py::arg("defaultValue"),
+         "Get boolean configuration parameter with default value")
+    .def("validateConfig", &Config::validate, "Validate configuration parameters")
+    .def("getConfigTemplate", &Config::getTemplate, "Get configuration parameter template")
+    .def("mergeConfig", &Config::mergeConfig, py::arg("otherConfig"), "Merge another configuration")
+    
+    // Enhanced debugging and monitoring tools
+    .def("startMonitoring", &Brain::startMonitoring,
+         "Start real-time monitoring of brain activity")
+    .def("stopMonitoring", &Brain::stopMonitoring,
+         "Stop real-time monitoring")
+    .def("isMonitoring", &Brain::isMonitoring,
+         "Check if monitoring is active")
+    .def("getMonitorData", &Brain::getMonitorData,
+         "Get current monitoring data")
+    .def("exportMetrics", &Brain::exportMetrics, py::arg("filepath"),
+         "Export metrics to file")
+    .def("getPerformanceMetrics", &Brain::getPerformanceMetrics,
+         "Get performance metrics")
+    
+    // Enhanced serialization utilities
+    .def("saveWithMetadata", [](Brain& self, const std::string& filepath, const std::string& metadata) {
+        return self.save(filepath, metadata);
+    }, py::arg("filepath"), py::arg("metadata"),
+         "Save brain state with metadata")
+    .def("loadWithVersion", [](Brain& self, const std::string& filepath, uint32_t expectedVersion) {
+        return self.load(filepath, expectedVersion);
+    }, py::arg("filepath"), py::arg("expectedVersion"),
+         "Load brain state with version validation")
+    .def("validateCheckpoint", &Brain::validateCheckpoint, py::arg("filepath"),
+         "Validate checkpoint file integrity")
+    .def("getCheckpointInfo", &Brain::getCheckpointInfo, py::arg("filepath"),
+         "Get checkpoint file information")
+    
+    // Performance monitoring and timing tools
+    .def("timeStep", &Brain::timeStep, py::arg("currentStep"),
+         "Time a single brain step operation")
+    .def("getTimingStats", &Brain::getTimingStats,
+         "Get timing statistics for brain operations")
+    .def("resetTiming", &Brain::resetTiming,
+         "Reset timing statistics")
+    .def("getMemoryUsage", &Brain::getMemoryUsage,
+         "Get current memory usage")
+    .def("getCPUUsage", &Brain::getCPUUsage,
+         "Get current CPU usage")
+    
+    // Batch processing tools
+    .def("runBatchSimulation", [](std::shared_ptr<Brain> brain, int numSteps, int batchSize) {
+        std::vector<std::shared_ptr<Brain>> results;
+        brain->runBatchSimulation(numSteps, batchSize, results);
+        return results;
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("batchSize"),
+         "Run batch simulation and return results")
+    .def("runParallelSimulation", [](std::shared_ptr<Brain> brain, int numSteps, int numThreads) {
+        std::vector<std::shared_ptr<Brain>> results;
+        brain->runParallelSimulation(numSteps, numThreads, results);
+        return results;
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("numThreads"),
+         "Run parallel simulation and return results")
+    
+    // Interactive exploration tools
+    .def("exploreParameterSpace", [](std::shared_ptr<Brain> brain, const std::vector<std::string>& parameters, 
+                                  const std::vector<std::vector<float>>& ranges, int numSamples) {
+        std::vector<std::shared_ptr<Brain>> results;
+        brain->exploreParameterSpace(parameters, ranges, numSamples, results);
+        return results;
+    }, py::arg("brain"), py::arg("parameters"), py::arg("ranges"), py::arg("numSamples"),
+         "Explore parameter space and return results")
+    .def("getExplorationResults", &Brain::getExplorationResults,
+         "Get exploration results")
+    
+    // Advanced AgentBrain interface
+    .def("createAdvancedAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                  const std::string& strategy, const std::string& policy) {
+        return std::make_shared<AgentBrain>(brain, world, strategy, policy);
+    }, py::arg("brain"), py::arg("world"), py::arg("strategy"), py::arg("policy"),
+         "Create advanced agent with strategy and policy")
+    .def("enableAdvancedFeatures", [](AgentBrain& agent, bool rewardModulation, bool structuralPlasticity,
+                                    bool development, bool curiosity, bool prediction) {
+        agent.enableAdvancedFeatures(rewardModulation, structuralPlasticity, development, curiosity, prediction);
+    }, py::arg("rewardModulation"), py::arg("structuralPlasticity"), py::arg("development"),
+       py::arg("curiosity"), py::arg("prediction"),
+         "Enable advanced agent features")
+    .def("setAgentPolicy", &AgentBrain::setPolicy, py::arg("policy"),
+         "Set agent policy")
+    .def("getAgentPolicy", &AgentBrain::getPolicy,
+         "Get agent policy")
+    
+    // Simple high-level APIs for common use cases
+    m.def("createBrainWithDefaults", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, "Create brain with default configuration")
+    
+    m.def("runSimpleSimulation", [](int numSteps, int neuronCount) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("region_count", 1);
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        for (int i = 0; i < numSteps; ++i) {
+            brain->step(i);
+        }
+        
+        return brain;
+    }, py::arg("numSteps"), py::arg("neuronCount"),
+         "Run simple simulation and return brain")
+    
+    m.def("createAgentWithWorld", [](std::shared_ptr<Brain> brain, int width, int height) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, 8, 8);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        return agent;
+    }, py::arg("brain"), py::arg("width"), py::arg("height"),
+         "Create agent with world")
+    
+    // Serialization and checkpoint utilities
+    m.def("createCheckpoint", &nlm::createCheckpoint, py::arg("name"), py::arg("description"),
+         "Create new checkpoint with name and description")
+    m.def("getAvailableCheckpoints", &nlm::getAvailableCheckpoints,
+         "Get list of available checkpoints")
+    m.def("deleteCheckpoint", &nlm::deleteCheckpoint, py::arg("name"),
+         "Delete checkpoint")
+    m.def("exportForAnalysis", &nlm::exportForAnalysis, py::arg("brain"), py::arg("outputPath"),
+         "Export brain for external analysis")
+    m.def("importForAnalysis", &nlm::importForAnalysis, py::arg("inputPath"),
+         "Import brain from external analysis")
+    
+    // Visualization and plotting tools (lightweight)
+    m.def("createSimplePlot", &nlm::createSimplePlot, py::arg("data"), py::arg("title"), py::arg("filename"),
+         "Create simple plot of simulation data")
+    m.def("plotMetrics", &nlm::plotMetrics, py::arg("brain"), py::arg("metrics"), py::arg("filename"),
+         "Plot brain metrics")
+    m.def("animateSimulation", &nlm::animateSimulation, py::arg("brain"), py::arg("steps"), py::arg("outputPath"),
+         "Animate simulation")
+    
+    // Utility functions and helpers
+    m.def("benchmarkBrain", &nlm::benchmarkBrain, py::arg("brain"), py::arg("steps"), py::arg("warmup"),
+         "Benchmark brain performance")
+    m.def("validateBrainHealth", &nlm::validateBrainHealth, py::arg("brain"),
+         "Validate brain health and integrity")
+    m.def("getBrainDiagnostics", &nlm::getBrainDiagnostics, py::arg("brain"),
+         "Get brain diagnostic information")
+    m.def("repairBrain", &nlm::repairBrain, py::arg("brain"),
+         "Attempt to repair brain integrity issues")
+    
+    // Error handling and recovery
+    .def("safeStep", [](Brain& self, int step) {
+        try {
+            self.step(step);
+            return true;
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Step failed: ") + e.what());
+            return false;
+        }
+    }, py::arg("step"),
+         "Safely execute brain step with error handling")
+    .def("getLastError", &Brain::getLastError,
+         "Get last error message")
+    .def("clearErrors", &Brain::clearErrors,
+         "Clear error history")
+    
+    // Advanced visualization and analysis
+    .def("createNeuroView", [](std::shared_ptr<Brain> brain) {
+        return std::make_shared<NeuroView>(brain);
+    }, py::arg("brain"),
+         "Create neuroscientific visualization view")
+    .def("createBehaviorPlot", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        return std::make_shared<BehaviorPlot>(brain, world);
+    }, py::arg("brain"), py::arg("world"),
+         "Create behavior visualization plot")
+    .def("createMemoryTrace", [](std::shared_ptr<Brain> brain) {
+        return std::make_shared<MemoryTrace>(brain);
+    }, py::arg("brain"),
+         "Create memory trace visualization")
+    .def("createTimeSeries", [](std::shared_ptr<Brain> brain, const std::vector<std::string>& metrics) {
+        return std::make_shared<TimeSeries>(brain, metrics);
+    }, py::arg("brain"), py::arg("metrics"),
+         "Create time series plot of metrics")
+    
+    // Session management and persistence
+    m.def("createSession", &nlm::createSession, py::arg("name"), py::arg("description"),
+         "Create simulation session")
+    m.def("getSession", &nlm::getSession, py::arg("name"),
+         "Get simulation session")
+    m.def("listSessions", &nlm::listSessions,
+         "List all simulation sessions")
+    m.def("endSession", &nlm::endSession, py::arg("name"),
+         "End simulation session")
+    m.def("saveSession", &nlm::saveSession, py::arg("name"), py::arg("filepath"),
+         "Save session to file")
+    m.def("loadSession", &nlm::loadSession, py::arg("filepath"),
+         "Load session from file")
+    
+    // Educational and research tools
+    m.def("createTutorialBrain", &nlm::createTutorialBrain,
+         "Create brain for educational tutorials")
+    m.def("runTutorial", &nlm::runTutorial, py::arg("tutorialName"),
+         "Run specific tutorial")
+    m.def("getTutorialList", &nlm::getTutorialList,
+         "Get list of available tutorials")
+    m.def("createResearchExperiment", &nlm::createResearchExperiment, py::arg("experimentType"), py::arg("parameters"),
+         "Create research experiment")
+    m.def("runResearchExperiment", &nlm::runResearchExperiment, py::arg("experiment"), py::arg("brain"),
+         "Run research experiment")
+    m.def("analyzeResults", &nlm::analyzeResults, py::arg("results"), py::arg("analysisType"),
+         "Analyze experiment results")
 }
 
 } // namespace nlm

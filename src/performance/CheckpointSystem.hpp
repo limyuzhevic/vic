@@ -175,6 +175,67 @@ struct SynapseCheckpointData {
 };
 
 /**
+ * Working memory state for checkpointing
+ */
+struct WorkingMemoryCheckpointData {
+    std::vector<uint64_t> neurons;
+    std::vector<float> activations;
+    std::vector<uint64_t> timestamps;
+    std::vector<float> strengths;
+    std::vector<bool> isActive;
+};
+
+/**
+ * Episodic memory state for checkpointing
+ */
+struct EpisodicMemoryCheckpointData {
+    std::vector<uint64_t> timestamps;
+    std::vector<float> rewards;
+    std::vector<std::vector<uint64_t>> activeNeurons;
+    std::vector<std::vector<float>> neuronActivations;
+    std::vector<float> episodeStrengths;
+    std::vector<std::vector<uint64_t>> replaySequences;
+};
+
+/**
+ * Prediction system state for checkpointing
+ */
+struct PredictionSystemCheckpointData {
+    float prediction;
+    float confidence;
+    float predictionError;
+    float learningRate;
+    std::vector<float> history;
+    std::vector<float> weights;
+};
+
+/**
+ * Neuromodulation state for checkpointing
+ */
+struct NeuromodulationCheckpointData {
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+    float predictionErrorLevel;
+    float acetylcholineLevel;
+    float norepinephrineLevel;
+    float serotoninLevel;
+    std::vector<float> history;
+};
+
+/**
+ * Cognitive system state for checkpointing
+ */
+struct CognitiveCheckpointData {
+    std::vector<uint64_t> attentionWinners;
+    std::vector<float> attentionStrengths;
+    std::vector<std::vector<uint64_t>> concepts;
+    std::vector<std::vector<float>> conceptActivations;
+    std::vector<std::vector<uint64_t>> plannedActions;
+    std::vector<float> actionProbabilities;
+};
+
+/**
  * Checkpoint reader
  */
 class CheckpointReader {
@@ -278,15 +339,59 @@ public:
                    uint64_t regionCount, uint64_t step, double simTime);
     
     /**
-     * Write checkpoint data
+     * Write working memory state
      */
-    bool writeNeurons(const NeuronCheckpointData& data);
-    bool writeSynapses(const SynapseCheckpointData& data);
+    bool writeWorkingMemory(const WorkingMemoryCheckpointData& data);
     
     /**
-     * Write raw section data
+     * Write episodic memory state
      */
-    bool writeSection(CheckpointSection sectionType, const void* data, size_t size);
+    bool writeEpisodicMemory(const EpisodicMemoryCheckpointData& data);
+    
+    /**
+     * Write prediction system state
+     */
+    bool writePredictionSystem(const PredictionSystemCheckpointData& data);
+    
+    /**
+     * Write neuromodulation state
+     */
+    bool writeNeuromodulation(const NeuromodulationCheckpointData& data);
+    
+    /**
+     * Write cognitive state
+     */
+    bool writeCognitive(const CognitiveCheckpointData& data);
+    
+    /**
+     * Read working memory state
+     */
+    bool readWorkingMemory(WorkingMemoryCheckpointData& data);
+    
+    /**
+     * Read episodic memory state
+     */
+    bool readEpisodicMemory(EpisodicMemoryCheckpointData& data);
+    
+    /**
+     * Read prediction system state
+     */
+    bool readPredictionSystem(PredictionSystemCheckpointData& data);
+    
+    /**
+     * Read neuromodulation state
+     */
+    bool readNeuromodulation(NeuromodulationCheckpointData& data);
+    
+    /**
+     * Read cognitive state
+     */
+    bool readCognitive(CognitiveCheckpointData& data);
+    
+    /**
+     * Get checksum of checkpoint data
+     */
+    uint64_t getChecksum() const { return checksum_; }
     
     /**
      * Finalize and write footer
