@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
+
 project(pynlm_bindings LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -87,15 +88,22 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
+# Original bindings
 pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
+# Enhanced bindings
+pybind11_add_module(pynlm_enhanced bindings_enhanced.cpp)
+target_link_libraries(pynlm_enhanced PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm_enhanced PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
+    target_compile_options(pynlm_enhanced PRIVATE /permissive-)
 endif()
 
-install(TARGETS pynlm
+install(TARGETS pynlm pynlm_enhanced
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm

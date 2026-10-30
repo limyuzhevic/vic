@@ -1,12 +1,32 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
+#include <stdexcept>
+#include <system_error>
 
 namespace nlm {
+
+// Custom exceptions
+class ConfigException : public std::runtime_error {
+public:
+    explicit ConfigException(const std::string& message) 
+        : std::runtime_error("Config Error: " + message) {}
+};
+
+class ConfigFileNotFoundException : public ConfigException {
+public:
+    explicit ConfigFileNotFoundException(const std::string& filepath)
+        : ConfigException("File not found: " + filepath) {}
+};
+
+class ConfigValidationException : public ConfigException {
+public:
+    explicit ConfigValidationException(const std::string& message)
+        : ConfigException("Validation Error: " + message) {}
+};
+
+class ConfigParseException : public ConfigException {
+public:
+    explicit ConfigParseException(const std::string& message)
+        : ConfigException("Parse Error: " + message) {}
+};
 
 // Forward declarations
 class Config;
@@ -29,6 +49,15 @@ enum class ConfigSource {
     File,
     CommandLine,
     Runtime
+};
+
+// Configuration statistics
+struct ConfigStats {
+    size_t totalEntries = 0;
+    std::map<int, size_t> entriesBySource;
+    std::map<std::string, size_t> valuesByType;
+    
+    ConfigStats() : totalEntries(0) {}
 };
 
 // Configuration entry
@@ -92,6 +121,37 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validation methods
+    bool validate() const;
+    bool hasNonDefaultValues() const;
+    bool validateKey(const std::string& key) const;
+    std::vector<std::string> getValidatedKeys() const;
+    
+    // Config entry management
+    void addEntry(const std::string& key, const ConfigValue& value,
+                 const std::string& description = "",
+                 ConfigSource source = ConfigSource::Runtime);
+    std::vector<ConfigEntry> getAllEntries() const;
+    
+    // Configuration statistics
+    ConfigStats getStats() const;
+    
+    // Serialization
+    std::string serialize(const std::string& format = "") const;
+    
+    // Legacy methods
+    bool loadFromJSON(const std::string& filepath);
+    bool saveToSimpleFormat(const std::string& filepath) const;
+    bool saveToJSON(const std::string& filepath) const;
+    
+    // Enhanced Python-style API methods (for bindings)
+    bool isLoaded() const { return hasNonDefaultValues(); }
+    size_t entryCount() const { return getKeys().size(); }
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const {
+        return getOr<T>(key, defaultValue);
+    }
     
 private:
     struct Impl;
