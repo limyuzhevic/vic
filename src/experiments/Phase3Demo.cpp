@@ -8,6 +8,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -244,15 +245,40 @@ private:
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
+    // Parse command line arguments
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
     
+    // Parse command line arguments
     if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+        try {
+            numEpisodes = std::stoi(argv[1]);
+            if (numEpisodes < 1 || numEpisodes > 1000) {
+                throw std::invalid_argument("numEpisodes must be between 1 and 1000");
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: Invalid numEpisodes value: " << argv[1] 
+                      << ". Using default value: " << 5 << "\n";
+            numEpisodes = 5;
+        }
     }
+    
     if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+        try {
+            stepsPerEpisode = std::stoi(argv[2]);
+            if (stepsPerEpisode < 1 || stepsPerEpisode > 10000) {
+                throw std::invalid_argument("stepsPerEpisode must be between 1 and 10000");
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: Invalid stepsPerEpisode value: " << argv[2] 
+                      << ". Using default value: " << 200 << "\n";
+            stepsPerEpisode = 200;
+        }
     }
+    
+    std::cout << "Phase 3 Demo - NLM World Interaction\n";
+    std::cout << "===================================\n\n";
+    std::cout << "Running with " << numEpisodes << " episodes, " << stepsPerEpisode << " steps per episode\n\n";
     
     nlm::Phase3Demo demo;
     demo.run(numEpisodes, stepsPerEpisode);

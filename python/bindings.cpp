@@ -287,7 +287,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("getEnergy", &SimpleWorld::getAgentBody().getEnergy)
+        .def("getHealth", &SimpleWorld::getAgentBody().getHealth)
+        .def("getAge", &SimpleWorld::getAgentBody().getAge)
+        .def("getPosition", &SimpleWorld::getAgentBody().getPosition)
+        .def("setPosition", &SimpleWorld::setAgentStart);
 
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))

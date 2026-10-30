@@ -2,6 +2,7 @@
 #include <memory>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 #include "core/Config/Config.hpp"
 #include "core/Logger/Logger.hpp"
 #include "brain/Brain.hpp"
@@ -12,7 +13,6 @@
 #include "memory/NeuralWorkingMemory.hpp"
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
-#include "cognition/NeuralPlanner.hpp"
 #include "cognition/NeuralPlanner.hpp"
 
 using namespace nlm;
@@ -36,18 +36,68 @@ void printSection(const std::string& title) {
     std::cout << "\n--- " << title << " ---\n";
 }
 
+void printHelp() {
+    std::cout << "\n" << std::string(60, '=') << "\n";
+    std::cout << "  NLM Phase 4 DEMO HELP\n";
+    std::cout << std::string(60, '=') << "\n\n";
+    std::cout << "Usage: nlm_phase4_demo [numTrials]\n\n";
+    std::cout << "Arguments:\n";
+    std::cout << "  [numTrials]        Number of trials to run (default: 50, range: 1-1000000)\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --help, -h         Show this help message\n";
+    std::cout << "  --version          Show version information\n";
+}
+
+void printVersion() {
+    std::cout << "\nNLM Phase 4 Demo\n";
+    std::cout << "Version: 2.0.0\n";
+    std::cout << "Build: Release\n";
+    std::cout << "Date: " << __DATE__ << "\n";
+}
+
 int main(int argc, char* argv[]) {
+    // Check for help/version flags
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        }
+    }
+    
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
     
     // Parse command line arguments
     size_t numTrials = 50;
     if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+        try {
+            numTrials = std::stoull(argv[1]);
+            if (numTrials < 1) {
+                std::cerr << "Error: numTrials must be >= 1. Using default value: " << 50 << "\n";
+                numTrials = 50;
+            } else if (numTrials > 1000000) {
+                std::cerr << "Error: numTrials cannot exceed 1,000,000. Using maximum value: " << 1000000 << "\n";
+                numTrials = 1000000;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: Invalid numTrials value: " << argv[1] << ". Using default value: " << 50 << "\n";
+            numTrials = 50;
+        }
     }
+    
+    std::cout << "Number of trials: " << numTrials << "\n\n";
     
     // Create configuration
     auto config = std::make_shared<Config>();
+    if (!config) {
+        std::cerr << "Error: Failed to allocate configuration object!\n";
+        return 1;
+    }
+    
     config->set("neuron_count", size_t(1000));
     config->set("region_count", size_t(2));
     config->set("connection_probability", 0.1f);
@@ -59,11 +109,16 @@ int main(int argc, char* argv[]) {
     // Create brain
     std::cout << "Initializing brain...\n";
     auto brain = std::make_shared<Brain>(config);
+    if (!brain) {
+        std::cerr << "Error: Failed to allocate brain object!\n";
+        return 1;
+    }
+    
     if (!brain->initialize()) {
         std::cerr << "Failed to initialize brain!\n";
         return 1;
     }
-    
+
     printHeader("PHASE 4 EXPERIMENTS");
     
     // Run Temporal Prediction Experiment
