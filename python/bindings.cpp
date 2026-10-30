@@ -398,23 +398,205 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+              "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+              "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+              "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+              "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+              "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Helper functions for debugging and monitoring
+    m.def("debug_brain_state", [](std::shared_ptr<Brain> brain) {
+        brain->logStatus();
+        return std::make_tuple(
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount(),
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            brain->getDevelopmentalStage()
+        );
+    }, py::arg("brain"),
+        "Get brain state statistics for debugging");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("create_default_brain_with_monitors", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500, ConfigSource::Default);
+        config->set("region_count", 1, ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (brain->initialize()) {
+            NLM_LOG_INFO("Created monitoring brain with " + 
+                        std::to_string(brain->getTotalNeuronCount()) + " neurons");
+            return brain;
+        }
+        
+        NLM_LOG_ERROR("Failed to create default brain");
+        return std::shared_ptr<Brain>(nullptr);
+    }, "Create a default brain with monitoring enabled");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("create_brain_with_all_systems", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000, ConfigSource::Default);
+        config->set("region_count", 2, ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (brain->initialize()) {
+            NLM_LOG_INFO("Created full brain system with all neural subsystems");
+            return brain;
+        }
+        
+        NLM_LOG_ERROR("Failed to create full brain system");
+        return std::shared_ptr<Brain>(nullptr);
+    }, "Create a complete brain system with all subsystems enabled");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    m.def("monitor_brain_health", [](std::shared_ptr<Brain> brain) {
+        auto status = brain->logStatus();
+        return std::make_tuple(
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount(),
+            brain->getActiveNeuronCount(),
+            brain->getFiringNeuronCount(),
+            brain->getAverageFiringRate(),
+            brain->getExcitationInhibitionRatio()
+        );
+    }, py::arg("brain"),
+        "Monitor brain health and return key statistics");
+
+    m.def("check_system_integration", [](std::shared_ptr<Brain> brain) {
+        bool integration_ok = true;
+        
+        if (!brain->getWorkingMemory()) {
+            NLM_LOG_ERROR("Working memory not available");
+            integration_ok = false;
+        }
+        
+        if (!brain->getEpisodicMemory()) {
+            NLM_LOG_ERROR("Episodic memory not available");
+            integration_ok = false;
+        }
+        
+        if (!brain->getDopamine()) {
+            NLM_LOG_ERROR("Dopamine system not available");
+            integration_ok = false;
+        }
+        
+        if (!brain->getCuriosity()) {
+            NLM_LOG_ERROR("Curiosity system not available");
+            integration_ok = false;
+        }
+        
+        if (!brain->getPredictionSystem()) {
+            NLM_LOG_ERROR("Prediction system not available");
+            integration_ok = false;
+        }
+        
+        if (!brain->getPlanner()) {
+            NLM_LOG_ERROR("Planner not available");
+            integration_ok = false;
+        }
+        
+        if (!brain->getConceptFormation()) {
+            NLM_LOG_ERROR("Concept formation not available");
+            integration_ok = false;
+        }
+        
+        if (!brain->getAttention()) {
+            NLM_LOG_ERROR("Attention system not available");
+            integration_ok = false;
+        }
+        
+        if (!brain->getDevelopmentSystem()) {
+            NLM_LOG_ERROR("Development system not available");
+            integration_ok = false;
+        }
+        
+        if (integration_ok) {
+            NLM_LOG_INFO("All brain systems integrated successfully");
+        } else {
+            NLM_LOG_ERROR("System integration incomplete");
+        }
+        
+        return integration_ok;
+    }, py::arg("brain"),
+        "Check if all brain systems are properly integrated");
+
+    m.def("get_brain_summary", [](std::shared_ptr<Brain> brain) {
+        std::stringstream ss;
+        ss << "NLM Brain Summary:" << std::endl;
+        ss << "  Total neurons: " << brain->getTotalNeuronCount() << std::endl;
+        ss << "  Total synapses: " << brain->getTotalSynapseCount() << std::endl;
+        ss << "  Active neurons: " << brain->getActiveNeuronCount() << std::endl;
+        ss << "  Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+        ss << "  Average firing rate: " << brain->getAverageFiringRate() << " Hz" << std::endl;
+        ss << "  E/I ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        ss << "  Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        ss << "  Developmental stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+        
+        // Memory systems
+        auto wm = brain->getWorkingMemory();
+        if (wm) ss << "  Working memory: " << wm->getActiveTraces() << " traces" << std::endl;
+        
+        auto em = brain->getEpisodicMemory();
+        if (em) ss << "  Episodic memory: " << em->getEpisodeCount() << " episodes" << std::endl;
+        
+        auto dop = brain->getDopamine();
+        if (dop) ss << "  Dopamine level: " << dop->getLevel() << std::endl;
+        
+        auto cur = brain->getCuriosity();
+        if (cur) ss << "  Curiosity level: " << cur->getLevel() << std::endl;
+        
+        auto pre = brain->getPredictionSystem();
+        if (pre) ss << "  Prediction system: Active" << std::endl;
+        
+        auto planner = brain->getPlanner();
+        if (planner) ss << "  Planner: Active" << std::endl;
+        
+        auto concept = brain->getConceptFormation();
+        if (concept) ss << "  Concept formation: " << concept->getConceptCount() << " concepts" << std::endl;
+        
+        auto attention = brain->getAttention();
+        if (attention) ss << "  Attention: Active" << std::endl;
+        
+        auto dev = brain->getDevelopmentSystem();
+        if (dev) ss << "  Development stage: " << dev->getStageName() << std::endl;
+        
+        return ss.str();
+    }, py::arg("brain"),
+        "Get comprehensive summary of brain state and systems");
+
+    m.def("create_exploratory_agent", [](std::shared_ptr<Brain> brain) {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"),
+        "Create an agent brain interface for exploring brain interactions");
+
+    m.def("create_world_environment", []() {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a simple world environment for agent interaction");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

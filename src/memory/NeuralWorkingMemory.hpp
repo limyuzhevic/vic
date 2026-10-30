@@ -74,6 +74,11 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Helper methods for attention system
+    float getActivation(NeuronId neuron) const { return getNeuronActivation(neuron); }
+    void enhanceActivation(NeuronId neuron, float amount);
+    void reduceActivation(NeuronId neuron, float amount);
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);

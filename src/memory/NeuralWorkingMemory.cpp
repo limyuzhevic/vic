@@ -43,15 +43,8 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         NeuronId neuron = memoryNeurons_[i % memoryNeurons_.size()];
         float activation = pattern[i] * strength;
         
-        // Set neuron activation
-        if (auto* n = brain_->getRegion(neuron.getId() / 1000)->getAllNeurons()) {
-            for (auto* nn : *n) {
-                if (nn->getId() == neuron) {
-                    nn->injectCurrent(activation * 5.0f);
-                    break;
-                }
-            }
-        }
+        // Direct current injection to neuron
+        brain_->injectCurrent(neuron, activation * 5.0f);
         
         // Update stored activation
         if (i < memoryActivations_.size()) {
@@ -195,6 +188,34 @@ float NeuralWorkingMemory::getMemoryActivity() const {
         total += act;
     }
     return total / memoryActivations_.size();
+}
+
+void NeuralWorkingMemory::enhanceActivation(NeuronId neuron, float amount) {
+    // Find this neuron in memory
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        memoryActivations_[idx] = std::min(1.0f, memoryActivations_[idx] + amount);
+        
+        // Inject additional current to strengthen the trace
+        if (brain_) {
+            brain_->injectCurrent(neuron, amount * 3.0f);
+        }
+    }
+}
+
+void NeuralWorkingMemory::reduceActivation(NeuronId neuron, float amount) {
+    // Find this neuron in memory
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        memoryActivations_[idx] = std::max(0.0f, memoryActivations_[idx] - amount);
+        
+        // Apply inhibitory current to weaken the trace
+        if (brain_) {
+            brain_->injectCurrent(neuron, -amount * 2.0f);
+        }
+    }
 }
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
