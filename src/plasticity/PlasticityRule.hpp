@@ -6,14 +6,13 @@
 namespace nlm {
 
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// Now implements complete plasticity system for Phase 6
 
 class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
@@ -37,7 +36,7 @@ private:
 };
 
 // Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
+// Implemented STDP-based Hebbian learning
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();
@@ -60,27 +59,46 @@ private:
 };
 
 // Anti-Hebbian rule: decrease weight when neurons fire together
-// PLACEHOLDER - Phase 2
 class AntiHebbianRule : public PlasticityRule {
 public:
+    AntiHebbianRule();
+    ~AntiHebbianRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "AntiHebbian"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Bienenstock-Cooper-Munro (BCM) rule
-// PLACEHOLDER - Phase 2
 class BCMRule : public PlasticityRule {
 public:
+    BCMRule();
+    ~BCMRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
-    const char* getName() const override { return "BCM"; }
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
+    const char* getName() const override;
+    
+    // BCM parameters
+    void setTheta(float theta);
+    float getTheta() const;
+    void setSigma(float sigma);
+    float getSigma() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
-
-} // namespace nlm
