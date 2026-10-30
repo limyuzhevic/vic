@@ -25,6 +25,9 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -61,14 +64,20 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
-    bool initialize();
+    // Initialize neuromodulation systems
+    void initialize();
     
-    // Main simulation step
-    void step(SimulationStep currentStep);
+    // Initialize neuromodulation systems
+    void initializeNeuromodulation();
     
-    // Simulation time step
-    void step(SimulationStep currentStep, Timestamp currentTime);
+    // Initialize acetylcholine (attention and memory)
+    void initializeAcetylcholine();
+    
+    // Initialize norepinephrine (arousal and vigilance)
+    void initializeNorepinephrine();
+    
+    // Initialize serotonin (mood and social behavior)
+    void initializeSerotonin();
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
@@ -170,10 +179,19 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
+// ========== NEUROMODULATION SYSTEMS ==========
+
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -187,11 +205,11 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Integration validation
+    void validateIntegration() const;
     
-    // Logging
-    void logStatus() const;
+    // Log integration status
+    void logIntegrationStatus() const;
     
 private:
     struct Impl;

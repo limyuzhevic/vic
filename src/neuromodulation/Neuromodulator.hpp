@@ -62,6 +62,12 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Attention and memory functions
+    void enhanceAttention(const std::vector<NeuronId>& neurons);
+    void consolidateMemory(const std::vector<float>& pattern);
+    float getAttentionStrength() const;
+    bool isAttendingTo(NeuronId neuron) const;
 };
 
 // Norepinephrine: Arousal and vigilance
@@ -73,6 +79,15 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Arousal and vigilance functions
+    void signalArousal(float intensity);
+    void signalStress(float stressLevel);
+    void enhanceExploration(float explorationAmount);
+    float getArousal() const;
+    float getVigilance() const;
+    float getExplorationBias() const;
+    bool isHighVigilance() const;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
@@ -84,6 +99,16 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Mood and behavioral functions
+    void signalReward(float rewardValue);
+    void signalSocialInteraction(float socialQuality);
+    void signalStress(float stressLevel);
+    float getMood() const;
+    float getImpulsivity() const;
+    float getSocialBehavior() const;
+    float getRewardSensitivity() const;
+    bool isPositiveMood() const;
 };
 
 } // namespace nlm

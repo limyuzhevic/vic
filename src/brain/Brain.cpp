@@ -7,6 +7,9 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
@@ -46,6 +49,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -126,6 +132,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -258,8 +267,12 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
     
-    // Register spike handlers for event-driven processing
+    // Initialize new neuromodulators
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
@@ -510,9 +523,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Integrate prediction system with working memory and sensory input
+        // Convert working memory content to sensory input for prediction
+        auto workingMemoryPattern = pImpl->workingMemory->retrieve();
+        
+        // Create a simple sensory input from working memory for prediction
+        class SensoryInput predictionInput;
+        predictionInput.setData(workingMemoryPattern);
+        predictionInput.setTimestamp(currentTime);
+        
+        // Generate prediction for next state
+        auto prediction = pImpl->predictionSystem->predictNextState(predictionInput);
+        
+        if (prediction) {
+            // Update prediction system with predicted state
+            pImpl->predictionSystem->updatePredictions(*prediction, predictionInput);
+        }
+        
+        // Use prediction error for learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Signal prediction error to neuromodulators (especially dopamine and curiosity)
+        if (pImpl->dopamine) {
+            pImpl->dopamine->signalRewardPredictionError(predictionError);
+        }
+        
+        if (pImpl->curiosity) {
+            if (pImpl->novelty) {
+                pImpl->curiosity->update(pImpl->novelty->getLevel(), predictionError, pImpl->timestep);
+            } else {
+                pImpl->curiosity->update(0.0f, predictionError, pImpl->timestep);
+            }
+        }
+        
+        // Log prediction system status
+        NLM_LOG_INFO("Prediction system updated: Error=" + std::to_string(predictionError) +
+                    " Confidence=" + std::to_string(pImpl->predictionSystem->getConfidence()));
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -523,13 +570,63 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+            
+            // Connect attention to acetylcholine system for attention enhancement
+            if (pImpl->acetylcholine && !competitors.empty()) {
+                pImpl->acetylcholine->enhanceAttention(competitors);
+            }
+        }
+        
+        // Apply attention to prediction system
+        if (pImpl->predictionSystem) {
+            // High attention boosts prediction accuracy
+            float attentionLevel = 0.5f;  // Could be computed from attention system
+            if (pImpl->dopamine) {
+                attentionLevel = pImpl->dopamine->getLevel();
+            }
+            
+            // Update prediction confidence based on attention
+            float currentConfidence = pImpl->predictionSystem->getConfidence();
+            pImpl->predictionSystem->pImpl->confidence = std::min(1.0f, currentConfidence + attentionLevel * 0.1f);
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->workingMemory && pImpl->dopamine) {
+        // Extract current neural activity pattern from working memory
+        std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
+        
+        // Compute reward from dopamine level (as simplified reward signal)
+        float reward = pImpl->dopamine->getLevel();
+        
+        // Create features based on working memory pattern
+        std::vector<float> features;
+        for (float value : currentPattern) {
+            features.push_back(std::abs(value));  // Use absolute value as feature
+        }
+        
+        // Present experience to concept formation system
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            currentPattern, features, reward, currentStep);
+        
+        // If a new concept was formed, store it in episodic memory
+        if (conceptId > 0 && pImpl->episodicMemory) {
+            // Store concept formation as an episode
+            EpisodicMemoryItem conceptEpisode;
+            conceptEpisode.timestamp = currentStep;
+            conceptEpisode.reward = reward;
+            conceptEpisode.isConceptFormation = true;
+            conceptEpisode.conceptId = conceptId;
+            
+            // Store in episodic memory
+            pImpl->episodicMemory->storeEpisode(conceptEpisode);
+        }
+        
+        // Connect concept formation to planning system
+        if (pImpl->planner && conceptId > 0) {
+            // Update planner with newly formed concept
+            pImpl->planner->updateKnowledge(pImpl->conceptFormation->getConceptPrototype(conceptId));
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -582,10 +679,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
-    }
+    // Add integration debugging and validation
+    validateIntegration();
+    logIntegrationStatus();
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -1057,12 +1153,16 @@ Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
 }
 
-Curiosity* Brain::getCuriosity() {
-    return pImpl->curiosity.get();
+// Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
 }
 
-Novelty* Brain::getNovelty() {
-    return pImpl->novelty.get();
+// Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+// Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 PredictionError* Brain::getPredictionErrorSignal() {
@@ -1112,6 +1212,159 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+// Integration validation
+void Brain::validateIntegration() const {
+    NLM_LOG_INFO("=== INTEGRATION VALIDATION ===");
+    
+    bool allSystemsInitialized = true;
+    
+    // Check memory systems
+    if (!pImpl->workingMemory) {
+        NLM_LOG_ERROR("Working memory not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->episodicMemory) {
+        NLM_LOG_ERROR("Episodic memory not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->associativeMemory) {
+        NLM_LOG_ERROR("Associative memory not initialized");
+        allSystemsInitialized = false;
+    }
+    
+    // Check prediction system
+    if (!pImpl->predictionSystem) {
+        NLM_LOG_ERROR("Prediction system not initialized");
+        allSystemsInitialized = false;
+    }
+    
+    // Check cognition systems
+    if (!pImpl->planner) {
+        NLM_LOG_ERROR("Neural planner not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->conceptFormation) {
+        NLM_LOG_ERROR("Concept formation not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->attention) {
+        NLM_LOG_ERROR("Attention system not initialized");
+        allSystemsInitialized = false;
+    }
+    
+    // Check neuromodulation systems
+    if (!pImpl->dopamine) {
+        NLM_LOG_ERROR("Dopamine system not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->acetylcholine) {
+        NLM_LOG_ERROR("Acetylcholine system not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->norepinephrine) {
+        NLM_LOG_ERROR("Norepinephrine system not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->serotonin) {
+        NLM_LOG_ERROR("Serotonin system not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->curiosity) {
+        NLM_LOG_ERROR("Curiosity system not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->novelty) {
+        NLM_LOG_ERROR("Novelty system not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->predictionError) {
+        NLM_LOG_ERROR("Prediction error system not initialized");
+        allSystemsInitialized = false;
+    }
+    
+    // Check plasticity systems
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_ERROR("Spike system not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->stdp) {
+        NLM_LOG_ERROR("STDP system not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->hebbian) {
+        NLM_LOG_ERROR("Hebbian system not initialized");
+        allSystemsInitialized = false;
+    }
+    if (!pImpl->structuralPlasticity) {
+        NLM_LOG_ERROR("Structural plasticity system not initialized");
+        allSystemsInitialized = false;
+    }
+    
+    if (allSystemsInitialized) {
+        NLM_LOG_INFO("✓ All integration systems properly initialized");
+    } else {
+        NLM_LOG_ERROR("✗ Integration validation failed - missing systems");
+    }
+}
+
+// Log integration status
+void Brain::logIntegrationStatus() const {
+    NLM_LOG_INFO("=== INTEGRATION STATUS REPORT ===");
+    
+    // Check neuromodulation integration
+    if (pImpl->dopamine) {
+        NLM_LOG_INFO("Dopamine: Level=" + std::to_string(pImpl->dopamine->getLevel()) +
+                    " PlasticityFactor=" + std::to_string(pImpl->dopamine->getPlasticityFactor()));
+    }
+    
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine: Level=" + std::to_string(pImpl->acetylcholine->getLevel()) +
+                    " AttentionStrength=" + std::to_string(pImpl->acetylcholine->getAttentionStrength()));
+    }
+    
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine: Level=" + std::to_string(pImpl->norepinephrine->getLevel()) +
+                    " Arousal=" + std::to_string(pImpl->norepinephrine->getArousal()) +
+                    " Vigilance=" + std::to_string(pImpl->norepinephrine->getVigilance()));
+    }
+    
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin: Level=" + std::to_string(pImpl->serotonin->getLevel()) +
+                    " Mood=" + std::to_string(pImpl->serotonin->getMood()) +
+                    " RewardSensitivity=" + std::to_string(pImpl->serotonin->getRewardSensitivity()));
+    }
+    
+    // Check memory system integration
+    if (pImpl->workingMemory) {
+        NLM_LOG_INFO("Working Memory: Capacity=" + std::to_string(pImpl->workingMemory->getCapacity()) +
+                    " ActiveTraces=" + std::to_string(pImpl->workingMemory->getActiveTraces()) +
+                    " Activity=" + std::to_string(pImpl->workingMemory->getMemoryActivity()));
+    }
+    
+    if (pImpl->episodicMemory) {
+        NLM_LOG_INFO("Episodic Memory: Episodes=" + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    }
+    
+    // Check prediction system integration
+    if (pImpl->predictionSystem) {
+        NLM_LOG_INFO("Prediction System: Error=" + std::to_string(pImpl->predictionSystem->getPredictionError()) +
+                    " Confidence=" + std::to_string(pImpl->predictionSystem->getConfidence()));
+    }
+    
+    // Check attention system integration
+    if (pImpl->attention) {
+        NLM_LOG_INFO("Attention System: Winners=" + std::to_string(pImpl->attention->getWinners().size()) +
+                    " AttentionFocus=" + std::to_string(pImpl->attention->getAttendedRegions().size()) + " regions");
+    }
+    
+    // Check concept formation integration
+    if (pImpl->conceptFormation) {
+        NLM_LOG_INFO("Concept Formation: Concepts=" + std::to_string(pImpl->conceptFormation->getConceptCount()));
+    }
+    
+    NLM_LOG_INFO("=== INTEGRATION STATUS COMPLETE ===");
 }
 
 } // namespace nlm
