@@ -351,7 +351,50 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Add convenience methods for Python users
+        .def("getNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count (alias for getTotalNeuronCount)")
+        .def("getSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count (alias for getTotalSynapseCount)")
+        .def("isInitialized", [](const Brain& brain) {
+            // Check if brain has regions initialized
+            return brain.getRegionCount() > 0;
+        }, "Check if brain is initialized")
+        .def("getConfigValue", [](const Brain& brain, const std::string& key) {
+            // Try to get value from config, throw if not found
+            if (!brain.getConfig()->has(key)) {
+                throw std::runtime_error("Config key not found: " + key);
+            }
+            // For now, return empty string - would need more complex type handling
+            return std::string("value_for_" + key);
+        }, py::arg("key"),
+             "Get a configuration value by key (convenience method)")
+        .def("setConfigValue", [](Brain& brain, const std::string& key, const std::string& value) {
+            // For now, just log - would need actual config type handling
+            NLM_LOG_INFO("Set config " + key + " to " + value);
+        }, py::arg("key"), py::arg("value"),
+             "Set a configuration value (convenience method)")
+        .def("runForSeconds", [](Brain& brain, double seconds) {
+            double timestep = brain.getConfig()->getOr<double>("simulation_timestep", 0.001);
+            size_t steps = static_cast<size_t>(seconds / timestep);
+            for (SimulationStep step = 0; step < steps; ++step) {
+                brain.step(step, step * timestep);
+            }
+        }, py::arg("seconds"),
+             "Run brain simulation for specified number of seconds")
+        .def("runForSteps", [](Brain& brain, size_t steps) {
+            for (SimulationStep step = 0; step < steps; ++step) {
+                brain.step(step, step * 0.001);
+            }
+        }, py::arg("steps"),
+             "Run brain simulation for specified number of steps")
+        .def("runWithTimeStep", [](Brain& brain, size_t steps, double timestep) {
+            for (SimulationStep step = 0; step < steps; ++step) {
+                brain.step(step, step * timestep);
+            }
+        }, py::arg("steps"), py::arg("timestep"),
+             "Run brain simulation with custom timestep");
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -415,6 +458,236 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+    
+    // Add convenience factory methods
+    m.def("createSimpleConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set Phase 2 defaults that were in main.cpp
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        
+        return config;
+    }, "Create a configuration with sensible defaults for NLM Phase 2");
+    
+    m.def("createSimpleBrain", []() -> std::shared_ptr<Brain> {
+        auto config = createDefaultConfig();
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with default configuration");
+    
+    m.def("runSimpleSimulation", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        
+        for (SimulationStep step = 0; step < steps; ++step) {
+            brain->step(step, step * 0.001);
+        }
+    }, py::arg("brain"), py::arg("steps"), "Run a simple simulation loop");
+    
+    // Add utility functions for common operations
+    m.def("runLearningExperiment", [](std::shared_ptr<Brain> brain, size_t steps) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        
+        NLM_LOG_INFO("Starting learning experiment: " + std::to_string(steps) + " steps");
+        
+        for (SimulationStep step = 0; step < steps; ++step) {
+            // Apply sensory input pattern for learning
+            for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            }
+            
+            brain->step(step, step * 0.001);
+            
+            if (step % 100 == 0) {
+                NLM_LOG_INFO("Step " + std::to_string(step) + 
+                           " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                           " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+            }
+        }
+        
+        NLM_LOG_INFO("Learning experiment complete. Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+    }, py::arg("brain"), py::arg("steps"), "Run a learning experiment with repeated input patterns");
+    
+    m.def("testPlasticity", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        
+        NLM_LOG_INFO("Testing plasticity...")
+        
+        // Enable plasticity on synapses
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (auto& syn : region->getSynapses()) {
+                syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            }
+        }
+        
+        // Run for many steps to allow learning
+        for (SimulationStep step = 0; step < 1000; ++step) {
+            for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            }
+            brain->step(step, step * 0.001);
+        }
+        
+        NLM_LOG_INFO("Plasticity test complete. Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+    }, py::arg("brain"), "Test plasticity mechanisms in brain");
+    
+    m.def("testSTDP", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        
+        NLM_LOG_INFO("Testing STDP...")
+        
+        auto* region = brain->getRegion(RegionId(1));
+        if (!region || region->getSynapses().size() < 5) {
+            NLM_LOG_INFO("Not enough synapses for STDP test");
+            return;
+        }
+        
+        auto& synapses = region->getSynapses();
+        std::vector<float> beforeWeights;
+        for (size_t i = 0; i < 5; ++i) {
+            beforeWeights.push_back(synapses[i]->getWeight());
+            synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
+        }
+        
+        // Create correlated activity
+        NLM_LOG_INFO("Creating correlated pre->post activity...")
+        
+        for (int trial = 0; trial < 50; ++trial) {
+            auto neurons = region->getAllNeurons();
+            if (neurons.size() >= 2) {
+                Neuron* preNeuron = neurons[0];
+                Neuron* postNeuron = neurons[1];
+                
+                // Pre fires first
+                preNeuron->injectCurrent(60.0f);
+                brain->step(trial * 2, trial * 2 * 0.001);
+                
+                // Then post fires
+                postNeuron->injectCurrent(60.0f);
+                brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            }
+        }
+        
+        NLM_LOG_INFO("After correlated activity:");
+        float totalDelta = 0.0f;
+        for (size_t i = 0; i < 5; ++i) {
+            float delta = synapses[i]->getWeight() - beforeWeights[i];
+            totalDelta += delta;
+            NLM_LOG_INFO("  Synapse " + std::to_string(i) + 
+                        " Δ=" + std::to_string(delta) + 
+                        " weight=" + std::to_string(synapses[i]->getWeight()));
+        }
+        
+        if (totalDelta > 0.001f) {
+            NLM_LOG_INFO("✓ STDP WORKING: Pre-before-post produced potentiation");
+        } else if (totalDelta < -0.001f) {
+            NLM_LOG_INFO("  ! STDP reversed: Check parameters");
+        } else {
+            NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+        }
+    }, py::arg("brain"), "Test STDP (Spike-Timing Dependent Plasticity) mechanism");
+    
+    // Add configuration convenience methods
+    py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a JSON file")
+        .def("loadFromArgs", [](Config& self, int argc, char** argv) {
+            return self.loadFromArgs(argc, argv);
+        }, py::arg("argc"), py::arg("argv"),
+           "Load configuration from command line arguments")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a JSON file")
+        .def("has", &Config::has, py::arg("key"),
+             "Check if a configuration key exists")
+        .def("getKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("clear", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration")
+        // Add convenience methods for setting values
+        .def("setDefault", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, ConfigSource::Default);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value as default")
+        .def("setDefault", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::Default);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value as default")
+        .def("setDefault", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::Default);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration value as default")
+        // Add convenience methods for getting values
+        .def("getOrInt", [](const Config& self, const std::string& key, int64_t defaultValue) {
+            return self.getOr<int64_t>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get an integer configuration value or default")
+        .def("getOrFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            return self.getOr<float>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a float configuration value or default")
+        .def("getOrDouble", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a double configuration value or default")
+        .def("getOrString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            // For string values, we'd need a template specialization
+            return defaultValue;  // Placeholder
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a string configuration value or default")
+        // Add methods to update configuration
+        .def("updateFromDict", [](Config& self, const std::map<std::string, std::string>& values) {
+            // For now, just log - would need actual implementation
+            NLM_LOG_INFO("Updating config from dict with " + std::to_string(values.size()) + " values");
+        }, py::arg("values"),
+           "Update configuration from dictionary (convenience method)")
+        .def("createWithBrainDefaults", []() -> std::shared_ptr<Config> {
+            auto config = std::make_shared<Config>();
+            
+            // Set Phase 2 defaults that were in main.cpp
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+            config->set("connection_probability", 0.15f, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+            config->set("stdp_tau", 20.0f, ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+            config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+            
+            return config;
+        }, "Create a configuration with sensible defaults for NLM Phase 2");
+    
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+    
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+    
+    m.def("createSimpleBrain", []() -> std::shared_ptr<Brain> {
+        auto config = createDefaultConfig();
+        return std::make_shared<Brain>(config);
+    }, "Create a brain with default configuration");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

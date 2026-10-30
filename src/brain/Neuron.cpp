@@ -220,10 +220,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
+    // dt is in seconds, convert to milliseconds for consistency with tau (ms)
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
+    // Skip adaptation during refractory period
+    if (pImpl->state.adaptationVariable > 0.0f && pImpl->state.refractoryRemaining == 0) {
         V -= pImpl->state.adaptationVariable * 0.01f;
         pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
     }
@@ -250,7 +252,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Neuron is Active (above threshold) but not currently firing
+        // Set to Resting if below threshold and not in refractory
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        } else {
+            pImpl->state.firingState = FiringState::Refractory;
+        }
     }
     
     // Clear synaptic input for next step

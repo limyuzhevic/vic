@@ -12,10 +12,11 @@ requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience", "brain-sim"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +26,33 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries",
+    "Framework :: Pytest",
 ]
-
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "matplotlib>=3.5",
+    "scipy>=1.8",
+]
+example = [
+    "jupyter>=1.0",
+    "pandas>=1.5",
+    "seaborn>=0.12",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
+"Bug Tracker" = "https://github.com/nlm-project/nlm/issues"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -54,4 +68,30 @@ NLM_SOURCE_DIR = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["python/pynlm"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == \"__main__\":",
+    "if TYPE_CHECKING:",
+]
+
+[project.scripts]
+nlm-demo = "python.pynlm:demo"
+nlm-learn = "python.pynlm:learning_demo"
+
+[tool.pylint.master]
+load-plugins = "pylint.extensions.docparams"
+
+[tool.pylint.typecheck]
+generated-members = ["pybind11::module", "pybind11::module_::module_derived"]
