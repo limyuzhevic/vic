@@ -193,6 +193,22 @@ public:
     // Logging
     void logStatus() const;
     
+    // Helper method for Python bindings - get regions as vector of pointers
+    std::vector<NeuralRegion*> getRegions() const {
+        std::vector<NeuralRegion*> regions;
+        regions.reserve(getRegions().size());
+        for (const auto& region : getRegions()) {
+            regions.push_back(region.get());
+        }
+        return regions;
+    }
+    
+    // Get agent start position (for world integration)
+    std::pair<float, float> getAgentStart() const {
+        // This would need to be implemented based on world requirements
+        return std::make_pair(0.0f, 0.0f);
+    }
+    
 private:
     struct Impl;
     Impl* pImpl;
