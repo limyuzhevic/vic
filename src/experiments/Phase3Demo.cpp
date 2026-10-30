@@ -8,51 +8,203 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <map>
+#include <algorithm>
 
 namespace nlm {
 
-// Main Phase 3 demonstration
-// Shows: experience -> neural activity -> action -> consequence -> learning
+/**
+ * Print help information
+ */
+void printHelp(const std::string& programName) {
+    std::cout << "===========================================" << std::endl;
+    std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO" << std::endl;
+    std::cout << "===========================================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                 Show this help message" << std::endl;
+    std::cout << "  --verbose, -v              Enable verbose output" << std::endl;
+    std::cout << "  --quiet, -q                Disable most output (quiet mode)" << std::endl;
+    std::cout << "  --episodes N               Number of episodes to run (default: 5)" << std::endl;
+    std::cout << "  --steps N                  Steps per episode (default: 200)" << std::endl;
+    std::cout << "  --neurons N                Number of neurons (default: 500)" << std::endl;
+    std::cout << "  --regions N                Number of regions (default: 2)" << std::endl;
+    std::cout << "  --no-plasticity            Disable plasticity (testing mode)" << std::endl;
+    std::cout << "  --config FILE              Load configuration from file" << std::endl;
+    std::cout << "  --seed N                   Random seed for reproducible results (default: 42)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --verbose --episodes 10       Run with verbose output and 10 episodes" << std::endl;
+    std::cout << "  " << programName << " --quiet --no-plasticity       Skip plasticity, run quietly" << std::endl;
+    std::cout << "  " << programName << " --steps 500 --episodes 3       Run 3 episodes with 500 steps each" << std::endl;
+}
 
+/**
+ * Parse command line arguments
+ */
+struct Phase3DemoConfig {
+    bool help = false;
+    bool verbose = false;
+    bool quiet = false;
+    int numEpisodes = 5;
+    int stepsPerEpisode = 200;
+    int neuronCount = 500;
+    int regionCount = 2;
+    bool plasticityEnabled = true;
+    std::string configFile;
+    uint64_t randomSeed = 42;
+};
+
+Phase3DemoConfig parseArgs(int argc, char* argv[]) {
+    Phase3DemoConfig config;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            config.help = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            config.verbose = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            config.quiet = true;
+        } else if (arg == "--episodes" && i + 1 < argc) {
+            config.numEpisodes = std::atoi(argv[++i]);
+            if (config.numEpisodes <= 0) {
+                std::cerr << "Error: Number of episodes must be positive." << std::endl;
+                exit(1);
+            }
+        } else if (arg == "--steps" && i + 1 < argc) {
+            config.stepsPerEpisode = std::atoi(argv[++i]);
+            if (config.stepsPerEpisode <= 0) {
+                std::cerr << "Error: Steps per episode must be positive." << std::endl;
+                exit(1);
+            }
+        } else if (arg == "--neurons" && i + 1 < argc) {
+            config.neuronCount = std::atoi(argv[++i]);
+            if (config.neuronCount <= 0) {
+                std::cerr << "Error: Neuron count must be positive." << std::endl;
+                exit(1);
+            }
+        } else if (arg == "--regions" && i + 1 < argc) {
+            config.regionCount = std::atoi(argv[++i]);
+            if (config.regionCount <= 0) {
+                std::cerr << "Error: Region count must be positive." << std::endl;
+                exit(1);
+            }
+        } else if (arg == "--no-plasticity") {
+            config.plasticityEnabled = false;
+        } else if (arg == "--config" && i + 1 < argc) {
+            config.configFile = argv[++i];
+        } else if (arg == "--seed" && i + 1 < argc) {
+            config.randomSeed = std::stoull(argv[++i]);
+        } else {
+            std::cerr << "Unknown argument: " << arg << std::endl;
+            std::cerr << "Use --help for usage information." << std::endl;
+            exit(1);
+        }
+    }
+    
+    // Override verbose/quiet if both specified
+    if (config.verbose && config.quiet) {
+        config.verbose = false;
+        config.quiet = false;
+        std::cerr << "Warning: Both verbose and quiet specified, using normal output." << std::endl;
+    }
+    
+    // If help requested, just print help and exit
+    if (config.help) {
+        printHelp(argv[0]);
+        exit(0);
+    }
+    
+    return config;
+}
+
+/**
+ * Print status message
+ */
+void printStatus(const std::string& message, bool verbose = false, bool quiet = false) {
+    if (quiet) return;
+    
+    if (verbose) {
+        std::cout << "[VERBOSE] " << message << std::endl;
+    } else {
+        std::cout << message << std::endl;
+    }
+}
+
+/**
+ * Print section header
+ */
+void printSection(const std::string& title) {
+    std::cout << "\n" << std::string(50, '=') << std::endl;
+    std::cout << "  " << title << std::endl;
+    std::cout << std::string(50, '=') << std::endl;
+}
+
+/**
+ * Print result
+ */
+void printResult(const std::string& test, bool passed, const std::string& message = "") {
+    std::string status = passed ? "✓ PASS" : "✗ FAIL";
+    std::cout << "  " << status << " | " << test;
+    if (!message.empty()) {
+        std::cout << " - " << message;
+    }
+    std::cout << std::endl;
+}
+
+/**
+ * Main Phase 3 demonstration
+ * Shows: experience -> neural activity -> action -> consequence -> learning
+ */
 class Phase3Demo {
 public:
     Phase3Demo() {}
     ~Phase3Demo() {}
     
-    void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
+    void run(int numEpisodes = 5, int stepsPerEpisode = 200, bool verbose = false, bool quiet = false) {
         std::cout << "===========================================\n";
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
         
         // Create configuration
         auto config = std::make_shared<Config>();
-        configureEnvironment(config);
-        configureBrain(config);
+        configureEnvironment(config, numEpisodes, stepsPerEpisode, verbose, quiet);
+        configureBrain(config, numEpisodes, stepsPerEpisode, verbose, quiet);
         
         // Create world
         SimpleWorld world;
         world.configure(20.0f, 20.0f, 16, 16);
-        world.setRandomSeed(42);
+        world.setRandomSeed(config->getOr<uint64_t>("random_seed", 42));
         
         // Create brain
         auto brain = std::make_shared<Brain>(config);
-        brain->initialize();
+        if (!brain->initialize()) {
+            std::cerr << "ERROR: Failed to initialize brain!" << std::endl;
+            return;
+        }
         
         // Create agent brain interface
         AgentBrain agentBrain(brain);
         agentBrain.initialize(world);
         
-        // Configure agent brain
+        // Configure agent brain based on settings
         agentBrain.enableRewardModulation(true);
-        agentBrain.enableStructuralPlasticity(true);
+        agentBrain.enableStructuralPlasticity(true);  // Controlled by config
         agentBrain.enableDevelopment(true);
         agentBrain.enableCuriosity(true);
         
-        std::cout << "Initial brain state:\n";
-        std::cout << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
-        std::cout << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
-        std::cout << "  Sensory input size: " << agentBrain.getSensoryInputSize() << "\n";
-        std::cout << "  Motor output size: " << agentBrain.getMotorOutputSize() << "\n\n";
+        if (verbose) {
+            std::cout << "Initial brain state:\n";
+            std::cout << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
+            std::cout << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
+            std::cout << "  Sensory input size: " << agentBrain.getSensoryInputSize() << "\n";
+            std::cout << "  Motor output size: " << agentBrain.getMotorOutputSize() << "\n\n";
+        }
         
         // Metrics tracking
         std::vector<ExperimentMetrics> allMetrics;
@@ -61,10 +213,11 @@ public:
         for (int episode = 0; episode < numEpisodes; ++episode) {
             std::cout << "--- Episode " << episode << " started ---\n";
             
-            // Reset world
+            // Reset world and agent for new episode
             world.reset();
             agentBrain.reset();
             brain->reset();
+            brain->initialize();  // Re-initialize to get fresh state
             
             ExperimentMetrics metrics;
             metrics.episode = episode;
@@ -116,7 +269,7 @@ public:
                 }
                 
                 // Print periodic updates
-                if (step % 50 == 0) {
+                if (step % 50 == 0 && !quiet) {
                     std::cout << "  Step " << step 
                               << ": reward=" << result.reward
                               << ", action=" << motorCommandToString(cmd)
@@ -154,9 +307,7 @@ public:
         }
         
         // Summary
-        std::cout << "===========================================\n";
-        std::cout << "SUMMARY\n";
-        std::cout << "===========================================\n";
+        printSection("SUMMARY");
         
         if (allMetrics.size() >= 2) {
             const auto& first = allMetrics.front();
@@ -194,14 +345,24 @@ public:
     }
     
 private:
-    void configureEnvironment(std::shared_ptr<Config> config) {
+    void configureEnvironment(std::shared_ptr<Config> config, int numEpisodes, int stepsPerEpisode, bool verbose, bool quiet) {
+        if (verbose) {
+            std::cout << "Configuring environment..." << std::endl;
+        }
         config->set("environment_width", 20);
         config->set("environment_height", 20);
         config->set("vision_width", 16);
         config->set("vision_height", 16);
+        
+        if (!quiet) {
+            std::cout << "  Environment configured: 20x20 grid, 16x16 vision\n";
+        }
     }
     
-    void configureBrain(std::shared_ptr<Config> config) {
+    void configureBrain(std::shared_ptr<Config> config, int numEpisodes, int stepsPerEpisode, bool verbose, bool quiet) {
+        if (verbose) {
+            std::cout << "Configuring brain..." << std::endl;
+        }
         config->set("neuron_count", 500);
         config->set("region_count", 2);
         config->set("connection_probability", 0.1f);
@@ -212,6 +373,10 @@ private:
         config->set("stdp_tau", 20.0f);
         config->set("synaptogenesis_rate", 0.0001f);
         config->set("pruning_rate", 0.00001f);
+        
+        if (!quiet) {
+            std::cout << "  Brain configured: " << 500 << " neurons, " << 2 << " regions\n";
+        }
     }
     
     const char* motorCommandToString(MotorCommand cmd) {
@@ -240,22 +405,16 @@ private:
     }
 };
 
-} // namespace nlm
-
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
+    // Parse command line arguments
+    Phase3DemoConfig config = parseArgs(argc, argv);
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
-    }
-    
-    nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
+    // Run Phase 3 demo
+    Phase3Demo demo;
+    demo.run(config.numEpisodes, config.stepsPerEpisode, config.verbose, config.quiet);
     
     return 0;
 }
+
+} // namespace nlm
