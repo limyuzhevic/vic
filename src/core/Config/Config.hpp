@@ -87,8 +87,17 @@ public:
     // Get all keys
     std::vector<std::string> getKeys() const;
     
-    // Clear all
+        // Clear all
     void clear();
+    
+    // Validate configuration parameters
+    bool validate() const;
+    
+    // Merge configuration from another config
+    void merge(const Config& other);
+    
+    // Get configuration statistics
+    std::string getStatistics() const;
     
     // Get configuration summary
     std::string summary() const;

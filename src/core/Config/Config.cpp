@@ -1,16 +1,81 @@
-#include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>  // JSON library for parsing
 
-namespace nlm {
+// Convert ConfigValue to JSON value
+static nlohmann::json configValueToJson(const ConfigValue& value) {
+    return std::visit([](auto&& arg) -> nlohmann::json {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            return nlohmann::json::parse("\"" + arg + "\"");
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, int> ||
+                             std::is_same_v<T, int64_t> ||
+                             std::is_same_v<T, double>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            return nlohmann::json(arg);
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            return nlohmann::json(arg);
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            return nlohmann::json(arg);
+        } else {
+            return nlohmann::json();
+        }
+    }, value);
+}
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
-
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+// Convert JSON value to ConfigValue
+static ConfigValue jsonToConfigValue(const nlohmann::json& jsonValue) {
+    if (jsonValue.is_string()) {
+        // Try to parse as boolean first for true/false strings
+        std::string str = jsonValue.get<std::string>();
+        if (str == "true") return true;
+        if (str == "false") return false;
+        return str;
+    } else if (jsonValue.is_boolean()) {
+        return jsonValue.get<bool>();
+    } else if (jsonValue.is_number_integer()) {
+        return jsonValue.get<int64_t>();
+    } else if (jsonValue.is_number_unsigned()) {
+        return jsonValue.get<uint64_t>();
+    } else if (jsonValue.is_number()) {
+        return jsonValue.get<double>();
+    } else if (jsonValue.is_array()) {
+        // Determine array type
+        if (!jsonValue.empty()) {
+            if (jsonValue[0].is_number_integer()) {
+                std::vector<int64_t> vec;
+                vec.reserve(jsonValue.size());
+                for (const auto& item : jsonValue) {
+                    vec.push_back(item.get<int64_t>());
+                }
+                return vec;
+            } else if (jsonValue[0].is_number()) {
+                std::vector<double> vec;
+                vec.reserve(jsonValue.size());
+                for (const auto& item : jsonValue) {
+                    vec.push_back(item.get<double>());
+                }
+                return vec;
+            } else if (jsonValue[0].is_string()) {
+                std::vector<std::string> vec;
+                vec.reserve(jsonValue.size());
+                for (const auto& item : jsonValue) {
+                    vec.push_back(item.get<std::string>());
+                }
+                return vec;
+            }
+        }
+        return std::vector<int64_t>(); // Empty int array as default
+    }
+    
+    // Fallback to string representation
+    return jsonValue.dump();
+}
 
 Config::~Config() = default;
 
@@ -19,40 +84,99 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Try to parse as JSON first
+    try {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string content = buffer.str();
+        
+        // Check if it's JSON (starts with { or [ or has key-value pairs in JSON format)
+        bool isJson = false;
+        if (content.find('{') != std::string::npos || content.find('[') != std::string::npos) {
+            try {
+                auto jsonData = nlohmann::json::parse(content);
+                
+                // If it's a JSON object, process it
+                if (jsonData.is_object()) {
+                    isJson = true;
+                    for (const auto& [key, value] : jsonData.items()) {
+                        ConfigValue configValue = jsonToConfigValue(value);
+                        set(key, configValue, ConfigSource::File);
+                    }
+                }
+            } catch (const nlohmann::json::parse_error&) {
+                // Not valid JSON, fall back to simple format
+                isJson = false;
+            }
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // If not JSON or JSON parsing failed, use simple key=value format
+        if (!isJson) {
+            file.clear();
+            file.seekg(0);
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            std::string line;
+            while (std::getline(file, line)) {
+                // Skip empty lines and comments
+                line = trim(line);
+                if (line.empty() || line[0] == '#' || line[0] == '/') {
+                    continue;
+                }
+                
+                // Parse simple key=value pairs
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = trim(line.substr(0, pos));
+                    std::string value = trim(line.substr(pos + 1));
+                    
+                    // Remove quotes if present
+                    if (value.size() >= 2 && 
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                }
+            }
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        // Fallback to simple format if anything goes wrong
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        return true;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -86,7 +210,21 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Serialize the value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -211,5 +349,92 @@ template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) cons
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Validate configuration parameters
+bool Config::validate() const {
+    // Validate critical configuration parameters
+    bool isValid = true;
+    
+    // Check for required parameters
+    if (!has("random_seed")) {
+        NLM_LOG_WARNING("Missing required parameter: random_seed");
+        isValid = false;
+    }
+    
+    if (!has("neuron_count") || getOr<size_t>("neuron_count", 0) < 10) {
+        NLM_LOG_WARNING("Invalid neuron_count: must be >= 10");
+        isValid = false;
+    }
+    
+    if (!has("simulation_timestep") || getOr<double>("simulation_timestep", 0.0) <= 0.0) {
+        NLM_LOG_WARNING("Invalid simulation_timestep: must be > 0");
+        isValid = false;
+    }
+    
+    if (!has("region_count") || getOr<size_t>("region_count", 0) < 1) {
+        NLM_LOG_WARNING("Invalid region_count: must be >= 1");
+        isValid = false;
+    }
+    
+    // Check for reasonable bounds
+    if (has("neuron_count")) {
+        size_t neuronCount = getOr<size_t>("neuron_count", 0);
+        if (neuronCount > 1000000) {
+            NLM_LOG_WARNING("Very large neuron_count may impact performance");
+        }
+    }
+    
+    if (has("max_simulation_steps")) {
+        size_t maxSteps = getOr<size_t>("max_simulation_steps", 0);
+        if (maxSteps > 10000000) {
+            NLM_LOG_WARNING("Very large max_simulation_steps may require significant time");
+        }
+    }
+    
+    return isValid;
+}
+
+// Merge configuration from another config
+void Config::merge(const Config& other) {
+    // Merge all entries from other config
+    for (const auto& entry : other.pImpl->entries) {
+        // Use runtime source for merged entries
+        set(entry.key, entry.value, ConfigSource::Runtime);
+    }
+}
+
+// Get configuration statistics
+std::string Config::getStatistics() const {
+    std::ostringstream oss;
+    oss << "Configuration Statistics:" << std::endl;
+    oss << "Total entries: " << pImpl->entries.size() << std::endl;
+    
+    // Count entries by source
+    size_t defaultCount = 0, fileCount = 0, cliCount = 0, runtimeCount = 0;
+    for (const auto& entry : pImpl->entries) {
+        switch (entry.source) {
+            case ConfigSource::Default: defaultCount++; break;
+            case ConfigSource::File: fileCount++; break;
+            case ConfigSource::CommandLine: cliCount++; break;
+            case ConfigSource::Runtime: runtimeCount++; break;
+        }
+    }
+    
+    oss << "Default entries: " << defaultCount << std::endl;
+    oss << "File entries: " << fileCount << std::endl;
+    oss << "Command line entries: " << cliCount << std::endl;
+    oss << "Runtime entries: " << runtimeCount << std::endl;
+    
+    // Show memory usage estimate
+    size_t totalMemory = pImpl->entries.size() * (sizeof(ConfigEntry) + 100); // Rough estimate
+    oss << "Estimated memory usage: " << (totalMemory / 1024) << " KB" << std::endl;
+    
+    return oss.str();
+}
+
+// Clear and reset configuration
+void Config::clear() {
+    pImpl->entries.clear();
+}
 
 } // namespace nlm
