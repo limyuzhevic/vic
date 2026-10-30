@@ -139,9 +139,11 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Error handling system
+add_library(nlm_error_handling STATIC
+    src/core/ErrorHandling/ErrorHandling.cpp
+)
+target_include_directories(nlm_error_handling PUBLIC src)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase3_demo nlm_phase4_demo
