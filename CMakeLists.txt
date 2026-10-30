@@ -139,6 +139,18 @@ add_executable(nlm_phase4_demo
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
+# Add Python bindings module
+add_subdirectory(python)
+
+# Add performance module
+add_subdirectory(src/performance)
+
+# Add debugging module
+add_subdirectory(src/debugging)
+
+# Add plasticity manager
+add_subdirectory(src/plasticity)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
