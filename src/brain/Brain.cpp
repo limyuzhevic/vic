@@ -286,6 +286,21 @@ bool Brain::initialize() {
         }
     });
     
+    // Register cleanup handler for memory management
+    pImpl->spikeSystem->registerCleanupHandler([this]() {
+        // Clear all spike-related state on cleanup
+        pImpl->totalSpikesThisStep = 0;
+        pImpl->spikeSystem->clearAllEvents();
+    });
+}
+
+Brain::~Brain() {
+    // Cleanup: unregister all handlers to prevent memory leaks
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->clearAllHandlers();
+    }
+}
+    
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
@@ -439,43 +454,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
+        // Calculate neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
     
-    for (auto& region : pImpl->regions) {
-        for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
-            if (syn->getPlasticityFlags().stdp) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                    float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
-                    syn->setWeight(weight);
-                }
-            }
-            
-            // Apply Hebbian learning
-            if (syn->getPlasticityFlags().hebbian) {
-                const auto& preSpikes = syn->getPreSpikeHistory();
-                const auto& postSpikes = syn->getPostSpikeHistory();
-                
-                if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
-                }
-            }
-            
-            // Update synapse state
-            syn->step(currentTime);
+    // Apply STDP with neuromodulation
+    if (syn->getPlasticityFlags().stdp) {
+        const auto& preSpikes = syn->getPreSpikeHistory();
+        const auto& postSpikes = syn->getPostSpikeHistory();
+        
+        if (!preSpikes.empty() && !postSpikes.empty()) {
+            // Modify weight change based on dopamine
+            pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+            float weight = syn->getWeight();
+            weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+            syn->setWeight(weight);
         }
     }
+    
+    // Apply Hebbian learning
+    if (syn->getPlasticityFlags().hebbian) {
+        const auto& preSpikes = syn->getPreSpikeHistory();
+        const auto& postSpikes = syn->getPostSpikeHistory();
+        
+        if (!preSpikes.empty() && !postSpikes.empty()) {
+            pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+        }
+    }
+    
+    // Update synapse state
+    syn->step(currentTime);
     
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
@@ -879,9 +889,9 @@ bool Brain::load(const std::string& filepath) {
                         if (idx < neuronData.firingState.size()) {
                             neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
                         }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
-                        }
+                    if (idx < neuronData.refractoryRemaining.size()) {
+                        neuron->setRefractoryPeriod(neuronData.refractoryRemaining[idx]);
+                    }
                     }
                     idx++;
                 }
