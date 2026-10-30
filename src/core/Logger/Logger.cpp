@@ -113,19 +113,75 @@ Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    if (logger) {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        pImpl->loggers.push_back(logger);
+        
+        // Log the addition
+        std::ostringstream oss;
+        oss << "[LOGGER_ADDED] Added logger: " << logger->getLevel();
+        for (auto& existingLogger : pImpl->loggers) {
+            if (existingLogger == logger) {
+                oss << " (this logger)";
+                break;
+            }
+        }
+        oss << "\n";
+        
+        // Output to existing loggers
+        for (auto& existingLogger : pImpl->loggers) {
+            LogEntry entry;
+            entry.level = LogLevel::Info;
+            entry.message = oss.str();
+            entry.file = "logger.cpp";
+            entry.line = __LINE__;
+            entry.function = "addLogger";
+            entry.timestamp = std::chrono::system_clock::now();
+            existingLogger->log(entry);
+        }
+    }
 }
 
 void Logger::clearLoggers() {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Log the clearing
+    std::ostringstream oss;
+    oss << "[LOGGER_CLEARED] Cleared " << pImpl->loggers.size() << " loggers\n";
+    
+    // Output to existing loggers before clearing
+    for (auto& existingLogger : pImpl->loggers) {
+        LogEntry entry;
+        entry.level = LogLevel::Warning;
+        entry.message = oss.str();
+        entry.file = "logger.cpp";
+        entry.line = __LINE__;
+        entry.function = "clearLoggers";
+        entry.timestamp = std::chrono::system_clock::now();
+        existingLogger->log(entry);
+    }
+    
     pImpl->loggers.clear();
 }
 
 void Logger::setLevel(LogLevel level) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Log the level change
+    std::ostringstream oss;
+    oss << "[LOGGER_LEVEL_SET] Set global log level to: " << levelToString(level) << "\n";
+    
     for (auto& logger : pImpl->loggers) {
         logger->setLevel(level);
+        
+        LogEntry entry;
+        entry.level = LogLevel::Info;
+        entry.message = oss.str();
+        entry.file = "logger.cpp";
+        entry.line = __LINE__;
+        entry.function = "setLevel";
+        entry.timestamp = std::chrono::system_clock::now();
+        logger->log(entry);
     }
 }
 
@@ -133,6 +189,7 @@ void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
+    // Create log entry
     LogEntry entry;
     entry.level = level;
     entry.message = message;
@@ -141,6 +198,7 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
     
+    // Log the entry to all loggers
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
     }
@@ -182,8 +240,14 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    static std::shared_ptr<Logger> globalLoggerPtr = nullptr;
+    
+    if (logger) {
+        // Only set once to avoid multiple initializations
+        if (globalLoggerPtr == nullptr) {
+            globalLoggerPtr = logger;
+        }
+    }
 }
 
 // LogStream implementation

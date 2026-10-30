@@ -131,10 +131,32 @@ void Experiment::setEndStep(SimulationStep step) {
 
 void Experiment::addNote(const std::string& note) {
     pImpl->notes.push_back(note);
-}
+    }
 
-const std::vector<std::string>& Experiment::getNotes() const {
-    return pImpl->notes;
-}
+    const std::vector<std::string>& Experiment::getNotes() const {
+        return pImpl->notes;
+    }
+
+    // Get number of metrics
+    size_t Experiment::getMetricCount() const {
+        return pImpl->metrics.size();
+    }
+
+    // Get metric name by index
+    const std::string& Experiment::getMetricName(size_t index) const {
+        static std::string empty;
+        if (index < pImpl->metrics.size()) {
+            return pImpl->metrics[index].first;
+        }
+        return empty;
+    }
+
+    // Get metric value by index
+    double Experiment::getMetricByIndex(size_t index) const {
+        if (index < pImpl->metrics.size()) {
+            return pImpl->metrics[index].second;
+        }
+        return 0.0;
+    }
 
 } // namespace nlm

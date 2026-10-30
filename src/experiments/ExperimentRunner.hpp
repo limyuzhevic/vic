@@ -42,8 +42,13 @@ public:
     // Set random seed for reproducibility
     void setGlobalSeed(uint64_t seed);
     
-    // Save experiment results
+    // Save experiment results in different formats
     bool saveResults(const std::string& filepath) const;
+    
+    // Private helper methods for different file formats
+    bool saveResultsCSV(const std::string& filepath) const;
+    bool saveResultsJSON(const std::string& filepath) const;
+    bool saveResultsText(const std::string& filepath) const;
     
 private:
     struct Impl;

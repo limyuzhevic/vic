@@ -113,8 +113,137 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    // Determine file format based on extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".csv") {
+        return saveResultsCSV(filepath);
+    } else if (ext == ".json") {
+        return saveResultsJSON(filepath);
+    } else {
+        // Default to simple text format
+        return saveResultsText(filepath);
+    }
+}
+
+// CSV results saving implementation
+bool ExperimentRunner::saveResultsCSV(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Write CSV header
+    file << "Experiment Name,Seed,Start Step,End Step,Total Neurons,Total Synapses,Firing Neurons,Average Firing Rate,Total Reward,Metric Count\n";
+    
+    // Write experiment data
+    for (const auto& exp : pImpl->experiments) {
+        file << exp->getName() << ",";
+        file << exp->getSeed() << ",";
+        file << exp->getStartStep() << ",";
+        file << exp->getEndStep() << ",";
+        
+        // Get metrics
+        size_t totalNeurons = exp->getMetric("total_neurons");
+        size_t totalSynapses = exp->getMetric("total_synapses");
+        size_t firingNeurons = exp->getMetric("firing_neurons");
+        float avgFiringRate = exp->getMetric("average_firing_rate");
+        float totalReward = exp->getMetric("total_reward");
+        
+        file << totalNeurons << ",";
+        file << totalSynapses << ",";
+        file << firingNeurons << ",";
+        file << avgFiringRate << ",";
+        file << totalReward << ",";
+        file << exp->getMetricCount() << "\n";
+    }
+    
+    return true;
+}
+
+// JSON results saving implementation
+bool ExperimentRunner::saveResultsJSON(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "{\n";
+    file << "  \"experiments\": [\n";
+    
+    for (size_t i = 0; i < pImpl->experiments.size(); ++i) {
+        const auto& exp = pImpl->experiments[i];
+        
+        file << "    {\n";
+        file << "      \"name\": \"" << exp->getName() << "\",\n";
+        file << "      \"seed\": " << exp->getSeed() << ",\n";
+        file << "      \"start_step\": " << exp->getStartStep() << ",\n";
+        file << "      \"end_step\": " << exp->getEndStep() << ",\n";
+        
+        // Get metrics
+        file << "      \"metrics\": {\n";
+        for (size_t j = 0; j < exp->getMetricCount(); ++j) {
+            const auto& metricName = exp->getMetricName(j);
+            double metricValue = exp->getMetric(metricName);
+            
+            file << "        \"" << metricName << "\": " << metricValue;
+            if (j < exp->getMetricCount() - 1) {
+                file << ",";
+            }
+            file << "\n";
+        }
+        file << "      }\n";
+        
+        if (i < pImpl->experiments.size() - 1) {
+            file << "    },\n";
+        } else {
+            file << "    }\n";
+        }
+    }
+    
+    file << "  ],\n";
+    file << "  \"global_seed\": " << pImpl->globalSeed << "\n";
+    file << "}\n";
+    
+    return true;
+}
+
+// Text results saving implementation
+bool ExperimentRunner::saveResultsText(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "NLM Experiment Results\n";
+    file << "======================\n\n";
+    
+    file << "Total Experiments: " << pImpl->experiments.size() << "\n";
+    file << "Global Seed: " << pImpl->globalSeed << "\n\n";
+    
+    for (size_t i = 0; i < pImpl->experiments.size(); ++i) {
+        const auto& exp = pImpl->experiments[i];
+        
+        file << "Experiment " << (i + 1) << ":\n";
+        file << "  Name: " << exp->getName() << "\n";
+        file << "  Seed: " << exp->getSeed() << "\n";
+        file << "  Steps: " << exp->getStartStep() << " - " << exp->getEndStep() << "\n";
+        file << "  Metrics Count: " << exp->getMetricCount() << "\n";
+        
+        file << "  Metric Details:\n";
+        for (size_t j = 0; j < exp->getMetricCount(); ++j) {
+            const auto& metricName = exp->getMetricName(j);
+            double metricValue = exp->getMetric(metricName);
+            file << "    " << metricName << ": " << metricValue << "\n";
+        }
+        
+        if (i < pImpl->experiments.size() - 1) {
+            file << "\n";
+        }
+    }
+    
+    return true;
 }
 
 } // namespace nlm

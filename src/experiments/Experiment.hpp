@@ -40,6 +40,15 @@ public:
     // Check if metric exists
     bool hasMetric(const std::string& name) const;
     
+    // Get number of metrics
+    size_t getMetricCount() const;
+    
+    // Get metric name by index
+    const std::string& getMetricName(size_t index) const;
+    
+    // Get metric value by index
+    double getMetricByIndex(size_t index) const;
+    
     // Recording step data
     void recordStep(SimulationStep step, size_t neuronCount, size_t synapseCount,
                    size_t firingCount, float avgFiringRate);
