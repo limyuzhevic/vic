@@ -48,9 +48,9 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     auto startTime = std::chrono::high_resolution_clock::now();
     
     for (size_t step = 0; step < steps; ++step) {
-        // Inject some random input
+        // Inject some random input (reduced from 30.0f to 10.0f for more realistic dynamics)
         for (size_t i = 0; i < std::min(size_t(10), neuronCount / 10); ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+            brain->injectCurrentToNeurons(NeuronType::Sensory, 10.0f);  // Reduced from 30.0f
         }
         
         brain->step(step, step * 0.001);

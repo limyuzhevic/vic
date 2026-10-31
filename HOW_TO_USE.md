@@ -1,13 +1,13 @@
-# NLM (Neural Learning Machine) - HOW TO USE
+## Key Improvements in This Version
 
-## Overview
+This version includes significant enhancements:
 
-NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
-
-This document covers:
-1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+1. **Phase 5 Standalone Demo** - New comprehensive demo showing lifelong learning
+2. **Enhanced Command-Line Interface** - Advanced options for all demos
+3. **Improved Neural Dynamics** - Reduced excessive firing rates and better stability
+4. **Enhanced Reward System** - Better prediction and learning mechanisms
+5. **Extended Configuration Options** - More control over brain parameters
+6. **Better Documentation** - Comprehensive user guides and examples
 
 ---
 

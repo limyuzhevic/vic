@@ -119,8 +119,10 @@ public:
                 // 5. Apply motor command to world
                 ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
                 
-                // 6. Apply reward modulation
-                agentBrain.applyRewardModulation(result.reward, 0.0f);
+                // 6. Apply reward modulation with predicted reward
+                // Use agent's expected reward as prediction, or 0 for first time
+                float predictedReward = agentBrain.getExpectedReward();
+                agentBrain.applyRewardModulation(result.reward, predictedReward);
                 
                 // 7. Update world
                 world.update(0.01);  // 10ms timestep

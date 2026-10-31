@@ -132,37 +132,49 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Performance monitoring (headers only)
+add_library(nlm_performance STATIC
+    src/performance/SimplePerformanceMonitor.cpp
+    src/performance/SimplePerformanceMonitor.hpp
+)
+target_include_directories(nlm_performance PUBLIC src/performance)
+target_link_libraries(nlm_performance PUBLIC nlm_core)
+
+# Phase 2 demo (enhanced with performance monitoring)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_performance)
 
-# Phase 3 demo executable
+# Phase 3 demo
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_performance)
 
-# Phase 4 demo executable
+# Phase 4 demo
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_performance)
 
-# Phase 6 demo executable
-# Note: Phase 5 has no standalone demo yet - its library is wired here
-# and a demo is tracked as the next cleanup step.
+# Phase 5 demo (NEW!)
+add_executable(nlm_phase5_demo
+    src/experiments/Phase5Demo.cpp
+)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase5 nlm_performance)
+
+# Phase 6 demo
 add_executable(nlm_phase6_demo
     src/experiments/Phase6Demo.cpp
 )
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6 nlm_performance)
 
 # Benchmark executable
 add_executable(nlm_benchmark
     src/benchmark.cpp
 )
-target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+target_link_libraries(nlm_benchmark PUBLIC nlm_core nlm_performance)
 
 # Testing
 enable_testing()

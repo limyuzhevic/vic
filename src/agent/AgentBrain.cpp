@@ -440,6 +440,10 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+float AgentBrain::getExpectedReward() const {
+    return expectedReward_;
+}
+
 void AgentBrain::reset() {
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;

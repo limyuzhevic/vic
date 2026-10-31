@@ -84,8 +84,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         float reward = actionResult.reward;
         totalReward += reward;
         
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        // Apply reward modulation with predicted reward
+        // Use agent's expected reward as prediction, or 0 for first time
+        float predictedReward = agent.getExpectedReward();
+        agent.applyRewardModulation(reward, predictedReward);
         
         // Update development
         if (config.enableDevelopment) {
@@ -137,8 +139,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             
             // Create new brain and load
             auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
+            // Load checkpoint first (before initialization)
+            // This ensures the brain state is properly restored from the checkpoint
             if (brain2->load(config.checkpointPath)) {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
                 result.checkpointingWorks = true;
@@ -350,12 +352,14 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     
     // Create new brain and load
     auto brain2 = std::make_shared<Brain>(cfg);
-    brain2->initialize();
-    
+    // Load checkpoint first (before initialization)
+    // This ensures the brain state is properly restored from the checkpoint
     if (!brain2->load(path)) {
         NLM_LOG_ERROR("Failed to load checkpoint");
         return false;
     }
+    
+    brain2->initialize();  // Initialize after loading to complete setup
     
     size_t totalSpikes2 = brain2->getTotalSpikeCount();
     NLM_LOG_INFO("Brain2 total spikes after load: " + std::to_string(totalSpikes2));

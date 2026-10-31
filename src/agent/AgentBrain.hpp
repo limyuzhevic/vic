@@ -56,6 +56,9 @@ public:
     // Get current developmental stage
     DevelopmentalStage getDevelopmentalStage() const;
     
+    // Get expected reward
+    float getExpectedReward() const;
+    
     // Get neuromodulation level
     float getNeuromodulationLevel() const;
     
