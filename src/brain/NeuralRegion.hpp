@@ -34,6 +34,11 @@ public:
     void setName(const std::string& name);
     
     // Population management
+    // Set the next neuron ID to allocate. Brain uses this so neuron IDs are
+    // globally unique across regions; without it every region started at 1
+    // and Brain's neuron-by-ID spike-delivery map sent region 1's spikes
+    // to region 2's neurons with the same ID, leaving region 1 silent.
+    void setNextNeuronIndex(uint64_t next);
     PopulationId addPopulation(size_t size, NeuronType type = NeuronType::Internal);
     NeuralPopulation* getPopulation(PopulationId id);
     const NeuralPopulation* getPopulation(PopulationId id) const;

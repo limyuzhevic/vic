@@ -163,50 +163,66 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     return decoded;
 }
 
-MotorCommand AgentBrain::decodeFromMotorNeurons() {
-    // Calculate average activity in each motor group
-    auto calcActivity = [](const std::vector<Neuron*>& neurons) -> float {
-        if (neurons.empty()) return 0.0f;
+std::vector<AgentBrain::MotorGroupActivity> AgentBrain::getMotorGroupActivities() const {
+    auto calc = [](const std::vector<Neuron*>& neurons, const char* name) {
+        MotorGroupActivity out{name, 0.0f, 0, neurons.size()};
+        if (neurons.empty()) return out;
         float sum = 0.0f;
-        for (Neuron* n : neurons) {
+        float rateSum = 0.0f;
+        for (const Neuron* n : neurons) {
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
+            if (n->getState().firingState == FiringState::Refractory) ++out.refractoryCount;
+            rateSum += n->getFiringRate();
         }
-        return sum / neurons.size();
+        out.activity = sum / static_cast<float>(neurons.size());
+        out.firingRate = rateSum / static_cast<float>(neurons.size());
+        return out;
     };
-    
-    float forwardAct = calcActivity(motorForward_);
-    float backwardAct = calcActivity(motorBackward_);
-    float leftAct = calcActivity(motorTurnLeft_);
-    float rightAct = calcActivity(motorTurnRight_);
-    float interactAct = calcActivity(motorInteract_);
-    float waitAct = calcActivity(motorWait_);
-    
-    // Find maximum activity
+    return {
+        calc(motorForward_, "forward"),
+        calc(motorBackward_, "backward"),
+        calc(motorTurnLeft_, "left"),
+        calc(motorTurnRight_, "right"),
+        calc(motorInteract_, "interact"),
+        calc(motorWait_, "wait"),
+    };
+}
+
+MotorCommand AgentBrain::decodeFromMotorNeurons() {
+    auto activities = getMotorGroupActivities();
+    // Order matches getMotorGroupActivities(): fwd, bwd, left, right, interact, wait
     struct { MotorCommand cmd; float activity; } commands[] = {
-        {MotorCommand::MoveForward, forwardAct},
-        {MotorCommand::MoveBackward, backwardAct},
-        {MotorCommand::TurnLeft, leftAct},
-        {MotorCommand::TurnRight, rightAct},
-        {MotorCommand::Interact, interactAct},
-        {MotorCommand::Wait, waitAct}
+        {MotorCommand::MoveForward, activities[0].firingRate},
+        {MotorCommand::MoveBackward, activities[1].firingRate},
+        {MotorCommand::TurnLeft, activities[2].firingRate},
+        {MotorCommand::TurnRight, activities[3].firingRate},
+        {MotorCommand::Interact, activities[4].firingRate},
     };
-    
+
+    // Relative, spike-based decoding, not an absolute 0.5 mV membrane
+    // threshold with Wait as the default winner. Two reasons: (1) the old
+    // code required a motor group to beat both the Wait group (by strict
+    // >) and 0.5, and motor membrane activities were 0 or far below 0.5,
+    // so the agent could never move; (2) membrane deviation itself is a
+    // bad proxy for firing, because a neuron that just spiked resets its
+    // membrane to rest — at sampling time the neurons that fired have
+    // activity 0, exactly erasing the signal. Mean firing rate (now
+    // derived from counted spikes) survives the reset, so the group that
+    // fired most in the recent past wins. Wait is not a motor pattern —
+    // it is the absence of one — so it does not compete here. Only
+    // return Wait when there is essentially no motor firing at all.
     MotorCommand best = MotorCommand::Wait;
-    float bestActivity = waitAct;  // Default to wait if nothing stronger
-    
+    float bestActivity = 0.0f;
     for (const auto& c : commands) {
         if (c.activity > bestActivity) {
             bestActivity = c.activity;
             best = c.cmd;
         }
     }
-    
-    // Only act if there's meaningful activity
-    if (bestActivity < 0.5f) {
+    if (bestActivity <= 0.1f) {
         return MotorCommand::Wait;
     }
-    
     return best;
 }
 

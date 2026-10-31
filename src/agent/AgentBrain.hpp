@@ -31,6 +31,21 @@ public:
     
     // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
+
+    // Diagnostic: per motor group, in decode order. `activity` is mean
+    // |membrane - resting| (the old decode metric); `firingRate` is mean
+    // firing rate in Hz (now derived from counted spikes). Decode uses
+    // firingRate, because a neuron that just spiked resets its membrane
+    // to rest, so membrane deviation at sampling time is 0 for exactly
+    // the neurons that fired — the old metric erased its own signal.
+    struct MotorGroupActivity {
+        const char* name;
+        float activity;
+        size_t refractoryCount;  // neurons in Refractory state (recently spiked)
+        size_t size = 0;
+        float firingRate = 0.0f;
+    };
+    std::vector<MotorGroupActivity> getMotorGroupActivities() const;
     
     // Apply neuromodulation based on reward
     void applyRewardModulation(float reward, float predictedReward);
