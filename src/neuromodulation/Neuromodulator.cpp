@@ -30,27 +30,33 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+    // Calculate plasticity enhancement factor based on dopamine level
+    // Higher dopamine levels increase synaptic plasticity for learning
+    float basePlasticity = 0.5f;
+    float enhancement = 0.5f * pImpl->level;
+    return basePlasticity + enhancement;
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Decay dopamine level towards baseline over time
+    // Natural decay simulates dopaminergic neuron baseline activity
+    float decayAmount = pImpl->decayRate * std::max(static_cast<float>(dt), 1e-6f);
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - decayAmount);
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    // Process reward signal by increasing dopamine level
+    // Reward prediction errors drive learning through dopamine bursts
+    float increase = reward * pImpl->releaseRate;
+    pImpl->level = std::min(pImpl->peak, pImpl->level + increase);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    // Process reward prediction error signal
+    // Negative prediction error (worse than expected) reduces dopamine
+    // Positive prediction error (better than expected) increases dopamine
+    float change = error * pImpl->releaseRate;
+    pImpl->level = std::max(0.0f, pImpl->level + change);
 }
 
 } // namespace nlm

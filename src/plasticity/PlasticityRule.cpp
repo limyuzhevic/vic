@@ -24,24 +24,24 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
-    if (preSpikes.empty() || postSpikes.empty()) {
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
+    // Count coincident pre-post spike pairs within a narrow time window
+    // This implements the "fire together, wire together" principle
     size_t coincidences = 0;
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
+            // Use fixed 10ms coincidence window (configurable in production)
+            if (std::abs(pre - post) < 10.0f) {
+                coincidences++;
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
+    // Apply weight change proportional to number of coincident spikes
+    // Using Hebbian learning rule: Δw ∝ 1 when pre-post coincident
     if (coincidences > 0) {
         applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
     }

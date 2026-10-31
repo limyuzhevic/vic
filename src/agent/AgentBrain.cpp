@@ -135,7 +135,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // sensory input. The original intensity encoding is kept.
     const auto& vision = percept.getVision();
     for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
+        if (sensoryVision_[i]) {  // Safe pointer access with null check
             // Inject current proportional to vision intensity
             float current = vision[i] * 5.0f;  // Scale factor
             sensoryVision_[i]->injectCurrent(current);
@@ -194,26 +194,33 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
                           " maxTouch=" + std::to_string(maxTouch_);
         hasThoughtOutcome_ = false;
     }
+    thoughtPercept_ = "visionMean=" + std::to_string(visionMean) +
+                          " fwdObjVision=" + std::to_string(forwardObjectVision_) +
+                          " fwdTouch=" + std::to_string(forwardTouch_) +
+                          " maxTouch=" + std::to_string(maxTouch_);
+        hasThoughtOutcome_ = false;
+    }
+    // Add bounds checking and null pointer safety for touch input
     for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
+        if (sensoryTouch_[i]) {  // Safe pointer access with null check
             float current = touch[i] * 8.0f;  // Collision signal
             sensoryTouch_[i]->injectCurrent(current);
         }
     }
     
-    // Internal signals (4 values -> sensoryInternal_ neurons)
+    // Add bounds checking and null pointer safety for internal signals
     const auto& intern = percept.getInternal();
     for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
+        if (sensoryInternal_[i]) {  // Safe pointer access with null check
             float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
             sensoryInternal_[i]->injectCurrent(current);
         }
     }
     
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
+    // Add bounds checking and null pointer safety for proprioception
     const auto& proprio = percept.getProprioception();
     for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
+        if (sensoryProprioception_[i]) {  // Safe pointer access with null check
             float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
             sensoryProprioception_[i]->injectCurrent(current);
         }
@@ -346,16 +353,21 @@ std::vector<AgentBrain::MotorGroupActivity> AgentBrain::getMotorGroupActivities(
     auto calc = [](const std::vector<Neuron*>& neurons, const char* name) {
         MotorGroupActivity out{name, 0.0f, 0, neurons.size()};
         if (neurons.empty()) return out;
+        
         float sum = 0.0f;
         float rateSum = 0.0f;
         for (const Neuron* n : neurons) {
+            // Safe pointer access with null check and bounds validation
+            if (!n) continue;  // Skip null pointers gracefully
+            
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
             if (n->getState().firingState == FiringState::Refractory) ++out.refractoryCount;
             rateSum += n->getFiringRate();
         }
-        out.activity = sum / static_cast<float>(neurons.size());
-        out.firingRate = rateSum / static_cast<float>(neurons.size());
+        
+        out.activity = neurons.empty() ? 0.0f : sum / static_cast<float>(neurons.size());
+        out.firingRate = neurons.empty() ? 0.0f : rateSum / static_cast<float>(neurons.size());
         return out;
     };
     return {

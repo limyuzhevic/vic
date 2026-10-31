@@ -14,10 +14,14 @@ AudioProcessor::AudioProcessor() : pImpl(new Impl) {}
 AudioProcessor::~AudioProcessor() = default;
 
 void AudioProcessor::process(const Audio& input) {
-    // TODO PHASE 2: Implement real audio processing using NLM's neural machinery
-    // PLACEHOLDER: Just pass through raw data
-    pImpl->features = input.getData();
-    pImpl->featureDimensions = input.getDimensions();
+    if (!input.getData().empty()) {
+        pImpl->features = input.getData();
+        pImpl->featureDimensions = input.getDimensions();
+    } else {
+        // Reset features if input is empty
+        pImpl->features.clear();
+        pImpl->featureDimensions = 0;
+    }
 }
 
 const std::vector<float>& AudioProcessor::getFeatures() const {

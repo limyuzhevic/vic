@@ -128,7 +128,13 @@ float NeuralPopulation::getActivityLevel() const {
     if (pImpl->neurons.empty()) {
         return 0.0f;
     }
-    return static_cast<float>(getActiveCount()) / static_cast<float>(pImpl->neurons.size());
+    size_t activeCount = 0;
+    for (const auto* neuron : pImpl->neurons) {
+        if (neuron->isFiring() || neuron->getFiringRate() > 0.0f) {
+            activeCount++;
+        }
+    }
+    return static_cast<float>(activeCount) / static_cast<float>(pImpl->neurons.size());
 }
 
 void NeuralPopulation::initializeRandom(RandomGenerator& rng) {
@@ -180,13 +186,24 @@ float NeuralPopulation::getVarianceMembranePotential() const {
     if (pImpl->membranePotentials.size() < 2) {
         return 0.0f;
     }
-    float mean = getMeanMembranePotential();
-    float sumSquares = 0.0f;
+    
+    // Use single-pass algorithm for better performance
+    float mean = 0.0f;
+    float m2 = 0.0f;
+    size_t count = 0;
+    
     for (float v : pImpl->membranePotentials) {
-        float diff = v - mean;
-        sumSquares += diff * diff;
+        count++;
+        float delta = v - mean;
+        mean += delta / count;
+        float delta2 = v - mean;
+        m2 += delta * delta2;
     }
-    return sumSquares / static_cast<float>(pImpl->membranePotentials.size() - 1);
+    
+    if (count < 2) {
+        return 0.0f;
+    }
+    return m2 / static_cast<float>(count - 1);
 }
 
 } // namespace nlm
