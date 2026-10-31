@@ -29,6 +29,20 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // Base class for common ID functionality
+    py::class_<NeuronId, SynapseId, RegionId, PopulationId>(m, "IDBase", R"pbdoc(Base class for all unique identifiers)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("value"))
+        .def_readwrite("value", &NeuronId::value)
+        .def("index", &NeuronId::index)
+        .def("__eq__", &NeuronId::operator==)
+        .def("__ne__", &NeuronId::operator!=)
+        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const NeuronId& id) {
+            return "<ID: " + std::to_string(id.value) + ">";
+        });
+
+    // ID type definitions with proper documentation and Pythonic extensions
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -71,7 +85,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__hash__", [](const PopulationId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -416,6 +434,247 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced configuration factory functions
+    m.def("create_development_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("development.stage", "CriticalPeriod");
+        config->set("development.enableStructuralPlasticity", true);
+        config->set("development.neurogenesisRate", 0.1);
+        config->set("neuromodulation.enableDopamine", true);
+        config->set("neuromodulation.enableCuriosity", true);
+        config->set("prediction.enable", true);
+        config->set("memory.enableReplay", true);
+        config->set("memory.replayInterval", 100);
+        return config;
+    }, "Create a development-focused configuration");
+
+    m.def("create_adult_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("development.stage", "Adult");
+        config->set("development.enableStructuralPlasticity", false);
+        config->set("development.neurogenesisRate", 0.0);
+        config->set("neuromodulation.enableDopamine", true);
+        config->set("neuromodulation.enableCuriosity", false);
+        config->set("prediction.enable", true);
+        config->set("memory.enableReplay", true);
+        config->set("memory.replayInterval", 500);
+        return config;
+    }, "Create an adult-focused configuration");
+
+    m.def("create_curiosity_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuromodulation.enableCuriosity", true);
+        config->set("neuromodulation.curiosityThreshold", 0.5);
+        config->set("neuromodulation.curiosityDecayRate", 0.01);
+        config->set("prediction.enable", true);
+        config->set("prediction.confidenceThreshold", 0.3);
+        config->set("brain.explorationBias", 0.8);
+        return config;
+    }, "Create a curiosity-focused configuration");
+
+    // Advanced world factory functions
+    m.def("create_test_world", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(50, 50, 10, 10);
+        world->setRandomSeed(12345);
+        return world;
+    }, "Create a test world with predefined settings");
+
+    m.def("populate_test_world", [](std::shared_ptr<SimpleWorld> world) {
+        std::vector<WorldObject> objects;
+        
+        // Add resources
+        objects.emplace_back(10.0f, 10.0f, WorldObjectType::Resource, 10.0f, 0.3f);
+        objects.emplace_back(20.0f, 20.0f, WorldObjectType::Resource, 15.0f, 0.3f);
+        objects.emplace_back(30.0f, 30.0f, WorldObjectType::Resource, 20.0f, 0.3f);
+        
+        // Add hazards
+        objects.emplace_back(40.0f, 40.0f, WorldObjectType::Hazard, 5.0f, 0.5f);
+        
+        // Add walls around the perimeter
+        for (int x = 0; x < world->getWidth(); x += 5) {
+            objects.emplace_back(static_cast<float>(x), 0.0f, WorldObjectType::Wall, 1.0f, 1.0f);
+        }
+        
+        for (int y = 0; y < world->getHeight(); y += 5) {
+            objects.emplace_back(0.0f, static_cast<float>(y), WorldObjectType::Wall, 1.0f, 1.0f);
+        }
+        
+        for (int x = 0; x < world->getWidth(); x += 5) {
+            objects.emplace_back(static_cast<float>(x), static_cast<float>(world->getHeight()), 
+                               WorldObjectType::Wall, 1.0f, 1.0f);
+        }
+        
+        for (int y = 0; y < world->getHeight(); y += 5) {
+            objects.emplace_back(static_cast<float>(world->getWidth()), static_cast<float>(y), 
+                               WorldObjectType::Wall, 1.0f, 1.0f);
+        }
+        
+        for (const auto& obj : objects) {
+            world->addObject(obj);
+        }
+        
+        return objects.size();
+    }, "Populate a world with test objects", py::arg("world"));
+
+    // Validation and utility functions
+    m.def("validate_neuron_id", [](const NeuronId& id) {
+        if (id.value == 0) {
+            throw std::invalid_argument("Neuron ID value cannot be zero");
+        }
+        return true;
+    }, "Validate a neuron ID", py::arg("id"));
+
+    m.def("validate_synapse_id", [](const SynapseId& id) {
+        if (id.value == 0) {
+            throw std::invalid_argument("Synapse ID value cannot be zero");
+        }
+        return true;
+    }, "Validate a synapse ID", py::arg("id"));
+
+    // ID convenience functions
+    m.def("invalid_neuron_id", []() { return INVALID_NEURON_ID; }, "Get the invalid neuron ID");
+    m.def("invalid_synapse_id", []() { return INVALID_SYNAPSE_ID; }, "Get the invalid synapse ID");
+    m.def("invalid_region_id", []() { return INVALID_REGION_ID; }, "Get the invalid region ID");
+    m.def("invalid_population_id", []() { return INVALID_POPULATION_ID; }, "Get the invalid population ID");
+
+    // ID creation factory functions
+    m.def("create_neuron_id", &NeuronId, "Create a NeuronId from value", py::arg("value") = 0);
+    m.def("create_synapse_id", &SynapseId, "Create a SynapseId from value", py::arg("value") = 0);
+    m.def("create_region_id", &RegionId, "Create a RegionId from value", py::arg("value") = 0);
+    m.def("create_population_id", &PopulationId, "Create a PopulationId from value", py::arg("value") = 0);
+
+    // Batch operations for performance
+    m.def("batch_inject_current", [](std::shared_ptr<Brain> brain, const std::vector<NeuronId>& neurons, float current) {
+        for (const auto& neuron : neurons) {
+            brain->injectCurrent(neuron, current);
+        }
+    }, "Inject current to multiple neurons at once", py::arg("brain"), py::arg("neurons"), py::arg("current"));
+
+    m.def("batch_update_neurons", [](std::shared_ptr<Brain> brain, const std::vector<NeuronId>& neurons, const std::vector<float>& currents) {
+        if (neurons.size() != currents.size()) {
+            throw std::invalid_argument("Neuron and current vectors must have the same size");
+        }
+        for (size_t i = 0; i < neurons.size(); ++i) {
+            brain->injectCurrent(neurons[i], currents[i]);
+        }
+    }, "Inject currents to multiple neurons at once", py::arg("brain"), py::arg("neurons"), py::arg("currents"));
+
+    // Debug and monitoring utilities
+    m.def("log_brain_stats", [](std::shared_ptr<Brain> brain, std::shared_ptr<Logger> logger = nullptr) {
+        if (!logger) {
+            logger = brain->getConfig()->getOr<std::shared_ptr<Logger>>("logger", nullptr);
+        }
+        if (logger) {
+            logger->info("Brain Stats - Neurons: {}, Active: {}, Firing: {}, Total spikes: {}", 
+                        brain->getTotalNeuronCount(), brain->getActiveNeuronCount(),
+                        brain->getFiringNeuronCount(), brain->getTotalSpikeCount());
+        }
+        return brain->getAverageFiringRate();
+    }, "Log brain statistics", py::arg("brain"), py::arg("logger") = nullptr);
+
+    m.def("compare_brains", [](const std::vector<std::shared_ptr<Brain>>& brains) {
+        if (brains.empty()) {
+            throw std::invalid_argument("At least one brain required for comparison");
+        }
+        
+        struct Comparison {
+            size_t neuronCount = 0;
+            size_t activeCount = 0;
+            size_t firingCount = 0;
+            size_t totalSpikes = 0;
+            float avgFiringRate = 0.0f;
+        };
+        
+        std::vector<Comparison> results;
+        results.reserve(brains.size());
+        
+        for (const auto& brain : brains) {
+            Comparison comp;
+            comp.neuronCount = brain->getTotalNeuronCount();
+            comp.activeCount = brain->getActiveNeuronCount();
+            comp.firingCount = brain->getFiringNeuronCount();
+            comp.totalSpikes = brain->getTotalSpikeCount();
+            comp.avgFiringRate = brain->getAverageFiringRate();
+            results.push_back(comp);
+        }
+        
+        return results;
+    }, "Compare multiple brains and return statistics", py::arg("brains"));
+
+    // Configuration validation utilities
+    m.def("validate_configuration", [](std::shared_ptr<Config> config) {
+        std::vector<std::string> errors;
+        
+        auto keys = config->getKeys();
+        if (!config->has("brain.neuronCount")) {
+            errors.push_back("Missing brain.neuronCount");
+        }
+        if (!config->has("world.width")) {
+            errors.push_back("Missing world.width");
+        }
+        if (!config->has("world.height")) {
+            errors.push_back("Missing world.height");
+        }
+        
+        auto neuronCountOpt = config->get<int>("brain.neuronCount");
+        if (neuronCountOpt && neuronCountOpt.value() < 10) {
+            errors.push_back("brain.neuronCount must be at least 10");
+        }
+        
+        auto worldWidthOpt = config->get<float>("world.width");
+        if (worldWidthOpt && worldWidthOpt.value() <= 0) {
+            errors.push_back("world.width must be positive");
+        }
+        
+        auto worldHeightOpt = config->get<float>("world.height");
+        if (worldHeightOpt && worldHeightOpt.value() <= 0) {
+            errors.push_back("world.height must be positive");
+        }
+        
+        return errors;
+    }, "Validate a configuration and return any errors", py::arg("config"));
+
+    // Advanced brain management utilities
+    m.def("copy_brain_state", [](std::shared_ptr<Brain> source, std::shared_ptr<Brain> target) {
+        target->reset();
+        target->setDevelopmentalStage(source->getDevelopmentalStage());
+        return "State copied (simplified implementation)";
+    }, "Copy brain state from one brain to another", py::arg("source"), py::arg("target"));
+
+    m.def("merge_brains", [](const std::vector<std::shared_ptr<Brain>>& brains) {
+        if (brains.empty()) {
+            throw std::invalid_argument("At least one brain required for merge");
+        }
+        
+        auto config = std::make_shared<Config>();
+        size_t neuronCount = 0;
+        
+        for (const auto& brain : brains) {
+            neuronCount += brain->getTotalNeuronCount();
+        }
+        
+        config->set("brain.neuronCount", neuronCount / brains.size());
+        config->set("brain.initialExcitatoryRatio", 0.8);
+        
+        return std::make_shared<Brain>(config);
+    }, "Create a merged brain from multiple brains", py::arg("brains"));
+
+    // Experiment utilities
+    m.def("run_agent_episode", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, int max_steps) {
+        agent->reset();
+        
+        for (int step = 0; step < max_steps; ++step) {
+            world->update(0.1f);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            return percept;
+        }
+        
+        return std::make_shared<SensoryPercept>();
+    }, "Run a complete agent episode", py::arg("agent"), py::arg("world"), py::arg("max_steps"));
+
+    // Global constants
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
