@@ -61,7 +61,12 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Print help information
+    static void printHelp(const std::string& programName = "nlm");
+    static void printVersion();
+    static void printConfigurationTemplate(const std::string& filepath = "configs/default.cfg");
+    
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values
@@ -93,6 +98,38 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Parameter validation helpers
+    static bool validateNeuronCount(int64_t count);
+    static bool validateRegionCount(int64_t regions);
+    static bool validateConnectionProbability(float prob);
+    static bool validateTimeStep(double timestep);
+    static bool validateSTDPParameters(float ltp, float ltd, float tau);
+    static bool validatePlasticityRate(float rate);
+    
+    // Set default configuration
+    void setDefaults();
+    
+    // Configuration schema definition (for validation)
+    static const std::unordered_map<std::string, std::string> getConfigSchema();
+    
+    // Enhanced command-line argument parsing with validation
+    bool loadFromArgsEnhanced(int argc, char** argv, const std::unordered_map<std::string, std::string>& validKeys);
+    
+    // Configuration statistics
+    struct ConfigStats {
+        size_t totalEntries = 0;
+        size_t fileEntries = 0;
+        size_t commandLineEntries = 0;
+        size_t runtimeEntries = 0;
+        std::unordered_map<std::string, size_t> entriesByKey;
+    };
+    
+    ConfigStats getStats() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -100,6 +137,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing helpers
+    static bool parseJSONFile(const std::string& filepath, std::vector<ConfigEntry>& entries);
+    static std::string valueToString(const ConfigValue& value) const;
+    static bool validateKey(const std::string& key);
+    static bool validateValue(const std::string& key, const std::string& value);
+    
+    // Argument parsing helpers
+    static std::string parseArgument(const std::string& arg, std::string& key);
+    static std::string normalizeKey(const std::string& key);
 };
 
 } // namespace nlm
