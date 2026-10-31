@@ -3,9 +3,10 @@
  * 
  * This demo runs the Phase 6 integration experiment to verify
  * that all brain systems are properly connected.
+ * Enhanced with command-line argument support and improved Config system.
  */
 
-#include "experiments/Phase6IntegratedExperiment.hpp"
+#include "Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
 
@@ -15,8 +16,29 @@ int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
+    // Check for help argument
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--help" || std::string(argv[i]) == "-h") {
+            Phase6Config::printHelp();
+            return 0;
+        }
+    }
+    
     // Initialize logging
     Logger::getInstance().setLevel(Logger::Level::Info);
+    
+    // Create config and load from command line
+    Phase6Config config;
+    if (!config.loadFromArgs(argc, argv)) {
+        std::cerr << "ERROR: Failed to load configuration from command line arguments" << std::endl;
+        std::cerr << "Use --help for more information" << std::endl;
+        return 1;
+    }
+    
+    // Print configuration summary
+    std::cout << std::endl;
+    std::cout << "=== Configuration Summary ===" << std::endl;
+    std::cout << config.summary() << std::endl;
     
     // Create experiment
     Phase6IntegratedExperiment experiment;
@@ -51,15 +73,8 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with config settings
     std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
-    
     auto result = experiment.run(config);
     
     std::cout << std::endl;

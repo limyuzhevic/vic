@@ -93,6 +93,9 @@ public:
     // Get configuration summary
     std::string summary() const;
     
+    // Static helper for printing help
+    static void printHelp();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

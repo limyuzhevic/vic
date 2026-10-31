@@ -17,6 +17,7 @@
 
 #include "../experiments/Experiment.hpp"
 #include "../experiments/Metrics.hpp"
+#include "../core/Config/Config.hpp"
 #include <vector>
 #include <string>
 #include <memory>
@@ -73,27 +74,42 @@ struct Phase6IntegrationResult {
 };
 
 /**
- * Configuration for Phase 6 integration experiment
+ * Configuration for Phase 6 integration experiment (using enhanced Config system)
  */
-struct Phase6Config {
-    uint64_t maxSteps;
-    size_t neuronCount;
-    size_t regionCount;
-    float connectionProbability;
-    bool enableCheckpointing;
-    bool enableReplay;
-    bool enableDevelopment;
-    std::string checkpointPath;
+class Phase6Config {
+public:
+    Phase6Config() = default;
+    ~Phase6Config() = default;
     
-    Phase6Config()
-        : maxSteps(10000)
-        , neuronCount(1000)
-        , regionCount(1)
-        , connectionProbability(0.1f)
-        , enableCheckpointing(true)
-        , enableReplay(true)
-        , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+    // Disable copying, enable moving
+    Phase6Config(const Phase6Config&) = delete;
+    Phase6Config& operator=(const Phase6Config&) = delete;
+    Phase6Config(Phase6Config&&) noexcept = default;
+    Phase6Config& operator=(Phase6Config&&) noexcept = default;
+    
+    // Configuration parameters
+    uint64_t maxSteps = 10000;
+    size_t neuronCount = 1000;
+    size_t regionCount = 1;
+    float connectionProbability = 0.1f;
+    bool enableCheckpointing = true;
+    bool enableReplay = true;
+    bool enableDevelopment = true;
+    std::string checkpointPath = "./checkpoint_test.bin";
+    
+    // Load configuration from file
+    bool loadFromFile(const std::string& filepath);
+    
+    // Load configuration from command line arguments
+    bool loadFromArgs(int argc, char** argv);
+    
+    // Get configuration summary
+    std::string summary() const;
+    
+    // Print help for configuration options
+    static void printHelp();
+private:
+    // Internal implementation
 };
 
 /**

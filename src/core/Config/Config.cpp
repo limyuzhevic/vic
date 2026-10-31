@@ -59,7 +59,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
+        // Handle --key=value format (enhanced)
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
@@ -68,14 +68,193 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 set(key, value, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
+        // Handle -key value format (enhanced)
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
         }
+        // Handle boolean flags (--verbose)
+        else if (arg.substr(0, 2) == "--" && arg.find('=') == std::string::npos) {
+            std::string key = arg.substr(2);
+            set(key, "1", ConfigSource::CommandLine);
+        }
+        // Handle short boolean flags (-v)
+        else if (arg.size() == 2 && arg[0] == '-') {
+            std::string key = arg.substr(1);
+            set(key, "1", ConfigSource::CommandLine);
+        }
     }
     return true;
+}
+
+// Load from environment variables
+void Config::loadFromEnv(const std::string& prefix) {
+    for (const auto& env : std::filesystem::environment()) {
+        if (env.first.find(prefix) == 0) {
+            std::string key = env.first.substr(prefix.size());
+            std::string value = env.second;
+            set(key, value, ConfigSource::File);
+        }
+    }
+}
+
+// Merge configuration from another config
+void Config::mergeFrom(const Config& other, ConfigSource source) {
+    for (const auto& entry : other.pImpl->entries) {
+        set(entry.key, entry.value, source);
+    }
+}
+
+// Override configuration values from another config
+void Config::overrideFrom(const Config& other) {
+    for (const auto& entry : other.pImpl->entries) {
+        set(entry.key, entry.value, ConfigSource::CommandLine);
+    }
+}
+
+// Type-safe getters with automatic conversion
+int Config::getInt(const std::string& key, int defaultValue) const {
+    auto val = get<int>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+double Config::getDouble(const std::string& key, double defaultValue) const {
+    auto val = get<double>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+bool Config::getBool(const std::string& key, bool defaultValue) const {
+    auto val = get<bool>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+std::string Config::getString(const std::string& key, const std::string& defaultValue) const {
+    auto val = get<std::string>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
+
+std::vector<int> Config::getIntList(const std::string& key) const {
+    auto val = get<std::vector<int>>(key);
+    return val.has_value() ? val.value() : std::vector<int>();
+}
+
+std::vector<double> Config::getDoubleList(const std::string& key) const {
+    auto val = get<std::vector<double>>(key);
+    return val.has_value() ? val.value() : std::vector<double>();
+}
+
+// Convenience setters
+template<typename T>
+void Config::set(const std::string& key, const T& value, ConfigSource source) {
+    // Convert to ConfigValue
+    ConfigValue configValue;
+    if constexpr (std::is_same_v<T, int>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, double>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, bool>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+        configValue = value;
+    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+        configValue = value;
+    } else {
+        static_assert(!std::is_same_v<T, T>, "Unsupported type for Config::set");
+    }
+    
+    set(key, configValue, source);
+}
+
+void Config::setInt(const std::string& key, int value, ConfigSource source) {
+    set(key, value, source);
+}
+
+void Config::setDouble(const std::string& key, double value, ConfigSource source) {
+    set(key, value, source);
+}
+
+void Config::setBool(const std::string& key, bool value, ConfigSource source) {
+    set(key, value, source);
+}
+
+void Config::setString(const std::string& key, const std::string& value, ConfigSource source) {
+    set(key, value, source);
+}
+
+// Tab completion support
+std::vector<std::string> Config::getTabCompletions(const std::string& partial) const {
+    std::vector<std::string> completions;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.find(partial) == 0) {
+            completions.push_back(entry.key);
+        }
+    }
+    return completions;
+}
+
+// Print help for all configuration options
+void Config::printHelp() const {
+    std::cout << "=== Configuration Help ===" << std::endl;
+    std::cout << "Common configuration options:" << std::endl;
+    std::cout << "  --neuron_count=N          Number of neurons to create (default: 500)" << std::endl;
+    std::cout << "  --region_count=N          Number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --connection_probability=F Connection probability between neurons (0.0-1.0, default: 0.1)" << std::endl;
+    std::cout << "  --stdp_ltp_weight=F       STDP LTP weight (default: 0.01)" << std::endl;
+    std::cout << "  --stdp_ltd_weight=F       STDP LTD weight (default: 0.012)" << std::endl;
+    std::cout << "  --simulation_timestep=F    Simulation time step in seconds (default: 0.001)" << std::endl;
+    std::cout << "  --random_seed=N            Random seed for reproducibility (default: 42)" << std::endl;
+    std::cout << "  --checkpoint_dir=S         Directory for checkpoint files (default: ./checkpoints)" << std::endl;
+    std::cout << "  --enable_replay            Enable episodic memory replay" << std::endl;
+    std::cout << "  --enable_development       Enable developmental processes" << std::endl;
+    std::cout << "  --verbose                 Enable verbose logging" << std::endl;
+    std::cout << "  --help                    Show this help message" << std::endl;
+}
+
+// Print configuration summary
+std::string Config::getSummary() const {
+    std::ostringstream oss;
+    oss << "=== Configuration Summary ===" << std::endl;
+    oss << "Total entries: " << pImpl->entries.size() << std::endl;
+    oss << "" << std::endl;
+    
+    for (const auto& entry : pImpl->entries) {
+        oss << entry.key << " = ";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (arg ? "true" : "false");
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << " (" << static_cast<int>(entry.source) << ")" << std::endl;
+    }
+    
+    return oss.str();
+}
+
+// Get configuration statistics
+Config::ConfigStats Config::getStats() const {
+    ConfigStats stats;
+    stats.totalEntries = pImpl->entries.size();
+    
+    for (const auto& entry : pImpl->entries) {
+        switch (entry.source) {
+            case ConfigSource::Default: stats.defaultEntries++; break;
+            case ConfigSource::File: stats.fileEntries++; break;
+            case ConfigSource::CommandLine: stats.commandLineEntries++; break;
+            case ConfigSource::Runtime: stats.runtimeEntries++; break;
+        }
+    }
+    
+    return stats;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {

@@ -9,6 +9,98 @@
 
 namespace nlm {
 
+// Helper function to convert Phase6Config to nlm::Config
+static std::shared_ptr<nlm::Config> createNLMConfig(const Phase6Config& config) {
+    auto cfg = std::make_shared<nlm::Config>();
+    cfg->set("neuron_count", config.neuronCount);
+    cfg->set("region_count", config.regionCount);
+    cfg->set("connection_probability", config.connectionProbability);
+    cfg->set("stdp_ltp_weight", 0.01f);
+    cfg->set("stdp_ltd_weight", 0.012f);
+    cfg->set("synaptogenesis_rate", 0.0001f);
+    cfg->set("pruning_rate", 0.00001f);
+    cfg->set("replay_interval", config.enableReplay ? 100 : 0);
+    cfg->set("consolidation_interval", config.enableDevelopment ? 1000 : 0);
+    cfg->set("checkpoint_dir", config.checkpointPath);
+    return cfg;
+}
+
+// Phase6Config implementation
+bool Phase6Config::loadFromFile(const std::string& filepath) {
+    if (config_) {
+        config_->loadFromFile(filepath);
+        // Update our fields from config
+        neuronCount = config_->getInt("neuron_count", neuronCount);
+        regionCount = config_->getInt("region_count", regionCount);
+        connectionProbability = config_->getDouble("connection_probability", connectionProbability);
+        enableReplay = config_->hasKey("replay_interval") && config_->getInt("replay_interval", 0) > 0;
+        enableDevelopment = config_->hasKey("consolidation_interval") && config_->getInt("consolidation_interval", 0) > 0;
+        checkpointPath = config_->getString("checkpoint_dir", checkpointPath);
+    }
+    return true;
+}
+
+bool Phase6Config::loadFromArgs(int argc, char** argv) {
+    // Create internal config if not exists
+    if (!config_) {
+        config_ = std::make_shared<nlm::Config>();
+    }
+    
+    // Use enhanced Config::loadFromArgs which handles boolean flags and other options
+    if (!config_->loadFromArgs(argc, argv)) {
+        return false;
+    }
+    
+    // Update our fields from config
+    neuronCount = config_->getInt("neuron_count", neuronCount);
+    regionCount = config_->getInt("region_count", regionCount);
+    connectionProbability = config_->getDouble("connection_probability", connectionProbability);
+    enableReplay = config_->hasKey("replay_interval") && config_->getInt("replay_interval", 0) > 0;
+    enableDevelopment = config_->hasKey("consolidation_interval") && config_->getInt("consolidation_interval", 0) > 0;
+    checkpointPath = config_->getString("checkpoint_dir", checkpointPath);
+    
+    // Handle boolean flags
+    enableCheckpointing = config_->hasKey("enable_checkpointing") ? 
+        config_->getBool("enable_checkpointing", enableCheckpointing) : enableCheckpointing;
+    enableReplay = config_->hasKey("enable_replay") ? 
+        config_->getBool("enable_replay", enableReplay) : enableReplay;
+    enableDevelopment = config_->hasKey("enable_development") ? 
+        config_->getBool("enable_development", enableDevelopment) : enableDevelopment;
+    
+    return true;
+}
+
+std::string Phase6Config::summary() const {
+    std::ostringstream oss;
+    oss << "=== Phase 6 Configuration ===" << std::endl;
+    oss << "neuron_count: " << neuronCount << std::endl;
+    oss << "region_count: " << regionCount << std::endl;
+    oss << "connection_probability: " << connectionProbability << std::endl;
+    oss << "enable_checkpointing: " << (enableCheckpointing ? "true" : "false") << std::endl;
+    oss << "enable_replay: " << (enableReplay ? "true" : "false") << std::endl;
+    oss << "enable_development: " << (enableDevelopment ? "true" : "false") << std::endl;
+    oss << "checkpoint_path: " << checkpointPath << std::endl;
+    return oss.str();
+}
+
+void Phase6Config::printHelp() {
+    std::cout << "=== Phase 6 Configuration Help ===" << std::endl;
+    std::cout << "Common configuration options:" << std::endl;
+    std::cout << "  --neuron_count=N          Number of neurons to create (default: 1000)" << std::endl;
+    std::cout << "  --region_count=N          Number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --connection_probability=F Connection probability between neurons (0.0-1.0, default: 0.1)" << std::endl;
+    std::cout << "  --max_steps=N             Maximum simulation steps (default: 10000)" << std::endl;
+    std::cout << "  --enable_checkpointing     Enable checkpoint saving" << std::endl;
+    std::cout << "  --enable_replay           Enable episodic memory replay" << std::endl;
+    std::cout << "  --enable_development      Enable developmental processes" << std::endl;
+    std::cout << "  --checkpoint_dir=S         Directory for checkpoint files (default: ./checkpoint_test.bin)" << std::endl;
+    std::cout << "  --help                    Show this help message" << std::endl;
+    std::cout << "  -v, --verbose             Enable verbose logging" << std::endl;
+    std::cout << "  -h                        Show help" << std::endl;
+}
+
+// End of Phase6Config implementation
+
 Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
 
 Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
@@ -23,15 +115,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", config.neuronCount);
-    cfg->set("region_count", config.regionCount);
-    cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    // Create enhanced configuration
+    auto cfg = createNLMConfig(config);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
