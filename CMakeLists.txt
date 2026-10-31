@@ -192,6 +192,13 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
+# Test executables
+add_executable(config_demo demo_config.cpp)
+target_link_libraries(config_demo PUBLIC nlm_core)
+
+add_executable(test_config test_config.cpp)
+target_link_libraries(test_config PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
