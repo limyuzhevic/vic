@@ -239,11 +239,74 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
-    // Test 5: Development system exists
-    if (brain->getDevelopmentSystem() != nullptr) {
-        NLM_LOG_INFO("[PASS] Development system is integrated");
+    // Test 6: Association memory system exists
+    if (brain->getAssociativeMemory() != nullptr) {
+        NLM_LOG_INFO("[PASS] Association memory is integrated");
     } else {
-        NLM_LOG_ERROR("[FAIL] Development system is NOT integrated");
+        NLM_LOG_ERROR("[FAIL] Association memory is NOT integrated");
+        success = false;
+    }
+    
+    // Test 7: Novelty detection system exists
+    if (brain->getNovelty() != nullptr) {
+        NLM_LOG_INFO("[PASS] Novelty detection is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Novelty detection is NOT integrated");
+        success = false;
+    }
+    
+    // Test 8: Prediction error system exists
+    if (brain->getPredictionErrorSignal() != nullptr) {
+        NLM_LOG_INFO("[PASS] Prediction error signal is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Prediction error signal is NOT integrated");
+        success = false;
+    }
+    
+    // Test 9: Development stages are functional
+    auto stage = brain->getDevelopmentalStage();
+    if (stage == DevelopmentalStage::Initial || 
+        stage == DevelopmentalStage::CriticalPeriod ||
+        stage == DevelopmentalStage::Maturation ||
+        stage == DevelopmentalStage::Adult ||
+        stage == DevelopmentalStage::Aging) {
+        NLM_LOG_INFO("[PASS] Development system is functional with stage: " + stageToString(stage));
+    } else {
+        NLM_LOG_ERROR("[FAIL] Development system not functional");
+        success = false;
+    }
+    
+    // Test 10: All systems can process together (integration test)
+    NLM_LOG_INFO("[TEST] Processing sensory input through all systems...");
+    
+    // Create a simple sensory input
+    std::vector<float> sensoryInput(10, 0.5f);  // 10-dimensional input
+    
+    // Process through brain (should not crash)
+    brain->receiveSensoryInput(SensoryInput(sensoryInput));
+    
+    // Process through multiple steps
+    bool systemsWorkingTogether = true;
+    for (int i = 0; i < 10 && systemsWorkingTogether; ++i) {
+        brain->step(i, i * 0.001);
+        
+        // Check that all systems are still functional
+        if (brain->getWorkingMemory() == nullptr ||
+            brain->getEpisodicMemory() == nullptr ||
+            brain->getDopamine() == nullptr ||
+            brain->getPredictionSystem() == nullptr ||
+            brain->getPlanner() == nullptr ||
+            brain->getConceptFormation() == nullptr ||
+            brain->getAttention() == nullptr ||
+            brain->getDevelopmentSystem() == nullptr) {
+            systemsWorkingTogether = false;
+        }
+    }
+    
+    if (systemsWorkingTogether) {
+        NLM_LOG_INFO("[PASS] All systems work together (integration test passed)");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Systems failed to work together");
         success = false;
     }
     

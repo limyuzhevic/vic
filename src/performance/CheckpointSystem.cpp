@@ -346,10 +346,33 @@ bool CheckpointWriter::bufferSection(CheckpointSection sectionType,
 }
 
 bool CheckpointWriter::writeSection(CheckpointSection sectionType, const void* data, size_t size) {
-    // Generic sections are not used by Brain::save/load; buffer them
-    // only if they are neuron/synapse sections written in raw form is
-    // out of scope, so report failure rather than silently dropping.
-    (void)sectionType; (void)data; (void)size;
+    // Check if this is a standard section that should be written directly
+    if (sectionType == CheckpointSection::Neurons) {
+        if (data && size > 0) {
+            neuronPayload_.assign(static_cast<const uint8_t*>(data), 
+                                 static_cast<const uint8_t*>(data) + size);
+        }
+        return writeSectionToStream(stream_, sectionType, neuronPayload_, bytesWritten_);
+    } else if (sectionType == CheckpointSection::Synapses) {
+        if (data && size > 0) {
+            synapsePayload_.assign(static_cast<const uint8_t*>(data), 
+                                  static_cast<const uint8_t*>(data) + size);
+        }
+        return writeSectionToStream(stream_, sectionType, synapsePayload_, bytesWritten_);
+    } else if (sectionType == CheckpointSection::SpikeHistory) {
+        if (data && size > 0) {
+            delayedSpikePayload_.assign(static_cast<const uint8_t*>(data), 
+                                       static_cast<const uint8_t*>(data) + size);
+        }
+        return writeSectionToStream(stream_, sectionType, delayedSpikePayload_, bytesWritten_);
+    }
+    
+    // For other sections, buffer them like Brain::save/load does
+    if (data && size > 0) {
+        std::vector<uint8_t> payload(size);
+        std::memcpy(payload.data(), data, size);
+        return bufferSection(sectionType, payload);
+    }
     return false;
 }
 
@@ -361,27 +384,31 @@ bool CheckpointWriter::finalize() {
     stream_.write(reinterpret_cast<const char*>(&placeholder), sizeof(placeholder));
     if (!stream_) return false;
     bytesWritten_ = sizeof(placeholder);
-    if (!writeSectionToStream(stream_, CheckpointSection::Neurons, neuronPayload_, bytesWritten_)) return false;
-    if (!writeSectionToStream(stream_, CheckpointSection::Synapses, synapsePayload_, bytesWritten_)) return false;
-    if (!writeSectionToStream(stream_, CheckpointSection::SpikeHistory, delayedSpikePayload_, bytesWritten_)) return false;
-    // Phase 5 extra sections, in fixed order so a reader can rely on
-    // layout (readSection also finds them by type, order-independent).
+    
+    // Write standard sections using the writeSection interface
+    if (!writeSection(CheckpointSection::Neurons, neuronPayload_.data(), neuronPayload_.size())) return false;
+    if (!writeSection(CheckpointSection::Synapses, synapsePayload_.data(), synapsePayload_.size())) return false;
+    if (!writeSection(CheckpointSection::SpikeHistory, delayedSpikePayload_.data(), delayedSpikePayload_.size())) return false;
+    
+    // Write extra sections using the writeSection interface (Phase 5 data)
     for (CheckpointSection type : {CheckpointSection::SimulationState,
                                    CheckpointSection::RandomState,
                                    CheckpointSection::Plasticity,
                                    CheckpointSection::Memory}) {
         for (const auto& entry : extraPayloads_) {
             if (entry.first == type && !entry.second.empty()) {
-                if (!writeSectionToStream(stream_, type, entry.second, bytesWritten_)) return false;
+                if (!writeSection(type, entry.second.data(), entry.second.size())) return false;
             }
         }
     }
+    
     SectionHeader endHeader;
     endHeader.type = static_cast<uint32_t>(CheckpointSection::End);
     endHeader.offset = static_cast<uint64_t>(stream_.tellp()) + sizeof(SectionHeader);
     stream_.write(reinterpret_cast<const char*>(&endHeader), sizeof(endHeader));
     if (!stream_) return false;
     bytesWritten_ += sizeof(endHeader);
+    
     // Patch the real header in place.
     header_.totalSize = bytesWritten_;
     header_.checksum = ChecksumCalculator::crc32(neuronPayload_.data(), neuronPayload_.size());

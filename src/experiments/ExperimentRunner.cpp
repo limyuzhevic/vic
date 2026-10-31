@@ -113,8 +113,43 @@ void ExperimentRunner::setGlobalSeed(uint64_t seed) {
 }
 
 bool ExperimentRunner::saveResults(const std::string& filepath) const {
-    // TODO PHASE 2: Implement results saving
-    return false;
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "NLM Experiment Results\n";
+    file << "=======================\n\n";
+    
+    for (const auto& experiment : pImpl->experiments) {
+        file << "Experiment: " << experiment->getName() << "\n";
+        file << "Seed: " << experiment->getSeed() << "\n";
+        file << "Start Step: " << experiment->getStartStep() << "\n";
+        file << "End Step: " << experiment->getEndStep() << "\n\n";
+        
+        file << "Configuration:\n";
+        for (const auto& configPair : experiment->getConfig()) {
+            file << "  " << configPair.first << ": " << configPair.second << "\n";
+        }
+        
+        file << "\nMetrics:\n";
+        for (const auto& metricPair : experiment->getMetrics()) {
+            file << "  " << metricPair.first << ": " << metricPair.second << "\n";
+        }
+        
+        file << "\nStep Data:\n";
+        for (const auto& stepData : experiment->getStepData()) {
+            file << "  Step " << stepData.step << ": "
+                 << "neurons=" << stepData.neuronCount << ", "
+                 << "synapses=" << stepData.synapseCount << ", "
+                 << "firing=" << stepData.firingCount << ", "
+                 << "avg_rate=" << stepData.avgFiringRate << "\n";
+        }
+        
+        file << "\n";
+    }
+    
+    return true;
 }
 
 } // namespace nlm

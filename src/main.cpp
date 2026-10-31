@@ -48,7 +48,45 @@ void printBanner() {
     )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+void printHelp() {
+    printBanner();
+    std::cout << "\nUsage: nlm [OPTIONS]\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  --config=<file>        Load configuration from file (default: configs/default.cfg)\n";
+    std::cout << "  --neuron_count=<N>     Set number of neurons (default: 500)\n";
+    std::cout << "  --region_count=<N>     Set number of regions (default: 1)\n";
+    std::cout << "  --connection_probability=<f> Set connection probability (default: 0.15)\n";
+    std::cout << "  --random_seed=<N>      Set random seed for reproducibility (default: 42)\n";
+    std::cout << "  --simulation_timestep=<t> Set simulation timestep (default: 0.001)\n";
+    std::cout << "  --stdp_ltp_weight=<w>  Set STDP LTP weight (default: 0.02)\n";
+    std::cout << "  --stdp_ltd_weight=<w>  Set STDP LTD weight (default: 0.015)\n";
+    std::cout << "  --stdp_tau=<t>         Set STDP time constant (default: 20.0)\n";
+    std::cout << "  --synaptogenesis_rate=<r> Set synaptogenesis rate (default: 0.0001)\n";
+    std::cout << "  --pruning_rate=<r>     Set pruning rate (default: 0.00001)\n";
+    std::cout << "  --verbose              Increase verbosity level\n";
+    std::cout << "  --quiet                Decrease verbosity level\n";
+    std::cout << "  --help                 Show this help message\n";
+    std::cout << "  --version              Show version information\n\n";
+    std::cout << "Examples:\n";
+    std::cout << "  ./nlm --neuron_count=1000 --random_seed=123\n";
+    std::cout << "  ./nlm --config=my_config.cfg --verbose\n";
+    std::cout << "  ./nlm --stdp_ltp_weight=0.05 --stdp_ltd_weight=0.03\n";
+}
+
+void printVersion() {
+    printBanner();
+    std::cout << "\nNLM - Neural Learning Machine (熙然)\n";
+    std::cout << "Version: 0.1.0 (Phase 2)\n";
+    std::cout << "Build Date: " << __DATE__ << "\n";
+    std::cout << "C++ Standard: C++20\n";
+    std::cout << "Author: Research project\n\n";
+    std::cout << "An experimental artificial developmental brain system implementing:\n";
+    std::cout << "  - Leaky Integrate-and-Fire (LIF) neuron dynamics\n";
+    std::cout << "  - Event-driven spike propagation with synaptic delays\n";
+    std::cout << "  - STDP and Hebbian plasticity rules\n";
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)\n";
+}
+
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -279,22 +317,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -308,6 +346,18 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Handle help and version flags before any other processing
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version" || arg == "-v") {
+            printVersion();
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -367,6 +417,28 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Handle verbose and quiet flags
+    bool verbose = false;
+    bool quiet = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--verbose" || arg == "-V") {
+            verbose = true;
+            quiet = false;
+        } else if (arg == "--quiet" || arg == "-q") {
+            quiet = true;
+            verbose = false;
+        }
+    }
+    
+    // Set log level based on verbosity
+    if (quiet) {
+        consoleLogger->setLevel(LogLevel::Error);
+    } else if (verbose) {
+        consoleLogger->setLevel(LogLevel::Debug);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");

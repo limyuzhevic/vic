@@ -67,11 +67,15 @@ struct Brain::Impl {
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
+    size_t neuronsThatFiredThisStep;
 
     // Phase 5 learned preference trait (see Brain.hpp). Updated only
     // from sandbox reward via AgentBrain; checkpointed with the
     // simulation state so a reloaded brain keeps what it learned.
     float learnedPreference = 0.0f;
+    
+    // Neurons that fired this step (for accurate firing count)
+    std::unordered_set<NeuronId> neuronsFiredThisStep;
     
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
@@ -100,6 +104,7 @@ struct Brain::Impl {
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
+        , neuronsThatFiredThisStep(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
@@ -310,6 +315,8 @@ bool Brain::initialize() {
         // Count spikes
         ++pImpl->totalSpikesThisStep;
         ++pImpl->totalSpikesTotal;
+        // Track neurons that have fired (use a set to avoid double-counting)
+        pImpl->neuronsFiredThisStep.insert(event.neuron.index());
     });
     
     // Register delayed spike handler to deliver synaptic input
@@ -369,6 +376,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
+    pImpl->neuronsFiredThisStep.clear();
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
@@ -1005,7 +1013,10 @@ bool Brain::save(const std::string& filepath) const {
             p5AppendU64(payload, static_cast<uint64_t>(pImpl->totalSpikesThisStep));
             p5AppendFloat(payload, pImpl->learnedPreference);
             p5AppendU64(payload, static_cast<uint64_t>(pImpl->stepsSinceLastEpisode));
-            writer.bufferSection(CheckpointSection::SimulationState, payload);
+            p5AppendU64(payload, static_cast<uint64_t>(pImpl->neuronsFiredThisStep.size()));
+            for (const auto& id : pImpl->neuronsFiredThisStep) {
+                p5AppendU64(payload, id.index());
+            }
         }
         // RandomState: full RNG engine state, not just the seed.
         if (pImpl->rng) {
@@ -1256,13 +1267,20 @@ bool Brain::load(const std::string& filepath) {
             auto payload = reader.readSection(CheckpointSection::SimulationState);
             if (!payload.empty()) {
                 P5Reader r{payload.data(), payload.data() + payload.size()};
-                uint64_t total = 0, thisStep = 0, sinceEp = 0;
+                uint64_t total = 0, thisStep = 0, sinceEp = 0, firedNeurons = 0;
                 float pref = 0.0f;
-                if (r.u64(total) && r.u64(thisStep) && r.f32(pref) && r.u64(sinceEp) && r.ok) {
+                if (r.u64(total) && r.u64(thisStep) && r.f32(pref) && r.u64(sinceEp) && r.u64(firedNeurons) && r.ok) {
                     pImpl->totalSpikesTotal = static_cast<size_t>(total);
                     pImpl->totalSpikesThisStep = static_cast<size_t>(thisStep);
                     pImpl->learnedPreference = std::clamp(pref, -1.0f, 1.0f);
                     pImpl->stepsSinceLastEpisode = static_cast<size_t>(sinceEp);
+                    pImpl->neuronsFiredThisStep.clear();
+                    for (uint64_t i = 0; i < firedNeurons && r.p < r.end && r.ok; ++i) {
+                        uint64_t id = 0;
+                        if (r.u64(id) && r.ok) {
+                            pImpl->neuronsFiredThisStep.insert(NeuronId(id));
+                        }
+                    }
                 } else {
                     NLM_LOG_INFO("SimulationState section unreadable; counters/preference not restored");
                 }
@@ -1445,7 +1463,7 @@ size_t Brain::getActiveNeuronCount() const {
 }
 
 size_t Brain::getFiringNeuronCount() const {
-    return pImpl->totalSpikesThisStep;
+    return static_cast<size_t>(pImpl->neuronsFiredThisStep.size());
 }
 
 float Brain::getAverageFiringRate() const {
