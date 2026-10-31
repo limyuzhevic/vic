@@ -13,6 +13,42 @@ struct Dopamine::Impl {
     Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
 };
 
+struct Acetylcholine::Impl {
+    float level;
+    float baseline;
+    float peak;
+    float decayRate;
+    float attentionGain;
+    float memoryConsolidationRate;
+    
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.05f), 
+             attentionGain(0.5f), memoryConsolidationRate(0.3f) {}
+};
+
+struct Norepinephrine::Impl {
+    float level;
+    float baseline;
+    float peak;
+    float decayRate;
+    float arousalGain;
+    float vigilanceBoost;
+    
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.08f),
+             arousalGain(0.3f), vigilanceBoost(0.7f) {}
+};
+
+struct Serotonin::Impl {
+    float level;
+    float baseline;
+    float peak;
+    float decayRate;
+    float moodBoost;
+    float socialBehavior;
+    
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.03f),
+             moodBoost(0.4f), socialBehavior(0.6f) {}
+};
+
 Dopamine::Dopamine() : pImpl(new Impl) {}
 
 Dopamine::~Dopamine() = default;

@@ -30,6 +30,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;  // NEW: ACh for attention and memory consolidation
+class Norepinephrine;  // NEW: NE for arousal and vigilance
+class Serotonin;  // NEW: 5-HT for mood and social behavior
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -176,6 +179,15 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();  // NEW: ACh for attention
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();  // NEW: NE for arousal
+    
+    // Serotonin - mood and social behavior
+    Serotonin* getSerotonin();  // NEW: 5-HT for mood
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

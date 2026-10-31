@@ -10,6 +10,8 @@
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"  // Contains Dopamine, Acetylcholine, Norepinephrine, Serotonin
+#include "../neuromodulation/Reward.hpp"  // Contains Dopamine (duplicate include, but needed for reward functions)
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -52,6 +54,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;  // NEW: ACh for attention and memory
+    std::unique_ptr<Norepinephrine> norepinephrine;  // NEW: NE for arousal and vigilance
+    std::unique_ptr<Serotonin> serotonin;  // NEW: 5-HT for mood and social behavior
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -141,6 +146,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();  // NEW: ACh for attention and memory consolidation
+        norepinephrine = std::make_unique<Norepinephrine>();  // NEW: NE for arousal and vigilance
+        serotonin = std::make_unique<Serotonin>();  // NEW: 5-HT for mood and social behavior
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -472,6 +480,58 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
     }
     
+    // Update acetylcholine (attention and memory)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+        
+        // Apply acetylcholine effects on attention
+        // Acetylcholine enhances attention to salient stimuli
+        float acetylcholineLevel = pImpl->acetylcholine->getLevel();
+        if (acetylcholineLevel > 0.3f) {
+            // Enhance attention to novel or surprising inputs
+            if (pImpl->novelty && pImpl->novelty->getLevel() > 0.5f) {
+                // Boost working memory updating for novel inputs
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->strengthenMemory(1.0f + acetylcholineLevel);
+                }
+            }
+        }
+    }
+    
+    // Update norepinephrine (arousal and vigilance)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Apply norepinephrine effects on arousal
+        // Norepinephrine increases neural gain and alertness
+        float norepinephrineLevel = pImpl->norepinephrine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Norepinephrine modulates arousal and vigilance
+                    // Higher norepinephrine increases response gain
+                    float arousalMod = norepinephrineLevel * 0.3f;
+                    if (arousalMod > 0.0f) {
+                        neuron->injectCurrent(arousalMod);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update serotonin (mood and social behavior)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Apply serotonin effects on mood and social behavior
+        // Serotonin modulates impulsivity and social behavior
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        if (serotoninLevel > 0.5f) {
+            // High serotonin reduces impulsive actions
+            // (This would be used in agent decision making)
+        }
+    }
+    
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
@@ -495,10 +555,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
+    // Calculate combined neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
-        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        plasticityMod *= pImpl->dopamine->getPlasticityFactor();
+    }
+    if (pImpl->acetylcholine) {
+        plasticityMod *= pImpl->acetylcholine->getPlasticityFactor();
+    }
+    if (pImpl->norepinephrine) {
+        plasticityMod *= pImpl->norepinephrine->getPlasticityFactor();
+    }
+    if (pImpl->serotonin) {
+        plasticityMod *= pImpl->serotonin->getPlasticityFactor();
     }
     
     for (auto& region : pImpl->regions) {
@@ -593,17 +662,66 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
+            // Store sensory state (from working memory) for prediction and concept formation
+            if (pImpl->workingMemory) {
+                episode.sensoryState = pImpl->workingMemory->retrieve();
+            }
+            
+            // Store energy and novelty based on neuromodulation
+            if (pImpl->novelty) {
+                episode.energy = 1.0f - pImpl->novelty->getLevel();  // Lower novelty = more energy
+                episode.novelty = pImpl->novelty->getLevel();
+            }
+            
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
             pImpl->episodicMemory->storeEpisode(episode);
+            
+            // Also update prediction system and concept formation with this experience
+            if (pImpl->predictionSystem && !episode.sensoryState.empty()) {
+                // Create a mock prediction from this episode
+                pImpl->predictionSystem->train(episode.sensoryState);
+            }
+            if (pImpl->conceptFormation && !episode.sensoryState.empty()) {
+                // Extract features from sensory state and present to concept formation
+                // Simple feature extraction: normalize and add to concept formation
+                std::vector<float> features = episode.sensoryState;
+                pImpl->conceptFormation->presentExperience(features, features, episode.reward, currentStep);
+            }
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current state and observation
+        // Get current sensory state from recent sensory input
+        std::vector<float> currentState;
+        if (pImpl->workingMemory) {
+            currentState = pImpl->workingMemory->retrieve();
+        }
+        
+        // Make prediction for next state
+        auto predicted = pImpl->predictionSystem->predictNextState(currentState);
+        
+        // Update prediction based on actual experience
+        pImpl->predictionSystem->updatePredictions(predicted, currentState);
+        
+        // Use prediction error for attention modulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        if (std::abs(predictionError) > 0.1f) {
+            // High prediction error increases attention to this state
+            if (pImpl->attention && !currentState.empty()) {
+                // Convert state to neuron IDs for attention
+                std::vector<NeuronId> neurons;
+                for (size_t i = 0; i < std::min(currentState.size(), static_cast<size_t>(1000)); ++i) {
+                    if (currentState[i] > 0.5f) {
+                        neurons.push_back(NeuronId(static_cast<uint64_t>(i)));
+                    }
+                }
+                pImpl->attention->processCompetition(neurons);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1517,6 +1635,21 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+// NEW: Acetylcholine for attention and memory consolidation
+Acetylcholine* getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+// NEW: Norepinephrine for arousal and vigilance
+Norepinephrine* getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+// NEW: Serotonin for mood and social behavior
+Serotonin* getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 Curiosity* Brain::getCuriosity() {

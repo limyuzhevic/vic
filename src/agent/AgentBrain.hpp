@@ -5,6 +5,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../motor/Action.hpp"
 #include <memory>
 #include <vector>
 
@@ -199,6 +200,14 @@ private:
     bool hasThoughtPlanned_ = false;
     float thoughtReward_ = 0.0f;
     bool hasThoughtOutcome_ = false;
+    
+    // Phase 6 NEW: Planner influence for advanced decision making
+    // What the planner suggested based on learned action quality
+    ActionType lastPlannerPlanned_ = ActionType::Wait;
+    // How well the action was learned (0-1)
+    float lastPlannerActionQuality_ = 0.0f;
+    // How confident the planner is (0-1)
+    float lastPlannerConfidence_ = 0.0f;
 };
 
 } // namespace nlm

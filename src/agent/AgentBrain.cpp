@@ -2,6 +2,7 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/Random/Random.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -21,6 +22,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    // Phase 6 NEW: Initialize planner influence variables
+    , lastPlannerPlanned_(ActionType::Wait)
+    , lastPlannerActionQuality_(0.0f)
+    , lastPlannerConfidence_(0.0f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -289,6 +294,34 @@ MotorCommand AgentBrain::decodeMotorCommand() {
             default: thoughtPlanned_ = MotorCommand::Wait; break;
         }
         hasThoughtPlanned_ = true;
+        
+        // NEW: Use planner's decision to bias motor selection
+        // The planner's action quality and predictions influence motor neurons
+        float plannerConfidence = brain_->getPlanner()->getPlanningConfidence();
+        float actionQuality = 0.0f;
+        
+        switch (planned) {
+            case ActionType::MoveForward: actionQuality = brain_->getPlanner()->getActionQuality(ActionType::MoveForward); break;
+            case ActionType::MoveBackward: actionQuality = brain_->getPlanner()->getActionQuality(ActionType::MoveBackward); break;
+            case ActionType::TurnLeft: actionQuality = brain_->getPlanner()->getActionQuality(ActionType::TurnLeft); break;
+            case ActionType::TurnRight: actionQuality = brain_->getPlanner()->getActionQuality(ActionType::TurnRight); break;
+            case ActionType::Interact: actionQuality = brain_->getPlanner()->getActionQuality(ActionType::Interact); break;
+            default: actionQuality = 0.0f; break;
+        }
+        
+        // Apply planner bias to motor decoding
+        if (actionQuality > 0.5f && plannerConfidence > 0.5f) {
+            // High action quality and confidence from planner biases motor selection
+            // We'll apply this bias in decodeFromMotorNeurons
+            lastPlannerPlanned_ = planned;
+            lastPlannerActionQuality_ = actionQuality;
+            lastPlannerConfidence_ = plannerConfidence;
+        }
+    } else {
+        // Clear planner bias if no planner or no vision
+        lastPlannerPlanned_ = ActionType::Wait;
+        lastPlannerActionQuality_ = 0.0f;
+        lastPlannerConfidence_ = 0.0f;
     }
 
     MotorCommand decoded = decodeFromMotorNeurons();
@@ -602,14 +635,35 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Compute prediction error
     predictionError_ = reward - predictedReward;
     
-    // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
-    
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    
+    // NEW: Signal other neuromodulators based on reward experience
+    if (brain_) {
+        // Signal acetylcholine for attention and memory consolidation
+        if (brain_->getAcetylcholine()) {
+            // ACh increases with reward prediction and successful learning
+            float rewardPrediction = std::clamp(std::abs(predictionError_) * 0.5f, 0.0f, 1.0f);
+            brain_->getAcetylcholine()->signalAttention(rewardPrediction, 0.0f);
+        }
+        
+        // Signal norepinephrine for arousal and alertness
+        if (brain_->getNorepinephrine()) {
+            // NE increases with reward prediction error and novelty
+            float arousal = std::clamp((std::abs(predictionError_) + noveltyLevel_) * 0.4f, 0.0f, 1.0f);
+            brain_->getNorepinephrine()->signalArousal(arousal, 0.0f, 0.0f);
+        }
+        
+        // Signal serotonin for positive mood and social behavior
+        if (brain_->getSerotonin()) {
+            // 5-HT increases with reward and satisfaction
+            float satisfaction = std::clamp(reward * 0.3f, 0.0f, 1.0f);
+            brain_->getSerotonin()->signalPositiveExperience(satisfaction, 0.0f);
+        }
+    }
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -636,9 +690,23 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    // Modulate plasticity based on all neuromodulators
+    // Positive neuromodulators increase plasticity, negative decrease
+    float plasticityFactor = 1.0f;
+    if (brain_) {
+        if (brain_->getDopamine()) {
+            plasticityFactor *= brain_->getDopamine()->getPlasticityFactor();
+        }
+        if (brain_->getAcetylcholine()) {
+            plasticityFactor *= brain_->getAcetylcholine()->getPlasticityFactor();
+        }
+        if (brain_->getNorepinephrine()) {
+            plasticityFactor *= brain_->getNorepinephrine()->getPlasticityFactor();
+        }
+        if (brain_->getSerotonin()) {
+            plasticityFactor *= brain_->getSerotonin()->getPlasticityFactor();
+        }
+    }
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
@@ -741,6 +809,11 @@ void AgentBrain::reset() {
     expectedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
+    
+    // Phase 6 NEW: Reset planner influence variables
+    lastPlannerPlanned_ = ActionType::Wait;
+    lastPlannerActionQuality_ = 0.0f;
+    lastPlannerConfidence_ = 0.0f;
     
     // Clear the visual prediction (a new episode's first scene is
     // novel again) and the touch state.
