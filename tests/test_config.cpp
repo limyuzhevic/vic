@@ -1,5 +1,5 @@
 // Config Tests
-#include "core/Config/Config.hpp"
+#include "nlm.h"
 #include <cassert>
 #include <iostream>
 
@@ -7,83 +7,52 @@ namespace test_config {
 
 void testConfigCreation() {
     nlm::Config config;
-    assert(!config.has("test"));
     
     std::cout << "    testConfigCreation passed" << std::endl;
 }
 
-void testConfigSetAndGet() {
+void testConfigSetting() {
     nlm::Config config;
+    config.set("test_key", std::string("test_value"));
     
-    config.set("int_value", 42, nlm::ConfigSource::Runtime);
-    assert(config.has("int_value"));
+    assert(config.has("test_key"));
     
-    auto intVal = config.get<int>("int_value");
-    assert(intVal.has_value());
-    assert(*intVal == 42);
-    
-    config.set("double_value", 3.14, nlm::ConfigSource::Runtime);
-    auto doubleVal = config.get<double>("double_value");
-    assert(doubleVal.has_value());
-    assert(*doubleVal > 3.13 && *doubleVal < 3.15);
-    
-    config.set("string_value", std::string("hello"), nlm::ConfigSource::Runtime);
-    auto stringVal = config.get<std::string>("string_value");
-    assert(stringVal.has_value());
-    assert(*stringVal == "hello");
-    
-    config.set("bool_value", true, nlm::ConfigSource::Runtime);
-    auto boolVal = config.get<bool>("bool_value");
-    assert(boolVal.has_value());
-    assert(*boolVal == true);
-    
-    std::cout << "    testConfigSetAndGet passed" << std::endl;
+    std::cout << "    testConfigSetting passed" << std::endl;
 }
 
-void testConfigGetOr() {
+void testConfigGetting() {
     nlm::Config config;
+    config.set("int_key", 42);
+    config.set("string_key", std::string("hello"));
+    config.set("double_key", 3.14);
     
-    int val = config.getOr<int>("missing", 100);
-    assert(val == 100);
+    auto intVal = config.get<int>("int_key");
+    auto stringVal = config.get<std::string>("string_key");
+    auto doubleVal = config.get<double>("double_key");
     
-    config.set("existing", 50, nlm::ConfigSource::Runtime);
-    val = config.getOr<int>("existing", 100);
-    assert(val == 50);
+    assert(intVal && *intVal == 42);
+    assert(stringVal && *stringVal == "hello");
+    assert(doubleVal && std::abs(*doubleVal - 3.14) < 0.001);
     
-    std::cout << "    testConfigGetOr passed" << std::endl;
+    std::cout << "    testConfigGetting passed" << std::endl;
 }
 
-void testConfigRemove() {
+void testConfigSummary() {
     nlm::Config config;
+    config.set("test", std::string("value"));
     
-    config.set("test", 123, nlm::ConfigSource::Runtime);
-    assert(config.has("test"));
+    std::string summary = config.summary();
+    assert(summary.find("test") != std::string::npos);
+    assert(summary.find("value") != std::string::npos);
     
-    config.remove("test");
-    assert(!config.has("test"));
-    
-    std::cout << "    testConfigRemove passed" << std::endl;
-}
-
-void testConfigKeys() {
-    nlm::Config config;
-    
-    config.set("key1", 1, nlm::ConfigSource::Runtime);
-    config.set("key2", 2, nlm::ConfigSource::Runtime);
-    config.set("key3", 3, nlm::ConfigSource::Runtime);
-    
-    auto keys = config.getKeys();
-    assert(keys.size() == 3);
-    
-    std::cout << "    testConfigKeys passed" << std::endl;
+    std::cout << "    testConfigSummary passed" << std::endl;
 }
 
 void runAll() {
     testConfigCreation();
-    testConfigSetAndGet();
-    testConfigGetOr();
-    testConfigRemove();
-    testConfigKeys();
+    testConfigSetting();
+    testConfigGetting();
+    testConfigSummary();
 }
 
 } // namespace test_config

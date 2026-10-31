@@ -1,6 +1,5 @@
 // Brain Tests
-#include "brain/Brain.hpp"
-#include "core/Config/Config.hpp"
+#include "nlm.h"
 #include <cassert>
 #include <iostream>
 

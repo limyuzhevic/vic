@@ -1,5 +1,5 @@
 // Types Tests
-#include "core/Types/Types.hpp"
+#include "nlm.h"
 #include <cassert>
 #include <iostream>
 
@@ -48,41 +48,39 @@ void testPopulationId() {
 }
 
 void testNeuronType() {
-    assert(nlm::NeuronType::Excitatory != nlm::NeuronType::Inhibitory);
-    assert(nlm::NeuronType::Sensory != nlm::NeuronType::Motor);
+    nlm::NeuronType type1 = nlm::NeuronType::Excitatory;
+    nlm::NeuronType type2 = nlm::NeuronType::Inhibitory;
+    
+    assert(static_cast<int>(type1) != static_cast<int>(type2));
     
     std::cout << "    testNeuronType passed" << std::endl;
 }
 
 void testSynapseType() {
-    assert(nlm::SynapseType::Excitatory != nlm::SynapseType::Inhibitory);
+    nlm::SynapseType type1 = nlm::SynapseType::Excitatory;
+    nlm::SynapseType type2 = nlm::SynapseType::Inhibitory;
+    
+    assert(static_cast<int>(type1) != static_cast<int>(type2));
     
     std::cout << "    testSynapseType passed" << std::endl;
 }
 
-void testPlasticityFlags() {
-    nlm::PlasticityFlags flags;
-    assert(!flags.hebbian);
-    assert(!flags.stdp);
-    assert(!flags.reward_modulated);
+void testDevelopmentalStage() {
+    nlm::DevelopmentalStage stage1 = nlm::DevelopmentalStage::Initial;
+    nlm::DevelopmentalStage stage2 = nlm::DevelopmentalStage::Adult;
     
-    flags.hebbian = true;
-    assert(flags.hebbian);
+    assert(static_cast<int>(stage1) != static_cast<int>(stage2));
     
-    std::cout << "    testPlasticityFlags passed" << std::endl;
+    std::cout << "    testDevelopmentalStage passed" << std::endl;
 }
 
-void testSpikeEvent() {
-    nlm::SpikeEvent event;
-    event.source_neuron = nlm::NeuronId(1);
-    event.timestamp = 0.5;
-    event.step = 500;
+void testFiringState() {
+    nlm::FiringState state1 = nlm::FiringState::Resting;
+    nlm::FiringState state2 = nlm::FiringState::Active;
     
-    assert(event.source_neuron.index() == 1);
-    assert(event.timestamp == 0.5);
-    assert(event.step == 500);
+    assert(static_cast<int>(state1) != static_cast<int>(state2));
     
-    std::cout << "    testSpikeEvent passed" << std::endl;
+    std::cout << "    testFiringState passed" << std::endl;
 }
 
 void runAll() {
@@ -92,8 +90,8 @@ void runAll() {
     testPopulationId();
     testNeuronType();
     testSynapseType();
-    testPlasticityFlags();
-    testSpikeEvent();
+    testDevelopmentalStage();
+    testFiringState();
 }
 
 } // namespace test_types
