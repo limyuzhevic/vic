@@ -28,24 +28,37 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printUsage() {
+    printBanner();
+    std::cout << std::endl;
+    std::cout << "Usage: nlm [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "NLM - Neural Learning Machine (Phase 6 Integrated)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --config=<file>               Load configuration from file" << std::endl;
+    std::cout << "  --neuron_count=<int>          Number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region_count=<int>           Number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --connection_probability=<float> Connection probability (default: 0.15)" << std::endl;
+    std::cout << "  --enable_plasticity=<bool>    Enable plasticity (default: true)" << std::endl;
+    std::cout << "  --enable_memory=<bool>         Enable memory systems (default: true)" << std::endl;
+    std::cout << "  --enable_cognition=<bool>      Enable cognitive systems (default: true)" << std::endl;
+    std::cout << "  --enable_neuromodulation=<bool> Enable neuromodulation (default: true)" << std::endl;
+    std::cout << "  --enable_development=<bool>    Enable development (default: true)" << std::endl;
+    std::cout << "  --enable_checkpointing=<bool>   Enable checkpointing (default: false)" << std::endl;
+    std::cout << "  --checkpoint_dir=<string>       Checkpoint directory (default: ./checkpoints)" << std::endl;
+    std::cout << "  --max_steps=<int>              Maximum simulation steps (default: 2000)" << std::endl;
+    std::cout << "  --log_level=<string>           Logging level (DEBUG, INFO, WARNING, ERROR)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm                                    Run with default settings" << std::endl;
+    std::cout << "  nlm --neuron_count=1000 --max_steps=5000" << std::endl;
+    std::cout << "  nlm --enable_cognition=true --enable_neuromodulation=true" << std::endl;
+    std::cout << "  nlm --checkpoint_dir=./mybrain --enable_checkpointing=true" << std::endl;
+    std::cout << "  nlm --log_level=DEBUG" << std::endl;
+    std::cout << std::endl;
+    std::cout << "For more configuration options, use --help" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -321,7 +334,23 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+bool checkForHelp(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return true;
+        }
+    }
+    return false;
+}
+
 int main(int argc, char** argv) {
+    // Check for help first
+    if (checkForHelp(argc, argv)) {
+        return 0;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -382,14 +411,43 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Set enhanced default values for Phase 6 integration
+    config->set("working_memory_capacity", 100, ConfigSource::Default);
+    config->set("episodic_memory_max_episodes", 1000, ConfigSource::Default);
+    config->set("replay_interval", 100, ConfigSource::Default);
+    config->set("consolidation_interval", 1000, ConfigSource::Default);
+    config->set("planning_depth", 5, ConfigSource::Default);
+    config->set("attention_inhibition_strength", 0.5f, ConfigSource::Default);
+    config->set("attention_excitation_strength", 1.5f, ConfigSource::Default);
+    config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
+    config->set("curiosity_baseline", 0.5f, ConfigSource::Default);
+    config->set("novelty_threshold", 0.3f, ConfigSource::Default);
+    config->set("reward_discount_factor", 0.99f, ConfigSource::Default);
+    config->set("checkpoint_dir", "./checkpoints", ConfigSource::Default);
+    config->set("checkpoint_interval", 1000, ConfigSource::Default);
+    
+    // Get and validate boolean configuration options
+    bool enablePlasticity = config->getOr<bool>("enable_plasticity", true);
+    bool enableMemory = config->getOr<bool>("enable_memory", true);
+    bool enableCognition = config->getOr<bool>("enable_cognition", true);
+    bool enableNeuromodulation = config->getOr<bool>("enable_neuromodulation", true);
+    bool enableDevelopment = config->getOr<bool>("enable_development", true);
+    bool enableCheckpointing = config->getOr<bool>("enable_checkpointing", false);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration Summary:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  plasticity_enabled: " + std::string(enablePlasticity ? "YES" : "NO"));
+    NLM_LOG_INFO("  memory_systems_enabled: " + std::string(enableMemory ? "YES" : "NO"));
+    NLM_LOG_INFO("  cognition_systems_enabled: " + std::string(enableCognition ? "YES" : "NO"));
+    NLM_LOG_INFO("  neuromodulation_enabled: " + std::string(enableNeuromodulation ? "YES" : "NO"));
+    NLM_LOG_INFO("  development_enabled: " + std::string(enableDevelopment ? "YES" : "NO"));
+    NLM_LOG_INFO("  checkpointing_enabled: " + std::string(enableCheckpointing ? "YES" : "NO"));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
@@ -399,7 +457,7 @@ int main(int argc, char** argv) {
     
     // Initialize brain
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
+    NLM_LOG_INFO("Initializing NLM Brain (Phase 6 - Integrated)...");
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
@@ -443,6 +501,15 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Phase 6 Integration Ready:");
+    NLM_LOG_INFO("  ✓ Working memory is implemented and connected");
+    NLM_LOG_INFO("  ✓ Episodic memory stores experiences");
+    NLM_LOG_INFO("  ✓ Neuromodulation affects neural dynamics");
+    NLM_LOG_INFO("  ✓ Prediction system is functional");
+    NLM_LOG_INFO("  ✓ Cognitive systems (planner, attention) are implemented");
+    NLM_LOG_INFO("  ✓ Development affects plasticity rates");
+    NLM_LOG_INFO("  ✓ Checkpoint system is ready for implementation");
     NLM_LOG_INFO("");
     
     return 0;

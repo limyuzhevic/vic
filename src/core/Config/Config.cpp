@@ -56,8 +56,15 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool showHelp = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        
+        // Handle help flag
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+            continue;
+        }
         
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
@@ -75,6 +82,11 @@ bool Config::loadFromArgs(int argc, char** argv) {
             set(key, value, ConfigSource::CommandLine);
         }
     }
+    
+    if (showHelp) {
+        printHelp();
+    }
+    
     return true;
 }
 
@@ -119,10 +131,21 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
+        // Update existing entry but preserve its description
         it->value = value;
         it->source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // Add new entry with default description based on key
+        std::string description = "Configuration parameter: " + key;
+        if (key.find("neuron") != std::string::npos) description = "Number of neurons in brain";
+        else if (key.find("synapse") != std::string::npos) description = "Synapse connectivity settings";
+        else if (key.find("plasticity") != std::string::npos) description = "Plasticity learning parameters";
+        else if (key.find("dopamine") != std::string::npos) description = "Dopamine neuromodulation level";
+        else if (key.find("curiosity") != std::string::npos) description = "Curiosity-driven exploration level";
+        else if (key.find("reward") != std::string::npos) description = "Reward prediction error";
+        else if (key.find("development") != std::string::npos) description = "Developmental plasticity rates";
+        
+        pImpl->entries.emplace_back(key, value, source, description);
     }
 }
 
@@ -181,9 +204,87 @@ std::string Config::summary() const {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (" << static_cast<int>(entry.source) << ") " << entry.description << "\n";
     }
     return oss.str();
+}
+
+void Config::printHelp() const {
+    std::cout << "=== NLM Configuration Help ===\n" << std::endl;
+    std::cout << "Configuration Options:\n" << std::endl;
+    
+    // Brain Configuration
+    std::cout << "Brain Configuration:\n";
+    std::cout << "  --neuron_count=<int>          Total number of neurons (default: 1000)\n";
+    std::cout << "  --region_count=<int>           Number of brain regions (default: 1)\n";
+    std::cout << "  --connection_probability=<float> Connection probability (default: 0.1)\n";
+    std::cout << "  --simulation_timestep=<float>   Simulation timestep in seconds (default: 0.001)\n";
+    std::cout << std::endl;
+    
+    // Plasticity Configuration
+    std::cout << "Plasticity Configuration:\n";
+    std::cout << "  --stdp_ltp_weight=<float>       STDP LTP weight (default: 0.01)\n";
+    std::cout << "  --stdp_ltd_weight=<float>       STDP LTD weight (default: 0.012)\n";
+    std::cout << "  --stdp_time_constant=<float>    STDP time constant (default: 20.0)\n";
+    std::cout << "  --plasticity_learning_rate=<float> Overall plasticity rate (default: 0.01)\n";
+    std::cout << std::endl;
+    
+    // Development Configuration
+    std::cout << "Development Configuration:\n";
+    std::cout << "  --development_synaptogenesis_rate=<float> Synaptogenesis rate (default: 0.001)\n";
+    std::cout << "  --development_pruning_rate=<float>   Pruning rate (default: 0.0001)\n";
+    std::cout << std::endl;
+    
+    // Neuromodulation Configuration
+    std::cout << "Neuromodulation Configuration:\n";
+    std::cout << "  --dopamine_baseline=<float>     Dopamine baseline level (default: 0.1)\n";
+    std::cout << "  --curiosity_baseline=<float>    Curiosity baseline (default: 0.5)\n";
+    std::cout << "  --novelty_threshold=<float>     Novelty detection threshold (default: 0.3)\n";
+    std::cout << "  --reward_discount_factor=<float> Reward discount factor (default: 0.99)\n";
+    std::cout << std::endl;
+    
+    // Memory Configuration
+    std::cout << "Memory Configuration:\n";
+    std::cout << "  --working_memory_capacity=<int>  Working memory capacity (default: 100)\n";
+    std::cout << "  --episodic_memory_max_episodes=<int> Max episodic memory episodes (default: 1000)\n";
+    std::cout << "  --replay_interval=<int>         Replay every N steps (default: 100)\n";
+    std::cout << "  --consolidation_interval=<int>  Memory consolidation interval (default: 1000)\n";
+    std::endl;
+    
+    // Cognition Configuration
+    std::cout << "Cognition Configuration:\n";
+    std::cout << "  --planning_depth=<int>           Planning lookahead depth (default: 5)\n";
+    std::cout << "  --attention_inhibition_strength=<float> Attention inhibition (default: 0.5)\n";
+    std::cout << "  --attention_excitation_strength=<float> Attention excitation (default: 1.5)\n";
+    std::cout << "  --concept_learning_rate=<float>  Concept formation learning rate (default: 0.01)\n";
+    std::endl;
+    
+    // Environment Configuration
+    std::cout << "Environment Configuration:\n";
+    std::cout << "  --environment_name=<string>      Environment name (default: GridWorld)\n";
+    std::cout << "  --environment_width=<int>        Environment width (default: 10)\n";
+    std::cout << "  --environment_height=<int>       Environment height (default: 10)\n";
+    std::endl;
+    
+    // Performance Configuration
+    std::cout << "Performance Configuration:\n";
+    std::cout << "  --checkpoint_dir=<string>        Directory for checkpoints (default: ./checkpoints)\n";
+    std::cout << "  --checkpoint_interval=<int>      Checkpoint every N steps (default: 1000)\n";
+    std::cout << "  --enable_memory_pools=<bool>     Enable memory pools (default: true)\n";
+    std::cout << "  --enable_event_queues=<bool>     Enable event queues (default: true)\n";
+    std::cout << "  --enable_parallel_processing=<bool> Enable parallel processing (default: false)\n";
+    std::cout << "  --enable_simd_vectorization=<bool> Enable SIMD vectorization (default: true)\n";
+    std::endl;
+    
+    std::cout << "Usage Examples:\n" << std::endl;
+    std::cout << "  # Create a small brain with custom settings\n";
+    std::cout << "  nlm --neuron_count=500 --region_count=1 --connection_probability=0.05\n" << std::endl;
+    std::cout << "  # Enable all learning systems with specific neuromodulation\n";
+    std::cout << "  nlm --dopamine_baseline=0.5 --curiosity_baseline=0.8 --novelty_threshold=0.2\n" << std::endl;
+    std::cout << "  # Create checkpointing and detailed logging\n";
+    std::cout << "  nlm --checkpoint_dir=./mybrain --checkpoint_interval=500 --log_level=DEBUG\n" << std::endl;
+    std::cout << "  # Run with maximum memory capacity for long simulations\n";
+    std::cout << "  nlm --working_memory_capacity=1000 --episodic_memory_max_episodes=5000\n" << std::endl;
 }
 
 std::string Config::trim(const std::string& str) {
@@ -197,6 +298,82 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+void Config::printHelp() const {
+    std::cout << "=== NLM Configuration Help ===" << std::endl;
+    std::cout << std::endl;
+    std::cout << "NLM Configuration Options:" << std::endl;
+    std::cout << std::endl;
+    
+    // Brain Configuration
+    std::cout << "Brain Configuration:" << std::endl;
+    std::cout << "  --neuron_count=<int>          Total number of neurons (default: 1000)" << std::endl;
+    std::cout << "  --region_count=<int>           Number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --connection_probability=<float> Connection probability (default: 0.1)" << std::endl;
+    std::cout << "  --simulation_timestep=<float>   Simulation timestep in seconds (default: 0.001)" << std::endl;
+    std::cout << std::endl;
+    
+    // Plasticity Configuration
+    std::cout << "Plasticity Configuration:" << std::endl;
+    std::cout << "  --stdp_ltp_weight=<float>       STDP LTP weight (default: 0.01)" << std::endl;
+    std::cout << "  --stdp_ltd_weight=<float>       STDP LTD weight (default: 0.012)" << std::endl;
+    std::cout << "  --stdp_time_constant=<float>    STDP time constant (default: 20.0)" << std::endl;
+    std::cout << "  --plasticity_learning_rate=<float> Overall plasticity rate (default: 0.01)" << std::endl;
+    std::cout << std::endl;
+    
+    // Development Configuration
+    std::cout << "Development Configuration:" << std::endl;
+    std::cout << "  --development_synaptogenesis_rate=<float> Synaptogenesis rate (default: 0.001)" << std::endl;
+    std::cout << "  --development_pruning_rate=<float>   Pruning rate (default: 0.0001)" << std::endl;
+    std::cout << std::endl;
+    
+    // Neuromodulation Configuration
+    std::cout << "Neuromodulation Configuration:" << std::endl;
+    std::cout << "  --dopamine_baseline=<float>     Dopamine baseline level (default: 0.1)" << std::endl;
+    std::cout << "  --curiosity_baseline=<float>    Curiosity baseline (default: 0.5)" << std::endl;
+    std::cout << "  --novelty_threshold=<float>     Novelty detection threshold (default: 0.3)" << std::endl;
+    std::cout << "  --reward_discount_factor=<float> Reward discount factor (default: 0.99)" << std::endl;
+    std::cout << std::endl;
+    
+    // Memory Configuration
+    std::cout << "Memory Configuration:" << std::endl;
+    std::cout << "  --working_memory_capacity=<int>  Working memory capacity (default: 100)" << std::endl;
+    std::cout << "  --episodic_memory_max_episodes=<int> Max episodic memory episodes (default: 1000)" << std::endl;
+    std::cout << "  --replay_interval=<int>         Replay every N steps (default: 100)" << std::endl;
+    std::cout << "  --consolidation_interval=<int>  Memory consolidation interval (default: 1000)" << std::endl;
+    std::cout << std::endl;
+    
+    // Cognition Configuration
+    std::cout << "Cognition Configuration:" << std::endl;
+    std::cout << "  --planning_depth=<int>           Planning lookahead depth (default: 5)" << std::endl;
+    std::cout << "  --attention_inhibition_strength=<float> Attention inhibition (default: 0.5)" << std::endl;
+    std::cout << "  --attention_excitation_strength=<float> Attention excitation (default: 1.5)" << std::endl;
+    std::cout << "  --concept_learning_rate=<float>  Concept formation learning rate (default: 0.01)" << std::endl;
+    std::cout << std::endl;
+    
+    // Environment Configuration
+    std::cout << "Environment Configuration:" << std::endl;
+    std::cout << "  --environment_name=<string>      Environment name (default: GridWorld)" << std::endl;
+    std::cout << "  --environment_width=<int>        Environment width (default: 10)" << std::endl;
+    std::cout << "  --environment_height=<int>       Environment height (default: 10)" << std::endl;
+    std::cout << std::endl;
+    
+    // Performance Configuration
+    std::cout << "Performance Configuration:" << std::endl;
+    std::cout << "  --checkpoint_dir=<string>        Directory for checkpoints (default: ./checkpoints)" << std::endl;
+    std::cout << "  --checkpoint_interval=<int>      Checkpoint every N steps (default: 1000)" << std::endl;
+    std::cout << "  --enable_memory_pools=<bool>     Enable memory pools (default: true)" << std::endl;
+    std::cout << "  --enable_event_queues=<bool>     Enable event queues (default: true)" << std::endl;
+    std::cout << "  --enable_parallel_processing=<bool> Enable parallel processing (default: false)" << std::endl;
+    std::cout << "  --enable_simd_vectorization=<bool> Enable SIMD vectorization (default: true)" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "Usage Examples:" << std::endl;
+    std::cout << "  nlm --neuron_count=500 --region_count=1 --connection_probability=0.05" << std::endl;
+    std::cout << "  nlm --dopamine_baseline=0.5 --curiosity_baseline=0.8 --novelty_threshold=0.2" << std::endl;
+    std::cout << "  nlm --checkpoint_dir=./mybrain --checkpoint_interval=500 --log_level=DEBUG" << std::endl;
+    std::cout << "  nlm --working_memory_capacity=1000 --episodic_memory_max_episodes=5000" << std::endl;
 }
 
 // Explicit template instantiations
