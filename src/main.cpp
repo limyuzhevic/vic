@@ -407,20 +407,22 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    brain->logStatus();
-    
+brain->logStatus();
+
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
-    // Reset brain for plasticity experiment
-    brain->reset();
+    // Reset brain for plasticity experiment (create new brain instance for clean state)
+    brain.reset();
+    brain = std::make_shared<Brain>(config);
     brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
+    // Reset and run Test 3: STDP verification (create new brain instance for clean state)
+    brain.reset();
+    brain = std::make_shared<Brain>(config);
     brain->initialize();
     runStdpVerification(brain);
     
@@ -444,6 +446,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
+    
+    // Release brain memory and cleanup
+    brain.reset();
+    config.reset();
     
     return 0;
 }
