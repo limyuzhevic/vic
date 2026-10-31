@@ -21,7 +21,7 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
-class PredictionSystem;
+class NeuralPrediction;
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;

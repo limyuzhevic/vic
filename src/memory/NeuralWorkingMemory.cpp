@@ -21,7 +21,7 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     : pImpl(new Impl)
     , brain_(nullptr)
     , capacity_(100)
-    , decayRate_(0.01f)
+    , decayRate_(0.0001f)
 {
 }
 

@@ -12,7 +12,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
+#include "../prediction/NeuralPrediction.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
@@ -37,7 +37,7 @@ struct Brain::Impl {
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<NeuralPrediction> predictionSystem;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
@@ -285,7 +285,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -548,6 +548,8 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // leak — below the ~15 mV spike gap, so a neuron must integrate
     // over several steps to fire instead of firing every cycle.
     if (currentStep > 0 && currentStep % 100 == 0) {
+        // Log homeostatic scaling activity
+        NLM_LOG_INFO("Homeostatic synaptic scaling at step " + std::to_string(currentStep));
         constexpr float kIncomingExcitatoryCap = 3.0f;
         for (auto& region : pImpl->regions) {
             for (auto* neuron : region->getAllNeurons()) {
@@ -560,6 +562,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     float scale = kIncomingExcitatoryCap / sum;
                     for (Synapse* syn : incoming) {
                         if (syn->getWeight() > 0.0f) {
+                            // Log scaling for synapses that exceed the cap
+                            NLM_LOG_INFO("Scaling synapse from " + std::to_string(syn->getWeight()) + 
+                                       " to " + std::to_string(syn->getWeight() * scale));
                             syn->setWeight(syn->getWeight() * scale);
                         }
                     }
@@ -568,9 +573,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
 
-    // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+// ========== STEP 7: Update episodic memory ==========
+     pImpl->stepsSinceLastEpisode++;
+if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
@@ -596,87 +601,130 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            pImpl->episodicMemory->storeEpisode(episode);
+// Log episode storage with statistics and error handling
+             try {
+                 NLM_LOG_INFO("Storing episodic memory at step " + std::to_string(currentStep) +
+                             " with " + std::to_string(episode.activeNeurons.size()) +
+                             " active neurons, reward: " + std::to_string(episode.reward));
+             } catch (const std::exception& e) {
+                 NLM_LOG_ERROR(std::string("Failed to log episodic memory at step " + std::to_string(currentStep) + ": ") + e.what());
+             }
+             
+             pImpl->episodicMemory->storeEpisode(episode);
+             
+             // Log successful episode storage
+             try {
+                 NLM_LOG_INFO("Successfully stored episodic memory with " + std::to_string(episode.activeNeurons.size()) + " neurons");
+             } catch (const std::exception& e) {
+                 NLM_LOG_ERROR(std::string("Failed to confirm episodic memory storage at step " + std::to_string(currentStep) + ": ") + e.what());
+             }
         }
     }
-    
-    // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
-    }
-    
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
-        
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
-        }
-    }
-    
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
-    }
-    
-    // ========== STEP 12: Replay important memories ==========
-    if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
-        // Get episodes for replay
-        auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
-        }
-    }
-    
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
-        
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity.get();
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
-        }
-    }
-    
-    // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
-    }
-    
-    // ========== STEP 15: Checkpoint management ==========
-    if (pImpl->checkpointManager) {
-        pImpl->checkpointManager->update(currentStep, currentTime);
-    }
+     
+     // ========== STEP 7.5: Update prediction system ==========
+     if (pImpl->predictionSystem) {
+         // Integrate NeuralPrediction system with sensory observations
+         // The prediction system generates predictions and computes prediction errors
+         // These signals are used for neuromodulation and learning
+         
+         // Record current sensory state for prediction learning
+         // For now, we'll use a placeholder implementation that can be expanded
+         // The actual implementation should access sensory observations from the environment
+         
+         // Generate predictions based on learned sequences
+         // std::vector<float> prediction = pImpl->predictionSystem->generatePrediction(currentStep);
+         
+         // Update predictions with actual observations and get prediction error
+         // float predictionError = pImpl->predictionSystem->updateWithObservation(sensoryState, currentStep);
+         
+         // Use prediction error as neuromodulatory signal
+         // float predictionError = pImpl->predictionSystem->updateWithObservation(actualState, currentStep);
+         // if (predictionError > 0.5f) {
+         //     // High prediction error -> increase novelty and curiosity
+         //     // This will enhance learning and exploration
+         // }
+     }
+     
+// ========== STEP 8: Update attention system ==========
+     if (pImpl->attention) {
+         pImpl->attention->update(pImpl->timestep);
+         
+         // Apply attention to working memory winners
+         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+             pImpl->attention->processCompetition(competitors);
+         }
+     }
+     
+     // ========== STEP 9: Update concept formation ==========
+     if (pImpl->conceptFormation) {
+         // Process current neural activity patterns to form concepts
+         // This requires sensory state encoding
+         
+         // Concept formation integrates with prediction system
+         // to learn abstract representations of sensory patterns
+         // and their relationships
+         
+         // The concept formation system uses neural predictions
+         // to identify recurring patterns and form abstract concepts
+         // std::vector<float> currentSensoryState = ...; // Get from sensory input
+         // pImpl->conceptFormation->update(currentSensoryState, currentStep);
+     }
+     
+// ========== STEP 10: Apply structural plasticity periodically ==========
+     if (currentStep % 100 == 0) {
+         pImpl->structuralPlasticity->update(this, *pImpl->rng);
+     }
+     
+     // ========== STEP 11: Replay important memories ==========
+     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
+         // Get episodes for replay
+         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
+         for (const auto* episode : episodesToReplay) {
+             pImpl->episodicMemory->replayEpisode(episode);
+         }
+     }
+     
+     // ========== STEP 12: Apply development effects ==========
+     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
+         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+         
+         // Development affects plasticity rates
+         auto* sp = pImpl->structuralPlasticity.get();
+         if (sp) {
+             DevelopmentalStage stage = pImpl->developmentalStage;
+             float plasticityMod = 1.0f;
+             
+             switch (stage) {
+                 case DevelopmentalStage::Initial:
+                     plasticityMod = 1.0f;  // High plasticity
+                     break;
+                 case DevelopmentalStage::CriticalPeriod:
+                     plasticityMod = 0.8f;
+                     break;
+                 case DevelopmentalStage::Maturation:
+                     plasticityMod = 0.5f;
+                     break;
+                 case DevelopmentalStage::Adult:
+                     plasticityMod = 0.2f;  // Stable
+                     break;
+             }
+             
+             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
+             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+         }
+     }
+     
+     // ========== STEP 13: Periodic memory consolidation ==========
+     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+         // Consolidate important memories, remove weak ones
+         pImpl->episodicMemory->consolidate(0.3f);
+     }
+     
+     // ========== STEP 14: Checkpoint management ==========
+     if (pImpl->checkpointManager) {
+         pImpl->checkpointManager->update(currentStep, currentTime);
+     }
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -1473,7 +1521,7 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
+NeuralPrediction* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 

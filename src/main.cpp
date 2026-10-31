@@ -316,6 +316,7 @@ int main(int argc, char** argv) {
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
     logger->addLogger(consoleLogger);
+    logger->addLogger(std::make_shared<FileLogger>("nlm.log", LogLevel::Info));
     Logger::setGlobal(logger);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
