@@ -19,14 +19,40 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+#include <algorithm>
 
 using namespace nlm;
+
+void printUsage(const std::string& programName) {
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "NLM - Neural Learning Machine Phase 2 Demo" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config=file      Load configuration from JSON/YAML/legacy file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  -c file            Same as --config" << std::endl;
+    std::cout << "  --neuron-count=N   Number of neurons in the brain" << std::endl;
+    std::cout << "  --region-count=N   Number of brain regions" << std::endl;
+    std::cout << "  --random-seed=N    Random seed for reproducible experiments" << std::endl;
+    std::cout << "  --timestep=T       Simulation timestep in seconds" << std::endl;
+    std::cout << "  --connection-prob=P Probability of synaptic connections" << std::endl;
+    std::cout << "  --stdp-enable      Enable STDP plasticity" << std::endl;
+    std::cout << "  --hebbian-enable   Enable Hebbian plasticity" << std::endl;
+    std::cout << "  --structural-enable Enable structural plasticity" << std::endl;
+    std::cout << "  --reward-enable    Enable reward-based modulation" << std::endl;
+    std::cout << "  --curiosity-enable Enable curiosity-driven exploration" << std::endl;
+    std::cout << "  --novelty-enable   Enable novelty detection" << std::endl;
+    std::cout << "  --stdp-ltp=W       STDP LTP weight" << std::endl;
+    std::cout << "  --stdp-ltd=W       STDP LTD weight" << std::endl;
+    std::cout << "  --stdp-tau=T       STDP time constant" << std::endl;
+    std::cout << "  --synaptogenesis=R Synaptogenesis rate" << std::endl;
+    std::cout << "  --pruning=R       Pruning rate" << std::endl;
+    std::cout << "  --help             Show this help message" << std::endl;
+    std::cout << "  --version          Show version information" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Example:" << std::endl;
+    std::cout << "  " << programName << " --neuron-count=2000 --random-seed=12345 --stdp-enable --reward-enable" << std::endl;
+}
 
 void printBanner() {
     std::cout << R"(
@@ -39,13 +65,44 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics          ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity rules                        ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printUsage(const std::string& programName) {
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "NLM - Neural Learning Machine Phase 2 Demo" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --config=file      Load configuration from JSON/YAML/legacy file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  -c file            Same as --config" << std::endl;
+    std::cout << "  --neuron-count=N   Number of neurons in the brain" << std::endl;
+    std::cout << "  --region-count=N   Number of brain regions" << std::endl;
+    std::cout << "  --random-seed=N    Random seed for reproducible experiments" << std::endl;
+    std::cout << "  --timestep=T       Simulation timestep in seconds" << std::endl;
+    std::cout << "  --connection-prob=P Probability of synaptic connections" << std::endl;
+    std::cout << "  --stdp-enable      Enable STDP plasticity" << std::endl;
+    std::cout << "  --hebbian-enable   Enable Hebbian plasticity" << std::endl;
+    std::cout << "  --structural-enable Enable structural plasticity" << std::endl;
+    std::cout << "  --reward-enable    Enable reward-based modulation" << std::endl;
+    std::cout << "  --curiosity-enable Enable curiosity-driven exploration" << std::endl;
+    std::cout << "  --novelty-enable   Enable novelty detection" << std::endl;
+    std::cout << "  --stdp-ltp=W       STDP LTP weight" << std::endl;
+    std::cout << "  --stdp-ltd=W       STDP LTD weight" << std::endl;
+    std::cout << "  --stdp-tau=T       STDP time constant" << std::endl;
+    std::cout << "  --synaptogenesis=R Synaptogenesis rate" << std::endl;
+    std::cout << "  --pruning=R       Pruning rate" << std::endl;
+    std::cout << "  --help             Show this help message" << std::endl;
+    std::cout << "  --version          Show version information" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Example:" << std::endl;
+    std::cout << "  " << programName << " --neuron-count=2000 --random-seed=12345 --stdp-enable --reward-enable" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience

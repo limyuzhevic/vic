@@ -145,21 +145,33 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON, YAML, or legacy key=value file")
         .def("loadFromArgs", [](Config& self, int argc, char** argv) {
             return self.loadFromArgs(argc, argv);
         }, py::arg("argc"), py::arg("argv"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("hasNested", &Config::has, py::arg("key"),
+             "Check if a configuration key exists (supports nested keys)")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("getKeysWithPrefix", &Config::getKeys, py::arg("prefix"),
+             "Get all configuration keys with optional prefix filter")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = 0,
+             "Set configuration value (supports nested keys)")
+        .def("setNested", &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = 0,
+             "Set configuration value (supports nested keys)")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key (supports nested keys)")
+        .def("removeNested", &Config::remove, py::arg("key"),
+             "Remove configuration key (supports nested keys)")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -415,6 +427,62 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Advanced convenience functions for power users
+    m.def("loadConfigFromJSON", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (config->loadFromFile(filepath)) {
+            return config;
+        }
+        return nullptr;
+    }, py::arg("filepath"), "Load configuration from JSON file");
+
+    m.def("loadConfigFromYAML", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (config->loadFromFile(filepath)) {
+            return config;
+        }
+        return nullptr;
+    }, py::arg("filepath"), "Load configuration from YAML file");
+
+    m.def("loadConfigFromLegacy", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (config->loadFromFile(filepath)) {
+            return config;
+        }
+        return nullptr;
+    }, py::arg("filepath"), "Load configuration from legacy key=value file");
+
+    m.def("createCompleteSetup", [](int neuronCount = 1000, int regionCount = 1) -> std::tuple<std::shared_ptr<Config>, std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", neuronCount);
+        config->set("brain.region_count", regionCount);
+        config->set("random_seed", 42);
+        
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        return std::make_tuple(config, brain, world, agent);
+    }, py::arg("neuronCount") = 1000, py::arg("regionCount") = 1,
+        "Create a complete setup with default configuration");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
