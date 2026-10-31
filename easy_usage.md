@@ -1,5 +1,9 @@
 # NLM - Easy Usage Guide for Beginners
 
+**Note:** Python bindings are now built by default! The `pynlm` module is available out of the box.
+
+---
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!

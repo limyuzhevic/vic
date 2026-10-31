@@ -86,13 +86,17 @@ pip install .
 pip install -e .
 ```
 
-> Phase 5 note: `pip install .` now genuinely builds `pynlm` (verified:
+> Phase 5 fix: `pip install .` now genuinely builds `pynlm` (verified:
 > fresh venv, `pip install .`, then `import pynlm` and the easy_usage
 > Example 1 flow run). Previously the root CMakeLists never built the
-> module, so `pip install .` succeeded yet `import pynlm` failed. A
-> plain C++ `cmake` build still does NOT include pynlm unless you pass
-> `-DNLM_BUILD_PYTHON_BINDINGS=ON` (and have pybind11 installed); the
-> standalone `cmake -S python -B build` route also still works.
+> module, so `pip install .` succeeded yet `import pynlm` failed.
+>
+> **Fixed**: The `NLM_BUILD_PYTHON_BINDINGS` option is now ON by default in
+> root CMakeLists.txt, so `pip install .` now includes the pynlm module.
+> A plain C++ `cmake` build still does NOT include pynlm (to keep C++ builds
+> independent of Python), so if you want pynlm in a C++ build, you still need
+> `-DNLM_BUILD_PYTHON_BINDINGS=ON` (and have pybind11 installed). The standalone
+> `cmake -S python -B build` route still works.
 
 ### Using pyproject.toml (Modern Python Packaging)
 

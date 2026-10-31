@@ -75,6 +75,12 @@ set(NLM_WORLD_SOURCES
     ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp
 )
 
+# Note: This python/CMakeLists.txt is a standalone build system for Python bindings.
+# It defines its own nlm_core/nlm_agent/nlm_world targets as static libraries.
+# The root CMakeLists.txt now builds Python bindings by default (NLM_BUILD_PYTHON_BINDINGS=ON),
+# so this standalone build is optional and only needed if you want to build Python bindings
+# independently of the main NLM build.
+
 add_library(nlm_core STATIC ${NLM_CORE_SOURCES})
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../src>

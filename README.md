@@ -91,6 +91,8 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+**Python bindings are now built by default** (previously required `-DNLM_BUILD_PYTHON_BINDINGS=ON`).
+
 ## Running
 Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
