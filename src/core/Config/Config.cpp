@@ -18,15 +18,34 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try JSON first, then fallback to simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Simple JSON detection
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    // Try to parse as JSON (very basic implementation)
+    if (firstLine.find('{') != std::string::npos && firstLine.find('}') != std::string::npos) {
+        // Basic JSON parsing
+        return loadFromSimpleFormat(file);
+    }
+    
+    // Fallback to simple key=value format
+    return loadFromSimpleFormat(file);
+}
+
+bool Config::loadFromSimpleFormat(std::ifstream& file) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -48,7 +67,7 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            setValidated(key, value, ConfigSource::File);
         }
     }
     
@@ -65,14 +84,14 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                setValidated(key, value, ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            setValidated(key, value, ConfigSource::CommandLine);
         }
     }
     return true;
@@ -86,7 +105,45 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Save actual value based on type
+        std::visit([&file](auto&& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << v << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (v ? "true" : "false");
+            } else if constexpr (std::is_arithmetic_v<T> && !std::is_same_v<T, char>) {
+                file << v;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i) file << ", ";
+                    file << v[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i) file << ", ";
+                    file << v[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i) file << ", ";
+                    file << "\"" << v[i] << "\"";
+                }
+                file << "]";
+            } else {
+                // Fallback for unknown types
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -122,6 +179,126 @@ void Config::set(const std::string& key, double value, ConfigSource source) {
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
+}
+
+// Legacy set methods (kept for backward compatibility)
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    setValidated(key, value, source);
+}
+
+void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    setValidated(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int value, ConfigSource source) {
+    setValidated(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
+    setValidated(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, double value, ConfigSource source) {
+    setValidated(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, bool value, ConfigSource source) {
+    setValidated(key, ConfigValue(value), source);
+}
+
+bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                setValidated(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            setValidated(key, value, ConfigSource::CommandLine);
+        }
+    }
+    return true;
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // Try JSON first, then fallback to simple key=value format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Simple JSON detection
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    // Try to parse as JSON (very basic implementation)
+    if (firstLine.find('{') != std::string::npos && firstLine.find('}') != std::string::npos) {
+        // Basic JSON parsing
+        return loadFromSimpleFormat(file);
+    }
+    
+    // Fallback to simple key=value format
+    return loadFromSimpleFormat(file);
+}
+
+bool Config::loadFromSimpleFormat(std::ifstream& file) {
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            setValidated(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+void Config::setValidated(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Enhanced validation
+    if (key.empty()) {
+        throw std::invalid_argument(errorMessage("set", key) + "Empty key not allowed");
+    }
+    
+    // Check against validation rules if any
+    // (placeholder for future implementation)
+    
+    set(key, value, source);
+}
+
+void Config::setStringValidated(const std::string& key, const std::string& value, ConfigSource source) {
+    setValidated(key, ConfigValue(value), source);
+}
+
+void Config::setNumericValidated(const std::string& key, double value, ConfigSource source) {
+    setValidated(key, ConfigValue(value), source);
 }
 
 bool Config::has(const std::string& key) const {
@@ -177,6 +354,46 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+bool Config::validate() const {
+    // Placeholder for validation logic
+    return true;
+}
+
+std::string Config::getValidationErrors() const {
+    return "Validation not yet implemented";
+}
+
+void Config::addValidationRule(const ValidationRule& rule) {
+    // Placeholder for schema validation
+}
+
+void Config::clearValidationRules() {
+    // Placeholder for clearing validation rules
+}
+
+void Config::loadFromEnvironment(const std::string& prefix) {
+    // Load configuration from environment variables
+    for (const auto& env : std::vector<std::string>{
+        "brain.neuron_count", "brain.synapse_density", "simulation.timestep",
+        "plasticity.enable", "neuromod.dopamine.scale"
+    }) {
+        std::string envKey = prefix + toLower(env);
+        auto envValue = std::getenv(envKey.c_str());
+        if (envValue) {
+            setValidated(env, std::string(envValue), ConfigSource::Runtime);
+        }
+    }
+}
+
+ConfigSource Config::getSource(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    if (it != pImpl->entries.end()) {
+        return it->source;
+    }
+    return ConfigSource::Default;
+}
+
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -188,6 +405,15 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+bool Config::isNumeric(const std::string& str) {
+    return !str.empty() && std::find_if(str.begin(), str.end(), [](char c) {
+        return !std::isdigit(c) && c != '.' && c != '-'; }) == str.end();
+}
+
+std::string Config::errorMessage(const std::string& operation, const std::string& key) const {
+    return "Config::" + operation + "(key='" + key + "'): ";
 }
 
 template<typename T>

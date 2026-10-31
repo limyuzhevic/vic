@@ -56,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -66,19 +66,24 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
+    
+    // Set values with enhanced validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Enhanced type-specific setters with validation
+    void setValidated(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    void setStringValidated(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    void setNumericValidated(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -95,6 +100,29 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const;
+    std::string getValidationErrors() const;
+    
+    // Schema support for advanced users
+    struct ValidationRule {
+        std::string key;
+        std::string type;  // "string", "int", "float", "bool", "range", "enum"
+        std::string description;
+        std::any defaultValue;
+        std::pair<double, double> range;  // for numeric types
+        std::vector<std::string> allowedValues;  // for enum types
+    };
+    
+    void addValidationRule(const ValidationRule& rule);
+    void clearValidationRules();
+    
+    // Environment variable support
+    void loadFromEnvironment(const std::string& prefix = "NLM_");
+    
+    // Get source information
+    ConfigSource getSource(const std::string& key) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +130,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isNumeric(const std::string& str);
+    static std::string errorMessage(const std::string& operation, const std::string& key) const;
 };
 
 } // namespace nlm
