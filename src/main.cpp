@@ -48,6 +48,29 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printHelp() {
+    std::cout << "Usage: nlm [OPTIONS]" << std::endl;
+    std::cout << "       Run the NLM Phase 2 Real Neural Computation simulation." << std::endl << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help                    Display this help message and exit." << std::endl;
+    std::cout << "  --config <file>           Load configuration from specified file." << std::endl;
+    std::cout << "                            (Default: configs/default.cfg)" << std::endl;
+    std::cout << "  --neuron-count <n>        Set number of neurons (default: 500)." << std::endl;
+    std::cout << "  --region-count <n>        Set number of brain regions (default: 1)." << std::endl;
+    std::cout << "  --timestep <float>        Set simulation timestep in seconds (default: 0.001)." << std::endl;
+    std::cout << "  --seed <n>                Set random seed for reproducible results (default: 42)." << std::endl << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --help                 Show this help message" << std::endl;
+    std::cout << "  nlm --config my_config.cfg  Load custom configuration" << std::endl;
+    std::cout << "  nlm --neuron-count 1000 --region-count 2  Override default settings" << std::endl << std::endl;
+    std::cout << "The executable runs three neural computation tests:" << std::endl;
+    std::cout << "  1. Basic connectivity test - verifies signal propagation" << std::endl;
+    std::cout << "  2. Plasticity learning experiment - demonstrates synaptic adaptation" << std::endl;
+    std::cout << "  3. STDP verification - confirms spike timing dependent plasticity" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "For more information, visit: https://github.com/NLM-project" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -322,6 +345,85 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Parse command-line arguments
+    std::string configFile = "configs/default.cfg";
+    int64_t neuronCount = 500;
+    int64_t regionCount = 1;
+    double timestep = 0.001;
+    int64_t seed = 42;
+    bool showHelp = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --help flag
+        if (arg == "--help") {
+            showHelp = true;
+        }
+        // Handle --config parameter
+        else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+        // Handle other parameters
+        else if (arg.substr(0, 13) == "--neuron-count") {
+            if (arg.find('=') != std::string::npos) {
+                neuronCount = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                neuronCount = std::stoll(argv[++i]);
+            }
+        }
+        else if (arg.substr(0, 12) == "--region-count") {
+            if (arg.find('=') != std::string::npos) {
+                regionCount = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                regionCount = std::stoll(argv[++i]);
+            }
+        }
+        else if (arg.substr(0, 10) == "--timestep") {
+            if (arg.find('=') != std::string::npos) {
+                timestep = std::stod(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                timestep = std::stod(argv[++i]);
+            }
+        }
+        else if (arg.substr(0, 9) == "--seed") {
+            if (arg.find('=') != std::string::npos) {
+                seed = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                seed = std::stoll(argv[++i]);
+            }
+        }
+    }
+    
+    // Print help and exit if requested
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    // Validate arguments
+    if (neuronCount <= 0) {
+        std::cerr << "Error: Invalid neuron count. Must be positive. Received: " << neuronCount << std::endl;
+        printHelp();
+        return 1;
+    }
+    
+    if (regionCount <= 0) {
+        std::cerr << "Error: Invalid region count. Must be positive. Received: " << regionCount << std::endl;
+        printHelp();
+        return 1;
+    }
+    
+    if (timestep <= 0.0) {
+        std::cerr << "Error: Invalid timestep. Must be positive. Received: " << timestep << std::endl;
+        printHelp();
+        return 1;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -343,34 +445,29 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
+    // Load config from file with enhanced error handling
+    bool configLoaded = false;
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        configLoaded = true;
     } else {
+        NLM_LOG_WARNING("Configuration file not found or could not be loaded: " + configFile);
         NLM_LOG_INFO("Using default configuration.");
+        
+        // Provide more helpful error information
+        std::cerr << "Warning: Configuration file '" << configFile << "' not found or is invalid." << std::endl;
+        std::cerr << "        Using default configuration instead." << std::endl;
+        std::cerr << "        Check that the file exists and is readable." << std::endl;
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("random_seed", seed, ConfigSource::CommandLine);
+    config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+    config->set("neuron_count", neuronCount, ConfigSource::CommandLine);
+    config->set("region_count", regionCount, ConfigSource::CommandLine);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
     // STDP parameters
@@ -382,7 +479,7 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    // Log configuration summary with validation
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
@@ -392,8 +489,12 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
+    // Initialize simulation clock with validation
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        std::cerr << "Error: Invalid simulation timestep in configuration. Must be positive. Received: " << timestep << std::endl;
+        return 1;
+    }
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
