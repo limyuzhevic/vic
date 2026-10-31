@@ -24,11 +24,12 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Random/Random.cpp
     ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
     ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
+    ${NLM_SOURCE_DIR}/core/OptimizedCore.hpp
     ${NLM_SOURCE_DIR}/brain/Neuron.cpp
     ${NLM_SOURCE_DIR}/brain/Synapse.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
     ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp
-    ${NLM_SOURCE_DIR}/brain/Brain.cpp
+    ${NLM_SOURCE_DIR}/brain/BrainOptimized.cpp
     ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
     ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
     ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
@@ -68,7 +69,11 @@ set(NLM_CORE_SOURCES
 
 set(NLM_AGENT_SOURCES
     ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
-    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrainCore.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrainSensory.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrainMotor.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrainLearning.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrainDevelopment.cpp
 )
 
 set(NLM_WORLD_SOURCES

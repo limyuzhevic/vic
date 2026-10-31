@@ -29,12 +29,12 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain (optimized with memory management improvements)
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
+    src/brain/BrainOptimized.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -89,10 +89,19 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Add optimized core components as source files
+target_sources(nlm_core PRIVATE
+    src/core/OptimizedCore.hpp
+)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+    src/agent/AgentBrainCore.cpp
+    src/agent/AgentBrainSensory.cpp
+    src/agent/AgentBrainMotor.cpp
+    src/agent/AgentBrainLearning.cpp
+    src/agent/AgentBrainDevelopment.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
@@ -195,6 +204,11 @@ endif()
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Add Phase 6 integration test
+add_executable(test_phase6_integration tests/test_phase6_integration.cpp)
+target_link_libraries(test_phase6_integration PUBLIC nlm_core nlm_agent nlm_world)
+add_test(NAME Phase6IntegrationTest COMMAND test_phase6_integration)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
