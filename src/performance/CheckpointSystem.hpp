@@ -298,6 +298,16 @@ public:
      * without them a reload cannot continue the saved trajectory.
      */
     bool writeDelayedSpikes(const std::vector<DelayedSpikeEvent>& events);
+
+    /**
+     * Phase 5: buffer an extra raw section, written at finalize()
+     * after SpikeHistory and before End. Used by Brain::save for the
+     * SimulationState (spike counters, learned preference), RandomState
+     * (RNG engine state), Plasticity (per-synapse spike histories) and
+     * Memory (working + episodic) sections. Absent sections are
+     * tolerated on load (legacy checkpoints), so old files still load.
+     */
+    bool bufferSection(CheckpointSection sectionType, const std::vector<uint8_t>& payload);
     
     /**
      * Write raw section data
@@ -336,6 +346,8 @@ private:
     std::vector<uint8_t> neuronPayload_;
     std::vector<uint8_t> synapsePayload_;
     std::vector<uint8_t> delayedSpikePayload_;
+    // Phase 5 extra sections, in the fixed write order used by finalize().
+    std::vector<std::pair<CheckpointSection, std::vector<uint8_t>>> extraPayloads_;
 };
 
 /**

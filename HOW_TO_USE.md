@@ -75,7 +75,8 @@ make install
 ### From Source (Recommended for Development)
 
 ```bash
-# Install build dependencies
+# Install build dependencies (use a venv on PEP 668 systems, where
+# system pip refuses to install packages)
 pip install pybind11 scikit-build-core pytest numpy
 
 # Build and install
@@ -84,6 +85,14 @@ pip install .
 # Or install in development mode
 pip install -e .
 ```
+
+> Phase 5 note: `pip install .` now genuinely builds `pynlm` (verified:
+> fresh venv, `pip install .`, then `import pynlm` and the easy_usage
+> Example 1 flow run). Previously the root CMakeLists never built the
+> module, so `pip install .` succeeded yet `import pynlm` failed. A
+> plain C++ `cmake` build still does NOT include pynlm unless you pass
+> `-DNLM_BUILD_PYTHON_BINDINGS=ON` (and have pybind11 installed); the
+> standalone `cmake -S python -B build` route also still works.
 
 ### Using pyproject.toml (Modern Python Packaging)
 

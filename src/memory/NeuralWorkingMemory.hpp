@@ -51,6 +51,26 @@ public:
     // Get number of active memory traces
     size_t getActiveTraces() const { return activeTraces_.size(); }
 
+    // Phase 5 checkpoint support: the stored neurons/activations are
+    // the actual working-memory content (activeTraces_ is only cleared
+    // in this codebase and never populated by the closed loop, so the
+    // neuron count — not getActiveTraces() — is the honest measure of
+    // working-memory content). Snapshot/restore round-trip the full
+    // stored content; recurrent maintenance connections are rebuilt
+    // by update(), not stored.
+    size_t getMemoryNeuronCount() const { return memoryNeurons_.size(); }
+    const std::vector<float>& getMemoryActivations() const { return memoryActivations_; }
+    const std::vector<SimulationStep>& getMemoryTimestamps() const { return memoryTimestamps_; }
+    void restoreSnapshot(const std::vector<NeuronId>& neurons,
+                         const std::vector<float>& activations,
+                         const std::vector<SimulationStep>& timestamps) {
+        size_t n = std::min({neurons.size(), activations.size(), timestamps.size()});
+        memoryNeurons_.assign(neurons.begin(), neurons.begin() + static_cast<std::ptrdiff_t>(n));
+        memoryActivations_.assign(activations.begin(), activations.begin() + static_cast<std::ptrdiff_t>(n));
+        memoryTimestamps_.assign(timestamps.begin(), timestamps.begin() + static_cast<std::ptrdiff_t>(n));
+        activeTraces_.clear();
+    }
+
     // Get capacity
     size_t getCapacity() const { return capacity_; }
     void setCapacity(size_t cap) { capacity_ = cap; }

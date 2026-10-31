@@ -102,6 +102,16 @@ public:
 
     // Get total number of episodes
     size_t getEpisodeCount() const { return episodes_.size(); }
+
+    // Phase 5 checkpoint support: full episode list for snapshot, and
+    // restore that clears then re-stores (storeEpisode caps at
+    // maxEpisodes_, so a snapshot larger than the cap is truncated
+    // the same way live storage would be).
+    const std::deque<EpisodicMemoryItem>& getEpisodes() const { return episodes_; }
+    void restoreEpisodes(const std::vector<EpisodicMemoryItem>& episodes) {
+        clear();
+        for (const auto& ep : episodes) storeEpisode(ep);
+    }
     void setMaxEpisodes(size_t n) { maxEpisodes_ = n; }
 
     // Get recent episodes

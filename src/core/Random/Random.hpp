@@ -33,6 +33,15 @@ public:
     // Seed operations
     void seed(uint64_t seed);
     uint64_t getSeed() const;
+
+    // Phase 5 checkpoint support: serialize the full mt19937_64 engine
+    // state (not just the seed — reseeding would replay the whole
+    // random sequence from the start, so a reloaded brain would repeat
+    // its earlier random choices). The format is the standard library
+    // stream format for mt19937_64; restoreState returns false on a
+    // parse failure and leaves the generator untouched.
+    std::string serializeState() const;
+    bool restoreState(const std::string& state);
     
     // Random number generation
     // Uniform integer in [min, max]

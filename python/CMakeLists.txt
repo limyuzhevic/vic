@@ -4,6 +4,10 @@ project(pynlm_bindings LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+# Phase 5 fix: the module is a shared library, so the static NLM libs
+# it links must be position-independent, or the link fails with
+# "recompile with -fPIC".
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -52,6 +56,8 @@ set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/prediction/PredictionSystem.cpp
     ${NLM_SOURCE_DIR}/prediction/NeuralPrediction.cpp
     ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
+    ${NLM_SOURCE_DIR}/motor/Action.cpp
+    ${NLM_SOURCE_DIR}/performance/CheckpointSystem.cpp
     ${NLM_SOURCE_DIR}/environment/Environment.cpp
     ${NLM_SOURCE_DIR}/environment/Observation.cpp
     ${NLM_SOURCE_DIR}/experiments/Experiment.cpp

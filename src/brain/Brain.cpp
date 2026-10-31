@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <cmath>
+#include <cstring>
 #include <sstream>
 
 namespace nlm {
@@ -66,6 +67,11 @@ struct Brain::Impl {
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
+
+    // Phase 5 learned preference trait (see Brain.hpp). Updated only
+    // from sandbox reward via AgentBrain; checkpointed with the
+    // simulation state so a reloaded brain keeps what it learned.
+    float learnedPreference = 0.0f;
     
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
@@ -424,9 +430,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                     
                     // Store to working memory - neurons that fire become part of working memory
+                    // Phase 5 fix: the old activation was
+                    // |membrane - resting| / 10, but a neuron that just
+                    // spiked has membrane == reset, and reset == resting
+                    // for every neuron (Neuron::initializeRandom is never
+                    // called — only synaptic connectivity is randomized
+                    // — so all neurons keep the default -70/-70). The
+                    // stored activation was therefore always 0, and
+                    // decayWeakTraces removed every trace on the next
+                    // update, so working memory was permanently empty
+                    // (0 traces in every demo) despite hundreds of
+                    // spikes per step. A spike is itself the activation
+                    // event, so a just-fired neuron stores 1.0; the
+                    // existing decay then keeps it alive only while the
+                    // neuron keeps firing, which is the intended
+                    // working-memory behaviour.
                     if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 
-                            std::abs(state.membranePotential - state.restingPotential) / 10.0f);
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
                     }
                 }
             }
@@ -837,6 +857,65 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
+namespace {
+// Phase 5 checkpoint payload helpers for the extra sections. Format is
+// deliberately simple and self-describing per value: a uint64 count
+// followed by raw elements, in a fixed order per section. All readers
+// bounds-check and fail the section (not the whole load) on truncation,
+// so a corrupt extra section degrades to the Phase 4 behaviour instead
+// of aborting a load that would otherwise succeed.
+void p5AppendU64(std::vector<uint8_t>& out, uint64_t v) {
+    const uint8_t* b = reinterpret_cast<const uint8_t*>(&v);
+    out.insert(out.end(), b, b + sizeof(v));
+}
+void p5AppendFloat(std::vector<uint8_t>& out, float v) {
+    const uint8_t* b = reinterpret_cast<const uint8_t*>(&v);
+    out.insert(out.end(), b, b + sizeof(v));
+}
+void p5AppendDouble(std::vector<uint8_t>& out, double v) {
+    const uint8_t* b = reinterpret_cast<const uint8_t*>(&v);
+    out.insert(out.end(), b, b + sizeof(v));
+}
+template <typename T>
+void p5AppendVec(std::vector<uint8_t>& out, const std::vector<T>& v) {
+    p5AppendU64(out, static_cast<uint64_t>(v.size()));
+    if (!v.empty()) {
+        const uint8_t* b = reinterpret_cast<const uint8_t*>(v.data());
+        out.insert(out.end(), b, b + v.size() * sizeof(T));
+    }
+}
+struct P5Reader {
+    const uint8_t* p;
+    const uint8_t* end;
+    bool ok = true;
+    bool u64(uint64_t& v) {
+        if (end - p < static_cast<std::ptrdiff_t>(sizeof(v))) { ok = false; return false; }
+        std::memcpy(&v, p, sizeof(v)); p += sizeof(v); return true;
+    }
+    bool f32(float& v) {
+        if (end - p < static_cast<std::ptrdiff_t>(sizeof(v))) { ok = false; return false; }
+        std::memcpy(&v, p, sizeof(v)); p += sizeof(v); return true;
+    }
+    bool f64(double& v) {
+        if (end - p < static_cast<std::ptrdiff_t>(sizeof(v))) { ok = false; return false; }
+        std::memcpy(&v, p, sizeof(v)); p += sizeof(v); return true;
+    }
+    template <typename T>
+    bool vec(std::vector<T>& v) {
+        uint64_t n = 0;
+        if (!u64(n)) return false;
+        if (n > 10000000) { ok = false; return false; }
+        if (end - p < static_cast<std::ptrdiff_t>(n * sizeof(T))) { ok = false; return false; }
+        v.resize(static_cast<size_t>(n));
+        if (n > 0) {
+            std::memcpy(v.data(), p, static_cast<size_t>(n) * sizeof(T));
+            p += static_cast<std::ptrdiff_t>(n * sizeof(T));
+        }
+        return true;
+    }
+};
+}  // namespace
+
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
@@ -915,6 +994,81 @@ bool Brain::save(const std::string& filepath) const {
                 NLM_LOG_ERROR("Failed to write pending spikes to checkpoint");
                 return false;
             }
+        }
+
+        // Phase 5 extra sections: everything Phase 4 left out.
+        // SimulationState: spike counters, learned preference trait,
+        // steps-since-episode counter (episodic storage cadence).
+        {
+            std::vector<uint8_t> payload;
+            p5AppendU64(payload, static_cast<uint64_t>(pImpl->totalSpikesTotal));
+            p5AppendU64(payload, static_cast<uint64_t>(pImpl->totalSpikesThisStep));
+            p5AppendFloat(payload, pImpl->learnedPreference);
+            p5AppendU64(payload, static_cast<uint64_t>(pImpl->stepsSinceLastEpisode));
+            writer.bufferSection(CheckpointSection::SimulationState, payload);
+        }
+        // RandomState: full RNG engine state, not just the seed.
+        if (pImpl->rng) {
+            std::string state = pImpl->rng->serializeState();
+            std::vector<uint8_t> payload(state.begin(), state.end());
+            writer.bufferSection(CheckpointSection::RandomState, payload);
+        }
+        // Plasticity: per-synapse pre/post spike histories, in the same
+        // region order as the synapse section, matched by pair on load.
+        {
+            std::vector<uint8_t> payload;
+            for (const auto& region : pImpl->regions) {
+                for (const auto& syn : region->getSynapses()) {
+                    p5AppendU64(payload, syn->getSourceNeuron().index());
+                    p5AppendU64(payload, syn->getDestinationNeuron().index());
+                    p5AppendVec<double>(payload, syn->getPreSpikeHistory());
+                    p5AppendVec<double>(payload, syn->getPostSpikeHistory());
+                }
+            }
+            writer.bufferSection(CheckpointSection::Plasticity, payload);
+        }
+        // Memory: working-memory content + full episodic episodes.
+        {
+            std::vector<uint8_t> payload;
+            if (pImpl->workingMemory) {
+                auto neurons = pImpl->workingMemory->getMemoryNeurons();
+                std::vector<uint64_t> ids;
+                ids.reserve(neurons.size());
+                for (const auto& n : neurons) ids.push_back(n.index());
+                p5AppendVec<uint64_t>(payload, ids);
+                p5AppendVec<float>(payload, pImpl->workingMemory->getMemoryActivations());
+                p5AppendVec<uint64_t>(payload, pImpl->workingMemory->getMemoryTimestamps());
+            } else {
+                p5AppendVec<uint64_t>(payload, {});
+                p5AppendVec<float>(payload, {});
+                p5AppendVec<uint64_t>(payload, {});
+            }
+            if (pImpl->episodicMemory) {
+                const auto& eps = pImpl->episodicMemory->getEpisodes();
+                p5AppendU64(payload, static_cast<uint64_t>(eps.size()));
+                for (const auto& ep : eps) {
+                    p5AppendU64(payload, ep.timestamp);
+                    p5AppendFloat(payload, ep.positionX);
+                    p5AppendFloat(payload, ep.positionY);
+                    p5AppendFloat(payload, ep.orientation);
+                    p5AppendU64(payload, static_cast<uint64_t>(static_cast<int32_t>(ep.action)));
+                    p5AppendFloat(payload, ep.reward);
+                    p5AppendFloat(payload, ep.energy);
+                    p5AppendFloat(payload, ep.novelty);
+                    p5AppendFloat(payload, ep.resultingReward);
+                    p5AppendU64(payload, ep.age);
+                    p5AppendVec<float>(payload, ep.sensoryState);
+                    p5AppendVec<float>(payload, ep.resultingSensoryState);
+                    std::vector<uint64_t> activeIds;
+                    activeIds.reserve(ep.activeNeurons.size());
+                    for (const auto& n : ep.activeNeurons) activeIds.push_back(n.index());
+                    p5AppendVec<uint64_t>(payload, activeIds);
+                    p5AppendVec<float>(payload, ep.neuronActivations);
+                }
+            } else {
+                p5AppendU64(payload, 0);
+            }
+            writer.bufferSection(CheckpointSection::Memory, payload);
         }
         
         // Finalize
@@ -1094,6 +1248,111 @@ bool Brain::load(const std::string& filepath) {
         pImpl->currentStep = reader.getHeader().step;
         pImpl->currentTime = reader.getHeader().simulationTime;
 
+        // Phase 5 extra sections. Each is optional (legacy checkpoints
+        // lack them) and each failure only logs — a missing/corrupt
+        // extra section must not abort a load whose neurons and
+        // synapses restored fine.
+        {
+            auto payload = reader.readSection(CheckpointSection::SimulationState);
+            if (!payload.empty()) {
+                P5Reader r{payload.data(), payload.data() + payload.size()};
+                uint64_t total = 0, thisStep = 0, sinceEp = 0;
+                float pref = 0.0f;
+                if (r.u64(total) && r.u64(thisStep) && r.f32(pref) && r.u64(sinceEp) && r.ok) {
+                    pImpl->totalSpikesTotal = static_cast<size_t>(total);
+                    pImpl->totalSpikesThisStep = static_cast<size_t>(thisStep);
+                    pImpl->learnedPreference = std::clamp(pref, -1.0f, 1.0f);
+                    pImpl->stepsSinceLastEpisode = static_cast<size_t>(sinceEp);
+                } else {
+                    NLM_LOG_INFO("SimulationState section unreadable; counters/preference not restored");
+                }
+            }
+        }
+        {
+            auto payload = reader.readSection(CheckpointSection::RandomState);
+            if (!payload.empty() && pImpl->rng) {
+                std::string state(payload.begin(), payload.end());
+                if (!pImpl->rng->restoreState(state)) {
+                    NLM_LOG_INFO("RandomState section unreadable; RNG not restored");
+                }
+            }
+        }
+        {
+            // Per-synapse spike histories, matched by (source, dest)
+            // pair like the synapse weights above.
+            auto payload = reader.readSection(CheckpointSection::Plasticity);
+            if (!payload.empty()) {
+                P5Reader r{payload.data(), payload.data() + payload.size()};
+                std::unordered_map<uint64_t, std::vector<Synapse*>> byPair;
+                auto pairKey = [](uint64_t src, uint64_t dst) { return (src << 32) ^ dst; };
+                for (auto& region : pImpl->regions) {
+                    for (auto& syn : region->getSynapses()) {
+                        byPair[pairKey(syn->getSourceNeuron().index(),
+                                       syn->getDestinationNeuron().index())].push_back(syn.get());
+                    }
+                }
+                std::unordered_map<uint64_t, size_t> usedCount;
+                size_t restored = 0;
+                while (r.p < r.end && r.ok) {
+                    uint64_t src = 0, dst = 0;
+                    std::vector<double> pre, post;
+                    if (!r.u64(src) || !r.u64(dst) || !r.vec(pre) || !r.vec(post)) break;
+                    uint64_t key = pairKey(src, dst);
+                    auto it = byPair.find(key);
+                    if (it == byPair.end()) continue;
+                    size_t used = usedCount[key]++;
+                    if (used >= it->second.size()) continue;
+                    it->second[used]->setPreSpikeHistory(pre);
+                    it->second[used]->setPostSpikeHistory(post);
+                    ++restored;
+                }
+                NLM_LOG_INFO("Restored spike histories for " + std::to_string(restored) + " synapses");
+            }
+        }
+        {
+            auto payload = reader.readSection(CheckpointSection::Memory);
+            if (!payload.empty()) {
+                P5Reader r{payload.data(), payload.data() + payload.size()};
+                std::vector<uint64_t> wmIds;
+                std::vector<float> wmActs;
+                std::vector<uint64_t> wmTimes;
+                if (r.vec(wmIds) && r.vec(wmActs) && r.vec(wmTimes) && r.ok &&
+                    pImpl->workingMemory) {
+                    std::vector<NeuronId> neurons;
+                    neurons.reserve(wmIds.size());
+                    for (uint64_t id : wmIds) neurons.emplace_back(id);
+                    pImpl->workingMemory->restoreSnapshot(neurons, wmActs, wmTimes);
+                }
+                uint64_t epCount = 0;
+                if (r.u64(epCount) && r.ok && pImpl->episodicMemory) {
+                    std::vector<EpisodicMemoryItem> eps;
+                    eps.reserve(static_cast<size_t>(epCount));
+                    for (uint64_t i = 0; i < epCount && r.ok; ++i) {
+                        EpisodicMemoryItem ep;
+                        uint64_t ts = 0, actionRaw = 0, age = 0;
+                        std::vector<uint64_t> activeIds;
+                        if (!r.u64(ts) || !r.f32(ep.positionX) || !r.f32(ep.positionY) ||
+                            !r.f32(ep.orientation) || !r.u64(actionRaw) ||
+                            !r.f32(ep.reward) || !r.f32(ep.energy) || !r.f32(ep.novelty) ||
+                            !r.f32(ep.resultingReward) || !r.u64(age) ||
+                            !r.vec(ep.sensoryState) || !r.vec(ep.resultingSensoryState) ||
+                            !r.vec(activeIds) || !r.vec(ep.neuronActivations)) {
+                            break;
+                        }
+                        ep.timestamp = ts;
+                        ep.action = static_cast<ActionType>(static_cast<int32_t>(actionRaw));
+                        ep.age = age;
+                        ep.activeNeurons.reserve(activeIds.size());
+                        for (uint64_t id : activeIds) ep.activeNeurons.emplace_back(id);
+                        eps.push_back(std::move(ep));
+                    }
+                    if (r.ok) {
+                        pImpl->episodicMemory->restoreEpisodes(eps);
+                    }
+                }
+            }
+        }
+
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         
@@ -1222,6 +1481,14 @@ PredictionSystem* Brain::getPredictionSystem() {
 
 NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();
+}
+
+float Brain::getLearnedPreference() const {
+    return pImpl->learnedPreference;
+}
+
+void Brain::setLearnedPreference(float preference) {
+    pImpl->learnedPreference = std::clamp(preference, -1.0f, 1.0f);
 }
 
 ConceptFormation* Brain::getConceptFormation() {

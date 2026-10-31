@@ -67,6 +67,24 @@ public:
     
     // Get prediction error
     float getPredictionError() const;
+
+    // Thought trace (Phase 5): a one-line, human-readable record of the
+    // most recent loop — what was perceived, what the planner suggested
+    // from learned action quality, what the brain actually decoded, and
+    // the outcome reward. The planner suggestion is advisory: the
+    // brain's motor decode still decides the action, so a trace where
+    // planned != acted is a real, reportable disagreement, not a script.
+    std::string getThoughtTrace() const;
+
+    // Learned preference trait, stored on the Brain so it survives a
+    // checkpoint reload (see Brain::getLearnedPreference).
+    float getLearnedPreference() const;
+
+    // Phase 5 diagnostic counters (see private section): how often the
+    // vision-gated reflex bonus / hazard suppression / WTA pulse fired.
+    int getReflexBonusCount() const { return reflexBonusCount_; }
+    int getReflexSuppressCount() const { return reflexSuppressCount_; }
+    int getWtaPulseCount() const { return wtaPulseCount_; }
     
     // Reset agent for new episode
     void reset();
@@ -135,9 +153,52 @@ private:
     // (0 = nothing within touch range, 1 = touching). Used only for the
     // innate proximity reflex in decodeFromMotorNeurons().
     float maxTouch_ = 0.0f;
+    // Phase 5 vision-guided reflex features, derived from the same
+    // percept the brain already receives (no world label is leaked):
+    // forwardTouch_ is the strongest touch in the forward cone (touch
+    // sensors 0, 1, 7 of 8, i.e. -45..+45 degrees); forwardObjectVision_
+    // is the closest forward-cone vision value (centre rays 5..10 of
+    // 16) below the empty value 1.0. The world's vision encoding makes
+    // a close bright object ~0.65-0.8 (resource), a close dark object
+    // ~0.24-0.3 (hazard) and a close wall ~0.1-0.2 — so a value above
+    // 0.5 with forward touch is a resource cue, and a value below 0.35
+    // is a hazard/wall cue. Touch alone cannot tell them apart; vision
+    // in the same percept can, and only that is used here.
+    float forwardTouch_ = 0.0f;
+    float forwardObjectVision_ = 1.0f;
+    // Phase 5 winner-take-all state: the motor group that won the last
+    // decode, and by how much. On the next presentation its competitors
+    // receive a lateral-inhibition pulse (see processSensoryInput), so
+    // a decisive winner suppresses its rivals instead of every group
+    // saturating together at 70-90 Hz.
+    int lastWinnerGroup_ = -1;
+    float lastWinnerMargin_ = 0.0f;
+    int consecutiveWinnerCount_ = 0;
+    // Phase 5 action-diversity state, updated from final decoded
+    // actions: steps since the last turn, and how many times the same
+    // movement has repeated in a row. Used for a turn-diversity bias
+    // and a repetition-fatigue penalty in decode, not a pathfinder.
+    int stepsSinceTurn_ = 0;
+    int repeatCount_ = 0;
+    // Phase 5 diagnostic counters (not used for decisions): how often
+    // the vision-gated reflex bonus / hazard suppression / WTA pulse
+    // actually fired, so demo reports can tell a live mechanism from
+    // a dead one.
+    int reflexBonusCount_ = 0;
+    int reflexSuppressCount_ = 0;
+    int wtaPulseCount_ = 0;
     // Last decoded command, for the interact no-repeat rule below.
     MotorCommand lastDecoded_ = MotorCommand::Wait;
     bool hasLastDecoded_ = false;
+    // Phase 5 thought trace: last perceived scene summary, last
+    // planner suggestion (from learned action quality), last decoded
+    // action, and its outcome reward. Filled across one loop turn.
+    std::vector<float> lastVision_;
+    std::string thoughtPercept_ = "none";
+    MotorCommand thoughtPlanned_ = MotorCommand::Wait;
+    bool hasThoughtPlanned_ = false;
+    float thoughtReward_ = 0.0f;
+    bool hasThoughtOutcome_ = false;
 };
 
 } // namespace nlm
