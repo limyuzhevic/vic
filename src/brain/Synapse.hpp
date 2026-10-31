@@ -54,6 +54,10 @@ public:
     const std::vector<Timestamp>& getPreSpikeHistory() const;
     const std::vector<Timestamp>& getPostSpikeHistory() const;
     void clearHistory();
+    // Phase 5 checkpoint support: restore histories recorded by
+    // recordPre/PostSpike (capped at the same MAX_SPIKE_HISTORY).
+    void setPreSpikeHistory(const std::vector<Timestamp>& history);
+    void setPostSpikeHistory(const std::vector<Timestamp>& history);
     
     // Plasticity flags
     const PlasticityFlags& getPlasticityFlags() const;

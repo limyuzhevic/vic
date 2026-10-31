@@ -191,6 +191,16 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
+
+    // Learned preference trait (Phase 5): a single scalar, -1..1,
+    // updated only by sandbox reward through AgentBrain, saved in the
+    // checkpoint (SimulationState section) and used as a small bias in
+    // later action choice. This is the measured "personality" step: a
+    // preference learned from experience that survives a reload and
+    // changes later behaviour. It is not a language-model persona and
+    // it does not, on its own, make the brain a human brain.
+    float getLearnedPreference() const;
+    void setLearnedPreference(float preference);
     
     // Logging
     void logStatus() const;

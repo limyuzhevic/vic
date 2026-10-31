@@ -333,6 +333,18 @@ bool CheckpointWriter::writeDelayedSpikes(const std::vector<DelayedSpikeEvent>& 
     return true;
 }
 
+bool CheckpointWriter::bufferSection(CheckpointSection sectionType,
+                                     const std::vector<uint8_t>& payload) {
+    for (auto& entry : extraPayloads_) {
+        if (entry.first == sectionType) {
+            entry.second = payload;
+            return true;
+        }
+    }
+    extraPayloads_.emplace_back(sectionType, payload);
+    return true;
+}
+
 bool CheckpointWriter::writeSection(CheckpointSection sectionType, const void* data, size_t size) {
     // Generic sections are not used by Brain::save/load; buffer them
     // only if they are neuron/synapse sections written in raw form is
@@ -352,6 +364,18 @@ bool CheckpointWriter::finalize() {
     if (!writeSectionToStream(stream_, CheckpointSection::Neurons, neuronPayload_, bytesWritten_)) return false;
     if (!writeSectionToStream(stream_, CheckpointSection::Synapses, synapsePayload_, bytesWritten_)) return false;
     if (!writeSectionToStream(stream_, CheckpointSection::SpikeHistory, delayedSpikePayload_, bytesWritten_)) return false;
+    // Phase 5 extra sections, in fixed order so a reader can rely on
+    // layout (readSection also finds them by type, order-independent).
+    for (CheckpointSection type : {CheckpointSection::SimulationState,
+                                   CheckpointSection::RandomState,
+                                   CheckpointSection::Plasticity,
+                                   CheckpointSection::Memory}) {
+        for (const auto& entry : extraPayloads_) {
+            if (entry.first == type && !entry.second.empty()) {
+                if (!writeSectionToStream(stream_, type, entry.second, bytesWritten_)) return false;
+            }
+        }
+    }
     SectionHeader endHeader;
     endHeader.type = static_cast<uint32_t>(CheckpointSection::End);
     endHeader.offset = static_cast<uint64_t>(stream_.tellp()) + sizeof(SectionHeader);

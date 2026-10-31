@@ -65,7 +65,15 @@ public:
 
     // Set action quality function (from experience)
     void setActionQuality(ActionType action, float quality) {
-        actionQuality_[static_cast<size_t>(action)] = quality;
+        size_t idx = static_cast<size_t>(action);
+        if (idx >= actionQuality_.size()) actionQuality_.resize(idx + 1, 0.0f);
+        actionQuality_[idx] = quality;
+    }
+
+    // Get action quality learned from experience (0 if never tried).
+    float getActionQuality(ActionType action) const {
+        size_t idx = static_cast<size_t>(action);
+        return idx < actionQuality_.size() ? actionQuality_[idx] : 0.0f;
     }
 
     // Get current goal

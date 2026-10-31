@@ -9,6 +9,9 @@
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
+#include <cmath>
+#include <set>
+#include <utility>
 
 namespace nlm {
 
@@ -69,7 +72,19 @@ public:
             
             ExperimentMetrics metrics;
             metrics.episode = episode;
-            
+
+            // Phase 5 navigation/interact metrics: visited 1x1 cells,
+            // interact outcomes from the world's own result message
+            // (consumed_resource / hit_hazard / no_object — not a label
+            // given to the brain), and forward/backward oscillation
+            // (a Fwd step immediately followed by Bwd, or vice versa).
+            std::set<std::pair<int, int>> visitedCells;
+            int resourcesConsumed = 0, hazardsHit = 0, emptyInteracts = 0;
+            int tooSoonCount = 0;
+            int oscillations = 0;
+            MotorCommand prevMove = MotorCommand::Wait;
+            bool hasPrevMove = false;
+
             float episodeReward = 0.0f;
             // Monotonic brain-step counter for this episode. The old code
             // reused neuralStep 0..9 for every action, so delayed spikes
@@ -134,6 +149,24 @@ public:
                 metrics.totalReward += result.reward;
                 metrics.totalSpikes += brain->getFiringNeuronCount();
                 
+                // Phase 5 metrics: coverage, interact outcome, oscillation.
+                {
+                    const auto& body = world.getAgentBody();
+                    visitedCells.insert({static_cast<int>(std::floor(body.x)),
+                                         static_cast<int>(std::floor(body.y))});
+                }
+                if (result.message == "too soon") ++tooSoonCount;
+                if (cmd == MotorCommand::Interact) {
+                    if (result.message == "consumed_resource") ++resourcesConsumed;
+                    else if (result.message == "hit_hazard") ++hazardsHit;
+                    else ++emptyInteracts;
+                }
+                if (cmd == MotorCommand::MoveForward || cmd == MotorCommand::MoveBackward) {
+                    if (hasPrevMove && prevMove != cmd) ++oscillations;
+                    prevMove = cmd;
+                    hasPrevMove = true;
+                }
+
                 // Count actions (Look actions are not Wait)
                 switch (cmd) {
                     case MotorCommand::MoveForward: metrics.forwardCount++; break;
@@ -184,6 +217,18 @@ public:
                       << ", lookL=" << metrics.lookLeftCount
                       << ", lookR=" << metrics.lookRightCount
                       << ", avgFiringRate=" << metrics.averageFiringRate
+                      << "\n";
+            std::cout << "  Phase5 metrics: visitedCells=" << visitedCells.size()
+                      << ", resources=" << resourcesConsumed
+                      << ", hazards=" << hazardsHit
+                      << ", emptyInteracts=" << emptyInteracts
+                      << ", oscillations=" << oscillations
+                      << ", finalNovelty=" << metrics.finalNovelty
+                      << ", finalCuriosity=" << metrics.finalCuriosity
+                      << ", tooSoon=" << tooSoonCount
+                      << ", reflexBonus=" << agentBrain.getReflexBonusCount()
+                      << ", reflexSuppress=" << agentBrain.getReflexSuppressCount()
+                      << ", wtaPulses=" << agentBrain.getWtaPulseCount()
                       << "\n\n";
         }
         

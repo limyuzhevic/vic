@@ -1,4 +1,5 @@
 #include "Random.hpp"
+#include <sstream>
 #include <stdexcept>
 
 namespace nlm {
@@ -36,6 +37,20 @@ void RandomGenerator::seed(uint64_t seed) {
 
 uint64_t RandomGenerator::getSeed() const {
     return pImpl->currentSeed;
+}
+
+std::string RandomGenerator::serializeState() const {
+    std::ostringstream out;
+    out << pImpl->gen;
+    return out.str();
+}
+
+bool RandomGenerator::restoreState(const std::string& state) {
+    std::istringstream in(state);
+    std::mt19937_64 gen;
+    if (!(in >> gen)) return false;
+    pImpl->gen = gen;
+    return true;
 }
 
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {

@@ -154,6 +154,28 @@ void Synapse::clearHistory() {
     pImpl->postSpikeHistory.clear();
 }
 
+void Synapse::setPreSpikeHistory(const std::vector<Timestamp>& history) {
+    pImpl->preSpikeHistory = history;
+    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        pImpl->preSpikeHistory.erase(
+            pImpl->preSpikeHistory.begin(),
+            pImpl->preSpikeHistory.begin() +
+                static_cast<std::ptrdiff_t>(pImpl->preSpikeHistory.size() -
+                                            Impl::MAX_SPIKE_HISTORY));
+    }
+}
+
+void Synapse::setPostSpikeHistory(const std::vector<Timestamp>& history) {
+    pImpl->postSpikeHistory = history;
+    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        pImpl->postSpikeHistory.erase(
+            pImpl->postSpikeHistory.begin(),
+            pImpl->postSpikeHistory.begin() +
+                static_cast<std::ptrdiff_t>(pImpl->postSpikeHistory.size() -
+                                            Impl::MAX_SPIKE_HISTORY));
+    }
+}
+
 PlasticityFlags& Synapse::getPlasticityFlags() {
     return pImpl->plasticityFlags;
 }

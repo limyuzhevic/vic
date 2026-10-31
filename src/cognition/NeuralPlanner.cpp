@@ -136,12 +136,23 @@ std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size
     
     std::vector<ActionType> current;
     generate(current, depth);
-    
-    // Limit number of sequences
+
+    // Limit number of sequences. Phase 5 fix: the old code kept only
+    // the first 100 sequences, which — with depth 5 and lexicographic
+    // generation — all start with MoveForward, so the planner could
+    // never suggest any other first action no matter what it learned.
+    // Keeping 100 evenly spaced sequences preserves one representative
+    // per first action, so learned action quality can actually change
+    // the planner's suggestion.
     if (result.size() > 100) {
-        result.resize(100);
+        std::vector<std::vector<ActionType>> kept;
+        kept.reserve(100);
+        for (size_t i = 0; i < 100; ++i) {
+            kept.push_back(result[i * result.size() / 100]);
+        }
+        result = std::move(kept);
     }
-    
+
     return result;
 }
 
