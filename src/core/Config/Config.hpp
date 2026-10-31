@@ -97,9 +97,14 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
-    // Internal helpers
+// Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Enhanced parsing methods
+    void parseJSON(const std::string& content, ConfigSource source);
+    void parseYAML(const std::string& content, ConfigSource source);
+    std::string configValueToString(const ConfigValue& value) const;
 };
 
 } // namespace nlm

@@ -39,13 +39,49 @@ void printBanner() {
     ║                                                               ║
     ║     An experimental artificial developmental brain.            ║
     ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
+    ║     - Leaky Integrate-and-Fire (LIF) neuron dynamics           ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
+    ║     - STDP and Hebbian plasticity rules                        ║
+    ║     - Structural plasticity                                     ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printHelp() {
+    std::cout << "=== NLM Phase 2 Command Line Options ===" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Basic Options:" << std::endl;
+    std::cout << "  --config <file>           Load configuration from file" << std::endl;
+    std::cout << "  --config=<file>           Alternative syntax for --config" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Advanced Options:" << std::endl;
+    std::cout << "  --experimental            Enable experimental features" << std::endl;
+    std::cout << "  --debug                   Enable debug logging (DEBUG level)" << std::endl;
+    std::cout << "  --profile                 Enable profiling (saves to nlm_profile.csv)" << std::endl;
+    std::cout << "  --visualize               Enable visualization" << std::endl;
+    std::cout << "  --fast                    Fast mode (reduced neurons, larger timestep)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Custom Configuration:" << std::endl;
+    std::cout << "  --key=value               Set custom configuration key/value" << std::endl;
+    std::cout << "  --key value               Alternative syntax for key=value" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Key Types (automatic detection):" << std::endl;
+    std::cout << "  Integers: --neurons=100, --seed=42" << std::endl;
+    std::cout << "  Floats/Doubles: --dt=0.001, --rate=0.15" << std::endl;
+    std::cout << "  Booleans: --enabled=true, --debug=false" << std::endl;
+    std::cout << "  Strings: --name=\"Test Brain\", --mode=fast" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  ./nlm_phase6_demo --config=myconfig.json --debug --visualize" << std::endl;
+    std::cout << "  ./nlm_phase6_demo --neurons=200 --rate=0.05 --experimental" << std::endl;
+    std::cout << "  ./nlm_phase6_demo --fast --profile" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration File Formats:" << std::endl;
+    std::cout << "  JSON (.json): Modern, structured configuration" << std::endl;
+    std::cout << "  YAML (.yaml/.yml): Human-readable, structured config" << std::endl;
+    std::cout << "  Legacy (.cfg): Simple key = value format" << std::endl;
+    std::cout << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -340,110 +376,43 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
+    // Load config from file
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
-    
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
-    
-    // Initialize brain
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
-    
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
-        return 1;
+    // Parse remaining command-line args for basic config overrides
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config" && arg.find('=') == std::string::npos) {
+            // Skip config file argument
+            if (i + 1 < argc) {
+                i++;
+            }
+        }
+        else if (arg == "--experimental" || arg == "--debug" || arg == "--profile" || 
+                 arg == "--visualize" || arg == "--fast") {
+            // Skip these flags
+            continue;
+        }
+        else if (arg.find('=') != std::string::npos && arg.substr(0, 2) == "--") {
+            // Skip key=value pairs
+            continue;
+        }
+        else if (arg.substr(0, 2) == "--") {
+            // Check if it's a simple flag (like --help)
+            if (arg == "--help" || arg == "-h") {
+                // Skip help flag
+                continue;
+            }
+            // Try to parse as --key value
+            if (i + 1 < argc && argv[i+1][0] != '-') {
+                std::string key = arg.substr(2);
+                std::string value = argv[i+1];
+                i++; // Skip value
+                config->set(key, value, ConfigSource::CommandLine);
+            }
+        }
     }
-    
-    brain->logStatus();
-    
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
-    
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
-    
-    return 0;
-}
