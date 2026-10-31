@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <set>
 
 namespace nlm {
 

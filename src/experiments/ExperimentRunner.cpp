@@ -78,7 +78,7 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     for (auto& exp : experiments) {
         // Create fresh brain and environment for each experiment
         // PLACEHOLDER: In real implementation, would clone from template
-        auto brain = std::make_shared<Brain>(brainTemplate->getConfig());
+        auto brain = std::make_shared<Brain>(std::const_pointer_cast<Config>(brainTemplate->getConfig()));
         brain->initialize();
         
         // Would also create fresh environment here

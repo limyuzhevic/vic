@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../sensory/SensoryInput.hpp"
+#include "../motor/Action.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"

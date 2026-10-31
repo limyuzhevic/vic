@@ -8,6 +8,7 @@
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
@@ -95,7 +96,7 @@ struct Brain::Impl {
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<uint64_t>("random_seed")) {
+        if (auto seedOpt = config->get<int64_t>("random_seed")) {
             seed = *seedOpt;
         }
         rng = std::make_unique<RandomGenerator>(seed);
@@ -146,8 +147,8 @@ struct Brain::Impl {
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
         // Get integration intervals from config
-        replayInterval = config->getOr<size_t>("replay_interval", 100);
-        consolidationInterval = config->getOr<size_t>("consolidation_interval", 1000);
+        replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
+        consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -178,8 +179,8 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
     
     // Get configuration values
-    size_t neuronCount = pImpl->config->getOr<size_t>("neuron_count", 1000);
-    size_t regionCount = pImpl->config->getOr<size_t>("region_count", 1);
+    size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000));
+    size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", 1));
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
@@ -414,7 +415,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
+        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -455,7 +456,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
                     // Modify weight change based on dopamine
-                    pImpl->stdp->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    pImpl->stdp->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
                     weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
                     syn->setWeight(weight);
@@ -468,7 +469,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn, preSpikes, postSpikes, pImpl->timestep);
+                    pImpl->hebbian->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
                 }
             }
             
@@ -551,7 +552,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
         // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity;
+        auto* sp = pImpl->structuralPlasticity.get();
         if (sp) {
             DevelopmentalStage stage = pImpl->developmentalStage;
             float plasticityMod = 1.0f;
@@ -813,7 +814,7 @@ bool Brain::save(const std::string& filepath) const {
         // Write synapses
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
-            for (const auto* syn : region->getSynapses()) {
+            for (const auto& syn : region->getSynapses()) {
                 synapseData.sourceNeuron.push_back(syn->getSourceNeuron().index());
                 synapseData.destinationNeuron.push_back(syn->getDestinationNeuron().index());
                 synapseData.weight.push_back(syn->getWeight());

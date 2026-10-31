@@ -176,14 +176,19 @@ bool Logger::isEnabled(LogLevel level) const {
     return false;
 }
 
+static std::shared_ptr<Logger>& globalLoggerPtr() {
+    static std::shared_ptr<Logger> ptr = std::make_shared<Logger>();
+    return ptr;
+}
+
 Logger& Logger::getGlobal() {
-    static Logger globalLogger;
-    return globalLogger;
+    return *globalLoggerPtr();
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    // This is a placeholder for advanced global logger management
-    // In practice, we just use getGlobal() which is already static
+    if (logger) {
+        globalLoggerPtr() = logger;
+    }
 }
 
 // LogStream implementation

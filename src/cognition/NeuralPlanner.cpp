@@ -98,7 +98,7 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
         totalReward += actionValue;
         
         // Reduce confidence if we're uncertain
-        confidence *= getSelfModelConfidence(action);
+        confidence *= planningConfidence_;
     }
     
     candidate.expectedReward = totalReward;
@@ -335,7 +335,7 @@ float SelfModel::getSelfModelConfidence(ActionType action) const {
     return totalConf / effects.size();
 }
 
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+float SelfModel::computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                               const std::vector<float>& afterState,
                                               ActionType action) const {
     // If we have a good prediction for this action, it's likely self-generated

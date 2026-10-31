@@ -2,6 +2,7 @@
 
 #include "../core/Types/Types.hpp"
 #include "../brain/Brain.hpp"
+#include "../motor/Action.hpp"
 #include <vector>
 #include <memory>
 #include <deque>
@@ -101,6 +102,7 @@ public:
 
     // Get total number of episodes
     size_t getEpisodeCount() const { return episodes_.size(); }
+    void setMaxEpisodes(size_t n) { maxEpisodes_ = n; }
 
     // Get recent episodes
     std::vector<const EpisodicMemoryItem*> getRecentEpisodes(size_t count) const;

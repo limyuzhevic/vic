@@ -59,6 +59,7 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
+#include <random>
 
 namespace nlm {
 

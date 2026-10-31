@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Action.hpp"
+#include "../motor/Action.hpp"
+#include "../sensory/SensoryInput.hpp"
 
 namespace nlm {
 

@@ -5,6 +5,7 @@
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../cognition/NeuralPlanner.hpp"
+#include "../core/Random/Random.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>

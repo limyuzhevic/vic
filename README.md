@@ -74,13 +74,20 @@ make -j4
 ```
 
 ## Running
+Build all targets first (see Building above). The entry points are
+currently separate demos per phase, not a single unified binary:
 
-### Phase 6 Demo (Integration Test)
 ```bash
-./nlm_phase6_demo
+./nlm                 # Phase 2 demo in src/main.cpp
+./nlm_phase3_demo
+./nlm_phase4_demo
+./nlm_phase6_demo     # Phase 6 integration test
+./nlm_benchmark
 ```
 
-This runs a comprehensive integration test verifying all brain systems are connected.
+`nlm_phase6_demo` runs a comprehensive integration test verifying all
+brain systems are connected. Phase 5 is wired as the `nlm_phase5`
+library in CMake; it does not yet have a standalone demo executable.
 
 ## Project Structure
 
@@ -97,6 +104,9 @@ NLM/
 │   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
 ├── src/
 │   ├── core/           # Core utilities
+│   ├── agent/          # Agent-brain interface
+│   ├── world/          # Simple world
+│   ├── performance/    # Checkpoints, pools, queues (headers)
 │   ├── brain/          # Neural components (integrated)
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
