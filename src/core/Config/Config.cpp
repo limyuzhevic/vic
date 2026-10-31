@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
+#include <chrono>
+#include <iostream>
 
 namespace nlm {
 
@@ -19,16 +22,37 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Check file extension for format detection
+    std::string ext = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        ext = filepath.substr(dotPos + 1);
+    }
     
+    // Convert to lowercase for comparison
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == "json") {
+        return loadFromJSON(filepath);
+    } else if (ext == "yaml" || ext == "yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Default to key=value format (legacy support)
+        return loadFromKeyValue(filepath);
+    }
+}
+
+bool Config::loadFromKeyValue(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        std::cerr << "Warning: Cannot open config file: " << filepath << std::endl;
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,16 +67,38 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Validate key
+            if (key.empty()) {
+                std::cerr << "Warning: Config line " << lineNumber << ": Empty key, skipping" << std::endl;
+                continue;
+            }
+            
             set(key, value, ConfigSource::File);
+        } else {
+            std::cerr << "Warning: Config line " << lineNumber << ": Invalid format (missing '='), skipping: " << line << std::endl;
         }
     }
     
     return true;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // TODO: Implement JSON parsing using a library like nlohmann::json
+    // For now, provide a placeholder with error message
+    std::cerr << "Warning: JSON config support not yet implemented. Falling back to key=value format. File: " << filepath << std::endl;
+    return loadFromKeyValue(filepath);
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // TODO: Implement YAML parsing using a library like yaml-cpp
+    // For now, provide a placeholder with error message
+    std::cerr << "Warning: YAML config support not yet implemented. Falling back to key=value format. File: " << filepath << std::endl;
+    return loadFromKeyValue(filepath);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,9 +130,48 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write header comment
+    file << "# NLM Configuration File\n";
+    file << "# Generated on: " << std::chrono::system_clock::now() << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Write the actual value based on its type
+        std::visit([&file](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << v << "\"";
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t>) {
+                file << v;
+            } else if constexpr (std::is_same_v<T, double> || 
+                                 std::is_same_v<T, float>) {
+                // Use precise formatting to avoid floating point precision issues
+                file << std::setprecision(10) << v;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (v ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        file << "\"" << v[i] << "\"";
+                    } else {
+                        file << v[i];
+                    }
+                }
+                file << "]";
+            } else {
+                // Fallback for unknown types
+                file << "UNKNOWN_TYPE_" << static_cast<int>(v);
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -155,7 +240,8 @@ std::string Config::summary() const {
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
+        // Fix lambda capture: use a lambda that captures oss by reference
+        auto visitLambda = [&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (std::is_same_v<T, std::string>) {
                 oss << "\"" << arg << "\"";
@@ -171,7 +257,8 @@ std::string Config::summary() const {
             } else {
                 oss << arg;
             }
-        }, entry.value);
+        };
+        std::visit(visitLambda, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
