@@ -352,14 +352,35 @@ PYBIND11_MODULE(pynlm, m) {
              "Get total spike count")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+.def("getWorkingMemory", &Brain::getWorkingMemory,
+               "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+               "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+               "Get associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+               "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+               "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+               "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+               "Get attentional selection system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+               "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+               "Get dopamine system")
+        .def("getCuriosity", &Brain::getCuriosity,
+               "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+               "Get novelty system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+               "Get prediction error system")
+        .def("getLearnedPreference", &Brain::getLearnedPreference,
+               "Get learned preference trait")
+        .def("setLearnedPreference", &Brain::setLearnedPreference,
+               py::arg("preference"),
+               "Set learned preference trait")
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
