@@ -190,6 +190,88 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
     
+    // Get neuromodulation levels for advanced control
+    float getDopamineLevel() const;
+    float getCuriosityLevel() const;
+    float getNoveltyLevel() const;
+    float getPredictionError() const;
+    float getNeuromodulationLevel() const;
+
+    // Set neuromodulation parameters for advanced control
+    void setDopamineLevel(float level);
+    void setCuriosityLevel(float level);
+    void setNoveltyLevel(float level);
+    void setPredictionErrorLevel(float level);
+
+    // Get development system information
+    std::string getDevelopmentStageName() const;
+    double getDevelopmentalProgress() const;
+
+    // Get brain performance metrics for monitoring
+    double getAverageFiringRate() const;
+    double getExcitatoryInhibitionRatio() const;
+    size_t getMemoryTraceCount() const;
+    size_t getEpisodeCount() const;
+    size_t getConceptCount() const;
+
+    // Advanced configuration methods
+    void configure(float v_thresh = -55.0f, float v_rest = -70.0f, float v_reset = -75.0f,
+                   float tau_mem = 20.0f, float tau_ref = 2.0f, size_t neuron_count = 1000,
+                   float connection_probability = 0.1f);
+    
+    // Brain state management for experiments
+    bool saveState(const std::string& filepath) const;
+    bool loadState(const std::string& filepath);
+    std::string getBrainHash() const;
+    bool validateState() const;
+
+    // Getters for all memory system pointers (for advanced access)
+    std::unique_ptr<class NeuralWorkingMemory> getWorkingMemoryPtr() const;
+    std::unique_ptr<class NeuralEpisodicMemory> getEpisodicMemoryPtr() const;
+    std::unique_ptr<class NeuralAssociativeMemory> getAssociativeMemoryPtr() const;
+    std::unique_ptr<class PredictionSystem> getPredictionSystemPtr() const;
+    std::unique_ptr<class NeuralPlanner> getPlannerPtr() const;
+    std::unique_ptr<class ConceptFormation> getConceptFormationPtr() const;
+    std::unique_ptr<class AttentionalSelection> getAttentionPtr() const;
+    std::unique_ptr<class DevelopmentSystem> getDevelopmentSystemPtr() const;
+    std::unique_ptr<class Dopamine> getDopaminePtr() const;
+    std::unique_ptr<class Curiosity> getCuriosityPtr() const;
+    std::unique_ptr<class Novelty> getNoveltyPtr() const;
+    std::unique_ptr<class PredictionError> getPredictionErrorPtr() const;
+
+    // Getters for all system pointers (for advanced access)
+    std::unique_ptr<class SpikeSystem> getSpikeSystemPtr() const;
+    std::unique_ptr<class STDP> getSTDPPtr() const;
+    std::unique_ptr<class Hebbian> getHebbianPtr() const;
+    std::unique_ptr<class StructuralPlasticity> getStructuralPlasticityPtr() const;
+    std::unique_ptr<class RandomGenerator> getRandomGeneratorPtr() const;
+    std::unique_ptr<class SimulationClock> getSimulationClockPtr() const;
+    std::unique_ptr<class Logger> getLoggerPtr() const;
+
+    // Get detailed statistics for performance analysis
+    struct BrainStats {
+        size_t totalNeurons;
+        size_t totalSynapses;
+        size_t activeNeurons;
+        size_t firingNeurons;
+        float avgFiringRate;
+        float excitationInhibitionRatio;
+        size_t totalSpikes;
+        size_t workingMemoryTraces;
+        size_t episodicMemoryEpisodes;
+        size_t conceptCount;
+        float curiosityLevel;
+        float noveltyLevel;
+        float dopamineLevel;
+        float predictionError;
+        std::string developmentalStage;
+        double developmentalProgress;
+        std::chrono::steady_clock::time_point lastUpdate;
+    };
+    
+    BrainStats getStatistics() const;
+    std::string getStatisticsString() const;
+
     // Logging
     void logStatus() const;
     

@@ -400,26 +400,248 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Create world with advanced configuration
+    static std::shared_ptr<SimpleWorld> createAdvancedWorld(
+        size_t width, size_t height, 
+        size_t visionWidth = 8, size_t visionHeight = 8,
+        float energyDecayRate = 0.01f, 
+        float maxEnergy = 100.0f,
+        size_t numObjects = 0
+    ) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->setMaxEnergy(maxEnergy);
+        world->setEnergyDecayRate(energyDecayRate);
+        
+        // Add random objects if specified
+        if (numObjects > 0) {
+            std::mt19937 rng(42);
+            std::uniform_real_distribution<float> posDist(0.0f, static_cast<float>(width));
+            std::uniform_real_distribution<float> radiusDist(0.5f, 2.0f);
+            
+            for (size_t i = 0; i < numObjects; ++i) {
+                float x = posDist(rng);
+                float y = posDist(rng);
+                float radius = radiusDist(rng);
+                
+                // Random object type
+                std::uniform_int_distribution<int> typeDist(0, 2);
+                WorldObjectType type;
+                switch (typeDist(rng)) {
+                    case 0: type = WorldObjectType::Resource; break;
+                    case 1: type = WorldObjectType::Hazard; break;
+                    default: type = WorldObjectType::Wall; break;
+                }
+                
+                float value = (type == WorldObjectType::Resource) ? 10.0f : 
+                             (type == WorldObjectType::Hazard) ? -5.0f : 0.0f;
+                
+                WorldObject obj(x, y, type, value, radius);
+                world->addObject(obj);
+            }
+        }
+        
+        return world;
+    }
+    
+    // Create world with development system
+    static std::shared_ptr<SimpleWorld> createDevelopmentalWorld(
+        size_t width, size_t height,
+        size_t visionWidth = 8, size_t visionHeight = 8,
+        float developmentRate = 0.1f,
+        size_t initialNeurons = 500
+    ) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        
+        // Create brain with developmental configuration
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(initialNeurons));
+        config->set("development_synaptogenesis_rate", developmentRate);
+        config->set("development_pruning_rate", developmentRate * 0.01f);
+        
+        return world;
+    }
+    
+    // Create simple utility for brain configuration
+    static std::shared_ptr<Config> createBalancedConfig(
+        size_t neuronCount = 1000,
+        float connectionProbability = 0.1f,
+        bool enablePlasticity = true,
+        bool enableDevelopment = false
+    ) {
+        auto config = std::make_shared<Config>();
+        
+        // Basic configuration
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", connectionProbability);
+        
+        // Plasticity settings
+        config->set("plasticity_stdp_learning_rate", 0.001f);
+        config->set("plasticity_stdp_tau_plus", 20.0f);
+        config->set("plasticity_stdp_tau_minus", 20.0f);
+        config->set("plasticity_hebbian_learning_rate", 0.0005f);
+        config->set("plasticity_structural_enable", enablePlasticity);
+        
+        // Development settings
+        config->set("development_synaptogenesis_rate", 0.0001f);
+        config->set("development_pruning_rate", 0.00001f);
+        config->set("development_enable", enableDevelopment);
+        
+        // Neuromodulation settings
+        config->set("neuromod_curiosity_enable", true);
+        config->set("neuromod_novelty_enable", true);
+        config->set("neuromod_dopamine_scale", 1.0f);
+        
+        return config;
+    }
+    
+    // Create simple utility for agent setup
+    static std::shared_ptr<AgentBrain> createAdvancedAgent(
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<SimpleWorld> world,
+        bool enableRewardModulation = true,
+        bool enableCuriosity = true,
+        bool enableDevelopment = false,
+        bool enableStructuralPlasticity = true
+    ) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        if (enableRewardModulation) agent->enableRewardModulation(true);
+        if (enableCuriosity) agent->enableCuriosity(true);
+        if (enableDevelopment) agent->enableDevelopment(true);
+        if (enableStructuralPlasticity) agent->enableStructuralPlasticity(true);
+        
+        return agent;
+    }
+    
+    // Run simulation with advanced features
+    static struct SimulationResult {
+        size_t steps;
+        float totalReward;
+        float avgFiringRate;
+        size_t finalNeuronCount;
+        size_t finalSynapseCount;
+        float curiosityLevel;
+        float noveltyLevel;
+        float dopamineLevel;
+        std::vector<float> firingRateHistory;
+        std::chrono::milliseconds elapsedTime;
+    };
+    
+    static SimulationResult runAdvancedSimulation(
+        std::shared_ptr<Brain> brain,
+        std::shared_ptr<SimpleWorld> world,
+        std::shared_ptr<AgentBrain> agent,
+        size_t numSteps = 1000,
+        bool recordMetrics = true,
+        std::function<void(size_t, float, float)> callback = nullptr
+    ) {
+        SimulationResult result;
+        result.steps = numSteps;
+        result.totalReward = 0.0f;
+        result.avgFiringRate = 0.0f;
+        result.finalNeuronCount = 0;
+        result.finalSynapseCount = 0;
+        result.curiosityLevel = 0.0f;
+        result.noveltyLevel = 0.0f;
+        result.dopamineLevel = 0.0f;
+        result.elapsedTime = std::chrono::milliseconds(0);
+        
+        auto startTime = std::chrono::steady_clock::now();
+        
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Brain step
+            brain->step(step);
+            
+            // Get action
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply action to world
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Get reward
+            float reward = 0.0f;
+            if (world->getSensoryPercept().getInternal().size() > 0) {
+                reward = world->getSensoryPercept().getInternal()[0];
+            }
+            
+            result.totalReward += reward;
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            if (recordMetrics) {
+                result.firingRateHistory.push_back(brain->getAverageFiringRate());
+                result.curiosityLevel = agent->getCuriosityLevel();
+                result.noveltyLevel = agent->getNoveltyLevel();
+                result.dopamineLevel = agent->getNeuromodulationLevel();
+                
+                if (callback) {
+                    callback(step, brain->getAverageFiringRate(), reward);
+                }
+            }
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+        }
+        
+        auto endTime = std::chrono::steady_clock::now();
+        result.elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        // Calculate averages
+        if (numSteps > 0) {
+            result.avgFiringRate = result.totalReward / static_cast<float>(numSteps);
+        }
+        
+        result.finalNeuronCount = brain->getTotalNeuronCount();
+        result.finalSynapseCount = brain->getTotalSynapseCount();
+        
+        return result;
+    }
+    
+    // Create complete NLM environment
+    static std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> 
+    createCompleteEnvironment(
+        const std::string& configType = "balanced",
+        size_t worldWidth = 20,
+        size_t worldHeight = 20,
+        size_t visionWidth = 8,
+        size_t visionHeight = 8
+    ) {
+        // Create brain
+        std::shared_ptr<Config> config;
+        if (configType == "balanced") {
+            config = createBalancedConfig(1000, 0.1f, true, false);
+        } else if (configType == "high_plasticity") {
+            config = createBalancedConfig(1500, 0.15f, true, true);
+        } else if (configType == "sparse") {
+            config = createBalancedConfig(500, 0.05f, false, false);
+        } else {
+            config = createBalancedConfig();
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Create world
+        auto world = createAdvancedWorld(worldWidth, worldHeight, visionWidth, visionHeight, 0.01f, 100.0f, 10);
+        
+        // Create agent
+        auto agent = createAdvancedAgent(brain, world, true, true, false, true);
+        
+        return std::make_tuple(brain, world, agent);
+    }
+}}
 }
 
 } // namespace nlm
