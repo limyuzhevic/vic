@@ -150,8 +150,11 @@ void testSynapseReset() {
     synapse.setEligibilityTrace(0.3f);
     
     synapse.reset();
-    
-    assert(synapse.getWeight() == 0.0f);
+
+    // Reset clears short-term state, NOT the weight: Brain::reset() runs
+    // at the start of every Phase 3 episode, and zeroing weights there
+    // disconnected the network (all spike deliveries carried weight 0).
+    assert(synapse.getWeight() == 0.5f);
     assert(synapse.getPreSpikeHistory().empty());
     assert(synapse.getPostSpikeHistory().empty());
     assert(synapse.getEligibilityTrace() == 0.0f);

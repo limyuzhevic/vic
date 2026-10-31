@@ -52,6 +52,10 @@ void NeuralRegion::setName(const std::string& name) {
     pImpl->name = name;
 }
 
+void NeuralRegion::setNextNeuronIndex(uint64_t next) {
+    pImpl->nextNeuronIndex = next;
+}
+
 PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
     PopulationId popId(pImpl->populations.size() + 1);
     auto population = std::make_unique<NeuralPopulation>(popId, size);

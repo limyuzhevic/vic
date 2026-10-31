@@ -223,7 +223,13 @@ void Synapse::step(Timestamp currentTime) {
 }
 
 void Synapse::reset() {
-    pImpl->weight = 0.0f;
+    // Do NOT zero the weight here. Brain::reset() is called at the start
+    // of every Phase 3 episode, and zeroing weights there disconnected the
+    // whole network: every sensory spike then delivered weight 0, so
+    // internal and motor neurons stayed exactly at rest and the agent
+    // could never move. Weight is long-term connectivity / learned state;
+    // reset only clears short-term state (spike histories, eligibility)
+    // and restores efficacy, so a new episode starts with an intact brain.
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;

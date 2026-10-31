@@ -210,9 +210,11 @@ bool Brain::initialize() {
     
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
+    size_t nextNeuronIndex = 1;  // globally unique IDs across regions (see setNextNeuronIndex)
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
+            region->setNextNeuronIndex(nextNeuronIndex);
             // Add populations. The old layout had no inhibitory neurons at
             // all (Sensory/Internal/Motor are all treated as excitatory by
             // initializeRandomConnectivity), so any input caused runaway
@@ -240,9 +242,10 @@ bool Brain::initialize() {
                 }
             }
             
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) + 
+            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) +
                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
                         std::to_string(region->getTotalNeuronCount()) + " neurons");
+            nextNeuronIndex += region->getTotalNeuronCount();
         }
     }
     

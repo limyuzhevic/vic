@@ -57,6 +57,10 @@ struct ExperimentMetrics {
     int turnRightCount;
     int interactCount;
     int waitCount;
+    // Look actions were previously counted as Wait by the demo's default
+    // case, which understated non-Wait share. Count them separately.
+    int lookLeftCount;
+    int lookRightCount;
     
     ExperimentMetrics();
     void reset();

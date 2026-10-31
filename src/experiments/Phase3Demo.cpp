@@ -8,6 +8,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cstdlib>
 
 namespace nlm {
 
@@ -70,22 +71,50 @@ public:
             metrics.episode = episode;
             
             float episodeReward = 0.0f;
-            
+            // Monotonic brain-step counter for this episode. The old code
+            // reused neuralStep 0..9 for every action, so delayed spikes
+            // scheduled for step 10+ could never be delivered and
+            // accumulated forever in the spike system.
+            uint64_t brainStepCounter = 0;
+
             // Run steps
             for (int step = 0; step < stepsPerEpisode; ++step) {
                 // 1. Get sensory percept from world
                 const SensoryPercept& percept = world.getSensoryPercept();
-                
+
                 // 2. Inject sensory input into brain
                 agentBrain.processSensoryInput(percept);
-                
+
                 // 3. Simulate brain (multiple steps per action)
                 for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
-                    brain->step(neuralStep);
+                    (void)neuralStep;
+                    brain->step(brainStepCounter++);
                 }
                 
                 // 4. Decode motor command from brain activity
                 MotorCommand cmd = agentBrain.decodeMotorCommand();
+
+                // Instrumentation (opt-in, off by default): log the exact
+                // quantities the Wait-default hypothesis depends on, for
+                // episode 0 only. Set NLM_PHASE3_INSTRUMENT=1 to enable.
+                if (episode == 0 && std::getenv("NLM_PHASE3_INSTRUMENT")) {
+                    auto acts = agentBrain.getMotorGroupActivities();
+                    size_t visionSeen = 0;
+                    for (float v : percept.getVision()) {
+                        if (v < 0.999f) ++visionSeen;
+                    }
+                    std::cout << "INSTR step=" << step
+                              << " firing=" << brain->getFiringNeuronCount()
+                              << " avgRate=" << brain->getAverageFiringRate()
+                              << " visionSeen=" << visionSeen << "/"
+                              << percept.getVision().size();
+                    for (const auto& a : acts) {
+                        std::cout << " " << a.name << "=" << a.activity
+                                  << "/rate=" << a.firingRate
+                                  << "(n=" << a.size << ",refr=" << a.refractoryCount << ")";
+                    }
+                    std::cout << " cmd=" << motorCommandToString(cmd) << "\n";
+                }
                 
                 // 5. Apply motor command to world
                 ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
@@ -105,13 +134,15 @@ public:
                 metrics.totalReward += result.reward;
                 metrics.totalSpikes += brain->getFiringNeuronCount();
                 
-                // Count actions
+                // Count actions (Look actions are not Wait)
                 switch (cmd) {
                     case MotorCommand::MoveForward: metrics.forwardCount++; break;
                     case MotorCommand::MoveBackward: metrics.backwardCount++; break;
                     case MotorCommand::TurnLeft: metrics.turnLeftCount++; break;
                     case MotorCommand::TurnRight: metrics.turnRightCount++; break;
                     case MotorCommand::Interact: metrics.interactCount++; break;
+                    case MotorCommand::LookLeft: metrics.lookLeftCount++; break;
+                    case MotorCommand::LookRight: metrics.lookRightCount++; break;
                     default: metrics.waitCount++; break;
                 }
                 
@@ -144,12 +175,15 @@ public:
             std::cout << "  Total Reward: " << metrics.totalReward << "\n";
             std::cout << "  Final Energy: " << metrics.finalEnergy << "\n";
             std::cout << "  Synapses: " << metrics.totalSynapses << "\n";
-            std::cout << "  Action counts: fwd=" << metrics.forwardCount 
+            std::cout << "  Action counts: fwd=" << metrics.forwardCount
                       << ", bwd=" << metrics.backwardCount
                       << ", left=" << metrics.turnLeftCount
                       << ", right=" << metrics.turnRightCount
                       << ", interact=" << metrics.interactCount
                       << ", wait=" << metrics.waitCount
+                      << ", lookL=" << metrics.lookLeftCount
+                      << ", lookR=" << metrics.lookRightCount
+                      << ", avgFiringRate=" << metrics.averageFiringRate
                       << "\n\n";
         }
         
