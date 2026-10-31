@@ -196,6 +196,67 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+
+    // ========== REFACTORED STEP() DECOMPOSITION ==========
+    // Phase 1: Spike processing and neuron updates
+    void ProcessPendingDelayedSpikes();
+    void UpdateNeurons();
+    void DetectAndScheduleSpikes();
+    void ProcessSpikes();
+
+    // Phase 2: Memory and cognition systems
+    void UpdateWorkingMemory();
+    void UpdateEpisodicMemory();
+    void UpdatePredictionSystem();
+    void UpdateAttentionSystem();
+    void UpdateConceptFormation();
+    void UpdateMemoryNeurons();
+
+    // Phase 3: Neuromodulation and plasticity
+    void ApplyNeuromodulation();
+    void ApplyPlasticityRules();
+    void ApplyPredictionErrorNeuromodulation();
+    void ApplyCuriosityAndNovelty();
+
+    // Phase 4: Structural and developmental changes
+    void ApplyStructuralPlasticity();
+    void ApplyDevelopmentEffects();
+    void PeriodicMemoryConsolidation();
+
+    // Phase 5: Memory replay and checkpointing
+    void ReplayMemories();
+    void CheckpointManagement();
+
+    // Phase 6: Statistics and monitoring
+    void CollectStatistics();
+
+    // Helper methods for step() orchestration
+    void InitializeStep(SimulationStep currentStep, Timestamp currentTime);
+    void FinalizeStep();
+
+    // ========== HELPER AND UTILITY METHODS ==========
+    
+    // Neuron I/O operations
+    void InjectSensoryInput();
+    void InjectCurrentToNeurons(NeuronType type, MembranePotential current);
+    void StoreActiveNeuronsToWorkingMemory();
+    
+    // Memory system helpers
+    void CaptureEpisodeToEpisodicMemory(Timestamp currentTime);
+    void PrepareMemoryForReplay();
+    void ConsolidateMemories(float threshold);
+    
+    // Neuromodulation helpers
+    void UpdateDopamineEffects();
+    void UpdatePlasticityWithNeuromodulation(float plasticityMod);
+    
+    // Development and staging helpers
+    void UpdateDevelopmentalStage(SimulationStep currentStep);
+    void UpdatePlasticityRatesBasedOnStage(DevelopmentalStage stage);
+    
+    // Statistics and logging
+    void UpdateStepStatistics();
+    void LogStepProgress() const;
 };
 
 } // namespace nlm
