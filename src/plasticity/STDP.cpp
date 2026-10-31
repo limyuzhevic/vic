@@ -58,24 +58,17 @@ void STDP::update(Synapse* synapse,
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
-    
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);  // Δt in ms
-            
-            if (dt > 0) {
-                // Pre before post: POTENTIATION
-                // "Cells that fire together, wire together" - but only if pre fires before post
-                float delta = pImpl->ltpWeight * std::exp(-dt / tau);
-                totalDelta += delta;
-            } else if (dt < 0) {
-                // Post before pre: DEPRESSION
-                // "Anti-Hebbian" - connection weakens if post fires without pre
-                float delta = -pImpl->ltdWeight * std::exp(dt / tau);  // dt is negative, so this subtracts
-                totalDelta += delta;
-            }
-            // dt == 0: no change (simultaneous spikes - rare in practice)
-        }
+
+    // Nearest-neighbour STDP: only the most recent pre/post pair is used.
+    // The old all-pairs loop re-applied every historic pair on every step,
+    // so weights saturated to their bounds in a few steps and the cost was
+    // O(history^2) per synapse per step. Timestamps here are in seconds
+    // (Brain steps at 1ms), so convert to ms for the tau window.
+    float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
+    if (dtMs > 0) {
+        totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
+    } else if (dtMs < 0) {
+        totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
     }
     
     // Apply weight change with bounds
@@ -83,9 +76,23 @@ void STDP::update(Synapse* synapse,
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
-        
+
+        // Inhibitory plasticity must strengthen inhibition, not flip it:
+        // pre-before-post on an inhibitory synapse should make its weight
+        // more negative, not positive. Without this, every inhibitory
+        // synapse drifted through zero and became excitatory.
+        if (synapse->getType() == SynapseType::Inhibitory) {
+            totalDelta = -totalDelta;
+        }
+
         // Apply weight change
         synapse->addToWeight(totalDelta);
+        // Enforce sign: excitatory stays >= 0.01, inhibitory stays <= -0.01.
+        if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
+            synapse->setWeight(-0.01f);
+        } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
+            synapse->setWeight(0.01f);
+        }
         
         // Update eligibility trace for reward-modulated learning
         float currentTrace = synapse->getEligibilityTrace();

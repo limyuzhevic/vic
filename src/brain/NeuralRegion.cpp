@@ -13,8 +13,10 @@ struct NeuralRegion::Impl {
     std::unordered_map<NeuronId, std::vector<SynapseId>> outgoingSynapses;  // source -> synapse ids
     std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses;  // dest -> synapse ids
     SynapseId nextSynapseId;
-    
-    explicit Impl(RegionId id) : id(id), nextSynapseId(1) {}
+    uint64_t nextNeuronIndex;
+    std::unordered_map<uint64_t, Synapse*> synapseById;
+
+    explicit Impl(RegionId id) : id(id), nextSynapseId(1), nextNeuronIndex(1) {}
 };
 
 NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
@@ -54,6 +56,9 @@ PopulationId NeuralRegion::addPopulation(size_t size, NeuronType type) {
     PopulationId popId(pImpl->populations.size() + 1);
     auto population = std::make_unique<NeuralPopulation>(popId, size);
     population->setNeuronType(type);
+    // Materialise the neurons, with IDs unique across this region.
+    population->createNeurons(NeuronId(pImpl->nextNeuronIndex));
+    pImpl->nextNeuronIndex += size;
     pImpl->populations.push_back(std::move(population));
     return popId;
 }
@@ -98,27 +103,20 @@ SynapseId NeuralRegion::addSynapse(NeuronId source, NeuronId destination,
     
     pImpl->outgoingSynapses[source].push_back(synId);
     pImpl->incomingSynapses[destination].push_back(synId);
-    
+
+    pImpl->synapseById[synId.index()] = synapse.get();
     pImpl->synapses.push_back(std::move(synapse));
     return synId;
 }
 
 Synapse* NeuralRegion::getSynapse(SynapseId id) {
-    for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
-        }
-    }
-    return nullptr;
+    auto it = pImpl->synapseById.find(id.index());
+    return it != pImpl->synapseById.end() ? it->second : nullptr;
 }
 
 const Synapse* NeuralRegion::getSynapse(SynapseId id) const {
-    for (auto& syn : pImpl->synapses) {
-        if (syn->getId() == id) {
-            return syn.get();
-        }
-    }
-    return nullptr;
+    auto it = pImpl->synapseById.find(id.index());
+    return it != pImpl->synapseById.end() ? it->second : nullptr;
 }
 
 size_t NeuralRegion::getSynapseCount() const {
@@ -291,6 +289,9 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
             if (Synapse* syn = getSynapse(synId)) {
                 syn->setType(synType);
                 syn->initializeRandom(rng);
+                // A synapse that never updates its weight cannot learn.
+                // Plasticity flags default to false, so enable them here.
+                syn->enablePlasticity(true, true, false);
             }
         }
     }
