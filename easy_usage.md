@@ -2,15 +2,32 @@
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (Neural Learning Machine) is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+
+**Key Features:**
+- **Phase 6 Integration**: All brain systems (memory, prediction, cognition, neuromodulation) work together
+- **Real Neural Computation**: Implements Leaky Integrate-and-Fire (LIF) neurons with event-driven dynamics
+- **Multiple Learning Mechanisms**: STDP, Hebbian learning, and structural plasticity
+- **Development**: Brains mature over time with changing plasticity rates
+- **Interactive**: Use command-line tools or Python API to work with neural simulations
+
+**What you can do with NLM:**
+1. Create virtual brains with thousands of neurons
+2. Run simulations to see learning and development emerge
+3. Explore how memory systems work
+4. Study neuromodulation and its effects on learning
+5. Create agents that interact with simulated worlds
+6. Save and load brain states for analysis
+
+**Important Update**: NLM now includes an enhanced command-line interface (`nlm`) that provides a much more user-friendly way to work with neural simulations. The Python API (`pynlm`) is still available for programmatic access.
 
 Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+- **Neurons** = Brain cells that send signals to each other (LIF neurons with realistic dynamics)
+- **Synapses** = Connections between brain cells (plastic connections that strengthen/weaken)
+- **Learning** = When connections get stronger or weaker based on what happens (STDP, Hebbian, structural plasticity)
+- **Memory** = The brain remembering patterns (working memory, episodic memory, associative memory)
 
-That's it! NLM simulates all of this.
+NLM simulates all of this through a comprehensive, integrated brain architecture.
 
 ---
 

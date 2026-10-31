@@ -46,13 +46,15 @@ After successful compilation, you will have:
 
 | Target | Type | Description |
 |--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
+| `nlm` | Executable | **Main simulation executable with enhanced CLI interface** |
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
 | `nlm_test` | Executable | Unit test suite |
+
+**New Feature**: The `nlm` executable now includes an enhanced command-line interface with comprehensive commands for brain exploration, experiment running, configuration management, and scripting.
 
 ### Build Options
 
@@ -66,6 +68,24 @@ cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
 # Install to custom prefix
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
 make install
+```
+
+**New Feature**: Added improved build system with better target organization and installation options.
+
+### Additional Build Options
+
+```bash
+# Build with Python bindings (enabled by default)
+cmake .. -DPYTHON_BINDINGS=ON
+
+# Build without Python bindings
+cmake .. -DPYTHON_BINDINGS=OFF
+
+# Build with all experiments enabled
+cmake .. -DENABLE_ALL_EXPERIMENTS=ON
+
+# Build with specific experiment set
+cmake .. -DEXPERIMENTS=phase3,phase4,phase6
 ```
 
 ---
