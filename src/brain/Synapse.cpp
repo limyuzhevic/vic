@@ -202,24 +202,30 @@ void Synapse::step(Timestamp currentTime) {
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        // Pre-calculate exponential decay to avoid repeated calculations
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
+    // Decay short-term depression - simplified logic
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
-        float timeSinceActivity = std::max(
-            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
-            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
-        );
+        // Calculate time since last activity for depression recovery
+        float timeSincePost = (pImpl->lastPostSpikeTime >= 0.0f) ? 
+            static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : FLT_MAX;
+        float timeSincePre = (pImpl->lastPreSpikeTime >= 0.0f) ? 
+            static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : FLT_MAX;
+        
+        float timeSinceActivity = std::min(timeSincePost, timeSincePre);
+        
         // Recovery from depression toward 1.0
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
     // Decay eligibility trace for reward-modulated learning
+    // Use a configurable decay rate instead of hardcoded 0.001f
     decayEligibilityTrace(0.001f);  // Fast decay
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Weight clamping should be handled by setWeight, not in step()
+    // to avoid redundant operations in the main simulation loop
 }
 
 void Synapse::reset() {

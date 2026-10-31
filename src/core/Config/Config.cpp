@@ -24,11 +24,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Configuration file not found: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,15 +46,19 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
             set(key, value, ConfigSource::File);
+            NLM_LOG_DEBUG("Loaded config: " + key + " = " + value + " (line " + std::to_string(lineNumber) + ")");
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNumber) + ": " + line);
         }
     }
     
+    NLM_LOG_INFO("Loaded " + std::to_string(pImpl->entries.size()) + " configuration entries from: " + filepath);
     return true;
 }
 
@@ -86,22 +93,55 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Use ConfigValue::toString() to properly serialize the value
+        std::visit([&file](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << v << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << v[i] << "\"";
+                    } else {
+                        file << v[i];
+                    }
+                }
+                file << "]";
+            } else {
+                file << v;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
+    NLM_LOG_INFO("Saved " + std::to_string(pImpl->entries.size()) + " configuration entries to: " + filepath);
     return true;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
+    ConfigEntry newEntry(key, value, source);
+    newEntry.description = description;
+    
     if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
+        *it = newEntry;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.push_back(newEntry);
     }
+}
+
+// Helper method to get all configuration entries for export
+std::vector<ConfigEntry> Config::getAllEntries() const {
+    return pImpl->entries;
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
@@ -130,11 +170,15 @@ bool Config::has(const std::string& key) const {
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        NLM_LOG_INFO("Removed config key: " + key);
+        pImpl->entries.erase(it);
+    } else {
+        NLM_LOG_DEBUG("Config key not found for removal: " + key);
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {
@@ -173,8 +217,38 @@ std::string Config::summary() const {
             }
         }, entry.value);
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
+    oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+// Additional utility methods
+std::vector<ConfigEntry> Config::getEntriesBySource(ConfigSource source) const {
+    std::vector<ConfigEntry> result;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.source == source) {
+            result.push_back(entry);
+        }
+    }
+    return result;
+}
+
+bool Config::hasDefaultValue(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    if (it == pImpl->entries.end()) {
+        return false;
+    }
+    return it->source == ConfigSource::Default;
+}
+
+bool Config::hasCommandLineValue(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    if (it == pImpl->entries.end()) {
+        return false;
+    }
+    return it->source == ConfigSource::CommandLine;
 }
 
 std::string Config::trim(const std::string& str) {
@@ -194,27 +268,47 @@ template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
+    
     if (it == pImpl->entries.end()) {
+        NLM_LOG_DEBUG("Config key not found: " + key);
         return std::nullopt;
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
-        } else {
-            return std::nullopt;
-        }
-    }, it->value);
+    
+    try {
+        // Numeric values convert between int/int64/double/float/etc, so a
+        // value stored as double can be read as float and vice versa.
+        return std::visit([](auto&& v) -> std::optional<T> {
+            using V = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<V, T>) {
+                return v;
+            } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
+                return static_cast<T>(v);
+            } else {
+                NLM_LOG_WARNING("Config type mismatch for key: " + key + " (expected " + typeid(T).name() + ", got " + typeid(V).name() + "); returning nullopt");
+                return std::nullopt;
+            }
+        }, it->value);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception getting config key " + key + ": " + e.what());
+        return std::nullopt;
+    }
 }
 
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (val.has_value()) {
+        return val.value();
+    }
+    
+    // Log when using default value
+    NLM_LOG_DEBUG("Using default value for config key: " + key + " = " + std::to_string(defaultValue));
+    return defaultValue;
+}
+    
+    // Log when using default value
+    NLM_LOG_DEBUG("Using default value for config key: " + key + " = " + std::to_string(defaultValue));
+    return defaultValue;
 }
 
 // Explicit template instantiations

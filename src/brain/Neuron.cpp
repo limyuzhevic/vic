@@ -266,9 +266,13 @@ void Neuron::step(Timestamp currentTime) {
 }
 
 void Neuron::reset() {
+    // Reset all neuron state to initial conditions
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    // Clear incoming and outgoing synapse references
+    pImpl->incomingSynapses.clear();
+    pImpl->outgoingSynapses.clear();
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
