@@ -138,6 +138,24 @@ public:
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    
+    // Process pattern for concept formation
+    // Legacy interface - forwards to presentExperience
+    void processPattern(const std::vector<float>& pattern, SimulationStep currentTime) {
+        // Convert pattern to features (same for backward compatibility)
+        presentExperience(pattern, pattern, 0.0f, currentTime);
+    }
+    
+    // Process pattern with explicit features
+    void processPattern(const std::vector<float>& pattern,
+                        const std::vector<float>& features,
+                        float reward = 0.0f,
+                        SimulationStep currentTime = 0) {
+        presentExperience(pattern, features, reward, currentTime);
+    }
+    
+    // Get generalization ability (can concept handle variations?)
+    float getGeneralizationAbility(size_t conceptId) const;
 
 private:
     // Create new concept from pattern

@@ -295,9 +295,46 @@ void ConceptFormation::clear() {
     concepts_.clear();
     nextConceptId_ = 1;
 }
-
-// SpatialRepresentation Implementation
-struct SpatialRepresentation::Impl {
+    
+    // Get generalization ability (can concept handle variations?)
+    float ConceptFormation::getGeneralizationAbility(size_t conceptId) const {
+        const DiscoveredConcept* conceptObj = getConcept(conceptId);
+        if (!conceptObj) return 0.0f;
+        
+        // Generalization ability = how varied are the instances
+        if (conceptObj->instances.size() < 2) return 0.0f;
+        
+        float totalVariance = 0.0f;
+        for (const auto& instance : conceptObj->instances) {
+            float sim = computeSimilarity(instance.pattern, conceptObj->prototype);
+            totalVariance += (1.0f - sim);
+        }
+        
+        return 1.0f - (totalVariance / conceptObj->instances.size());
+    }
+    
+    // Process pattern for concept formation
+    // Legacy interface - forwards to presentExperience
+    void ConceptFormation::processPattern(const std::vector<float>& pattern, SimulationStep currentTime) {
+        // Convert pattern to features (same for backward compatibility)
+        presentExperience(pattern, pattern, 0.0f, currentTime);
+    }
+    
+    // Process pattern with explicit features
+    void ConceptFormation::processPattern(const std::vector<float>& pattern,
+                                          const std::vector<float>& features,
+                                          float reward,
+                                          SimulationStep currentTime) {
+        presentExperience(pattern, features, reward, currentTime);
+    }
+    
+    // SpatialRepresentation Implementation
+    
+    
+    struct SpatialRepresentation::Impl {
+    
+    
+    struct SpatialRepresentation::Impl {
     Brain* brain;
     
     Impl() : brain(nullptr) {}
