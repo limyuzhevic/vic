@@ -12,10 +12,11 @@ requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,6 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
 ]
 
 dependencies = []
@@ -33,12 +35,37 @@ dependencies = []
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "matplotlib>=3.0",
+    "scipy>=1.5",
+    "networkx>=2.5",
+    "jupyter>=1.0",
+    "ipython>=7.0",
+    "black>=21.0",
+    "isort>=5.0",
+    "flake8>=3.8",
+    "mypy>=0.800",
+    "pytest-cov>=2.10",
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+]
+
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=2.10",
+    "numpy>=1.20",
+]
+
+vis = [
+    "matplotlib>=3.0",
+    "plotly>=5.0",
+    "jupyter>=1.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
 
 [tool.scikit-build]
 cmake.minimum-version = "3.16"
@@ -55,3 +82,46 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 88
+target_version = "py38"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[project.scripts]
+nlm-cli = "pynlm.cli:main"
+pynlm = "pynlm.cli:main"
+
+[project.entry-points.pynlm]
+console_scripts = [
+    "nlm-cli = pynlm.cli:main",
+    "pynlm = pynlm.cli:main",
+]
+
