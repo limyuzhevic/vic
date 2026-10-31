@@ -221,6 +221,12 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Enabling cognitive integration...")
+    NLM_LOG_INFO("  - Neural planning for action selection")
+    NLM_LOG_INFO("  - Concept formation from sensory patterns")
+    NLM_LOG_INFO("  - Attentional selection of important stimuli")
+    
+    std::vector<float> sensoryPattern(50, 0.5f);  // Simple sensory pattern
     
     for (SimulationStep step = 0; step < 1000; ++step) {
         // Create input pattern - inject current into sensory neurons
@@ -228,13 +234,15 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
         }
         
-        brain->step(step, step * 0.001);
+        // Use the enhanced step method with cognitive integration
+        brain->step(step, step * 0.001, true, true, true, &sensoryPattern);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                        " | Planned action: " + std::to_string(static_cast<int>(brain->getPlannedAction())));
         }
     }
     
@@ -243,6 +251,12 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Compute and display statistics
     experiment.computeStatistics();
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Cognitive Integration Results ===");
+    NLM_LOG_INFO("  Neural planner enabled: " + std::to_string(brain->getPlannedAction() != ActionType::Wait));
+    NLM_LOG_INFO("  Total concepts formed: [Available via ConceptFormation API]");
+    NLM_LOG_INFO("  Attentional focus: [Available via Attention API]");
 }
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {
@@ -288,11 +302,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         if (preNeuron && postNeuron) {
             // Pre fires first
             preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
+            brain->step(trial * 2, trial * 2 * 0.001, false, false, false, nullptr);
             
             // Then post fires
             postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001, false, false, false, nullptr);
         }
     }
     
@@ -301,8 +315,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     for (size_t i = 0; i < 5; ++i) {
         float delta = synapses[i]->getWeight() - beforeWeights[i];
         NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
+                        " after: " + std::to_string(synapses[i]->getWeight()) +
+                        " (Δ=" + std::to_string(delta) + ")");
     }
     
     // Check if weights increased (LTP)

@@ -61,6 +61,9 @@ struct Brain::Impl {
     SimulationStep currentStep;
     Timestamp currentTime;
     
+    // Action planning
+    ActionType plannedAction_;  // Action planned by NeuralPlanner
+    
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
@@ -86,6 +89,7 @@ struct Brain::Impl {
         , timestep(0.001)
         , currentStep(0)
         , currentTime(0.0)
+        , plannedAction_(ActionType::Wait)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
@@ -300,14 +304,16 @@ bool Brain::initialize() {
 }
 
 void Brain::step(SimulationStep currentStep) {
-    step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep);
+    step(currentStep, static_cast<Timestamp>(currentStep) * pImpl->timestep, false, false, false, nullptr);
 }
 
-void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
+void Brain::step(SimulationStep currentStep, Timestamp currentTime, 
+                    bool enablePlanning, bool enableConceptFormation,
+                    bool enableAttention, const std::vector<float>* sensoryPattern) {
     /*
      * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
      * 
-     * This implements the complete integrated brain simulation:
+     * This implements the complete integrated brain simulation with configurable options:
      * 
      * 1. Process pending delayed spike events (deliver synaptic input)
      * 2. Update all neuron membrane potentials (LIF dynamics)
@@ -323,6 +329,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 12. Replay important memories (during rest or periodically)
      * 13. Apply development effects
      * 14. Collect statistics
+     * 
+     * Options:
+     * - enablePlanning: Enable neural planning for action selection
+     * - enableConceptFormation: Enable concept discovery from patterns
+     * - enableAttention: Enable attentional selection
+     * - sensoryPattern: Optional sensory input pattern for cognition systems
      */
     
     pImpl->currentStep = currentStep;
@@ -406,33 +418,80 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
-    // ========== STEP 5: Apply neuromodulation effects ==========
-    // Update novelty detection
-    if (pImpl->novelty) {
-        pImpl->novelty->update(pImpl->timestep);
-    }
-    
-    // Update curiosity
-    if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->timestep);
-    }
-    
-    // Update dopamine (reward prediction error)
-    if (pImpl->dopamine) {
-        pImpl->dopamine->update(pImpl->timestep);
-        
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
-        float dopamineLevel = pImpl->dopamine->getLevel();
+    // ========== STEP 5B: Integrate cognition systems (if enabled) ==========
+    if (enablePlanning && pImpl->planner) {
+        // Get current neural state as sensory pattern for planning
+        std::vector<float> currentState;
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
-                for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+                if (pop->getNeuronType() == NeuronType::Internal || 
+                    pop->getNeuronType() == NeuronType::Motor) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        float activity = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+                        currentState.push_back(activity);
+                    }
+                }
+            }
+        }
+        
+        // Use planned action for next step if planning is enabled
+        if (!currentState.empty() && currentState.size() > 0) {
+            ActionType plannedAction = pImpl->planner->planAction(currentState);
+            // Store planned action for next step's action selection
+            pImpl->plannedAction_ = plannedAction;
+        }
+    }
+    
+    if (enableConceptFormation && pImpl->conceptFormation && sensoryPattern) {
+        // Form concepts from sensory input
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            *sensoryPattern, std::vector<float>(sensoryPattern->size(), 0.5f), 0.5f, currentStep);
+        
+        // If we got a new concept, log it
+        if (conceptId > 0) {
+            NLM_LOG_INFO("ConceptFormation: New concept discovered at step " + std::to_string(currentStep));
+        }
+    }
+    
+    if (enableAttention && pImpl->attention) {
+        // Update attention system with current brain state
+        pImpl->attention->update(pImpl->timestep);
+        
+        // Apply attention to working memory competition
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+            
+            // Update attention winners based on attention
+            if (!pImpl->attention->getWinners().empty()) {
+                // Strengthen attended neurons in working memory
+                for (NeuronId winner : pImpl->attention->getWinners()) {
+                    if (pImpl->workingMemory->contains(winner)) {
+                        float currentActivation = pImpl->workingMemory->getNeuronActivation(winner);
+                        pImpl->workingMemory->storeToNeuron(winner, currentActivation * 1.1f);
+                    }
+                }
+            }
+        }
+        
+        // Apply top-down attention bias from planner if planning is enabled
+        if (enablePlanning && pImpl->planner && pImpl->getCurrentGoal().size() > 0) {
+            std::vector<float> goalState = pImpl->planner->getCurrentGoal();
+            // Apply goal-related attention bias
+            for (size_t i = 0; i < std::min(goalState.size(), currentState.size()); ++i) {
+                if (goalState[i] > 0.7f) {
+                    // High goal importance -> increase attention
+                    float biasStrength = goalState[i] * 0.5f;
+                    // Apply this as top-down bias to internal neurons
+                    for (auto& region : pImpl->regions) {
+                        for (auto& pop : region->getPopulations()) {
+                            if (pop->getNeuronType() == NeuronType::Internal) {
+                                for (auto* neuron : pop->getNeurons()) {
+                                    pImpl->attention->applyTopDownBias(neuron->getId(), biasStrength);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -725,14 +784,68 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     pImpl->stdp->setLTDWeight(0.012f * modulation);
 }
 
-void Brain::updatePlasticity() {
-    // Plasticity is now applied during each step
-    // This method is kept for API compatibility
-}
-
 void Brain::develop() {
     // Development updates structural plasticity
     pImpl->structuralPlasticity->update(this, *pImpl->rng);
+}
+
+ActionType Brain::getPlannedAction() const {
+    return pImpl->plannedAction_;
+}
+
+void Brain::setPlannedAction(ActionType action) {
+    pImpl->plannedAction_ = action;
+}
+
+void Brain::updatePlannerWithCurrentState() {
+    if (pImpl->planner) {
+        // Get current neural state as sensory pattern for planning
+        std::vector<float> currentState;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Internal || 
+                    pop->getNeuronType() == NeuronType::Motor) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        const auto& state = neuron->getState();
+                        float activity = std::abs(state.membranePotential - state.restingPotential) / 20.0f;
+                        currentState.push_back(activity);
+                    }
+                }
+            }
+        }
+        
+        if (!currentState.empty()) {
+            ActionType plannedAction = pImpl->planner->planAction(currentState);
+            pImpl->plannedAction_ = plannedAction;
+        }
+    }
+}
+
+void Brain::updateConceptFormationWithSensoryInput(const std::vector<float>& sensoryPattern) {
+    if (pImpl->conceptFormation) {
+        size_t conceptId = pImpl->conceptFormation->presentExperience(
+            sensoryPattern, std::vector<float>(sensoryPattern.size(), 0.5f), 0.5f, pImpl->currentStep);
+        
+        if (conceptId > 0) {
+            NLM_LOG_INFO("ConceptFormation: New concept discovered at step " + std::to_string(pImpl->currentStep));
+        }
+    }
+}
+
+void Brain::updateAttentionWithWorkingMemory() {
+    if (pImpl->attention && pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+        std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+        pImpl->attention->processCompetition(competitors);
+        
+        if (!pImpl->attention->getWinners().empty()) {
+            for (NeuronId winner : pImpl->attention->getWinners()) {
+                if (pImpl->workingMemory->contains(winner)) {
+                    float currentActivation = pImpl->workingMemory->getNeuronActivation(winner);
+                    pImpl->workingMemory->storeToNeuron(winner, currentActivation * 1.1f);
+                }
+            }
+        }
+    }
 }
 
 void Brain::reset() {

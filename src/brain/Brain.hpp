@@ -187,11 +187,14 @@ public:
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Action selection
+    ActionType getPlannedAction() const { return pImpl->plannedAction_; }
+    void setPlannedAction(ActionType action) { pImpl->plannedAction_ = action; }
     
-    // Logging
-    void logStatus() const;
+    // Cognitive integration helper
+    void updatePlannerWithCurrentState();
+    void updateConceptFormationWithSensoryInput(const std::vector<float>& sensoryPattern);
+    void updateAttentionWithWorkingMemory();
     
 private:
     struct Impl;

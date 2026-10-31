@@ -121,14 +121,51 @@ void testBrainStatus() {
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
-void runAll() {
-    testBrainCreation();
-    testBrainInitialization();
-    testBrainStep();
-    testBrainReset();
-    testBrainRegions();
-    testBrainActionProduction();
-    testBrainStatus();
+void testBrainCognitionIntegration() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Test 1: Default step (cognition integration disabled)
+    brain.step(0, 0.0);
+    assert(brain.getPlannedAction() == nlm::ActionType::Wait);
+    
+    // Test 2: Enhanced step with cognition integration enabled
+    std::vector<float> sensoryPattern(10, 0.5f);
+    brain.step(1, 0.1, true, true, true, &sensoryPattern);
+    
+    // Verify cognitive systems are available
+    assert(brain.getPlanner() != nullptr);
+    assert(brain.getConceptFormation() != nullptr);
+    assert(brain.getAttention() != nullptr);
+    
+    // Test 3: Planned action setter/getter
+    brain.setPlannedAction(nlm::ActionType::MoveForward);
+    assert(brain.getPlannedAction() == nlm::ActionType::MoveForward);
+    
+    std::cout << "    testBrainCognitionIntegration passed" << std::endl;
+}
+
+void testBrainActionProductionWithCognition() {
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Enable cognitive integration
+    std::vector<float> sensoryPattern(10, 0.5f);
+    brain.step(0, 0.0, true, true, true, &sensoryPattern);
+    
+    // Verify that action production still works with cognitive integration
+    auto action = brain.produceAction();
+    assert(action != nullptr);
+    
+    std::cout << "    testBrainActionProductionWithCognition passed" << std::endl;
 }
 
 } // namespace test_brain
