@@ -211,15 +211,15 @@ float NeuralRegion::getSynapticDensity() const {
     return static_cast<float>(pImpl->synapses.size()) / static_cast<float>(maxConnections);
 }
 
-void NeuralRegion::step(Timestamp currentTime) {
+void NeuralRegion::step(Timestamp currentTime, TimestepDuration dt) {
     // Step all populations
     for (auto& pop : pImpl->populations) {
-        pop->step(currentTime);
+        pop->step(currentTime, dt);
     }
     
     // Step all synapses
     for (auto& syn : pImpl->synapses) {
-        syn->step(currentTime);
+        syn->step(currentTime, dt);
     }
 }
 

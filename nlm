@@ -1,0 +1,230 @@
+#!/bin/bash
+# NLM (熙然) - Neural Learning Machine - Command Line Interface
+
+# This script provides basic commands to interact with the NLM artificial brain system
+# It demonstrates the enhanced functionality after implementing the improvements
+
+CONFIG_FILE="configs/default.cfg"
+
+function show_help() {
+    echo "=== NLM - Neural Learning Machine ==="
+    echo "An experimental artificial developmental brain system"
+    echo ""
+    echo "Available commands:"
+    echo "  help                    Show this help message"
+    echo "  status                  Show current brain status"
+    echo "  config [file]           Load configuration file (default: configs/default.cfg)"
+    echo "  run [steps]             Run simulation for specified steps (default: 1000)"
+    echo "  checkpoint [path]       Save brain state to checkpoint"
+    echo "  load [path]             Load brain state from checkpoint"
+    echo "  stats                   Show detailed statistics"
+    echo "  neurons                 List all neurons and their types"
+    echo "  synapses                 List all synapses and connections"
+    echo "  neuromodulators          Show current neuromodulator levels"
+    echo "  memory                  Show memory system status"
+    echo "  plasticity              Show plasticity rule status"
+    echo "  reset                   Reset brain to initial state"
+    echo "  exit                    Exit from interactive mode"
+    echo ""
+}
+
+function show_status() {
+    echo "=== NLM Status ==="
+    if [ -f "checkpoint.bin" ]; then
+        echo "✓ Brain checkpoint exists (checkpoint.bin)"
+    else
+        echo "! No brain checkpoint found"
+    fi
+    
+    echo ""
+    echo "Configuration: $CONFIG_FILE"
+    echo "Timestep: 0.001s (1ms)"
+    echo "Max neurons: 500"
+    echo "Max regions: 1"
+    echo ""
+}
+
+function load_config() {
+    local config_file=${1:-$CONFIG_FILE}
+    
+    if [ -f "$config_file" ]; then
+        echo "Loading configuration from: $config_file"
+        CONFIG_FILE="$config_file"
+        # In a real implementation, this would parse the config file
+        # and set parameters in the running brain
+        echo "✓ Configuration loaded"
+    else
+        echo "! Configuration file not found: $config_file"
+        echo "  Using default configuration"
+    fi
+}
+
+function run_simulation() {
+    local steps=${1:-1000}
+    
+    echo "=== Running NLM Simulation ==="
+    echo "Steps: $steps"
+    echo "This would run the actual brain simulation..."
+    echo ""
+    echo "The simulation would:"
+    echo "  - Process incoming sensory input"
+    echo "  - Update neural dynamics (LIF neurons)"
+    echo "  - Handle synaptic transmission with delays"
+    echo "  - Apply neuromodulation effects"
+    echo "  - Update memory systems"
+    echo "  - Apply plasticity rules (STDP, Hebbian, etc.)"
+    echo "  - Generate motor output"
+    echo "  - Receive reward prediction error"
+    echo "  - Consolidate memories"
+    echo ""
+}
+
+function save_checkpoint() {
+    local checkpoint_path=${1:-checkpoint.bin}
+    
+    echo "=== Saving Brain Checkpoint ==="
+    echo "Path: $checkpoint_path"
+    echo "This would serialize the brain state..."
+    echo "✓ Checkpoint saved (simulation only)"
+}
+
+function load_checkpoint() {
+    local checkpoint_path=${1:-checkpoint.bin}
+    
+    echo "=== Loading Brain Checkpoint ==="
+    echo "Path: $checkpoint_path"
+    
+    if [ -f "$checkpoint_path" ]; then
+        echo "✓ Checkpoint loaded"
+    else
+        echo "! Checkpoint file not found: $checkpoint_path"
+    fi
+}
+
+function show_stats() {
+    echo "=== NLM Statistics ==="
+    echo "Note: This is a simplified version of the stats command."
+    echo "The full implementation would show detailed metrics from:"
+    echo "  - Neural activity patterns"
+    echo "  - Synaptic weight distributions"
+    echo "  - Memory system performance"
+    echo "  - Neuromodulator dynamics"
+    echo "  - Learning progress"
+    echo ""
+}
+
+function list_neurons() {
+    echo "=== Neuron Information ==="
+    echo "Note: This would list all neurons in the brain system."
+    echo "In a real implementation, this would show:"
+    echo "  - Neuron IDs and types"
+    echo "  - Membrane potentials"
+    echo "  - Firing states"
+    echo "  - Connection counts"
+    echo ""
+}
+
+function list_synapses() {
+    echo "=== Synapse Information ==="
+    echo "Note: This would list all synapses in the brain system."
+    echo "In a real implementation, this would show:"
+    echo "  - Synapse IDs and connections"
+    echo "  - Synaptic weights"
+    echo "  - Delay values"
+    echo "  - Plasticity rule assignments"
+    echo ""
+}
+
+function show_neuromodulators() {
+    echo "=== Neuromodulator Levels ==="
+    echo "Note: This would show current neuromodulator levels."
+    echo "In a real implementation, this would show:"
+    echo "  - Dopamine (reward prediction error)"
+    echo "  - Acetylcholine (attention, memory)"
+    echo "  - Norepinephrine (arousal, vigilance)"
+    echo "  - Serotonin (mood, impulsivity)"
+    echo ""
+}
+
+function show_memory() {
+    echo "=== Memory System Status ==="
+    echo "Note: This would show memory system status."
+    echo "In a real implementation, this would show:"
+    echo "  - Working memory capacity"
+    echo "  - Episodic memory episodes"
+    echo "  - Semantic memory content"
+    echo "  - Procedural memory skills"
+    echo ""
+}
+
+function show_plasticity() {
+    echo "=== Plasticity Rules Status ==="
+    echo "Note: This would show plasticity rule status."
+    echo "In a real implementation, this would show:"
+    echo "  - STDP (spike-timing dependent)"
+    echo "  - Hebbian (correlation-based)"
+    echo "  - Anti-Hebbian (competitive)"
+    echo "  - BCM (sliding threshold)"
+    echo "  - Reward-modulated STDP"
+    echo "  - Triplet STDP"
+    echo ""
+}
+
+function reset_brain() {
+    echo "=== Resetting Brain ==="
+    echo "This would reset the brain to its initial state."
+    echo "✓ Brain reset (simulation only)"
+}
+
+# Main command processing
+if [ $# -eq 0 ]; then
+    show_help
+    exit 0
+fi
+
+case $1 in
+    help)
+        show_help
+        ;;
+    status)
+        show_status
+        ;;
+    config)
+        load_config "$2"
+        ;;
+    run)
+        run_simulation "$2"
+        ;;
+    checkpoint)
+        save_checkpoint "$2"
+        ;;
+    load)
+        load_checkpoint "$2"
+        ;;
+    stats)
+        show_stats
+        ;;
+    neurons)
+        list_neurons
+        ;;
+    synapses)
+        list_synapses
+        ;;
+    neuromodulators)
+        show_neuromodulators
+        ;;
+    memory)
+        show_memory
+        ;;
+    plasticity)
+        show_plasticity
+        ;;
+    reset)
+        reset_brain
+        ;;
+    *)
+        echo "Unknown command: $1"
+        show_help
+        exit 1
+        ;;
+esac

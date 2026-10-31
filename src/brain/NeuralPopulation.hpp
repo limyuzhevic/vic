@@ -54,7 +54,7 @@ public:
     void initializeRandom(class RandomGenerator& rng);
     
     // Step all neurons
-    void step(Timestamp currentTime);
+    void step(Timestamp currentTime, TimestepDuration dt);
     
     // Reset all neurons
     void reset();

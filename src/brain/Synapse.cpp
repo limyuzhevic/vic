@@ -191,15 +191,8 @@ void Synapse::setEfficacy(float efficacy) {
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
-void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
-    // 1. Decay short-term plasticity state
-    // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
-    
-    TimestepDuration dt = 0.001;  // 1ms timestep
-    
-    // Decay short-term facilitation (Tsodyks-Markram model)
+void Synapse::step(Timestamp currentTime, TimestepDuration dt) {
+    // Update short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
@@ -217,6 +210,16 @@ void Synapse::step(Timestamp currentTime) {
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
+    
+    // Update efficacy based on recent use (use-dependent modulation)
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSinceLastSpike = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        // Efficacy decays with time since last spike
+        pImpl->efficacy *= std::exp(-timeSinceLastSpike / 1000.0f);
+        
+        // Each spike slightly increases efficacy (short-term potentiation)
+        pImpl->efficacy = std::min(pImpl->efficacy + 0.1f, 2.0f);
+    }
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
