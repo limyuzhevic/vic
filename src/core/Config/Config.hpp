@@ -64,13 +64,6 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values
-    template<typename T>
-    std::optional<T> get(const std::string& key) const;
-    
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -92,6 +85,13 @@ public:
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Get values
+    template<typename T>
+    std::optional<T> get(const std::string& key) const;
+    
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const;
     
 private:
     struct Impl;

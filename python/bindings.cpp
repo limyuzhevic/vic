@@ -416,10 +416,281 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
-
-} // namespace nlm
+    // Set default values for common configuration parameters
+    static void setDefaultConfig(std::shared_ptr<Config> config) {
+        // Basic brain configuration
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.1);
+        config->set("brain.connection_probability", 0.05);
+        config->set("brain.v_thresh", -50.0);
+        config->set("brain.v_rest", -70.0);
+        config->set("brain.v_reset", -75.0);
+        
+        // Plasticity configuration
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.structural.enable", true);
+        
+        // Neuromodulation configuration
+        config->set("neuromod.dopamine.scale", 1.0);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        
+        // Development configuration
+        config->set("development.initial_plasticity", 1.0);
+        config->set("development.maturation_age", 300.0);
+        
+        // Memory configuration
+        config->set("memory.working_capacity", 100);
+        config->set("memory.episodic_duration", 1000);
+        
+        // Prediction configuration
+        config->set("prediction.enabled", true);
+        config->set("prediction.horizon", 10);
+    }
+    
+    // Create a complete agent system with world
+    static std::tuple<std::shared_ptr<Brain>, std::shared_ptr<AgentBrain>, std::shared_ptr<SimpleWorld>>
+    createAgentSystem(const std::string& configFile = "") {
+        auto config = std::make_shared<Config>();
+        
+        if (!configFile.empty() && config->loadFromFile(configFile)) {
+            // Override defaults with config file values
+            setDefaultConfig(config);
+        } else {
+            setDefaultConfig(config);
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        
+        // Configure world with standard parameters
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, agent, world);
+    }
+    
+    // Create a brain with default config
+    static std::shared_ptr<Brain> createDefaultBrain() {
+        auto config = std::make_shared<Config>();
+        setDefaultConfig(config);
+        return std::make_shared<Brain>(config);
+    }
+    
+    // Save brain state and return filename
+    static std::string saveBrainState(std::shared_ptr<Brain> brain, const std::string& prefix = "checkpoint") {
+        if (!brain) {
+            throw std::runtime_error("Cannot save null brain");
+        }
+        
+        std::string timestamp = std::to_string(std::time(nullptr));
+        std::string filepath = prefix + "_" + timestamp + ".bin";
+        
+        if (brain->save(filepath)) {
+            return filepath;
+        } else {
+            throw std::runtime_error("Failed to save brain state to " + filepath);
+        }
+    }
+    
+    // Run complete simulation episode
+    static std::vector<float> runEpisode(int steps = 100, const std::string& configFile = "",
+                                        std::function<bool(const std::vector<float>&, float)> rewardFunc = nullptr) {
+        auto [brain, agent, world] = createAgentSystem(configFile);
+        
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        std::vector<float> rewards;
+        
+        for (int step = 0; step < steps; ++step) {
+            // Update world
+            world->update(0.1);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process sensory input
+            agent->processSensoryInput(percept);
+            
+            // Brain thinks
+            brain->step(step, step * 0.001);
+            
+            // Get action
+            auto action = agent->decodeMotorCommand();
+            
+            // Apply action to world
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Calculate reward
+            float reward = 0.0f;
+            if (rewardFunc) {
+                auto allSignals = percept.getAllSignals();
+                reward = rewardFunc(allSignals, step);
+            }
+            
+            // Apply reward modulation
+            agent->applyRewardModulation(reward, 0.0f);
+            
+            // Update development
+            agent->updateDevelopment(0.1);
+            
+            rewards.push_back(reward);
+        }
+        
+        return rewards;
+    }
+    
+    // Create brain from configuration dictionary
+    static std::shared_ptr<Brain> createBrainFromDict(const py::dict& configDict) {
+        auto config = std::make_shared<Config>();
+        
+        for (auto item : configDict) {
+            std::string key = py::cast<std::string>(item.first);
+            py::object value = item.second;
+            
+            try {
+                // Try different Python types
+                if (py::isinstance<int>(value)) {
+                    config->set(key, py::cast<int>(value));
+                } else if (py::isinstance<float>(value)) {
+                    config->set(key, py::cast<float>(value));
+                } else if (py::isinstance<double>(value)) {
+                    config->set(key, py::cast<double>(value));
+                } else if (py::isinstance<bool>(value)) {
+                    config->set(key, py::cast<bool>(value));
+                } else if (py::isinstance<std::string>(value)) {
+                    config->set(key, py::cast<std::string>(value));
+                } else if (py::isinstance<py::list>(value)) {
+                    auto list = py::cast<std::vector<double>>(value);
+                    config->set(key, ConfigValue(list));
+                } else if (py::isinstance<py::list>(value) && value.is_none()) {
+                    // Handle empty lists
+                    config->set(key, ConfigValue(std::vector<double>()));
+                }
+            } catch (const std::exception& e) {
+                throw std::runtime_error("Error processing config key " + key + ": " + e.what());
+            }
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        return brain;
+    }
+    
+    // Advanced simulation control with episode management
+    static std::shared_ptr<EpisodeManager> createEpisodeManager() {
+        return std::make_shared<EpisodeManager>();
+    }
+    
+    // Save configuration to JSON file (if JSON support is implemented)
+    static bool saveConfigToJSON(const std::string& filepath, const std::shared_ptr<Config>& config) {
+        // This is a placeholder - actual JSON implementation would require
+        // adding JSON library dependency and implementation
+        return false;
+    }
+    
+    // Load configuration from JSON file (if JSON support is implemented)
+    static bool loadConfigFromJSON(const std::string& filepath, const std::shared_ptr<Config>& config) {
+        // This is a placeholder - actual JSON implementation would require
+        // adding JSON library dependency and implementation
+        return false;
+    }
+    
+    // Create a batch processor for running multiple simulations in parallel
+    static std::shared_ptr<BatchProcessor> createBatchProcessor(int maxParallel = 4) {
+        return std::make_shared<BatchProcessor>(maxParallel);
+    }
+    
+    // Get version information with build details
+    static py::dict getFullVersionInfo() {
+        py::dict info;
+        info["version"] = "0.1.0";
+        info["build_date"] = "2026-01-31";
+        info["build_type"] = "Release";
+        info["compiler"] = "C++20";
+        info["python_binding"] = "pybind11";
+        info["project"] = "NLM - Neural Learning Machine";
+        info["phase"] = "6 (Final Integration)";
+        info["description"] = "An experimental artificial developmental brain.";
+        return info;
+    }
+    
+    // Create a specialized brain configuration for specific research domains
+    static std::shared_ptr<Brain> createResearchBrain(const std::string& domain,
+                                                       const std::string& configFile = "") {
+        auto config = std::make_shared<Config>();
+        
+        // Set domain-specific defaults
+        if (domain == "reinforcement_learning") {
+            config->set("brain.neuron_count", 2000);
+            config->set("plasticity.stdp.learning_rate", 0.01);
+            config->set("neuromod.dopamine.scale", 2.0);
+            config->set("prediction.enabled", true);
+            config->set("cognition.planning.enabled", true);
+        } else if (domain == "pattern_recognition") {
+            config->set("brain.neuron_count", 1500);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("memory.episodic_duration", 5000);
+            config->set("memory.associative.enabled", true);
+        } else if (domain == "sequential_learning") {
+            config->set("brain.neuron_count", 3000);
+            config->set("development.initial_plasticity", 1.5);
+            config->set("plasticity.stdp.enable", true);
+            config->set("prediction.horizon", 20);
+        } else {
+            // Default configuration
+            setDefaultConfig(config);
+        }
+        
+        if (!configFile.empty()) {
+            // Load additional configuration (this would need proper JSON implementation)
+            // For now, this is a placeholder
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize research brain for domain: " + domain);
+        }
+        
+        return brain;
+    }
+    
+    // Get a comprehensive list of all available configuration options
+    static py::dict getAllConfigOptions() {
+        py::dict options;
+        
+        // Brain configuration options
+        options["brain.neuron_count"] = "int - Total number of neurons (default: 1000)";
+        options["brain.synapse_density"] = "float - Synapse connectivity density (default: 0.1)";
+        options["brain.connection_probability"] = "float - Connection probability (default: 0.05)";
+        options["brain.v_thresh"] = "float - Neuron threshold potential (default: -50.0)";
+        options["brain.v_rest"] = "float - Resting potential (default: -70.0)";
+        options["brain.v_reset"] = "float - Reset potential after spike (default: -75.0)";
+        
+        // Plasticity configuration options
+        options["plasticity.stdp.enable"] = "bool - Enable Spike-Timing-Dependent Plasticity (default: true)";
+        options["plasticity.stdp.learning_rate"] = "float - STDP learning rate (default: 0.001)";
+        options["plasticity.hebbian.enable"] = "bool - Enable Hebbian learning (default: true)";
+        options["plasticity.structural.enable"] = "bool - Enable structural plasticity (default: true)";
+        
+        // Neuromodulation configuration options
+        options["neuromod.dopamine.scale"] = "float - Dopamine modulation scale (default: 1.0)";
+        options["neuromod.curiosity.enable"] = "bool - Enable curiosity-driven exploration (default: true)";
+        options["neuromod.novelty.enable"] = "bool - Enable novelty detection (default: true)";
+        
+        // Development configuration options
+        options["development.initial_plasticity"] = "float - Initial plasticity level (default: 1.0)";
+        options["development.maturation_age"] = "float - Age at maturation (default: 300.0)";
+        
+        return options;
+    }

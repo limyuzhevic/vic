@@ -60,9 +60,9 @@ bool Config::loadFromArgs(int argc, char** argv) {
         std::string arg(argv[i]);
         
         // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        if (arg.size() >= 3 && arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
+            if (pos != std::string::npos && pos < arg.size() - 1) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
@@ -86,33 +86,42 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Format the value based on its type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (value ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || 
+                               std::is_same_v<T, int64_t> ||
+                               std::is_same_v<T, double>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                               std::is_same_v<T, std::vector<double>> ||
+                               std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        file << "\"" << value[i] << "\"";
+                    } else {
+                        file << value[i];
+                    }
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    
-    try {
-        return std::get<T>(it->value);
-    } catch (const std::bad_variant_access&) {
-        return std::nullopt;
-    }
-}
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
+// Remove the duplicate template definitions from Config.cpp
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
