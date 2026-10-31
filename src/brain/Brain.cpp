@@ -9,11 +9,8 @@
 #include "../neuromodulation/Neuromodulator.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/PredictionError.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
-#include "../cognition/NeuralPlanner.hpp"
-#include "../cognition/ConceptFormation.hpp"
+#include "../prediction/NeuralPrediction.hpp"
+#include "../neuromodulation/PredictionError.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -35,6 +32,7 @@ struct Brain::Impl {
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<NeuralPrediction> neuralPrediction;  // Enhanced prediction system
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
@@ -78,6 +76,11 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Current sensory state (for prediction, concept formation, planning)
+    std::vector<float> currentSensoryState;
+    // Current action taken
+    ActionType currentAction;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -92,6 +95,8 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , currentSensoryState()
+        , currentAction(ActionType::Wait)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -113,8 +118,9 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
-        // Initialize prediction system
+        // Initialize prediction systems
         predictionSystem = std::make_unique<PredictionSystem>();
+        neuralPrediction = std::make_unique<NeuralPrediction>();
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
@@ -242,8 +248,9 @@ bool Brain::initialize() {
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
     
-    // Initialize prediction system
+    // Initialize prediction systems
     // (PredictionSystem doesn't have initialize method currently)
+    pImpl->neuralPrediction->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -511,7 +518,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
+        // Update placeholder prediction system with current state
         // For now, just track prediction error history
     }
     
@@ -527,9 +534,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && !pImpl->currentSensoryState.empty()) {
+        // Present current sensory state for concept formation
+        // This allows the system to discover patterns and concepts from experience
+        pImpl->conceptFormation->presentExperience(
+            pImpl->currentSensoryState,
+            pImpl->currentSensoryState,  // Use sensory state as features for now
+            pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+            currentStep
+        );
+        
+        // Use concept formation to guide attention
+        if (pImpl->attention) {
+            // Get the most relevant concept
+            size_t conceptId = pImpl->conceptFormation->getMatchingConcept(pImpl->currentSensoryState);
+            if (conceptId > 0) {
+                // Focus attention on this concept
+                auto conceptProto = pImpl->conceptFormation->getConceptPrototype(conceptId);
+                if (!conceptProto.empty()) {
+                    // In a full implementation, this would activate attention on neurons
+                    // that match the concept prototype
+                }
+            }
+        }
+        
+        // Use concept stability to modulate exploration
+        if (pImpl->curiosity) {
+            // Find most stable concept
+            size_t mostStableConcept = 0;
+            float bestStability = 0.0f;
+            
+            for (size_t i = 0; i < pImpl->conceptFormation->getConceptCount(); ++i) {
+                float stability = pImpl->conceptFormation->getConceptStability(i);
+                if (stability > bestStability) {
+                    bestStability = stability;
+                    mostStableConcept = i;
+                }
+            }
+            
+            if (bestStability > 0.7f) {
+                // High concept stability -> reduce curiosity/exploration
+                pImpl->curiosity->setExplorationDrive(0.3f);
+            } else {
+                // Low concept stability -> increase curiosity/exploration
+                pImpl->curiosity->setExplorationDrive(0.8f);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -597,6 +647,16 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
+    
+    // Store sensory state for prediction and concept formation
+    pImpl->currentSensoryState.clear();
+    pImpl->currentSensoryState.resize(values.size());
+    for (size_t i = 0; i < values.size(); ++i) {
+        pImpl->currentSensoryState[i] = static_cast<float>(values[i]);
+    }
+    
+    // Store action taken (default: Wait for now)
+    pImpl->currentAction = ActionType::Wait;
     
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
@@ -1021,6 +1081,10 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
+}
+
+NeuralPrediction* Brain::getNeuralPrediction() {
+    return pImpl->neuralPrediction.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========

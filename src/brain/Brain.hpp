@@ -20,6 +20,7 @@ class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
 class PredictionSystem;
+class NeuralPrediction;  // Add NeuralPrediction
 class NeuralPlanner;
 class ConceptFormation;
 class AttentionalSelection;
@@ -28,6 +29,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class PredictionErrorSignal;  // Add PredictionErrorSignal
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -152,6 +154,7 @@ public:
     
     // Prediction system for sensory prediction and error computation
     PredictionSystem* getPredictionSystem();
+    NeuralPrediction* getNeuralPrediction();  // Enhanced neural prediction
     
     // ========== COGNITION SYSTEMS ==========
     

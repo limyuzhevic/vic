@@ -244,7 +244,13 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
+    // Signal reward to brain's dopamine system
+    if (brain_->getDopamine()) {
+        brain_->getDopamine()->signalReward(reward);
+        brain_->getDopamine()->signalRewardPredictionError(predictionError_);
+    }
+    
+    // Dopamine-like signal (based on prediction error) - for synapse eligibility traces
     dopamineLevel_ = predictionError_;
     
     // Clamp to reasonable range
