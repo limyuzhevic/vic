@@ -18,6 +18,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "experiments/Phase6IntegratedExperiment.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,8 +26,181 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <filesystem>
 
 using namespace nlm;
+
+// Command-line argument parser
+struct CLIArguments {
+    std::string configFile = "configs/default.cfg";
+    bool usePhase6Demo = false;
+    uint64_t maxSteps = 0;  // 0 = use defaults
+    uint64_t neuronCount = 0;  // 0 = use defaults
+    uint64_t regionCount = 0;  // 0 = use defaults
+    float connectionProbability = -1.0f;  // -1.0 = use defaults
+    float stdpLtpWeight = -1.0f;  // -1.0 = use defaults
+    float stdpLtdWeight = -1.0f;  // -1.0 = use defaults
+    float synaptogenesisRate = -1.0f;  // -1.0 = use defaults
+    float pruningRate = -1.0f;  // -1.0 = use defaults
+    std::string checkpointPath = "checkpoint.bin";
+    bool enableCheckpointing = true;
+    bool enableReplay = false;
+    bool enableDevelopment = false;
+    bool enableRewardModulation = false;
+    bool enableCuriosity = false;
+    std::string logLevel = "INFO";
+    bool help = false;
+    bool version = false;
+};
+
+// Parse command-line arguments
+CLIArguments parseCLIArguments(int argc, char** argv) {
+    CLIArguments args;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            args.help = true;
+        } else if (arg == "--version") {
+            args.version = true;
+        } else if (arg == "--phase6-demo") {
+            args.usePhase6Demo = true;
+        } else if (arg.substr(0, 12) == "--config-file") {
+            if (arg.find('=') != std::string::npos) {
+                args.configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 12) == "--config-file") {
+            if (i + 1 < argc) {
+                args.configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 13) == "--max-steps") && arg.find('=') != std::string::npos) {
+            args.maxSteps = std::stoull(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 8) == "--steps") && arg.find('=') != std::string::npos) {
+            args.maxSteps = std::stoull(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 15) == "--neuron-count") && arg.find('=') != std::string::npos) {
+            args.neuronCount = std::stoull(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 11) == "--neurons") && arg.find('=') != std::string::npos) {
+            args.neuronCount = std::stoull(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 14) == "--region-count") && arg.find('=') != std::string::npos) {
+            args.regionCount = std::stoull(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 10) == "--regions") && arg.find('=') != std::string::npos) {
+            args.regionCount = std::stoull(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 25) == "--connection-probability") && arg.find('=') != std::string::npos) {
+            args.connectionProbability = std::stof(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 21) == "--connection-density") && arg.find('=') != std::string::npos) {
+            args.connectionProbability = std::stof(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 19) == "--stdp-ltp-weight") && arg.find('=') != std::string::npos) {
+            args.stdpLtpWeight = std::stof(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 18) == "--stdp-ltd-weight") && arg.find('=') != std::string::npos) {
+            args.stdpLtdWeight = std::stof(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 23) == "--synaptogenesis-rate") && arg.find('=') != std::string::npos) {
+            args.synaptogenesisRate = std::stof(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 16) == "--pruning-rate") && arg.find('=') != std::string::npos) {
+            args.pruningRate = std::stof(arg.substr(arg.find('=') + 1));
+        } else if (arg.substr(0, 20) == "--checkpoint-path") && arg.find('=') != std::string::npos) {
+            args.checkpointPath = arg.substr(arg.find('=') + 1);
+        } else if (arg == "--no-checkpoint") {
+            args.enableCheckpointing = false;
+        } else if (arg == "--no-replay") {
+            args.enableReplay = false;
+        } else if (arg == "--no-development") {
+            args.enableDevelopment = false;
+        } else if (arg == "--no-reward-modulation") {
+            args.enableRewardModulation = false;
+        } else if (arg == "--no-curiosity") {
+            args.enableCuriosity = false;
+        } else if (arg.substr(0, 13) == "--log-level") && arg.find('=') != std::string::npos) {
+            args.logLevel = arg.substr(arg.find('=') + 1);
+        } else if (arg.substr(0, 12) == "--log-level") && i + 1 < argc) {
+            args.logLevel = argv[++i];
+        } else if (arg.substr(0, 9) == "--timeout") && arg.find('=') != std::string::npos) {
+            // Convert timeout seconds to steps (assuming 1ms timestep)
+            uint64_t timeoutSeconds = std::stoull(arg.substr(arg.find('=') + 1));
+            args.maxSteps = timeoutSeconds * 1000;  // 1000 steps per second
+        } else if (arg.substr(0, 8) == "--run") && arg.find('=') != std::string::npos) {
+            // Accept --run=test1, --run=experiment1, etc.
+            std::string runSpec = arg.substr(arg.find('=') + 1);
+            if (runSpec.find("phase6") != std::string::npos) {
+                args.usePhase6Demo = true;
+            }
+        } else {
+            // Unknown argument, ignore but print warning
+            std::cerr << "Warning: Unknown argument ignored: " << arg << std::endl;
+        }
+    }
+    
+    return args;
+}
+
+// Print help information
+void printHelp() {
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "================================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: nlm [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --version                     Show version information" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration:" << std::endl;
+    std::cout << "  --config-file <file>          Configuration file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --max-steps <steps>           Maximum simulation steps" << std::endl;
+    std::cout << "  --steps <steps>               Alias for --max-steps" << std::endl;
+    std::cout << "  --neuron-count <count>        Number of neurons" << std::endl;
+    std::cout << "  --neurons <count>             Alias for --neuron-count" << std::endl;
+    std::cout << "  --region-count <count>        Number of brain regions" << std::endl;
+    std::cout << "  --regions <count>             Alias for --region-count" << std::endl;
+    std::cout << "  --connection-probability <p>  Connection probability (0.0-1.0)" << std::endl;
+    std::cout << "  --connection-density <d>      Alias for --connection-probability" << std::endl;
+    std::cout << "  --stdp-ltp-weight <w>         STDP LTP weight" << std::endl;
+    std::cout << "  --stdp-ltd-weight <w>         STDP LTD weight" << std::endl;
+    std::cout << "  --synaptogenesis-rate <r>     Synaptogenesis rate" << std::endl;
+    std::cout << "  --pruning-rate <r>            Pruning rate" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Features:" << std::endl;
+    std::cout << "  --phase6-demo                 Run Phase 6 integration demo" << std::endl;
+    std::cout << "  --checkpoint-path <path>      Checkpoint file path" << std::endl;
+    std::cout << "  --no-checkpoint               Disable checkpointing" << std::endl;
+    std::cout << "  --no-replay                   Disable replay system" << std::endl;
+    std::cout << "  --no-development              Disable development system" << std::endl;
+    std::cout << "  --no-reward-modulation        Disable reward modulation" << std::endl;
+    std::cout << "  --no-curiosity                Disable curiosity system" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Logging:" << std::endl;
+    std::cout << "  --log-level <level>           Log level (DEBUG, INFO, WARNING, ERROR)" << std::endl;
+    std::cout << "  --timeout <seconds>           Maximum runtime in seconds" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Example usage:" << std::endl;
+    std::cout << "  nlm --max-steps 5000 --neuron-count 2000 --connection-density 0.05" << std::endl;
+    std::cout << "  nlm --phase6-demo" << std::endl;
+    std::cout << "  nlm --config-file myconfig.cfg --no-checkpoint --log-level DEBUG" << std::endl;
+    std::cout << std::endl;
+}
+
+// Print version information
+void printVersion() {
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "Version: 0.2.0 Phase 2 Integration" << std::endl;
+    std::cout << "Built with C++20" << std::endl;
+    std::cout << "Architecture: Experimental Artificial Developmental Brain" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Key features:" << std::endl;
+    std::cout << "  - Real LIF neuron dynamics" << std::endl;
+    std::cout << "  - Event-driven spike propagation with delays" << std::endl;
+    std::cout << "  - Multiple plasticity mechanisms (STDP, Hebbian, reward-modulated)" << std::endl;
+    std::cout << "  - Structural plasticity (synaptogenesis/pruning)" << std::endl;
+    std::cout << "  - Memory systems (working, episodic, associative)" << std::endl;
+    std::cout << "  - Neuromodulation (dopamine, curiosity, novelty)" << std::endl;
+    std::cout << "  - Prediction system with forward model" << std::endl;
+    std::cout << "  - Developmental stages and plasticity modulation" << std::endl;
+    std::cout << "  - Checkpoint save/load and replay mechanisms" << std::endl;
+    std::cout << "  - Advanced agent-world interaction" << std::endl;
+}
 
 void printBanner() {
     std::cout << R"(
