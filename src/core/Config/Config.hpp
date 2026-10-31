@@ -59,6 +59,10 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Internal format loaders
+    bool loadFromJSON(const std::string& jsonContent);
+    bool loadFromYAML(const std::string& content);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     

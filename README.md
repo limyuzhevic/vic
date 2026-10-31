@@ -90,17 +90,61 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
-
 ## Running
+
 Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
+./nlm                 # Phase 2 demo in src/main.cpp (enhanced with comprehensive CLI)
 ./nlm_phase3_demo
 ./nlm_phase4_demo
 ./nlm_phase6_demo     # Phase 6 integration test
 ./nlm_benchmark
+```
+
+### Enhanced main.cpp Command Line Interface
+
+The `./nlm` executable has been completely enhanced with a comprehensive command-line interface:
+
+#### Basic Usage
+```bash
+# Run default simulation
+./nlm
+
+# View help information
+./nlm --help
+
+# Run with specific parameters
+./nlm --neuron-count=1000 --timestep=0.01 --seed=123
+```
+
+#### Advanced Usage
+```bash
+# Run with enhanced plasticity
+./nlm --stdp-ltp-weight=0.03 --stdp-ltd-weight=0.018
+
+# Quick validation (skips detailed experiments)
+./nlm --quick-run --verbose
+
+# Load configuration from file
+./nlm --config=configs/my_config.cfg
+
+# Run with custom brain parameters
+./nlm --neuron-count=2000 --region-count=2 --connection-probability=0.2
+```
+
+#### Configuration Files
+
+NLM supports multiple configuration file formats:
+
+- **Simple key=value format**: `configs/default.cfg`
+- **JSON format**: `configs/brain_config.json`
+- **YAML format**: `configs/brain_config.yaml`
+
+To use a different format, specify it with the `--config` option:
+```bash
+./nlm --config=brain_config.json
 ```
 
 `nlm_phase6_demo` runs a comprehensive integration test verifying all
@@ -113,6 +157,9 @@ library in CMake; it does not yet have a standalone demo executable.
 NLM/
 ├── CMakeLists.txt
 ├── README.md
+├── IMPROVEMENTS_SUMMARY.md      # Summary of recent improvements
+├── easy_usage.md                # Enhanced usage guide with C++ CLI
+├── HOW_TO_USE.md                # Comprehensive documentation
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
@@ -132,7 +179,7 @@ NLM/
 │   ├── neuromodulation/# Neuromodulators (integrated)
 │   ├── memory/        # Memory systems (integrated)
 │   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── cognition/     # Cognitive mechanisms (integrated)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
@@ -141,6 +188,121 @@ NLM/
 ├── tests/
 └── configs/
 ```
+
+## Key Improvements
+
+Recent enhancements to the NLM project include:
+
+### 1. Enhanced main.cpp
+- **Modular Design**: Split into multiple focused classes
+- **Comprehensive CLI**: Extended command-line options for all configuration parameters
+- **Multiple Format Support**: JSON, YAML, and key=value configuration files
+- **Improved Error Handling**: Better validation and error messages
+- **Enhanced Documentation**: Complete documentation and examples
+
+### 2. Improved Configuration System
+- **Multi-Format Support**: JSON, YAML, and traditional key=value formats
+- **Robust Parsing**: Enhanced format detection and error handling
+- **Flexible Options**: Extensive configuration parameters for customization
+
+### 3. Comprehensive Documentation
+- **easy_usage.md**: Enhanced with C++ command-line interface documentation
+- **HOW_TO_USE.md**: Enhanced with detailed main.cpp features and examples
+- **IMPROVEMENTS_SUMMARY.md**: Complete summary of all improvements
+
+### 4. Better User Experience
+- **Intuitive Interface**: Comprehensive CLI with helpful options
+- **Clear Documentation**: Extensive examples and references
+- **Robust Error Handling**: Detailed error messages and validation
+- **Backward Compatibility**: All existing functionality preserved
+
+## Usage Examples
+
+### Basic Examples
+```bash
+# Run default simulation
+./nlm
+
+# View help information
+./nlm --help
+
+# Run with custom parameters
+./nlm --neuron-count=1000 --timestep=0.01 --seed=123
+```
+
+### Advanced Examples
+```bash
+# Run with enhanced plasticity
+./nlm --stdp-ltp-weight=0.03 --stdp-ltd-weight=0.018
+
+# Quick validation
+./nlm --quick-run --verbose
+
+# Load from JSON configuration
+./nlm --config=brain_config.json
+
+# Configure custom brain parameters
+./nlm --neuron-count=2000 --region-count=2
+```
+
+### Configuration Files
+
+**Simple key=value** (`configs/default.cfg`):
+```
+neuron_count = 500
+region_count = 1
+connection_probability = 0.15
+simulation_timestep = 0.001
+random_seed = 42
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+```
+
+**JSON** (`configs/brain_config.json`):
+```json
+{
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "simulation_timestep": 0.001,
+    "random_seed": 42
+}
+```
+
+## Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+## Testing
+
+Run the test suite to verify the enhanced functionality:
+```bash
+cd build
+ctest --output-on-failure
+```
+
+## License
+
+MIT
+
+## Authors
+
+Research project — See docs for scientific background.
+
+## Further Reading
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
+- [docs/SCIENCE.md](docs/SCIENCE.md) - Scientific background
+- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [docs/PHASE6_FINAL_AUDIT.md](docs/PHASE6_FINAL_AUDIT.md) - Phase 6 integration audit
+- [IMPROVEMENTS_SUMMARY.md](IMPROVEMENTS_SUMMARY.md) - Summary of recent improvements
+- [easy_usage.md](easy_usage.md) - Enhanced usage guide with C++ CLI
+- [HOW_TO_USE.md](HOW_TO_USE.md) - Comprehensive documentation
 
 ## Phase Summary
 

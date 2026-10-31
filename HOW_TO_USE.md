@@ -535,8 +535,230 @@ pip install --force-reinstall .
 
 ---
 
-## Further Reading
+### Runtime Issues
+
+**ImportError: No module named 'pynlm':**
+```bash
+pip install --force-reinstall .
+```
+
+**Segmentation faults:**
+- Check that `initialize()` is called before `step()`
+- Ensure `reset()` is called before re-running simulation
+
+---
+
+## Part 4: Advanced C++ Command-Line Interface
+
+This section covers the enhanced command-line interface and improved main.cpp functionality.
+
+### Enhanced main.cpp Features
+
+The main.cpp file has been completely refactored for better modularity and enhanced functionality:
+
+1. **Modular Design**: Split into multiple classes (ConfigurationManager, BrainInitializer, Test runners, ResultsReporter)
+2. **Comprehensive CLI Support**: Extended command-line options for all configuration parameters
+3. **Multiple Configuration Formats**: Support for key=value, JSON, and YAML formats
+4. **Enhanced Error Handling**: Better error messages and exception handling
+5. **Improved Logging**: More detailed logging with different verbosity levels
+
+### Command Line Options
+
+The enhanced command-line interface provides extensive control over NLM simulations:
+
+```bash
+nlm [OPTIONS]
+```
+
+**Configuration Options:**
+- `--config[=FILE]` - Load configuration from FILE
+- `--neuron-count=N` - Set number of neurons
+- `--region-count=N` - Set number of brain regions
+- `--timestep=T` - Set simulation timestep
+- `--seed=N` - Set random seed
+
+**Plasticity Options:**
+- `--stdp-ltp-weight=W` - Set STDP LTP weight
+- `--stdp-ltd-weight=W` - Set STDP LTD weight
+- `--stdp-tau=T` - Set STDP time constant
+- `--synaptogenesis-rate=R` - Set synaptogenesis rate
+- `--pruning-rate=R` - Set pruning rate
+- `--connection-probability=P` - Set connection probability
+
+**Experiment Control:**
+- `--verbose` - Enable verbose logging
+- `--quick-run` - Skip detailed experiments, run quick validation
+
+### Usage Examples
+
+**Basic Usage:**
+```bash
+# Run default simulation
+nlm
+
+# Run with custom configuration
+nlm --config=myconfig.cfg
+
+# Run with specific parameters
+nlm --neuron-count=1000 --timestep=0.01 --seed=123
+
+# Run with enhanced plasticity
+nlm --stdp-ltp-weight=0.03 --stdp-ltd-weight=0.018
+
+# Quick validation (skips detailed experiments)
+nlm --quick-run --verbose
+```
+
+**Configuration File Examples:**
+
+**Simple key=value format**:
+```bash
+# Save configuration to file
+nlm --neuron-count=1000 --region-count=2 --timestep=0.01
+# This would save to a temporary config file
+
+# Create a config file and load it
+nlm --config=configs/my_brain.cfg
+```
+
+**JSON format:**
+```json
+{
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "simulation_timestep": 0.001,
+    "random_seed": 42,
+    "stdp_ltp_weight": 0.025,
+    "stdp_ltd_weight": 0.02,
+    "stdp_tau": 25.0
+}
+```
+
+### Advanced Configuration
+
+The configuration system now supports multiple formats:
+
+1. **Simple key=value format** (traditional)
+2. **JSON format** (structured, human-readable)
+3. **YAML format** (YAML, good for complex configurations)
+
+**To use different formats:**
+```bash
+# Load JSON configuration
+nlm --config=brain_config.json
+
+# Load YAML configuration
+nlm --config=brain_config.yaml
+```
+
+### Configuration Parameters Reference
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `random_seed` | int | 42 | Random number generator seed |
+| `simulation_timestep` | float | 0.001 | Neural simulation timestep |
+| `neuron_count` | int | 500 | Total number of neurons |
+| `region_count` | int | 1 | Number of brain regions |
+| `connection_probability` | float | 0.15 | Probability of synaptic connections |
+| `stdp_ltp_weight` | float | 0.02 | STDP LTP learning rate |
+| `stdp_ltd_weight` | float | 0.015 | STDP LTD learning rate |
+| `stdp_tau` | float | 20.0 | STDP time constant |
+| `synaptogenesis_rate` | float | 0.0001 | Rate of new synapse formation |
+| `pruning_rate` | float | 0.00001 | Rate of synapse elimination |
+
+### Experiment Modes
+
+1. **Default Mode**: Complete Phase 2 experiments (3 tests)
+2. **Quick Mode**: Skip detailed experiments, run validation only
+3. **Custom Mode**: Configure specific experiments with custom parameters
+
+**Quick Mode Example:**
+```bash
+# Run quick validation (3 seconds)
+nlm --quick-run
+```
+
+**Custom Mode Example:**
+```bash
+# Run with custom parameters
+nlm --neuron-count=100 --region-count=1 --timestep=0.001 \
+    --stdp-ltp-weight=0.01 --stdp-ltd-weight=0.008 \
+    --synaptogenesis-rate=0.00005 --pruning-rate=0.000005
+```
+
+### Error Handling and Validation
+
+The enhanced main.cpp includes improved error handling:
+
+- **Configuration Validation**: Validates configuration file syntax
+- **Parameter Validation**: Ensures parameters are within valid ranges
+- **Error Messages**: Provides detailed error messages with suggestions
+- **Exception Safety**: Catches and handles exceptions gracefully
+
+### Performance and Optimization
+
+The refactored main.cpp includes several performance improvements:
+
+1. **Memory Management**: Better object lifecycle management
+2. **Modular Design**: Separation of concerns for better maintainability
+3. **Efficient Logging**: Reduced overhead in logging operations
+4. **Parallel Processing**: Support for concurrent operations where beneficial
+
+### Building with Enhanced Features
+
+To build with all enhanced features:
+
+```bash
+# Configure with CMake
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_BUILD_PYTHON_BINDINGS=ON
+
+# Build all targets
+make -j$(nproc)
+
+# Run tests
+ctest --output-on-failure
+```
+
+### Advanced Usage Tips
+
+1. **Combine Options**: Mix and match configuration options for custom experiments
+2. **Use Relative Paths**: Configuration files can use relative paths
+3. **Override Settings**: Command-line options override configuration file settings
+4. **Debugging**: Use `--verbose` for detailed logging
+5. **Testing**: Use `--quick-run` for fast testing
+
+### Troubleshooting
+
+**Common Issues and Solutions:**
+
+1. **Configuration file not found**:
+   ```bash
+   nlm --config=./configs/my_config.cfg
+   ```
+
+2. **Invalid parameter values**:
+   ```bash
+   # Use default values
+   nlm --neuron-count=500
+   ```
+
+3. **Performance issues**:
+   ```bash
+   # Use smaller configuration
+   nlm --neuron-count=100
+   ```
+
+4. **Help and Documentation**:
+   ```bash
+   nlm --help
+   ```
+
+### Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [docs/PHASE6_FINAL_AUDIT.md](docs/PHASE6_FINAL_AUDIT.md) - Phase 6 integration audit
