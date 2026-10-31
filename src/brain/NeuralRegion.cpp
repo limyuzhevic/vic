@@ -19,11 +19,15 @@ struct NeuralRegion::Impl {
     explicit Impl(RegionId id) : id(id), nextSynapseId(1), nextNeuronIndex(1) {}
 };
 
-NeuralRegion::NeuralRegion(RegionId id) : pImpl(new Impl(id)) {}
+NeuralRegion::NeuralRegion(RegionId id) : 
+    id_(id), name_(), populations_(), synapses_(), 
+    outgoingSynapses_(), incomingSynapses_(), nextSynapseId_(1), 
+    nextNeuronIndex_(1) {}
 
-NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Impl(id)) {
-    pImpl->name = name;
-}
+NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : 
+    id_(id), name_(name), populations_(), synapses_(), 
+    outgoingSynapses_(), incomingSynapses_(), nextSynapseId_(1), 
+    nextNeuronIndex_(1) {}
 
 NeuralRegion::~NeuralRegion() = default;
 

@@ -36,7 +36,7 @@ public:
     
     // Add neuron to population (caller retains ownership)
     void addNeuron(Neuron* neuron);
-
+    
     // Create `size` neurons owned by this population, with sequential IDs
     // starting at startId. This is what actually materialises a population:
     // before this fix a population only stored a size counter and no neurons.
@@ -73,8 +73,13 @@ public:
     float getVarianceMembranePotential() const;
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Simplified implementation - no PIMPL
+    PopulationId id_;
+    size_t size_;
+    std::vector<Neuron*> neurons_;
+    std::vector<std::unique_ptr<Neuron>> ownedNeurons_;
+    NeuronType neuronType_;
+    std::vector<MembranePotential> membranePotentials_;  // for statistics
 };
 
 } // namespace nlm

@@ -848,6 +848,14 @@ void Brain::reset() {
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
+    // Rebuild neuronById map after reset - this is critical for O(1) lookup
+    pImpl->neuronById.clear();
+    for (auto& region : pImpl->regions) {
+        for (auto* neuron : region->getAllNeurons()) {
+            pImpl->neuronById[neuron->getId().index()] = neuron;
+        }
+    }
+    
     // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();

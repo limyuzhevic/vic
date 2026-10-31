@@ -1,8 +1,9 @@
 // NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Phase 2: Real Neural Computation Tests - Enhanced Version
 
 #include <iostream>
 #include <cassert>
+#include <string>
 
 // Forward declarations of test functions
 namespace test_types {
@@ -37,12 +38,27 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_main {
+    void runAll();
+}
+
+namespace test_research {
+    void runAll();
+}
+
+namespace test_performance {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
+    std::cout << "=== NLM Phase 2 Tests (Enhanced) ===" << std::endl;
+    std::cout << "Testing Real Neural Computation with Enhanced Features:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Enhanced Research Mode" << std::endl;
+    std::cout << "  - Performance Optimization" << std::endl;
+    std::cout << "  - Command-Line Interface" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -113,6 +129,33 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Main functionality tests..." << std::endl;
+    try {
+        test_main::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Research mode tests..." << std::endl;
+    try {
+        test_research::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Performance tests..." << std::endl;
+    try {
+        test_performance::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

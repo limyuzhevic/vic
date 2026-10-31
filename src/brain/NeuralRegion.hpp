@@ -85,8 +85,16 @@ public:
     std::vector<const Neuron*> getAllNeurons() const;
     
 private:
-    struct Impl;
-    Impl* pImpl;
+    // Simplified implementation - no PIMPL
+    RegionId id_;
+    std::string name_;
+    std::vector<std::unique_ptr<NeuralPopulation>> populations_;
+    std::vector<std::unique_ptr<Synapse>> synapses_;
+    std::unordered_map<NeuronId, std::vector<SynapseId>> outgoingSynapses_;
+    std::unordered_map<NeuronId, std::vector<SynapseId>> incomingSynapses_;
+    SynapseId nextSynapseId_;
+    uint64_t nextNeuronIndex_;
+    std::unordered_map<uint64_t, Synapse*> synapseById_;
 };
 
 } // namespace nlm
