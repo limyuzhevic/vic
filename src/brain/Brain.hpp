@@ -3,6 +3,9 @@
 #include "../core/Types/Types.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
+#include "BrainCore.hpp"
+#include "BrainSetup.hpp"
+#include "BrainIntegration.hpp"
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"
@@ -195,9 +198,19 @@ public:
     // Logging
     void logStatus() const;
     
+    // New modular access to brain components
+    std::shared_ptr<BrainCore> getCore() { return core; }
+    std::shared_ptr<BrainSetup> getSetup() { return setup; }
+    std::shared_ptr<BrainIntegration> getIntegration() { return integration; }
+    
 private:
-    struct Impl;
-    Impl* pImpl;
+    struct LegacyImpl;
+    LegacyImpl* pImpl;
+    
+    // New modular architecture components
+    std::shared_ptr<BrainCore> core;
+    std::shared_ptr<BrainSetup> setup;
+    std::shared_ptr<BrainIntegration> integration;
 };
 
 } // namespace nlm
