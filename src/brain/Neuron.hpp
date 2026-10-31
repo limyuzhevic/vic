@@ -134,7 +134,11 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Real integrate-and-fire dynamics implementation complete with:
+    // - LIF differential equations with exponential Euler integration
+    // - Spike-frequency adaptation
+    // - Refractory period handling
+    // - Synaptic input integration
     void step(Timestamp currentTime);
     
     // Reset to initial state

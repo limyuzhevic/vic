@@ -331,6 +331,12 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    std::string outputFile = "";
+    std::string logFile = "";
+    std::string logLevelStr = "INFO";
+    bool enableDebugOutput = false;
+    bool enablePerformanceProfiling = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -339,8 +345,47 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg.substr(0, 7) == "--output") {
+            if (arg.find('=') != std::string::npos) {
+                outputFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                outputFile = argv[++i];
+            }
+        } else if (arg.substr(0, 8) == "--logfile") {
+            if (arg.find('=') != std::string::npos) {
+                logFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logFile = argv[++i];
+            }
+        } else if (arg.substr(0, 5) == "--loglevel") {
+            if (arg.find('=') != std::string::npos) {
+                logLevelStr = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logLevelStr = argv[++i];
+            }
+        } else if (arg == "--debug") {
+            enableDebugOutput = true;
+        } else if (arg == "--profile") {
+            enablePerformanceProfiling = true;
         }
     }
+    
+    // Configure logging
+    LogLevel logLevel = LogLevel::Info;
+    std::transform(logLevelStr.begin(), logLevelStr.end(), logLevelStr.begin(), ::tolower);
+    if (logLevelStr == "debug") logLevel = LogLevel::Debug;
+    else if (logLevelStr == "warning") logLevel = LogLevel::Warning;
+    else if (logLevelStr == "error") logLevel = LogLevel::Error;
+    else if (logLevelStr == "critical") logLevel = LogLevel::Critical;
+    
+    if (!logFile.empty()) {
+        auto fileLogger = std::make_shared<ConsoleLogger>(logLevel);
+        fileLogger->setOutputFile(logFile);
+        logger->addLogger(fileLogger);
+    }
+    
+    // Set global log level
+    logger->setLevel(logLevel);
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
@@ -352,6 +397,22 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
+    // Apply additional command-line options
+    if (enableDebugOutput) {
+        config->set("debug_mode", true, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Debug mode enabled");
+    }
+    
+    if (enablePerformanceProfiling) {
+        config->set("performance_profiling", true, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Performance profiling enabled");
+    }
+    
+    if (!outputFile.empty()) {
+        config->set("checkpoint_output", outputFile, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Checkpoint output configured: " + outputFile);
+    }
+    
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
@@ -359,14 +420,54 @@ int main(int argc, char** argv) {
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
+    // Advanced STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
     
-    // Structural plasticity parameters
+    // Advanced structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Add advanced plasticity parameters
+    config->set("hebbian_learning_rate", 0.01f, ConfigSource::Default);
+    config->set("stdp_normalization", 1.0f, ConfigSource::Default);
+    config->set("reward_modulation_strength", 0.5f, ConfigSource::Default);
+    
+    // Add development parameters
+    config->set("development_enabled", true, ConfigSource::Default);
+    config->set("critical_period_start", 0.1f, ConfigSource::Default);
+    config->set("critical_period_end", 0.5f, ConfigSource::Default);
+    
+    // Add curiosity and exploration parameters
+    config->set("curiosity_enabled", true, ConfigSource::Default);
+    config->set("curiosity_decay_rate", 0.001f, ConfigSource::Default);
+    config->set("novelty_threshold", 0.3f, ConfigSource::Default);
+    
+    // Add working memory parameters
+    config->set("working_memory_capacity", 10, ConfigSource::Default);
+    config->set("working_memory_decay_rate", 0.1f, ConfigSource::Default);
+    
+    // Add episodic memory parameters
+    config->set("episodic_memory_capacity", 100, ConfigSource::Default);
+    config->set("episodic_memory_replay_rate", 0.01f, ConfigSource::Default);
+    
+    // Add prediction system parameters
+    config->set("prediction_enabled", true, ConfigSource::Default);
+    config->set("prediction_horizon", 5, ConfigSource::Default);
+    config->set("prediction_error_threshold", 0.5f, ConfigSource::Default);
+    
+    // Add self-model parameters
+    config->set("self_model_enabled", true, ConfigSource::Default);
+    config->set("self_model_update_rate", 0.1f, ConfigSource::Default);
+    
+    // Add social learning parameters
+    config->set("social_learning_enabled", false, ConfigSource::Default);
+    config->set("social_modeling_threshold", 0.8f, ConfigSource::Default);
+    
+    // Add continual learning parameters
+    config->set("continual_learning_enabled", true, ConfigSource::Default);
+    config->set("catastrophic_forgetting_protection", 0.1f, ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -376,12 +477,36 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  debug_mode: " + std::to_string(config->getOr<bool>("debug_mode", false)));
+    NLM_LOG_INFO("  performance_profiling: " + std::to_string(config->getOr<bool>("performance_profiling", false)));
+    NLM_LOG_INFO("  log_level: " + logLevelStr);
+    NLM_LOG_INFO("  output_file: " + (outputFile.empty() ? "disabled" : outputFile));
+    NLM_LOG_INFO("  log_file: " + (logFile.empty() ? "disabled" : logFile));
+    NLM_LOG_INFO("  hebbian_learning_rate: " + std::to_string(config->getOr<float>("hebbian_learning_rate", 0.01f)));
+    NLM_LOG_INFO("  stdp_normalization: " + std::to_string(config->getOr<float>("stdp_normalization", 1.0f)));
+    NLM_LOG_INFO("  reward_modulation_strength: " + std::to_string(config->getOr<float>("reward_modulation_strength", 0.5f)));
+    NLM_LOG_INFO("  development_enabled: " + std::to_string(config->getOr<bool>("development_enabled", true)));
+    NLM_LOG_INFO("  curiosity_enabled: " + std::to_string(config->getOr<bool>("curiosity_enabled", true)));
+    NLM_LOG_INFO("  working_memory_capacity: " + std::to_string(config->getOr<int>("working_memory_capacity", 10)));
+    NLM_LOG_INFO("  episodic_memory_capacity: " + std::to_string(config->getOr<int>("episodic_memory_capacity", 100)));
+    NLM_LOG_INFO("  prediction_enabled: " + std::to_string(config->getOr<bool>("prediction_enabled", true)));
+    NLM_LOG_INFO("  self_model_enabled: " + std::to_string(config->getOr<bool>("self_model_enabled", true)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    
+    // Log advanced parameters
+    if (enableDebugOutput) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Advanced Configuration:");
+        NLM_LOG_INFO("  Development stage: " + std::to_string(config->getOr<int>("critical_period_start", 0.1f)) + " -> " + std::to_string(config->getOr<int>("critical_period_end", 0.5f)));
+        NLM_LOG_INFO("  Curiosity parameters: decay_rate=" + std::to_string(config->getOr<float>("curiosity_decay_rate", 0.001f)) + ", threshold=" + std::to_string(config->getOr<float>("novelty_threshold", 0.3f)));
+        NLM_LOG_INFO("  Memory systems: working_capacity=" + std::to_string(config->getOr<int>("working_memory_capacity", 10)) + ", episodic_capacity=" + std::to_string(config->getOr<int>("episodic_memory_capacity", 100)));
+        NLM_LOG_INFO("  Prediction system: horizon=" + std::to_string(config->getOr<int>("prediction_horizon", 5)) + ", error_threshold=" + std::to_string(config->getOr<float>("prediction_error_threshold", 0.5f)));
+    }
     
     // Initialize brain
     NLM_LOG_INFO("");

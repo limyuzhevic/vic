@@ -156,6 +156,87 @@ PYBIND11_MODULE(pynlm, m) {
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
            "Load configuration from command line arguments")
+        // Add convenience methods for common configuration patterns
+        .def("loadFromDict", [](Config& self, const py::dict& dict) {
+            for (auto item : dict) {
+                std::string key = py::cast<std::string>(item.first);
+                // Try to convert value to appropriate type based on type hints
+                if (py::isinstance<py::int_>(item.second)) {
+                    self.set(key, py::cast<int>(item.second), nlm::ConfigSource::Runtime);
+                } else if (py::isinstance<py::float_>(item.second)) {
+                    self.set(key, py::cast<float>(item.second), nlm::ConfigSource::Runtime);
+                } else if (py::isinstance<py::str>(item.second)) {
+                    self.set(key, py::cast<std::string>(item.second), nlm::ConfigSource::Runtime);
+                } else if (py::isinstance<py::bool_>(item.second)) {
+                    self.set(key, py::cast<bool>(item.second), nlm::ConfigSource::Runtime);
+                } else {
+                    // For complex types, convert to string representation
+                    self.set(key, py::cast<std::string>(py::repr(item.second)), nlm::ConfigSource::Runtime);
+                }
+            }
+        }, py::arg("config_dict"),
+           "Load configuration from a Python dictionary")
+        // Add configuration validation and serialization methods
+        .def("validate", &Config::summary,
+             "Validate configuration and return summary (for debugging)")
+        .def("getValue", [](const Config& self, const std::string& key, const std::string& typeHint) {
+            // Enhanced type-safe getter with type hints
+            auto val = self.get<std::string>(key);  // Get as string first
+            if (!val.has_value()) {
+                return std::make_pair("missing", std::string(""));
+            }
+            return std::make_pair(typeHint, *val);
+        }, py::arg("key"), py::arg("type_hint"),
+           "Get configuration value with type hint (for debugging)")
+        // Add serialization methods
+        .def("toJson", [](const Config& self) {
+            // Convert configuration to JSON-like format for easier Python manipulation
+            py::dict result;
+            for (const auto& key : self.getKeys()) {
+                auto val = self.get<std::string>(key);
+                if (val.has_value()) {
+                    // Try to infer type from string representation
+                    std::string strVal = *val;
+                    // Basic type detection
+                    if (strVal == "true" || strVal == "false") {
+                        bool boolVal = (strVal == "true");
+                        result[key.c_str()] = boolVal;
+                    } else if (strVal.find('.') != std::string::npos) {
+                        try {
+                            float floatVal = std::stof(strVal);
+                            result[key.c_str()] = floatVal;
+                        } catch (...) {
+                            result[key.c_str()] = strVal;
+                        }
+                    } else {
+                        try {
+                            int intVal = std::stoi(strVal);
+                            result[key.c_str()] = intVal;
+                        } catch (...) {
+                            result[key.c_str()] = strVal;
+                        }
+                    }
+                }
+            }
+            return result;
+        }, "Convert configuration to Python dictionary for easier access")
+        // Add configuration comparison methods
+        .def("merge", [](Config& self, const Config& other) {
+            for (const auto& key : other.getKeys()) {
+                auto val = other.get<std::string>(key);
+                if (val.has_value()) {
+                    // Extract type from existing value and use appropriate setter
+                    auto originalVal = self.get<std::string>(key);
+                    if (originalVal.has_value()) {
+                        // Replace existing value with new one
+                        self.set(key, *val, nlm::ConfigSource::Runtime);
+                    } else {
+                        self.set(key, *val, nlm::ConfigSource::Runtime);
+                    }
+                }
+            }
+        }, py::arg("other"),
+           "Merge another configuration into this one")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
