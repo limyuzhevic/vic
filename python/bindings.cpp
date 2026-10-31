@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <limits>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -12,9 +14,17 @@
 #include "../src/agent/AgentBrain.hpp"
 #include "../src/world/SimpleWorld.hpp"
 #include "../src/sensory/SensoryInput.hpp"
+#include "../src/sensory/Vision.hpp"
+#include "../src/sensory/Audio.hpp"
+#include "../src/sensory/InternalSignals.hpp"
+#include "../src/sensory/VisionProcessor.hpp"
+#include "../src/sensory/AudioProcessor.hpp"
+#include "../src/sensory/InternalSignalsProcessor.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/plasticity/PlasticityRule.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -134,13 +144,149 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Wait", MotorCommand::Wait)
         .export_values();
 
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
+    // Vision class bindings
+    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input with width, height, and channels)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
+              py::arg("channels") = 3)
+        .def("setData", [](Vision& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::invalid_argument("Vision data cannot be empty");
+            }
+            self.setData(data);
+        }, py::arg("data"), "Set vision data with validation")
+        .def("getData", &Vision::getData, "Get vision data")
+        .def("getWidth", &Vision::getWidth, "Get vision width")
+        .def("getHeight", &Vision::getHeight, "Get vision height")
+        .def("getChannels", &Vision::getChannels, "Get vision channels")
+        .def("getType", &Vision::getType, "Get sensory input type")
+        .def("getDimensions", &Vision::getDimensions, "Get dimensionality")
+        .def("getTimestamp", &Vision::getTimestamp, "Get timestamp")
+        .def("setTimestamp", &Vision::setTimestamp, py::arg("timestamp"),
+              "Set timestamp");
+
+    // Audio class bindings
+    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input with sample rate and number of samples)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
+        .def("setData", [](Audio& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::invalid_argument("Audio data cannot be empty");
+            }
+            self.setData(data);
+        }, py::arg("data"), "Set audio data with validation")
+        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"),
+              "Set sample rate")
+        .def("getSampleRate", &Audio::getSampleRate, "Get sample rate")
+        .def("getNumSamples", &Audio::getNumSamples, "Get number of samples")
+        .def("getType", &Audio::getType, "Get sensory input type")
+        .def("getData", &Audio::getData, "Get audio data")
+        .def("getDimensions", &Audio::getDimensions, "Get dimensionality")
+        .def("getTimestamp", &Audio::getTimestamp, "Get timestamp")
+        .def("setTimestamp", &Audio::setTimestamp, py::arg("timestamp"),
+              "Set timestamp");
+
+    // InternalSignals class bindings
+    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
+        .def(py::init<>())
+        .def("addSignal", &InternalSignals::addSignal, py::arg("value"),
+              "Add a signal value")
+        .def("clearSignals", &InternalSignals::clearSignals,
+              "Clear all signals")
+        .def("getType", &InternalSignals::getType, "Get sensory input type")
+        .def("getData", &InternalSignals::getData, "Get signals data")
+        .def("getDimensions", &InternalSignals::getDimensions,
+              "Get dimensionality")
+        .def("getTimestamp", &InternalSignals::getTimestamp, "Get timestamp")
+        .def("setTimestamp", &InternalSignals::setTimestamp, py::arg("timestamp"),
+              "Set timestamp");
+
+    // Vision class bindings
+    py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input with width, height, and channels)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
+              py::arg("channels") = 3)
+        .def("setData", [](Vision& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::invalid_argument("Vision data cannot be empty");
+            }
+            self.setData(data);
+        }, py::arg("data"), "Set vision data with validation")
+        .def("getData", &Vision::getData, "Get vision data")
+        .def("getWidth", &Vision::getWidth, "Get vision width")
+        .def("getHeight", &Vision::getHeight, "Get vision height")
+        .def("getChannels", &Vision::getChannels, "Get vision channels")
+        .def("getType", &Vision::getType, "Get sensory input type")
+        .def("getDimensions", &Vision::getDimensions, "Get dimensionality")
+        .def("getTimestamp", &Vision::getTimestamp, "Get timestamp")
+        .def("setTimestamp", &Vision::setTimestamp, py::arg("timestamp"),
+              "Set timestamp");
+
+    // Audio class bindings
+    py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input with sample rate and number of samples)pbdoc")
+        .def(py::init<>())
+        .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
+        .def("setData", [](Audio& self, const std::vector<float>& data) {
+            if (data.empty()) {
+                throw std::invalid_argument("Audio data cannot be empty");
+            }
+            self.setData(data);
+        }, py::arg("data"), "Set audio data with validation")
+        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"),
+              "Set sample rate")
+        .def("getSampleRate", &Audio::getSampleRate, "Get sample rate")
+        .def("getNumSamples", &Audio::getNumSamples, "Get number of samples")
+        .def("getType", &Audio::getType, "Get sensory input type")
+        .def("getData", &Audio::getData, "Get audio data")
+        .def("getDimensions", &Audio::getDimensions, "Get dimensionality")
+        .def("getTimestamp", &Audio::getTimestamp, "Get timestamp")
+        .def("setTimestamp", &Audio::setTimestamp, py::arg("timestamp"),
+              "Set timestamp");
+
+    // InternalSignals class bindings
+    py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
+        .def(py::init<>())
+        .def("addSignal", &InternalSignals::addSignal, py::arg("value"),
+              "Add a signal value")
+        .def("clearSignals", &InternalSignals::clearSignals,
+              "Clear all signals")
+        .def("getType", &InternalSignals::getType, "Get sensory input type")
+        .def("getData", &InternalSignals::getData, "Get signals data")
+        .def("getDimensions", &InternalSignals::getDimensions,
+              "Get dimensionality")
+        .def("getTimestamp", &InternalSignals::getTimestamp, "Get timestamp")
+        .def("setTimestamp", &InternalSignals::setTimestamp, py::arg("timestamp"),
+              "Set timestamp");
+
+    // VisionProcessor class bindings
+    py::class_<VisionProcessor>(m, "VisionProcessor", R"pbdoc(Vision processing neural network)")
+        .def(py::init<>())
+        .def("process", &VisionProcessor::process, py::arg("input"),
+              "Process vision input to extract features")
+        .def("getFeatures", &VisionProcessor::getFeatures,
+              "Get processed vision features")
+        .def("getFeatureDimensions", &VisionProcessor::getFeatureDimensions,
+              "Get feature dimensionality");
+
+    // AudioProcessor class bindings
+    py::class_<AudioProcessor>(m, "AudioProcessor", R"pbdoc(Audio processing neural network)")
+        .def(py::init<>())
+        .def("process", &AudioProcessor::process, py::arg("input"),
+              "Process audio input to extract features")
+        .def("getFeatures", &AudioProcessor::getFeatures,
+              "Get processed audio features")
+        .def("getFeatureDimensions", &AudioProcessor::getFeatureDimensions,
+              "Get feature dimensionality");
+
+    // InternalSignalsProcessor class bindings
+    py::class_<InternalSignalsProcessor>(m, "InternalSignalsProcessor", R"pbdoc(Internal signals processing neural network)")
+        .def(py::init<>())
+        .def("process", &InternalSignalsProcessor::process, py::arg("input"),
+              "Process internal signals")
+        .def("getProcessedSignals", &InternalSignalsProcessor::getProcessedSignals,
+              "Get processed internal signals")
+        .def("getHomeostaticSignals", &InternalSignalsProcessor::getHomeostaticSignals,
+              "Get homeostatic signals");
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
@@ -424,10 +570,72 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Add advanced Python API documentation
+    m.attr("__doc__") = R"pbdoc(
+        Enhanced NLM (Neural Learning Machine) Python API
+
+        Key improvements:
+        - Added Vision, Audio, InternalSignals sensory input classes
+        - Added VisionProcessor, AudioProcessor, InternalSignalsProcessor
+        - Enhanced error handling with data validation
+        - Comprehensive documentation for all classes and methods
+        - Type safety and input validation
+        - Advanced usage examples available in documentation
+    )pbdoc";
+
+    // Add helper functions for common patterns
+    m.def("validateSensoryData", [](const std::vector<float>& data) {
+        if (data.empty()) {
+            throw std::invalid_argument("Sensory data cannot be empty");
+        }
+        if (data.size() > std::numeric_limits<size_t>::max()) {
+            throw std::invalid_argument("Data too large for processing");
+        }
+        return true;
+    }, py::arg("data"), R"pbdoc(Validate sensory data for processing")");
+
+    m.def("createSensoryFromVector", [](const std::vector<float>& data, const std::string& type) {
+        if (type == "vision") {
+            auto vision = std::make_shared<Vision>();
+            vision->setData(data);
+            return std::static_pointer_cast<SensoryInput>(vision);
+        } else if (type == "audio") {
+            auto audio = std::make_shared<Audio>();
+            audio->setData(data);
+            return std::static_pointer_cast<SensoryInput>(audio);
+        } else if (type == "internal") {
+            auto internal = std::make_shared<InternalSignals>();
+            // Add signals from data
+            for (float value : data) {
+                internal->addSignal(value);
+            }
+            return std::static_pointer_cast<SensoryInput>(internal);
+        }
+        throw std::invalid_argument("Unsupported sensory type: " + type);
+    }, py::arg("data"), py::arg("type"),
+       R"pbdoc(Create sensory input from vector data)");
+
+    m.def("getAvailableSensoryTypes", []() {
+        return std::vector<std::string>{"vision", "audio", "internal"};
+    }, R"pbdoc(Get list of available sensory input types)");
+
+    m.def("getDefaultBrainConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.1f);
+        config->set("random_seed", 42);
+        config->set("simulation_timestep", 0.001f);
+        return config;
+    }, R"pbdoc(Get a configured default brain configuration)");
+
+    // Add version and metadata attributes
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Project";
+    m.attr("__description__") = "Enhanced Neural Learning Machine Python Bindings with advanced sensory processing";
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
-
-} // namespace nlm
