@@ -85,6 +85,21 @@ void STDP::update(Synapse* synapse,
             totalDelta = -totalDelta;
         }
 
+        // Soft (weight-dependent) bounds, Phase 4: the old rule added a
+        // fixed ~0.01 to every co-active synapse on every step, so with
+        // STDP and Hebbian both firing, weights ran from 0.2 to the 1.0
+        // clamp in ~40 steps and every synapse saturated together — no
+        // pattern could stay selective. Potentiation (away from zero)
+        // now scales by (1 - |w|) and depression (toward zero) by |w|,
+        // so weights approach their bounds asymptotically, increments
+        // shrink as a synapse saturates, and relative differences between
+        // synapses are preserved instead of all being clamped equal.
+        {
+            float w = synapse->getWeight();
+            bool awayFromZero = std::abs(w + totalDelta) > std::abs(w);
+            totalDelta *= awayFromZero ? (1.0f - std::abs(w)) : std::abs(w);
+        }
+
         // Apply weight change
         synapse->addToWeight(totalDelta);
         // Enforce sign: excitatory stays >= 0.01, inhibitory stays <= -0.01.

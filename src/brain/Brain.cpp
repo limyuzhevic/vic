@@ -512,6 +512,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // ========== STEP 6b: Homeostatic synaptic scaling (Phase 4) ==========
+    // Every 100 steps, cap each neuron's total incoming excitatory
+    // weight. STDP/Hebbian with soft bounds stop individual weights
+    // saturating, but they do not stop the *sum* of ~25 incoming
+    // weights growing until every neuron is driven over threshold on
+    // every refractory cycle — the periodic attractor of Phase 3.
+    // Rescaling only when the sum exceeds the cap, and scaling all
+    // incoming excitatory weights by the same factor, preserves the
+    // *relative* pattern of strengths (selectivity) while bounding
+    // total drive. Inhibitory weights are left untouched, so scaling
+    // also moves the E/I balance toward inhibition rather than away.
+    // Cap 3.0: with ~5 co-active presynaptic neurons per step, total
+    // drive is then at most ~5 * (3.0/25) * 10 = 6 mV per step before
+    // leak — below the ~15 mV spike gap, so a neuron must integrate
+    // over several steps to fire instead of firing every cycle.
+    if (currentStep > 0 && currentStep % 100 == 0) {
+        constexpr float kIncomingExcitatoryCap = 3.0f;
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                auto incoming = region->getSynapsesTo(neuron->getId());
+                float sum = 0.0f;
+                for (Synapse* syn : incoming) {
+                    if (syn->getWeight() > 0.0f) sum += syn->getWeight();
+                }
+                if (sum > kIncomingExcitatoryCap) {
+                    float scale = kIncomingExcitatoryCap / sum;
+                    for (Synapse* syn : incoming) {
+                        if (syn->getWeight() > 0.0f) {
+                            syn->setWeight(syn->getWeight() * scale);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
     if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
@@ -841,6 +877,7 @@ bool Brain::save(const std::string& filepath) const {
                     neuronData.refractoryRemaining.push_back(state.refractoryRemaining);
                     neuronData.refractoryPeriod.push_back(state.refractoryPeriod);
                     neuronData.lastSpikeTime.push_back(state.lastSpikeTime);
+                    neuronData.firingRate.push_back(state.firingRate);
                 }
             }
         }
@@ -860,12 +897,24 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                synapseData.efficacy.push_back(syn->getEfficacy());
             }
         }
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
+        }
+
+        // Pending delayed spikes are in-flight synaptic input; a reload
+        // without them drops every spike scheduled for the next 1-5
+        // steps. Save them alongside neurons and synapses.
+        if (pImpl->spikeSystem) {
+            auto pending = pImpl->spikeSystem->getPendingDelayedSpikes();
+            if (!writer.writeDelayedSpikes(pending)) {
+                NLM_LOG_ERROR("Failed to write pending spikes to checkpoint");
+                return false;
+            }
         }
         
         // Finalize
@@ -898,14 +947,39 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
+        // Neuron count must match exactly: neuron state is restored
+        // positionally, so a mismatch would misalign every membrane.
+        // Synapse count, by contrast, legitimately drifts: structural
+        // plasticity grows/prunes synapses during a run (Phase 6 gains
+        // a synapse over 2000 steps), so a fresh brain of the same
+        // shape has a slightly different count. Synapses are therefore
+        // restored by (source, destination) pair below, and only a
+        // large unmatched fraction fails the load.
+        if (reader.getHeader().neuronCount != getTotalNeuronCount()) {
+            NLM_LOG_ERROR("Checkpoint neuron mismatch: header has " +
+                std::to_string(reader.getHeader().neuronCount) + " neurons, this brain has " +
+                std::to_string(getTotalNeuronCount()));
+            return false;
+        }
+        if (reader.getHeader().synapseCount != getTotalSynapseCount()) {
+            NLM_LOG_INFO("Checkpoint synapse count differs (header " +
+                std::to_string(reader.getHeader().synapseCount) + ", this brain " +
+                std::to_string(getTotalSynapseCount()) +
+                "); restoring by (source, destination) pair");
+        }
+
         // Read neurons
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to read neurons from checkpoint");
             return false;
         }
-        
-        // Apply neuron states
+
+        // Apply neuron states, including the fields the old load dropped
+        // (refractory remaining, firing rate, last spike time): without
+        // them a reloaded brain restarts its firing-rate EMA and
+        // refractory state from zero and does not continue where the
+        // saved brain left off.
         size_t idx = 0;
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
@@ -916,29 +990,110 @@ bool Brain::load(const std::string& filepath) {
                         neuron->setThreshold(neuronData.threshold[idx]);
                         neuron->setResetPotential(neuronData.resetPotential[idx]);
                         neuron->setLeakConductance(neuronData.leakConductance[idx]);
+                        auto& state = neuron->getState();
                         if (idx < neuronData.firingState.size()) {
-                            neuron->setFiringState(static_cast<FiringState>(neuronData.firingState[idx]));
+                            state.firingState = static_cast<FiringState>(neuronData.firingState[idx]);
                         }
                         if (idx < neuronData.refractoryRemaining.size()) {
-                            neuron->setRefractoryPeriod(neuronData.refractoryPeriod[idx]);
+                            state.refractoryRemaining = neuronData.refractoryRemaining[idx];
+                        }
+                        if (idx < neuronData.refractoryPeriod.size()) {
+                            state.refractoryPeriod = neuronData.refractoryPeriod[idx];
+                        }
+                        if (idx < neuronData.lastSpikeTime.size()) {
+                            state.lastSpikeTime = neuronData.lastSpikeTime[idx];
+                        }
+                        // Firing rate is the decode signal, so a
+                        // reloaded brain must resume with the saved
+                        // rates, not restart its EMA from zero.
+                        if (idx < neuronData.firingRate.size()) {
+                            state.firingRate = neuronData.firingRate[idx];
                         }
                     }
                     idx++;
                 }
             }
         }
-        
+
         // Read synapses
         SynapseCheckpointData synapseData;
         if (!reader.readSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to read synapses from checkpoint");
             return false;
         }
-        
-        // Apply synapse states - this is complex because we need to find matching synapses
-        // For now, just log the count
-        NLM_LOG_INFO("Loaded " + std::to_string(synapseData.weight.size()) + " synapses");
-        
+
+        // Apply synapse states. The old load only logged the count and
+        // restored nothing, so a "loaded" brain kept its freshly
+        // initialised weights. Match by (source, destination) pair —
+        // not by position — so the restore is correct even if synapse
+        // creation order ever changes; fall back to position only for
+        // pairs that have no match (e.g. duplicate pairs).
+        {
+            std::unordered_map<uint64_t, std::vector<Synapse*>> byPair;
+            auto pairKey = [](uint64_t src, uint64_t dst) {
+                return (src << 32) ^ dst;
+            };
+            for (auto& region : pImpl->regions) {
+                for (auto& syn : region->getSynapses()) {
+                    byPair[pairKey(syn->getSourceNeuron().index(),
+                                   syn->getDestinationNeuron().index())].push_back(syn.get());
+                }
+            }
+            std::unordered_map<uint64_t, size_t> usedCount;
+            size_t restored = 0;
+            for (size_t i = 0; i < synapseData.weight.size(); ++i) {
+                uint64_t key = pairKey(synapseData.sourceNeuron[i],
+                                       synapseData.destinationNeuron[i]);
+                auto it = byPair.find(key);
+                Synapse* target = nullptr;
+                if (it != byPair.end()) {
+                    size_t used = usedCount[key]++;
+                    if (used < it->second.size()) target = it->second[used];
+                }
+                if (!target) continue;
+                target->setWeight(synapseData.weight[i]);
+                if (i < synapseData.delay.size()) target->setDelay(synapseData.delay[i]);
+                if (i < synapseData.synapseType.size()) {
+                    target->setType(static_cast<SynapseType>(synapseData.synapseType[i]));
+                }
+                if (i < synapseData.eligibilityTrace.size()) {
+                    target->setEligibilityTrace(synapseData.eligibilityTrace[i]);
+                }
+                if (i < synapseData.efficacy.size()) {
+                    target->setEfficacy(synapseData.efficacy[i]);
+                }
+                ++restored;
+            }
+            NLM_LOG_INFO("Restored " + std::to_string(restored) + " / " +
+                         std::to_string(synapseData.weight.size()) + " synapses");
+            // A few unmatched synapses are expected (structural
+            // plasticity prunes/grows between save and a fresh load),
+            // but a large unmatched fraction means the wrong brain.
+            if (!synapseData.weight.empty() &&
+                restored * 10 < synapseData.weight.size() * 9) {
+                NLM_LOG_ERROR("Too few saved synapses matched on load");
+                return false;
+            }
+        }
+
+        // Restore pending delayed spikes (in-flight synaptic input).
+        {
+            std::vector<DelayedSpikeEvent> pending;
+            if (!reader.readDelayedSpikes(pending)) {
+                NLM_LOG_ERROR("Failed to read pending spikes from checkpoint");
+                return false;
+            }
+            if (pImpl->spikeSystem) {
+                pImpl->spikeSystem->restorePendingDelayedSpikes(pending);
+            }
+            NLM_LOG_INFO("Restored " + std::to_string(pending.size()) + " pending delayed spikes");
+        }
+
+        // Restore simulation clock so a reloaded brain continues from
+        // the saved step instead of restarting its step counter.
+        pImpl->currentStep = reader.getHeader().step;
+        pImpl->currentTime = reader.getHeader().simulationTime;
+
         NLM_LOG_INFO("Brain state loaded successfully");
         return true;
         

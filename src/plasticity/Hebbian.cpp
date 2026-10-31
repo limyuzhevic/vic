@@ -63,8 +63,12 @@ void Hebbian::update(Synapse* synapse,
         delta = -delta;  // strengthen inhibition, don't flip it to excitatory
     }
     
-    // Apply with bounds
+    // Apply with bounds. Soft bound, Phase 4 (see STDP.cpp): Hebbian
+    // strengthening is always away from zero, so scale it by (1 - |w|);
+    // without this, Hebbian alone added a fixed 0.01 per co-active step
+    // and saturated every weight together with STDP.
     if (std::abs(delta) > 1e-6f) {
+        delta *= (1.0f - std::abs(synapse->getWeight()));
         applyWeightChange(synapse, delta);
         if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
             synapse->setWeight(-0.01f);

@@ -5,6 +5,7 @@
 #include <cassert>
 #include <iostream>
 #include <cmath>
+#include <stdexcept>
 
 namespace test_stdp {
 
@@ -145,6 +146,8 @@ void testSTDPWeightBounds() {
     std::cout << "    testSTDPWeightBounds passed" << std::endl;
 }
 
+void testSTDPSoftBounds();
+
 void runAll() {
     std::cout << "Running STDP tests..." << std::endl;
     testSTDPCreation();
@@ -155,6 +158,46 @@ void runAll() {
     testSTDPDepression();
     testSTDPEmptySpikes();
     testSTDPWeightBounds();
+    testSTDPSoftBounds();
+}
+
+void testSTDPSoftBounds() {
+    // Phase 4: potentiation must shrink as the weight approaches its
+    // bound, so repeated co-activity approaches 1.0 asymptotically
+    // instead of clamping there in a few steps and erasing differences.
+    nlm::STDP stdp;
+    nlm::RandomGenerator rng(42);
+
+    nlm::Synapse synapse(nlm::SynapseId(1), nlm::NeuronId(1), nlm::NeuronId(2));
+    synapse.setType(nlm::SynapseType::Excitatory);
+    synapse.setWeight(0.5f);
+
+    // Pre 5ms before post, in seconds (Brain steps at 1ms).
+    std::vector<nlm::Timestamp> preSpikes = {0.0};
+    std::vector<nlm::Timestamp> postSpikes = {0.005};
+
+    stdp.update(&synapse, preSpikes, postSpikes, 0.001);
+    float firstDelta = synapse.getWeight() - 0.5f;
+    if (!(firstDelta > 0.0f)) throw std::runtime_error("STDP soft-bound: no potentiation");
+    // Unscaled delta would be 0.01 * exp(-5/20) ~= 0.0078; soft scaling
+    // by (1 - 0.5) must make the actual step smaller than that.
+    if (!(firstDelta < 0.0078f)) throw std::runtime_error("STDP soft-bound: step not scaled down");
+
+    float prevDelta = firstDelta;
+    for (int i = 0; i < 200; ++i) {
+        float before = synapse.getWeight();
+        stdp.update(&synapse, preSpikes, postSpikes, 0.001);
+        float delta = synapse.getWeight() - before;
+        if (!(delta >= 0.0f)) throw std::runtime_error("STDP soft-bound: negative increment");
+        if (!(delta <= prevDelta + 1e-6f)) throw std::runtime_error("STDP soft-bound: increments did not shrink");
+        prevDelta = delta;
+    }
+    // Approaches but never reaches the bound, even after 200 updates.
+    if (!(synapse.getWeight() < 1.0f)) throw std::runtime_error("STDP soft-bound: weight reached bound");
+    if (!(synapse.getWeight() > 0.5f)) throw std::runtime_error("STDP soft-bound: weight did not grow");
+
+    std::cout << "    testSTDPSoftBounds passed (final weight="
+              << synapse.getWeight() << ")" << std::endl;
 }
 
 } // namespace test_stdp

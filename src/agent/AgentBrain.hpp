@@ -125,9 +125,19 @@ private:
     bool developmentEnabled_;
     bool curiosityEnabled_;
     
-    // Previous sensory state for novelty detection
-    std::vector<float> previousVision_;
+    // Slowly adapting prediction of the visual scene, for novelty
+    // detection (see processSensoryInput). Not the previous frame:
+    // per-frame differencing cannot work here, because the world
+    // changes vision by only ~0-0.004 per action step while moving.
+    std::vector<float> predictedVision_;
     float sensoryNoveltyDecay_;
+    // Strongest touch/proximity signal in the most recent percept
+    // (0 = nothing within touch range, 1 = touching). Used only for the
+    // innate proximity reflex in decodeFromMotorNeurons().
+    float maxTouch_ = 0.0f;
+    // Last decoded command, for the interact no-repeat rule below.
+    MotorCommand lastDecoded_ = MotorCommand::Wait;
+    bool hasLastDecoded_ = false;
 };
 
 } // namespace nlm
