@@ -368,6 +368,24 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // World parameters
+    config->set("world_width", 20.0f, ConfigSource::Default);
+    config->set("world_height", 20.0f, ConfigSource::Default);
+    config->set("max_energy", 100.0f, ConfigSource::Default);
+    config->set("move_speed", 3.0f, ConfigSource::Default);
+    config->set("turn_speed", 2.0f, ConfigSource::Default);
+    config->set("interact_range", 1.0f, ConfigSource::Default);
+    config->set("vision_fov", 1.5707963267948966f, ConfigSource::Default); // PI/2
+    config->set("vision_max_range", 8.0f, ConfigSource::Default);
+    config->set("reward_movement_cost", 0.01f, ConfigSource::Default);
+    config->set("reward_wall_cost", 0.05f, ConfigSource::Default);
+    config->set("reward_hit_hazard_cost", 0.02f, ConfigSource::Default);
+    config->set("reward_hit_resource_gain", -0.005f, ConfigSource::Default);
+    config->set("velocity_damping", 0.9f, ConfigSource::Default);
+    config->set("energy_decay_rate", 0.01f, ConfigSource::Default);
+    config->set("resource_energy_gain", 30.0f, ConfigSource::Default);
+    config->set("development_consolidation_threshold", 0.3f, ConfigSource::Default);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -376,6 +394,22 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  world_width: " + std::to_string(config->getOr<float>("world_width", 20.0f)));
+    NLM_LOG_INFO("  world_height: " + std::to_string(config->getOr<float>("world_height", 20.0f)));
+    NLM_LOG_INFO("  max_energy: " + std::to_string(config->getOr<float>("max_energy", 100.0f)));
+    NLM_LOG_INFO("  move_speed: " + std::to_string(config->getOr<float>("move_speed", 3.0f)));
+    NLM_LOG_INFO("  turn_speed: " + std::to_string(config->getOr<float>("turn_speed", 2.0f)));
+    NLM_LOG_INFO("  interact_range: " + std::to_string(config->getOr<float>("interact_range", 1.0f)));
+    NLM_LOG_INFO("  vision_fov: " + std::to_string(config->getOr<float>("vision_fov", 1.5707963267948966f)));
+    NLM_LOG_INFO("  vision_max_range: " + std::to_string(config->getOr<float>("vision_max_range", 8.0f)));
+    NLM_LOG_INFO("  reward_movement_cost: " + std::to_string(config->getOr<float>("reward_movement_cost", 0.01f)));
+    NLM_LOG_INFO("  reward_wall_cost: " + std::to_string(config->getOr<float>("reward_wall_cost", 0.05f)));
+    NLM_LOG_INFO("  reward_hit_hazard_cost: " + std::to_string(config->getOr<float>("reward_hit_hazard_cost", 0.02f)));
+    NLM_LOG_INFO("  reward_hit_resource_gain: " + std::to_string(config->getOr<float>("reward_hit_resource_gain", -0.005f)));
+    NLM_LOG_INFO("  velocity_damping: " + std::to_string(config->getOr<float>("velocity_damping", 0.9f)));
+    NLM_LOG_INFO("  energy_decay_rate: " + std::to_string(config->getOr<float>("energy_decay_rate", 0.01f)));
+    NLM_LOG_INFO("  resource_energy_gain: " + std::to_string(config->getOr<float>("resource_energy_gain", 30.0f)));
+    NLM_LOG_INFO("  development_consolidation_threshold: " + std::to_string(config->getOr<float>("development_consolidation_threshold", 0.3f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

@@ -100,6 +100,7 @@ struct Brain::Impl {
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
+        , learnedPreference(0.0f)
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
@@ -208,6 +209,24 @@ bool Brain::initialize() {
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
+    
+    // Set default values for Phase 6 integration
+    pImpl->config->set("world_width", 20.0f, ConfigSource::Default);
+    pImpl->config->set("world_height", 20.0f, ConfigSource::Default);
+    pImpl->config->set("max_energy", 100.0f, ConfigSource::Default);
+    pImpl->config->set("move_speed", 3.0f, ConfigSource::Default);
+    pImpl->config->set("turn_speed", 2.0f, ConfigSource::Default);
+    pImpl->config->set("interact_range", 1.0f, ConfigSource::Default);
+    pImpl->config->set("vision_fov", 1.5707963267948966f, ConfigSource::Default); // PI/2
+    pImpl->config->set("vision_max_range", 8.0f, ConfigSource::Default);
+    pImpl->config->set("reward_movement_cost", 0.01f, ConfigSource::Default);
+    pImpl->config->set("reward_wall_cost", 0.05f, ConfigSource::Default);
+    pImpl->config->set("reward_hit_hazard_cost", 0.02f, ConfigSource::Default);
+    pImpl->config->set("reward_hit_resource_gain", -0.005f, ConfigSource::Default);
+    pImpl->config->set("velocity_damping", 0.9f, ConfigSource::Default);
+    pImpl->config->set("energy_decay_rate", 0.01f, ConfigSource::Default);
+    pImpl->config->set("resource_energy_gain", 30.0f, ConfigSource::Default);
+    pImpl->config->set("development_consolidation_threshold", 0.3f, ConfigSource::Default);
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -594,7 +613,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
             
             // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            // Note: reward was already set above
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -709,14 +728,14 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
     auto it = pImpl->neuronById.find(neuron.index());
-    if (it != pImpl->neuronById.end()) {
+    if (it != pImpl->neuronById.end() && it->second) {
         it->second->injectCurrent(current);
         return;
     }
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
-            if (n->getId() == neuron) {
+            if (n && n->getId() == neuron) {
                 n->injectCurrent(current);
                 return;
             }

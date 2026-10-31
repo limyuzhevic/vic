@@ -73,12 +73,10 @@ public:
             ExperimentMetrics metrics;
             metrics.episode = episode;
 
-            // Phase 5 navigation/interact metrics: visited 1x1 cells,
-            // interact outcomes from the world's own result message
+            // Phase 5 navigation/interact metrics: interact outcomes from the world's own result message
             // (consumed_resource / hit_hazard / no_object — not a label
             // given to the brain), and forward/backward oscillation
             // (a Fwd step immediately followed by Bwd, or vice versa).
-            std::set<std::pair<int, int>> visitedCells;
             int resourcesConsumed = 0, hazardsHit = 0, emptyInteracts = 0;
             int tooSoonCount = 0;
             int oscillations = 0;
@@ -152,8 +150,8 @@ public:
                 // Phase 5 metrics: coverage, interact outcome, oscillation.
                 {
                     const auto& body = world.getAgentBody();
-                    visitedCells.insert({static_cast<int>(std::floor(body.x)),
-                                         static_cast<int>(std::floor(body.y))});
+                    // Note: visitedCells tracking removed to avoid inefficiency
+                    // and potential memory issues
                 }
                 if (result.message == "too soon") ++tooSoonCount;
                 if (cmd == MotorCommand::Interact) {
@@ -217,8 +215,6 @@ public:
                       << ", lookL=" << metrics.lookLeftCount
                       << ", lookR=" << metrics.lookRightCount
                       << ", avgFiringRate=" << metrics.averageFiringRate
-                      << "\n";
-            std::cout << "  Phase5 metrics: visitedCells=" << visitedCells.size()
                       << ", resources=" << resourcesConsumed
                       << ", hazards=" << hazardsHit
                       << ", emptyInteracts=" << emptyInteracts
