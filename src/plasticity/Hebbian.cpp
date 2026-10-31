@@ -53,25 +53,24 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Count correlated spike pairs (simplified covariance)
-    size_t correlationCount = 0;
-    for (Timestamp preTime : preSpikes) {
-        for (Timestamp postTime : postSpikes) {
-            float dt = static_cast<float>(postTime - preTime);
-            // Count spikes within a broad time window as correlated
-            if (std::abs(dt) < 100.0f) {  // 100ms correlation window
-                ++correlationCount;
-            }
-        }
+    // Nearest-neighbour version: the old all-pairs count made delta grow
+    // with history length (up to 100x100 pairs) and saturated every weight
+    // to its bound in one step. One correlated recent pair = one step.
+    // Timestamps are in seconds, so the 100ms window is 0.1s.
+    float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
+    float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
+    if (synapse->getType() == SynapseType::Inhibitory) {
+        delta = -delta;  // strengthen inhibition, don't flip it to excitatory
     }
-    
-    // Compute weight change based on correlation
-    // More sophisticated: use actual spike counts and firing rates
-    float delta = pImpl->learningRate * static_cast<float>(correlationCount);
     
     // Apply with bounds
     if (std::abs(delta) > 1e-6f) {
         applyWeightChange(synapse, delta);
+        if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
+            synapse->setWeight(-0.01f);
+        } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
+            synapse->setWeight(0.01f);
+        }
     }
 }
 

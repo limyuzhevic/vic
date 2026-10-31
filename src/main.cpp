@@ -222,10 +222,22 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
+    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
+    // each step. The old code injected 30.0f into *every* sensory neuron
+    // 20 times per step (600.0f), so the whole network fired synchronously
+    // and every weight saturated to 1.0 - learning was measurable but not
+    // selective at all.
+    std::vector<NeuronId> patternNeurons;
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (auto* neuron : region->getAllNeurons()) {
+            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+                patternNeurons.push_back(neuron->getId());
+            }
+        }
+    }
     for (SimulationStep step = 0; step < 1000; ++step) {
-        // Create input pattern - inject current into sensory neurons
-        for (size_t i = 0; i < 20 && i < brain->getTotalNeuronCount() / 4; ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
+        for (NeuronId id : patternNeurons) {
+            brain->injectCurrent(id, 30.0f);
         }
         
         brain->step(step, step * 0.001);
@@ -252,64 +264,38 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     auto* region = brain->getRegion(RegionId(1));
     if (!region) return;
     
-    // Get first few synapses
+    // Use one real synapse and its own pre/post neurons. The old test
+    // fired neurons[0]/neurons[1] and measured synapses[0..4], which are
+    // usually unrelated to that pair, so its result said nothing about STDP.
     auto& synapses = region->getSynapses();
-    if (synapses.size() < 5) {
-        NLM_LOG_INFO("  Not enough synapses for STDP test");
+    if (synapses.empty()) {
+        NLM_LOG_INFO("  No synapses for STDP test");
         return;
     }
-    
-    NLM_LOG_INFO("  Testing STDP on 5 synapses:");
-    
-    // Record initial weights
-    std::vector<float> beforeWeights;
-    for (size_t i = 0; i < 5; ++i) {
-        beforeWeights.push_back(synapses[i]->getWeight());
-        synapses[i]->enablePlasticity(false, true, false);  // Enable only STDP
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " before: " + std::to_string(beforeWeights[i]));
-    }
-    
-    // Create correlated activity: fire pre then post to trigger LTP
+    Synapse* syn = synapses[0].get();
+    syn->enablePlasticity(false, true, false);  // STDP only
+    float beforeWeight = syn->getWeight();
+    NLM_LOG_INFO("  Testing STDP on 1 synapse:");
+    NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
+                 " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
+                 ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
+
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-    
+
     for (int trial = 0; trial < 50; ++trial) {
-        // Fire pre-synaptic neuron
-        Neuron* preNeuron = nullptr;
-        Neuron* postNeuron = nullptr;
-        
-        auto neurons = region->getAllNeurons();
-        if (neurons.size() >= 2) {
-            preNeuron = neurons[0];
-            postNeuron = neurons[1];
-        }
-        
-        if (preNeuron && postNeuron) {
-            // Pre fires first
-            preNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2, trial * 2 * 0.001);
-            
-            // Then post fires
-            postNeuron->injectCurrent(60.0f);
-            brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
-        }
+        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
+        brain->step(trial * 2, trial * 2 * 0.001);
+        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
+        brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-    
-    // Record after weights
+
+    float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
-    for (size_t i = 0; i < 5; ++i) {
-        float delta = synapses[i]->getWeight() - beforeWeights[i];
-        NLM_LOG_INFO("    Synapse " + std::to_string(i) + 
-                    " after: " + std::to_string(synapses[i]->getWeight()) +
-                    " (Δ=" + std::to_string(delta) + ")");
-    }
-    
-    // Check if weights increased (LTP)
-    float totalDelta = 0.0f;
-    for (size_t i = 0; i < 5; ++i) {
-        totalDelta += synapses[i]->getWeight() - beforeWeights[i];
-    }
+    NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
+                 " (Δ=" + std::to_string(delta) + ")");
+
+    float totalDelta = delta;
     
     NLM_LOG_INFO("");
     if (totalDelta > 0.001f) {

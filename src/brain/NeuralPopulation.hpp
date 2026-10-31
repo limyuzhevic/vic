@@ -34,8 +34,13 @@ public:
     Neuron* getNeuron(NeuronIndex index);
     const Neuron* getNeuron(NeuronIndex index) const;
     
-    // Add neuron to population
+    // Add neuron to population (caller retains ownership)
     void addNeuron(Neuron* neuron);
+
+    // Create `size` neurons owned by this population, with sequential IDs
+    // starting at startId. This is what actually materialises a population:
+    // before this fix a population only stored a size counter and no neurons.
+    void createNeurons(NeuronId startId);
     
     // Get all neurons
     const std::vector<Neuron*>& getNeurons() const;

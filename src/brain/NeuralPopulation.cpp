@@ -8,6 +8,7 @@ struct NeuralPopulation::Impl {
     PopulationId id;
     size_t size;
     std::vector<Neuron*> neurons;
+    std::vector<std::unique_ptr<Neuron>> ownedNeurons;
     NeuronType neuronType;
     std::vector<MembranePotential> membranePotentials;  // for statistics
     
@@ -55,6 +56,19 @@ const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
         return nullptr;
     }
     return pImpl->neurons[index];
+}
+
+void NeuralPopulation::createNeurons(NeuronId startId) {
+    pImpl->ownedNeurons.clear();
+    pImpl->neurons.clear();
+    pImpl->neurons.reserve(pImpl->size);
+    pImpl->ownedNeurons.reserve(pImpl->size);
+    for (size_t i = 0; i < pImpl->size; ++i) {
+        auto neuron = std::make_unique<Neuron>(NeuronId(startId.index() + i));
+        neuron->setType(pImpl->neuronType);
+        pImpl->neurons.push_back(neuron.get());
+        pImpl->ownedNeurons.push_back(std::move(neuron));
+    }
 }
 
 void NeuralPopulation::addNeuron(Neuron* neuron) {

@@ -18,6 +18,7 @@
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
+#include <unordered_map>
 #include <cmath>
 #include <sstream>
 
@@ -69,6 +70,10 @@ struct Brain::Impl {
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
+    // NeuronId -> neuron, for O(1) synaptic delivery (was a linear scan
+    // over all neurons per delayed spike, which made real networks unusable).
+    std::unordered_map<uint64_t, Neuron*> neuronById;
+    bool spikeHandlersRegistered = false;
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
@@ -177,6 +182,18 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+
+    // Re-initialising must rebuild, not append: a previous run left
+    // reset()+initialize() reporting 1000 neurons for a 500-neuron brain.
+    pImpl->regions.clear();
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
+    pImpl->neuronById.clear();
+    pImpl->nextRegionId = RegionId(1);
+    pImpl->totalSpikesTotal = 0;
+    pImpl->totalSpikesThisStep = 0;
+    pImpl->currentStep = 0;
+    pImpl->currentTime = 0.0;
     
     // Get configuration values
     size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000));
@@ -196,9 +213,17 @@ bool Brain::initialize() {
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
-            // Add populations
+            // Add populations. The old layout had no inhibitory neurons at
+            // all (Sensory/Internal/Motor are all treated as excitatory by
+            // initializeRandomConnectivity), so any input caused runaway
+            // excitation and every weight saturated. Split the internal
+            // population 80/20 into excitatory and inhibitory neurons.
             auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            auto internalPopId = region->addPopulation(neuronsPerRegion / 2, NeuronType::Internal);
+            size_t internalCount = neuronsPerRegion / 2;
+            size_t internalExcitatory = internalCount * 4 / 5;
+            auto internalPopId = region->addPopulation(internalExcitatory, NeuronType::Internal);
+            auto inhibitoryPopId = region->addPopulation(internalCount - internalExcitatory, NeuronType::Inhibitory);
+            (void)internalPopId; (void)inhibitoryPopId;
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
@@ -221,6 +246,13 @@ bool Brain::initialize() {
         }
     }
     
+    // Build the neuron lookup used by synaptic delivery and injection.
+    for (auto& region : pImpl->regions) {
+        for (auto* neuron : region->getAllNeurons()) {
+            pImpl->neuronById[neuron->getId().index()] = neuron;
+        }
+    }
+
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
@@ -260,6 +292,10 @@ bool Brain::initialize() {
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
+    // Register spike handlers once; re-initialising used to register them
+    // again and double-count every spike.
+    if (!pImpl->spikeHandlersRegistered) {
+        pImpl->spikeHandlersRegistered = true;
     // Register spike handlers for event-driven processing
     pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
         // Count spikes
@@ -269,23 +305,18 @@ bool Brain::initialize() {
     
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        // Find destination neuron and deliver synaptic input
-        for (auto& region : pImpl->regions) {
-            auto neurons = region->getAllNeurons();
-            for (auto* neuron : neurons) {
-                if (neuron->getId() == event.destination_neuron) {
-                    // Apply synaptic weight as current
-                    MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-                    if (event.is_excitatory) {
-                        neuron->receiveExcitatoryInput(synapticCurrent);
-                    } else {
-                        neuron->receiveInhibitoryInput(-synapticCurrent);
-                    }
-                    return;
-                }
+        auto it = pImpl->neuronById.find(event.destination_neuron.index());
+        if (it != pImpl->neuronById.end()) {
+            Neuron* neuron = it->second;
+            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            if (event.is_excitatory) {
+                neuron->receiveExcitatoryInput(synapticCurrent);
+            } else {
+                neuron->receiveInhibitoryInput(-synapticCurrent);
             }
         }
     });
+    }  // spikeHandlersRegistered
     
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
@@ -618,6 +649,11 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 }
 
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+    auto it = pImpl->neuronById.find(neuron.index());
+    if (it != pImpl->neuronById.end()) {
+        it->second->injectCurrent(current);
+        return;
+    }
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
