@@ -4,6 +4,8 @@
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
 #include <chrono>
 #include <cmath>
 
@@ -25,8 +27,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create configuration
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", config.neuronCount);
-    cfg->set("region_count", config.regionCount);
+    cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount));
+    cfg->set("region_count", static_cast<int64_t>(config.regionCount));
     cfg->set("connection_probability", config.connectionProbability);
     cfg->set("stdp_ltp_weight", 0.01f);
     cfg->set("stdp_ltd_weight", 0.012f);
@@ -43,7 +45,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.initialize(16, 16);
+    world.configure(16, 16, 16, 16);
+    world.reset();
     
     // Create agent
     AgentBrain agent(brain);
@@ -62,7 +65,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        SensoryPercept percept = world.observe(agent.getBrain()->getRegions()[0].get());
+        world.update(0.001);
+        SensoryPercept percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -74,10 +78,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        world.applyAction(agent.getBrain()->getRegions()[0].get(), cmd);
+        ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
         
         // Compute reward
-        float reward = world.computeReward(agent.getBrain()->getRegions()[0].get());
+        float reward = actionResult.reward;
         totalReward += reward;
         
         // Apply reward modulation

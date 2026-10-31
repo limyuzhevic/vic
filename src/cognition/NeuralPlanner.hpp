@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../motor/Action.hpp"
 #include "../brain/Brain.hpp"
 #include <vector>
 #include <memory>
@@ -81,6 +82,9 @@ private:
     // Evaluate single action from state
     float evaluateAction(ActionType action, const std::vector<float>& state);
 
+    // Predict next state after an action (simple forward model)
+    std::vector<float> predictNextState(ActionType action, const std::vector<float>& currentState);
+
     struct Impl;
     std::unique_ptr<Impl> pImpl;
 
@@ -129,7 +133,7 @@ public:
     float getSelfModelConfidence(ActionType action) const;
 
     // Is this change likely caused by self (action) vs external?
-    float computeSelfGenerated Likeness(const std::vector<float>& beforeState,
+    float computeSelfGeneratedLikeness(const std::vector<float>& beforeState,
                                        const std::vector<float>& afterState,
                                        ActionType action) const;
 
@@ -158,6 +162,8 @@ private:
     // Find best matching previous experience
     std::vector<float> findMatchingEffect(ActionType action,
                                           const std::vector<float>& beforeState) const;
+
+    float computeSimilarity(const std::vector<float>& a, const std::vector<float>& b) const;
 
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -220,6 +226,9 @@ public:
 
     // Update social knowledge based on interactions
     void updateSocialKnowledge(float interactionReward);
+
+    // Similarity between two patterns (cosine)
+    float computeSimilarity(const std::vector<float>& a, const std::vector<float>& b) const;
 
     // Clear social learning
     void clear();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AgentBody.hpp"
+#include "../sensory/SensoryInput.hpp"
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"

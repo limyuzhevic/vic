@@ -286,7 +286,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
     // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(uint32_t(2), uint32_t(10)));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
@@ -298,5 +298,21 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
 }
+
+NeuronId Neuron::getId() const { return pImpl->id; }
+NeuronType Neuron::getType() const { return pImpl->type; }
+const NeuronState& Neuron::getState() const { return pImpl->state; }
+MembranePotential Neuron::getMembranePotential() const { return pImpl->state.membranePotential; }
+MembranePotential Neuron::getThreshold() const { return pImpl->state.threshold; }
+bool Neuron::isFiring() const { return pImpl->state.firingState == FiringState::Active; }
+bool Neuron::isRefractory() const { return pImpl->state.refractoryRemaining > 0; }
+FiringRate Neuron::getFiringRate() const { return pImpl->state.firingRate; }
+MembranePotential Neuron::getTotalCurrent() const { return pImpl->totalCurrent; }
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const { return pImpl->spikeHistory; }
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const { return pImpl->incomingSynapses; }
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const { return pImpl->outgoingSynapses; }
+const PlasticityFlags& Neuron::getPlasticityFlags() const { return pImpl->plasticityFlags; }
+RegionId Neuron::getRegionId() const { return pImpl->regionId; }
+PopulationId Neuron::getPopulationId() const { return pImpl->populationId; }
 
 } // namespace nlm

@@ -68,6 +68,8 @@ public:
     
     // World dimensions
     float getWidth() const { return width_; }
+    size_t getVisionWidth() const { return visionWidth_; }
+    size_t getVisionHeight() const { return visionHeight_; }
     float getHeight() const { return height_; }
     
     // Energy settings

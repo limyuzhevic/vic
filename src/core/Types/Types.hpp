@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
+#include <functional>
 #include <type_traits>
 
 namespace nlm {
@@ -17,6 +19,8 @@ struct NeuronId {
     constexpr bool operator==(const NeuronId& other) const = default;
     constexpr bool operator!=(const NeuronId& other) const = default;
     constexpr bool operator<(const NeuronId& other) const { return value < other.value; }
+    constexpr NeuronId& operator++() { ++value; return *this; }
+    constexpr NeuronId operator++(int) { NeuronId old = *this; ++value; return old; }
     
     constexpr uint64_t index() const { return value; }
 };
@@ -31,6 +35,8 @@ struct SynapseId {
     constexpr bool operator==(const SynapseId& other) const = default;
     constexpr bool operator!=(const SynapseId& other) const = default;
     constexpr bool operator<(const SynapseId& other) const { return value < other.value; }
+    constexpr SynapseId& operator++() { ++value; return *this; }
+    constexpr SynapseId operator++(int) { SynapseId old = *this; ++value; return old; }
     
     constexpr uint64_t index() const { return value; }
 };
@@ -45,6 +51,8 @@ struct RegionId {
     constexpr bool operator==(const RegionId& other) const = default;
     constexpr bool operator!=(const RegionId& other) const = default;
     constexpr bool operator<(const RegionId& other) const { return value < other.value; }
+    constexpr RegionId& operator++() { ++value; return *this; }
+    constexpr RegionId operator++(int) { RegionId old = *this; ++value; return old; }
     
     constexpr uint64_t index() const { return value; }
 };
@@ -59,6 +67,8 @@ struct PopulationId {
     constexpr bool operator==(const PopulationId& other) const = default;
     constexpr bool operator!=(const PopulationId& other) const = default;
     constexpr bool operator<(const PopulationId& other) const { return value < other.value; }
+    constexpr PopulationId& operator++() { ++value; return *this; }
+    constexpr PopulationId operator++(int) { PopulationId old = *this; ++value; return old; }
     
     constexpr uint64_t index() const { return value; }
 };
@@ -190,3 +200,18 @@ constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
 } // namespace nlm
+
+namespace std {
+template<> struct hash<nlm::NeuronId> {
+    size_t operator()(const nlm::NeuronId& id) const noexcept { return std::hash<uint64_t>{}(id.value); }
+};
+template<> struct hash<nlm::SynapseId> {
+    size_t operator()(const nlm::SynapseId& id) const noexcept { return std::hash<uint64_t>{}(id.value); }
+};
+template<> struct hash<nlm::RegionId> {
+    size_t operator()(const nlm::RegionId& id) const noexcept { return std::hash<uint64_t>{}(id.value); }
+};
+template<> struct hash<nlm::PopulationId> {
+    size_t operator()(const nlm::PopulationId& id) const noexcept { return std::hash<uint64_t>{}(id.value); }
+};
+} // namespace std

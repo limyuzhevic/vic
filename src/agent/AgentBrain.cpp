@@ -1,5 +1,6 @@
 #include "AgentBrain.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/Random/Random.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -218,7 +219,7 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(0, 7);
+            int choice = brain_->getRandomGenerator()->uniformInt(uint32_t(0), uint32_t(7));
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -252,7 +253,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
+        for (const auto& syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
             
             if (std::abs(eligibility) > 0.001f) {

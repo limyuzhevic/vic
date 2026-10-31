@@ -271,7 +271,7 @@ void NeuralPrediction::modulatePredictionSynapses(float error, float reward) {
     
     // Apply reward-modulated plasticity to prediction-related synapses
     for (const auto& region : brain_->getRegions()) {
-        for (auto* syn : region->getSynapses()) {
+        for (const auto& syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
             
             // If this synapse was recently active in prediction pathway
