@@ -158,17 +158,11 @@ add_executable(nlm_phase5_demo
 )
 target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
 
-# Phase 6 demo executable
-add_executable(nlm_phase6_demo
-    src/experiments/Phase6Demo.cpp
+# Unified demo launcher executable
+add_executable(nlm_demo
+    src/nlm_demo.cpp
 )
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
-
-# Benchmark executable
-add_executable(nlm_benchmark
-    src/benchmark.cpp
-)
-target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+target_link_libraries(nlm_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
@@ -197,7 +191,7 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark nlm_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

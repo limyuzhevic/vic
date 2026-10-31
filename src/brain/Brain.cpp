@@ -157,12 +157,15 @@ struct Brain::Impl {
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
-        // Get integration intervals from config
-        replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
-        consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+    // Initialize checkpoint manager
+    checkpointManager = std::make_unique<CheckpointManager>();
+    
+    // Configure with homeostatic scaling enabled
+    std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+    checkpointManager->configure(checkpointDir, 10000, 5, true);
+    
+    // Log homeostasis status
+    NLM_LOG_INFO("Homeostatic mechanisms enabled: synaptic scaling active");
     }
     
     DevelopmentalStage developmentalStage;
@@ -204,7 +207,7 @@ bool Brain::initialize() {
     // Get configuration values
     size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000));
     size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", 1));
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.01f);  // Reduced from 0.1f to 0.01f for sparser connectivity
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
@@ -677,6 +680,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+    
+    // ========== STEP 16: Apply homeostatic synaptic scaling ==========
+    applyHomeostaticScaling();
 }
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
@@ -1574,6 +1580,69 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+void Brain::applyHomeostaticScaling() {
+    // Apply homeostatic synaptic scaling to maintain stable network activity
+    // This prevents runaway excitation and promotes balanced E/I dynamics
+    
+    // Only apply if the feature is enabled in config
+    if (!pImpl->config->getOr<bool>("enable_homeostatic_plasticity", true)) {
+        return;
+    }
+    
+    // Get scaling parameters
+    size_t scalingInterval = static_cast<size_t>(pImpl->config->getOr<int64_t>("synaptic_scaling_interval", 100));
+    float targetFiringRate = pImpl->config->getOr<float>("synaptic_scaling_target", 1.0f);
+    
+    // Check if it's time to apply scaling
+    static size_t lastScalingStep = 0;
+    if (pImpl->currentStep - lastScalingStep < scalingInterval) {
+        return;
+    }
+    lastScalingStep = pImpl->currentStep;
+    
+    NLM_LOG_INFO("Applying homeostatic synaptic scaling");
+    
+    // Calculate current average firing rate
+    float currentFiringRate = getAverageFiringRate();
+    float firingRateRatio = targetFiringRate / (currentFiringRate + 0.01f);  // Avoid division by zero
+    
+    // Apply scaling factor to all synapses
+    // Scale down if firing rate is too high, scale up if too low
+    float scalingFactor = 1.0f;
+    
+    if (currentFiringRate > targetFiringRate * 2.0f) {
+        // High firing rate - reduce excitation, increase inhibition
+        scalingFactor = std::max(0.5f, 1.0f - (currentFiringRate - targetFiringRate) * 0.1f);
+        NLM_LOG_INFO("High firing rate (" + std::to_string(currentFiringRate) + 
+                    " Hz) detected, scaling factor: " + std::to_string(scalingFactor));
+    } else if (currentFiringRate < targetFiringRate * 0.5f) {
+        // Low firing rate - increase excitation slightly
+        scalingFactor = std::min(1.5f, 1.0f + (targetFiringRate - currentFiringRate) * 0.05f);
+        NLM_LOG_INFO("Low firing rate (" + std::to_string(currentFiringRate) + 
+                    " Hz) detected, scaling factor: " + std::to_string(scalingFactor));
+    }
+    
+    // Apply scaling to all synapses in all regions
+    for (auto& region : pImpl->regions) {
+        for (auto& syn : region->getSynapses()) {
+            if (scalingFactor != 1.0f) {
+                float currentWeight = syn->getWeight();
+                float scaledWeight = currentWeight * scalingFactor;
+                
+                // Ensure weights stay within reasonable bounds
+                scaledWeight = std::clamp(scaledWeight, -1.0f, 1.0f);
+                
+                // Apply scaled weight
+                syn->setWeight(scaledWeight);
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("Homeostatic scaling completed. Current firing rate: " + 
+                std::to_string(currentFiringRate) + " Hz, target: " + 
+                std::to_string(targetFiringRate) + " Hz");
 }
 
 } // namespace nlm

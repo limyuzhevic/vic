@@ -36,7 +36,7 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     auto config = std::make_shared<Config>();
     config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.1f, ConfigSource::Default);
+    config->set("connection_probability", 0.01f, ConfigSource::Default);  // Reduced from 0.1f for sparser connectivity and better learning control
     config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
     

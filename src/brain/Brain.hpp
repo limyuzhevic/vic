@@ -186,24 +186,13 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Apply homeostatic synaptic scaling to maintain stable firing rates
+    // Prevents runaway excitation and promotes balanced network activity
+    void applyHomeostaticScaling();
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-
-    // Learned preference trait (Phase 5): a single scalar, -1..1,
-    // updated only by sandbox reward through AgentBrain, saved in the
-    // checkpoint (SimulationState section) and used as a small bias in
-    // later action choice. This is the measured "personality" step: a
-    // preference learned from experience that survives a reload and
-    // changes later behaviour. It is not a language-model persona and
-    // it does not, on its own, make the brain a human brain.
-    float getLearnedPreference() const;
-    void setLearnedPreference(float preference);
-    
-    // Logging
-    void logStatus() const;
+    // Get current firing rate statistics for homeostatic regulation
+    float getAverageFiringRate() const;
+    size_t getFiringNeuronCount() const;
     
 private:
     struct Impl;

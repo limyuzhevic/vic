@@ -49,11 +49,11 @@ int main(int argc, char* argv[]) {
     auto config = std::make_shared<Config>();
     config->set("neuron_count", static_cast<int64_t>(1000));
     config->set("region_count", static_cast<int64_t>(2));
-    config->set("connection_probability", 0.1f);
+    config->set("connection_probability", 0.01f);  // Reduced from 0.1f for sparser connectivity and better learning control
     config->set("random_seed", static_cast<int64_t>(42));
     config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
+    config->set("stdp_ltp_weight", 0.005f);      // Reduced for stable learning
+    config->set("stdp_ltd_weight", 0.008f);      // Reduced for stable learning
     
     // Create brain
     std::cout << "Initializing brain...\n";

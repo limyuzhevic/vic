@@ -84,17 +84,35 @@ struct Phase6Config {
     bool enableReplay;
     bool enableDevelopment;
     std::string checkpointPath;
+    // Enhanced homeostatic and plasticity parameters
+    bool enableHomeostaticPlasticity;
+    float stdpLTPWeight;
+    float stdpLTDWeight;
+    float stdpTimeConstant;
+    float hebbianLearningRate;
+    float hebbianMaxWeight;
+    uint64_t synapticScalingInterval;
+    float synapticScalingTarget;
     
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
         , regionCount(1)
-        , connectionProbability(0.1f)
+        , connectionProbability(0.01f)  // Reduced from 0.1f for sparser connectivity
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
-};
+        , checkpointPath("./checkpoint_test.bin")
+        // Enhanced parameters for stable learning
+        , enableHomeostaticPlasticity(true)
+        , stdpLTPWeight(0.005f)           // Reduced for stable learning
+        , stdpLTDWeight(0.008f)           // Reduced for stable learning
+        , stdpTimeConstant(15.0f)        // Reduced for faster stabilization
+        , hebbianLearningRate(0.002f)     // Conservative Hebbian learning
+        , hebbianMaxWeight(0.5f)         // Prevent runaway excitation
+        , synapticScalingInterval(100)   // Scale frequently for stability
+        , synapticScalingTarget(1.0f)    // Target firing rate 1.0 Hz
+{}
 
 /**
  * Phase 6 integrated experiment runner

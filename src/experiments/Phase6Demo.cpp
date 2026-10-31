@@ -60,7 +60,16 @@ int main(int argc, char* argv[]) {
     config.enableReplay = true;
     config.enableDevelopment = true;
     
-    auto result = experiment.run(config);
+    // Enhanced parameters for Phase 6 demo
+    config.connectionProbability = 0.01f;  // Reduced for sparser connectivity
+    config.enableHomeostaticPlasticity = true;
+    config.stdpLTPWeight = 0.005f;
+    config.stdpLTDWeight = 0.008f;
+    config.stdpTimeConstant = 15.0f;
+    config.hebbianLearningRate = 0.002f;
+    config.hebbianMaxWeight = 0.5f;
+    config.synapticScalingInterval = 100;
+    config.synapticScalingTarget = 1.0f;
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;

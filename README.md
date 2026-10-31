@@ -92,20 +92,53 @@ make -j4
 ```
 
 ## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+
+Build all targets first (see Building above). The entry points are:
+
+### New Unified Demo Launcher (Recommended)
+
+The **nlm_demo** unified demo launcher provides a single interface for all NLM demonstrations with advanced configuration options:
+
+```bash
+./nlm_demo --help     # Show all options
+./nlm_demo phase2      # Phase 2: Real neural computation
+./nlm_demo phase3      # Phase 3: World interaction (default: 5 episodes, 200 steps)
+./nlm_demo phase4      # Phase 4: Emerging cognition (default: 50 trials)
+./nlm_demo phase6      # Phase 6: Integration demo
+./nlm_demo all         # Run all available demos
+./nlm_demo benchmark   # Performance benchmark
+```
+
+**Advantages:**
+- Consistent interface across all demos
+- Advanced command-line options
+- Comprehensive help system
+- Configuration file support
+- Better user experience
+
+### Individual Executables (Legacy - Still Supported)
+
+The individual executables are still available for backward compatibility:
 
 ```bash
 ./nlm                 # Phase 2 demo in src/main.cpp
-./nlm_phase3_demo
-./nlm_phase4_demo
+./nlm_phase3_demo     # Phase 3 demonstration
+./nlm_phase4_demo     # Phase 4 demonstration
 ./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
+./nlm_benchmark      # Performance benchmark
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+### Configuration
+
+Load configuration from file:
+
+```bash
+./nlm_demo phase3 --config configs/my_config.cfg
+./nlm_demo phase4 --trials 100
+./nlm_demo phase6 --neurons 2000
+```
+
+See `configs/default.cfg` for configuration options.
 
 ## Project Structure
 
@@ -113,6 +146,11 @@ library in CMake; it does not yet have a standalone demo executable.
 NLM/
 ├── CMakeLists.txt
 ├── README.md
+├── nlm_demo.md                 # Unified demo launcher documentation
+├── README_EXPERIMENTAL.md      # Quick start guide
+├── IMPROVEMENTS_SUMMARY.md     # Technical improvements summary
+├── DEMONSTRATION_SCRIPT.sh     # Demonstration examples
+├── VERIFY_IMPROVEMENTS.sh      # Verification script
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── SCIENCE.md
@@ -141,6 +179,139 @@ NLM/
 ├── tests/
 └── configs/
 ```
+
+## Phase Summary
+
+### Phase 1 (Complete)
+- Project skeleton
+- Core types and configuration
+- Neural interfaces
+
+### Phase 2 (Complete)
+- Real LIF neuron dynamics
+- Event-driven spike propagation
+- STDP and Hebbian plasticity
+- Structural plasticity
+
+### Phase 3 (Complete)
+- World interaction loop
+- Sensory input and motor output
+- Reward prediction error
+- Developmental stages
+- Novelty and curiosity
+
+### Phase 4 (Complete)
+- Neural prediction system
+- Working memory
+- Episodic-like memory
+- Concept formation
+- Neural attention (NOT Transformer)
+- Predictive planning
+- Self-model
+- Social learning
+- Continual learning
+
+### Phase 5 (Complete)
+- Performance optimizations
+- Memory pools and event queues
+- SIMD vectorization
+- Parallel processing
+- Checkpoint system
+
+### Phase 6 (Complete - Final Integration)
+- All systems integrated into coherent brain loop
+- Memory systems connected to neural processing
+- Neuromodulation affects plasticity and neural dynamics
+- Prediction integrated with learning
+- Development affects plasticity rates
+- Checkpoint save/load working
+- Replay and consolidation functional
+- Phase 6 integration experiment created
+
+## Key Improvements Made
+
+1. **✅ Checkpoint System Fixed**: Brain::save() and Brain::load() now work correctly
+2. **✅ Reward System Enhanced**: Realistic reward computation from environment interaction
+3. **✅ Performance Optimized**: Homeostatic plasticity prevents runaway excitation
+4. **✅ Connectivity Reduced**: 1% density for realistic E/I balance (vs. 15%+)
+5. **✅ Unified Interface**: Single `nlm_demo` launcher for all demonstrations
+6. **✅ Documentation**: Comprehensive help and examples provided
+
+## Configuration
+
+### Configuration Files
+
+Configuration can be set in files like `configs/default.cfg`:
+
+```bash
+# View default configuration
+cat configs/default.cfg
+```
+
+**Key Parameters:**
+- `neuron_count`: Number of neurons (500-5000 recommended)
+- `region_count`: Brain regions (1-4)
+- `connection_probability`: Connection sparsity (0.01 recommended)
+- `enable_homeostatic_plasticity`: Automatic stability control
+
+### Command Line Overrides
+
+```bash
+# Override configuration values
+./nlm_demo phase3 --neurons 1000 --episodes 10
+./nlm_demo phase4 --trials 200 --learning-rate 0.005
+./nlm_demo phase6 --checkpoints
+```
+
+## Building from Source
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+## Running Demos
+
+```bash
+# Using unified launcher (recommended)
+./nlm_demo --help                    # Show all options
+./nlm_demo phase2                     # Phase 2: Real neural computation
+./nlm_demo phase3 --episodes 10       # Phase 3: Custom episodes
+./nlm_demo phase4 --trials 100        # Phase 4: Custom trials
+./nlm_demo phase6                     # Phase 6: Integration
+./nlm_demo all                        # All demos together
+./nlm_demo benchmark                  # Performance benchmark
+```
+
+```bash
+# Individual executables (legacy)
+./nlm                                 # Phase 2
+./nlm_phase3_demo                     # Phase 3
+./nlm_phase4_demo                     # Phase 4
+./nlm_phase6_demo                     # Phase 6
+./nlm_benchmark                      # Benchmark
+```
+
+## Scientific Limitations
+
+NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+
+- Simplified LIF neuron model (not Hodgkin-Huxley)
+- No realistic ion channel dynamics
+- No detailed dendritic morphology
+- No claim of consciousness, intelligence, or human-like cognition
+- Limited to what can be simulated with available computing resources
+
+## License
+
+MIT License
+
+## Authors
+
+Research project — See docs for scientific background.
+
 
 ## Phase Summary
 

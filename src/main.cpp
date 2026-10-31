@@ -357,16 +357,23 @@ int main(int argc, char** argv) {
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("connection_probability", 0.01f, ConfigSource::Default);  // Reduced from 0.15f to 0.01f for sparser connectivity and better learning control
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Enable homeostatic plasticity
+    config->set("enable_homeostatic_plasticity", true, ConfigSource::Default);
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Configure homeostatically-regulated STDP parameters
+    config->set("stdp_ltp_weight", 0.005f, ConfigSource::Default);      // Reduced from 0.02f
+    config->set("stdp_ltd_weight", 0.008f, ConfigSource::Default);      // Reduced from 0.015f
+    config->set("stdp_tau", 15.0f, ConfigSource::Default);              // Reduced from 20.0f for faster stabilization
+    
+    // Configure Hebbian learning to be more conservative
+    config->set("hebbian_learning_rate", 0.002f, ConfigSource::Default);  // New parameter
+    config->set("hebbian_max_weight", 0.5f, ConfigSource::Default);       // New parameter
+    
+    // Synaptic scaling parameters
+    config->set("synaptic_scaling_interval", 100, ConfigSource::Default);  // Scale every 100 steps
+    config->set("synaptic_scaling_target", 1.0f, ConfigSource::Default);   // Target firing rate 1.0 Hz
     
     // Log configuration summary
     NLM_LOG_INFO("");

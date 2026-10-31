@@ -25,13 +25,20 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
+    // Create configuration with enhanced parameters
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount));
     cfg->set("region_count", static_cast<int64_t>(config.regionCount));
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
+    
+    // Enhanced plasticity parameters
+    cfg->set("stdp_ltp_weight", config.stdpLTPWeight);
+    cfg->set("stdp_ltd_weight", config.stdpLTDWeight);
+    cfg->set("stdp_tau", config.stdpTimeConstant);
+    cfg->set("hebbian_learning_rate", config.hebbianLearningRate);
+    cfg->set("hebbian_max_weight", config.hebbianMaxWeight);
+    cfg->set("synaptic_scaling_interval", config.synapticScalingInterval);
+    cfg->set("synaptic_scaling_target", config.synapticScalingTarget);
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
     
