@@ -18,8 +18,57 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# Configure dependency management
+message(STATUS "=== NLM Build Configuration ===")
+message(STATUS "Project: NLM Neural Learning Machine")
+message(STATUS "Version: 0.1.0")
+message(STATUS "C++ Standard: C++20")
+
+# Try to find nlohmann/json package
+set(NLOHMANN_JSON_FOUND FALSE)
+find_package(nlohmann_json 3.11 QUIET)
+if(nlohmann_json_FOUND)
+    message(STATUS "Found nlohmann/json: ${nlohmann_json_VERSION}")
+else()
+    message(STATUS "nlohmann/json not found, using fallback implementation")
+    set(NLOHMANN_JSON_FALLBACK 1)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include)
+endif()
+
+# Try to find yaml-cpp package
+set(YAML_CPP_FOUND FALSE)
+find_package(yaml-cpp QUIET)
+if(yaml_cpp_FOUND)
+    message(STATUS "Found yaml-cpp: ${YAML_CPP_VERSION}")
+else()
+    message(STATUS "yaml-cpp not found, using fallback implementation")
+    set(YAML_CPP_FALLBACK 1)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/external/include)
+endif()
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Create external include directory structure
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/include/nlohmann)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/external/include/yaml-cpp)
+
+# Copy fallback implementations if they don't exist
+if(NOT NLOHMANN_JSON_FOUND)
+    if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/external/include/nlohmann/json.hpp)
+        message(STATUS "Installing nlohmann/json fallback implementation...")
+        file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/external/include/nlohmann/json.hpp
+             DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external/include/nlohmann/)
+    endif()
+endif()
+
+if(NOT YAML_CPP_FOUND)
+    if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/external/include/yaml-cpp/yaml.h)
+        message(STATUS "Installing yaml-cpp fallback implementation...")
+        file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/external/include/yaml-cpp/yaml.h
+             DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/external/include/yaml-cpp/)
+    endif()
+endif()
 
 # Core library
 add_library(nlm_core STATIC
@@ -149,3 +198,8 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+message(STATUS "=== Build Configuration Complete ===")
+message(STATUS "Dependencies: ${NLOHMANN_JSON_FOUND ? \"Real nlohmann/json\" : \"Fallback nlohmann/json\"}")
+message(STATUS "Dependencies: ${YAML_CPP_FOUND ? \"Real yaml-cpp\" : \"Fallback yaml-cpp\"}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
