@@ -65,6 +65,11 @@ add_library(nlm_core STATIC
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    src/cognition/SelfModel.cpp
+    src/cognition/SocialLearning.cpp
+    src/cognition/AttentionalSelection.cpp
+    src/cognition/SpatialRepresentation.cpp
+    src/cognition/TemporalRelation.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
@@ -79,6 +84,8 @@ add_library(nlm_core STATIC
     src/environment/Environment.cpp
     src/environment/Observation.cpp
     src/environment/Action.cpp
+    src/environment/MultiAgentEnvironment.cpp
+    src/environment/MultiAgentExperiment.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp

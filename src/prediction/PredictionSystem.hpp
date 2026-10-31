@@ -1,18 +1,17 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include <vector>
-#include <memory>
+#include "../brain/Brain.hpp"
 
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
 // PLACEHOLDER - Phase 2 will implement real predictive coding
 
-class PredictionSystem {
-public:
-    PredictionSystem();
+PredictionSystem();
     ~PredictionSystem();
+    
+    // Initialize with brain reference
+    void initialize(Brain* brain);
     
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction

@@ -40,6 +40,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -243,7 +245,7 @@ bool Brain::initialize() {
     pImpl->associativeMemory->initialize(this);
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    pImpl->predictionSystem->initialize(this);
     
     // Initialize cognition systems
     pImpl->planner->initialize(this);
@@ -254,6 +256,10 @@ bool Brain::initialize() {
     pImpl->attention->initialize(this);
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
+    
+    // Initialize self-model and social learning
+    pImpl->selfModel->initialize(this);
+    pImpl->socialLearning->initialize(this);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -511,8 +517,98 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current state
+        // This includes:
+        // 1. Making predictions based on current neural activity
+        // 2. Computing prediction errors compared to actual sensory input
+        // 3. Updating internal models based on prediction errors
+        
+        // Create internal signals representing current brain state
+        class InternalSignalsInput : public SensoryInput {
+        public:
+            InternalSignalsInput(const Brain* brain) {
+                // Create a simple representation of current brain state
+                // This would be much more sophisticated in a real implementation
+                size_t dim = 10;  // Feature dimension
+                data_.resize(dim, 0.0f);
+                
+                // Extract features from current brain state
+                if (brain) {
+                    // Use working memory content
+                    auto workingMem = brain->getWorkingMemory();
+                    if (workingMem) {
+                        size_t traces = workingMem->getActiveTraces();
+                        
+                        for (size_t i = 0; i < std::min(dim, traces); ++i) {
+                            data_[i] = 1.0f;  // Simplified - in real system would use actual trace values
+                        }
+                    }
+                    
+                    // Add some statistics
+                    if (brain->getRegionCount() > 0) {
+                        data_[Math::clamp<size_t>(dim - 1, 0, dim - 1)] = 
+                            brain->getTotalNeuronCount() / 1000.0f; // Normalized neuron count
+                    }
+                }
+            }
+            
+            const char* getType() const override { return "InternalSignals"; }
+            const std::vector<float>& getData() const override { return data_; }
+            size_t getDimensions() const override { return data_.size(); }
+            std::unique_ptr<SensoryInput> clone() const override {
+                return std::make_unique<InternalSignalsInput>(*this);
+            }
+            
+        private:
+            std::vector<float> data_;
+        };
+        
+        InternalSignalsInput currentState(this);
+        
+        // Make prediction for next state
+        auto predictedState = pImpl->predictionSystem->predictNextState(currentState);
+        
+        // Update predictions based on actual sensory input (if any)
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Create a simplified sensory input from current neural activity
+            // This would be much more sophisticated with real sensory processing
+            class SimpleSensoryInput : public SensoryInput {
+            public:
+                SimpleSensoryInput() {
+                    size_t dim = 10;
+                    data_.resize(dim, 0.0f);
+                    
+                    // Convert sensory neuron activity to input pattern
+                    for (size_t i = 0; i < std::min(dim, pImpl->sensoryNeurons.size()); ++i) {
+                        Neuron* neuron = pImpl->sensoryNeurons[i];
+                        if (neuron) {
+                            float activation = std::max(0.0f, 
+                                neuron->getState().membranePotential - neuron->getState().restingPotential);
+                            data_[i] = activation;
+                        }
+                    }
+                }
+                
+                const char* getType() const override { return "SensoryInput"; }
+                const std::vector<float>& getData() const override { return data_; }
+                size_t getDimensions() const override { return data_.size(); }
+                std::unique_ptr<SensoryInput> clone() const override {
+                    return std::make_unique<SimpleSensoryInput>(*this);
+                }
+                
+            private:
+                std::vector<float> data_;
+            };
+            
+            SimpleSensoryInput actualInput;
+            pImpl->predictionSystem->updatePredictions(predictedState, actualInput);
+            
+            // Log prediction error for monitoring
+            float error = pImpl->predictionSystem->getPredictionError();
+            if (error > 0.01f) {
+                NLM_LOG_INFO("Prediction system: Error = " + std::to_string(error));
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -1037,6 +1133,16 @@ AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
 
+// Self-model for body schema and self-awareness
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
+}
+
+// Social learning for imitation and communication
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
+}
+
 // ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
@@ -1075,6 +1181,14 @@ std::shared_ptr<const Config> Brain::getConfig() const {
 
 RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
+}
+
+// Check if checkpoint can be saved
+bool Brain::canSaveCheckpoint() const {
+    if (!pImpl->checkpointManager) return false;
+    
+    // Check if it's time for a checkpoint based on save interval
+    return (pImpl->currentStep > 0 && pImpl->currentStep % pImpl->checkpointManager->getSaveIntervalSteps() == 0);
 }
 
 void Brain::logStatus() const {

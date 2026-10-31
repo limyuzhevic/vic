@@ -15,6 +15,13 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/cognition/SelfModel.hpp"
+#include "../src/cognition/SocialLearning.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
+#include "../src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/SpatialRepresentation.hpp"
+#include "../src/cognition/TemporalRelation.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -289,6 +296,110 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
+    // Cognitive Systems
+    py::class_<NeuralPlanner>(m, "NeuralPlanner", R"pbdoc(Neural planner for action planning)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralPlanner::initialize, py::arg("brain"))
+        .def("planAction", &NeuralPlanner::planAction, py::arg("currentState"), py::arg("targetReward") = 0.5f)
+        .def("evaluateSequence", &NeuralPlanner::evaluateSequence, py::arg("actions"), py::arg("startState"))
+        .def("getPlanningDepth", &NeuralPlanner::getPlanningDepth)
+        .def("setPlanningDepth", &NeuralPlanner::setPlanningDepth, py::arg("depth"))
+        .def("getPlanningConfidence", &NeuralPlanner::getPlanningConfidence)
+        .def("updatePlanQuality", &NeuralPlanner::updatePlanQuality, py::arg("plannedActions"), py::arg("actualActions"), py::arg("actualReward"))
+        .def("clearCache", &NeuralPlanner::clearCache)
+        .def("setActionQuality", &NeuralPlanner::setActionQuality, py::arg("action"), py::arg("quality"))
+        .def("getCurrentGoal", &NeuralPlanner::getCurrentGoal)
+        .def("setCurrentGoal", &NeuralPlanner::setCurrentGoal, py::arg("goal"))
+        .def("wasRecentPlanSuccessful", &NeuralPlanner::wasRecentPlanSuccessful);
+
+    py::class_<SelfModel>(m, "SelfModel", R"pbdoc(Self-model for body schema and self-awareness)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SelfModel::initialize, py::arg("brain"))
+        .def("recordSelfAction", &SelfModel::recordSelfAction, py::arg("action"), py::arg("beforeState"), py::arg("afterState"))
+        .def("predictActionConsequence", &SelfModel::predictActionConsequence, py::arg("action"), py::arg("currentState"))
+        .def("getSelfModelConfidence", &SelfModel::getSelfModelConfidence, py::arg("action"))
+        .def("computeSelfGeneratedLikeness", &SelfModel::computeSelfGeneratedLikeness, py::arg("beforeState"), py::arg("afterState"), py::arg("action"))
+        .def("getPreferredAction", &SelfModel::getPreferredAction, py::arg("state"))
+        .def("updateSelfModel", &SelfModel::updateSelfModel, py::arg("predicted"), py::arg("actual"), py::arg("action"))
+        .def("getCapabilityLevel", &SelfModel::getCapabilityLevel)
+        .def("getBodyAwareness", &SelfModel::getBodyAwareness)
+        .def("clear", &SelfModel::clear)
+        .def("hasSelfModel", &SelfModel::hasSelfModel);
+
+    py::class_<SocialLearning>(m, "SocialLearning", R"pbdoc(Social learning for imitation and communication)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SocialLearning::initialize, py::arg("brain"))
+        .def("observeAgentAction", &SocialLearning::observeAgentAction, py::arg("observedAction"), py::arg("observerState"), py::arg("resultingState"))
+        .def("canImitate", &SocialLearning::canImitate, py::arg("observedAction"))
+        .def("getImitationAction", &SocialLearning::getImitationAction, py::arg("currentState"))
+        .def("learnCommunicationSignal", &SocialLearning::learnCommunicationSignal, py::arg("signalPattern"), py::arg("signalReward"))
+        .def("detectSignal", &SocialLearning::detectSignal, py::arg("neuralPattern"))
+        .def("getSignalPattern", &SocialLearning::getSignalPattern)
+        .def("getSignalMeaning", &SocialLearning::getSignalMeaning)
+        .def("updateSocialKnowledge", &SocialLearning::updateSocialKnowledge, py::arg("interactionReward"))
+        .def("clear", &SocialLearning::clear)
+        .def("hasSocialKnowledge", &SocialLearning::hasSocialKnowledge)
+        .def("getObservationCount", &SocialLearning::getObservationCount);
+
+    py::class_<AttentionalSelection>(m, "AttentionalSelection", R"pbdoc(Attentional selection for focus and resource allocation)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &AttentionalSelection::initialize, py::arg("brain"))
+        .def("processCompetition", &AttentionalSelection::processCompetition, py::arg("competitors"), py::arg("globalInhibition") = 1.0f)
+        .def("focusOnRegion", &AttentionalSelection::focusOnRegion, py::arg("region"))
+        .def("releaseAttention", &AttentionalSelection::releaseAttention)
+        .def("getAttendedRegions", &AttentionalSelection::getAttendedRegions)
+        .def("setInhibitionStrength", &AttentionalSelection::setInhibitionStrength, py::arg("strength"))
+        .def("setExcitationStrength", &AttentionalSelection::setExcitationStrength, py::arg("strength"))
+        .def("setCompetitionThreshold", &AttentionalSelection::setCompetitionThreshold, py::arg("threshold"))
+        .def("getInhibitionFor", &AttentionalSelection::getInhibitionFor, py::arg("neuron"))
+        .def("getExcitationFor", &AttentionalSelection::getExcitationFor, py::arg("neuron"))
+        .def("update", &AttentionalSelection::update, py::arg("dt"))
+        .def("isAttended", &AttentionalSelection::isAttended, py::arg("neuron"))
+        .def("applyTopDownBias", &AttentionalSelection::applyTopDownBias, py::arg("neuron"), py::arg("biasStrength"))
+        .def("applyBottomUpSalience", &AttentionalSelection::applyBottomUpSalience, py::arg("neuron"), py::arg("salienceStrength"))
+        .def("reset", &AttentionalSelection::reset);
+
+    py::class_<ConceptFormation>(m, "ConceptFormation", R"pbdoc(Concept formation for pattern discovery)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &ConceptFormation::initialize, py::arg("brain"))
+        .def("presentExperience", &ConceptFormation::presentExperience, py::arg("pattern"), py::arg("features"), py::arg("reward"), py::arg("currentTime"))
+        .def("getMatchingConcept", &ConceptFormation::getMatchingConcept, py::arg("pattern"), py::arg("similarityThreshold") = 0.7f)
+        .def("getConcepts", &ConceptFormation::getConcepts)
+        .def("getConcept", &ConceptFormation::getConcept, py::arg("conceptId"))
+        .def("getConceptPrototype", &ConceptFormation::getConceptPrototype, py::arg("conceptId"))
+        .def("getConceptInstances", &ConceptFormation::getConceptInstances, py::arg("conceptId"))
+        .def("getConceptStability", &ConceptFormation::getConceptStability, py::arg("conceptId"))
+        .def("getConceptCount", &ConceptFormation::getConceptCount)
+        .def("mergeConcepts", &ConceptFormation::mergeConcepts, py::arg("conceptA"), py::arg("conceptB"))
+        .def("updateConcept", &ConceptFormation::updateConcept, py::arg("conceptId"), py::arg("newPattern"), py::arg("features"), py::arg("reward"))
+        .def("computeSimilarity", &ConceptFormation::computeSimilarity, py::arg("a"), py::arg("b"))
+        .def("isNovel", &ConceptFormation::isNovel, py::arg("pattern"), py::arg("similarityThreshold") = 0.7f)
+        .def("findConceptForPattern", &ConceptFormation::findConceptForPattern, py::arg("pattern"))
+        .def("clear", &ConceptFormation::clear)
+        .def("getGeneralizationAbility", &ConceptFormation::getGeneralizationAbility, py::arg("conceptId"));
+
+    py::class_<SpatialRepresentation>(m, "SpatialRepresentation", R"pbdoc(Spatial representation for location and navigation)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SpatialRepresentation::initialize, py::arg("brain"))
+        .def("recordPosition", &SpatialRepresentation::recordPosition, py::arg("x"), py::arg("y"), py::arg("sensoryCues"))
+        .def("getPredictedPosition", &SpatialRepresentation::getPredictedPosition)
+        .def("integrateMovement", &SpatialRepresentation::integrateMovement, py::arg("dx"), py::arg("dy"))
+        .def("getPositionActivation", &SpatialRepresentation::getPositionActivation, py::arg("x"), py::arg("y"))
+        .def("getPlaceNeuronsNear", &SpatialRepresentation::getPlaceNeuronsNear, py::arg("x"), py::arg("y"), py::arg("radius"))
+        .def("getGridSpacing", &SpatialRepresentation::getGridSpacing)
+        .def("clear", &SpatialRepresentation::clear)
+        .def("hasPlaceCells", &SpatialRepresentation::hasPlaceCells);
+
+    py::class_<TemporalRelation>(m, "TemporalRelation", R"pbdoc(Temporal relations for sequence learning)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &TemporalRelation::initialize, py::arg("brain"))
+        .def("recordSequence", &TemporalRelation::recordSequence, py::arg("eventA"), py::arg("eventB"), py::arg("reward"))
+        .def("predictNext", &TemporalRelation::predictNext, py::arg("eventA"))
+        .def("predictPrevious", &TemporalRelation::predictPrevious, py::arg("eventB"))
+        .def("getPredictionConfidence", &TemporalRelation::getPredictionConfidence, py::arg("event"))
+        .def("getSequenceLength", &TemporalRelation::getSequenceLength)
+        .def("clear", &TemporalRelation::clear);
+
     py::class_<Brain>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
@@ -323,35 +434,15 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a region by ID")
         .def("getRegionCount", &Brain::getRegionCount,
              "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
-        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
-             "Get total neuron count across all regions")
-        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
-        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
-        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
-        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
-        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
-        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
-        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
-        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate)
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio)
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount)
+        .def("getPendingSpikeEventCount", &Brain::getPendingSpikeEventCount)
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage)
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage, py::arg("stage"))
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             py::return_value_policy::reference_internal)
+        .def("logStatus", &Brain::logStatus);
 
     py::class_<AgentBrain>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -415,6 +506,34 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createNeuralPlanner", []() -> std::shared_ptr<NeuralPlanner> {
+        return std::make_shared<NeuralPlanner>();
+    }, "Create a new neural planner");
+
+    m.def("createSelfModel", []() -> std::shared_ptr<SelfModel> {
+        return std::make_shared<SelfModel>();
+    }, "Create a new self-model");
+
+    m.def("createSocialLearning", []() -> std::shared_ptr<SocialLearning> {
+        return std::make_shared<SocialLearning>();
+    }, "Create new social learning system");
+
+    m.def("createAttentionalSelection", []() -> std::shared_ptr<AttentionalSelection> {
+        return std::make_shared<AttentionalSelection>();
+    }, "Create new attentional selection system");
+
+    m.def("createConceptFormation", []() -> std::shared_ptr<ConceptFormation> {
+        return std::make_shared<ConceptFormation>();
+    }, "Create new concept formation system");
+
+    m.def("createSpatialRepresentation", []() -> std::shared_ptr<SpatialRepresentation> {
+        return std::make_shared<SpatialRepresentation>();
+    }, "Create new spatial representation system");
+
+    m.def("createTemporalRelation", []() -> std::shared_ptr<TemporalRelation> {
+        return std::make_shared<TemporalRelation>();
+    }, "Create new temporal relation system");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

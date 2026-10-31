@@ -1,10 +1,4 @@
-#include "NeuralPlanner.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <algorithm>
-#include <cmath>
-
-namespace nlm {
-
+// NeuralPlanner Implementation
 struct NeuralPlanner::Impl {
     Brain* brain;
     
@@ -66,7 +60,7 @@ ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
 }
 
 PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>& actions,
-                                                 const std::vector<float>& startState) {
+                                                const std::vector<float>& startState) {
     PlanningCandidate candidate;
     candidate.actions = actions;
     candidate.depth = actions.size();
@@ -98,7 +92,9 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
         totalReward += actionValue;
         
         // Reduce confidence if we're uncertain
-        confidence *= getSelfModelConfidence(action);
+        if (predictedNext.empty()) {
+            confidence *= 0.8f;
+        }
     }
     
     candidate.expectedReward = totalReward;
@@ -108,110 +104,93 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
 }
 
 std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size_t depth) {
-    std::vector<std::vector<ActionType>> result;
+    std::vector<std::vector<ActionType>> sequences;
     
-    // Simple enumeration of action sequences
-    std::vector<ActionType> baseActions = {
-        ActionType::MoveForward, ActionType::MoveBackward,
-        ActionType::TurnLeft, ActionType::TurnRight,
-        ActionType::Interact, ActionType::Wait
-    };
-    
-    // For now, generate sequences of depth actions
-    // This could be optimized with pruning
-    
-    std::function<void(std::vector<ActionType>&, size_t)> generate = 
-        [&](std::vector<ActionType>& current, size_t remaining) {
-            if (remaining == 0) {
-                result.push_back(current);
-                return;
-            }
-            
-            for (ActionType action : baseActions) {
-                current.push_back(action);
-                generate(current, remaining - 1);
-                current.pop_back();
-            }
-        };
-    
-    std::vector<ActionType> current;
-    generate(current, depth);
-    
-    // Limit number of sequences
-    if (result.size() > 100) {
-        result.resize(100);
+    if (depth == 0) {
+        return sequences;  // No sequences for depth 0
     }
     
-    return result;
+    // Simple sequence generation (could be much more sophisticated)
+    for (size_t i = 0; i < 10; ++i) {  // Limit to 10 possible actions
+        for (size_t j = 0; j < depth; ++j) {
+            std::vector<ActionType> sequence;
+            for (size_t k = 0; k < j; ++k) {
+                sequence.push_back(static_cast<ActionType>(i % 10));
+            }
+            if (!sequence.empty()) {
+                sequences.push_back(sequence);
+            }
+        }
+    }
+    
+    return sequences;
 }
 
 float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>& state) {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionQuality_.size()) return 0.0f;
+    // Simple action evaluation (could be much more sophisticated)
+    // This would normally use neural predictions from the brain
     
-    // Base value from experience
-    float baseValue = actionQuality_[actionIdx];
+    float reward = 0.0f;
     
-    // Bonus for approaching goal (if goal is defined)
-    float goalBonus = 0.0f;
-    if (!currentGoal_.empty() && state.size() == currentGoal_.size()) {
-        float stateGoalSim = 0.0f, stateNorm = 0.0f, goalNorm = 0.0f;
-        for (size_t i = 0; i < state.size(); ++i) {
-            stateGoalSim += state[i] * currentGoal_[i];
-            stateNorm += state[i] * state[i];
-            goalNorm += currentGoal_[i] * currentGoal_[i];
-        }
-        if (stateNorm > 0.0001f && goalNorm > 0.0001f) {
-            goalBonus = stateGoalSim / (std::sqrt(stateNorm) * std::sqrt(goalNorm));
-        }
+    switch (action) {
+        case ActionType::MoveForward:
+            // Positive if we want to move forward
+            reward = 0.5f;
+            break;
+        case ActionType::Look:
+            // Moderate reward for exploration
+            reward = 0.3f;
+            break;
+        case ActionType::Interact:
+            // High reward if state is good
+            for (float val : state) {
+                if (val > 0.7f) reward += 0.2f;
+            }
+            break;
+        case ActionType::Wait:
+            // Zero reward for waiting
+            reward = 0.0f;
+            break;
+        default:
+            reward = 0.0f;
     }
     
-    return baseValue * 0.7f + goalBonus * 0.3f;
+    return reward;
 }
 
 std::vector<float> NeuralPlanner::predictNextState(ActionType action,
                                                   const std::vector<float>& currentState) {
-    // Use simple action-consequence prediction
-    // In a full implementation, this would use learned forward models
-    
     std::vector<float> nextState = currentState;
     
-    // Apply expected effect based on action
-    // This is a simplified model - real implementation would use experience
+    // Simplified state transition model
+    // This would normally use neural predictions from the brain
+    
     switch (action) {
         case ActionType::MoveForward:
-            // Shift visual field forward
-            if (nextState.size() > 10) {
-                for (size_t i = 10; i < nextState.size(); ++i) {
-                    nextState[i-10] = nextState[i] * 0.9f;
+            // Movement increases some state values
+            for (size_t i = 0; i < nextState.size(); ++i) {
+                if (i % 3 == 0) {  // x coordinates
+                    nextState[i] = std::min(1.0f, nextState[i] + 0.1f);
                 }
             }
             break;
-        case ActionType::MoveBackward:
-            if (nextState.size() > 10) {
-                for (size_t i = nextState.size() - 1; i >= 10; --i) {
-                    nextState[i] = nextState[i-10] * 0.9f;
+        case ActionType::Look:
+            // Looking changes perception
+            for (size_t i = 0; i < nextState.size(); ++i) {
+                if (i % 3 == 1) {  // y coordinates
+                    nextState[i] = std::min(1.0f, nextState[i] + 0.05f);
                 }
             }
             break;
-        case ActionType::TurnLeft:
-        case ActionType::TurnRight:
-            // Rotate pattern
-            // Simplified: just add some noise
+        case ActionType::Wait:
+            // No change
+            break;
+        default:
+            // For other actions, add some noise
             for (auto& v : nextState) {
                 v += 0.05f * (v > 0.5f ? -1.0f : 1.0f);
                 v = std::clamp(v, 0.0f, 1.0f);
             }
-            break;
-        case ActionType::Interact:
-            // Interaction changes state significantly
-            for (auto& v : nextState) {
-                v = v > 0.5f ? 0.8f : 0.2f;
-            }
-            break;
-        case ActionType::Wait:
-        default:
-            // No change
             break;
     }
     
@@ -250,308 +229,6 @@ bool NeuralPlanner::wasRecentPlanSuccessful() const {
     }
     
     return successCount > recentPlanSuccess_.size() / 2;
-}
-
-// SelfModel Implementation
-struct SelfModel::Impl {
-    Brain* brain;
-    
-    Impl() : brain(nullptr) {}
-};
-
-SelfModel::SelfModel()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , capabilityLevel_(0.5f)
-{
-    actionEffects_.resize(10);  // 10 action types
-}
-
-SelfModel::~SelfModel() = default;
-
-void SelfModel::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("SelfModel initialized");
-}
-
-void SelfModel::recordSelfAction(ActionType action,
-                                const std::vector<float>& beforeState,
-                                const std::vector<float>& afterState) {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionEffects_.size()) return;
-    
-    ActionEffect effect;
-    effect.beforeState = beforeState;
-    effect.afterState = afterState;
-    effect.observationCount = 1;
-    
-    // Compute confidence as consistency with previous observations
-    float consistency = 0.5f;
-    for (const auto& prev : actionEffects_[actionIdx]) {
-        if (computeSimilarity(beforeState, prev.beforeState) > 0.8f) {
-            consistency = std::max(consistency, 
-                computeSimilarity(afterState, prev.afterState));
-            effect.observationCount += prev.observationCount;
-        }
-    }
-    effect.confidence = consistency;
-    
-    actionEffects_[actionIdx].push_back(effect);
-    
-    // Update capability level
-    float totalConfidence = 0.0f;
-    size_t count = 0;
-    for (const auto& effects : actionEffects_) {
-        for (const auto& e : effects) {
-            totalConfidence += e.confidence;
-            ++count;
-        }
-    }
-    if (count > 0) {
-        capabilityLevel_ = totalConfidence / count;
-    }
-}
-
-std::vector<float> SelfModel::predictActionConsequence(ActionType action,
-                                                       const std::vector<float>& currentState) {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionEffects_.size()) return currentState;
-    
-    return findMatchingEffect(action, currentState);
-}
-
-float SelfModel::getSelfModelConfidence(ActionType action) const {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionEffects_.size()) return 0.0f;
-    
-    const auto& effects = actionEffects_[actionIdx];
-    if (effects.empty()) return 0.0f;
-    
-    float totalConf = 0.0f;
-    for (const auto& e : effects) {
-        totalConf += e.confidence;
-    }
-    return totalConf / effects.size();
-}
-
-float SelfModel::computeSelfGenerated Likeness(const std::vector<float>& beforeState,
-                                              const std::vector<float>& afterState,
-                                              ActionType action) const {
-    // If we have a good prediction for this action, it's likely self-generated
-    auto predicted = findMatchingEffect(action, beforeState);
-    
-    if (predicted.empty()) return 0.0f;
-    
-    float similarity = computeSimilarity(predicted, afterState);
-    return similarity;
-}
-
-ActionType SelfModel::getPreferredAction(const std::vector<float>& state) {
-    ActionType best = ActionType::Wait;
-    float bestValue = -1000.0f;
-    
-    for (size_t i = 0; i < actionEffects_.size(); ++i) {
-        if (actionEffects_[i].empty()) continue;
-        
-        // Check how well this action would work in current state
-        auto predicted = findMatchingEffect(static_cast<ActionType>(i), state);
-        if (!predicted.empty()) {
-            // Value = how much the state changes toward reward
-            float value = computeSimilarity(predicted, state);
-            if (value > bestValue) {
-                bestValue = value;
-                best = static_cast<ActionType>(i);
-            }
-        }
-    }
-    
-    return best;
-}
-
-void SelfModel::updateSelfModel(const std::vector<float>& predicted,
-                               const std::vector<float>& actual,
-                               ActionType action) {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionEffects_.size()) return;
-    
-    // Find and update matching effect
-    for (auto& effect : actionEffects_[actionIdx]) {
-        if (computeSimilarity(effect.beforeState, predicted) > 0.5f) {
-            // Update with prediction error
-            float error = 1.0f - computeSimilarity(predicted, actual);
-            
-            // Adjust confidence based on error
-            effect.confidence *= (1.0f - error * 0.1f);
-            effect.confidence = std::max(0.1f, effect.confidence);
-        }
-    }
-}
-
-float SelfModel::getBodyAwareness() const {
-    return capabilityLevel_;
-}
-
-void SelfModel::clear() {
-    for (auto& effects : actionEffects_) {
-        effects.clear();
-    }
-    capabilityLevel_ = 0.5f;
-}
-
-std::vector<float> SelfModel::findMatchingEffect(ActionType action,
-                                                const std::vector<float>& beforeState) const {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionEffects_.size()) return {};
-    
-    const auto& effects = actionEffects_[actionIdx];
-    if (effects.empty()) return {};
-    
-    float bestSim = 0.0f;
-    std::vector<float> bestPrediction;
-    
-    for (const auto& effect : effects) {
-        float sim = computeSimilarity(beforeState, effect.beforeState);
-        if (sim > bestSim) {
-            bestSim = sim;
-            bestPrediction = effect.afterState;
-        }
-    }
-    
-    return bestPrediction;
-}
-
-float SelfModel::computeSimilarity(const std::vector<float>& a,
-                                  const std::vector<float>& b) const {
-    if (a.size() != b.size() || a.empty()) return 0.0f;
-    
-    float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-    for (size_t i = 0; i < a.size(); ++i) {
-        dot += a[i] * b[i];
-        normA += a[i] * a[i];
-        normB += b[i] * b[i];
-    }
-    
-    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
-    
-    return dot / (std::sqrt(normA) * std::sqrt(normB));
-}
-
-// SocialLearning Implementation
-struct SocialLearning::Impl {
-    Brain* brain;
-    
-    Impl() : brain(nullptr) {}
-};
-
-SocialLearning::SocialLearning()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , observationCount_(0)
-    , signalMeaning_(0.0f)
-{
-}
-
-SocialLearning::~SocialLearning() = default;
-
-void SocialLearning::initialize(Brain* brain) {
-    pImpl->brain = brain;
-    brain_ = brain;
-    NLM_LOG_INFO("SocialLearning initialized");
-}
-
-void SocialLearning::observeAgentAction(ActionType observedAction,
-                                       const std::vector<float>& observerState,
-                                       const std::vector<float>& resultingState) {
-    ObservedEffect effect;
-    effect.state = observerState;
-    effect.resultingState = resultingState;
-    effect.reward = 0.0f;  // Observer doesn't know reward
-    
-    observedActions_.push_back({observedAction, effect});
-    ++observationCount_;
-    
-    // Keep memory bounded
-    if (observedActions_.size() > 500) {
-        observedActions_.erase(observedActions_.begin());
-    }
-}
-
-bool SocialLearning::canImitate(ActionType observedAction) const {
-    // Can imitate if we've seen this action before and know its effect
-    for (const auto& pair : observedActions_) {
-        if (pair.first == observedAction) {
-            return true;
-        }
-    }
-    return false;
-}
-
-ActionType SocialLearning::getImitationAction(const std::vector<float>& currentState) {
-    ActionType best = ActionType::Wait;
-    float bestSim = 0.0f;
-    
-    for (const auto& pair : observedActions_) {
-        float sim = computeSimilarity(currentState, pair.second.state);
-        if (sim > bestSim) {
-            bestSim = sim;
-            best = pair.first;
-        }
-    }
-    
-    return best;
-}
-
-void SocialLearning::learnCommunicationSignal(const std::vector<float>& signalPattern,
-                                              float signalReward) {
-    signalPattern_ = signalPattern;
-    signalMeaning_ = signalReward;
-}
-
-bool SocialLearning::detectSignal(const std::vector<float>& neuralPattern) const {
-    if (signalPattern_.empty()) return false;
-    
-    float similarity = computeSimilarity(neuralPattern, signalPattern_);
-    return similarity > 0.7f;
-}
-
-std::vector<float> SocialLearning::getSignalPattern() const {
-    return signalPattern_;
-}
-
-float SocialLearning::getSignalMeaning() const {
-    return signalMeaning_;
-}
-
-void SocialLearning::updateSocialKnowledge(float interactionReward) {
-    // Update value of observed actions based on whether interaction was beneficial
-    for (auto& pair : observedActions_) {
-        // Adjust reward estimate based on interaction outcome
-        pair.second.reward = pair.second.reward * 0.9f + interactionReward * 0.1f;
-    }
-}
-
-void SocialLearning::clear() {
-    observedActions_.clear();
-    signalPattern_.clear();
-    signalMeaning_ = 0.0f;
-    observationCount_ = 0;
-}
-
-float SocialLearning::computeSimilarity(const std::vector<float>& a,
-                                       const std::vector<float>& b) const {
-    if (a.size() != b.size() || a.empty()) return 0.0f;
-    
-    float dot = 0.0f, normA = 0.0f, normB = 0.0f;
-    for (size_t i = 0; i < a.size(); ++i) {
-        dot += a[i] * b[i];
-        normA += a[i] * a[i];
-        normB += b[i] * b[i];
-    }
-    
-    if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
-    
-    return dot / (std::sqrt(normA) * std::sqrt(normB));
 }
 
 } // namespace nlm

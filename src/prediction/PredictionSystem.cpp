@@ -1,18 +1,19 @@
 #include "PredictionSystem.hpp"
+#include "../core/Logger/Logger.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
-
-struct PredictionSystem::Impl {
-    float predictionError;
-    float confidence;
-    std::vector<float> errorHistory;
-    
-    Impl() : predictionError(0.0f), confidence(0.5f) {}
-};
 
 PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 
 PredictionSystem::~PredictionSystem() = default;
+
+void PredictionSystem::initialize(Brain* brain) {
+    // In a real implementation, this would set up prediction networks
+    // For now, it's a placeholder
+    NLM_LOG_INFO("PredictionSystem initialized");
+}
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate

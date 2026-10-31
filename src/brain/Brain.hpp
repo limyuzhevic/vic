@@ -29,6 +29,10 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// Forward declaration for cognition systems
+class SelfModel;
+class SocialLearning;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -164,7 +168,11 @@ public:
     // Attentional selection for focus
     AttentionalSelection* getAttention();
     
-    // ========== DEVELOPMENT SYSTEM ==========
+    // Self-model for body schema and self-awareness
+    SelfModel* getSelfModel();
+    
+    // Social learning for imitation and communication
+    SocialLearning* getSocialLearning();
     
     DevelopmentSystem* getDevelopmentSystem();
     DevelopmentalStage getDevelopmentalStage() const;
@@ -189,6 +197,9 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
+    
+    // Checkpoint system
+    bool canSaveCheckpoint() const;
     
     // Logging
     void logStatus() const;
