@@ -1,4 +1,6 @@
 #include "Brain.hpp"
+#include "BrainInitialization.hpp"
+#include "BrainStep.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -23,160 +25,36 @@
 #include <cstring>
 #include <sstream>
 
+// Brain.cpp - Main implementation file for Brain class
+// This file now contains remaining methods after extraction
+// of initialization, step, plasticity, memory, cognition,
+// neuromodulation, and development logic into separate files.
+
+#include "Brain.hpp"
+#include "BrainInitialization.hpp"
+#include "BrainStep.hpp"
+#include "BrainPlasticity.hpp"
+#include "BrainMemory.hpp"
+#include "BrainCognition.hpp"
+#include "BrainNeuromodulation.hpp"
+#include "BrainDevelopment.hpp"
+#include <algorithm>
+#include <cmath>
+
 namespace nlm {
 
-struct Brain::Impl {
-    std::shared_ptr<Config> config;
-    std::unique_ptr<RandomGenerator> rng;
-    std::vector<std::unique_ptr<NeuralRegion>> regions;
-    std::vector<InterRegionConnection> interRegionConnections;
-    
-    // ========== INTEGRATED MEMORY SYSTEMS ==========
-    std::unique_ptr<NeuralWorkingMemory> workingMemory;
-    std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
-    std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
-    
-    // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
-    
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
-    std::unique_ptr<NeuralPlanner> planner;
-    std::unique_ptr<ConceptFormation> conceptFormation;
-    std::unique_ptr<AttentionalSelection> attention;
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    std::unique_ptr<DevelopmentSystem> developmentSystem;
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
-    
-    // Phase 2: Real neural computation components
-    std::unique_ptr<SpikeSystem> spikeSystem;
-    std::unique_ptr<STDP> stdp;
-    std::unique_ptr<Hebbian> hebbian;
-    std::unique_ptr<StructuralPlasticity> structuralPlasticity;
-    
-    // Simulation parameters
-    TimestepDuration timestep;
-    SimulationStep currentStep;
-    Timestamp currentTime;
-    
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
-
-    // Phase 5 learned preference trait (see Brain.hpp). Updated only
-    // from sandbox reward via AgentBrain; checkpointed with the
-    // simulation state so a reloaded brain keeps what it learned.
-    float learnedPreference = 0.0f;
-    
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
-    // NeuronId -> neuron, for O(1) synaptic delivery (was a linear scan
-    // over all neurons per delayed spike, which made real networks unusable).
-    std::unordered_map<uint64_t, Neuron*> neuronById;
-    bool spikeHandlersRegistered = false;
-    
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
-    
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
-    
-    Impl(std::shared_ptr<Config> cfg)
-        : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
-        , timestep(0.001)
-        , currentStep(0)
-        , currentTime(0.0)
-        , totalSpikesThisStep(0)
-        , totalSpikesTotal(0)
-        , isResting(false)
-        , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<int64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
-        
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
-        consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
-    }
-    
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
-};
-
+// Brain constructor
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
+// Brain destructor
 Brain::~Brain() = default;
 
+// Brain move constructor
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
 }
 
+// Brain move assignment operator
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
         delete pImpl;
@@ -185,6 +63,57 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     }
     return *this;
 }
+
+// Region management
+RegionId Brain::addRegion(const std::string& name) {
+    RegionId id(pImpl->nextRegionId++);
+    auto region = std::make_unique<NeuralRegion>(id, name);
+    pImpl->regions.push_back(std::move(region));
+    return id;
+}
+
+NeuralRegion* Brain::getRegion(RegionId id) {
+    for (auto& region : pImpl->regions) {
+        if (region->getId() == id) {
+            return region.get();
+        }
+    }
+    return nullptr;
+}
+
+const NeuralRegion* Brain::getRegion(RegionId id) const {
+    for (const auto& region : pImpl->regions) {
+        if (region->getId() == id) {
+            return region.get();
+        }
+    }
+    return nullptr;
+}
+
+size_t Brain::getRegionCount() const {
+    return pImpl->regions.size();
+}
+
+std::vector<RegionId> Brain::getRegionIds() const {
+    std::vector<RegionId> ids;
+    ids.reserve(pImpl->regions.size());
+    for (const auto& region : pImpl->regions) {
+        ids.push_back(region->getId());
+    }
+    return ids;
+}
+
+// Get all regions
+const std::vector<std::unique_ptr<NeuralRegion>>& Brain::getRegions() const {
+    return pImpl->regions;
+}
+
+// Additional remaining implementations...
+// This file is now much cleaner and more maintainable
+// with complex logic extracted into focused, specialized files
+
+} // namespace nlm
+
 
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
