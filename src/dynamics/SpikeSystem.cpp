@@ -115,6 +115,21 @@ size_t SpikeSystem::getSpikeCount() const {
     return pImpl->spikeHistory.size();
 }
 
+std::vector<DelayedSpikeEvent> SpikeSystem::getPendingDelayedSpikes() const {
+    std::vector<DelayedSpikeEvent> out;
+    for (const auto& pair : pImpl->delayedSpikes) {
+        out.insert(out.end(), pair.second.begin(), pair.second.end());
+    }
+    return out;
+}
+
+void SpikeSystem::restorePendingDelayedSpikes(const std::vector<DelayedSpikeEvent>& events) {
+    pImpl->delayedSpikes.clear();
+    for (const auto& event : events) {
+        pImpl->delayedSpikes[event.delivery_step].push_back(event);
+    }
+}
+
 size_t SpikeSystem::getPendingSpikeCount() const {
     return pImpl->pendingSpikes.size();
 }

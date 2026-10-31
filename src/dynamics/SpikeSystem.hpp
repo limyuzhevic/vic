@@ -64,6 +64,14 @@ public:
     size_t getSpikeCount() const;
     size_t getPendingSpikeCount() const;
     size_t getPendingDelayedCount() const;
+
+    // Phase 4: pending delayed spikes are in-flight synaptic input —
+    // without them, a checkpoint reload loses every spike scheduled
+    // for delivery in the next 1-5 steps and cannot continue the saved
+    // trajectory. Expose them for checkpointing (flat list; delivery
+    // step grouping is restored by restorePendingDelayedSpikes).
+    std::vector<DelayedSpikeEvent> getPendingDelayedSpikes() const;
+    void restorePendingDelayedSpikes(const std::vector<DelayedSpikeEvent>& events);
     
     // Statistics
     float getAverageSpikeRate() const;

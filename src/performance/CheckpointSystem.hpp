@@ -24,6 +24,7 @@
  * - Environment state (optional)
  */
 
+#include "../core/Types/Types.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -153,6 +154,7 @@ struct NeuronCheckpointData {
     std::vector<uint32_t> refractoryRemaining;
     std::vector<uint32_t> refractoryPeriod;
     std::vector<float> lastSpikeTime;
+    std::vector<float> firingRate;  // Phase 4: decode uses firing rate, so it must round-trip
     std::vector<uint64_t> neuronType;
     std::vector<uint64_t> regionId;
     std::vector<uint64_t> populationId;
@@ -212,7 +214,14 @@ public:
      */
     bool readNeurons(NeuronCheckpointData& data);
     bool readSynapses(SynapseCheckpointData& data);
-    
+
+    /**
+     * Read pending delayed spikes (SpikeHistory section). Returns false
+     * only on a parse failure; an absent section (legacy checkpoint)
+     * leaves `events` empty and returns true.
+     */
+    bool readDelayedSpikes(std::vector<DelayedSpikeEvent>& events);
+
     /**
      * Read raw section data
      */
@@ -282,6 +291,13 @@ public:
      */
     bool writeNeurons(const NeuronCheckpointData& data);
     bool writeSynapses(const SynapseCheckpointData& data);
+
+    /**
+     * Buffer pending delayed spikes (written as the SpikeHistory
+     * section at finalize()). These are in-flight synaptic inputs;
+     * without them a reload cannot continue the saved trajectory.
+     */
+    bool writeDelayedSpikes(const std::vector<DelayedSpikeEvent>& events);
     
     /**
      * Write raw section data
@@ -316,6 +332,10 @@ private:
     std::vector<SectionHeader> sections_;
     uint64_t bytesWritten_;
     std::vector<uint8_t> compressBuffer_;
+    // Payloads buffered until finalize(), when the header is complete.
+    std::vector<uint8_t> neuronPayload_;
+    std::vector<uint8_t> synapsePayload_;
+    std::vector<uint8_t> delayedSpikePayload_;
 };
 
 /**
