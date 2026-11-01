@@ -1,0 +1,481 @@
+#!/usr/bin/env python3
+
+"""
+NLM Command Line Interface
+
+A comprehensive command-line interface for NLM (Neural Learning Machine) with:
+- Configuration management
+- Batch processing
+- Checkpoint management
+- Performance monitoring
+- Experiment control
+"""
+
+import argparse
+import json
+import sys
+import os
+import time
+from pathlib import Path
+from typing import Optional, Dict, Any, List
+
+# Add the src directory to the path so we can import pynlm
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+try:
+    import pynlm
+except ImportError:
+    print("Error: pynlm not found. Please install with 'pip install .'")
+    sys.exit(1)
+
+class NLMCLI:
+    """NLM Command Line Interface"""
+    
+    def __init__(self):
+        self.brain = None
+        self.world = None
+        self.agent = None
+        self.config = None
+    
+    def create_brain(self, config_file: Optional[str] = None) -> bool:
+        """Create a brain with optional configuration file"""
+        try:
+            self.config = pynlm.createDefaultConfig()
+            
+            if config_file and os.path.exists(config_file):
+                self.config.loadFromFile(config_file)
+            
+            self.brain = pynlm.createBrain(self.config)
+            self.brain.initialize()
+            
+            print(f"Created brain with {self.brain.getTotalNeuronCount()} neurons")
+            return True
+        except Exception as e:
+            print(f"Error creating brain: {e}")
+            return False
+    
+    def create_world(self, width: int = 20, height: int = 20,
+                    vision_width: int = 8, vision_height: int = 8) -> bool:
+        """Create a simple world"""
+        try:
+            self.world = pynlm.createSimpleWorld()
+            self.world.configure(width, height, vision_width, vision_height)
+            self.world.reset()
+            print(f"Created world {width}x{height} with {vision_width}x{vision_height} vision")
+            return True
+        except Exception as e:
+            print(f"Error creating world: {e}")
+            return False
+    
+    def create_agent(self) -> bool:
+        """Create agent brain interface"""
+        try:
+            if not self.brain:
+                print("Error: No brain created. Create brain first.")
+                return False
+            
+            self.agent = pynlm.createAgentBrain(self.brain)
+            if self.world:
+                self.agent.initialize(self.world)
+            
+            print("Created agent brain interface")
+            return True
+        except Exception as e:
+            print(f"Error creating agent: {e}")
+            return False
+    
+    def run_simulation(self, steps: int, timestep: float = 0.1,
+                      enable_features: Dict[str, bool] = None) -> Dict[str, Any]:
+        """Run a simulation"""
+        if not self.brain or not self.agent or not self.world:
+            print("Error: Brain, world, and agent not created")
+            return {}
+        
+        try:
+            enable_features = enable_features or {
+                'reward_modulation': True,
+                'structural_plasticity': True,
+                'development': True,
+                'curiosity': True
+            }
+            
+            # Enable requested features
+            self.agent.enableRewardModulation(enable_features.get('reward_modulation', True))
+            self.agent.enableStructuralPlasticity(enable_features.get('structural_plasticity', True))
+            self.agent.enableDevelopment(enable_features.get('development', True))
+            self.agent.enableCuriosity(enable_features.get('curiosity', True))
+            
+            total_reward = 0.0
+            spike_counts = []
+            firing_rates = []
+            
+            for step in range(steps):
+                # Update world
+                self.world.update(timestep)
+                
+                # Get sensory input
+                percept = self.world.getSensoryPercept()
+                
+                # Process sensory input
+                self.agent.processSensoryInput(percept)
+                
+                # Run brain step
+                self.brain.step(step)
+                
+                # Get motor command
+                action = self.agent.decodeMotorCommand()
+                
+                # Apply motor command
+                self.world.applyMotorCommand(action, self.world.getSimulationTime())
+                
+                # Apply reward modulation
+                reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+                self.agent.applyRewardModulation(reward, 0.0)
+                total_reward += reward
+                
+                # Collect statistics every 100 steps
+                if step % 100 == 0:
+                    spike_counts.append(self.brain.getTotalSpikeCount())
+                    firing_rates.append(self.brain.getAverageFiringRate())
+                    
+                    print(f"Step {step}: Reward={reward:.3f}, Total={total_reward:.3f}, "
+                          f"Firing={self.brain.getFiringNeuronCount()}, "
+                          f"Rate={self.brain.getAverageFiringRate():.2f} Hz")
+                
+                # Update development
+                self.agent.updateDevelopment(timestep)
+            
+            return {
+                'total_reward': total_reward,
+                'final_spike_count': self.brain.getTotalSpikeCount(),
+                'final_firing_rate': self.brain.getAverageFiringRate(),
+                'final_ei_ratio': self.brain.getExcitationInhibitionRatio(),
+                'steps_run': steps,
+                'avg_reward_per_step': total_reward / steps if steps > 0 else 0
+            }
+            
+        except Exception as e:
+            print(f"Error during simulation: {e}")
+            return {}
+    
+    def save_brain(self, filepath: str) -> bool:
+        """Save brain checkpoint"""
+        if not self.brain:
+            print("Error: No brain to save")
+            return False
+        
+        try:
+            if self.brain.save(filepath):
+                print(f"Brain saved to {filepath}")
+                return True
+            else:
+                print(f"Error: Failed to save brain to {filepath}")
+                return False
+        except Exception as e:
+            print(f"Error saving brain: {e}")
+            return False
+    
+    def load_brain(self, filepath: str) -> bool:
+        """Load brain checkpoint"""
+        try:
+            # Create a new brain first
+            if not self.create_brain():
+                return False
+            
+            if self.brain.load(filepath):
+                print(f"Brain loaded from {filepath}")
+                # Recreate agent with new brain
+                self.agent = pynlm.createAgentBrain(self.brain)
+                if self.world:
+                    self.agent.initialize(self.world)
+                return True
+            else:
+                print(f"Error: Failed to load brain from {filepath}")
+                return False
+        except Exception as e:
+            print(f"Error loading brain: {e}")
+            return False
+    
+    def export_config(self, filepath: str) -> bool:
+        """Export current configuration to file"""
+        if not self.config:
+            print("Error: No configuration to export")
+            return False
+        
+        try:
+            self.config.saveToFile(filepath)
+            print(f"Configuration exported to {filepath}")
+            return True
+        except Exception as e:
+            print(f"Error exporting configuration: {e}")
+            return False
+    
+    def run_batch_simulation(self, config_files: List[str], output_dir: str,
+                           steps_per_config: int = 1000) -> Dict[str, Any]:
+        """Run batch simulation with multiple configurations"""
+        results = {}
+        
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+            
+            for i, config_file in enumerate(config_files):
+                config_name = Path(config_file).stem
+                print(f"\n=== Running batch {i+1}/{len(config_files)}: {config_name} ===")
+                
+                # Create brain with this config
+                if not self.create_brain(config_file):
+                    continue
+                
+                # Create world and agent
+                self.create_world()
+                self.create_agent()
+                
+                # Run simulation
+                result = self.run_simulation(steps_per_config)
+                
+                if result:
+                    # Save results
+                    result_file = os.path.join(output_dir, f"{config_name}_results.json")
+                    with open(result_file, 'w') as f:
+                        json.dump(result, f, indent=2)
+                    
+                    # Save brain checkpoint
+                    brain_file = os.path.join(output_dir, f"{config_name}_brain.bin")
+                    self.save_brain(brain_file)
+                    
+                    results[config_name] = result
+                    print(f"Results saved to {result_file}")
+                
+                # Clean up for next iteration
+                self.brain = None
+                self.world = None
+                self.agent = None
+            
+            # Save batch summary
+            summary_file = os.path.join(output_dir, "batch_summary.json")
+            with open(summary_file, 'w') as f:
+                json.dump(results, f, indent=2)
+            
+            print(f"\nBatch simulation complete. Results saved to {summary_file}")
+            return results
+            
+        except Exception as e:
+            print(f"Error during batch simulation: {e}")
+            return results
+    
+    def monitor_performance(self, duration: int, interval: int = 100) -> Dict[str, Any]:
+        """Monitor performance for specified duration"""
+        if not self.brain or not self.agent or not self.world:
+            print("Error: Brain, world, and agent not created")
+            return {}
+        
+        try:
+            start_time = time.time()
+            step = 0
+            
+            print(f"Starting performance monitoring for {duration} seconds...")
+            print(f"Interval: {interval} steps, Reporting every {interval} steps")
+            
+            while time.time() - start_time < duration:
+                self.world.update(0.1)
+                
+                percept = self.world.getSensoryPercept()
+                self.agent.processSensoryInput(percept)
+                self.brain.step(step)
+                
+                action = self.agent.decodeMotorCommand()
+                self.world.applyMotorCommand(action, self.world.getSimulationTime())
+                
+                if step % interval == 0:
+                    elapsed = time.time() - start_time
+                    steps_per_second = step / elapsed if elapsed > 0 else 0
+                    
+                    print(f"Step {step} ({elapsed:.1f}s): "
+                          f"Rate={self.brain.getAverageFiringRate():.2f} Hz, "
+                          f"Firing={self.brain.getFiringNeuronCount()}, "
+                          f"SPS={steps_per_second:.1f}")
+                
+                step += 1
+            
+            return {
+                'steps_completed': step,
+                'elapsed_time': time.time() - start_time,
+                'steps_per_second': step / (time.time() - start_time) if time.time() > start_time else 0,
+                'final_spike_count': self.brain.getTotalSpikeCount()
+            }
+            
+        except Exception as e:
+            print(f"Error during performance monitoring: {e}")
+            return {}
+
+
+def main():
+    """Main CLI entry point"""
+    parser = argparse.ArgumentParser(
+        description="NLM Command Line Interface for Neural Learning Machine",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  nlm-cli --create-brain --config my_config.json
+  nlm-cli --run-simulation --steps 1000 --output results.json
+  nlm-cli --batch-config config1.json config2.json --output-dir batch_results
+  nlm-cli --monitor --duration 60 --interval 50
+  nlm-cli --save-checkpoint brain.bin
+  nlm-cli --load-checkpoint brain.bin
+        """
+    )
+    
+    # Global options
+    parser.add_argument("--verbose", "-v", action="store_true",
+                       help="Enable verbose output")
+    
+    # Subcommands
+    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+    
+    # Create brain command
+    parser_brain = subparsers.add_parser("create-brain", help="Create a new brain")
+    parser_brain.add_argument("--config", help="Configuration file path")
+    
+    # Create world command
+    parser_world = subparsers.add_parser("create-world", help="Create a new world")
+    parser_world.add_argument("--width", type=int, default=20, help="World width")
+    parser_world.add_argument("--height", type=int, default=20, help="World height")
+    parser_world.add_argument("--vision-width", type=int, default=8, help="Vision width")
+    parser_world.add_argument("--vision-height", type=int, default=8, help="Vision height")
+    
+    # Create agent command
+    subparsers.add_parser("create-agent", help="Create agent brain interface")
+    
+    # Run simulation command
+    parser_sim = subparsers.add_parser("run-simulation", help="Run a simulation")
+    parser_sim.add_argument("--steps", type=int, required=True, help="Number of simulation steps")
+    parser_sim.add_argument("--timestep", type=float, default=0.1, help="Simulation timestep")
+    parser_sim.add_argument("--output", help="Output file for results")
+    parser_sim.add_argument("--enable-reward", action="store_true", default=True, help="Enable reward modulation")
+    parser_sim.add_argument("--enable-plasticity", action="store_true", default=True, help="Enable structural plasticity")
+    parser_sim.add_argument("--enable-development", action="store_true", default=True, help="Enable development")
+    parser_sim.add_argument("--enable-curiosity", action="store_true", default=True, help="Enable curiosity")
+    
+    # Save brain command
+    parser_save = subparsers.add_parser("save-brain", help="Save brain checkpoint")
+    parser_save.add_argument("filepath", help="File path to save brain")
+    
+    # Load brain command
+    parser_load = subparsers.add_parser("load-brain", help="Load brain checkpoint")
+    parser_load.add_argument("filepath", help="File path to load brain from")
+    
+    # Export config command
+    parser_export = subparsers.add_parser("export-config", help="Export configuration to file")
+    parser_export.add_argument("filepath", help="File path to export config to")
+    
+    # Batch simulation command
+    parser_batch = subparsers.add_parser("batch", help="Run batch simulation")
+    parser_batch.add_argument("config_files", nargs="+", help="Configuration files")
+    parser_batch.add_argument("--output-dir", required=True, help="Output directory for results")
+    parser_batch.add_argument("--steps-per-config", type=int, default=1000, help="Steps per configuration")
+    
+    # Monitor command
+    parser_monitor = subparsers.add_parser("monitor", help="Monitor performance")
+    parser_monitor.add_argument("--duration", type=int, required=True, help="Duration in seconds")
+    parser_monitor.add_argument("--interval", type=int, default=100, help="Reporting interval in steps")
+    
+    # List configuration options
+    parser_list = subparsers.add_parser("list-config-options", help="List available configuration options")
+    
+    # Main execution
+    args = parser.parse_args()
+    
+    cli = NLMCLI()
+    
+    try:
+        if args.command == "create-brain":
+            success = cli.create_brain(args.config)
+            sys.exit(0 if success else 1)
+            
+        elif args.command == "create-world":
+            success = cli.create_world(args.width, args.height, args.vision_width, args.vision_height)
+            sys.exit(0 if success else 1)
+            
+        elif args.command == "create-agent":
+            success = cli.create_agent()
+            sys.exit(0 if success else 1)
+            
+        elif args.command == "run-simulation":
+            enable_features = {
+                'reward_modulation': args.enable_reward,
+                'structural_plasticity': args.enable_plasticity,
+                'development': args.enable_development,
+                'curiosity': args.enable_curiosity
+            }
+            
+            result = cli.run_simulation(args.steps, args.timestep, enable_features)
+            
+            if args.output and result:
+                with open(args.output, 'w') as f:
+                    json.dump(result, f, indent=2)
+                print(f"Results saved to {args.output}")
+            
+            if result:
+                print(f"Simulation completed. Total reward: {result['total_reward']:.3f}")
+            
+            sys.exit(0 if result else 1)
+            
+        elif args.command == "save-brain":
+            success = cli.save_brain(args.filepath)
+            sys.exit(0 if success else 1)
+            
+        elif args.command == "load-brain":
+            success = cli.load_brain(args.filepath)
+            sys.exit(0 if success else 1)
+            
+        elif args.command == "export-config":
+            success = cli.export_config(args.filepath)
+            sys.exit(0 if success else 1)
+            
+        elif args.command == "batch":
+            results = cli.run_batch_simulation(args.config_files, args.output_dir, args.steps_per_config)
+            sys.exit(0 if results else 1)
+            
+        elif args.command == "monitor":
+            result = cli.monitor_performance(args.duration, args.interval)
+            if result:
+                print(f"Monitoring complete. Steps: {result['steps_completed']}, "
+                      f"Time: {result['elapsed_time']:.1f}s, "
+                      f"Rate: {result['steps_per_second']:.1f} SPS")
+            sys.exit(0 if result else 1)
+            
+        elif args.command == "list-config-options":
+            print("Available configuration options:")
+            print("  brain.neuron_count (int): Total number of neurons")
+            print("  brain.region_count (int): Number of brain regions")
+            print("  brain.connection_probability (float): Synapse connection probability")
+            print("  stdp_ltp_weight (float): STDP LTP weight")
+            print("  stdp_ltd_weight (float): STDP LTD weight")
+            print("  stdp_tau (float): STDP time constant")
+            print("  synaptogenesis_rate (float): Structural plasticity rate")
+            print("  pruning_rate (float): Structural plasticity pruning rate")
+            print("  simulation_timestep (float): Simulation timestep")
+            print("  plasticity.stdp.enable (bool): Enable STDP")
+            print("  plasticity.hebbian.enable (bool): Enable Hebbian learning")
+            print("  plasticity.structural.enable (bool): Enable structural plasticity")
+            print("  neuromod.dopamine.scale (float): Dopamine modulation scale")
+            print("  neuromod.curiosity.enable (bool): Enable curiosity")
+            print("  neuromod.novelty.enable (bool): Enable novelty detection")
+            print("  replay_interval (int): Memory replay interval")
+            print("  consolidation_interval (int): Memory consolidation interval")
+            print("  checkpoint_dir (string): Checkpoint directory")
+            sys.exit(0)
+            
+        else:
+            parser.print_help()
+            sys.exit(1)
+            
+    except Exception as e:
+        print(f"Error: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
