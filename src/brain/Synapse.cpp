@@ -213,17 +213,16 @@ void Synapse::setEfficacy(float efficacy) {
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
-void Synapse::step(Timestamp currentTime) {
+void Synapse::step(Timestamp currentTime, TimestepDuration dt) {
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
-    
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        // Use dt for proper exponential decay: S(t) = S0 * exp(-t/tau)
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
@@ -233,15 +232,31 @@ void Synapse::step(Timestamp currentTime) {
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
+        // Recovery from depression toward 1.0 with proper time scaling
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Decay eligibility trace for reward-modulated learning (use dt)
+    decayEligibilityTrace(dt);  // Use dt instead of hardcoded 0.001f
     
-    // Clamp weight bounds
+    // Clamp weight bounds to prevent instability
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Update synaptic efficacy based on recent activity (use dt)
+    // Efficacy reflects use-dependent modulation
+    if (dt > 0.0f) {
+        // Decay efficacy over time (use dt)
+        pImpl->efficacy = std::max(0.0f, pImpl->efficacy - dt * 0.001f);
+        
+        // Reset efficacy when synapses haven't been active recently (recovery)
+        float timeSinceLastActivity = std::max(
+            pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 999.0f,
+            pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 999.0f
+        );
+        if (timeSinceLastActivity > 1000.0f) {  // Longer than 1 second (1000 ms)
+            pImpl->efficacy = std::min(pImpl->efficacy + dt * 0.0001f, 1.0f);
+        }
+    }
 }
 
 void Synapse::reset() {

@@ -220,9 +220,9 @@ void NeuralRegion::step(Timestamp currentTime) {
         pop->step(currentTime);
     }
     
-    // Step all synapses
+    // Step all synapses (with timestep for proper decay)
     for (auto& syn : pImpl->synapses) {
-        syn->step(currentTime);
+        syn->step(currentTime, 0.001f); // Use default timestep
     }
 }
 
