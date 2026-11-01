@@ -299,6 +299,12 @@ brain.load("checkpoint.bin")       # Load state
 # Regions
 region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
+
+# Advanced Brain methods
+brain.runSteps(num_steps)         # Run multiple steps efficiently
+brain.runPlasticityExperiment(num_steps, pattern_neurons)  # Run learning experiment
+brain.getConnectivityStats()       # Get detailed connectivity statistics
+brain.simulateToTarget(target_spikes)  # Simulate until target reached
 ```
 
 #### Config Class
@@ -353,6 +359,11 @@ agent.getCuriosityLevel()
 agent.getNoveltyLevel()
 agent.getPredictionError()
 agent.getNeuromodulationLevel()
+
+# Advanced AgentBrain methods
+agent.runEpisode(world, max_steps)  # Run complete episode
+agent.simulateUntil(condition)       # Simulate until condition met
+agent.getMotorGroupActivities()      # Get motor group activity details
 ```
 
 #### SimpleWorld Class
@@ -388,6 +399,11 @@ world.getHeight()
 world.getSimulationTime()
 world.getMaxEnergy()
 world.setMaxEnergy(100.0)
+
+# Advanced SimpleWorld methods
+getObjectAt(x, y)                    # Get object at position
+hasObjectAt(x, y)                    # Check if object exists
+stepWorld(timestep, callback)       # Run world steps with callbacks
 ```
 
 ### Enumerations
@@ -507,7 +523,69 @@ for _ in range(500):
 
 ---
 
-## Troubleshooting
+## Part 6: Advanced Features
+
+### Factory Functions
+
+The NLM Python bindings now include advanced factory functions for specialized scenarios:
+
+#### 1. Research-Grade Brain
+
+```python
+brain, config = pynlm.createResearchGradeBrain(config_file)
+# Features: All systems enabled (STDP, Hebbian, Structural, Neuromodulation)
+```
+
+#### 2. Production-Optimized Brain
+
+```python
+brain = pynlm.createProductionBrain(neuron_count)
+# Features: Optimized for stability and performance
+```
+
+#### 3. Learning Environment
+
+```python
+brain, world, agent = pynlm.createLearningEnvironment(config_file)
+# Features: Complete setup with all learning systems enabled
+```
+
+#### 4. Experiment Setup
+
+```python
+experiment_setup = pynlm.createExperimentSetup(experiment_type, custom_config)
+# Features: Pre-configured setups for different experiment types
+```
+
+### Performance Monitoring
+
+#### Benchmarking
+
+```python
+steps, duration, steps_per_second = pynlm.benchmarkBrain(brain, steps)
+# Returns: (steps_completed, duration_ms, steps_per_second)
+```
+
+#### Activity Profiling
+
+```python
+profile_stats = pynlm.profileBrainActivity(brain, steps)
+# Returns: Dictionary with detailed statistics
+```
+
+### Extension Points
+
+The advanced features provide extension points for custom implementations:
+
+1. **Custom Callbacks**: Implement custom pre/post step logic
+2. **Data Collection**: Extend with custom data collection systems
+3. **Condition Systems**: Implement custom termination conditions
+4. **Performance Monitoring**: Add custom performance metrics
+5. **Visualization Integration**: Connect with visualization tools
+
+---
+
+## Part 7: Troubleshooting
 
 ### Build Issues
 
