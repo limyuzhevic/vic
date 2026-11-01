@@ -535,8 +535,59 @@ pip install --force-reinstall .
 
 ---
 
-## Further Reading
-
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [docs/PHASE6_FINAL_AUDIT.md](docs/PHASE6_FINAL_AUDIT.md) - Phase 6 integration audit
+
+---
+
+## Python API Reference
+
+The NLM Python bindings provide a complete interface to all brain systems:
+
+### Core API
+- `createDefaultConfig()` - Create default configuration
+- `createBrain(config)` - Create neural brain
+- `createAgentBrain(brain)` - Create agent interface
+- `createSimpleWorld()` - Create simulation world
+
+### Advanced API
+- `encodeText(text)` - Convert text to neural patterns
+- `addRegion(name)` - Create brain regions
+- `getRegion(id)` - Access brain regions
+- `save/load` methods - Persistence
+
+### Learning API
+- `enableRewardModulation()` - Learn from rewards
+- `enableCuriosity()` - Drive exploration
+- `enableStructuralPlasticity()` - Grow new connections
+- `enableDevelopment()` - Brain maturation
+- `enablePrediction()` - Anticipate future states
+- `enableAttention()` - Focus on relevant information
+
+### World API
+- `configure()` - Set world dimensions and parameters
+- `setRandomSeed()` - Set reproducibility
+- `setAgentStart()` - Set starting position
+
+### System Status API
+- `getTotalNeuronCount()` - Get total neuron count
+- `getTotalSynapseCount()` - Get total synapse count
+- `getFiringNeuronCount()` - Get currently firing neurons
+- `getAverageFiringRate()` - Get average firing rate
+- `getExcitationInhibitionRatio()` - Get E/I balance
+- `getDevelopmentalStage()` - Get current developmental stage
+- `getCuriosityLevel()` - Get curiosity level
+- `getNoveltyLevel()` - Get novelty level
+- `getPredictionError()` - Get prediction error
+- `getNeuromodulationLevel()` - Get neuromodulation level
+
+### Configuration API
+- `set(key, value)` - Set configuration values
+- `has(key)` - Check if configuration key exists
+- `getKeys()` - Get all configuration keys
+- `loadFromFile()` - Load from configuration file
+- `saveToFile()` - Save to configuration file
+
+The API is designed to be intuitive while exposing full control over all NLM systems for advanced users.
