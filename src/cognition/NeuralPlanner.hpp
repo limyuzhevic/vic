@@ -215,6 +215,12 @@ public:
     // Can I imitate this observed action?
     bool canImitate(ActionType observedAction) const;
 
+    // Phase 6: best imitation action for a state, with its
+    // similarity to the closest observed state, so a caller can
+    // refuse to imitate on a weak match instead of copying blindly.
+    std::pair<ActionType, float> getImitationActionAndSimilarity(
+        const std::vector<float>& currentState);
+
     // Get the best action to imitate given current state
     ActionType getImitationAction(const std::vector<float>& currentState);
 

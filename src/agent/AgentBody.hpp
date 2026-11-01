@@ -34,7 +34,7 @@ struct AgentBody {
         : x(0.0f), y(0.0f), orientation(0.0f)
         , velocityX(0.0f), velocityY(0.0f), angularVelocity(0.0f)
         , energy(1.0f), health(1.0f), age(0.0f)
-        , isMoving(false), isTurning(false), lastActionTime(0.0f) {}
+        , isMoving(false), isTurning(false), lastActionTime(-1000.0f) {}
     
     void reset() {
         x = 0.0f;
@@ -48,7 +48,10 @@ struct AgentBody {
         age = 0.0f;
         isMoving = false;
         isTurning = false;
-        lastActionTime = 0.0f;
+        // Phase 6: -1000, not 0 — the world clock starts at 0, so
+        // 0 meant the very first action of every run was always
+        // rejected as "too soon" before the agent had ever acted.
+        lastActionTime = -1000.0f;
     }
 };
 

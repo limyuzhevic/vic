@@ -455,7 +455,19 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
-    
+
+    // Phase 6, tried and reverted: global inhibitory feedback
+    // (inhibit every neuron when >10% of the population fired in
+    // a step). It lowered mean rate only slightly (80.8 -> 76.2 Hz
+    // in Phase 3) while making behaviour worse — a planner-driven
+    // Interact trap returned (115 empty interacts in one episode)
+    // and a hazard was consumed — because uniform inhibition
+    // flattens the motor pattern that the biases need to read, so
+    // the biases dominate more, not less. Population inhibition
+    // is the wrong lever here; see the drive-scaling change in
+    // AgentBrain/Neuron instead. This block is intentionally empty
+    // so the experiment and its result stay in the record.
+
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);

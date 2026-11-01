@@ -5,7 +5,10 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace nlm {
@@ -85,6 +88,36 @@ public:
     int getReflexBonusCount() const { return reflexBonusCount_; }
     int getReflexSuppressCount() const { return reflexSuppressCount_; }
     int getWtaPulseCount() const { return wtaPulseCount_; }
+
+    // Phase 6: text-as-a-sense. Encode a teacher word into the sparse
+    // pattern of text-neuron indices it drives (see .cpp). The string
+    // itself is never passed to the brain; only this pattern is
+    // injected, so association must be learned by plasticity, not by
+    // string matching in the decision logic.
+    static std::vector<size_t> encodeText(const std::string& text);
+    // Internal (non-motor, non-sensory) firing rates, for the
+    // text-association recall probe: a learned association means the
+    // internal pattern evoked by text alone moves toward the pattern
+    // evoked by the paired visual scene.
+    std::vector<float> getInternalFiringRates() const;
+    // Phase 6 thought/planning counters: how often the planner, a
+    // learned concept, the self-model, or a social observation
+    // actually changed the decoded action (not just advised it).
+    int getPlannerOverrideCount() const { return plannerOverrideCount_; }
+    int getPlannerAgreementCount() const { return plannerAgreementCount_; }
+    int getPlannerDecisionCount() const { return plannerDecisionCount_; }
+    int getConceptBiasCount() const { return conceptBiasCount_; }
+    int getSelfBiasCount() const { return selfBiasCount_; }
+    int getSocialBiasCount() const { return socialBiasCount_; }
+    // Phase 6 wired systems, for demos/tests: concept count and the
+    // self-model's mean confidence, plus social observation. A second
+    // agent (teacher) is observed through observeOtherAgent; in a
+    // single-agent world this stays at zero and social bias stays off.
+    size_t getConceptCount() const;
+    float getSelfModelConfidence() const;
+    size_t getSocialObservationCount() const;
+    void observeOtherAgent(MotorCommand observed, const std::vector<float>& beforeVision,
+                           const std::vector<float>& afterVision);
     
     // Reset agent for new episode
     void reset();
@@ -125,6 +158,10 @@ private:
     std::vector<Neuron*> sensoryTouch_;
     std::vector<Neuron*> sensoryInternal_;
     std::vector<Neuron*> sensoryProprioception_;
+    // Internal (hidden) neurons, for the recall probe. Sensory neurons
+    // are the input layer; the association between a word and a scene
+    // lives in which internal neurons the two inputs jointly recruit.
+    std::vector<Neuron*> internalNeurons_;
     
     // Neuromodulation state
     float dopamineLevel_;
@@ -190,6 +227,32 @@ private:
     // Last decoded command, for the interact no-repeat rule below.
     MotorCommand lastDecoded_ = MotorCommand::Wait;
     bool hasLastDecoded_ = false;
+    // Phase 6 wired cognition: the brain owns the planner and concept
+    // formation, but AgentBrain owns the self-model and social
+    // learning (Brain never owned them) and calls them from the loop,
+    // so they are no longer library-only classes. The self-model is
+    // fed every loop turn (previous percept -> current percept for
+    // the action just taken); social learning is fed only when a
+    // teacher/other agent is observed, via observeOtherAgent().
+    SelfModel selfModel_;
+    SocialLearning socialLearning_;
+    bool selfModelReady_ = false;
+    bool socialReady_ = false;
+    // Last percept's touch vector, kept so applyRewardModulation can
+    // present the pattern that actually led to a reward to concept
+    // formation (pattern -> action -> reward, in that order).
+    std::vector<float> lastTouch_;
+    std::string lastText_;
+    // Phase 6 counters for planner/concept/self/social influence.
+    int plannerOverrideCount_ = 0;
+    int plannerAgreementCount_ = 0;
+    int plannerDecisionCount_ = 0;
+    int conceptBiasCount_ = 0;
+    int selfBiasCount_ = 0;
+    int socialBiasCount_ = 0;
+    // Concept pattern for the current percept, in closeness form
+    // (1 - vision, 0 = empty) plus touch, for concept bias lookup.
+    std::vector<float> conceptPattern() const;
     // Phase 5 thought trace: last perceived scene summary, last
     // planner suggestion (from learned action quality), last decoded
     // action, and its outcome reward. Filled across one loop turn.

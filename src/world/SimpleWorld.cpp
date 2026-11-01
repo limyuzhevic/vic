@@ -121,15 +121,39 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     const float moveSpeed = 3.0f;
     const float turnSpeed = 2.0f;
     
-    // Only allow one action per step
-    if (currentTime - agent_.lastActionTime < 0.1) {
+    // Only allow one action per action interval (0.1 s of world
+    // time). Phase 6 note: this gate itself is unchanged — what
+    // was wrong was the demo loop, which advanced the world by
+    // only 0.01 s per decision, so 9 of every 10 decisions were
+    // necessarily rejected here. The demos now advance the world
+    // by one action interval per decision (see Phase3Demo), so
+    // every decoded action reaches the world. Do not "fix" this
+    // gate to 0.01 to make a metric look better: the world's
+    // movement physics (3.0 units/s, 2.0 rad/s) are defined per
+    // 0.1 s interval, and a 0.01 gate would make the agent move
+    // ten times faster than its own physics allows.
+    // Epsilon: world time accumulates 0.1 s steps in binary
+    // floating point, so a true 0.1 s gap can compute as
+    // 0.0999999999 s and be wrongly rejected. A 1e-6 s tolerance
+    // is far below any real pacing difference.
+    if (currentTime - agent_.lastActionTime < 0.1 - 1e-6) {
         return ActionResult(0.0f, false, "too soon");
     }
     
     agent_.lastActionTime = currentTime;
     
+    // Phase 6: a turn is a discrete action, not a persistent
+    // velocity. TurnLeft/Right set angularVelocity and the next
+    // world update rotates by 2.0 rad/s * 0.1 s = 0.2 rad; but
+    // nothing ever cleared it, so the agent kept rotating on
+    // every later step — with the old 0.01 s updates that was a
+    // barely-noticed 0.02 rad/step drift, with the corrected
+    // 0.1 s updates it would be a 0.2 rad/step spiral. Any
+    // non-turn action therefore stops rotation.
     switch (cmd) {
         case MotorCommand::MoveForward: {
+            agent_.angularVelocity = 0.0f;
+            agent_.isTurning = false;
             float dx = std::cos(agent_.orientation) * moveSpeed;
             float dy = std::sin(agent_.orientation) * moveSpeed;
             
@@ -150,6 +174,8 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
         }
         
         case MotorCommand::MoveBackward: {
+            agent_.angularVelocity = 0.0f;
+            agent_.isTurning = false;
             float dx = -std::cos(agent_.orientation) * moveSpeed * 0.5f;
             float dy = -std::sin(agent_.orientation) * moveSpeed * 0.5f;
             
@@ -185,16 +211,22 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             
         case MotorCommand::LookLeft:
             // Pan sensor (no movement)
+            agent_.angularVelocity = 0.0f;
+            agent_.isTurning = false;
             result.reward = 0.0f;
             result.success = true;
             break;
-            
+
         case MotorCommand::LookRight:
+            agent_.angularVelocity = 0.0f;
+            agent_.isTurning = false;
             result.reward = 0.0f;
             result.success = true;
             break;
-            
+
         case MotorCommand::Interact:
+            agent_.angularVelocity = 0.0f;
+            agent_.isTurning = false;
             result = interact();
             break;
             

@@ -488,6 +488,20 @@ void SocialLearning::observeAgentAction(ActionType observedAction,
     }
 }
 
+std::pair<ActionType, float> SocialLearning::getImitationActionAndSimilarity(
+    const std::vector<float>& currentState) {
+    ActionType best = ActionType::Wait;
+    float bestSim = 0.0f;
+    for (const auto& pair : observedActions_) {
+        float sim = computeSimilarity(currentState, pair.second.state);
+        if (sim > bestSim) {
+            bestSim = sim;
+            best = pair.first;
+        }
+    }
+    return {best, bestSim};
+}
+
 bool SocialLearning::canImitate(ActionType observedAction) const {
     // Can imitate if we've seen this action before and know its effect
     for (const auto& pair : observedActions_) {
