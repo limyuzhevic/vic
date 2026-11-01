@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,14 +20,36 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to detect file format by extension or content
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Read first line to check if it's JSON
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    bool isJson = false;
+    if (!firstLine.empty() && (firstLine.find('{') != std::string::npos || 
+                               firstLine.find('[') != std::string::npos)) {
+        // Try to parse as JSON
+        try {
+            nlohmann::json jsonData;
+            file >> jsonData;
+            if (!jsonData.is_null()) {
+                loadFromJson(jsonData);
+                return true;
+            }
+        } catch (const nlohmann::json::parse_error&) {
+            // Fall back to key=value format
+        }
+    }
+    
+    // If not JSON or JSON parsing failed, use key=value format
+    file.seekg(0);
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -90,6 +113,200 @@ bool Config::saveToFile(const std::string& filepath) const {
     }
     
     return true;
+}
+
+bool Config::saveToJson(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    nlohmann::json jsonData;
+    for (const auto& entry : pImpl->entries) {
+        jsonData[entry.key] = std::visit([](auto&& arg) -> nlohmann::json {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t> || std::is_same_v<T, float> || std::is_same_v<T, double>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                return arg;
+            } else {
+                return "";
+            }
+        }, entry.value);
+    }
+    
+    file << jsonData.dump(2);
+    return true;
+}
+
+std::string Config::toJson() const {
+    nlohmann::json jsonData;
+    for (const auto& entry : pImpl->entries) {
+        jsonData[entry.key] = std::visit([](auto&& arg) -> nlohmann::json {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t> || std::is_same_v<T, float> || std::is_same_v<T, double>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                return arg;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                return arg;
+            } else {
+                return "";
+            }
+        }, entry.value);
+    }
+    return jsonData.dump(2);
+}
+
+bool Config::loadFromJson(const std::string& jsonString) {
+    try {
+        nlohmann::json jsonData = nlohmann::json::parse(jsonString);
+        return loadFromJson(jsonData);
+    } catch (const nlohmann::json::parse_error&) {
+        return false;
+    }
+}
+
+bool Config::loadFromJson(const nlohmann::json& jsonData) {
+    clear();
+    
+    if (jsonData.is_object()) {
+        for (const auto& item : jsonData.items()) {
+            const std::string& key = item.key();
+            const nlohmann::json& value = item.value();
+            
+            ConfigValue configValue;
+            if (value.is_string()) {
+                configValue = value.get<std::string>();
+            } else if (value.is_number_integer()) {
+                configValue = value.get<int64_t>();
+            } else if (value.is_number_float()) {
+                configValue = value.get<double>();
+            } else if (value.is_boolean()) {
+                configValue = value.get<bool>();
+            } else if (value.is_array()) {
+                // Handle arrays
+                if (value.empty()) {
+                    configValue = std::vector<std::string>{};
+                } else if (value.front().is_string()) {
+                    std::vector<std::string> strArray;
+                    for (const auto& v : value) {
+                        strArray.push_back(v.get<std::string>());
+                    }
+                    configValue = strArray;
+                } else if (value.front().is_number_integer()) {
+                    std::vector<int> intArray;
+                    for (const auto& v : value) {
+                        intArray.push_back(v.get<int>());
+                    }
+                    configValue = intArray;
+                } else if (value.front().is_number_float()) {
+                    std::vector<double> doubleArray;
+                    for (const auto& v : value) {
+                        doubleArray.push_back(v.get<double>());
+                    }
+                    configValue = doubleArray;
+                } else {
+                    // Unknown array type, skip
+                    continue;
+                }
+            } else {
+                // Unsupported type, skip
+                continue;
+            }
+            
+            set(key, configValue, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
+
+bool Config::validate() const {
+    // Basic validation: check for required keys
+    // This can be extended with more sophisticated validation
+    const std::vector<std::string> requiredKeys = {
+        "neuron_count",
+        "simulation_timestep",
+        "random_seed"
+    };
+    
+    std::vector<std::string> errors;
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            errors.push_back("Missing required key: " + key);
+        }
+    }
+    
+    if (!errors.empty()) {
+        return false;
+    }
+    
+    // Validate types of key values
+    for (const auto& entry : pImpl->entries) {
+        if (!isValidKey(entry.key)) {
+            errors.push_back("Invalid key type or unsupported key: " + entry.key);
+        }
+    }
+    
+    return errors.empty();
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    return validate() ? std::vector<std::string>() : std::vector<std::string>{"Basic configuration validation failed"};
+}
+
+bool Config::isValidKey(const std::string& key) const {
+    // List of valid configuration keys
+    const std::vector<std::string> validKeys = {
+        "neuron_count",
+        "region_count", 
+        "connection_probability",
+        "simulation_timestep",
+        "random_seed",
+        "plasticity_learning_rate",
+        "stdp_ltp_weight",
+        "stdp_ltd_weight",
+        "stdp_time_constant",
+        "development_synaptogenesis_rate",
+        "development_pruning_rate",
+        "dopamine_baseline",
+        "reward_discount_factor",
+        "environment_name",
+        "environment_width",
+        "environment_height",
+        "vision_width",
+        "vision_height",
+        "log_level",
+        "log_to_file",
+        "log_filename",
+        "max_simulation_steps",
+        "simulation_time_limit",
+        "visualization_enabled",
+        "visualization_update_rate"
+    };
+    
+    return std::find(validKeys.begin(), validKeys.end(), key) != validKeys.end();
+}
+
+template<typename T>
+bool Config::isType(const std::string& key) const {
+    auto val = get<T>(key);
+    return val.has_value();
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

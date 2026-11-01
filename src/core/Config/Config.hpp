@@ -7,6 +7,13 @@
 #include <optional>
 #include <algorithm>
 
+// Forward declare nlohmann::json for JSON support
+namespace nlohmann {
+    template<typename T, typename U>
+    struct adl_serializer;
+    class json;
+}
+
 namespace nlm {
 
 // Forward declarations
@@ -56,14 +63,17 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Load from JSON string
+    bool loadFromJson(const std::string& jsonString);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from JSON object
+    bool loadFromJson(const nlohmann::json& jsonData);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Save to JSON file
+    bool saveToJson(const std::string& filepath) const;
+    
+    // Convert to JSON string
+    std::string toJson() const;
     
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>
@@ -80,20 +90,18 @@ template<typename T>
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Validate configuration values
+    bool validate() const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Check if key has valid type
+    bool isValidKey(const std::string& key) const;
     
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Check if value is of expected type
+    template<typename T>
+    bool isType(const std::string& key) const;
     
 private:
     struct Impl;

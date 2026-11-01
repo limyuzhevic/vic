@@ -611,21 +611,42 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
-    // Apply to all synapses with eligibility traces
+    // Apply neuromodulation signal to brain's dopamine system
+    if (brain_->getDopamine()) {
+        brain_->getDopamine()->setLevel(dopamineLevel_);
+        brain_->getDopamine()->signalRewardPredictionError(predictionError_);
+    }
+    
+    // Update curiosity based on novelty (already done in processSensoryInput)
+    // but we can also boost curiosity based on reward prediction error
+    if (curiosityEnabled_) {
+        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f
+                        + 0.6f * curiosityLevel_;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+        if (brain_->getCuriosity()) {
+            brain_->getCuriosity()->setLevel(curiosityLevel_);
+        }
+    }
+    
+    // Update novelty based on prediction error
+    if (brain_->getNovelty()) {
+        // Novelty is a measure of unexpected events, which includes prediction error
+        float noveltySignal = std::abs(predictionError_) * 0.5f;
+        brain_->getNovelty()->setLevel(noveltySignal);
+    }
+    
+    // Update prediction error signal
+    if (brain_->getPredictionErrorSignal()) {
+        brain_->getPredictionErrorSignal()->setLevel(predictionError_);
+    }
+    
+    // Apply reward to all synapses with eligibility traces (existing code)
     for (const auto& region : brain_->getRegions()) {
         for (const auto& syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
 
             if (std::abs(eligibility) > 0.001f) {
-                // Reward-modulated weight change. Phase 4: the old
-                // rule used delta = eligibility * dopamine with no
-                // learning rate, and eligibility traces accumulate
-                // STDP deltas to ~4, so a single +10 reward (dopamine
-                // clamped to 1) drove every eligible synapse straight
-                // to its clamp — one event saturated the network. A
-                // 0.05 learning rate and a +-0.1 per-event cap keep a
-                // reward event meaningful without erasing all prior
-                // selectivity in one step (standard R-STDP scaling).
+                // Reward-modulated weight change
                 float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
                 delta = std::clamp(delta, -0.1f, 0.1f);
                 syn->addToWeight(delta);
