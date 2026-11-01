@@ -19,14 +19,20 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+#include <tuple>
+#include <functional>
 
-using namespace nlm;
+// Type alias for shared pointer to Brain for better readability
+using BrainPtr = std::shared_ptr<Brain>;
+
+// Include the new Phase 2 test runner
+#include "phase2_test_runner.h"
+
+// Include the test implementation
+#include "test_implementation.h"
+
+// Include the test orchestrator
+#include "test_utils.h"
 
 void printBanner() {
     std::cout << R"(
@@ -237,7 +243,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     }
     for (SimulationStep step = 0; step < 1000; ++step) {
         for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+            brain->injectCurrent(id, 6.0f);  // Reduced from 30.0f to control runaway excitation
         }
         
         brain->step(step, step * 0.001);
@@ -395,20 +401,50 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Define test cases using the new test utilities
+    std::vector<std::tuple<std::string, std::string, std::function<void(BrainPtr)>, std::function<void(BrainPtr)>, std::function<void(BrainPtr)>, bool>> tests = {
+        // Test 1: Basic connectivity
+        std::make_tuple(
+            "Basic Connectivity Test",
+            "Test 1: Basic Neural Connectivity - Verify that neurons can fire and spikes propagate",
+            &TestImplementation::setupBasicConnectivityTest,  // Setup
+            &TestImplementation::executeBasicConnectivityTest,  // Execute
+            &TestImplementation::cleanupBasicConnectivityTest,  // Cleanup
+            true  // Requires brain reset
+        ),
+        
+        // Test 2: Plasticity learning
+        std::make_tuple(
+            "Plasticity Learning Test", 
+            "Test 2: Plasticity Learning Experiment - Demonstrate measurable synaptic changes through experience",
+            &TestImplementation::setupPlasticityTest,  // Setup
+            &TestImplementation::executePlasticityTest,  // Execute
+            &TestImplementation::cleanupPlasticityTest,  // Cleanup
+            true  // Requires brain reset
+        ),
+        
+        // Test 3: STDP verification
+        std::make_tuple(
+            "STDP Verification Test",
+            "Test 3: STDP Verification - Verify that STDP rule produces potentiation for correlated pre->post activity",
+            &TestImplementation::setupStdpTest,  // Setup
+            &TestImplementation::executeStdpTest,  // Execute
+            &TestImplementation::cleanupStdpTest,  // Cleanup
+            true  // Requires brain reset
+        )
+    };
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    // Run tests using the test orchestrator
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Phase 2 Test Suite ===");
+    NLM_LOG_INFO("Running organized test suite with improved separation of concerns");
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    bool testsSuccess = TestOrchestrator::runMultipleTests(brain, tests);
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (!testsSuccess) {
+        NLM_LOG_ERROR("Test suite failed");
+        return 1;
+    }
     
     // Final brain status
     NLM_LOG_INFO("");

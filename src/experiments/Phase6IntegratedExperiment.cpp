@@ -84,8 +84,12 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         float reward = actionResult.reward;
         totalReward += reward;
         
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        // Calculate prediction error for selective learning
+        // Prediction error = reward - expected reward (current dopamine level)
+        float predictionError = reward - agent.getNeuromodulationLevel();
+        
+        // Apply reward modulation with prediction error for selective learning
+        agent.applyRewardModulation(reward, predictionError);
         
         // Update development
         if (config.enableDevelopment) {
