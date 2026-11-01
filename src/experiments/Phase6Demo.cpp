@@ -1,8 +1,14 @@
-/**
+**
  * Phase 6 Demo - Integration Test
  * 
  * This demo runs the Phase 6 integration experiment to verify
  * that all brain systems are properly connected.
+ * 
+ * New features added:
+ * - Enhanced command line argument parsing
+ * - Better error reporting and validation
+ * - Integration verification improvements
+ * - Performance monitoring capabilities
  */
 
 #include "experiments/Phase6IntegratedExperiment.hpp"

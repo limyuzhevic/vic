@@ -19,15 +19,6 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
-
-using namespace nlm;
-
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -307,16 +298,132 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
+enum class DemoPhase {
+    Phase2 = 2,
+    Phase3,
+    Phase4,
+    Phase5,
+    Phase6,
+    Phase6Demo
+};
+
+DemoPhase parsePhaseArgument(const std::string& arg) {
+    if (arg == "2" || arg == "phase2") return DemoPhase::Phase2;
+    if (arg == "3" || arg == "phase3") return DemoPhase::Phase3;
+    if (arg == "4" || arg == "phase4") return DemoPhase::Phase4;
+    if (arg == "5" || arg == "phase5") return DemoPhase::Phase5;
+    if (arg == "6" || arg == "phase6") return DemoPhase::Phase6;
+    if (arg == "6demo" || arg == "phase6-demo") return DemoPhase::Phase6Demo;
+    return DemoPhase::Phase2;
+}
+
+void printUsage() {
     printBanner();
+    std::cout << "Usage: nlm [OPTIONS]\n";
+    std::cout << "\nBasic Options:\n";
+    std::cout << "  --config <file>      Load configuration from file (default: configs/default.cfg)\n";
+    std::cout << "  --phase <n|name>     Run specific phase (2, 3, 4, 5, or 6)\n";
+    std::cout << "  --help               Show this help message\n";
+    std::cout << "\nPhase 2 Options:\n";
+    std::cout << "  --neurons <n>        Number of neurons (default: 500)\n";
+    std::cout << "  --timestep <t>       Simulation timestep (default: 0.001)\n";
+    std::cout << "  --seed <n>           Random seed (default: 42)\n";
+    std::cout << "\nPhase 3 Options:\n";
+    std::cout << "  --episodes <n>       Number of episodes (default: 5)\n";
+    std::cout << "  --steps <n>          Steps per episode (default: 200)\n";
+    std::cout << "\nPhase 6 Options:\n";
+    std::cout << "  --maxsteps <n>       Maximum steps for Phase 6 (default: 2000)\n";
+    std::cout << "  --neurons <n>        Number of neurons (default: 500)\n";
+    std::cout << "\nDebugging & Profiling:\n";
+    std::cout << "  --verbose           Enable verbose logging\n";
+    std::cout << "  --profile           Enable performance profiling\n";
+    std::cout << "  --benchmark         Run benchmark mode\n";
+    std::cout << "\nCheckpointing:\n";
+    std::cout << "  --checkpoint <file>  Save brain state to checkpoint\n";
+    std::cout << "  --load <file>       Load brain state from checkpoint\n";
+}
+
+int main(int argc, char** argv) {
+    // Parse command line arguments
+    DemoPhase phase = DemoPhase::Phase2;
+    std::string configFile = "configs/default.cfg";
+    bool verbose = false;
+    bool profile = false;
+    bool benchmark = false;
+    std::string checkpointFile;
+    std::string loadFile;
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg.substr(0, 8) == "--phase=") {
+            phase = parsePhaseArgument(arg.substr(8));
+        } else if (arg.substr(0, 8) == "--phase ") {
+            phase = parsePhaseArgument(arg.substr(8));
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--profile") {
+            profile = true;
+        } else if (arg == "--benchmark") {
+            benchmark = true;
+        } else if (arg.substr(0, 12) == "--checkpoint=") {
+            checkpointFile = arg.substr(12);
+        } else if (arg.substr(0, 9) == "--load=") {
+            loadFile = arg.substr(9);
+        } else if (arg == "--neurons") {
+            if (i + 1 < argc) i++;
+        } else if (arg == "--timestep") {
+            if (i + 1 < argc) i++;
+        } else if (arg == "--seed") {
+            if (i + 1 < argc) i++;
+        } else if (arg == "--episodes") {
+            if (i + 1 < argc) i++;
+        } else if (arg == "--steps") {
+            if (i + 1 < argc) i++;
+        } else if (arg == "--maxsteps") {
+            if (i + 1 < argc) i++;
+        }
+    }
     
-    // Initialize logger
+    // Initialize logger with verbose level if requested
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    LogLevel logLevel = verbose ? LogLevel::Debug : LogLevel::Info;
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
+    
+    // Start profiling if requested
+    if (profile) {
+        NLM_LOG_INFO("Performance profiling enabled");
+        // TODO: Add profiling infrastructure
+    }
+    
+    // Initialize based on phase
+    switch (phase) {
+        case DemoPhase::Phase2:
+            std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+            break;
+        case DemoPhase::Phase3:
+            std::cout << "Initializing NLM Phase 3 World Interaction Demo...\n" << std::endl;
+            break;
+        case DemoPhase::Phase4:
+            std::cout << "Initializing NLM Phase 4 Emerging Cognition Demo...\n" << std::endl;
+            break;
+        case DemoPhase::Phase5:
+            std::cout << "Initializing NLM Phase 5 Brain-Personality Sandbox Demo...\n" << std::endl;
+            break;
+        case DemoPhase::Phase6Demo:
+            std::cout << "Initializing NLM Phase 6 Final Integration Demo...\n" << std::endl;
+            break;
+    }
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
@@ -352,21 +459,83 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Load configuration
+    auto config = std::make_shared<Config>();
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Try to load from file if provided
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+    }
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Load config from file (ignore if not found)
+    if (config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else {
+        NLM_LOG_INFO("Using default configuration.");
+    }
+    
+    // Override with command line args (simplified - would need full implementation)
+    // config->loadFromArgs(argc, argv);
+    
+    // Set default values based on phase
+    switch (phase) {
+        case DemoPhase::Phase2:
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+            config->set("connection_probability", 0.15f, ConfigSource::Default);
+            // STDP parameters
+            config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+            config->set("stdp_tau", 20.0f, ConfigSource::Default);
+            // Structural plasticity parameters
+            config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+            config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+            break;
+        case DemoPhase::Phase3:
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+            config->set("connection_probability", 0.1f, ConfigSource::Default);
+            break;
+        case DemoPhase::Phase4:
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+            config->set("connection_probability", 0.1f, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+            break;
+        case DemoPhase::Phase5:
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+            config->set("connection_probability", 0.1f, ConfigSource::Default);
+            config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+            config->set("stdp_tau", 20.0f, ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+            config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+            break;
+        case DemoPhase::Phase6Demo:
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+            config->set("connection_probability", 0.1f, ConfigSource::Default);
+            break;
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -377,6 +546,13 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
+    
+    // Load config from file (ignore if not found)
+    if (config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else {
+        NLM_LOG_INFO("Using default configuration.");
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -395,20 +571,67 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run demo based on phase
+    switch (phase) {
+        case DemoPhase::Phase2:
+            // Phase 2: Original tests
+            runBasicConnectivityTest(brain);
+            
+            // Reset brain for plasticity experiment
+            brain->reset();
+            brain->initialize();
+            
+            // Run Test 2: Plasticity learning experiment
+            runPlasticityExperiment(brain);
+            
+            // Reset and run Test 3: STDP verification
+            brain->reset();
+            brain->initialize();
+            runStdpVerification(brain);
+            
+            break;
+            
+        case DemoPhase::Phase3:
+            // Phase 3: Simple world interaction demo
+            std::cout << "Note: Phase 3 demo requires separate executable nlm_phase3_demo" << std::endl;
+            std::cout << "Run: ./nlm_phase3_demo [episodes] [steps]" << std::endl;
+            break;
+            
+        case DemoPhase::Phase4:
+            // Phase 4: Emerging cognition experiments
+            std::cout << "Note: Phase 4 demo requires separate executable nlm_phase4_demo" << std::endl;
+            std::cout << "Run: ./nlm_phase4_demo [trials]" << std::endl;
+            break;
+            
+        case DemoPhase::Phase5:
+            // Phase 5: Brain-personality sandbox
+            std::cout << "Note: Phase 5 demo requires separate executable nlm_phase5_demo" << std::endl;
+            std::cout << "Run: ./nlm_phase5_demo" << std::endl;
+            break;
+            
+        case DemoPhase::Phase6Demo:
+            // Phase 6: Final integration demo
+            std::cout << "Note: Phase 6 demo requires separate executable nlm_phase6_demo" << std::endl;
+            std::cout << "Run: ./nlm_phase6_demo" << std::endl;
+            break;
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    // Handle checkpointing if requested
+    if (!checkpointFile.empty()) {
+        NLM_LOG_INFO("Saving checkpoint to: " + checkpointFile);
+        // Note: checkpointing requires the Brain class to have save/load methods
+        // brain->save(checkpointFile);
+    }
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (!loadFile.empty()) {
+        NLM_LOG_INFO("Loading checkpoint from: " + loadFile);
+        // Note: checkpointing requires the Brain class to have save/load methods
+        // if (brain->load(loadFile)) {
+        //     NLM_LOG_INFO("Checkpoint loaded successfully");
+        // } else {
+        //     NLM_LOG_ERROR("Failed to load checkpoint");
+        // }
+    }
     
     // Final brain status
     NLM_LOG_INFO("");

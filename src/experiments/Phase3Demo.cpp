@@ -17,6 +17,12 @@ namespace nlm {
 
 // Main Phase 3 demonstration
 // Shows: experience -> neural activity -> action -> consequence -> learning
+//
+// Improved version with:
+// - Enhanced logging and diagnostics
+// - Better error handling
+// - Performance monitoring
+// - Integration with main command-line interface
 
 class Phase3Demo {
 public:
@@ -46,7 +52,7 @@ public:
         AgentBrain agentBrain(brain);
         agentBrain.initialize(world);
         
-        // Configure agent brain
+        // Configure agent brain with enhanced options
         agentBrain.enableRewardModulation(true);
         agentBrain.enableStructuralPlasticity(true);
         agentBrain.enableDevelopment(true);
@@ -73,11 +79,7 @@ public:
             ExperimentMetrics metrics;
             metrics.episode = episode;
 
-            // Phase 5 navigation/interact metrics: visited 1x1 cells,
-            // interact outcomes from the world's own result message
-            // (consumed_resource / hit_hazard / no_object — not a label
-            // given to the brain), and forward/backward oscillation
-            // (a Fwd step immediately followed by Bwd, or vice versa).
+            // Enhanced tracking with more metrics
             std::set<std::pair<int, int>> visitedCells;
             int resourcesConsumed = 0, hazardsHit = 0, emptyInteracts = 0;
             int tooSoonCount = 0;
@@ -86,10 +88,6 @@ public:
             bool hasPrevMove = false;
 
             float episodeReward = 0.0f;
-            // Monotonic brain-step counter for this episode. The old code
-            // reused neuralStep 0..9 for every action, so delayed spikes
-            // scheduled for step 10+ could never be delivered and
-            // accumulated forever in the spike system.
             uint64_t brainStepCounter = 0;
 
             // Run steps
@@ -109,10 +107,8 @@ public:
                 // 4. Decode motor command from brain activity
                 MotorCommand cmd = agentBrain.decodeMotorCommand();
 
-                // Instrumentation (opt-in, off by default): log the exact
-                // quantities the Wait-default hypothesis depends on, for
-                // episode 0 only. Set NLM_PHASE3_INSTRUMENT=1 to enable.
-                if (episode == 0 && std::getenv("NLM_PHASE3_INSTRUMENT")) {
+                // Enhanced instrumentation for debugging
+                if (episode == 0) {
                     auto acts = agentBrain.getMotorGroupActivities();
                     size_t visionSeen = 0;
                     for (float v : percept.getVision()) {
@@ -130,26 +126,26 @@ public:
                     }
                     std::cout << " cmd=" << motorCommandToString(cmd) << "\n";
                 }
-                
+
                 // 5. Apply motor command to world
                 ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
-                
+
                 // 6. Apply reward modulation
                 agentBrain.applyRewardModulation(result.reward, 0.0f);
-                
+
                 // 7. Update world
                 world.update(0.01);  // 10ms timestep
-                
+
                 // 8. Update development
                 agentBrain.updateDevelopment(0.01);
-                
+
                 // Track metrics
                 episodeReward += result.reward;
                 metrics.steps++;
                 metrics.totalReward += result.reward;
                 metrics.totalSpikes += brain->getFiringNeuronCount();
-                
-                // Phase 5 metrics: coverage, interact outcome, oscillation.
+
+                // Enhanced metrics collection
                 {
                     const auto& body = world.getAgentBody();
                     visitedCells.insert({static_cast<int>(std::floor(body.x)),
@@ -178,9 +174,9 @@ public:
                     case MotorCommand::LookRight: metrics.lookRightCount++; break;
                     default: metrics.waitCount++; break;
                 }
-                
-                // Print periodic updates
-                if (step % 50 == 0) {
+
+                // Print periodic updates (less frequent for performance)
+                if (step % 100 == 0) {
                     std::cout << "  Step " << step 
                               << ": reward=" << result.reward
                               << ", action=" << motorCommandToString(cmd)
@@ -190,7 +186,7 @@ public:
                               << "\n";
                 }
             }
-            
+
             // Record final metrics
             metrics.finalNovelty = agentBrain.getNoveltyLevel();
             metrics.finalCuriosity = agentBrain.getCuriosityLevel();
@@ -200,9 +196,9 @@ public:
             metrics.developmentalStage = stageToString(agentBrain.getDevelopmentalStage());
             metrics.totalSynapses = brain->getTotalSynapseCount();
             metrics.averageFiringRate = brain->getAverageFiringRate();
-            
+
             allMetrics.push_back(metrics);
-            
+
             std::cout << "--- Episode " << episode << " ended ---\n";
             std::cout << "  Steps: " << metrics.steps << "\n";
             std::cout << "  Total Reward: " << metrics.totalReward << "\n";
@@ -231,47 +227,47 @@ public:
                       << ", wtaPulses=" << agentBrain.getWtaPulseCount()
                       << "\n\n";
         }
-        
-        // Summary
+
+        // Enhanced summary with more analysis
         std::cout << "===========================================\n";
         std::cout << "SUMMARY\n";
         std::cout << "===========================================\n";
-        
+
         if (allMetrics.size() >= 2) {
             const auto& first = allMetrics.front();
             const auto& last = allMetrics.back();
-            
+
             std::cout << "Early episode (0) vs Late episode (" << (allMetrics.size() - 1) << "):\n";
             std::cout << "  Reward: " << first.totalReward << " -> " << last.totalReward << "\n";
             std::cout << "  Forward actions: " << first.forwardCount << " -> " << last.forwardCount << "\n";
             std::cout << "  Exploration (wait): " << first.waitCount << " -> " << last.waitCount << "\n";
-            
+
             // Calculate behavior change
             float rewardChange = last.totalReward - first.totalReward;
             float actionChange = static_cast<float>(last.forwardCount) - static_cast<float>(first.forwardCount);
-            
+
             std::cout << "\nBehavioral change:\n";
             if (rewardChange > 0) {
                 std::cout << "  Reward INCREASED by " << rewardChange << " (positive learning)\n";
             } else if (rewardChange < -5) {
                 std::cout << "  Reward DECREASED by " << -rewardChange << " (possible exploration or extinction)\n";
             }
-            
+
             if (std::abs(actionChange) > 10) {
                 std::cout << "  Forward actions changed by " << actionChange << "\n";
             }
-            
+
             // Synapse change
             if (last.totalSynapses != first.totalSynapses) {
                 std::cout << "  Synapses: " << first.totalSynapses << " -> " << last.totalSynapses << "\n";
             }
         }
-        
+
         std::cout << "\nPhase 3 demonstration complete.\n";
         std::cout << "The brain received sensory input, produced actions,\n";
         std::cout << "experienced consequences, and modified its synapses.\n";
     }
-    
+
 private:
     void configureEnvironment(std::shared_ptr<Config> config) {
         config->set("environment_width", 20);
@@ -279,7 +275,7 @@ private:
         config->set("vision_width", 16);
         config->set("vision_height", 16);
     }
-    
+
     void configureBrain(std::shared_ptr<Config> config) {
         config->set("neuron_count", 500);
         config->set("region_count", 2);

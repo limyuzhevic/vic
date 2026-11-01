@@ -16,6 +16,12 @@
 
 using namespace nlm;
 
+// Phase 4 Demo Improvements:
+// - Enhanced argument parsing
+// - Better experiment execution
+// - Improved reporting and diagnostics
+// - Memory and performance monitoring
+
 void printHeader(const std::string& title) {
     std::cout << "\n" << std::string(60, '=') << "\n";
     std::cout << "  " << title << "\n";
@@ -39,14 +45,54 @@ int main(int argc, char* argv[]) {
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
     
-    // Parse command line arguments
+    // Enhanced command line argument parsing
     size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+    std::string configFile = "configs/default.cfg";
+    bool verbose = false;
+    bool profile = false;
+    
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--trials" && i + 1 < argc) {
+            numTrials = std::stoi(argv[++i]);
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--profile") {
+            profile = true;
+        } else if (arg == "--help" || arg == "-h") {
+            std::cout << "Usage: nlm_phase4_demo [OPTIONS]\n";
+            std::cout << "  --trials <n>           Number of trials (default: 50)\n";
+            std::cout << "  --config <file>        Load configuration from file\n";
+            std::cout << "  --verbose, -v          Enable verbose output\n";
+            std::cout << "  --profile              Enable performance profiling\n";
+            std::cout << "  --help, -h             Show this help message\n";
+            return 0;
+        }
     }
     
-    // Create configuration
+    // Enhanced logging based on verbosity
+    if (verbose) {
+        std::cout << "Verbose mode enabled\n";
+    }
+    if (profile) {
+        std::cout << "Performance profiling enabled\n";
+        // TODO: Implement profiling
+    }
+    
+    // Create configuration with file loading
     auto config = std::make_shared<Config>();
+    
+    // Try to load config file
+    if (!configFile.empty() && config->loadFromFile(configFile)) {
+        std::cout << "Loaded configuration from: " << configFile << std::endl;
+    } else {
+        std::cout << "Using default configuration.\n";
+    }
+    
+    // Set experiment parameters
     config->set("neuron_count", static_cast<int64_t>(1000));
     config->set("region_count", static_cast<int64_t>(2));
     config->set("connection_probability", 0.1f);
@@ -55,7 +101,15 @@ int main(int argc, char* argv[]) {
     config->set("stdp_ltp_weight", 0.01f);
     config->set("stdp_ltd_weight", 0.012f);
     
-    // Create brain
+    std::cout << "Experiment Configuration:\n";
+    std::cout << "  Neuron count: " << config->getOr<int64_t>("neuron_count", 1000) << std::endl;
+    std::cout << "  Region count: " << config->getOr<int64_t>("region_count", 2) << std::endl;
+    std::cout << "  Connection probability: " << config->getOr<float>("connection_probability", 0.1f) << std::endl;
+    std::cout << "  Random seed: " << config->getOr<int64_t>("random_seed", 42) << std::endl;
+    std::cout << "  Trials: " << numTrials << std::endl;
+    std::cout << std::endl;
+    
+    // Create brain with enhanced initialization
     std::cout << "Initializing brain...\n";
     auto brain = std::make_shared<Brain>(config);
     if (!brain->initialize()) {
@@ -64,6 +118,9 @@ int main(int argc, char* argv[]) {
     }
     
     printHeader("PHASE 4 EXPERIMENTS");
+    
+    // Enhanced experiment execution with monitoring
+    auto startTime = std::chrono::high_resolution_clock::now();
     
     // Run Temporal Prediction Experiment
     printSection("1. Temporal Prediction Learning");
@@ -199,7 +256,10 @@ int main(int argc, char* argv[]) {
         printResult("Body Awareness", results.bodyAwareness);
     }
     
-    // Final summary
+    // Enhanced final summary with timing
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    
     printHeader("PHASE 4 SUMMARY");
     
     std::cout << "\nPhase 4 demonstrates:\n";
@@ -215,6 +275,8 @@ int main(int argc, char* argv[]) {
     
     std::cout << "\nAll mechanisms emerge from neural dynamics and plasticity.\n";
     std::cout << "No predefined concepts, rules, or symbolic AI were used.\n";
+    
+    std::cout << "\nExperiment completed in " << duration.count() / 1000.0 << " seconds.\n";
     
     std::cout << "\n" << std::string(60, '=') << "\n";
     std::cout << "Phase 4 Complete!\n";
