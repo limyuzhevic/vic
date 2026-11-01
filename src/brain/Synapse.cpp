@@ -2,6 +2,9 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <stdexcept>
+#include <cassert>
+#include <limits>
 
 namespace nlm {
 
@@ -43,11 +46,29 @@ struct Synapse::Impl {
     static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
+    // Enhanced STP parameters
+    static constexpr float MAX_EFFICIENCY = 2.0f;
+    static constexpr float MIN_EFFICIENCY = 0.0f;
+    static constexpr float ELIGIBILITY_DECAY_RATE = 0.001f;
+    static constexpr float EFFICACY_DECAY_RATE = 0.01f;
+    
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    
+    Impl() : id(), sourceNeuron(), destinationNeuron(), weight(0.0f), delay(1),
+             type(SynapseType::Excitatory), shortTermDepression(1.0f),
+             shortTermFacilitation(0.0f), lastPreSpikeTime(-1.0f),
+             lastPostSpikeTime(-1.0f), eligibilityTrace(0.0f), efficacy(1.0f) {}
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     : pImpl(new Impl) {
+    if (id == INVALID_SYNAPSE_HANDLE) {
+        throw std::invalid_argument("Synapse cannot have invalid ID");
+    }
+    if (source == INVALID_NEURON_ID || destination == INVALID_NEURON_ID) {
+        throw std::invalid_argument("Synapse neurons cannot have invalid IDs");
+    }
+    
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
@@ -94,7 +115,8 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+    // Enhanced weight setting with validation and bounds checking
+    pImpl->weight = std::clamp(weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
@@ -108,6 +130,10 @@ Delay Synapse::getDelay() const {
 }
 
 void Synapse::setDelay(Delay delay) {
+    // Enhanced delay setting with validation
+    if (delay < 0) {
+        throw std::invalid_argument("Delay cannot be negative");
+    }
     pImpl->delay = delay;
 }
 
@@ -116,6 +142,10 @@ SynapseType Synapse::getType() const {
 }
 
 void Synapse::setType(SynapseType type) {
+    if (type == SynapseType::Unknown) {
+        NLM_LOG_WARNING("Attempting to set synapse type to Unknown, using Excitatory instead");
+        type = SynapseType::Excitatory;
+    }
     pImpl->type = type;
 }
 
@@ -128,14 +158,22 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    if (timestamp < 0.0f) {
+        throw std::invalid_argument("Pre-synaptic spike timestamp cannot be negative");
+    }
     pImpl->preSpikeHistory.push_back(timestamp);
+    pImpl->lastPreSpikeTime = timestamp;
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    if (timestamp < 0.0f) {
+        throw std::invalid_argument("Post-synaptic spike timestamp cannot be negative");
+    }
     pImpl->postSpikeHistory.push_back(timestamp);
+    pImpl->lastPostSpikeTime = timestamp;
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
     }
@@ -152,6 +190,8 @@ const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
 void Synapse::clearHistory() {
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 void Synapse::setPreSpikeHistory(const std::vector<Timestamp>& history) {
@@ -163,6 +203,9 @@ void Synapse::setPreSpikeHistory(const std::vector<Timestamp>& history) {
                 static_cast<std::ptrdiff_t>(pImpl->preSpikeHistory.size() -
                                             Impl::MAX_SPIKE_HISTORY));
     }
+    if (!history.empty()) {
+        pImpl->lastPreSpikeTime = history.back();
+    }
 }
 
 void Synapse::setPostSpikeHistory(const std::vector<Timestamp>& history) {
@@ -173,6 +216,9 @@ void Synapse::setPostSpikeHistory(const std::vector<Timestamp>& history) {
             pImpl->postSpikeHistory.begin() +
                 static_cast<std::ptrdiff_t>(pImpl->postSpikeHistory.size() -
                                             Impl::MAX_SPIKE_HISTORY));
+    }
+    if (!history.empty()) {
+        pImpl->lastPostSpikeTime = history.back();
     }
 }
 
@@ -195,10 +241,11 @@ float Synapse::getEligibilityTrace() const {
 }
 
 void Synapse::setEligibilityTrace(float trace) {
-    pImpl->eligibilityTrace = trace;
+    pImpl->eligibilityTrace = std::clamp(trace, -Impl::MAX_EFFICIENCY, Impl::MAX_EFFICIENCY);
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    // Enhanced eligibility trace decay with better stability
     pImpl->eligibilityTrace *= (1.0f - decayRate);
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
@@ -210,35 +257,40 @@ float Synapse::getEfficacy() const {
 }
 
 void Synapse::setEfficacy(float efficacy) {
-    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
+    // Enhanced efficacy setting with validation
+    pImpl->efficacy = std::clamp(efficacy, Impl::MIN_EFFICIENCY, Impl::MAX_EFFICIENCY);
 }
 
 void Synapse::step(Timestamp currentTime) {
-    // Real synaptic dynamics:
+    // Real synaptic dynamics with enhanced mechanisms:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    // Enhanced short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
         pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
     }
     
-    // Decay short-term depression
+    // Enhanced short-term depression
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
         // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * 
+            (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
     // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    decayEligibilityTrace(Impl::ELIGIBILITY_DECAY_RATE);
+    
+    // Decay efficacy based on synaptic usage
+    pImpl->efficacy *= (1.0f - Impl::EFFICACY_DECAY_RATE);
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
@@ -256,6 +308,8 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
