@@ -307,7 +307,139 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
+// Print usage information
+void printUsage(const char* programName) {
+    std::cout << "=== NLM Phase 2 Demo ===" << std::endl;
+    std::cout << "Usage: " << programName << " [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h           Show this help message" << std::endl;
+    std::cout << "  --version           Show version information" << std::endl;
+    std::cout << "  --config <file>     Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --steps <num>       Number of simulation steps (default: 2000)" << std::endl;
+    std::cout << "  --neuron-count <n>  Number of neurons (default: 500)" << std::endl;
+    std::cout << "  --verbose, -v       Enable verbose output" << std::endl;
+    std::cout << "  --quiet, -q         Reduce output to minimum" << std::endl;
+    std::cout << "  --debug             Enable debug mode" << std::endl;
+    std::cout << "  --demo-mode <mode>  Choose demo mode: quiet, normal, verbose, debug (default: normal)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --steps 1000 --neuron-count 100" << std::endl;
+    std::cout << "  " << programName << " --verbose --config my_config.cfg" << std::endl;
+    std::cout << "  " << programName << " -q -h" << std::endl;
+}
+
+// Print version information
+void printVersion() {
+    std::cout << "NLM Phase 2 Demo v0.1.0" << std::endl;
+    std::cout << "Built with C++20" << std::endl;
+    std::cout << "Phase 6 Integration Complete - Real spiking neural computation" << std::endl;
+    std::cout << "Includes working memory, neuromodulation, and prediction systems" << std::endl;
+}
+
+// Progress reporting
+void reportProgress(SimulationStep currentStep, SimulationStep totalSteps, double elapsedTime) {
+    if (currentStep % 1000 == 0 || currentStep == totalSteps) {
+        double percent = 100.0 * currentStep / totalSteps;
+        double stepsPerSec = currentStep / (elapsedTime > 0 ? elapsedTime : 0.001);
+        NLM_LOG_INFO("  Progress: " + std::to_string(currentStep) + "/" + std::to_string(totalSteps) + 
+                    " steps (" + std::to_string(percent, 1) + "%) - " + std::to_string(stepsPerSec, 1) + " steps/sec");
+    }
+}
+
+// Configuration validation
+bool validateConfig(const Config& config) {
+    bool valid = true;
+    
+    int64_t neuronCount = config.getOr<int64_t>("neuron_count", 500);
+    if (neuronCount < 10) {
+        NLM_LOG_WARNING("Neuron count is very low (" + std::to_string(neuronCount) + "), may not be representative");
+        valid = false;
+    } else if (neuronCount > 10000) {
+        NLM_LOG_WARNING("Neuron count is very high (" + std::to_string(neuronCount) + "), may impact performance");
+        valid = false;
+    }
+    
+    float connectionProb = config.getOr<float>("connection_probability", 0.15f);
+    if (connectionProb < 0.0f || connectionProb > 1.0f) {
+        NLM_LOG_ERROR("Connection probability must be between 0.0 and 1.0 (current: " + std::to_string(connectionProb) + ")");
+        valid = false;
+    }
+    
+    double timestep = config.getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Simulation timestep must be positive (current: " + std::to_string(timestep) + ")");
+        valid = false;
+    } else if (timestep > 0.1) {
+        NLM_LOG_WARNING("Simulation timestep is large (" + std::to_string(timestep) + "), may affect stability");
+        valid = false;
+    }
+    
+    return valid;
+}
+
+// Get demo mode from command line
+std::string getDemoMode(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--demo-mode" && i + 1 < argc) {
+            return argv[++i];
+        } else if (arg.substr(0, 14) == "--demo-mode=") {
+            return arg.substr(14);
+        } else if (arg == "-m" && i + 1 < argc) {
+            return argv[++i];
+        }
+    }
+    return "normal";
+}
+
+// Get output level from command line
+LogLevel getOutputLevel(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--verbose" || arg == "-v") {
+            return LogLevel::Info;
+        } else if (arg == "--debug") {
+            return LogLevel::Debug;
+        } else if (arg == "--quiet" || arg == "-q") {
+            return LogLevel::Error;
+        }
+    }
+    return LogLevel::Info;
+}
+
+// Get integer value from command line
+bool getIntArg(int argc, char** argv, const std::string& flag, int64_t& value) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == flag && i + 1 < argc) {
+            value = std::stoll(argv[++i]);
+            return true;
+        } else if (arg.substr(0, flag.size()) == flag && arg[flag.size()] == '=') {
+            value = std::stoll(arg.substr(flag.size() + 1));
+            return true;
+        } else if (arg == flag.substr(1) && i + 1 < argc && arg[0] == '-') {
+            value = std::stoll(argv[++i]);
+            return true;
+        }
+    }
+    return false;
+}
+
+// Get string value from command line
+bool getStringArg(int argc, char** argv, const std::string& flag, std::string& value) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == flag && i + 1 < argc) {
+            value = argv[++i];
+            return true;
+        } else if (arg.substr(0, flag.size()) == flag && arg[flag.size()] == '=') {
+            value = arg.substr(flag.size() + 1);
+            return true;
+        }
+    }
+    return false;
+}
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;

@@ -12,6 +12,8 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+**Note:** This guide shows the **Python API** (pynlm). The Python bindings are built using scikit-build-core and require a C++ compiler. Build with `pip install .` or `cmake` from the root directory.
+
 ---
 
 ## The 3 Things You Need to Know
