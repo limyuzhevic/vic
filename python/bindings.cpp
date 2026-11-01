@@ -5,6 +5,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <numeric>
+#include <cmath>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -408,26 +411,194 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
+    // Create a new brain with default configuration and enhanced initialization
+    m.def("createBrainFromTemplate", [](const std::string& templateName) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        
+        // Apply template configuration
+        if (templateName == "research") {
+            // Research-oriented template: larger network, longer learning
+            config->set("brain.neuron_count", 2000);
+            config->set("brain.synapse_density", 0.15f);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.002f);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("neuromod.dopamine.scale", 1.5f);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+            config->set("brain.development.enable", true);
+        } else if (templateName == "rapid") {
+            // Rapid testing template: smaller network, quick learning
+            config->set("brain.neuron_count", 500);
+            config->set("brain.synapse_density", 0.05f);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.005f);
+            config->set("plasticity.hebbian.enable", false);
+            config->set("plasticity.structural.enable", false);
+            config->set("neuromod.dopamine.scale", 1.0f);
+            config->set("neuromod.curiosity.enable", false);
+            config->set("neuromod.novelty.enable", false);
+            config->set("brain.development.enable", false);
+        } else if (templateName == "balanced") {
+            // Balanced template: moderate everything
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.synapse_density", 0.1f);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.stdp.learning_rate", 0.003f);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("neuromod.dopamine.scale", 1.0f);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+            config->set("brain.development.enable", true);
+        } else {
+            // Default template
+            config->set("brain.neuron_count", 1000);
+            config->set("brain.synapse_density", 0.1f);
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain from template: " + templateName);
+        }
+        return brain;
+    }, py::arg("templateName"), "Create a brain with a predefined template configuration");
+    
+    // Advanced batch processing methods
+    m.def("batchProcessSensoryInput", [](std::shared_ptr<AgentBrain> agent, 
+                                       const std::vector<SensoryPercept>& percepts,
+                                       const std::vector<Timestamp>& timestamps) {
+        if (!agent) throw std::runtime_error("Agent is null");
+        if (percepts.size() != timestamps.size()) {
+            throw std::runtime_error("Percepts and timestamps must have the same size");
+        }
+        
+        for (size_t i = 0; i < percepts.size(); ++i) {
+            agent->processSensoryInput(percepts[i]);
+        }
+    }, py::arg("agent"), py::arg("percepts"), py::arg("timestamps"), 
+       "Process multiple sensory inputs in batch for efficiency");
+    
+    // Advanced configuration validation
+    m.def("validateConfiguration", [](const std::shared_ptr<Config>& config) {
+        if (!config) throw std::runtime_error("Config is null");
+        
+        std::vector<std::string> errors;
+        
+        // Check for required keys
+        auto keys = config->getKeys();
+        if (keys.empty()) {
+            errors.push_back("Configuration is empty");
+        }
+        
+        // Validate neuron count
+        if (config->has("brain.neuron_count")) {
+            int64_t neuronCount = config->getOr<int64_t>("brain.neuron_count", 0);
+            if (neuronCount <= 0) {
+                errors.push_back("brain.neuron_count must be positive");
+            } else if (neuronCount > 10000) {
+                errors.push_back("brain.neuron_count too large (max 10000)");
+            }
+        }
+        
+        // Validate plasticity settings
+        if (config->has("plasticity.stdp.enable") && 
+            config->getOr<bool>("plasticity.stdp.enable", false)) {
+            if (!config->has("plasticity.stdp.learning_rate") ||
+                config->getOr<float>("plasticity.stdp.learning_rate", 0.0f) <= 0.0f) {
+                errors.push_back("plasticity.stdp.learning_rate must be positive when STDP is enabled");
+            }
+        }
+        
+        return errors;
+    }, py::arg("config"), "Validate configuration and return list of errors");
+    
+    // Performance profiling methods
+    m.def("profileBrain", [](std::shared_ptr<Brain> brain, int steps) {
+        if (!brain) throw std::runtime_error("Brain is null");
+        
+        double startTime = std::clock();
+        double totalSteps = static_cast<double>(steps);
+        
+        float totalReward = 0.0f;
+        float maxFiringRate = 0.0f;
+        float minFiringRate = std::numeric_limits<float>::max();
+        
+        for (int step = 0; step < steps; ++step) {
+            // Simulate sensory input for profiling
+            brain->step(step, step * 0.001);
+            
+            float firingRate = brain->getAverageFiringRate();
+            totalReward += firingRate * 0.001f; // Simple reward proxy
+            maxFiringRate = std::max(maxFiringRate, firingRate);
+            minFiringRate = std::min(minFiringRate, firingRate);
+        }
+        
+        double endTime = std::clock();
+        double elapsed = (endTime - startTime) / CLOCKS_PER_SEC;
+        
+        return std::vector<double>{
+            elapsed,           // Processing time in seconds
+            totalReward / totalSteps,  // Average reward
+            maxFiringRate,    // Maximum firing rate
+            minFiringRate,    // Minimum firing rate
+            totalSteps / elapsed  // Steps per second
+        };
+    }, py::arg("brain"), py::arg("steps"), 
+       "Profile brain performance over specified steps");
+    
+    // Advanced world configuration methods
+    m.def("createAdvancedWorld", [](int width, int height, int visionWidth, int visionHeight,
+                                   float maxEnergy, float energyDecayRate,
+                                   float resourceEnergyGain) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(static_cast<float>(width), static_cast<float>(height),
+                        static_cast<size_t>(visionWidth), static_cast<size_t>(visionHeight));
+        world->setMaxEnergy(maxEnergy);
+        world->setEnergyDecayRate(energyDecayRate);
+        
+        // Store resource energy gain as internal state (custom attribute)
+        // Note: This would require adding more configuration options to SimpleWorld
+        return world;
+    }, py::arg("width") = 20, py::arg("height") = 20, py::arg("visionWidth") = 16, 
+       py::arg("visionHeight") = 16, py::arg("maxEnergy") = 100.0f, 
+       py::arg("energyDecayRate") = 0.01f, py::arg("resourceEnergyGain") = 30.0f,
+       "Create an advanced world configuration");
+    
+    // Exception type registration
+    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    
+    // Configuration statistics
+    m.def("getConfigStats", [](const std::shared_ptr<Config>& config) {
+        if (!config) throw std::runtime_error("Config is null");
+        
+        std::unordered_map<std::string, int> typeCounts;
+        auto keys = config->getKeys();
+        
+        for (const auto& key : keys) {
+            auto value = config->get<std::string>(key);
+            if (value) {
+                // Simple type detection (in practice, you'd want more sophisticated detection)
+                if (key.find("count") != std::string::npos || 
+                    key.find("number") != std::string::npos) {
+                    typeCounts["integer"]++;
+                } else if (key.find("rate") != std::string::npos || 
+                          key.find("probability") != std::string::npos) {
+                    typeCounts["float"]++;
+                } else if (key.find("enable") != std::string::npos || 
+                          key.find("bool") != std::string::npos) {
+                    typeCounts["boolean"]++;
+                } else {
+                    typeCounts["string"]++;
+                }
+            }
+        }
+        
+        return typeCounts;
+    // Final invalid neuron ID declarations
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
 }
-
-} // namespace nlm

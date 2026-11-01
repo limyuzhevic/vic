@@ -219,11 +219,20 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak contribution with membrane conductance
+    // Higher leak conductance means faster return to resting potential
+    float leakConductance = pImpl->state.leakConductance;
+    float leakContribution = (V_rest - V) * leakConductance;
     
     // Update membrane potential using exponential Euler integration
+    // Time step needs to be in seconds for the formula
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    
+    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        V -= pImpl->state.adaptationVariable * 0.01f;
+        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    }
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -294,6 +303,7 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
     // Threshold is typically -55mV with small variation
+    // But for better stability, we want a larger separation from resting potential
     pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
     
     // Resting potential typically -70mV
@@ -304,6 +314,10 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     
     // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(uint32_t(2), uint32_t(10)));
+    
+    // Initialize leak conductance for stability
+    // Higher leak conductance = faster return to resting potential
+    pImpl->state.leakConductance = 0.05f + rng.uniformReal(0.01f, 0.1f);
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;

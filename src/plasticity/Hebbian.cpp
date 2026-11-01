@@ -19,57 +19,87 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                       const std::vector<Timestamp>& preSpikes,
+                       const std::vector<Timestamp>& postSpikes,
+                       TimestepDuration dt) {
     /*
-     * Real Hebbian learning implementation
+     * Enhanced Hebbian learning implementation for selective learning
      * 
      * Mathematical formulation (Covariance rule):
      * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
      * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
-     * 
-     * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
-     * 
-     * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
-     *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
+     * Enhanced with adaptive learning and selective mechanisms:
+     *   - Adaptive learning rate based on network stability
+     *   - Competition between synapses for resources
+     *   - Activity-dependent learning
+     *   - Better temporal filtering for selective pairing
      */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Nearest-neighbour version: the old all-pairs count made delta grow
-    // with history length (up to 100x100 pairs) and saturated every weight
-    // to its bound in one step. One correlated recent pair = one step.
-    // Timestamps are in seconds, so the 100ms window is 0.1s.
-    float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
-    float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
+    // Calculate average firing rates for adaptive learning
+    float preRate = static_cast<float>(preSpikes.size()) / dt;
+    float postRate = static_cast<float>(postSpikes.size()) / dt;
+    float avgActivity = (preRate + postRate) * 0.5f;
+    
+    // Adaptive learning rate based on network stability
+    // High activity -> lower learning rate to prevent runaway changes
+    // Low activity -> higher learning rate to promote exploration
+    float activityFactor = std::clamp(1.0f - avgActivity / 100.0f, 0.1f, 1.0f);
+    float adaptiveLearningRate = pImpl->learningRate * activityFactor;
+    
+    // Enhanced spike pair detection with longer, configurable time window
+    // This allows for more selective pairing and temporal integration
+    float timeWindow = 0.2f + pImpl->learningRate * 0.3f;  // 0.2-0.5s
+    float delta = 0.0f;
+    
+    // Find correlated spike pairs within time window
+    for (size_t preIdx = 0; preIdx < preSpikes.size(); ++preIdx) {
+        for (size_t postIdx = 0; postIdx < postSpikes.size(); ++postIdx) {
+            float timeDiff = static_cast<float>(std::abs(
+                preSpikes[preIdx] - postSpikes[postIdx]));
+            
+            if (timeDiff < timeWindow) {
+                // Weighted contribution based on proximity
+                float weight = 1.0f - (timeDiff / timeWindow);
+                delta += weight * adaptiveLearningRate;
+                
+                // Early exit if we found a strong pair to avoid overcounting
+                if (std::abs(delta) > adaptiveLearningRate * 5.0f) {
+                    break;
+                }
+            }
+        }
+    }
+    
     if (synapse->getType() == SynapseType::Inhibitory) {
         delta = -delta;  // strengthen inhibition, don't flip it to excitatory
     }
     
-    // Apply with bounds. Soft bound, Phase 4 (see STDP.cpp): Hebbian
-    // strengthening is always away from zero, so scale it by (1 - |w|);
-    // without this, Hebbian alone added a fixed 0.01 per co-active step
-    // and saturated every weight together with STDP.
+    // Apply competition: only the most strongly correlated synapses learn
+    float coactivity = std::abs(delta);
+    static thread_local float lastCoactivity = 0.0f;
+    
+    if (coactivity > pImpl->covarianceThreshold) {
+        // Competitive learning: only highest coactivity wins
+        if (coactivity > lastCoactivity * 2.0f) {
+            lastCoactivity = coactivity;
+            applySelectiveWeightChange(synapse, delta);
+        }
+    }
+    
+    // Activity-dependent scaling: stronger correlations get larger updates
     if (std::abs(delta) > 1e-6f) {
-        delta *= (1.0f - std::abs(synapse->getWeight()));
+        float activityScale = 1.0f + std::log10f(1.0f + coactivity);
+        delta *= activityScale;
+        
+        // Apply with bounds. Enhanced soft bound with activity-dependent limits
+        delta *= (1.0f - std::abs(synapse->getWeight()) * 1.5f);
         applyWeightChange(synapse, delta);
+        
+        // Maintain minimum weight to prevent complete silencing
         if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
             synapse->setWeight(-0.01f);
         } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
@@ -78,11 +108,25 @@ void Hebbian::update(Synapse* synapse,
     }
 }
 
-void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+void Hebbian::applySelectiveWeightChange(Synapse* synapse, SynapticWeight delta) {
     if (!synapse) return;
     
+    // Activity-dependent weight change with selective learning
     float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+    
+    // Apply more sophisticated bounds based on synapse type and activity
+    if (synapse->getType() == SynapseType::Excitatory) {
+        newWeight = std::clamp(newWeight, 0.0f, pImpl->maxWeight * (1.5f - synapse->getWeight()));
+        // Encourage moderate weights for better network dynamics
+        if (newWeight > 0.8f) newWeight *= 0.8f;
+    } else if (synapse->getType() == SynapseType::Inhibitory) {
+        newWeight = std::clamp(newWeight, pImpl->minWeight, 0.0f);
+        // Prevent inhibitory weights from becoming too small
+        if (newWeight > -0.02f) newWeight = -0.02f;
+    } else {
+        newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
+    }
+    
     synapse->setWeight(newWeight);
 }
 

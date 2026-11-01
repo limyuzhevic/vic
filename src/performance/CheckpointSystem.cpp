@@ -459,7 +459,46 @@ bool CheckpointManager::load(const std::string& name) {
     std::string path = (std::filesystem::path(checkpointDir_) / name).string();
     CheckpointReader reader;
     if (!reader.open(path)) return false;
-    return reader.validate();
+    
+    // Validate checkpoint contents
+    if (!reader.validate()) {
+        error_ = "checkpoint validation failed: " + reader.getError();
+        return false;
+    }
+    
+    // Set internal providers for data loading
+    neuronProvider_ = [this, &reader]() {
+        NeuronCheckpointData data;
+        if (!reader.readNeurons(data)) {
+            error_ = "failed to read neurons: " + reader.getError();
+            return false;
+        }
+        // Store for later use
+        lastNeuronData_ = data;
+        return true;
+    };
+    
+    synapseProvider_ = [this, &reader]() {
+        SynapseCheckpointData data;
+        if (!reader.readSynapses(data)) {
+            error_ = "failed to read synapses: " + reader.getError();
+            return false;
+        }
+        // Store for later use
+        lastSynapseData_ = data;
+        return true;
+    };
+    
+    // Execute the data loading providers
+    bool neuronsOK = neuronProvider_();
+    bool synapsesOK = synapseProvider_();
+    
+    if (!neuronsOK || !synapsesOK) {
+        return false;
+    }
+    
+    lastCheckpointPath_ = path;
+    return true;
 }
 
 std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoints() const {

@@ -128,28 +128,65 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
     
     agent_.lastActionTime = currentTime;
     
-    switch (cmd) {
-        case MotorCommand::MoveForward: {
-            float dx = std::cos(agent_.orientation) * moveSpeed;
-            float dy = std::sin(agent_.orientation) * moveSpeed;
-            
-            float newX = agent_.x + dx * 0.1f;
-            float newY = agent_.y + dy * 0.1f;
-            
+        switch (cmd) {
+            case MotorCommand::MoveForward: {
+                float dx = std::cos(agent_.orientation) * moveSpeed;
+                float dy = std::sin(agent_.orientation) * moveSpeed;
+                
+                float newX = agent_.x + dx * 0.1f;
+                float newY = agent_.y + dy * 0.1f;
             if (isValidPosition(newX, newY)) {
-                agent_.x = newX;
-                agent_.y = newY;
-                agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
-                result.success = true;
-            } else {
-                result.reward = -0.05f;  // Cost for hitting wall
-                result.success = false;
+                    agent_.x = newX;
+                    agent_.y = newY;
+                    agent_.isMoving = true;
+                    
+                    // Calculate proximity rewards/penalties
+                    float energyProximity = std::abs(newX - agent_.x) * std::cos(agent_.orientation) +
+                                           std::abs(newY - agent_.y) * std::sin(agent_.orientation);
+                    energyProximity = std::max(0.0f, std::min(1.0f, (energyProximity + 1.0f) / 2.0f));
+                    
+                    result.reward = 0.1f;  // Base movement reward for forward progress
+                    result.reward += energyProximity * 0.3f;  // Bonus for forward motion
+                    
+                    // Check for hazard proximity to encourage avoidance
+                    float minHazardDist = std::numeric_limits<float>::max();
+                    float minResourceDist = std::numeric_limits<float>::max();
+                    for (const auto& obj : objects_) {
+                        if (!obj.active) continue;
+                        float dist = std::sqrt((obj.x - newX) * (obj.x - newX) + (obj.y - newY) * (obj.y - newY));
+                        if (obj.type == WorldObjectType::Hazard && dist < minHazardDist) {
+                            minHazardDist = dist;
+                        } else if (obj.type == WorldObjectType::Resource && dist < minResourceDist) {
+                            minResourceDist = dist;
+                        }
+                    }
+                    
+                    if (minHazardDist < 1.5f) {
+                        result.reward -= 0.5f;  // Penalty for being near hazard
+                    } else if (minHazardDist < 3.0f) {
+                        result.reward -= 0.2f;  // Mild penalty for hazard proximity
+                    }
+                    
+                    if (minResourceDist < 1.0f && minResourceDist > 0.0f) {
+                        result.reward += 0.5f;  // Reward for approaching resource
+                    }
+                    
+                    // Health maintenance bonus
+                    if (agent_.health >= 1.0f) {
+                        result.reward += 0.1f;  // Bonus for being healthy
+                    } else if (agent_.health < 0.5f) {
+                        result.reward -= 0.2f;  // Penalty for low health
+                    }
+                    
+                    result.success = true;
+                } else {
+                    result.reward = -0.5f;  // Cost for hitting wall
+                    result.success = false;
+                }
+                break;
             }
-            break;
-        }
         
-        case MotorCommand::MoveBackward: {
+        case MotorCommand::MoveBackward:
             float dx = -std::cos(agent_.orientation) * moveSpeed * 0.5f;
             float dy = -std::sin(agent_.orientation) * moveSpeed * 0.5f;
             
@@ -160,26 +197,26 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.02f;
+                // Backward movement can be useful for repositioning
+                result.reward = -0.1f;  // Higher cost for backward movement
                 result.success = true;
             } else {
-                result.reward = -0.05f;
+                result.reward = -0.5f;  // High cost for hitting wall while moving backward
                 result.success = false;
             }
             break;
-        }
         
         case MotorCommand::TurnLeft:
             agent_.angularVelocity = -turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -0.005f;  // Small cost for turning
             result.success = true;
             break;
             
         case MotorCommand::TurnRight:
             agent_.angularVelocity = turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -0.005f;  // Small cost for turning
             result.success = true;
             break;
             
@@ -252,6 +289,20 @@ ActionResult SimpleWorld::interact() {
     if (!result.success) {
         result.message = "no_object";
     }
+    
+    // Health-based reward to encourage survival
+    if (agent_.health >= 1.0f) {
+        result.reward += 0.3f;  // Bonus for being healthy
+    } else if (agent_.health < 0.5f) {
+        result.reward -= 0.5f;  // Penalty for low health
+    }
+    
+    // Age-based reward to encourage learning and adaptation
+    if (agent_.age < 100.0f) {
+        result.reward += 0.05f;  // Younger agents get exploration bonus
+    } else if (agent_.age < 300.0f) {
+        result.reward += 0.02f;  // Mid-age agents
+    } // Older agents don't get extra reward
     
     return result;
 }
