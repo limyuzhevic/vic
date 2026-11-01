@@ -56,30 +56,58 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/INI format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file with improved formatting
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    // Get values
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
 
-    // Set values
+    // Set values - convenience overloads with default Runtime source
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
-    
+
+    // Enhanced API for better usability
+    // Convenience methods with specific type conversions
+    void set(const std::string& key, float value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, uint64_t value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<int>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<double>& value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<std::string>& value, ConfigSource source = ConfigSource::Runtime);
+
+    // Configuration validation
+    bool validate(const std::string& key) const;
+    bool validateAll() const;
+    std::vector<std::string> getValidationErrors() const;
+
+    // Configuration export/import
+    std::string exportToJSON() const;
+    bool importFromJSON(const std::string& jsonStr);
+    std::string exportToINI() const;
+    bool importFromINI(const std::string& iniStr);
+
+    // Configuration comparison and merging
+    bool hasSameValues(const Config& other) const;
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+
+    // Configuration statistics and debugging
+    size_t getEntryCount() const;
+    std::vector<std::string> getKeys() const;
+    std::vector<ConfigSource> getSources(const std::string& key) const;
+
     // Check existence
     bool has(const std::string& key) const;
     
@@ -103,5 +131,23 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
+
+// Explicit template instantiations for all supported types
+// This ensures the templates are available when Config.hpp is included
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
+template std::optional<float> Config::get<float>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
+template float Config::getOr<float>(const std::string&, const float&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm

@@ -1,0 +1,292 @@
+{
+    "config_name": "Phase 6 Integration - Advanced Brain Configuration",
+    "version": "6.0.0",
+    "description": "Complete NLM brain configuration with all Phase 6 features",
+
+    "basic": {
+        "random_seed": 12345,
+        "simulation_timestep": 0.001,
+        "neuron_count": 2000,
+        "region_count": 2,
+        "connection_probability": 0.15
+    },
+
+    "plasticity": {
+        "stdp": {
+            "ltp_weight": 0.025,
+            "ltd_weight": 0.02,
+            "tau": 25.0,
+            "learning_rate": 0.8
+        },
+        "hebbian": {
+            "learning_rate": 0.5,
+            "weight_normalization": true
+        },
+        "structural": {
+            "synaptogenesis_rate": 0.00015,
+            "pruning_rate": 0.00002,
+            "max_synapses_per_neuron": 100,
+            "min_weight": 0.001
+        }
+    },
+
+    "neuromodulation": {
+        "dopamine": {
+            "initial_level": 0.6,
+            "plasticity_factor": 1.2,
+            "excitability_multiplier": 1.5
+        },
+        "curiosity": {
+            "initial_level": 0.4,
+            "exploration_bonus": 0.3,
+            "novelty_sensitivity": 0.8
+        },
+        "novelty": {
+            "detection_threshold": 0.6,
+            "adaptation_rate": 0.9,
+            "learning_boost": 1.1
+        },
+        "prediction_error": {
+            "initial_error": 0.0,
+            "error_decay": 0.95,
+            "learning_correction": 0.7
+        }
+    },
+
+    "memory": {
+        "working_memory": {
+            "capacity": 150,
+            "decay_rate": 0.9,
+            "replay_interval": 50,
+            "competition_strength": 1.2
+        },
+        "episodic_memory": {
+            "max_episodes": 3000,
+            "storage_window": 100,
+            "consolidation_threshold": 0.7,
+            "replay_frequency": 0.3
+        },
+        "associative_memory": {
+            "pattern_threshold": 0.8,
+            "association_strength": 1.0,
+            "retrieval_confidence": 0.9
+        }
+    },
+
+    "development": {
+        "stages": {
+            "initial": {
+                "plasticity_mod": 1.0,
+                "excitability": 1.0,
+                "structural_rate": 1.0
+            },
+            "critical_period": {
+                "plasticity_mod": 0.8,
+                "excitability": 1.2,
+                "structural_rate": 0.9
+            },
+            "maturation": {
+                "plasticity_mod": 0.5,
+                "excitability": 1.5,
+                "structural_rate": 0.7
+            },
+            "adult": {
+                "plasticity_mod": 0.2,
+                "excitability": 1.8,
+                "structural_rate": 0.3
+            }
+        },
+        "progression_rate": {
+            "stage_duration": [100, 200, 300, 400],
+            "plasticity_decay": 0.99
+        }
+    },
+
+    "cognition": {
+        "neural_planner": {
+            "planning_depth": 8,
+            "lookahead_steps": 5,
+            "action_evaluation": "confidence_based",
+            "reward_prediction": true
+        },
+        "concept_formation": {
+            "threshold": 0.65,
+            "min_patterns": 10,
+            "abstraction_level": "medium",
+            "concept_lifespan": 1000
+        },
+        "attention": {
+            "inhibition_strength": 0.6,
+            "excitation_strength": 1.8,
+            "focus_duration": 20,
+            "shift_speed": 0.8
+        }
+    },
+
+    "prediction": {
+        "prediction_system": {
+            "update_rate": 0.15,
+            "accuracy_threshold": 0.85,
+            "confidence_threshold": 0.7,
+            "prediction_window": 10
+        },
+        "neural_prediction": {
+            "prediction_depth": 6,
+            "prediction_error_weight": 0.4,
+            "pattern_memory": true,
+            "temporal_decay": 0.98
+        }
+    },
+
+    "environment": {
+        "world_simulation": {
+            "width": 200,
+            "height": 150,
+            "time_step": 0.001,
+            "complexity": "medium"
+        },
+        "sensory_processing": {
+            "vision_range": 15,
+            "audio_range": 12,
+            "sensory_resolution": 0.8,
+            "sensory_noise": 0.05
+        },
+        "motor_output": {
+            "action_space": "continuous",
+            "precision": 0.01,
+            "response_delay": 2,
+            "action_decay": 0.9
+        }
+    },
+
+    "checkpointing": {
+        "checkpoint_system": {
+            "enabled": true,
+            "directory": "./checkpoints",
+            "interval": 1000,
+            "max_checkpoints": 20,
+            "compression": "balanced"
+        },
+        "persistence": {
+            "save_frequency": "per_1000",
+            "load_automatically": true,
+            "backup_on_error": true,
+            "validation_enabled": true
+        }
+    },
+
+    "performance": {
+        "optimization": {
+            "enable_simd": true,
+            "enable_parallel": true,
+            "memory_pools": {
+                "neuron_pool": 5000,
+                "synapse_pool": 20000,
+                "event_queue": 10000
+            },
+            "caching": {
+                "enable_spike_cache": true,
+                "cache_size": 1000,
+                "cache_ttl": 100
+            }
+        },
+        "monitoring": {
+            "enable_metrics": true,
+            "metrics_interval": 100,
+            "performance_thresholds": {
+                "max_memory_usage_mb": 2000,
+                "max_cpu_usage_percent": 80,
+                "min_fps": 30
+            }
+        }
+    },
+
+    "logging": {
+        "console": {
+            "enabled": true,
+            "level": "info",
+            "format": "detailed",
+            "colors": true,
+            "timestamps": true
+        },
+        "file": {
+            "enabled": true,
+            "level": "debug",
+            "path": "nlm_debug.log",
+            "max_size_mb": 500,
+            "rotation_count": 5,
+            "buffer_size": 8192
+        },
+        "structured": {
+            "enabled": false,
+            "format": "json",
+            "include_stack_trace": true,
+            "include_performance_data": true
+        }
+    },
+
+    "experimentation": {
+        "batch_processing": {
+            "enabled": true,
+            "batch_size": 10,
+            "parallel_execution": true,
+            "result_format": "json"
+        },
+        "ablation_studies": {
+            "enabled": false,
+            "ablate_memory": false,
+            "ablate_neuromodulation": false,
+            "ablate_plasticity": false,
+            "ablate_cognition": false
+        },
+        "parameter_sweeps": {
+            "enabled": true,
+            "sweep_parameters": ["neuron_count", "connection_probability", "plasticity_mod"],
+            "sweep_values": {
+                "neuron_count": [500, 1000, 2000],
+                "connection_probability": [0.05, 0.1, 0.2],
+                "plasticity_mod": [0.5, 1.0, 2.0]
+            }
+        }
+    },
+
+    "advanced": {
+        "environment_variables": {
+            "enable": false,
+            "variables": ["NLM_LOG_LEVEL", "NLM_CHECKPOINT_DIR", "NLM_SIMULATION_SPEED"]
+        },
+        "dynamic_reloading": {
+            "enable": false,
+            "check_interval": 60,
+            "auto_backup": true
+        },
+        "validation": {
+            "schema_file": "nlm_config_schema.json",
+            "validate_on_load": true,
+            "strict_validation": false
+        },
+        "history": {
+            "enable": true,
+            "max_history_entries": 1000,
+            "backup_frequency": "daily"
+        }
+    }
+}
+
+# Notes:
+# This JSON configuration demonstrates:
+# 1. Nested configuration structure for better organization
+# 2. Type-specific values (numbers, booleans, arrays)
+# 3. Human-readable comments and descriptions
+# 4. Validation through schema (planned feature)
+# 5. Support for future configuration features
+
+# JSON vs INI comparison:
+# JSON:  - Hierarchical structure - Type-aware (bool, number, string) - Easier to parse programmatically
+# INI:  - Flat key-value pairs - Type-agnostic (all strings) - Easier to edit manually
+
+# Configuration validation rules (planned for future):
+# - Required keys: basic.random_seed, basic.neuron_count, basic.simulation_timestep
+# - Range validation: neuron_count > 0, timestep > 0
+# - Type validation: specific types for specific keys
+# - Logical validation: correlations between different configuration sections

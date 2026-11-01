@@ -1,0 +1,259 @@
+# NLM Configuration File - YAML Format
+# This configuration uses YAML syntax for better readability and nesting
+# Note: NLM currently implements INI-style format with basic JSON support
+# YAML support is planned for Phase 7
+
+# Configuration metadata
+name: "Phase 6 Integration Configuration"
+version: "6.0.0"
+description: "Complete NLM brain with all integrated systems"
+author: "NLM Research Team"
+date: "2026-11-01"
+
+# Basic brain configuration
+basic:
+  random_seed: 42
+  simulation_timestep: 0.001
+  neuron_count: 1000
+  region_count: 1
+  connection_probability: 0.1
+
+# Neural dynamics (Phase 2)
+neural_dynamics:
+  neuron_model: "LIF"
+  leak_conductance: 10.0
+  threshold: -55.0
+  reset_potential: -70.0
+  refractory_period: 9
+  max_spike_history: 100
+
+# Plasticity rules (Phase 2)
+plasticity:
+  stdp:
+    ltp_weight: 0.02
+    ltd_weight: 0.015
+    tau: 20.0
+    learning_rate: 0.8
+  hebbian:
+    learning_rate: 0.5
+    weight_normalization: true
+  structural:
+    synaptogenesis_rate: 0.0001
+    pruning_rate: 0.00001
+    max_synapses_per_neuron: 50
+
+# Neuromodulation (Phase 6)
+neuromodulation:
+  dopamine:
+    initial_level: 0.5
+    plasticity_factor: 1.0
+    excitability_multiplier: 1.0
+  curiosity:
+    initial_level: 0.3
+    exploration_bonus: 0.2
+    novelty_sensitivity: 0.7
+  novelty:
+    detection_threshold: 0.6
+    adaptation_rate: 0.9
+    learning_boost: 1.0
+  prediction_error:
+    initial_error: 0.0
+    error_decay: 0.95
+    learning_correction: 0.7
+
+# Memory systems (Phase 6)
+memory:
+  working_memory:
+    capacity: 100
+    decay_rate: 0.9
+    replay_interval: 100
+    competition_strength: 1.0
+  episodic_memory:
+    max_episodes: 1000
+    storage_window: 50
+    consolidation_threshold: 0.7
+    replay_frequency: 0.2
+  associative_memory:
+    pattern_threshold: 0.8
+    association_strength: 1.0
+    retrieval_confidence: 0.9
+
+# Development system (Phase 6)
+development:
+  stage: "Initial"
+  plasticity_mod: 1.0
+  excitability: 1.0
+  structural_rate: 1.0
+  # Developmental stage progression
+  stages:
+     initial:
+       duration: 100
+       plasticity_mod: 1.0
+       excitability: 1.0
+     critical_period:
+       duration: 200
+       plasticity_mod: 0.8
+       excitability: 1.2
+     maturation:
+       duration: 300
+       plasticity_mod: 0.5
+       excitability: 1.5
+     adult:
+       duration: 400
+       plasticity_mod: 0.2
+       excitability: 1.8
+
+# Cognition systems (Phase 6)
+cognition:
+  neural_planner:
+    planning_depth: 5
+    lookahead_steps: 3
+    action_evaluation: "confidence_based"
+    reward_prediction: true
+  concept_formation:
+    threshold: 0.7
+    min_patterns: 5
+    abstraction_level: "medium"
+  attentional_selection:
+    inhibition_strength: 0.5
+    excitation_strength: 1.5
+    focus_duration: 20
+
+# Prediction system (Phase 6)
+prediction:
+  system:
+    update_rate: 0.1
+    accuracy_threshold: 0.8
+    confidence_threshold: 0.7
+    prediction_window: 5
+  neural_prediction:
+    prediction_depth: 3
+    prediction_error_weight: 0.4
+    pattern_memory: true
+
+# Environment interface
+environment:
+  world:
+    width: 100
+    height: 100
+    time_step: 0.001
+  sensory:
+    vision_range: 10
+    audio_range: 8
+    sensory_resolution: 0.8
+  motor:
+    action_space: "continuous"
+    precision: 0.01
+    response_delay: 2
+
+# Checkpoint and persistence
+checkpoint:
+  directory: "./checkpoints"
+  interval: 1000
+  max_checkpoints: 10
+  compression: "balanced"
+
+# Performance optimizations
+performance:
+  optimizations:
+    enable_simd: true
+    enable_parallel: false
+    memory_pools:
+      neuron_pool: 2000
+      synapse_pool: 10000
+      event_queue: 5000
+  monitoring:
+    enable_metrics: true
+    metrics_interval: 100
+
+# Logging configuration
+logging:
+  console:
+    enabled: true
+    level: "info"
+    format: "detailed"
+    colors: true
+    timestamps: true
+  file:
+    enabled: true
+    level: "debug"
+    path: "nlm.log"
+    max_size_mb: 100
+    rotation_count: 5
+
+# Batch processing
+batch_processing:
+  enabled: false
+  batch_size: 10
+  parallel_execution: true
+
+# Advanced features (planned for Phase 7)
+advanced:
+  environment_variables: false
+  dynamic_reloading: false
+  validation: false
+  history: false
+
+# Configuration templates
+# These are commented out examples that can be uncommented and modified
+
+# Template 1: Fast simulation
+template_fast_simulation:
+  # Uncomment and modify for fast testing
+  basic:
+    neuron_count: 500
+    connection_probability: 0.05
+    enable_performance_optimizations: true
+
+# Template 2: Memory intensive
+template_memory_intensive:
+  # Uncomment and modify for memory research
+  memory:
+    working_memory:
+      capacity: 500
+    episodic_memory:
+      max_episodes: 5000
+      storage_window: 200
+  checkpoint:
+    interval: 100
+
+# Template 3: High plasticity
+template_high_plasticity:
+  # Uncomment and modify for plasticity research
+  development:
+    stages:
+      initial:
+        plasticity_mod: 1.5
+        excitability: 0.8
+      adult:
+        plasticity_mod: 0.1
+        excitability: 1.2
+  plasticity:
+    structural:
+      synaptogenesis_rate: 0.001
+      pruning_rate: 0.0001
+
+# Configuration file notes
+# This file demonstrates YAML syntax but NLM currently uses INI format
+# YAML support is planned for future versions
+# The equivalent INI format would have flat key-value pairs
+
+# Configuration validation (planned)
+# This file can be validated against configuration schemas
+# Validation rules ensure:
+# - Required keys are present
+# - Value types are correct
+# - Values are within valid ranges
+# - Logical consistency between sections
+
+# Configuration inheritance (planned)
+# Future versions will support:
+# - include: "base_config.yml"
+# - extend: adding to existing configuration
+# - override: replacing specific values
+
+# Configuration history (planned)
+# Future versions will track configuration changes:
+# - backup_frequency: "daily"
+# - max_history_entries: 1000
+# - keep_old_configs: true

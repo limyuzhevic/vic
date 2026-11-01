@@ -78,19 +78,55 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+// Save to file - with improved error handling and formatting
+    bool saveToFile(const std::string& filepath) const {
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
+            return false;
+        }
+        
+        // Write configuration in INI-like format for readability
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            
+            // Format based on value type
+            std::visit([&](const auto& val) {
+                using T = std::decay_t<decltype(val)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << entry.key << " = \"" << val << "\"\n";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << entry.key << " = " << (val ? "true" : "false") << "\n";
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    file << entry.key << " = [";
+                    for (size_t i = 0; i < val.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << val[i];
+                    }
+                    file << "]\n";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    file << entry.key << " = [";
+                    for (size_t i = 0; i < val.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << val[i];
+                    }
+                    file << "]\n";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    file << entry.key << " = [";
+                    for (size_t i = 0; i < val.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        file << "\"" << val[i] << "\"";
+                    }
+                    file << "]\n";
+                } else {
+                    file << entry.key << " = " << val << "\n";
+                }
+            }, entry.value);
+        }
+        
+        file << "\n"; // Add blank line at end
+        return true;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
-}
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
@@ -217,22 +253,388 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+    for (const auto& entry : pImpl->entries) {
+        oss << "  " << entry.key << " = [";
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) oss << ", ";
+                    oss << arg[i];
+                }
+                oss << "]";
+            } else {
+                oss << arg;
+            }
+        }, entry.value);
+        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+    }
+    return oss.str();
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Helper function to parse simple values from strings
+static ConfigValue parseValue(const std::string& str) {
+    // Try different types
+    try {
+        if (str.size() >= 2 && str.front() == '"' && str.back() == '"') {
+            return str.substr(1, str.size() - 2); // String with quotes
+        }
+        if (str == "true") {
+            return true;
+        }
+        if (str == "false") {
+            return false;
+        }
+        if (str.find('.') != std::string::npos) {
+            return std::stod(str);
+        }
+        try {
+            return std::stoll(str);
+        } catch (...) {
+            // If too large for int64_t, treat as double
+            return std::stod(str);
+        }
+    } catch (...) {
+        return str; // Return as string if all parsing fails
+    }
+}
+
+// Helper function to generate JSON from config entries
+static std::string configToJSON(const std::vector<ConfigEntry>& entries) {
+    std::ostringstream oss;
+    oss << "{\n";
+    for (size_t i = 0; i < entries.size(); ++i) {
+        const auto& entry = entries[i];
+        oss << "  \"" << entry.key << "\": ";
+        
+        std::visit([&oss](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << val << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << (val ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << "[";
+                for (size_t j = 0; j < val.size(); ++j) {
+                    if (j > 0) oss << ", ";
+                    oss << val[j];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << "[";
+                for (size_t j = 0; j < val.size(); ++j) {
+                    if (j > 0) oss << ", ";
+                    oss << val[j];
+                }
+                oss << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t j = 0; j < val.size(); ++j) {
+                    if (j > 0) oss << ", ";
+                    oss << "\"" << val[j] << "\"";
+                }
+                oss << "]";
+            } else {
+                oss << val;
+            }
+        }, entry.value);
+        
+        if (i < entries.size() - 1) {
+            oss << ",";
+        }
+        oss << "\n";
+    }
+    oss << "}\n";
+    return oss.str();
+}
+
+// Helper function to generate INI format from config entries
+static std::string configToINI(const std::vector<ConfigEntry>& entries) {
+    std::ostringstream oss;
+    for (const auto& entry : entries) {
+        oss << "# " << entry.description << "\n";
+        
+        std::visit([&oss](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << entry.key << " = \"" << val << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                oss << entry.key << " = " << (val ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                oss << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << val[i];
+                }
+                oss << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                oss << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << val[i];
+                }
+                oss << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                oss << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << "\"" << val[i] << "\"";
+                }
+                oss << "]\n";
+            } else {
+                oss << entry.key << " = " << val << "\n";
+            }
+        }, entry.value);
+        oss << "\n";
+    }
+    return oss.str();
+}
+
+// Configuration validation
+bool Config::validate(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    if (it == pImpl->entries.end()) {
+        return false; // Key doesn't exist
+    }
+    
+    // Basic validation based on key patterns and value types
+    // This can be extended with more specific validation rules
+    return true;
+}
+
+bool Config::validateAll() const {
+    for (const auto& entry : pImpl->entries) {
+        if (!validate(entry.key)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    // Check for required keys (can be extended)
+    const std::vector<std::string> requiredKeys = {
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count"
+    };
+    
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            errors.push_back("Missing required configuration key: " + key);
+        }
+    }
+    
+    // Check for valid ranges (can be extended)
+    auto neuronCount = getOr<int64_t>("neuron_count", 0);
+    if (neuronCount <= 0) {
+        errors.push_back("neuron_count must be positive");
+    }
+    
+    auto timestep = getOr<double>("simulation_timestep", 0.0);
+    if (timestep <= 0.0 || timestep > 1.0) {
+        errors.push_back("simulation_timestep must be between 0 and 1.0 seconds");
+    }
+    
+    return errors;
+}
+
+// Configuration export/import
+std::string Config::exportToJSON() const {
+    return configToJSON(pImpl->entries);
+}
+
+bool Config::importFromJSON(const std::string& jsonStr) {
+    // Simple JSON parser implementation
+    // This is a basic implementation; a real JSON parser would be more robust
+    clear();
+    
+    try {
+        // Remove braces and whitespace
+        std::string content = jsonStr;
+        content.erase(std::remove(content.begin(), content.end(), '{'), content.end());
+        content.erase(std::remove(content.begin(), content.end(), '}'), content.end());
+        content.erase(std::remove(content.begin(), content.end(), '\n'), content.end());
+        content.erase(std::remove(content.begin(), content.end(), '\r'), content.end());
+        content.erase(std::remove(content.begin(), content.end(), ' '), content.end());
+        
+        // Simple key-value parsing (expects "key": value format)
+        size_t pos = 0;
+        while (pos < content.size()) {
+            // Find key (up to " : ")
+            size_t keyEnd = content.find('"', pos);
+            if (keyEnd == std::string::npos) break;
+            
+            size_t keyStart = pos;
+            size_t colonPos = content.find('":', keyEnd);
+            if (colonPos == std::string::npos) break;
+            
+            std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+            
+            // Parse value
+            size_t valuePos = colonPos + 2;
+            if (valuePos >= content.size()) break;
+            
+            // Find end of value (next , or })
+            size_t valueEnd = content.find(',', valuePos);
+            if (valueEnd == std::string::npos) {
+                valueEnd = content.find('}', valuePos);
+            }
+            
+            if (valueEnd == std::string::npos) break;
+            
+            std::string valueStr = content.substr(valuePos, valueEnd - valuePos);
+            
+            // Parse value string
+            ConfigValue value = parseValue(valueStr);
+            
+            // Add to config
+            set(key, value, ConfigSource::File);
+            
+            pos = valueEnd + 1;
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON: " + std::string(e.what()));
+        return false;
+    }
+}
+
+std::string Config::exportToINI() const {
+    return configToINI(pImpl->entries);
+}
+
+bool Config::importFromINI(const std::string& iniStr) {
+    // Parse INI-style format
+    clear();
+    
+    try {
+        std::istringstream stream(iniStr);
+        std::string line;
+        std::string currentDescription;
+        
+        while (std::getline(stream, line)) {
+            line = trim(line);
+            if (line.empty()) continue;
+            
+            // Comment line - store as description for next entry
+            if (line[0] == '#' || line[0] == '/') {
+                currentDescription = line.substr(1);
+                trim(currentDescription);
+                continue;
+            }
+            
+            // Parse key = value
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove surrounding quotes
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to parse value as different types
+                ConfigValue parsedValue = parseValue(value);
+                
+                set(key, parsedValue, ConfigSource::File);
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing INI: " + std::string(e.what()));
+        return false;
+    }
+}
+
+// Configuration comparison and merging
+bool Config::hasSameValues(const Config& other) const {
+    if (pImpl->entries.size() != other.pImpl->entries.size()) {
+        return false;
+    }
+    
+    // Compare entries
+    for (const auto& entry : pImpl->entries) {
+        auto it = std::find_if(other.pImpl->entries.begin(), other.pImpl->entries.end(),
+            [&entry](const ConfigEntry& otherEntry) { return otherEntry.key == entry.key; });
+        
+        if (it == other.pImpl->entries.end()) {
+            return false;
+        }
+        
+        // Compare values (simplified comparison)
+        if (entry.value != it->value) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+void Config::merge(const Config& other, ConfigSource source) {
+    for (const auto& entry : other.pImpl->entries) {
+        // Use the source from the other config unless explicitly overridden
+        ConfigSource entrySource = (source == ConfigSource::Runtime) ? entry.source : source;
+        set(entry.key, entry.value, entrySource);
+    }
+}
+
+// Enhanced API methods
+void Config::set(const std::string& key, float value, ConfigSource source) {
+    set(key, static_cast<double>(value), source);
+}
+
+void Config::set(const std::string& key, uint64_t value, ConfigSource source) {
+    set(key, static_cast<int64_t>(value), source);
+}
+
+void Config::set(const std::string& key, const std::vector<int>& value, ConfigSource source) {
+    set(key, value, source);
+}
+
+void Config::set(const std::string& key, const std::vector<double>& value, ConfigSource source) {
+    set(key, value, source);
+}
+
+void Config::set(const std::string& key, const std::vector<std::string>& value, ConfigSource source) {
+    set(key, value, source);
+}
+
+// Configuration statistics and debugging
+ size_t Config::getEntryCount() const {
+    return pImpl->entries.size();
+}
+
+std::vector<std::string> Config::getKeys() const {
+    std::vector<std::string> keys;
+    keys.reserve(pImpl->entries.size());
+    for (const auto& entry : pImpl->entries) {
+        keys.push_back(entry.key);
+    }
+    return keys;
+}
+
+std::vector<ConfigSource> Config::getSources(const std::string& key) const {
+    std::vector<ConfigSource> sources;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key == key) {
+            sources.push_back(entry.source);
+        }
+    }
+    return sources;
+}
 
 } // namespace nlm
