@@ -92,7 +92,8 @@ MembranePotential Neuron::getLeakConductance() const {
 }
 
 void Neuron::setRefractoryPeriod(uint32_t steps) {
-    pImpl->state.refractoryPeriod = steps;
+    // Ensure biologically plausible refractory period
+    pImpl->state.refractoryPeriod = std::clamp(steps, uint32_t(1), uint32_t(50));
 }
 
 uint32_t Neuron::getRefractoryPeriod() const {
@@ -100,7 +101,12 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
+    // Clamp to biologically plausible range
+    pImpl->state.restingPotential = std::clamp(potential, -90.0f, -50.0f);
+    // Ensure threshold is always above resting potential
+    if (pImpl->state.threshold < pImpl->state.restingPotential) {
+        pImpl->state.threshold = pImpl->state.restingPotential + 15.0f;
+    }
 }
 
 MembranePotential Neuron::getRestingPotential() const {
@@ -108,7 +114,13 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
+    // Clamp to biologically plausible range and ensure it's close to resting
+    pImpl->state.resetPotential = std::clamp(potential, -85.0f, -55.0f);
+    // Reset potential should not be too far from resting potential
+    float diff = std::abs(pImpl->state.resetPotential - pImpl->state.restingPotential);
+    if (diff > 20.0f) {
+        pImpl->state.resetPotential = pImpl->state.restingPotential + 10.0f * (diff / 20.0f - 1.0f);
+    }
 }
 
 bool Neuron::checkThreshold() const {
@@ -237,11 +249,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Update the firing-rate metric from counted spikes, in Hz.
     // Previously setFiringRate() was never called anywhere, so
     // getAverageFiringRate() summed zeros even with thousands of spikes.
-    // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
-    // dt is in seconds (0.001 in the demos), so a neuron firing every
-    // step would approach 1000 Hz, and refractory periods cap it well
-    // below that in practice.
-    if (dt > 0.0) {
+    // Fixed: Only decay firing rate when neuron is not firing this step.
+    // Refractory period neurons keep their firing rate (not decaying).
+    // Only apply decay when neuron is resting and not firing this step.
+    if (dt > 0.0 && pImpl->state.firingState == FiringState::Resting) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
 
@@ -304,6 +315,22 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     
     // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(uint32_t(2), uint32_t(10)));
+    
+    // Clamp parameters to biologically plausible ranges
+    pImpl->state.threshold = std::clamp(pImpl->state.threshold, -80.0f, -40.0f);
+    pImpl->state.restingPotential = std::clamp(pImpl->state.restingPotential, -85.0f, -60.0f);
+    pImpl->state.resetPotential = std::clamp(pImpl->state.resetPotential, -85.0f, -55.0f);
+    
+    // Ensure threshold is above resting potential
+    if (pImpl->state.threshold < pImpl->state.restingPotential) {
+        pImpl->state.threshold = pImpl->state.restingPotential + 15.0f;
+    }
+    
+    // Ensure reset potential is close to resting
+    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 10.0f);
+    
+    // Refractory period also clamped to reasonable range
+    pImpl->state.refractoryPeriod = std::clamp(pImpl->state.refractoryPeriod, uint32_t(1), uint32_t(20));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
