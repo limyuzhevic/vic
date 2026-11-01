@@ -201,13 +201,131 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Set up quick build shortcuts
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+# Quick build target (Release)
+add_custom_target(quick
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Release ..
+    COMMAND make -j${nproc}
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Quick build (Release configuration)"
+    VERBATIM
+)
+
+# Debug build target with development mode
+add_custom_target(debug
+    COMMAND ${CMAKE_COMMAND} -DCMAKE_BUILD_TYPE=Debug -DNLM_DEVELOPMENT_MODE=ON ..
+    COMMAND make -j${nproc}
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Debug build with development mode"
+    VERBATIM
+)
+
+# Test build target
+add_custom_target(test
+    COMMAND ctest --output-on-failure
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Run all tests"
+)
+
+# Python bindings build target
+add_custom_target(python
+    COMMAND ${CMAKE_COMMAND} -DNLM_BUILD_PYTHON_BINDINGS=ON ..
+    COMMAND make -j${nproc}
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Build Python bindings"
+    VERBATIM
+)
+
+# Install target with improved error handling
+add_custom_target(install-enhanced
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target install
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Install NLM to system directories"
+)
+
+# Clean build targets
+add_custom_target(clean-all
+    COMMAND rm -rf ${CMAKE_BINARY_DIR}
+    COMMENT "Remove entire build directory"
+    VERBATIM
+)
+
+add_custom_target(clean-lib
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/libnlm_core.a
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/libnlm_agent.a
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/libnlm_world.a
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/libnlm_phase3.a
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/libnlm_phase4.a
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/libnlm_phase5.a
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/libnlm_phase6.a
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/libnlm_phase6text.a
+    COMMENT "Remove static libraries"
+)
+
+add_custom_target(clean-bin
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/nlm
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/nlm_benchmark
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/nlm_phase3_demo
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/nlm_phase4_demo
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/nlm_phase5_demo
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/nlm_phase6_demo
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/nlm_phase6_text_demo
+    COMMENT "Remove executables"
+)
+
+add_custom_target(clean-python
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/pynlm*.so
+    COMMAND rm -f ${CMAKE_BINARY_DIR}/pynlm*.pyd
+    COMMENT "Remove Python module"
+)
+
+# Phase-specific build targets
+foreach(PHASE in 3 4 5 6 6_text)
+    add_custom_target(build-phase${PHASE}
+        COMMAND ${CMAKE_COMMAND} -Dphase=${PHASE} ..
+        COMMAND make nlm_phase${PHASE}_demo
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Build Phase ${PHASE} demo"
+        VERBATIM
+    )
+endforeach()
+
+# Help target showing available targets
+add_custom_target(help
+    COMMAND echo "========================================"
+    COMMAND echo "Available NLM Build Targets:"
+    COMMAND echo "========================================"
+    COMMAND echo "  make                    - Standard build"
+    COMMAND echo "  make debug              - Debug build with development mode"
+    COMMAND echo "  make quick              - Quick Release build"
+    COMMAND echo "  make python             - Build Python bindings"
+    COMMAND echo "  make test               - Run all tests"
+    COMMAND echo "  make install            - Install NLM to system"
+    COMMAND echo "  make install-enhanced    - Enhanced installation"
+    COMMAND echo "  make clean              - Remove build artifacts"
+    COMMAND echo "  make clean-all          - Remove entire build directory"
+    COMMAND echo ""
+    COMMAND echo "========================================"
+    COMMAND echo "Phase-specific targets:"
+    COMMAND echo "========================================"
+    COMMAND echo "  make build-phase3      - Build Phase 3 demo"
+    COMMAND echo "  make build-phase4      - Build Phase 4 demo"
+    COMMAND echo "  make build-phase5      - Build Phase 5 demo"
+    COMMAND echo "  make build-phase6      - Build Phase 6 demo"
+    COMMAND echo "  make build-phase6text  - Build Phase 6 text demo"
+    COMMAND echo "========================================"
+    COMMENT "Show help information"
+)
+
+# Update the install targets to be more robust
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark nlm_phase6_text_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Install Python module
+if(NLM_BUILD_PYTHON_BINDINGS)
+    install(TARGETS pynlm LIBRARY DESTINATION .)
+endif()
