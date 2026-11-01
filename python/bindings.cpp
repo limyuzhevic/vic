@@ -424,10 +424,163 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                              std::shared_ptr<AgentBrain> agent, size_t numSteps) {
+        for (size_t i = 0; i < numSteps; ++i) {
+            world->update(0.1);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(static_cast<nlm::SimulationStep>(i));
+            world->applyMotorCommand(agent->decodeMotorCommand(),
+                                     world->getSimulationTime());
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       "Run a complete agent simulation loop");
+
+    m.def("runSimulationWithLearning", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                         std::shared_ptr<AgentBrain> agent, size_t numSteps) {
+        // Enable learning features
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        for (size_t i = 0; i < numSteps; ++i) {
+            world->update(0.1);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(static_cast<nlm::SimulationStep>(i));
+            world->applyMotorCommand(agent->decodeMotorCommand(),
+                                     world->getSimulationTime());
+            
+            // Apply reward and update development
+            float reward = 0.0f;
+            auto percept = world->getSensoryPercept();
+            auto internal = percept->getInternal();
+            if (!internal->empty()) {
+                reward = internal->front();
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+            agent->updateDevelopment(0.1);
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+       "Run a complete learning simulation with all enabled features");
+
+    m.def("createCompleteAgentSystem", [](size_t neuronCount = 1000, size_t regionCount = 2) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), nlm::ConfigSource::Runtime);
+        config->set("region_count", static_cast<int64_t>(regionCount), nlm::ConfigSource::Runtime);
+        config->set("connection_probability", 0.05, nlm::ConfigSource::Runtime);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10.0, 10.0);
+        
+        agent->initialize(*world);
+        
+        return std::make_tuple(brain, agent, world);
+    }, py::arg("neuronCount") = 1000, py::arg("regionCount") = 2,
+       "Create a complete agent system with brain, agent, and world");
+
+    m.def("getSystemStats", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent) {
+        std::map<std::string, std::string> stats;
+        
+        stats["total_neurons"] = std::to_string(brain->getTotalNeuronCount());
+        stats["total_synapses"] = std::to_string(brain->getTotalSynapseCount());
+        stats["firing_neurons"] = std::to_string(brain->getFiringNeuronCount());
+        stats["avg_firing_rate"] = std::to_string(brain->getAverageFiringRate());
+        stats["total_spikes"] = std::to_string(brain->getTotalSpikeCount());
+        stats["development_stage"] = std::to_string(static_cast<int>(brain->getDevelopmentalStage()));
+        stats["neuromodulation_level"] = std::to_string(agent->getNeuromodulationLevel());
+        stats["curiosity_level"] = std::to_string(agent->getCuriosityLevel());
+        stats["novelty_level"] = std::to_string(agent->getNoveltyLevel());
+        stats["prediction_error"] = std::to_string(agent->getPredictionError());
+        
+        return stats;
+    }, py::arg("brain"), py::arg("agent"), "Get comprehensive system statistics");
+
+    m.def("printBrainStatus", [](std::shared_ptr<Brain> brain) {
+        brain->logStatus();
+    }, py::arg("brain"), "Print detailed brain status information");
+
+    m.def("exportBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Export brain state to checkpoint file");
+
+    m.def("importBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->load(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Import brain state from checkpoint file");
+
+    m.def("resetSystem", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent) {
+        brain->reset();
+        agent->reset();
+    }, py::arg("brain"), py::arg("agent"), "Reset both brain and agent to initial state");
+
+    m.def("enableAllFeatures", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+    }, py::arg("agent"), "Enable all learning and development features");
+
+    m.def("disableAllFeatures", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(false);
+        agent->enableStructuralPlasticity(false);
+        agent->enableDevelopment(false);
+        agent->enableCuriosity(false);
+    }, py::arg("agent"), "Disable all learning and development features");
+
+    m.def("createDevelopmentStages", []() {
+        std::vector<std::string> stages;
+        stages.push_back("Initial");
+        stages.push_back("CriticalPeriod");
+        stages.push_back("Maturation");
+        stages.push_back("Adult");
+        stages.push_back("Aging");
+        return stages;
+    }, "Get list of available developmental stages");
+
+    m.def("createNeuronTypes", []() {
+        std::vector<std::string> types;
+        types.push_back("Excitatory");
+        types.push_back("Inhibitory");
+        types.push_back("Modulatory");
+        types.push_back("Sensory");
+        types.push_back("Motor");
+        types.push_back("Internal");
+        return types;
+    }, "Get list of available neuron types");
+
+    m.def("createActionTypes", []() {
+        std::vector<std::string> actions;
+        actions.push_back("MoveForward");
+        actions.push_back("MoveBackward");
+        actions.push_back("MoveLeft");
+        actions.push_back("MoveRight");
+        actions.push_back("TurnLeft");
+        actions.push_back("TurnRight");
+        actions.push_back("Look");
+        actions.push_back("Interact");
+        actions.push_back("Eat");
+        actions.push_back("Rest");
+        actions.push_back("Wait");
+        actions.push_back("Custom");
+        return actions;
+    }, "Get list of available action types");
+
+    m.def("createWorldObjectTypes", []() {
+        std::vector<std::string> types;
+        types.push_back("Empty");
+        types.push_back("Resource");
+        types.push_back("Hazard");
+        types.push_back("Wall");
+        types.push_back("Marker");
+        return types;
+    }, "Get list of available world object types");
 }
 
 } // namespace nlm
