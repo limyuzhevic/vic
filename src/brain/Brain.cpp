@@ -191,6 +191,10 @@ bool Brain::initialize() {
 
     // Re-initialising must rebuild, not append: a previous run left
     // reset()+initialize() reporting 1000 neurons for a 500-neuron brain.
+    if (!pImpl->regions.empty()) {
+        NLM_LOG_WARN("Re-initializing brain with existing regions, clearing first");
+    }
+    
     pImpl->regions.clear();
     pImpl->sensoryNeurons.clear();
     pImpl->motorNeurons.clear();
@@ -206,8 +210,23 @@ bool Brain::initialize() {
     size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", 1));
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
+    // Validate configuration values
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: 0");
+        return false;
+    }
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Invalid region_count: 0");
+        return false;
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connectionProbability));
+        return false;
+    }
+    
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
+                 std::to_string(regionCount) + " regions, " +
+                 std::to_string(connectionProbability) + " connection probability");
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -274,32 +293,48 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    }
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    }
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    }
     
     // Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.
@@ -1090,6 +1125,11 @@ bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
+        if (filepath.empty()) {
+            NLM_LOG_ERROR("Empty filepath provided for loading");
+            return false;
+        }
+        
         CheckpointReader reader;
         if (!reader.open(filepath)) {
             NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
@@ -1097,7 +1137,11 @@ bool Brain::load(const std::string& filepath) {
         }
         
         if (!reader.validate()) {
-            NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
+            std::string error = reader.getError();
+            if (error.empty()) {
+                error = "Checkpoint validation failed with unknown error";
+            }
+            NLM_LOG_ERROR("Checkpoint validation failed: " + error);
             return false;
         }
         
@@ -1115,20 +1159,26 @@ bool Brain::load(const std::string& filepath) {
                 std::to_string(getTotalNeuronCount()));
             return false;
         }
-        if (reader.getHeader().synapseCount != getTotalSynapseCount()) {
-            NLM_LOG_INFO("Checkpoint synapse count differs (header " +
-                std::to_string(reader.getHeader().synapseCount) + ", this brain " +
-                std::to_string(getTotalSynapseCount()) +
-                "); restoring by (source, destination) pair");
+        
+        // Check if synapses exist in both files
+        if (reader.getHeader().synapseCount > 0 && getTotalSynapseCount() == 0) {
+            NLM_LOG_ERROR("Checkpoint has synapses but this brain has no synapses");
+            return false;
         }
-
+        
         // Read neurons
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to read neurons from checkpoint");
             return false;
         }
-
+        
+        // Validate neuron data
+        if (neuronData.membranePotential.empty()) {
+            NLM_LOG_ERROR("Checkpoint contains no neuron state data");
+            return false;
+        }
+        
         // Apply neuron states, including the fields the old load dropped
         // (refractory remaining, firing rate, last spike time): without
         // them a reloaded brain restarts its firing-rate EMA and
@@ -1168,14 +1218,19 @@ bool Brain::load(const std::string& filepath) {
                 }
             }
         }
-
+        
         // Read synapses
         SynapseCheckpointData synapseData;
         if (!reader.readSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to read synapses from checkpoint");
             return false;
         }
-
+        
+        // Validate synapse data
+        if (synapseData.weight.empty()) {
+            NLM_LOG_WARN("Checkpoint contains no synapse weight data");
+        }
+        
         // Apply synapse states. The old load only logged the count and
         // restored nothing, so a "loaded" brain kept its freshly
         // initialised weights. Match by (source, destination) pair —
@@ -1247,6 +1302,14 @@ bool Brain::load(const std::string& filepath) {
         // the saved step instead of restarting its step counter.
         pImpl->currentStep = reader.getHeader().step;
         pImpl->currentTime = reader.getHeader().simulationTime;
+        
+        // Validate that loaded state makes sense
+        if (pImpl->currentStep > 1000000) {
+            NLM_LOG_WARN("Loaded brain has unusually high step count: " + std::to_string(pImpl->currentStep));
+        }
+        if (pImpl->currentTime > 10000.0) {
+            NLM_LOG_WARN("Loaded brain has unusually high simulation time: " + std::to_string(pImpl->currentTime));
+        }
 
         // Phase 5 extra sections. Each is optional (legacy checkpoints
         // lack them) and each failure only logs — a missing/corrupt
@@ -1357,7 +1420,8 @@ bool Brain::load(const std::string& filepath) {
         return true;
         
     } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+        std::string errorMsg = std::string("Exception loading brain: ") + e.what();
+        NLM_LOG_ERROR(errorMsg);
         return false;
     }
 }

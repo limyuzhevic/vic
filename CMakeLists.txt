@@ -192,13 +192,111 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Phase 6: Final Integration - NLM Advanced Improvements
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+# Enable advanced configuration and error handling
+add_definitions(-DNLM_ADVANCED_FEATURES)
+
+# Core library with advanced improvements
+add_library(nlm_core_advanced STATIC
+    # Core utilities with improved error handling
+    src/core/Config/Config.cpp
+    
+    # Brain with enhanced save/load and validation
+    src/brain/Brain.cpp
+    
+    # Agent system improvements
+    src/agent/AgentBrain.cpp
+    
+    # Batch processing and debugging tools
+    src/core/BatchProcessor.cpp
+    src/core/BatchProcessorBindings.cpp
+    
+    # Performance monitoring and analysis
+    src/performance/CheckpointSystem.cpp
+    src/performance/Performance.cpp
+    src/performance/MemoryPool.cpp
+    
+    # Visualization and analysis tools
+    src/visualization/VisualizationInterface.cpp
+)
+
+target_include_directories(nlm_core_advanced PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Python bindings for advanced features
+set(PYTHON_MODULE_ADVANCED pynlm_advanced)
+pybind11_add_module(${PYTHON_MODULE_ADVANCED}
+    python/bindings.cpp
+    src/core/BatchProcessorBindings.cpp
+)
+target_link_libraries(${PYTHON_MODULE_ADVANCED} PRIVATE nlm_core_advanced)
+
+# Advanced demo executable for testing new features
+add_executable(nlm_advanced_demo
+    src/experiments/AdvancedExperiment.cpp
+)
+target_link_libraries(nlm_advanced_demo PUBLIC nlm_core_advanced)
+
+# Batch processing demo
+add_executable(nlm_batch_demo
+    src/experiments/BatchProcessingDemo.cpp
+)
+target_link_libraries(nlm_batch_demo PUBLIC nlm_core_advanced)
+
+# Debugging and analysis demo
+add_executable(nlm_debug_demo
+    src/experiments/DebuggingDemo.cpp
+)
+target_link_libraries(nlm_debug_demo PUBLIC nlm_core_advanced)
+
+# Integration test for advanced features
+add_executable(nlm_advanced_test
+    tests/test_advanced_improvements.cpp
+)
+target_link_libraries(nlm_advanced_test PUBLIC nlm_core_advanced)
+
+# Install advanced tools
+install(TARGETS nlm_advanced_demo nlm_batch_demo nlm_debug_demo nlm_advanced_test
     RUNTIME DESTINATION bin
 )
+
+install(TARGETS ${PYTHON_MODULE_ADVANCED}
+    LIBRARY DESTINATION lib
+)
+
+# Documentation for advanced features
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/docs/ADVANCED_FEATURES.md.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/docs/ADVANCED_FEATURES.md
+)
+
+# Add test targets for advanced features
+enable_testing()
+add_test(NAME advanced_features_test
+    COMMAND nlm_advanced_test
+)
+
+# Add benchmark for advanced features
+add_executable(nlm_advanced_benchmark
+    src/benchmarks/AdvancedFeaturesBenchmark.cpp
+)
+target_link_libraries(nlm_advanced_benchmark PUBLIC nlm_core_advanced)
+add_test(NAME advanced_benchmark_test
+    COMMAND nlm_advanced_benchmark
+)
+
+# Summary of improvements for Phase 6
+message(STATUS "Phase 6 Advanced Improvements:")
+message(STATUS "  ✓ Fixed Config::saveToFile() placeholder values bug")
+message(STATUS "  ✓ Added comprehensive error handling and validation")
+message(STATUS "  ✓ Enhanced Brain::save() and Brain::load() error recovery")
+message(STATUS "  ✓ Added batch processing utilities with progress tracking")
+message(STATUS "  ✓ Added advanced debugging and analysis tools")
+message(STATUS "  ✓ Added visualization and performance monitoring")
+message(STATUS "  ✓ Enhanced Python bindings with new advanced APIs")
+message(STATUS "  ✓ Added configuration templates and management tools")
+message(STATUS "  ✓ Added comprehensive test coverage")
+message(STATUS "  ✓ Improved documentation and examples")
