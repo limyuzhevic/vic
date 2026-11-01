@@ -56,13 +56,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format with fallback to simple key=value)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
@@ -71,7 +71,7 @@ template<typename T>
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +95,9 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration values
+    bool validate() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +105,24 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    bool parseSimpleValue(const std::string& valueStr, ConfigValue& outValue) const;
+    bool parseSimpleKeyValue(const std::string& line, std::string& key, ConfigValue& value) const;
+    
+    // Template implementation details
+    template<typename T>
+    friend std::optional<T> Config::get(const std::string& key) const;
+    
+    template<typename T>
+    friend T Config::getOr(const std::string& key, const T& defaultValue) const;
 };
+
+// Specializations for vector types
+template std::optional<std::vector<int>> Config::get<std::vector<int>>(const std::string& key) const;
+template std::optional<std::vector<double>> Config::get<std::vector<double>>(const std::string& key) const;
+template std::optional<std::vector<std::string>> Config::get<std::vector<std::string>>(const std::string& key) const;
+
+template std::vector<int> Config::getOr<std::vector<int>>(const std::string& key, const std::vector<int>& defaultValue) const;
+template std::vector<double> Config::getOr<std::vector<double>>(const std::string& key, const std::vector<double>& defaultValue) const;
+template std::vector<std::string> Config::getOr<std::vector<std::string>>(const std::string& key, const std::vector<std::string>& defaultValue) const;
 
 } // namespace nlm
