@@ -29,6 +29,7 @@ int main(int argc, char* argv[]) {
     
     if (!integrationOK) {
         std::cerr << "ERROR: Integration verification failed!" << std::endl;
+        std::cerr << "Please check that all brain systems are properly initialized." << std::endl;
         return 1;
     }
     
@@ -36,19 +37,31 @@ int main(int argc, char* argv[]) {
     
     // Test individual systems
     std::cout << "--- Memory Integration Test ---" << std::endl;
-    experiment.testMemoryIntegration();
+    if (!experiment.testMemoryIntegration()) {
+        std::cerr << "ERROR: Memory integration test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Neuromodulation Integration Test ---" << std::endl;
-    experiment.testNeuromodulationIntegration();
+    if (!experiment.testNeuromodulationIntegration()) {
+        std::cerr << "ERROR: Neuromodulation integration test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Checkpoint Test ---" << std::endl;
-    experiment.testCheckpointing();
+    if (!experiment.testCheckpointing()) {
+        std::cerr << "ERROR: Checkpoint test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
     std::cout << "--- Replay Test ---" << std::endl;
-    experiment.testReplay();
+    if (!experiment.testReplay()) {
+        std::cerr << "ERROR: Replay test failed!" << std::endl;
+        return 1;
+    }
     std::cout << std::endl;
     
     // Run full experiment with smaller settings for demo

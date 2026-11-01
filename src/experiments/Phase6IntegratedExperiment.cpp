@@ -274,20 +274,23 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
     }
     
     // Check if working memory has traces
-    if (wm->getActiveTraces() > 0) {
+    bool wmHasTraces = (wm->getActiveTraces() > 0);
+    if (wmHasTraces) {
         NLM_LOG_INFO("[PASS] Working memory has active traces: " + std::to_string(wm->getActiveTraces()));
     } else {
         NLM_LOG_INFO("[INFO] Working memory has no active traces (may be normal for simple simulation)");
     }
     
     // Check if episodic memory has episodes
-    if (em->getEpisodeCount() > 0) {
+    bool emHasEpisodes = (em->getEpisodeCount() > 0);
+    if (emHasEpisodes) {
         NLM_LOG_INFO("[PASS] Episodic memory has episodes: " + std::to_string(em->getEpisodeCount()));
     } else {
         NLM_LOG_INFO("[INFO] Episodic memory has no episodes (may be normal for simple simulation)");
     }
     
-    return true;
+    // Consider the test passed if at least one memory system shows activity
+    return wmHasTraces || emHasEpisodes;
 }
 
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
@@ -316,8 +319,36 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
         brain->step(i, i * 0.001);
     }
     
-    NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
-    return true;
+    // Check if neuromodulators are actually changing over time
+    float dopamineStart = dopamine->getLevel();
+    float curiosityStart = curiosity->getLevel();
+    float noveltyStart = novelty->getLevel();
+    
+    // Run more steps to see if neuromodulators respond
+    for (int i = 50; i < 100; ++i) {
+        brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
+        brain->step(i, i * 0.001);
+    }
+    
+    float dopamineEnd = dopamine->getLevel();
+    float curiosityEnd = curiosity->getLevel();
+    float noveltyEnd = novelty->getLevel();
+    
+    bool dopamineActive = (dopamineEnd - dopamineStart) > 0.01f || dopamineEnd > 0.1f;
+    bool curiosityActive = (curiosityEnd - curiosityStart) > 0.01f || curiosityEnd > 0.1f;
+    bool noveltyActive = (noveltyEnd - noveltyStart) > 0.01f || noveltyEnd > 0.1f;
+    
+    if (dopamineActive || curiosityActive || noveltyActive) {
+        NLM_LOG_INFO("[PASS] Neuromodulation systems are active and responsive");
+        if (dopamineActive) NLM_LOG_INFO("  - Dopamine level changed: " + std::to_string(dopamineStart) + " -> " + std::to_string(dopamineEnd));
+        if (curiosityActive) NLM_LOG_INFO("  - Curiosity level changed: " + std::to_string(curiosityStart) + " -> " + std::to_string(curiosityEnd));
+        if (noveltyActive) NLM_LOG_INFO("  - Novelty level changed: " + std::to_string(noveltyStart) + " -> " + std::to_string(noveltyEnd));
+        return true;
+    } else {
+        NLM_LOG_INFO("[INFO] Neuromodulation systems exist but show minimal activity in this simulation");
+        // Still return true since the systems are integrated, just not highly active
+        return true;
+    }
 }
 
 bool Phase6IntegratedExperiment::testCheckpointing() {
@@ -341,12 +372,37 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("Brain1 avg firing: " + std::to_string(avgFiring1));
     NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
     
+    bool Phase6IntegratedExperiment::testCheckpointing() {
+    NLM_LOG_INFO("=== Testing Checkpoint Save/Load ===");
+    
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", 100);
+    
+    // Create and initialize brain
+    auto brain1 = std::make_shared<Brain>(cfg);
+    brain1->initialize();
+    
+    // Run some steps
+    for (int i = 0; i < 100; ++i) {
+        brain1->step(i, i * 0.001);
+    }
+    
+    float avgFiring1 = brain1->getAverageFiringRate();
+    size_t totalSpikes1 = brain1->getTotalSpikeCount();
+    
+    NLM_LOG_INFO("Brain1 avg firing: " + std::to_string(avgFiring1));
+    NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
+    
     // Save checkpoint
     std::string path = "/tmp/nlm_checkpoint_test.bin";
-    if (!brain1->save(path)) {
+    bool saved = brain1->save(path);
+    
+    if (!saved) {
         NLM_LOG_ERROR("Failed to save checkpoint");
         return false;
     }
+    
+    NLM_LOG_INFO("Checkpoint saved successfully");
     
     // Create new brain and load
     auto brain2 = std::make_shared<Brain>(cfg);
@@ -363,8 +419,15 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     // Note: Due to the nature of neural simulation, exact state restoration
     // is complex. The load should restore the structure at minimum.
     
-    NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
-    return true;
+    // Check if basic checkpoint functionality works
+    if (brain2->getTotalNeuronCount() == 100 && brain2->getTotalSynapseCount() > 0) {
+        NLM_LOG_INFO("[PASS] Checkpoint save/load completed successfully");
+        return true;
+    } else {
+        NLM_LOG_ERROR("Checkpoint restoration failed - incorrect brain state");
+        return false;
+    }
+}
 }
 
 bool Phase6IntegratedExperiment::testReplay() {
@@ -397,11 +460,14 @@ bool Phase6IntegratedExperiment::testReplay() {
         if (!episodes.empty()) {
             NLM_LOG_INFO("[PASS] Replay system can retrieve episodes");
             return true;
+        } else {
+            NLM_LOG_ERROR("Replay system cannot retrieve episodes despite having them stored");
+            return false;
         }
+    } else {
+        NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
+        return true;  // Episodic memory exists but has no episodes, which is acceptable
     }
-    
-    NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
-    return true;
 }
 
 } // namespace nlm
