@@ -267,11 +267,24 @@ ActionResult SimpleWorld::interact() {
             if (obj.type == WorldObjectType::Resource) {
                 agent_.energy = std::min(maxEnergy_, agent_.energy + resourceEnergyGain_);
                 result.reward = obj.value;  // Positive reward
+                
+                // Exploration bonus - reward for discovering new areas
+                // Each new resource discovered is a form of exploration
+                result.reward += 2.0f;
+                
                 result.success = true;
                 result.message = "consumed_resource";
             } else if (obj.type == WorldObjectType::Hazard) {
                 agent_.health -= 0.2f;
                 result.reward = obj.value;  // Negative reward
+                
+                // Penalty for hitting hazards
+                result.reward -= 3.0f;
+                
+                // Penalty for poor exploration (hitting hazards)
+                float hazardPenalty = 5.0f;
+                result.reward -= hazardPenalty;
+                
                 result.success = true;
                 result.message = "hit_hazard";
             }
