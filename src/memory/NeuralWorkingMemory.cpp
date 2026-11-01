@@ -23,6 +23,9 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Initialize brain reference in constructor to avoid null pointer access
+    // if storeToNeuron or other methods are called before initialize()
+    pImpl->brain = brain_;
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;

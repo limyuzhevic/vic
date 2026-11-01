@@ -62,6 +62,9 @@ public:
 
     // Clear planning cache
     void clearCache();
+    
+    // Clear all planning state
+    void clear();
 
     // Set action quality function (from experience)
     void setActionQuality(ActionType action, float quality) {

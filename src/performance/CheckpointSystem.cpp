@@ -369,7 +369,10 @@ bool CheckpointWriter::finalize() {
     for (CheckpointSection type : {CheckpointSection::SimulationState,
                                    CheckpointSection::RandomState,
                                    CheckpointSection::Plasticity,
-                                   CheckpointSection::Memory}) {
+                                   CheckpointSection::Memory,
+                                   CheckpointSection::Cognition,
+                                   CheckpointSection::Neuromodulation,
+                                   CheckpointSection::Development}) {
         for (const auto& entry : extraPayloads_) {
             if (entry.first == type && !entry.second.empty()) {
                 if (!writeSectionToStream(stream_, type, entry.second, bytesWritten_)) return false;

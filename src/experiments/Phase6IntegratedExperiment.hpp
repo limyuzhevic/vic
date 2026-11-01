@@ -130,6 +130,11 @@ public:
     bool testCheckpointing();
     
     /**
+     * Test reset system
+     */
+    bool testReset();
+    
+    /**
      * Test replay system
      */
     bool testReplay();

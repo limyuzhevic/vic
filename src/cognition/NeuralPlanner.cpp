@@ -252,7 +252,19 @@ void NeuralPlanner::clearCache() {
     // Clear any planning cache
 }
 
-bool NeuralPlanner::wasRecentPlanSuccessful() const {
+void NeuralPlanner::clear() {
+    clearCache();
+    recentPlanSuccess_.clear();
+    pImpl->brain = nullptr;
+    brain_ = nullptr;
+    actionQuality_.clear();
+    actionQuality_.resize(10, 0.0f);  // Reset to initial state
+    planningDepth_ = 3;
+    planningConfidence_ = 0.5f;
+    currentGoal_.clear();
+    
+    NLM_LOG_INFO("NeuralPlanner cleared");
+}
     if (recentPlanSuccess_.empty()) return true;  // No data
     
     size_t successCount = 0;

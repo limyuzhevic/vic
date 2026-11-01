@@ -51,6 +51,10 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
+    std::cout << "--- Reset Test ---" << std::endl;
+    experiment.testReset();
+    std::cout << std::endl;
+    
     // Run full experiment with smaller settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;

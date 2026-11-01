@@ -404,4 +404,103 @@ bool Phase6IntegratedExperiment::testReplay() {
     return true;
 }
 
-} // namespace nlm
+// Test memory after reset
+    size_t episodeCount2 = em->getEpisodeCount();
+    NLM_LOG_INFO("Brain2 episodes after load: " + std::to_string(episodeCount2));
+    
+    // Note: Due to the nature of neural simulation, exact state restoration
+    // is complex. The load should restore the structure at minimum.
+    
+    NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
+    return true;
+}
+
+bool Phase6IntegratedExperiment::testReset() {
+    NLM_LOG_INFO("=== Testing Brain Reset Functionality ===");
+    
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", 100);
+    
+    // Create and initialize brain
+    auto brain = std::make_shared<Brain>(cfg);
+    brain->initialize();
+    
+    NLM_LOG_INFO("Brain initialized - testing integration");
+    
+    // Verify integration before reset
+    if (brain->getWorkingMemory() == nullptr) {
+        NLM_LOG_ERROR("Working memory is null before reset");
+        return false;
+    }
+    
+    if (brain->getEpisodicMemory() == nullptr) {
+        NLM_LOG_ERROR("Episodic memory is null before reset");
+        return false;
+    }
+    
+    if (brain->getAssociativeMemory() == nullptr) {
+        NLM_LOG_ERROR("Associative memory is null before reset");
+        return false;
+    }
+    
+    if (brain->getAttention() == nullptr) {
+        NLM_LOG_ERROR("Attention is null before reset");
+        return false;
+    }
+    
+    NLM_LOG_INFO("[PASS] All memory systems integrated before reset");
+    
+    // Run some steps to create some memory
+    for (int i = 0; i < 50; ++i) {
+        brain->step(i, i * 0.001);
+    }
+    
+    // Store something in working memory
+    auto* wm = brain->getWorkingMemory();
+    if (wm) {
+        std::vector<float> pattern = {1.0f, 0.5f, 0.0f, 0.5f, 1.0f};
+        wm->store(pattern, 1.0f);
+        NLM_LOG_INFO("[INFO] Stored pattern in working memory before reset");
+    }
+    
+    // Reset the brain
+    NLM_LOG_INFO("Resetting brain...");
+    brain->reset();
+    NLM_LOG_INFO("Brain reset complete");
+    
+    // Verify integration after reset - memory systems should still exist
+    if (brain->getWorkingMemory() == nullptr) {
+        NLM_LOG_ERROR("Working memory is null after reset");
+        return false;
+    }
+    
+    if (brain->getEpisodicMemory() == nullptr) {
+        NLM_LOG_ERROR("Episodic memory is null after reset");
+        return false;
+    }
+    
+    if (brain->getAssociativeMemory() == nullptr) {
+        NLM_LOG_ERROR("Associative memory is null after reset");
+        return false;
+    }
+    
+    if (brain->getAttention() == nullptr) {
+        NLM_LOG_ERROR("Attention is null after reset");
+        return false;
+    }
+    
+    // Verify cognition systems after reset
+    if (brain->getPlanner() == nullptr) {
+        NLM_LOG_ERROR("Planner is null after reset");
+        return false;
+    }
+    
+    if (brain->getConceptFormation() == nullptr) {
+        NLM_LOG_ERROR("Concept formation is null after reset");
+        return false;
+    }
+    
+    NLM_LOG_INFO("[PASS] All memory systems properly recreated after reset");
+    NLM_LOG_INFO("[PASS] Brain reset functionality test completed successfully");
+    return true;
+}
