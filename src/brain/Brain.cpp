@@ -935,7 +935,13 @@ bool Brain::save(const std::string& filepath) const {
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+            NLM_LOG_ERROR("Possible causes:");
+            NLM_LOG_ERROR("  1. Invalid file path or permissions");
+            NLM_LOG_ERROR("  2. Disk full");
+            NLM_LOG_ERROR("  3. File already exists and is read-only");
+            NLM_LOG_ERROR("  4. Insufficient disk space");
             return false;
+        }
         }
         
         // Set metadata
@@ -975,7 +981,12 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+            NLM_LOG_ERROR("This may indicate:");
+            NLM_LOG_ERROR("  1. Memory allocation failure during serialization");
+            NLM_LOG_ERROR("  2. Invalid neuron state data");
+            NLM_LOG_ERROR("  3. Corrupted internal data structures");
             return false;
+        }
         }
         
         // Write synapses
@@ -994,6 +1005,10 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            NLM_LOG_ERROR("This may indicate:");
+            NLM_LOG_ERROR("  1. Memory allocation failure during synapse serialization");
+            NLM_LOG_ERROR("  2. Invalid synapse data or corrupted weights");
+            NLM_LOG_ERROR("  3. Synapse state inconsistency");
             return false;
         }
 
@@ -1004,7 +1019,11 @@ bool Brain::save(const std::string& filepath) const {
             auto pending = pImpl->spikeSystem->getPendingDelayedSpikes();
             if (!writer.writeDelayedSpikes(pending)) {
                 NLM_LOG_ERROR("Failed to write pending spikes to checkpoint");
+                NLM_LOG_ERROR("This may indicate:");
+                NLM_LOG_ERROR("  1. Spike system state corruption");
+                NLM_LOG_ERROR("  2. Memory allocation failure for spike events");
                 return false;
+            }
             }
         }
 
@@ -1094,6 +1113,10 @@ bool Brain::save(const std::string& filepath) const {
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        NLM_LOG_ERROR("This indicates:");
+        NLM_LOG_ERROR("  1. Unexpected runtime error during checkpoint operation");
+        NLM_LOG_ERROR("  2. Memory corruption or invalid data during save");
+        NLM_LOG_ERROR("  3. File system or I/O error during checkpoint writing");
         return false;
     }
 }
@@ -1105,11 +1128,20 @@ bool Brain::load(const std::string& filepath) {
         CheckpointReader reader;
         if (!reader.open(filepath)) {
             NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
+            NLM_LOG_ERROR("Possible causes:");
+            NLM_LOG_ERROR("  1. File does not exist or is inaccessible");
+            NLM_LOG_ERROR("  2. File is corrupted or not a valid checkpoint");
+            NLM_LOG_ERROR("  3. Insufficient permissions to read the file");
+            NLM_LOG_ERROR("  4. File is locked by another process");
             return false;
         }
         
         if (!reader.validate()) {
             NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
+            NLM_LOG_ERROR("This indicates:");
+            NLM_LOG_ERROR("  1. Checkpoint file is corrupted or incomplete");
+            NLM_LOG_ERROR("  2. Incompatible checkpoint format (version mismatch)");
+            NLM_LOG_ERROR("  3. Invalid checkpoint data structure");
             return false;
         }
         
@@ -1125,6 +1157,15 @@ bool Brain::load(const std::string& filepath) {
             NLM_LOG_ERROR("Checkpoint neuron mismatch: header has " +
                 std::to_string(reader.getHeader().neuronCount) + " neurons, this brain has " +
                 std::to_string(getTotalNeuronCount()));
+            NLM_LOG_ERROR("This indicates:");
+            NLM_LOG_ERROR("  1. Checkpoint created with different brain configuration");
+            NLM_LOG_ERROR("  2. Brain initialization failed to create correct number of neurons");
+            NLM_LOG_ERROR("  3. Checkpoint file corruption or version incompatibility");
+            NLM_LOG_ERROR("");
+            NLM_LOG_ERROR("Recovery steps:");
+            NLM_LOG_ERROR("  - Ensure consistent brain configuration (neuron_count)");
+            NLM_LOG_ERROR("  - Use the same configuration when saving and loading");
+            NLM_LOG_ERROR("  - Consider recreating a new checkpoint if problem persists");
             return false;
         }
         if (reader.getHeader().synapseCount != getTotalSynapseCount()) {
@@ -1370,6 +1411,10 @@ bool Brain::load(const std::string& filepath) {
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+        NLM_LOG_ERROR("This indicates:");
+        NLM_LOG_ERROR("  1. Unexpected runtime error during checkpoint loading");
+        NLM_LOG_ERROR("  2. Data corruption or format incompatibility");
+        NLM_LOG_ERROR("  3. Memory allocation failure during load");
         return false;
     }
 }

@@ -32,6 +32,13 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration validation
+struct ConfigValidationError {
+    std::string key;
+    std::string message;
+    ConfigSource source;
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -44,7 +51,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Configuration class
 class Config {
 public:
     Config();
@@ -66,7 +73,7 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
@@ -94,6 +101,14 @@ template<typename T>
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validation
+    std::vector<ConfigValidationError> validate() const;
+    bool validateAndFix() const;
+    
+    // Configuration defaults
+    static std::string getDefaultConfigFile();
+    static std::vector<std::string> getRequiredKeys();
     
 private:
     struct Impl;

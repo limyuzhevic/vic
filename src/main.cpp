@@ -389,7 +389,17 @@ int main(int argc, char** argv) {
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("Brain initialization failed");
+        NLM_LOG_ERROR("Possible causes:");
+        NLM_LOG_ERROR("  1. Invalid configuration values");
+        NLM_LOG_ERROR("  2. Memory allocation failure");
+        NLM_LOG_ERROR("  3. Corrupted configuration file");
+        NLM_LOG_ERROR("  4. Insufficient system resources");
+        NLM_LOG_ERROR("");
+        NLM_LOG_ERROR("Configuration used:");
+        NLM_LOG_ERROR("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 1000)));
+        NLM_LOG_ERROR("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)));
+        NLM_LOG_ERROR("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
         return 1;
     }
     

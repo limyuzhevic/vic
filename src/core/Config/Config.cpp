@@ -19,13 +19,27 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    // Try to parse as JSON first
+    try {
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        
+        // Check if it looks like JSON (starts with { and ends with })
+        if (content.find('{') != std::string::npos && content.find('}') != std::string::npos) {
+            // TODO: Implement JSON parser using a lightweight JSON library
+            // For now, fall back to simple format
+        }
+    } catch (...) {
+        // If JSON parsing fails, try simple format
+    }
+    
+    // Parse simple key=value pairs (fallback)
+    file.clear();
+    file.seekg(0);
     
     std::string line;
     while (std::getline(file, line)) {
@@ -152,7 +166,10 @@ void Config::clear() {
 
 std::string Config::summary() const {
     std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+    oss << "Configuration Summary:" << std::endl;
+    oss << "  Total entries: " << pImpl->entries.size() << std::endl;
+    
+    // Show configured values
     for (const auto& entry : pImpl->entries) {
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
@@ -172,8 +189,20 @@ std::string Config::summary() const {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (Source: " << static_cast<int>(entry.source) << ")" << std::endl;
     }
+    
+    // Show validation status
+    auto errors = validate();
+    if (!errors.empty()) {
+        oss << std::endl << "  Validation Errors:" << std::endl;
+        for (const auto& error : errors) {
+            oss << "    " << error.key << ": " << error.message << std::endl;
+        }
+    } else {
+        oss << std::endl << "  ✓ Configuration is valid" << std::endl;
+    }
+    
     return oss.str();
 }
 
@@ -235,4 +264,98 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+// Validation implementation
+std::vector<ConfigValidationError> Config::validate() const {
+    std::vector<ConfigValidationError> errors;
+    
+    // Check for required configuration keys
+    std::vector<std::string> requiredKeys = getRequiredKeys();
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            ConfigValidationError error;
+            error.key = key;
+            error.message = "Missing required configuration key: " + key;
+            error.source = ConfigSource::Default;
+            errors.push_back(error);
+        }
+    }
+    
+    // Validate specific configuration values
+    if (has("neuron_count")) {
+        auto count = get<size_t>("neuron_count");
+        if (count.has_value()) {
+            if (count.value() < 1) {
+                ConfigValidationError error;
+                error.key = "neuron_count";
+                error.message = "neuron_count must be >= 1, got " + std::to_string(count.value());
+                error.source = ConfigSource::File;
+                errors.push_back(error);
+            }
+        }
+    }
+    
+    if (has("simulation_timestep")) {
+        auto timestep = get<double>("simulation_timestep");
+        if (timestep.has_value()) {
+            if (timestep.value() <= 0.0) {
+                ConfigValidationError error;
+                error.key = "simulation_timestep";
+                error.message = "simulation_timestep must be > 0, got " + std::to_string(timestep.value());
+                error.source = ConfigSource::File;
+                errors.push_back(error);
+            }
+        }
+    }
+    
+    if (has("connection_probability")) {
+        auto prob = get<float>("connection_probability");
+        if (prob.has_value()) {
+            if (prob.value() < 0.0f || prob.value() > 1.0f) {
+                ConfigValidationError error;
+                error.key = "connection_probability";
+                error.message = "connection_probability must be in [0.0, 1.0], got " + std::to_string(prob.value());
+                error.source = ConfigSource::File;
+                errors.push_back(error);
+            }
+        }
+    }
+    
+    return errors;
+}
+
+bool Config::validateAndFix() const {
+    auto errors = validate();
+    
+    // If there are errors that can be automatically fixed, fix them
+    bool wasFixed = false;
+    for (const auto& error : errors) {
+        if (error.key == "neuron_count" && !has("neuron_count")) {
+            // Fix missing neuron_count by setting a default
+            set("neuron_count", 1000LL, ConfigSource::Default);
+            wasFixed = true;
+        } else if (error.key == "simulation_timestep" && !has("simulation_timestep")) {
+            // Fix missing simulation_timestep by setting a default
+            set("simulation_timestep", 0.001, ConfigSource::Default);
+            wasFixed = true;
+        } else if (error.key == "connection_probability" && !has("connection_probability")) {
+            // Fix missing connection_probability by setting a default
+            set("connection_probability", 0.1f, ConfigSource::Default);
+            wasFixed = true;
+        }
+    }
+    
+    return wasFixed || errors.empty();
+}
+
+// Configuration defaults
+std::string Config::getDefaultConfigFile() {
+    return "configs/default.cfg";
+}
+
+std::vector<std::string> Config::getRequiredKeys() {
+    return {
+        "neuron_count",
+        "simulation_timestep",
+        "connection_probability"
+    };
+}
