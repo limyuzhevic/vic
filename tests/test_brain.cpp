@@ -1,5 +1,8 @@
 // Brain Tests
 #include "brain/Brain.hpp"
+#include "agent/AgentBrain.hpp"
+#include "cognition/ConceptFormation.hpp"
+#include "memory/NeuralWorkingMemory.hpp"
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <cmath>
@@ -203,6 +206,62 @@ void testBrainCheckpointRoundTrip() {
               << ", rates " << rate1 << " vs " << rate2 << ")" << std::endl;
 }
 
+void testPhase6TextEncoding() {
+    // Phase 6: the text encoder must be deterministic, and
+    // different words must give different patterns — otherwise
+    // "teaching" a word could not be distinguished from any other
+    // word even in principle. Throwing checks, not assert: in a
+    // Release build assert is compiled out and this test would
+    // be vacuous (the Phase 4 lesson).
+    auto apple1 = nlm::AgentBrain::encodeText("apple");
+    auto apple2 = nlm::AgentBrain::encodeText("Apple");
+    auto zebra = nlm::AgentBrain::encodeText("zebra");
+    if (apple1.size() != 4) throw std::runtime_error("text code must have 4 neurons");
+    if (apple1 != apple2) throw std::runtime_error("text encoding must be case-insensitive and deterministic");
+    if (apple1 == zebra) throw std::runtime_error("different words must encode differently");
+    std::cout << "    testPhase6TextEncoding passed" << std::endl;
+}
+
+void testPhase6ConceptSimilarity() {
+    // Phase 6: cosine alone scores a bright scene and a dark
+    // scene as identical (same direction, different magnitude),
+    // so concept formation collapsed every scene into one
+    // concept. The magnitude-aware similarity must separate
+    // them while keeping a scene similar to itself.
+    nlm::ConceptFormation concepts;
+    std::vector<float> resource(24, 0.0f), hazard(24, 0.0f);
+    for (int i = 5; i <= 10; ++i) { resource[i] = 0.3f; hazard[i] = 0.75f; }
+    resource[16] = 0.8f; hazard[16] = 0.8f;
+    float same = concepts.computeSimilarity(resource, resource);
+    float diff = concepts.computeSimilarity(resource, hazard);
+    if (same < 0.99f) throw std::runtime_error("identical patterns must score ~1.0");
+    if (diff >= 0.7f) throw std::runtime_error("resource vs hazard scenes must score below the 0.7 concept threshold");
+    std::cout << "    testPhase6ConceptSimilarity passed (same=" << same << ", diff=" << diff << ")" << std::endl;
+}
+
+void testPhase6WorkingMemoryTraces() {
+    // Phase 6: getActiveTraces() was always 0 because
+    // storeToNeuron never populated the trace list. A stored
+    // neuron must be an active trace.
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    nlm::Brain brain(config);
+    brain.initialize();
+    auto* wm = brain.getWorkingMemory();
+    if (!wm) throw std::runtime_error("no working memory");
+    nlm::NeuronId first;
+    bool found = false;
+    for (const auto& region : brain.getRegions()) {
+        for (auto* neuron : region->getAllNeurons()) { first = neuron->getId(); found = true; break; }
+        if (found) break;
+    }
+    if (!found) throw std::runtime_error("no neurons to store");
+    wm->storeToNeuron(first, 1.0f);
+    if (wm->getActiveTraces() == 0) throw std::runtime_error("stored neuron must be an active trace");
+    std::cout << "    testPhase6WorkingMemoryTraces passed" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -212,6 +271,9 @@ void runAll() {
     testBrainActionProduction();
     testBrainStatus();
     testBrainCheckpointRoundTrip();
+    testPhase6TextEncoding();
+    testPhase6ConceptSimilarity();
+    testPhase6WorkingMemoryTraces();
 }
 
 } // namespace test_brain

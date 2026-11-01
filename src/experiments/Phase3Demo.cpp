@@ -3,6 +3,7 @@
 #include "../agent/SensoryPercept.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../brain/Brain.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
 #include <iostream>
@@ -137,11 +138,19 @@ public:
                 // 6. Apply reward modulation
                 agentBrain.applyRewardModulation(result.reward, 0.0f);
                 
-                // 7. Update world
-                world.update(0.01);  // 10ms timestep
-                
+                // 7. Update world — Phase 6 pacing fix: one decision
+                // is one world action interval (0.1 s). The old
+                // 0.01 s step meant the world's 0.1 s action gate
+                // rejected 181/200 decisions as "too soon", so the
+                // brain was judged on actions it never took. The
+                // world gate itself is unchanged; the demo now
+                // actually steps the world by the interval the
+                // world's own physics (3.0 units/s, 2.0 rad/s) is
+                // defined over.
+                world.update(0.1);
+
                 // 8. Update development
-                agentBrain.updateDevelopment(0.01);
+                agentBrain.updateDevelopment(0.1);
                 
                 // Track metrics
                 episodeReward += result.reward;
@@ -226,9 +235,19 @@ public:
                       << ", finalNovelty=" << metrics.finalNovelty
                       << ", finalCuriosity=" << metrics.finalCuriosity
                       << ", tooSoon=" << tooSoonCount
+                      << ", executed=" << (stepsPerEpisode - tooSoonCount)
                       << ", reflexBonus=" << agentBrain.getReflexBonusCount()
                       << ", reflexSuppress=" << agentBrain.getReflexSuppressCount()
                       << ", wtaPulses=" << agentBrain.getWtaPulseCount()
+                      << ", plannerOverride=" << agentBrain.getPlannerOverrideCount()
+                      << ", plannerAgree=" << agentBrain.getPlannerAgreementCount()
+                      << "/" << agentBrain.getPlannerDecisionCount()
+                      << ", conceptBias=" << agentBrain.getConceptBiasCount()
+                      << ", selfBias=" << agentBrain.getSelfBiasCount()
+                      << ", socialBias=" << agentBrain.getSocialBiasCount()
+                      << ", concepts=" << agentBrain.getConceptCount()
+                      << ", selfConf=" << agentBrain.getSelfModelConfidence()
+                      << ", wmTraces=" << (brain->getWorkingMemory() ? brain->getWorkingMemory()->getActiveTraces() : 0)
                       << "\n\n";
         }
         

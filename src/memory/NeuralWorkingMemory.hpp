@@ -52,10 +52,11 @@ public:
     size_t getActiveTraces() const { return activeTraces_.size(); }
 
     // Phase 5 checkpoint support: the stored neurons/activations are
-    // the actual working-memory content (activeTraces_ is only cleared
-    // in this codebase and never populated by the closed loop, so the
-    // neuron count — not getActiveTraces() — is the honest measure of
-    // working-memory content). Snapshot/restore round-trip the full
+    // the actual working-memory content. Phase 6 fixed the stale
+    // note that activeTraces_ was never populated: storeToNeuron()
+    // now registers a trace, decay rebuilds the list, and restore
+    // repopulates it, so getActiveTraces() and the neuron count
+    // agree on content. Snapshot/restore round-trip the full
     // stored content; recurrent maintenance connections are rebuilt
     // by update(), not stored.
     size_t getMemoryNeuronCount() const { return memoryNeurons_.size(); }
@@ -68,7 +69,12 @@ public:
         memoryNeurons_.assign(neurons.begin(), neurons.begin() + static_cast<std::ptrdiff_t>(n));
         memoryActivations_.assign(activations.begin(), activations.begin() + static_cast<std::ptrdiff_t>(n));
         memoryTimestamps_.assign(timestamps.begin(), timestamps.begin() + static_cast<std::ptrdiff_t>(n));
+        // Phase 6: a restored snapshot is restored content, so its
+        // traces are active again (was: cleared and never repopulated).
         activeTraces_.clear();
+        for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+            if (memoryActivations_[i] > 0.1f) activeTraces_.push_back(i);
+        }
     }
 
     // Get capacity

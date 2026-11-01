@@ -149,7 +149,17 @@ This document explicitly lists what NLM cannot currently do and where it diverge
 - No symbolic representation
 - No hierarchical concepts
 - Limited abstraction capability
-- No language-based concepts (intentional)
+- Phase 6: text-as-a-sense exists (a teacher word is encoded as
+  a sparse pattern on dedicated sensory neurons and associated
+  with a scene by paired presentation), but it is NOT language
+  understanding: there is no grammar, no meaning, and no
+  pretrained language model, and word-specific recall is NOT
+  yet achieved — a taught word evokes a learned scene, but an
+  untaught word evokes it almost as strongly (see the Phase 6
+  report), because the dense burst network's internal patterns
+  overlap too much for word-specific recall. Specific
+  word-to-scene association needs sparser internal coding and
+  is a further phase, not a parameter fix.
 
 ### Attention
 - Simple competition model
@@ -162,6 +172,12 @@ This document explicitly lists what NLM cannot currently do and where it diverge
 - No tree search or simulation
 - No sophisticated state representation
 - No hierarchical planning
+- Phase 6: the planner is no longer advisory-only — its
+  suggestion biases motor decode when it has learned action
+  quality and clearly beats the motor winner (measured as
+  planner overrides in the Phase 3 demo), but it is still a
+  bias, not a plan executor, and Interact suggestions are
+  gated on something actually being touched.
 
 ### Self-Model
 - No sophisticated body schema
@@ -174,6 +190,12 @@ This document explicitly lists what NLM cannot currently do and where it diverge
 - No sophisticated imitation learning
 - No cultural transmission
 - No language-based social learning
+- Phase 6: social learning is now wired into AgentBrain
+  (observeOtherAgent + an imitation bias in decode, gated on
+  >0.8 state similarity), and a teacher demonstration is
+  imitated in the Phase 6 demo — but SimpleWorld has no
+  second agent, so in the ordinary closed loop it stays inert,
+  which is correct, not a bug.
 
 ## Claims We Do NOT Make
 

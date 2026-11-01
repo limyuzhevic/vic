@@ -180,7 +180,7 @@ int main() {
         MotorCommand cmd = agent.decodeMotorCommand();
         ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
         agent.applyRewardModulation(result.reward, 0.0f);
-        world.update(0.01);
+        world.update(0.1);  // Phase 6 pacing: one decision = one 0.1 s action interval.
         totalReward += result.reward;
         if (cmd == MotorCommand::Interact) {
             if (result.message == "consumed_resource") ++resources;

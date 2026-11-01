@@ -72,7 +72,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-    
+
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
@@ -81,6 +81,23 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        it = memoryNeurons_.end() - 1;
+    }
+
+    // Phase 6: activeTraces_ is the trace list getActiveTraces()
+    // reports, and it was never populated — only cleared — so it
+    // always read 0 even when memory held 50 neurons. A stored
+    // neuron is an active trace; decayWeakTraces() below removes
+    // it again when its activation falls below threshold, and
+    // clear()/restoreSnapshot() reset the list with the content.
+    if (it != memoryNeurons_.end()) {
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
+        if (activation > 0.1f && !present) activeTraces_.push_back(idx);
+        if (activation <= 0.1f && present) {
+            activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
+                                activeTraces_.end());
+        }
     }
     
     // Inject current to maintain activation
@@ -241,6 +258,13 @@ void NeuralWorkingMemory::decayWeakTraces() {
         memoryNeurons_.erase(memoryNeurons_.begin() + *it);
         memoryActivations_.erase(memoryActivations_.begin() + *it);
         memoryTimestamps_.erase(memoryTimestamps_.begin() + *it);
+    }
+    // Phase 6: erasing shifts memory indices, so the trace list
+    // cannot survive removal untouched — rebuild it from the
+    // remaining activations instead of leaving stale indices.
+    activeTraces_.clear();
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) activeTraces_.push_back(i);
     }
 }
 

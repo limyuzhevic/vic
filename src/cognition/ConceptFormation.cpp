@@ -264,8 +264,21 @@ float ConceptFormation::computeSimilarity(const std::vector<float>& a,
     }
     
     if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
-    
-    return dot / (std::sqrt(normA) * std::sqrt(normB));
+
+    // Phase 6: cosine alone cannot tell a bright scene from a dark
+    // one — closeness patterns for a resource (centre ~0.3) and a
+    // hazard (centre ~0.75) point the same way and score cosine
+    // 1.0, so every scene collapsed into one concept. Multiply by a
+    // magnitude factor: patterns of similar strength stay similar,
+    // patterns whose strength differs a lot do not. Same object at
+    // a somewhat different distance (norms 0.74 vs 1.2) still scores
+    // ~0.76 and matches; resource vs hazard (0.74 vs 1.84) scores
+    // ~0.57 and forms a separate concept. Direction and magnitude
+    // are both properties of the experience, not labels.
+    float cosine = dot / (std::sqrt(normA) * std::sqrt(normB));
+    float magA = std::sqrt(normA), magB = std::sqrt(normB);
+    float magFactor = 1.0f - std::abs(magA - magB) / (magA + magB + 0.0001f);
+    return cosine * magFactor;
 }
 
 bool ConceptFormation::isConceptStable(size_t conceptId) const {

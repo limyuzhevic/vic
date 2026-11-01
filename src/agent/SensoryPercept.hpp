@@ -3,6 +3,7 @@
 #include "AgentBody.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace nlm {
@@ -36,6 +37,14 @@ public:
     // Audio-like signals (if enabled)
     const std::vector<float>& getAudio() const { return audio_; }
     void setAudio(const std::vector<float>& a) { audio_ = a; }
+
+    // Phase 6 text-as-a-sense: an optional teacher-presented word or
+    // phrase. The brain never receives this string — AgentBrain's
+    // encoder turns it into a fixed sparse pattern on dedicated
+    // sensory neurons (see AgentBrain::encodeText), exactly as vision
+    // turns light into a pattern. Empty means no text is present.
+    const std::string& getText() const { return text_; }
+    void setText(const std::string& t) { text_ = t; }
     
     // Get all signals concatenated (for brain input)
     std::vector<float> getAllSignals() const;
@@ -52,6 +61,7 @@ private:
     std::vector<float> internal_;
     std::vector<float> proprioception_;
     std::vector<float> audio_;
+    std::string text_;
     double timestamp_;
 };
 

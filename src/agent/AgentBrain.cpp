@@ -44,6 +44,10 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                             case 5: motorWait_.push_back(n); break;
                         }
                     }
+                } else if (type == NeuronType::Internal) {
+                    for (Neuron* n : pop->getNeurons()) {
+                        internalNeurons_.push_back(n);
+                    }
                 } else if (type == NeuronType::Sensory) {
                     for (Neuron* n : pop->getNeurons()) {
                         // Distribute sensory neurons
@@ -64,6 +68,93 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
 }
 
 AgentBrain::~AgentBrain() = default;
+
+// Phase 6 text encoder: a teacher word becomes a sparse sensory
+// pattern, never a string the brain can match on. Lower-case, trim,
+// FNV-1a hash, then splitmix to pick 4 distinct neurons out of 16
+// dedicated text neurons. Different words get different (overlapping,
+// as in real sensory codes) patterns; the same word always gets the
+// same pattern, which is what makes paired learning possible at all.
+// The pattern is injected on sensoryVision_ neurons 16..30 — the
+// tail vision neurons that vision itself never uses (vision is 16
+// rays, the vision group has 31 neurons), so text has its own
+// channel and cannot masquerade as a visual scene.
+std::vector<size_t> AgentBrain::encodeText(const std::string& text) {
+    std::string norm;
+    for (char c : text) {
+        if (c == ' ' || c == '\t' || c == '\n') continue;
+        norm += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    if (norm.empty()) return {};
+    uint64_t h = 1469598103934665603ULL;
+    for (char c : norm) {
+        h ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
+        h *= 1099511628211ULL;
+    }
+    std::vector<size_t> out;
+    uint64_t state = h;
+    while (out.size() < 4) {
+        // splitmix64
+        state += 0x9e3779b97f4a7c15ULL;
+        uint64_t z = state;
+        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+        z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+        z = z ^ (z >> 31);
+        size_t idx = static_cast<size_t>(z % 15);
+        if (std::find(out.begin(), out.end(), idx) == out.end()) out.push_back(idx);
+    }
+    return out;
+}
+
+std::vector<float> AgentBrain::getInternalFiringRates() const {
+    std::vector<float> rates;
+    rates.reserve(internalNeurons_.size());
+    for (const Neuron* n : internalNeurons_) {
+        rates.push_back(n ? n->getFiringRate() : 0.0f);
+    }
+    return rates;
+}
+
+std::vector<float> AgentBrain::conceptPattern() const {
+    std::vector<float> pat;
+    for (float v : lastVision_) pat.push_back(1.0f - v);
+    for (float t : lastTouch_) pat.push_back(t);
+    return pat;
+}
+
+size_t AgentBrain::getConceptCount() const {
+    return brain_ && brain_->getConceptFormation() ? brain_->getConceptFormation()->getConceptCount() : 0;
+}
+
+float AgentBrain::getSelfModelConfidence() const {
+    if (!selfModelReady_) return 0.0f;
+    float sum = 0.0f;
+    int n = 0;
+    for (int a = 0; a < 6; ++a) {
+        float c = selfModel_.getSelfModelConfidence(static_cast<ActionType>(a));
+        if (c > 0.0f) { sum += c; ++n; }
+    }
+    return n ? sum / n : 0.0f;
+}
+
+size_t AgentBrain::getSocialObservationCount() const {
+    return socialReady_ ? socialLearning_.getObservationCount() : 0;
+}
+
+void AgentBrain::observeOtherAgent(MotorCommand observed, const std::vector<float>& beforeVision,
+                                   const std::vector<float>& afterVision) {
+    if (!socialReady_ && brain_) { socialLearning_.initialize(brain_.get()); socialReady_ = true; }
+    ActionType act = ActionType::Wait;
+    switch (observed) {
+        case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
+        case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
+        case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
+        case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
+        case MotorCommand::Interact: act = ActionType::Interact; break;
+        default: break;
+    }
+    socialLearning_.observeAgentAction(act, beforeVision, afterVision);
+}
 
 void AgentBrain::initialize(const SimpleWorld& world) {
     // Start with no prediction (all zeros), so the first scene is
@@ -91,6 +182,27 @@ size_t AgentBrain::getMotorOutputSize() const {
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
+
+    // Phase 6 self-model, wired into the loop: the percept arriving
+    // now is the consequence of the action decoded last turn, so
+    // record (previous vision -> current vision) for that action.
+    // This is what lets the agent later predict what its own actions
+    // do, instead of the SelfModel class sitting unused in the
+    // library. It records from the loop's own percepts only.
+    if (hasLastDecoded_ && !lastVision_.empty() && !percept.getVision().empty()) {
+        if (!selfModelReady_) { selfModel_.initialize(brain_.get()); selfModelReady_ = true; }
+        ActionType act = ActionType::Wait;
+        switch (lastDecoded_) {
+            case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
+            case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
+            case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
+            case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
+            case MotorCommand::Interact: act = ActionType::Interact; break;
+            default: break;
+        }
+        selfModel_.recordSelfAction(act, lastVision_, percept.getVision());
+    }
+    lastText_ = percept.getText();
 
     // Phase 5 winner-take-all lateral inhibition: if the last decode
     // had a decisive winner (margin > 5 Hz) and the scene is stable
@@ -142,6 +254,20 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
 
+    // Phase 6 text-as-a-sense: inject the teacher word's sparse
+    // pattern on the dedicated text neurons, in the same presentation
+    // as the visual scene, so STDP can associate the two. The brain
+    // sees only which text neurons fire — never the string — and no
+    // decision below branches on text content.
+    if (!percept.getText().empty()) {
+        for (size_t idx : encodeText(percept.getText())) {
+            size_t neuronIdx = 16 + idx;
+            if (neuronIdx < sensoryVision_.size() && sensoryVision_[neuronIdx]) {
+                sensoryVision_[neuronIdx]->injectCurrent(8.0f);
+            }
+        }
+    }
+
     // Touch input (8 values -> sensoryTouch_ neurons)
     const auto& touch = percept.getTouch();
     maxTouch_ = 0.0f;
@@ -173,7 +299,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         // AgentBrain.hpp for why >0.5 means resource-like and <0.35
         // hazard/wall-like at touch range.
         forwardObjectVision_ = 1.0f;
-        if (touch.size() >= 8 && !vision.empty()) {
+        if (touch.size() >= 8 && !vision.empty() && forwardTouch_ > 0.05f) {
             size_t touchDir = 0;
             float touchBest = touch[0];
             if (touch[1] > touchBest) { touchBest = touch[1]; touchDir = 1; }
@@ -187,7 +313,21 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
                     forwardObjectVision_ = std::min(forwardObjectVision_, vision[r]);
                 }
             }
+        } else if (!vision.empty()) {
+            // Phase 6: without touch, the forward object is the
+            // closest centre-ray object. The Phase 5 code left
+            // forwardObjectVision_ at its previous value (or 1.0)
+            // whenever nothing was touched, so bright-approach
+            // phototaxis — which is explicitly a vision-only, no-
+            // touch cue — could almost never fire from a fresh
+            // percept. Vision alone now drives it.
+            for (size_t r = 5; r <= 10 && r < vision.size(); ++r) {
+                if (vision[r] < 0.99f) {
+                    forwardObjectVision_ = std::min(forwardObjectVision_, vision[r]);
+                }
+            }
         }
+        lastTouch_ = touch;
         thoughtPercept_ = "visionMean=" + std::to_string(visionMean) +
                           " fwdObjVision=" + std::to_string(forwardObjectVision_) +
                           " fwdTouch=" + std::to_string(forwardTouch_) +
@@ -324,6 +464,13 @@ MotorCommand AgentBrain::decodeMotorCommand() {
         decoded = selectWithCuriosity(decoded);
     }
 
+    // Phase 6 planner agreement: planned vs finally acted, after
+    // curiosity exploration (which can still override both).
+    if (hasThoughtPlanned_) {
+        ++plannerDecisionCount_;
+        if (thoughtPlanned_ == decoded) ++plannerAgreementCount_;
+    }
+
     // Phase 5 diversity counters, from the final action actually taken.
     if (decoded == MotorCommand::TurnLeft || decoded == MotorCommand::TurnRight) {
         stepsSinceTurn_ = 0;
@@ -370,6 +517,19 @@ std::vector<AgentBrain::MotorGroupActivity> AgentBrain::getMotorGroupActivities(
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
     auto activities = getMotorGroupActivities();
+    // Phase 6 silent-brain guard: if no motor neuron is actually
+    // firing, no bias (planner, concept, reflex) may invent an
+    // action from nothing. This was found by the reverted drive-
+    // scaling experiment: with the network silenced, planner bias
+    // alone produced 178 empty Interacts per episode from a brain
+    // that was firing at 0 Hz. A silent brain waits.
+    {
+        float maxRaw = 0.0f;
+        for (size_t i = 0; i < 5 && i < activities.size(); ++i) {
+            maxRaw = std::max(maxRaw, activities[i].firingRate);
+        }
+        if (maxRaw <= 0.1f) return MotorCommand::Wait;
+    }
     // Order matches getMotorGroupActivities(): fwd, bwd, left, right, interact, wait
     // Phase 4: innate proximity reflex for Interact. Interact never won
     // because its rate sat ~5 Hz below forward/backward in the saturated
@@ -413,22 +573,23 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
                              forwardObjectVision_ < 0.99f;
     const bool hazardCue = forwardTouch_ > 0.05f &&
                            forwardObjectVision_ < 0.35f;
-    // Phase 5 bright-approach (phototaxis): a bright object in the
-    // forward vision direction, before touch range, biases Forward by
-    // +6 Hz. This is a sensory-motor mapping from vision brightness
-    // alone — no object label, no coordinates, no pathfinder — and it
-    // is what can actually bring the agent to a resource, because
-    // touch-range reflexes almost never fire in the sparse 20x20
-    // world (reflex bonus fired 0 times in the Phase 5 world-loop
-    // measurement). A far wall also reads bright (wall vision is
-    // distance/8), so this can also walk the agent toward a wall; as
-    // it approaches, the wall's vision value falls below 0.35, the
-    // hazard cue above takes over, and turn diversity breaks the
-    // approach. The bias is small enough that a decisive motor
-    // pattern still wins.
-    if (maxTouch_ <= 0.05f && forwardObjectVision_ > 0.5f &&
+    // Phase 5 bright-approach (phototaxis), widened in Phase 6:
+    // a bright object in the forward vision direction, before
+    // touch range, biases Forward by +10 Hz (was +6). The old
+    // >0.5 threshold only saw a resource within ~3 units
+    // ((8-3)/8*0.8 = 0.5); at 5 units a resource reads 0.3, so
+    // the agent walked past distant resources without ever
+    // steering toward them — the main remaining conversion gap
+    // once every action actually executes. The >0.3 floor still
+    // excludes hazards (their encoding tops out at 0.3, at
+    // touch range) while admitting resources out to ~5 units.
+    // A far wall also reads bright (distance/8), so this can
+    // still walk the agent toward a wall; as it approaches,
+    // the wall's vision value falls below 0.35, the hazard cue
+    // takes over, and turn diversity breaks the approach.
+    if (maxTouch_ <= 0.05f && forwardObjectVision_ > 0.3f &&
         forwardObjectVision_ < 0.95f) {
-        forwardRate += 6.0f;
+        forwardRate += 10.0f;
     }
     // Phase 5 interact gating: interacting with nothing is free in
     // reward terms (0) but costs a step, and in Phase 4/5 measurement
@@ -442,20 +603,23 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     if (maxTouch_ <= 0.05f) {
         interactRate = std::max(0.0f, interactRate - 12.0f);
     }
-    // Bonus raised 12 -> 16 in Phase 5: after the working-memory fix,
-    // motor rates rose enough that the typical Forward-vs-Interact
-    // deficit at a resource reached 12.6 Hz and the old bonus lost by
-    // 0.6 Hz in the pattern probe. The principle is unchanged (beat
-    // the typical deficit, not a decisive pattern); the hazard
-    // suppression and no-touch gating stay at 12 Hz.
+    // Bonus raised 12 -> 16 in Phase 5, then 16 -> 20 in Phase 6:
+    // after the refractory change lowered all rates, the
+    // Forward-vs-Interact deficit at a resource in the probe
+    // reached 17.1 Hz and the 16 Hz bonus lost by 1.1 Hz. The
+    // principle is unchanged (beat the typical deficit, not a
+    // decisive pattern); the hazard turn boost rises 8 -> 12 for
+    // the same reason (a 55.8 Hz backward pattern beat the
+    // boosted 55.1 Hz turn in the dark probe). No-touch gating
+    // and hazard suppression stay at 12 Hz.
     if (resourceCue && interactRate > 0.1f && noveltyLevel_ > 0.02f &&
         !(hasLastDecoded_ && lastDecoded_ == MotorCommand::Interact)) {
-        interactRate += 16.0f;
+        interactRate += 20.0f;
         ++reflexBonusCount_;
     } else if (hazardCue) {
         interactRate = std::max(0.0f, interactRate - 12.0f);
-        turnLeftRate += 8.0f;
-        turnRightRate += 8.0f;
+        turnLeftRate += 12.0f;
+        turnRightRate += 12.0f;
         ++reflexSuppressCount_;
     }
     // Phase 5 learned-preference bias: the scalar trait stored on the
@@ -466,6 +630,158 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     // from a fresh one.
     if (brain_) {
         interactRate += brain_->getLearnedPreference() * 5.0f;
+    }
+    // Phase 6 planner IN the loop (was advisory only). The planner
+    // suggests from learned action quality; that suggestion now
+    // biases the motor decode, but only once the planner has actually
+    // learned something (some action quality beyond +-0.05 from
+    // experienced rewards) and only when its suggestion is clearly
+    // better in its own units (quality gap > 0.15, on a -1..1
+    // reward/10 scale) than the action the motor pattern would pick.
+    // A +15 Hz bias can overturn a near-tie, not a decisive motor
+    // pattern, and the override is counted at winner selection below.
+    MotorCommand preBiasBest = MotorCommand::Wait;
+    {
+        float rates[5] = {forwardRate, backwardRate, turnLeftRate, turnRightRate, interactRate};
+        MotorCommand cmds[5] = {MotorCommand::MoveForward, MotorCommand::MoveBackward,
+                                MotorCommand::TurnLeft, MotorCommand::TurnRight,
+                                MotorCommand::Interact};
+        float bestR = -1.0f;
+        for (int i = 0; i < 5; ++i) {
+            if (rates[i] > bestR) { bestR = rates[i]; preBiasBest = cmds[i]; }
+        }
+    }
+    bool plannerBiasApplied = false;
+    MotorCommand plannerCmd = MotorCommand::Wait;
+    if (brain_ && brain_->getPlanner() && hasThoughtPlanned_ &&
+        thoughtPlanned_ != MotorCommand::Wait && thoughtPlanned_ != preBiasBest) {
+        auto toAction = [](MotorCommand c) {
+            switch (c) {
+                case MotorCommand::MoveForward: return ActionType::MoveForward;
+                case MotorCommand::MoveBackward: return ActionType::MoveBackward;
+                case MotorCommand::TurnLeft: return ActionType::TurnLeft;
+                case MotorCommand::TurnRight: return ActionType::TurnRight;
+                case MotorCommand::Interact: return ActionType::Interact;
+                default: return ActionType::Wait;
+            }
+        };
+        auto* planner = brain_->getPlanner();
+        // Thresholds matched to the actual quality scale: quality
+        // is an EMA toward reward/10, so a single +10 resource
+        // moves Interact to ~+0.1 while everyday movement costs
+        // sit near -0.001. A 0.15 gap would never fire; 0.05 does,
+        // and only after a real resource-scale experience.
+        bool learned = false;
+        for (ActionType a : {ActionType::MoveForward, ActionType::MoveBackward,
+                             ActionType::TurnLeft, ActionType::TurnRight,
+                             ActionType::Interact, ActionType::Wait}) {
+            if (std::abs(planner->getActionQuality(a)) > 0.02f) { learned = true; break; }
+        }
+        float qPlanned = planner->getActionQuality(toAction(thoughtPlanned_));
+        float qBest = planner->getActionQuality(toAction(preBiasBest));
+        // Phase 6 guard, learned from the reverted global-
+        // inhibition experiment: a planner suggestion to Interact
+        // when nothing is within touch range is exactly the
+        // Phase 4 trap in planner form (115 empty interacts in
+        // one episode). The planner may bias movement and turns
+        // freely, but Interact requires something to interact with.
+        bool interactWithoutTouch = thoughtPlanned_ == MotorCommand::Interact && maxTouch_ <= 0.05f;
+        if (learned && !interactWithoutTouch && qPlanned - qBest > 0.05f) {
+            plannerCmd = thoughtPlanned_;
+            plannerBiasApplied = true;
+            switch (thoughtPlanned_) {
+                case MotorCommand::MoveForward: forwardRate += 15.0f; break;
+                case MotorCommand::MoveBackward: backwardRate += 15.0f; break;
+                case MotorCommand::TurnLeft: turnLeftRate += 15.0f; break;
+                case MotorCommand::TurnRight: turnRightRate += 15.0f; break;
+                case MotorCommand::Interact: interactRate += 15.0f; break;
+                default: break;
+            }
+        }
+    }
+    // Phase 6 concept bias: if the current scene matches a concept
+    // whose experienced rewards were strongly positive, interacting
+    // is favoured; if strongly negative, interacting is penalised
+    // and turning favoured. Concepts are formed from experience in
+    // applyRewardModulation — no object label is used, only the
+    // scene pattern and its reward history.
+    if (brain_ && brain_->getConceptFormation()) {
+        auto pat = conceptPattern();
+        float norm = 0.0f;
+        for (float v : pat) norm += v * v;
+        if (norm > 0.01f) {
+            size_t cid = brain_->getConceptFormation()->getMatchingConcept(pat);
+            const auto* foundConcept = cid ? brain_->getConceptFormation()->getConcept(cid) : nullptr;
+            if (foundConcept && !foundConcept->instances.empty()) {
+                float avg = 0.0f;
+                for (const auto& inst : foundConcept->instances) avg += inst.avgReward;
+                avg /= static_cast<float>(foundConcept->instances.size());
+                // Thresholds matched to per-step presentation: a
+                // concept absorbs many -0.01 movement steps plus
+                // occasional +-10/+ -15 events, so its average is
+                // ~+0.2 for a resource scene and ~-0.3 for a hazard
+                // scene, not +-10. A +-1 threshold would never fire.
+                if (avg > 0.1f && maxTouch_ > 0.05f) { interactRate += 8.0f; ++conceptBiasCount_; }
+                else if (avg < -0.1f) {
+                    interactRate = std::max(0.0f, interactRate - 8.0f);
+                    turnLeftRate += 6.0f; turnRightRate += 6.0f;
+                    ++conceptBiasCount_;
+                }
+            }
+        }
+    }
+    // Phase 6 self-model bias, discriminative only: vision patterns
+    // are so similar frame to frame (most rays read empty) that
+    // self-model confidence is ~0.97 for every action — biasing
+    // every action by +3 Hz would cancel out and only inflate the
+    // counter. So only the single most-confident action, and only
+    // when it clearly leads the runner-up (> 0.05), gets +3 Hz.
+    // In practice this fires rarely, which is the honest result:
+    // the self-model records and predicts, but its confidence does
+    // not yet discriminate actions well.
+    if (selfModelReady_) {
+        MotorCommand cmds[5] = {MotorCommand::MoveForward, MotorCommand::MoveBackward,
+                                MotorCommand::TurnLeft, MotorCommand::TurnRight,
+                                MotorCommand::Interact};
+        ActionType acts[5] = {ActionType::MoveForward, ActionType::MoveBackward,
+                              ActionType::TurnLeft, ActionType::TurnRight,
+                              ActionType::Interact};
+        float conf[5];
+        for (int i = 0; i < 5; ++i) conf[i] = selfModel_.getSelfModelConfidence(acts[i]);
+        int bestI = 0;
+        float second = 0.0f;
+        for (int i = 0; i < 5; ++i) {
+            if (conf[i] > conf[bestI]) { second = conf[bestI]; bestI = i; }
+            else if (conf[i] > second) { second = conf[i]; }
+        }
+        if (conf[bestI] > 0.8f && conf[bestI] - second > 0.05f) {
+            switch (cmds[bestI]) {
+                case MotorCommand::MoveForward: forwardRate += 3.0f; break;
+                case MotorCommand::MoveBackward: backwardRate += 3.0f; break;
+                case MotorCommand::TurnLeft: turnLeftRate += 3.0f; break;
+                case MotorCommand::TurnRight: turnRightRate += 3.0f; break;
+                case MotorCommand::Interact: interactRate += 3.0f; break;
+                default: break;
+            }
+            ++selfBiasCount_;
+        }
+    }
+    // Phase 6 social bias: if another agent was observed acting in a
+    // closely matching state (similarity > 0.8), imitating that
+    // action gets +5 Hz. With no observations this is inert, which
+    // is correct for a single-agent world.
+    if (socialReady_ && socialLearning_.getObservationCount() > 0 && !lastVision_.empty()) {
+        auto [imitAct, sim] = socialLearning_.getImitationActionAndSimilarity(lastVision_);
+        if (sim > 0.8f) {
+            switch (imitAct) {
+                case ActionType::MoveForward: forwardRate += 5.0f; ++socialBiasCount_; break;
+                case ActionType::MoveBackward: backwardRate += 5.0f; ++socialBiasCount_; break;
+                case ActionType::TurnLeft: turnLeftRate += 5.0f; ++socialBiasCount_; break;
+                case ActionType::TurnRight: turnRightRate += 5.0f; ++socialBiasCount_; break;
+                case ActionType::Interact: interactRate += 5.0f; ++socialBiasCount_; break;
+                default: break;
+            }
+        }
     }
     // Phase 5 turn diversity / repetition fatigue. Phase 4 oscillated
     // forward/backward, turned only 0-2 times per episode and covered
@@ -530,6 +846,11 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     if (bestActivity <= 0.1f) {
         return MotorCommand::Wait;
     }
+    // Phase 6: count a genuine planner override — the planner's
+    // action won only because its bias overturned the motor winner.
+    if (plannerBiasApplied && best == plannerCmd && best != preBiasBest) {
+        ++plannerOverrideCount_;
+    }
     return best;
 }
 
@@ -569,6 +890,22 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     thoughtReward_ = reward;
     hasThoughtOutcome_ = true;
+    // Phase 6 concept formation, wired into the loop: the pattern
+    // that led to this action, paired with this action's reward.
+    // Concepts therefore emerge from experienced pattern/reward
+    // pairings — a bright scene repeatedly followed by +10 becomes
+    // a different concept from a dark scene followed by -15 — and
+    // the concept bias in decode can then use them. The pattern is
+    // closeness (1 - vision) plus touch, so an empty scene is the
+    // zero pattern and is skipped (it is not a concept).
+    if (brain_->getConceptFormation() && !lastVision_.empty()) {
+        auto pat = conceptPattern();
+        float norm = 0.0f;
+        for (float v : pat) norm += v * v;
+        if (norm > 0.01f) {
+            brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
+        }
+    }
     // Phase 5 learning for the thought/preference systems, from the
     // same reward the synaptic modulation below uses:
     //  - Planner action quality: EMA toward reward/10 for the action
@@ -755,6 +1092,14 @@ void AgentBrain::reset() {
     reflexBonusCount_ = 0;
     reflexSuppressCount_ = 0;
     wtaPulseCount_ = 0;
+    plannerOverrideCount_ = 0;
+    plannerAgreementCount_ = 0;
+    plannerDecisionCount_ = 0;
+    conceptBiasCount_ = 0;
+    selfBiasCount_ = 0;
+    socialBiasCount_ = 0;
+    lastTouch_.clear();
+    lastText_.clear();
     stepsSinceTurn_ = 0;
     repeatCount_ = 0;
     hasLastDecoded_ = false;
