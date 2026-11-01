@@ -82,6 +82,13 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
+#### Enhanced Features (Phase 6.1)
+- **Performance Monitoring**: Real-time tracking of neural activity and system performance
+- **Behavioral Testing**: Framework for testing pattern discrimination and learning
+- **Advanced Control**: Enhanced command-line options for fine-grained configuration
+- **Bug Fixes**: Fixed Phase 6 reward calculation bug
+- **Development Speed**: Fine-grained control over developmental progression
+
 ## Building
 
 ```bash

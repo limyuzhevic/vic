@@ -25,6 +25,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
+    if (config.showDetailedStats) {
+        NLM_LOG_INFO("Development speed: " + std::to_string(config.developmentSpeed));
+        NLM_LOG_INFO("Detailed statistics enabled");
+    }
+    
     // Create configuration
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount));
@@ -34,6 +39,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("stdp_ltd_weight", 0.012f);
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
+    cfg->set("development_speed", config.developmentSpeed);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -89,7 +95,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         
         // Update development
         if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
+            // Use development speed to scale the development rate
+            double devTimeStep = 0.001 * config.developmentSpeed;
+            agent.updateDevelopment(devTimeStep);
         }
         
         // Collect metrics
@@ -98,16 +106,24 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         
         // Periodic status
         if (step % 1000 == 0) {
+            std::string devInfo = config.enableDevelopment ? 
+                ("DevSpeed: " + std::to_string(config.developmentSpeed)) : "Dev: Off";
+            std::string detailedInfo = config.showDetailedStats ? 
+                (" | " + devInfo + " | Neuromod: " + std::to_string(agent.getNeuromodulationLevel()) + 
+                 " | Novelty: " + std::to_string(agent.getNoveltyLevel()) + 
+                 " | Curiosity: " + std::to_string(agent.getCuriosityLevel())) : "";
+            
             NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                         " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
+                             brain->getWorkingMemory()->getActiveTraces() : 0) +
+                         detailedInfo);
         }
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
+    result.totalReward = totalReward;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;

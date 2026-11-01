@@ -15,6 +15,49 @@ int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
+    // Parse command-line arguments
+    int neuronCount = 500;
+    int maxSteps = 2000;
+    bool enableCheckpointing = true;
+    bool enableReplay = true;
+    bool enableDevelopment = true;
+    double developmentSpeed = 1.0;
+    bool showDetailedStats = false;
+    std::string checkpointPath = "/tmp/nlm_checkpoint_demo.bin";
+    
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--neurons") == 0 && i + 1 < argc) {
+            neuronCount = std::atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--steps") == 0 && i + 1 < argc) {
+            maxSteps = std::atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--no-checkpoint") == 0) {
+            enableCheckpointing = false;
+        } else if (strcmp(argv[i], "--no-replay") == 0) {
+            enableReplay = false;
+        } else if (strcmp(argv[i], "--no-dev") == 0) {
+            enableDevelopment = false;
+        } else if (strcmp(argv[i], "--dev-speed") == 0 && i + 1 < argc) {
+            developmentSpeed = std::atof(argv[++i]);
+        } else if (strcmp(argv[i], "--stats") == 0) {
+            showDetailedStats = true;
+        } else if (strcmp(argv[i], "--checkpoint") == 0 && i + 1 < argc) {
+            checkpointPath = argv[++i];
+        } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            std::cout << "Usage: nlm_phase6_demo [options]\n";
+            std::cout << "Options:\n";
+            std::cout << "  --neurons N          Number of neurons (default: 500)\n";
+            std::cout << "  --steps N            Maximum simulation steps (default: 2000)\n";
+            std::cout << "  --no-checkpoint       Disable checkpointing\n";
+            std::cout << "  --no-replay           Disable replay system\n";
+            std::cout << "  --no-dev              Disable developmental system\n";
+            std::cout << "  --dev-speed N        Development speed multiplier (default: 1.0)\n";
+            std::cout << "  --stats               Show detailed statistics during simulation\n";
+            std::cout << "  --checkpoint PATH     Checkpoint file path (default: /tmp/nlm_checkpoint_demo.bin)\n";
+            std::cout << "  -h, --help           Show this help message\n";
+            return 0;
+        }
+    }
+    
     // Initialize logging
     Logger::getGlobal().setLevel(LogLevel::Info);
     
@@ -51,14 +94,17 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with configured settings
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    config.neuronCount = neuronCount;
+    config.maxSteps = maxSteps;
+    config.enableCheckpointing = enableCheckpointing;
+    config.enableReplay = enableReplay;
+    config.enableDevelopment = enableDevelopment;
+    config.developmentSpeed = developmentSpeed;
+    config.checkpointPath = checkpointPath;
+    config.showDetailedStats = showDetailedStats;
     
     auto result = experiment.run(config);
     

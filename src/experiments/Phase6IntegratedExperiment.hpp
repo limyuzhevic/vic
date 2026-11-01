@@ -83,6 +83,8 @@ struct Phase6Config {
     bool enableCheckpointing;
     bool enableReplay;
     bool enableDevelopment;
+    float developmentSpeed;
+    bool showDetailedStats;
     std::string checkpointPath;
     
     Phase6Config()
@@ -93,6 +95,8 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
+        , developmentSpeed(1.0f)
+        , showDetailedStats(false)
         , checkpointPath("./checkpoint_test.bin") {}
 };
 
