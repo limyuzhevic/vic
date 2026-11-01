@@ -424,6 +424,182 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Advanced brain creation utilities
+    m.def("createEmptyConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set up reasonable defaults for new brains
+        config->set("neuron_count", 500ll);
+        config->set("region_count", 1ll);
+        config->set("connection_probability", 0.15f);
+        config->set("simulation_timestep", 0.001);
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("random_seed", 42ll);
+        return config;
+    }, "Create an empty configuration with default values");
+
+    // Convenience brain factory methods
+    m.def("createSimpleBrain", [](int neuronCount) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("region_count", 1ll);
+        config->set("connection_probability", 0.15f);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuron_count"), "Create a simple brain with specified neuron count");
+
+    // Agent helper methods for common patterns
+    m.def("createAgentWithDefaults", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        return agent;
+    }, py::arg("brain"), py::arg("world"), "Create an agent brain with common defaults enabled");
+
+    // Performance optimization utilities
+    m.def("createPerformanceConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 1000ll);
+        config->set("region_count", 4ll);
+        config->set("connection_probability", 0.2f);
+        config->set("simulation_timestep", 0.0005);
+        config->set("stdp_ltp_weight", 0.008f);
+        config->set("stdp_ltd_weight", 0.008f);
+        config->set("checkpoint_interval", 10000ll);
+        config->set("random_seed", 12345ll);
+        return config;
+    }, "Create a performance-optimized configuration for large simulations");
+
+    // Quick preset configurations
+    m.def("createResearchConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 5000ll);
+        config->set("region_count", 8ll);
+        config->set("connection_probability", 0.12f);
+        config->set("simulation_timestep", 0.001);
+        config->set("stdp_ltp_weight", 0.005f);
+        config->set("stdp_ltd_weight", 0.006f);
+        config->set("synaptogenesis_rate", 0.00005f);
+        config->set("pruning_rate", 0.000005f);
+        config->set("random_seed", 999ll);
+        return config;
+    }, "Create a research-oriented configuration with advanced plasticity");
+
+    // Utility functions for brain management
+    m.def("runBrainSimulation", [](std::shared_ptr<Brain> brain, int steps, 
+                                  std::shared_ptr<SimpleWorld> world,
+                                  std::shared_ptr<AgentBrain> agent,
+                                  int randomSeed) -> std::map<std::string, float> {
+        if (brain) brain->reset();
+        if (world) world->reset();
+        if (agent) agent->reset();
+        
+        float totalReward = 0.0f;
+        float totalFiringRate = 0.0f;
+        size_t firingCount = 0;
+        
+        for (int step = 0; step < steps; ++step) {
+            if (world) {
+                world->update(0.1);
+                if (agent) {
+                    auto percept = world->getSensoryPercept();
+                    agent->processSensoryInput(percept);
+                }
+            }
+            
+            if (brain) brain->step(step, step * 0.1);
+            
+            if (agent) {
+                auto action = agent->decodeMotorCommand();
+                if (world) {
+                    auto result = world->applyMotorCommand(action, step * 0.1);
+                    totalReward += result.reward;
+                    agent->applyRewardModulation(result.reward, 0.0f);
+                }
+            }
+            
+            if (brain) {
+                totalFiringRate += brain->getAverageFiringRate();
+                if (brain->getFiringNeuronCount() > 0) firingCount++;
+            }
+            
+            if (agent) {
+                agent->updateDevelopment(0.1);
+            }
+        }
+        
+        std::map<std::string, float> stats;
+        if (brain) {
+            stats["total_spikes"] = static_cast<float>(brain->getTotalSpikeCount());
+            stats["avg_firing_rate"] = totalFiringRate / (firingCount > 0 ? firingCount : 1);
+            stats["firing_active_steps"] = static_cast<float>(firingCount);
+        }
+        stats["total_reward"] = totalReward;
+        stats["steps_completed"] = static_cast<float>(steps);
+        
+        return stats;
+    }, py::arg("brain"), py::arg("steps"), py::arg("world").nullopt, py::arg("agent").nullopt, py::arg("randomSeed") = 42,
+       "Run a complete brain-world-agent simulation with statistics collection");
+
+    // Batch operations for advanced users
+    m.def("createBrainEnsemble", [](const std::vector<int>& neuronCounts) -> std::vector<std::shared_ptr<Brain>> {
+        std::vector<std::shared_ptr<Brain>> brains;
+        for (size_t i = 0; i < neuronCounts.size(); ++i) {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", static_cast<int64_t>(neuronCounts[i]));
+            config->set("region_count", 1ll);
+            config->set("connection_probability", 0.15f);
+            config->set("random_seed", static_cast<int64_t>(i + 1));
+            brains.push_back(std::make_shared<Brain>(config));
+            if (brains.back()) {
+                brains.back()->initialize();
+            }
+        }
+        return brains;
+    }, py::arg("neuronCounts"), "Create multiple brains with different sizes for ensemble experiments");
+
+    // Diagnostic and debugging utilities
+    m.def("brainHealthReport", [](std::shared_ptr<Brain> brain) -> std::string {
+        if (!brain) return "ERROR: Null brain pointer";
+        
+        std::stringstream ss;
+        ss << "=== NLM Brain Health Report ===\n";
+        ss << "Neurons: " << brain->getTotalNeuronCount() << "\n";
+        ss << "Synapses: " << brain->getTotalSynapseCount() << "\n";
+        ss << "Firing: " << brain->getFiringNeuronCount() << " active\n";
+        ss << "Total Spikes: " << brain->getTotalSpikeCount() << "\n";
+        ss << "Avg Firing Rate: " << brain->getAverageFiringRate() << " Hz\n";
+        ss << "E/I Ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+        ss << "Development Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        ss << "Config Summary: " << brain->getConfig()->summary() << "\n";
+        
+        return ss.str();
+    }, py::arg("brain"), "Generate a detailed health report for a brain");
+
+    // Configuration utilities
+    m.def("validateConfig", [](std::shared_ptr<Config> config) -> bool {
+        if (!config) return false;
+        return config->has("neuron_count") && config->has("region_count") &&
+               config->has("connection_probability") && config->has("random_seed");
+    }, py::arg("config"), "Validate that a configuration has all required fields");
+
+    m.def("printConfigHelp", []() {
+        std::cout << "=== NLM Configuration Help ===\n"
+                  << "Required fields:\n"
+                  << "  neuron_count (int64_t): Number of neurons\n"
+                  << "  region_count (int64_t): Number of brain regions\n"
+                  << "  connection_probability (float): Connection probability (0-1)\n"
+                  << "  random_seed (int64_t): Random number seed\n\n"
+                  << "Optional fields:\n"
+                  << "  simulation_timestep (double): Time step size\n"
+                  << "  stdp_ltp_weight (float): STDP LTP weight\n"
+                  << "  stdp_ltd_weight (float): STDP LTD weight\n"
+                  << "  synaptogenesis_rate (float): Structural plasticity rate\n"
+                  << "  pruning_rate (float): Structural plasticity pruning rate\n"
+                  << "  checkpoint_interval (int64_t): Checkpoint save interval\n";
+    }, "Print configuration field documentation");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
