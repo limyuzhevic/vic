@@ -117,8 +117,13 @@ std::vector<float> AgentBrain::getInternalFiringRates() const {
 
 std::vector<float> AgentBrain::conceptPattern() const {
     std::vector<float> pat;
-    for (float v : lastVision_) pat.push_back(1.0f - v);
-    for (float t : lastTouch_) pat.push_back(t);
+    // Convert vision (higher is darker) and touch (higher is more touch) to concept features
+    for (float v : lastVision_) {
+        pat.push_back(1.0f - std::min(std::max(v, 0.0f), 1.0f)); // Normalize vision to [0,1]
+    }
+    for (float t : lastTouch_) {
+        pat.push_back(std::min(std::max(t, 0.0f), 1.0f)); // Normalize touch to [0,1]
+    }
     return pat;
 }
 
