@@ -256,6 +256,10 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
@@ -290,4 +294,34 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     pImpl->lastPostSpikeTime = -1.0f;
 }
 
-} // namespace nlm
+float Synapse::getShortTermDepression() const {
+    return pImpl->shortTermDepression;
+}
+
+void Synapse::setShortTermDepression(float depression) {
+    pImpl->shortTermDepression = depression;
+}
+
+float Synapse::getShortTermFacilitation() const {
+    return pImpl->shortTermFacilitation;
+}
+
+void Synapse::setShortTermFacilitation(float facilitation) {
+    pImpl->shortTermFacilitation = facilitation;
+}
+
+float Synapse::getLastPreSpikeTime() const {
+    return pImpl->lastPreSpikeTime;
+}
+
+void Synapse::setLastPreSpikeTime(float time) {
+    pImpl->lastPreSpikeTime = time;
+}
+
+float Synapse::getLastPostSpikeTime() const {
+    return pImpl->lastPostSpikeTime;
+}
+
+void Synapse::setLastPostSpikeTime(float time) {
+    pImpl->lastPostSpikeTime = time;
+}

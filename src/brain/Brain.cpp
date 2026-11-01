@@ -76,10 +76,14 @@ struct Brain::Impl {
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
+    // Global inhibitory neurons for feedback control (prevents runaway excitation)
+    std::vector<Neuron*> globalInhibitoryNeurons;
     // NeuronId -> neuron, for O(1) synaptic delivery (was a linear scan
     // over all neurons per delayed spike, which made real networks unusable).
     std::unordered_map<uint64_t, Neuron*> neuronById;
     bool spikeHandlersRegistered = false;
+    // Global inhibition control
+    bool globalInhibitionActive;
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
@@ -101,16 +105,16 @@ struct Brain::Impl {
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
+        , globalInhibitionActive(true)  // Enable global inhibition by default
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
-    {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<int64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
+    // Initialize random generator with seed from config
+    uint64_t seed = 42;  // Default seed
+    if (auto seedOpt = config->get<int64_t>("random_seed")) {
+        seed = *seedOpt;
+    }
+    rng = std::make_unique<RandomGenerator>(seed);
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
@@ -231,12 +235,15 @@ bool Brain::initialize() {
             size_t internalExcitatory = internalCount * 4 / 5;
             auto internalPopId = region->addPopulation(internalExcitatory, NeuronType::Internal);
             auto inhibitoryPopId = region->addPopulation(internalCount - internalExcitatory, NeuronType::Inhibitory);
-            (void)internalPopId; (void)inhibitoryPopId;
+            // Add a dedicated global inhibitory neuron population (5% of neurons)
+            auto globalInhibitoryPopId = region->addPopulation(static_cast<size_t>(neuronsPerRegion * 0.05), NeuronType::Inhibitory);
+            (void)internalPopId; (void)inhibitoryPopId; (void)globalInhibitoryPopId;
             auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
             auto* motorPop = region->getPopulation(motorPopId);
+            auto* globalInhibitoryPop = region->getPopulation(globalInhibitoryPopId);
             if (sensoryPop) {
                 for (auto* neuron : sensoryPop->getNeurons()) {
                     pImpl->sensoryNeurons.push_back(neuron);
@@ -247,12 +254,28 @@ bool Brain::initialize() {
                     pImpl->motorNeurons.push_back(neuron);
                 }
             }
+            // Make global inhibitory neurons available for O(1) access
+            if (globalInhibitoryPop) {
+                for (auto* neuron : globalInhibitoryPop->getNeurons()) {
+                    pImpl->globalInhibitoryNeurons.push_back(neuron);
+                }
+            }
             
             NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) +
                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
                         std::to_string(region->getTotalNeuronCount()) + " neurons");
             nextNeuronIndex += region->getTotalNeuronCount();
         }
+    }
+    
+    // Configure global inhibitory feedback
+    // Global inhibition reduces runaway excitation when firing rates get too high
+    if (pImpl->config->getOr<bool>("enable_global_inhibition", true)) {
+        // Enable spike handlers for global inhibitory neurons
+        pImpl->globalInhibitionActive = true;
+        NLM_LOG_INFO("Global inhibitory feedback enabled");
+    } else {
+        pImpl->globalInhibitionActive = false;
     }
     
     // Build the neuron lookup used by synaptic delivery and injection.
@@ -330,6 +353,55 @@ bool Brain::initialize() {
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    
+    // Set checkpoint providers
+    pImpl->checkpointManager->setNeuronProvider([this]() {
+        NeuronCheckpointData data;
+        data.membranePotential.reserve(getTotalNeuronCount());
+        data.restingPotential.reserve(getTotalNeuronCount());
+        data.threshold.reserve(getTotalNeuronCount());
+        data.resetPotential.reserve(getTotalNeuronCount());
+        data.leakConductance.reserve(getTotalNeuronCount());
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    data.membranePotential.push_back(state.membranePotential);
+                    data.restingPotential.push_back(state.restingPotential);
+                    data.threshold.push_back(state.threshold);
+                    data.resetPotential.push_back(state.resetPotential);
+                    data.leakConductance.push_back(state.leakConductance);
+                    data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                    data.refractoryRemaining.push_back(state.refractoryRemaining);
+                    data.refractoryPeriod.push_back(state.refractoryPeriod);
+                    data.lastSpikeTime.push_back(state.lastSpikeTime);
+                    data.firingRate.push_back(state.firingRate);
+                    data.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                    data.regionId.push_back(region->getId().index());
+                    data.populationId.push_back(pop->getId().index());
+                }
+            }
+        }
+        return true;
+    });
+    
+    pImpl->checkpointManager->setSynapseProvider([this]() {
+        SynapseCheckpointData data;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                data.weight.push_back(syn->getWeight());
+                data.delay.push_back(syn->getDelay());
+                data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                data.plasticityFlags = syn->getPlasticityFlags();
+                data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                data.efficacy.push_back(syn->getEfficacy());
+            }
+        }
+        return true;
+    });
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
@@ -453,9 +525,79 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // Process immediate spikes
+// Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
-
+    
+    // ========== STEP: Global inhibitory feedback ==========
+    // Use dedicated global inhibitory neurons to regulate population activity
+    // and prevent runaway excitation. This is more targeted than the earlier
+    // attempt that inhibited all neurons uniformly when >10% fired.
+    if (pImpl->globalInhibitionActive && !pImpl->globalInhibitoryNeurons.empty()) {
+        // Calculate firing rate as percentage of neurons that fired
+        float firingRatePercent = 0.0f;
+        if (pImpl->totalSpikesThisStep > 0 && !pImpl->regions.empty()) {
+            size_t totalNeurons = 0;
+            for (const auto& region : pImpl->regions) {
+                for (const auto& pop : region->getPopulations()) {
+                    totalNeurons += pop->getNeuronCount();
+                }
+            }
+            if (totalNeurons > 0) {
+                firingRatePercent = static_cast<float>(pImpl->totalSpikesThisStep) / static_cast<float>(totalNeurons);
+            }
+        }
+        
+        // Apply global inhibition when firing rate exceeds threshold
+        if (firingRatePercent > 0.10f) {  // 10% firing threshold
+            float inhibitionStrength = (firingRatePercent - 0.10f) * 5.0f;  // Scale up to ~2.5x max
+            
+            // Distribute inhibition across global inhibitory neurons
+            size_t numGlobalInhib = pImpl->globalInhibitoryNeurons.size();
+            if (numGlobalInhib > 0) {
+                // Each global inhibitory neuron receives proportional input
+                float baseCurrent = inhibitionStrength / static_cast<float>(numGlobalInhib);
+                
+                for (Neuron* neuron : pImpl->globalInhibitoryNeurons) {
+                    // Inject inhibitory current into global inhibitory neurons
+                    neuron->injectCurrent(-baseCurrent);
+                }
+                
+                // Schedule global inhibitory spike after short delay
+                SimulationStep delay = 2;  // 2-step delay
+                Timestamp deliveryTime = currentTime + delay * pImpl->timestep;
+                
+                for (Neuron* neuron : pImpl->globalInhibitoryNeurons) {
+                    SpikeEvent globalInhibEvent(neuron->getId(), currentTime + pImpl->timestep, currentStep);
+                    pImpl->spikeSystem->queueSpike(globalInhibEvent);
+                    
+                    // Also schedule delayed inhibition to target excitatory neurons
+                    for (auto& region : pImpl->regions) {
+                        for (auto& pop : region->getPopulations()) {
+                            if (pop->getNeuronType() == NeuronType::Internal || 
+                                pop->getNeuronType() == NeuronType::Sensory ||
+                                pop->getNeuronType() == NeuronType::Motor) {
+                                for (auto* targetNeuron : pop->getNeurons()) {
+                                    DelayedSpikeEvent delayedInhibEvent(
+                                        neuron->getId(),
+                                        targetNeuron->getId(),
+                                        SynapseId(0),  // Use placeholder ID
+                                        0.5f * baseCurrent,  // Inhibitory weight
+                                        SynapseType::Inhibitory,
+                                        currentTime,
+                                        deliveryTime,
+                                        currentStep,
+                                        currentStep + delay
+                                    );
+                                    pImpl->spikeSystem->queueDelayedSpike(delayedInhibEvent);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     // Phase 6, tried and reverted: global inhibitory feedback
     // (inhibit every neuron when >10% of the population fired in
     // a step). It lowered mean rate only slightly (80.8 -> 76.2 Hz
@@ -467,7 +609,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // is the wrong lever here; see the drive-scaling change in
     // AgentBrain/Neuron instead. This block is intentionally empty
     // so the experiment and its result stay in the record.
-
+    
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
         pImpl->workingMemory->update(pImpl->timestep);
@@ -987,8 +1129,11 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                synapseData.plasticityFlags = syn->getPlasticityFlags();
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
                 synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
         }
         
@@ -1227,6 +1372,15 @@ bool Brain::load(const std::string& filepath) {
                 }
                 if (i < synapseData.efficacy.size()) {
                     target->setEfficacy(synapseData.efficacy[i]);
+                }
+                if (i < synapseData.shortTermDepression.size()) {
+                    target->setShortTermDepression(synapseData.shortTermDepression[i]);
+                }
+                if (i < synapseData.shortTermFacilitation.size()) {
+                    target->setShortTermFacilitation(synapseData.shortTermFacilitation[i]);
+                }
+                if (i < synapseData.plasticityFlags.size()) {
+                    target->getPlasticityFlags() = synapseData.plasticityFlags[i];
                 }
                 ++restored;
             }
