@@ -201,6 +201,79 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
+# NLM - Neural Learning Machine CMake Configuration
+# Phase 1: Core Library
+# Phase 2: Real Neural Computation
+# Phase 3: Advanced Brain Capabilities
+# Phase 4: Cognitive and Social Learning
+# Phase 5: Performance Optimizations
+# Phase 6: Final Integration
+
+cmake_minimum_required(VERSION 3.16)
+project(NLM VERSION 0.1.0 LANGUAGES CXX)
+
+# C++20 standard with modern features
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Build type configuration
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+# Comprehensive compiler warnings
+if(MSVC)
+    add_compile_options(/W4 /WX)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror=return-type)
+endif()
+
+# Source directory configuration
+set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Configuration options
+set(NLM_ENABLE_TESTING ON CACHE BOOL "Enable comprehensive testing")
+set(NLM_BUILD_PYTHON_BINDINGS OFF CACHE BOOL "Build Python bindings (Phase 5 feature)")
+set(NLM_USE_NLOHMANN_JSON ON CACHE BOOL "Use modern JSON configuration format (Phase 6 feature)")
+set(NLM_BUILD_ALL_DEMOS ON CACHE BOOL "Build all demo executables")
+
+# Python bindings (Phase 5: this is what `pip install .` builds).
+# Previously pyproject.toml claimed scikit-build-core would build pynlm,
+# but the root CMakeLists never built the module — pip install
+# succeeded yet `import pynlm` failed. The option is OFF by default so
+# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
+# ON. The standalone python/CMakeLists.txt build still works too, but
+# it must not be added here as a subdirectory: it defines its own
+# nlm_core/nlm_agent/nlm_world targets, which would collide with the
+# ones above. This target reuses the root libraries instead.
+if(NLM_BUILD_PYTHON_BINDINGS)
+    find_package(Python REQUIRED COMPONENTS Interpreter Development)
+    find_package(pybind11 CONFIG REQUIRED)
+    # The module is shared, so the static libs it links need PIC.
+    set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
+        POSITION_INDEPENDENT_CODE ON)
+    pybind11_add_module(pynlm python/bindings.cpp)
+    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+    target_include_directories(pynlm PRIVATE src)
+    install(TARGETS pynlm LIBRARY DESTINATION .)
+    message(STATUS "Phase 5: Python bindings enabled")
+endif()
+
+# nlohmann/json for modern configuration file format
+if(NLM_USE_NLOHMANN_JSON)
+    # Try to find nlohmann_json via CMake config
+    find_package(nlohmann_json 3.11.2 QUIET)
+    if(nlohmann_json_FOUND)
+        message(STATUS "Phase 6: Modern JSON configuration system enabled")
+        # Add JSON-specific compiler options
+        target_compile_options(nlm_core PRIVATE -DHAVE_NLOHMANN_JSON)
+    else()
+        message(WARNING "nlohmann/json not found, falling back to legacy configuration format")
+        set(NLM_USE_NLOHMANN_JSON OFF)
+    endif()
+endif()
+
 # Testing
 enable_testing()
 add_subdirectory(tests)

@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Phase 6: Enhanced Testing with JSON Support
 
 #include <iostream>
 #include <cassert>
@@ -10,6 +11,10 @@ namespace test_types {
 }
 
 namespace test_config {
+    void runAll();
+}
+
+namespace test_config_json {
     void runAll();
 }
 
@@ -59,6 +64,16 @@ int main() {
     std::cout << "Running Config tests..." << std::endl;
     try {
         test_config::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    // NEW: Phase 6 Enhanced Config tests with JSON support
+    std::cout << "Running Enhanced JSON Config tests..." << std::endl;
+    try {
+        test_config_json::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

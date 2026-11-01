@@ -3,8 +3,83 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
+
+// Helper function to convert JSON value to ConfigValue
+static ConfigValue jsonValueToConfigValue(const nlohmann::json& jsonVal) {
+    if (jsonVal.is_string()) {
+        return jsonVal.get<std::string>();
+    } else if (jsonVal.is_boolean()) {
+        return jsonVal.get<bool>();
+    } else if (jsonVal.is_number_integer()) {
+        return jsonVal.get<int64_t>();
+    } else if (jsonVal.is_number_unsigned()) {
+        return jsonVal.get<uint64_t>();
+    } else if (jsonVal.is_number()) {
+        // Check if it's actually an integer or float
+        if (jsonVal.is_number_integer()) {
+            return jsonVal.get<int64_t>();
+        } else {
+            return jsonVal.get<double>();
+        }
+    } else if (jsonVal.is_array()) {
+        // Try to determine array type
+        if (!jsonVal.empty()) {
+            if (jsonVal[0].is_string()) {
+                std::vector<std::string> vec;
+                for (const auto& item : jsonVal) {
+                    vec.push_back(item.get<std::string>());
+                }
+                return vec;
+            } else if (jsonVal[0].is_number_integer()) {
+                std::vector<int64_t> vec;
+                for (const auto& item : jsonVal) {
+                    vec.push_back(item.get<int64_t>());
+                }
+                return vec;
+            } else if (jsonVal[0].is_number()) {
+                std::vector<double> vec;
+                for (const auto& item : jsonVal) {
+                    vec.push_back(item.get<double>());
+                }
+                return vec;
+            }
+        }
+        // Default to empty vector if type can't be determined
+        return std::vector<std::string>{};
+    } else {
+        // Default to empty string for unknown types
+        return std::string();
+    }
+}
+
+// Helper function to convert ConfigValue to JSON value
+static nlohmann::json configValueToJsonValue(const ConfigValue& configVal) {
+    return std::visit([](auto&& arg) -> nlohmann::json {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, uint64_t>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+            return arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            return arg;
+        } else {
+            return std::string(); // Default for unknown types
+        }
+    }, configVal);
+}
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,9 +94,31 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to load as JSON first (new format)
+    std::ifstream jsonFile(filepath);
+    if (jsonFile.is_open()) {
+        try {
+            nlohmann::json jsonData;
+            jsonFile >> jsonData;
+            
+            // Clear existing entries
+            pImpl->entries.clear();
+            
+            // Parse JSON data
+            for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+                std::string key = it.key();
+                ConfigValue value = jsonValueToConfigValue(*it);
+                set(key, value, ConfigSource::File);
+            }
+            
+            return true;
+        } catch (const std::exception&) {
+            // JSON parsing failed, fall back to legacy format
+            jsonFile.close();
+        }
+    }
     
+    // Try legacy key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -84,10 +181,18 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Auto-generated JSON format\n\n";
+    
+    nlohmann::json jsonData;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Use configValueToJsonValue to convert the value
+        jsonData[entry.key] = configValueToJsonValue(entry.value);
     }
+    
+    // Write JSON with indentation for readability
+    file << jsonData.dump(2);
     
     return true;
 }
