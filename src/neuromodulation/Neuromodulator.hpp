@@ -48,6 +48,10 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Integration with other systems
+    void integrateWithOtherSystems();
+    void signalToOtherSystems(float reward, float predictionError);
+    
 private:
     struct Impl;
     Impl* pImpl;
