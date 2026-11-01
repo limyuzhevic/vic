@@ -2,7 +2,7 @@
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (熙然, meaning "serene flow") is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
@@ -10,7 +10,13 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
+NLM is an experimental artificial developmental brain system that implements real neural computation with:
+- Leaky Integrate-and-Fire (LIF) neurons
+- Event-driven spike propagation with synaptic delays
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
+
+That's it! NLM simulates all of this using advanced neural simulation techniques.
 
 ---
 
@@ -141,6 +147,7 @@ print("Neurons firing:", brain.getFiringNeuronCount())
 print("Total spikes:", brain.getTotalSpikeCount())
 print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
+print("E/I Ratio:", brain.getExcitationInhibitionRatio())
 ```
 
 ### Pattern 3: Enable Brain Features
@@ -151,6 +158,8 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+agent.enablePrediction(True)            # Enable prediction system
+agent.enableMemory(True)                # Enable memory systems
 ```
 
 ---
@@ -179,9 +188,56 @@ Gives sensory information (vision, touch, etc.) to the brain.
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
 
----
+### `agent.applyRewardModulation(reward, predicted_reward)`
+Applies reward-based neuromodulation.
 
-## Mini Projects
+### `agent.updateDevelopment(timestep)`
+Updates development system.
+
+### `agent.getDevelopmentalStage()`
+Get current developmental stage.
+
+### `agent.getNeuromodulationLevel()`
+Get current neuromodulation level.
+
+### `agent.getCuriosityLevel()`
+Get curiosity level.
+
+### `agent.getNoveltyLevel()`
+Get novelty level.
+
+### `agent.getPredictionError()`
+Get prediction error.
+
+### `agent.reset()`
+Reset agent for new episode.
+
+### `agent.getBrain()`
+Get the underlying brain.
+
+### `agent.enableRewardModulation(enable)`
+Enable/disable reward modulation.
+
+### `agent.enableStructuralPlasticity(enable)`
+Enable/disable structural plasticity.
+
+### `agent.enableDevelopment(enable)`
+Enable/disable development.
+
+### `agent.enableCuriosity(enable)`
+Enable/disable curiosity.
+
+### `agent.isRewardModulationEnabled()`
+Check if reward modulation is enabled.
+
+### `agent.isStructuralPlasticityEnabled()`
+Check if structural plasticity is enabled.
+
+### `agent.isDevelopmentEnabled()`
+Check if development is enabled.
+
+### `agent.isCuriosityEnabled()`
+Check if curiosity is enabled.
 
 ### Project 1: Silent Brain (Just Neurons)
 
@@ -260,14 +316,18 @@ print("Agent simulation complete!")
 
 | What you want | Code |
 |--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
+| Create brain | `pynlm.createBrain(config)` or `pynlm.createLearningBrain(neurons)` |
 | Start brain | `brain.initialize()` |
 | Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
+| Make brain think multiple | `brain.stepMultiple(start_step, steps)` |
+| Run episode | `brain.runEpisode(steps)` |
+| Create world | `pynlm.createSimpleWorld()` or `pynlm.createTrainingEnvironment(w,h,vw,vh)` |
 | Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
+| Get brain stats | `brain.getTotalNeuronCount()`, `brain.getTotalSynapseCount()`, etc. |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Learn from reward | `agent.applyRewardModulation(reward, predicted_reward)` |
+| Get development stage | `brain.getDevelopmentalStage()`, `agent.getDevelopmentalStage()` |
 
 ---
 
