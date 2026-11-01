@@ -29,13 +29,13 @@ struct NeuronState {
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)
         , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
+        , resetPotential(-65.0f)  // Slightly above resting to prevent runaway excitation
+        , leakConductance(20.0f)   // Higher leak conductance for faster membrane time constant
         , synapseConductance(0.0f)
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        , refractoryPeriod(5)
+        , refractoryPeriod(15)  // Longer refractory period: 15 steps = 15ms at 1ms timestep
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
 };

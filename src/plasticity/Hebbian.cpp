@@ -10,8 +10,9 @@ struct Hebbian::Impl {
     float minWeight;
     float covarianceThreshold;  // For covariance rule
     
-    Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
+    Impl() : learningRate(0.005f), maxWeight(0.5f), minWeight(0.05f),  // More conservative parameters
              covarianceThreshold(0.0f) {}
+};
 };
 
 Hebbian::Hebbian() : pImpl(new Impl) {}
@@ -69,6 +70,12 @@ void Hebbian::update(Synapse* synapse,
     // and saturated every weight together with STDP.
     if (std::abs(delta) > 1e-6f) {
         delta *= (1.0f - std::abs(synapse->getWeight()));
+        
+        // Better balance with STDP: reduce Hebbian contribution when STDP
+        // has already made significant changes to the synapse
+        float stdpInfluence = 1.0f - std::abs(synapse->getWeight()) * 0.5f;
+        delta *= stdpInfluence * 0.8f;  // Reduce Hebbian effect to 80% of original
+        
         applyWeightChange(synapse, delta);
         if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
             synapse->setWeight(-0.01f);
@@ -98,12 +105,23 @@ float Hebbian::getLearningRate() const {
     return pImpl->learningRate;
 }
 
-void Hebbian::setMaxWeight(float maxWeight) {
-    pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
+// New learning parameter methods for better balance with STDP
+void Hebbian::setLearningParameters(float hebbianRate, float maxHebbianWeight, float minHebbianWeight) {
+    pImpl->learningRate = std::clamp(hebbianRate, 0.0f, 1.0f);
+    pImpl->maxWeight = std::clamp(maxHebbianWeight, 0.0f, 1.0f);
+    pImpl->minWeight = std::clamp(minHebbianWeight, 0.0f, pImpl->maxWeight);
 }
 
-float Hebbian::getMaxWeight() const {
+float Hebbian::getHebbianLearningRate() const {
+    return pImpl->learningRate;
+}
+
+float Hebbian::getHebbianMaxWeight() const {
     return pImpl->maxWeight;
+}
+
+float Hebbian::getHebbianMinWeight() const {
+    return pImpl->minWeight;
 }
 
 } // namespace nlm

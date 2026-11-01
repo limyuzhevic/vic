@@ -42,15 +42,28 @@ void Dopamine::update(TimestepDuration dt) {
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    // Real reward signaling: Dopamine neurons increase firing on unexpected rewards
+    // Positive reward produces dopamine burst (prediction error > 0)
+    if (reward > 0.0f) {
+        // For positive rewards, increase dopamine level proportionally
+        pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate * 0.1f);
+    } else {
+        // For negative rewards, decrease dopamine level
+        pImpl->level = std::max(pImpl->baseline, pImpl->level + reward * pImpl->releaseRate * 0.5f);
+    }
+    
+    // Clamp to reasonable range
+    pImpl->level = std::clamp(pImpl->level, pImpl->baseline, pImpl->peak);
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    // Real reward prediction error signaling: Dopamine responds to prediction errors
+    // Positive prediction error (better than expected) increases dopamine
+    // Negative prediction error (worse than expected) decreases dopamine
+    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate * 0.2f);
+    
+    // Clamp to reasonable range
+    pImpl->level = std::clamp(pImpl->level, pImpl->baseline, pImpl->peak);
 }
 
 } // namespace nlm

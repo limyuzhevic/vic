@@ -20,8 +20,13 @@ public:
     void setLearningRate(float rate);
     float getLearningRate() const;
     
-    void setMaxWeight(float maxWeight);
-    float getMaxWeight() const;
+    // Set learning parameters for better balance with STDP
+    void setLearningParameters(float hebbianRate, float maxHebbianWeight = 0.5f, float minHebbianWeight = 0.05f);
+    
+    // Get learning parameters
+    float getHebbianLearningRate() const;
+    float getHebbianMaxWeight() const;
+    float getHebbianMinWeight() const;
     
 private:
     struct Impl;

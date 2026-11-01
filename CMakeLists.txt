@@ -125,12 +125,12 @@ add_library(nlm_phase5 STATIC
 target_include_directories(nlm_phase5 PUBLIC src)
 target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Phase 6 experiments
-add_library(nlm_phase6 STATIC
-    src/experiments/Phase6IntegratedExperiment.cpp
+# Advanced analysis tools
+add_library(nlm_analysis STATIC
+    src/experiments/AdvancedAnalysisTools.cpp
 )
-target_include_directories(nlm_phase6 PUBLIC src)
-target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_analysis PUBLIC src)
+target_link_libraries(nlm_analysis PUBLIC nlm_core)
 
 # Main executable
 add_executable(nlm
@@ -163,6 +163,12 @@ add_executable(nlm_phase6_demo
     src/experiments/Phase6Demo.cpp
 )
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Enhanced NLM CLI demo (Phase 6 with comprehensive command-line interface)
+add_executable(nlm_demo_cli
+    src/experiments/NLMCliDemo.cpp
+)
+target_link_libraries(nlm_demo_cli PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
 # Benchmark executable
 add_executable(nlm_benchmark

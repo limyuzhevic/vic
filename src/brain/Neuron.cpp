@@ -18,9 +18,9 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
+    // LIF parameters with realistic values for LIF neurons
+    static constexpr float MEMBRANE_CAPACITANCE = 250.0f;  // nF (typical for cortical neurons)
+    static constexpr float TIME_CONSTANT = 20.0f;  // ms (typical membrane time constant)
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
@@ -208,6 +208,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Note: dt is in seconds, tau is in ms, so need to convert
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
@@ -216,14 +217,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Convert dt from seconds to milliseconds for consistency with tau
+    float dt_ms = static_cast<float>(dt) * 1000.0f;
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution (in mV/ms)
     float leakContribution = (V_rest - V) / tau;
     
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Update membrane potential using exponential Euler integration (dt in ms)
+    V = V + dt_ms * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -237,25 +241,24 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Update the firing-rate metric from counted spikes, in Hz.
     // Previously setFiringRate() was never called anywhere, so
     // getAverageFiringRate() summed zeros even with thousands of spikes.
-    // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
+    // Real EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
     // dt is in seconds (0.001 in the demos), so a neuron firing every
     // step would approach 1000 Hz, and refractory periods cap it well
     // below that in practice.
     if (dt > 0.0) {
+        // Decay the firing rate
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+        
+        // Add 1/dt Hz (which is steps per second) for each spike
+        // dt is in seconds, so 1/dt is Hz
+        pImpl->state.firingRate += 1.0f / static_cast<float>(dt);
+    } else {
+        pImpl->state.firingRate = 0.0f;
     }
 
     // Check for spike
     if (V >= threshold) {
         fired = true;
-        if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
-        }
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
-        
-        // Record spike
-        recordSpike(currentTime);
         
         // Reset membrane potential
         V = V_reset;
@@ -263,6 +266,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Enter refractory period
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
+        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        // Record spike
+        recordSpike(currentTime);
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
