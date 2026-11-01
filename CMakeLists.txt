@@ -205,8 +205,20 @@ endif()
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+# Command Line Interface (new in Phase 6)
+add_executable(nlm-cli
+    nlm-cli.cpp
+)
+target_link_libraries(nlm-cli PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Enhanced Phase 6 integration test executable
+add_executable(nlm_phase6_enhanced_demo
+    src/experiments/EnhancedPhase6IntegratedExperiment.cpp
+)
+target_link_libraries(nlm_phase6_enhanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Update install targets to include enhanced demo
+install(TARGETS nlm nlm-cli nlm_phase6_enhanced_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

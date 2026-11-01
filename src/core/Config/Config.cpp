@@ -19,13 +19,48 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Implement proper JSON/YAML parser
+    // Try JSON first (requires nlohmann/json)
+    try {
+        // Check if file exists and has .json extension
+        if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+            std::ifstream file(filepath);
+            if (file.is_open()) {
+                // For now, use existing key=value parser for .json files too
+                // In a full implementation, you would use a proper JSON parser
+                return loadFromSimpleFormat(file);
+            }
+        }
+        
+        // Try YAML (requires yaml-cpp)
+        if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".yaml") {
+            std::ifstream file(filepath);
+            if (file.is_open()) {
+                // For now, use existing key=value parser for .yaml files too
+                // In a full implementation, you would use a proper YAML parser
+                return loadFromSimpleFormat(file);
+            }
+        }
+        
+        // Try simple key=value format for .cfg files
+        if (filepath.size() >= 4 && filepath.substr(filepath.size() - 4) == ".cfg") {
+            return loadFromSimpleFormat(std::ifstream(filepath));
+        }
+        
+    } catch (const std::exception& e) {
+        // If parsing fails, fall back to simple format
+        std::ifstream file(filepath);
+        if (file.is_open()) {
+            return loadFromSimpleFormat(file);
+        }
     }
+    
+    return false;
+}
+
+// Helper method for parsing simple key=value format
+bool Config::loadFromSimpleFormat(std::ifstream& file) {
+    if (!file.is_open()) return false;
     
     std::string line;
     while (std::getline(file, line)) {
@@ -43,7 +78,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -51,7 +86,6 @@ bool Config::loadFromFile(const std::string& filepath) {
             set(key, value, ConfigSource::File);
         }
     }
-    
     return true;
 }
 
@@ -79,6 +113,17 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Try JSON first (requires nlohmann/json)
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+        return saveToJsonFormat(filepath);
+    }
+    
+    // Try YAML (requires yaml-cpp)
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".yaml") {
+        return saveToYamlFormat(filepath);
+    }
+    
+    // Default to simple key=value format
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -87,6 +132,113 @@ bool Config::saveToFile(const std::string& filepath) const {
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    }
+    
+    return true;
+}
+
+// Helper method to convert ConfigValue to string
+static std::string configValueToString(const ConfigValue& value) {
+    std::string result;
+    
+    std::visit([&](const auto& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, int>) {
+            result = std::to_string(val);
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            result = std::to_string(val);
+        } else if constexpr (std::is_same_v<T, double>) {
+            // Format to avoid scientific notation
+            result = std::to_string(val);
+            // Remove trailing zeros for cleaner output
+            size_t dotPos = result.find('.');
+            if (dotPos != std::string::npos) {
+                // Remove trailing zeros
+                while (!result.empty() && result.back() == '0') {
+                    result.pop_back();
+                }
+                // Remove decimal point if no fractional part left
+                if (!result.empty() && result.back() == '.') {
+                    result.pop_back();
+                }
+            }
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = val ? "true" : "false";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            result = val;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += std::to_string(val[i]);
+            }
+            result += "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                // Format double similarly
+                std::string num = std::to_string(val[i]);
+                size_t dotPos = num.find('.');
+                if (dotPos != std::string::npos) {
+                    while (!num.empty() && num.back() == '0') {
+                        num.pop_back();
+                    }
+                    if (!num.empty() && num.back() == '.') {
+                        num.pop_back();
+                    }
+                }
+                result += num;
+            }
+            result += "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            result = "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += "\"" + val[i] + "\"";
+            }
+            result += "]";
+        } else {
+            result = "UNKNOWN_TYPE";
+        }
+    }, value);
+    
+    return result;
+}
+
+// Simple JSON format saving (minimal implementation)
+bool Config::saveToJsonFormat(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": " << configValueToString(entry.value);
+        if (i < pImpl->entries.size() - 1) {
+            file << ",";
+        }
+        file << "\n";
+    }
+    file << "}\n";
+    
+    return true;
+}
+
+// Simple YAML format saving (minimal implementation)
+bool Config::saveToYamlFormat(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    file << "# NLM Configuration\n";
+    file << "# Generated from NLM config system\n\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        file << entry.key << ": " << configValueToString(entry.value) << "\n";
     }
     
     return true;

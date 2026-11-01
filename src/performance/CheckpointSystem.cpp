@@ -401,8 +401,37 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
+bool CheckpointWriter::writeHeader() {
+    if (!stream_.is_open()) return false;
+    stream_.seekp(0, std::ios::beg);
+    // Write the header that will be patched later in finalize()
+    CheckpointHeader placeholder;
+    placeholder.magic = CHECKPOINT_MAGIC;
+    placeholder.majorVersion = CHECKPOINT_VERSION_MAJOR;
+    placeholder.minorVersion = CHECKPOINT_VERSION_MINOR;
+    placeholder.patchVersion = CHECKPOINT_VERSION_PATCH;
+    placeholder.timestamp = static_cast<uint64_t>(std::time(nullptr));
+    placeholder.totalSize = 0;  // Will be updated in finalize()
+    placeholder.neuronCount = header_.neuronCount;
+    placeholder.synapseCount = header_.synapseCount;
+    placeholder.regionCount = header_.regionCount;
+    placeholder.step = header_.step;
+    placeholder.simulationTime = header_.simulationTime;
+    placeholder.checksum = 0;  // Will be updated in finalize()
+    placeholder.compressionLevel = header_.compressionLevel;
+    placeholder.flags = header_.flags;
+    
+    stream_.write(reinterpret_cast<const char*>(&placeholder), sizeof(placeholder));
+    bytesWritten_ = sizeof(placeholder);
+    return !stream_;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    if (!stream_.is_open()) return false;
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    bytesWritten_ += sizeof(header);
+    return !stream_;
+}
 bool CheckpointWriter::padToAlignment(size_t) { return true; }
 
 // ---------------- CheckpointManager ----------------
