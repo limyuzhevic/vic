@@ -66,7 +66,7 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
@@ -79,6 +79,18 @@ template<typename T>
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Load from JSON string
+    bool loadFromJSON(const std::string& jsonContent);
+    
+    // Load from simple key=value format
+    bool loadFromSimpleFormat(const std::string& content);
+    
+    // Set from string (for JSON parsing)
+    void setConfigFromString(const std::string& key, const std::string& valueStr);
+    
+    // Convert ConfigValue to string representation
+    static std::string visitToString(const ConfigValue& value);
     
     // Check existence
     bool has(const std::string& key) const;

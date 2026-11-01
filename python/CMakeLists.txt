@@ -1,9 +1,10 @@
+# Config for Python module pynlm (Phase 5 bindings)
 cmake_minimum_required(VERSION 3.16)
 project(pynlm_bindings LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 # Phase 5 fix: the module is a shared library, so the static NLM libs
 # it links must be position-independent, or the link fails with
 # "recompile with -fPIC".
@@ -15,6 +16,19 @@ endif()
 
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 CONFIG REQUIRED)
+
+# Try to find nlohmann/json for JSON parsing
+find_package(nlohmann_json 3.2.0 QUIET)
+if(NOT nlohmann_json_FOUND)
+    # Download nlohmann/json if not found
+    include(FetchContent)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.2
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+endif()
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 

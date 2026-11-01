@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <nlohmann/json.hpp>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -273,6 +274,15 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
              py::arg("visionWidth"), py::arg("visionHeight"))
+        .def("configureAdvanced", [](std::shared_ptr<SimpleWorld> self, int width, int height, 
+                                 int visionWidth, int visionHeight, const std::string& description,
+                                 float energyDecayRate, float maxEnergy) {
+            self->configure(width, height, visionWidth, visionHeight);
+            self->setEnergyDecayRate(energyDecayRate);
+            self->setMaxEnergy(maxEnergy);
+        }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+           py::arg("description"), py::arg("energyDecayRate"), py::arg("maxEnergy"),
+           "Configure world with advanced parameters")
         .def("reset", &SimpleWorld::reset)
         .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
         .def("update", &SimpleWorld::update, py::arg("timestep"))
@@ -411,18 +421,61 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
+    
+    // Configuration factory methods
+    m.def("createConfigFromJSON", [](const std::string& jsonContent) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromJSON(jsonContent)) {
+            throw std::runtime_error("Failed to parse JSON configuration");
+        }
+        return config;
+    }, py::arg("jsonContent"), "Create configuration from JSON string");
+    
+    m.def("createConfigFromFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw std::runtime_error("Failed to load configuration from file: " + filepath);
+        }
+        return config;
+    }, py::arg("filepath"), "Create configuration from file");
+    
+    // Brain creation factory methods
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
+    }, py::arg("config"), "Create a new brain with custom configuration");
+    
+    m.def("createBrain", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        return std::make_shared<Brain>(config);
+    }, "Create a new brain with default configuration");
+    
+    m.def("createBrainFromJSON", [](const std::string& jsonContent) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromJSON(jsonContent)) {
+            throw std::runtime_error("Failed to parse JSON configuration");
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("jsonContent"), "Create a brain with configuration loaded from JSON string");
+    
+    m.def("createBrainFromFile", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw std::runtime_error("Failed to load configuration from file: " + filepath);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"), "Create a brain with configuration loaded from file");
+    
+    m.def("createBrainFromArgs", [](const std::vector<std::string>& args) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromArgs(static_cast<int>(args.size()), const_cast<char**>(&args[0]))) {
+            throw std::runtime_error("Failed to parse command line arguments");
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("args"), "Create a brain with configuration loaded from command line arguments");
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
