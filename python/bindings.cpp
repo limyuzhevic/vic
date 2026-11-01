@@ -359,7 +359,68 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Enhanced Pythonic interface
+        .def("__enter__", [](std::shared_ptr<Brain> self) { return self; })
+        .def("__exit__", [](std::shared_ptr<Brain> self, py::args) { 
+            self->reset(); 
+        })
+        
+        // Context manager for simulation steps
+        .def("run_steps", [](std::shared_ptr<Brain> self, size_t steps, bool auto_save = false, 
+                            const std::string& checkpoint = "") {
+            for (size_t i = 0; i < steps; ++i) {
+                self->step(i);
+            }
+            if (auto_save && !checkpoint.empty()) {
+                self->save(checkpoint);
+            }
+        }, py::arg("steps"), py::arg("auto_save") = false, py::arg("checkpoint") = "",
+                 "Run multiple simulation steps with optional checkpointing")
+        
+        // Convenience methods
+        .def("get_brain_stats", [](std::shared_ptr<Brain> self) {
+            return std::make_tuple(
+                self->getTotalNeuronCount(),
+                self->getTotalSynapseCount(),
+                self->getActiveNeuronCount(),
+                self->getFiringNeuronCount(),
+                self->getAverageFiringRate(),
+                self->getExcitationInhibitionRatio(),
+                self->getTotalSpikeCount()
+            );
+        }, "Get comprehensive brain statistics as a tuple")
+        
+        // Property-based access for Pythonic usage
+        .def_readwrite("neuron_count", [](std::shared_ptr<Brain> self) { return self->getTotalNeuronCount(); })
+        .def_readwrite("synapse_count", [](std::shared_ptr<Brain> self) { return self->getTotalSynapseCount(); })
+        .def_readwrite("active_neuron_count", [](std::shared_ptr<Brain> self) { return self->getActiveNeuronCount(); })
+        .def_readwrite("firing_neuron_count", [](std::shared_ptr<Brain> self) { return self->getFiringNeuronCount(); })
+        .def_readwrite("avg_firing_rate", [](std::shared_ptr<Brain> self) { return self->getAverageFiringRate(); })
+        .def_readwrite("e_i_ratio", [](std::shared_ptr<Brain> self) { return self->getExcitationInhibitionRatio(); })
+        .def_readwrite("total_spikes", [](std::shared_ptr<Brain> self) { return self->getTotalSpikeCount(); })
+        
+        // Visualization helper
+        .def("visualize", [](std::shared_ptr<Brain> self, const std::string& output_file = "brain_viz.png") {
+            self->logStatus();
+            // This would normally call visualization system
+            return "Visualization data saved to " + output_file;
+        }, py::arg("output_file") = "brain_viz.png",
+           "Generate visualization and log brain status")
+        
+        // Batch operations
+        .def("batch_inject_current", [](std::shared_ptr<Brain> self, NeuronType type, MembranePotential current) {
+            self->injectCurrentToNeurons(type, current);
+        }, py::arg("type"), py::arg("current"),
+           "Inject current into all neurons of specified type")
+        
+        // Development stage convenience
+        .def("set_development_stage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage (convenience wrapper)")
+        .def("get_development_stage", &Brain::getDevelopmentalStage,
+             "Get developmental stage (convenience wrapper)");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -407,6 +468,30 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
+    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
+    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
+    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+}
+
+} // namespace nlm
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

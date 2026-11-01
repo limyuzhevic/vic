@@ -5,17 +5,20 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings and tools for NLM (Neural Learning Machine) - a neural system that learns from experience through spiking neural networks"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.8"
 authors = [
-    {name = "NLM Authors"}
+    {name = "NLM Authors", email = "nlm@example.org"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = [
+    "neural", "simulation", "spiking", "brain", "learning",
+    "ai", "neuroscience", "computational", "brain"
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +28,44 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-
-dependencies = []
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20",
+    "matplotlib>=3.5",
+    "pandas>=1.3",
+    "scipy>=1.7",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest-cov>=3.0",
+    "black>=22.0",
+    "flake8>=5.0",
+    "mypy>=0.991",
+    "sphinx>=5.0",
+    "sphinx-rtd-theme>=1.0",
+]
+
+experimental = [
+    "plotly>=5.13",
+    "seaborn>=0.12",
+    "jupyter>=1.0",
+]
+
+perf = [
+    "numba>=0.56",
+    "cython>=3.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
 
 [tool.scikit-build]
 # scikit-build-core >= 0.8 renamed minimum-version to version.
@@ -59,3 +86,65 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+skip-string-normalization = false
+include = '\\.pyi?$'
+exclude = '''
+/(
+    \\.eggs
+  | \\.git
+  | \\.hg
+  | \\.mypy_cache
+  | \\.tox
+  | \\.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | __pycache__
+  | \\.pyc
+  | \\.pyo
+  | \\.pyd
+  | \\.swp
+  | \\.swo
+  | *.egg-info
+  | venv
+  | env
+)
+'''
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["python/"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[project.scripts]
+nlm = "scripts.nlm_cli:main"
+nlm-config = "scripts.nlm_cli:create_config_command"
+nlm-run = "scripts.nlm_cli:run_command"
+nlm-viz = "scripts.nlm_cli:visualize_command"
+nlm-benchmark = "scripts.nlm_cli:benchmark_command"
+nlm-explore = "scripts.nlm_cli:explore_command"
+
+[project.gui-scripts]
+nlm-explorer = "scripts.nlm_cli:interactive_explore"
