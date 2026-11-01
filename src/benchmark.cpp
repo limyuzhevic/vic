@@ -74,6 +74,17 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
     std::cout << "    Steps/sec: " << std::fixed << std::setprecision(0) << result.stepsPerSecond << std::endl;
     std::cout << "    Spikes/step: " << std::fixed << std::setprecision(2) << result.spikesPerStep << std::endl;
     
+    // Memory usage tracking (if available)
+    std::cout << "    Memory usage: N/A (platform dependent)" << std::endl;
+    
+    // Network density metrics
+    double networkDensity = static_cast<double>(result.synapses) / (result.neurons * result.neurons);
+    std::cout << "    Network density: " << std::fixed << std::setprecision(6) << networkDensity << std::endl;
+    
+    // Activity metrics
+    double activityRatio = result.spikesPerStep * 100.0;  // percentage
+    std::cout << "    Neural activity: " << std::fixed << std::setprecision(3) << activityRatio << "% per step" << std::endl;
+    
     return result;
 }
 
