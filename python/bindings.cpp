@@ -15,6 +15,8 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "src/batch_operations.cpp"
+#include "src/advanced_statistics.cpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -428,6 +430,13 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    initBatchOperations(m);
+    initAdvancedStatistics(m);
+    initConfigurationEnhancements(m);
+    initPerformanceMonitoring(m);
+    initAdvancedDebugging(m);
+    initExtendedEnumerations(m);
 }
 
 } // namespace nlm
