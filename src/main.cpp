@@ -26,6 +26,17 @@
 #include <iomanip>
 #include <numeric>
 
+// Constants for main demo
+namespace {
+    constexpr size_t PLASTICITY_PATTERN_NEURON_COUNT = 20;  // Number of sensory neurons in plasticity pattern
+    constexpr float PLASTICITY_PATTERN_CURRENT = 30.0f;   // Current injected into pattern neurons
+    constexpr size_t PLASTICITY_EXPERIMENT_STEPS = 1000;  // Steps for plasticity experiment
+    constexpr size_t STDP_VERIFICATION_TRIALS = 50;       // Number of STDP verification trials
+    constexpr float STDP_EXPERIMENT_CURRENT = 60.0f;      // Current for STDP verification
+    constexpr double SIMULATION_TIMESTEP = 0.001;         // Simulation timestep
+    constexpr size_t CONNECTIVITY_TEST_INJECTED_NEURONS = 10;  // Neurons to inject current into in connectivity test
+}
+
 using namespace nlm;
 
 void printBanner() {
@@ -230,17 +241,17 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < PLASTICITY_PATTERN_NEURON_COUNT) {
                 patternNeurons.push_back(neuron->getId());
             }
         }
     }
-    for (SimulationStep step = 0; step < 1000; ++step) {
+    for (SimulationStep step = 0; step < PLASTICITY_EXPERIMENT_STEPS; ++step) {
         for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+            brain->injectCurrent(id, PLASTICITY_PATTERN_CURRENT);
         }
         
-        brain->step(step, step * 0.001);
+        brain->step(step, step * SIMULATION_TIMESTEP);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
@@ -283,11 +294,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
 
-    for (int trial = 0; trial < 50; ++trial) {
-        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
-        brain->step(trial * 2, trial * 2 * 0.001);
-        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
-        brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+    for (int trial = 0; trial < STDP_VERIFICATION_TRIALS; ++trial) {
+        brain->injectCurrent(syn->getSourceNeuron(), STDP_EXPERIMENT_CURRENT);
+        brain->step(trial * 2, trial * 2 * SIMULATION_TIMESTEP);
+        brain->injectCurrent(syn->getDestinationNeuron(), STDP_EXPERIMENT_CURRENT);
+        brain->step(trial * 2 + 1, (trial * 2 + 1) * SIMULATION_TIMESTEP);
     }
 
     float delta = syn->getWeight() - beforeWeight;

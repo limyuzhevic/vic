@@ -5,6 +5,14 @@
 #include <algorithm>
 #include <cmath>
 
+// Constants for neuron group distribution
+namespace {
+    constexpr size_t NUM_MOTOR_GROUPS = 6;  // forward, backward, turn_left, turn_right, interact, wait
+    constexpr size_t NUM_SENSORY_GROUPS = 4;  // vision, touch, internal, proprioception
+    constexpr size_t MAX_MOTOR_GROUP_SIZE = 50;  // Maximum neurons per motor group
+    constexpr size_t MAX_SENSORY_GROUP_SIZE = 100;  // Maximum neurons per sensory group
+}
+
 namespace nlm {
 
 AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
@@ -22,61 +30,98 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize motor and sensory neuron groups from brain populations
+    // This creates the mapping between neural populations and action categories
+    // for motor neurons (forward, backward, turn_left, turn_right, interact, wait)
+    // and sensory modalities (vision, touch, internal, proprioception)
     if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
-            }
-        }
+        assignNeuronGroupsToActionCategories();
+    } else {
+        NLM_LOG_WARN("AgentBrain initialized with null brain pointer");
     }
 }
 
 AgentBrain::~AgentBrain() = default;
 
-void AgentBrain::initialize(const SimpleWorld& world) {
-    // Start with no prediction (all zeros), so the first scene is
-    // novel — matching the old step-0 novelty spike — and the
-    // prediction is then built from actual percepts.
-    predictedVision_.clear();
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
+void AgentBrain::assignNeuronGroupsToActionCategories() {
+    // Assign neurons from brain populations to action categories in a structured way
+    // This method iterates through all regions and populations in the brain,
+    // distributing motor neurons across the 6 action categories (forward, backward,
+    // turn_left, turn_right, interact, wait) and sensory neurons across the 4
+    // sensory modalities (vision, touch, internal, proprioception).
+    //
+    // The distribution uses modulo arithmetic to ensure even coverage across
+    // all categories, preventing any single action from having disproportionately
+    // many neurons.
+    //
+    // Error handling: If brain_ is null, log a warning and return early.
+    if (!brain_) {
+        NLM_LOG_WARN("AgentBrain::assignNeuronGroupsToActionCategories: null brain pointer");
+        return;
+    }
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
-                 std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
-                 std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            
+            if (type == NeuronType::Motor) {
+                // Distribute motor neurons to action groups based on their order
+                // This ensures each action type gets a balanced distribution
+                distributeMotorNeurons(pop->getNeurons());
+            } else if (type == NeuronType::Sensory) {
+                // Distribute sensory neurons to sensory modality groups
+                distributeSensoryNeurons(pop->getNeurons());
+            }
+        }
+    }
+}
+
+void AgentBrain::distributeMotorNeurons(const std::vector<Neuron*>& neurons) {
+    // Distribute motor neurons across the 6 action categories using modulo arithmetic
+    // This creates a balanced distribution where each action type (forward, backward,
+    // turn_left, turn_right, interact, wait) receives approximately the same number
+    // of neurons, ensuring fair representation in the motor output system.
+    //
+    // The distribution algorithm uses neuron index modulo NUM_MOTOR_GROUPS to
+    // determine which action category each neuron belongs to, providing a
+    // deterministic and reproducible assignment.
+    for (size_t i = 0; i < neurons.size(); ++i) {
+        Neuron* neuron = neurons[i];
+        
+        // Use modulo arithmetic to distribute neurons evenly across motor groups
+        // This ensures all 6 action types get some neural representation
+        switch (i % NUM_MOTOR_GROUPS) {
+            case 0: motorForward_.push_back(neuron); break;
+            case 1: motorBackward_.push_back(neuron); break;
+            case 2: motorTurnLeft_.push_back(neuron); break;
+            case 3: motorTurnRight_.push_back(neuron); break;
+            case 4: motorInteract_.push_back(neuron); break;
+            case 5: motorWait_.push_back(neuron); break;
+        }
+    }
+}
+
+void AgentBrain::distributeSensoryNeurons(const std::vector<Neuron*>& neurons) {
+    // Distribute sensory neurons across the 4 sensory modalities using modulo arithmetic
+    // This creates a balanced distribution where each sensory modality (vision, touch,
+    // internal, proprioception) receives approximately the same number of neurons,
+    // ensuring comprehensive sensory processing capabilities.
+    //
+    // The distribution algorithm uses neuron index modulo NUM_SENSORY_GROUPS to
+    // determine which sensory modality each neuron belongs to, providing a
+    // deterministic and reproducible assignment.
+    for (size_t i = 0; i < neurons.size(); ++i) {
+        Neuron* neuron = neurons[i];
+        
+        // Distribute sensory neurons across different modalities
+        // This provides redundancy and distributed processing
+        switch (i % NUM_SENSORY_GROUPS) {
+            case 0: sensoryVision_.push_back(neuron); break;
+            case 1: sensoryTouch_.push_back(neuron); break;
+            case 2: sensoryInternal_.push_back(neuron); break;
+            case 3: sensoryProprioception_.push_back(neuron); break;
+        }
+    }
 }
 
 size_t AgentBrain::getSensoryInputSize() const {
@@ -90,7 +135,16 @@ size_t AgentBrain::getMotorOutputSize() const {
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
+    // Process sensory input from the world and inject current into sensory neurons
+    // This method handles multiple sensory modalities: vision, touch, internal signals,
+    // and proprioception. It also computes novelty based on prediction error for
+    // curiosity-driven exploration.
+    //
+    // Error handling: If brain_ is null, log a warning and return early.
+    if (!brain_) {
+        NLM_LOG_WARN("AgentBrain::processSensoryInput: null brain pointer");
+        return;
+    }
 
     // Phase 5 winner-take-all lateral inhibition: if the last decode
     // had a decisive winner (margin > 5 Hz) and the scene is stable
@@ -269,7 +323,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        NLM_LOG_WARN("AgentBrain::decodeMotorCommand called with null brain pointer");
+        return MotorCommand::Wait;
+    }
 
     // Phase 5 thought: ask the brain's planner what it would do, from
     // learned action quality, before the motor decode decides. The
@@ -297,6 +354,12 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // winning group (in decode order) and its margin over the
     // runner-up, from raw motor firing rates (before reflex/bias
     // adjustments, so the inhibition reflects the brain, not the bias).
+    //
+    // This records which motor group won the last action selection,
+    // by how much it led its nearest competitor, and tracks how many
+    // consecutive times the same group has won. This information is used
+    // to apply lateral inhibition to prevent runaway dominance and
+    // maintain behavioral diversity.
     {
         auto acts = getMotorGroupActivities();
         float best = 0.0f, second = 0.0f;
@@ -320,11 +383,22 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // (selectWithCuriosity), thresholds novelty could never reach after
     // step 0, so exploration was dead. Exploration is now proportional
     // to curiosity (see selectWithCuriosity) with no hard gate.
+    //
+    // When enabled, curiosity adds random action selection to maintain
+    // behavioral exploration and prevent the agent from getting stuck
+    // in local optima.
     if (curiosityEnabled_) {
         decoded = selectWithCuriosity(decoded);
     }
 
     // Phase 5 diversity counters, from the final action actually taken.
+    //
+    // These counters track behavioral patterns to encourage diversity:
+    // - stepsSinceTurn_: steps since last directional change (turn)
+    // - repeatCount_: consecutive repetitions of same movement
+    //
+    // Used for turn-diversity bias (no turn for >25 steps) and
+    // repetition-fatigue penalty (same movement 3+ times), not a pathfinder.
     if (decoded == MotorCommand::TurnLeft || decoded == MotorCommand::TurnRight) {
         stepsSinceTurn_ = 0;
     } else {
@@ -542,13 +616,44 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
     // at curiosity ~0.85 gives ~25%, and a fully familiar, stationary
     // scene (curiosity ~0) gives none — exploration scales with novelty
     // instead of being on/off behind an unreachable threshold.
+    //
+    // Error handling: If brain_ is null or random generator is null,
+    // log warnings and return the default command.
+    //
+    // The exploration function allows the agent to try random actions,
+    // maintaining behavioral diversity and preventing convergence to
+    // local optima.
+    //
+    // Available actions include all movement types, turning actions,
+    // looking actions, interact, and wait. The random selection is
+    // uniformly distributed across all 8 available actions.
+    if (!brain_) {
+        NLM_LOG_WARN("AgentBrain::selectWithCuriosity called with null brain pointer");
+        return defaultCmd;
+    }
+    
+    // Check for null random generator
+    auto* rng = brain_->getRandomGenerator();
+    if (!rng) {
+        NLM_LOG_WARN("AgentBrain::selectWithCuriosity: null random generator");
+        return defaultCmd;
+    }
+
+    // Exploration: occasionally choose random action, with probability
+    // proportional to curiosity. Phase 4: the old 0.5 hard gate meant
+    // exploration never fired once novelty fell below 0.25 (which was
+    // every step after step 0, given the novelty bug). Now a typical
+    // moving curiosity of ~0.14 gives ~4% random actions, a novel scene
+    // at curiosity ~0.85 gives ~25%, and a fully familiar, stationary
+    // scene (curiosity ~0) gives none — exploration scales with novelty
+    // instead of being on/off behind an unreachable threshold.
     {
         float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
 
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+        float r = rng->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
             // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(uint32_t(0), uint32_t(7));
+            int choice = rng->uniformInt(uint32_t(0), uint32_t(7));
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
@@ -566,9 +671,26 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
+    // Apply reward-based neuromodulation to the brain for learning
+    // This method implements reward-modulated plasticity, updating:
+    // - Planner action quality through exponential moving average
+    // - Learned preference trait based on Interact outcomes
+    // - Prediction error and dopamine-like signals
+    // - Synaptic weights through eligibility traces
+    // - Plasticity factors based on neuromodulatory signals
+    //
+    // Error handling: If brain_ is null, log a warning and return early.
+    // If rewardModulation is disabled, return without processing.
+    if (!brain_ || !rewardModulationEnabled_) {
+        if (!brain_) {
+            NLM_LOG_WARN("AgentBrain::applyRewardModulation called with null brain pointer");
+        }
+        return;
+    }
+    
     thoughtReward_ = reward;
     hasThoughtOutcome_ = true;
+    
     // Phase 5 learning for the thought/preference systems, from the
     // same reward the synaptic modulation below uses:
     //  - Planner action quality: EMA toward reward/10 for the action
@@ -599,19 +721,20 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Compute prediction error
+    // Compute prediction error (difference between expected and actual reward)
     predictionError_ = reward - predictedReward;
     
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
     // Dopamine-like signal (based on prediction error)
+    // This signal modulates plasticity throughout the network
     dopamineLevel_ = predictionError_;
     
-    // Clamp to reasonable range
+    // Clamp to reasonable range to prevent extreme values
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
-    // Apply to all synapses with eligibility traces
+    // Apply reward-modulated plasticity to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (const auto& syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
@@ -630,7 +753,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
                 delta = std::clamp(delta, -0.1f, 0.1f);
                 syn->addToWeight(delta);
                 
-                // Decay eligibility trace
+                // Decay eligibility trace for next reward event
                 syn->decayEligibilityTrace(0.1f);
             }
         }
@@ -638,6 +761,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     
     // Modulate plasticity based on dopamine
     // Positive dopamine increases plasticity, negative decreases
+    // This allows reward signals to control learning rate throughout development
     float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
