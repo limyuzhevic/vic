@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <variant>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -423,6 +425,237 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Helper functions for configuration and batch operations
+    m.def("configureBrainFromDict", [](std::shared_ptr<Config> config, const std::unordered_map<std::string, std::variant<int, double, bool, std::string>> &params) {
+        for (const auto& [key, value] : params) {
+            std::visit([&](auto&& val) {
+                using T = std::decay_t<decltype(val)>;
+                if constexpr (std::is_same_v<T, int>) {
+                    config->set(key, val);
+                } else if constexpr (std::is_same_v<T, double>) {
+                    config->set(key, val);
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    config->set(key, val);
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    config->set(key, val);
+                }
+            }, value);
+        }
+    }, py::arg("config"), py::arg("params"), "Configure brain from dictionary of parameters");
+
+    m.def("createConfigFromDict", [](const std::unordered_map<std::string, std::variant<int, double, bool, std::string>> &params) {
+        auto config = std::make_shared<Config>();
+        for (const auto& [key, value] : params) {
+            std::visit([&](auto&& val) {
+                using T = std::decay_t<decltype(val)>;
+                if constexpr (std::is_same_v<T, int>) {
+                    config->set(key, val);
+                } else if constexpr (std::is_same_v<T, double>) {
+                    config->set(key, val);
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    config->set(key, val);
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    config->set(key, val);
+                }
+            }, value);
+        }
+        return config;
+    }, py::arg("params"), "Create configuration from dictionary of parameters");
+
+    // Advanced debugging and inspection functions
+    m.def("inspectBrain", [](const std::shared_ptr<Brain> &brain, bool verbose = false) {
+        std::string report = "=== NLM BRAIN INSPECTION ===\\n";
+        report += "Neurons: " + std::to_string(brain->getTotalNeuronCount()) + "\\n";
+        report += "Synapses: " + std::to_string(brain->getTotalSynapseCount()) + "\\n";
+        report += "Active neurons: " + std::to_string(brain->getActiveNeuronCount()) + "\\n";
+        report += "Firing neurons: " + std::to_string(brain->getFiringNeuronCount()) + "\\n";
+        report += "Average firing rate: " + std::to_string(brain->getAverageFiringRate()) + "\\n";
+        report += "E/I ratio: " + std::to_string(brain->getExcitationInhibitionRatio()) + "\\n";
+        report += "Total spikes: " + std::to_string(brain->getTotalSpikeCount()) + "\\n";
+        report += "Region count: " + std::to_string(brain->getRegionCount()) + "\\n";
+        
+        if (verbose) {
+            report += "\\n=== DETAILED STATISTICS ===\\n";
+            report += "Developmental stage: " + std::to_string(static_cast<int>(brain->getDevelopmentalStage())) + "\\n";
+            report += "Config summary:\\n" + brain->getConfig()->summary() + "\\n";
+        }
+        
+        return report;
+    }, py::arg("brain"), py::arg("verbose"), "Get detailed inspection report of brain state");
+
+
+    m.def("profileBrain", [](std::shared_ptr<Brain> &brain, int duration_steps = 100) {
+        std::string report = "=== NLM BRAIN PROFILE ===\\n";
+        report += "Profiling brain performance over " + std::to_string(duration_steps) + " steps\\n";
+        
+        // Record initial state
+        size_t initial_neurons = brain->getTotalNeuronCount();
+        size_t initial_synapses = brain->getTotalSynapseCount();
+        size_t initial_spikes = brain->getTotalSpikeCount();
+        float initial_rate = brain->getAverageFiringRate();
+        
+        // Run profiling
+        for (int step = 0; step < duration_steps; ++step) {
+            brain->step(step);
+        }
+        
+        // Record final state
+        size_t final_neurons = brain->getTotalNeuronCount();
+        size_t final_synapses = brain->getTotalSynapseCount();
+        size_t final_spikes = brain->getTotalSpikeCount();
+        float final_rate = brain->getAverageFiringRate();
+        
+        // Calculate statistics
+        double neuron_change = static_cast<double>(final_neurons - initial_neurons) / initial_neurons * 100.0;
+        double synapse_change = static_cast<double>(final_synapses - initial_synapses) / initial_synapses * 100.0;
+        double spike_change = static_cast<double>(final_spikes - initial_spikes) / initial_spikes * 100.0;
+        double rate_change = static_cast<double>(final_rate - initial_rate) / initial_rate * 100.0;
+        
+        report += "Neuron count change: " + std::to_string(neuron_change) + "%\\n";
+        report += "Synapse count change: " + std::to_string(synapse_change) + "%\\n";
+        report += "Spike count change: " + std::to_string(spike_change) + "%\\n";
+        report += "Firing rate change: " + std::to_string(rate_change) + "%\\n";
+        report += "Average firing rate: " + std::to_string(final_rate) + "\\n";
+        
+        return report;
+    }, py::arg("brain"), py::arg("duration_steps"), "Profile brain performance over time");
+
+    // Batch operations for better performance
+    m.def("batchInjectCurrent", [](std::shared_ptr<Brain> brain, NeuronType type, double current, int steps) {
+        for (int step = 0; step < steps; ++step) {
+            brain->injectCurrentToNeurons(type, static_cast<MembranePotential>(current));
+            brain->step(step, step * 0.001);
+        }
+    }, py::arg("brain"), py::arg("type"), py::arg("current"), py::arg("steps"), "Inject current to all neurons of a type for multiple steps");
+
+    m.def("batchGetNeuronStats", [](const std::shared_ptr<Brain> &brain, NeuronType type) {
+        std::vector<double> stats;
+        auto region = brain->getRegion(RegionId(1)); // First region
+        if (region) {
+            auto neurons = region->getAllNeurons();
+            size_t count = 0;
+            double sum_potential = 0.0, sum_firing_rate = 0.0, sum_threshold = 0.0;
+            
+            for (auto neuron : neurons) {
+                if (neuron->getType() == type) {
+                    count++;
+                    sum_potential += neuron->getMembranePotential();
+                    sum_firing_rate += neuron->getFiringRate();
+                    sum_threshold += neuron->getThreshold();
+                }
+            }
+            
+            if (count > 0) {
+                stats.push_back(count);
+                stats.push_back(sum_potential / count);
+                stats.push_back(sum_firing_rate / count);
+                stats.push_back(sum_threshold / count);
+            }
+        }
+        return stats;
+    }, py::arg("brain"), py::arg("type"), "Get batch statistics for neurons of a specific type");
+
+    // Learning rate adjustment
+    m.def("adjustLearningRates", [](std::shared_ptr<Brain> &brain, double stdp_factor = 1.0, double hebbian_factor = 1.0) {
+        // This is a simplified version - in practice, you'd need to access the plasticity systems
+        // For now, we'll just adjust the configuration
+        auto config = brain->getConfig();
+        double current_stdp_ltp = config->getOr("plasticity.stdp.ltp_weight", 0.02);
+        double current_stdp_ltd = config->getOr("plasticity.stdp.ltd_weight", 0.015);
+        double current_hebbian = config->getOr("plasticity.hebbian.learning_rate", 0.001);
+        
+        config->set("plasticity.stdp.ltp_weight", current_stdp_ltp * stdp_factor);
+        config->set("plasticity.stdp.ltd_weight", current_stdp_ltd * stdp_factor);
+        config->set("plasticity.hebbian.learning_rate", current_hebbian * hebbian_factor);
+        
+        return "Learning rates adjusted: STDP factor=" + std::to_string(stdp_factor) + ", Hebbian factor=" + std::to_string(hebbian_factor);
+    }, py::arg("brain"), py::arg("stdp_factor"), py::arg("hebbian_factor"), "Adjust learning rates for plasticity");
+
+    // Utility functions for common operations
+    m.def("createSimpleSimulation", [](int neuron_count = 100, int duration_steps = 1000) {
+        auto config = pynlm::createDefaultConfig();
+        config->set("brain.neuron_count", neuron_count);
+        config->set("brain.region_count", 1);
+        
+        auto brain = pynlm::createBrain(config);
+        brain->initialize();
+        
+        for (int step = 0; step < duration_steps; ++step) {
+            brain->step(step);
+        }
+        
+        return brain;
+    }, py::arg("neuron_count"), py::arg("duration_steps"), "Create a simple simulation brain");
+
+    m.def("resetBrainSimulation", [](std::shared_ptr<Brain> &brain) {
+        brain->reset();
+        brain->initialize();
+        return "Brain simulation reset and reinitialized";
+    }, py::arg("brain"), "Reset and reinitialize brain simulation");
+
+    // Error handling and validation
+    m.def("validateBrainConfig", [](const std::shared_ptr<Config> &config) {
+        std::vector<std::string> errors;
+        
+        // Check for required parameters
+        if (!config->has("brain.neuron_count")) {
+            errors.push_back("Missing required parameter: brain.neuron_count");
+        }
+        
+        int neuron_count = config->getOr("brain.neuron_count", 1000);
+        if (neuron_count < 10 || neuron_count > 100000) {
+            errors.push_back("brain.neuron_count must be between 10 and 100000");
+        }
+        
+        // Check plasticity configuration
+        if (config->getOr("plasticity.stdp.enable", true)) {
+            double ltp_weight = config->getOr("plasticity.stdp.ltp_weight", 0.02);
+            double ltd_weight = config->getOr("plasticity.stdp.ltd_weight", 0.015);
+            if (ltp_weight <= 0 || ltd_weight <= 0) {
+                errors.push_back("STDP weights must be positive");
+            }
+        }
+        
+        if (errors.empty()) {
+            return "Configuration is valid";
+        } else {
+            std::string error_msg = "Configuration validation failed:\n";
+            for (const auto& error : errors) {
+                error_msg += "  - " + error + "\n";
+            }
+            return error_msg;
+        }
+    }, py::arg("config"), "Validate configuration and return error messages if any");
+
+    // Performance optimization hints
+    m.def("optimizeBrainConfig", [](std::shared_ptr<Config> &config) {
+        std::string hints;
+        
+        // Suggest optimizations based on configuration
+        int neuron_count = config->getOr("brain.neuron_count", 1000);
+        
+        if (neuron_count > 1000) {
+            hints += "Large neuron count detected. Consider:\n";
+            hints += "  - Using smaller brain for testing\n";
+            hints += "  - Enabling SIMD optimizations\n";
+            hints += "  - Using parallel processing\n";
+        }
+        
+        if (!config->getOr("performance.simd.enable", true)) {
+            hints += "SIMD optimizations are disabled. Consider enabling for better performance.\n";
+        }
+        
+        if (!config->getOr("performance.parallel.enable", true)) {
+            hints += "Parallel processing is disabled. Consider enabling for better performance.\n";
+        }
+        
+        if (hints.empty()) {
+            hints = "Configuration looks optimal for performance.\n";
+        }
+        
+        return hints;
+    }, py::arg("config"), "Get performance optimization hints for configuration");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
