@@ -469,7 +469,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
+        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, 
+                                pImpl->predictionSystem ? pImpl->predictionSystem->getPredictionError() : 0.0f, 
+                                pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -602,8 +604,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current neural state
+        // This predicts what will happen based on current brain activity
+        // The prediction error affects learning and motivation
+        
+        // Get current sensory input pattern for prediction
+        // For now, use a placeholder - in real implementation, this would come
+        // from the brain's sensory processing or environment observations
+        SensoryInput currentSensoryInput;
+        std::vector<float> sensoryData = {pImpl->currentTime};
+        currentSensoryInput.setData(sensoryData);
+        
+        // Train prediction system with current sensory state
+        pImpl->predictionSystem->train(currentSensoryInput);
+        
+        // The prediction system should be used by neuromodulation to drive curiosity
+        // and prediction error-based learning
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -619,8 +635,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation discovers recurring patterns from neural activity
+        // It should be presented with current experience patterns for concept formation
+        // This happens after attention has been applied to working memory
+        
+        // Extract current neural activity pattern from brain for concept formation
+        std::vector<float> pattern;
+        std::vector<float> features;
+        
+        // Collect neural activity from firing neurons as pattern
+        // For now, use a simplified representation - could be enhanced to
+        // use working memory content, sensory input, or other brain state
+        size_t numNeuronsToCollect = std::min<size_t>(10, getTotalNeuronCount());
+        pattern.reserve(numNeuronsToCollect);
+        for (size_t i = 0; i < numNeuronsToCollect; ++i) {
+            // Use normalized neural activity (0.0 to 1.0)
+            float activation = getAverageFiringRate() / 20.0f;  // Normalize to 0-1 range
+            pattern.push_back(std::min(1.0f, std::max(0.0f, activation)));
+        }
+        
+        // Features could be derived from sensory input or other sources
+        features.push_back(pImpl->currentTime);  // Simple time-based feature
+        features.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);  // Reward-related feature
+        
+        // Get reward from dopamine level for concept formation
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Present experience to concept formation system
+        pImpl->conceptFormation->presentExperience(pattern, features, reward, pImpl->currentStep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

@@ -65,7 +65,22 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values (defined here so templates instantiate in every TU)
+    // Configuration validation
+    std::vector<std::string> validate() const;
+    std::string getValidationErrors() const;
+    
+    // Advanced validation with rollback
+    bool validateAndSet(const std::string& key, const ConfigValue& value, ConfigSource source);
+    
+    // Validation state
+    bool isValid() const;
+    std::vector<std::string> getWarnings() const;
+    
+    // Get warning for specific entry
+    std::string getWarningForEntry(const ConfigEntry& entry) const;
+    
+    // Validate and provide detailed error for a specific entry
+    std::string validateEntry(const ConfigEntry& entry) const;
 template<typename T>
     std::optional<T> get(const std::string& key) const;
 

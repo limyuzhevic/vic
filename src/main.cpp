@@ -48,6 +48,53 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printAdvancedHelp() {
+    std::cout << R"(
+=== NLM Advanced Options ===
+
+Basic Options:
+  --help, -h           Show this help message
+  --version            Show version information
+  --config FILE        Specify configuration file (default: configs/default.cfg)
+  --log-file FILE      Write logs to file (default: nlm.log)
+  --checkpoint FILE    Save/load brain state from file
+  --visualization      Enable visualization (if available)
+  --advanced          Enable advanced mode with additional options
+
+Simulation Control:
+  --max-steps N        Maximum simulation steps (default: 10000)
+  --time-limit SECONDS Time limit in seconds (default: 0 = unlimited)
+  --environment TYPE   Environment type: GridWorld, Maze, etc. (default: GridWorld)
+  --env-params PARAMS  Environment parameters as key=value pairs
+
+Development & Learning:
+  --validate-only      Validate configuration only, don't run simulation
+  --validate-config    Alias for --validate-only
+
+Advanced Options (require --advanced):
+  --adv-option         Placeholder for additional advanced options
+  --adv-...            More advanced options can be added here
+
+Configuration Examples:
+  ./nlm --config myconfig.cfg --max-steps 5000 --environment Maze
+  ./nlm --visualization --checkpoint mybrain.checkpoint --validate-config
+  ./nlm --advanced --adv-save-stats --adv-enable-plasticity
+
+Save/Load:
+  Configuration files should be in key=value format
+  Brain checkpoints preserve learned preferences and neural state
+
+For more information, visit: https://github.com/nlm-project/nlm
+  )" << std::endl;
+}
+
+void printVersionInfo() {
+    std::cout << "NLM (熙然) - Neural Learning Machine v0.1.0" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "C++20 with Python bindings via scikit-build-core" << std::endl;
+    std::cout << "Built with CMake" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -279,22 +326,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -309,6 +356,18 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 
 int main(int argc, char** argv) {
     printBanner();
+    
+    // Handle help and version requests before initialization
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printAdvancedHelp();
+            return 0;
+        } else if (arg == "--version") {
+            printVersionInfo();
+            return 0;
+        }
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
@@ -329,10 +388,24 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Enhanced command-line argument parsing with power user options
     std::string configFile = "configs/default.cfg";
+    std::string logFile = "";
+    std::string checkpointFile = "";
+    bool enableVisualization = false;
+    bool enableAdvancedMode = false;
+    bool validateOnly = false;
+    bool showHelp = false;
+    bool showVersion = false;
+    int maxSteps = 10000;
+    double timeLimit = 0.0;
+    std::string environmentType = "GridWorld";
+    std::string environmentParams = "";
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        
+        // Handle --config filename
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
@@ -340,6 +413,126 @@ int main(int argc, char** argv) {
                 configFile = argv[++i];
             }
         }
+        // Handle --log-file
+        else if (arg.substr(0, 10) == "--log-file") {
+            if (arg.find('=') != std::string::npos) {
+                logFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logFile = argv[++i];
+            }
+        }
+        // Handle --checkpoint
+        else if (arg.substr(0, 12) == "--checkpoint") {
+            if (arg.find('=') != std::string::npos) {
+                checkpointFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                checkpointFile = argv[++i];
+            }
+        }
+        // Handle --visualization
+        else if (arg == "--visualization") {
+            enableVisualization = true;
+        }
+        // Handle --advanced
+        else if (arg == "--advanced") {
+            enableAdvancedMode = true;
+        }
+        // Handle --validate-only
+        else if (arg == "--validate-only") {
+            validateOnly = true;
+        }
+        // Handle --help
+        else if (arg == "--help" || arg == "-h") {
+            printAdvancedHelp();
+            return 0;
+        }
+        // Handle --version
+        else if (arg == "--version") {
+            printVersionInfo();
+            return 0;
+        }
+        // Handle --max-steps
+        else if (arg.substr(0, 11) == "--max-steps") {
+            if (arg.find('=') != std::string::npos) {
+                maxSteps = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                maxSteps = std::stoi(argv[++i]);
+            }
+        }
+        // Handle --time-limit
+        else if (arg.substr(0, 12) == "--time-limit") {
+            if (arg.find('=') != std::string::npos) {
+                timeLimit = std::stod(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                timeLimit = std::stod(argv[++i]);
+            }
+        }
+        // Handle --environment
+        else if (arg.substr(0, 13) == "--environment") {
+            if (arg.find('=') != std::string::npos) {
+                environmentType = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                environmentType = argv[++i];
+            }
+        }
+        // Handle --env-params
+        else if (arg.substr(0, 11) == "--env-params") {
+            if (arg.find('=') != std::string::npos) {
+                environmentParams = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                environmentParams = argv[++i];
+            }
+        }
+        // Handle --validate-config (validate config only)
+        else if (arg == "--validate-config") {
+            // For now, just show validation message
+            validateOnly = true;
+        }
+        // Handle other advanced options starting with --adv-
+        else if (arg.find("--adv-") == 0) {
+            std::string option = arg.substr(5);
+            if (enableAdvancedMode) {
+                // Process advanced option
+                NLM_LOG_INFO("Advanced option: " + option);
+                // Advanced options could be parsed here
+            }
+        }
+    }
+    
+    // Validate configuration if requested
+    if (validateOnly) {
+        auto errors = config->validate();
+        auto warnings = config->getWarnings();
+        
+        NLM_LOG_INFO("=== Configuration Validation ===");
+        if (errors.empty()) {
+            NLM_LOG_INFO("✓ Configuration is valid");
+        } else {
+            NLM_LOG_ERROR("✗ Configuration has errors:");
+            for (const auto& error : errors) {
+                NLM_LOG_ERROR("  - " + error);
+            }
+            return 1;
+        }
+        
+        if (!warnings.empty()) {
+            NLM_LOG_INFO("Warnings:");
+            for (const auto& warning : warnings) {
+                NLM_LOG_INFO("  - " + warning);
+            }
+        }
+        
+        NLM_LOG_INFO("Configuration validation complete");
+        return 0;
+    }
+    
+    // Configure log file if specified
+    if (!logFile.empty()) {
+        auto fileLogger = std::make_shared<FileLogger>(logFile);
+        config->set("log_to_file", true, ConfigSource::Runtime);
+        config->set("log_filename", logFile, ConfigSource::Runtime);
+        logger->addLogger(fileLogger);
+        NLM_LOG_INFO("Log file enabled: " + logFile);
     }
     
     // Load config from file (ignore if not found)
@@ -352,7 +545,7 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 with advanced options
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -367,6 +560,60 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Advanced configuration parameters
+    config->set("max_simulation_steps", static_cast<int64_t>(10000), ConfigSource::Default);
+    config->set("simulation_time_limit", 0.0, ConfigSource::Default);
+    config->set("environment_name", "GridWorld", ConfigSource::Default);
+    config->set("environment_width", static_cast<int64_t>(10), ConfigSource::Default);
+    config->set("environment_height", static_cast<int64_t>(10), ConfigSource::Default);
+    config->set("visualization_enabled", false, ConfigSource::Default);
+    config->set("visualization_update_rate", 30.0f, ConfigSource::Default);
+    config->set("log_to_file", false, ConfigSource::Default);
+    config->set("log_filename", "nlm.log", ConfigSource::Default);
+    config->set("checkpoint_dir", "./checkpoints", ConfigSource::Default);
+    config->set("reward_discount_factor", 0.99, ConfigSource::Default);
+    config->set("dopamine_baseline", 0.1, ConfigSource::Default);
+    
+    // Development parameters
+    config->set("replay_interval", static_cast<int64_t>(100), ConfigSource::Default);
+    config->set("consolidation_interval", static_cast<int64_t>(1000), ConfigSource::Default);
+    
+    // Validate configuration if requested
+    if (validateOnly) {
+        auto errors = config->validate();
+        auto warnings = config->getWarnings();
+        
+        NLM_LOG_INFO("=== Configuration Validation ===");
+        if (errors.empty()) {
+            NLM_LOG_INFO("✓ Configuration is valid");
+        } else {
+            NLM_LOG_ERROR("✗ Configuration has errors:");
+            for (const auto& error : errors) {
+                NLM_LOG_ERROR("  - " + error);
+            }
+            return 1;
+        }
+        
+        if (!warnings.empty()) {
+            NLM_LOG_INFO("Warnings:");
+            for (const auto& warning : warnings) {
+                NLM_LOG_INFO("  - " + warning);
+            }
+        }
+        
+        NLM_LOG_INFO("Configuration validation complete");
+        return 0;
+    }
+    
+    // Configure log file if specified
+    if (!logFile.empty()) {
+        auto fileLogger = std::make_shared<FileLogger>(logFile);
+        config->set("log_to_file", true, ConfigSource::Runtime);
+        config->set("log_filename", logFile, ConfigSource::Runtime);
+        logger->addLogger(fileLogger);
+        NLM_LOG_INFO("Log file enabled: " + logFile);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");

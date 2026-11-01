@@ -86,10 +86,187 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Properly serialize the value based on its type
+        std::visit([&](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << v << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                std::is_same_v<T, std::vector<double>> ||
+                                std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << v[i] << "\"";
+                    } else {
+                        file << v[i];
+                    }
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << v << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
+}
+
+// Validate configuration values
+std::vector<std::string> Config::validate() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        std::string error = validateEntry(entry);
+        if (!error.empty()) {
+            errors.push_back(entry.key + ": " + error);
+        }
+    }
+    
+    return errors;
+}
+
+// Validate a single configuration entry
+std::string Config::validateEntry(const ConfigEntry& entry) const {
+    // TODO PHASE 3: Implement configuration validation based on key and value type
+    // For now, basic validation of non-empty keys and sensible ranges for known parameters
+    
+    if (entry.key.empty()) {
+        return "Empty configuration key";
+    }
+    
+    // Basic validation for known parameters
+    if (entry.key == "random_seed") {
+        auto value = std::get_if<int64_t>(&entry.value);
+        if (value && (*value < 0 || *value > 1000000)) {
+            return "Random seed should be between 0 and 1,000,000";
+        }
+    } else if (entry.key == "simulation_timestep") {
+        auto value = std::get_if<double>(&entry.value);
+        if (value && (*value <= 0.0 || *value > 1.0)) {
+            return "Simulation timestep must be positive and less than 1.0";
+        }
+    } else if (entry.key == "neuron_count") {
+        auto value = std::get_if<int64_t>(&entry.value);
+        if (value && (*value <= 0 || *value > 10000)) {
+            return "Neuron count must be between 1 and 10,000";
+        }
+    } else if (entry.key == "connection_probability") {
+        auto value = std::get_if<double>(&entry.value);
+        if (value && (*value < 0.0 || *value > 1.0)) {
+            return "Connection probability must be between 0.0 and 1.0";
+        }
+    } else if (entry.key == "stdp_ltp_weight") {
+        auto value = std::get_if<double>(&entry.value);
+        if (value && (*value < 0.0 || *value > 1.0)) {
+            return "STDP LTP weight must be between 0.0 and 1.0";
+        }
+    } else if (entry.key == "stdp_ltd_weight") {
+        auto value = std::get_if<double>(&entry.value);
+        if (value && (*value < 0.0 || *value > 1.0)) {
+            return "STDP LTD weight must be between 0.0 and 1.0";
+        }
+    } else if (entry.key == "stdp_time_constant") {
+        auto value = std::get_if<double>(&entry.value);
+        if (value && (*value <= 0.0 || *value > 100.0)) {
+            return "STDP time constant must be positive and less than 100.0";
+        }
+    } else if (entry.key == "reward_discount_factor") {
+        auto value = std::get_if<double>(&entry.value);
+        if (value && (*value < 0.0 || *value > 1.0)) {
+            return "Reward discount factor must be between 0.0 and 1.0";
+        }
+    } else if (entry.key == "environment_width" || entry.key == "environment_height") {
+        auto value = std::get_if<int64_t>(&entry.value);
+        if (value && (*value <= 0 || *value > 1000)) {
+            return "Environment dimension must be between 1 and 1,000";
+        }
+    } else if (entry.key == "max_simulation_steps") {
+        auto value = std::get_if<int64_t>(&entry.value);
+        if (value && (*value <= 0 || *value > 1000000)) {
+            return "Max simulation steps must be between 1 and 1,000,000";
+        }
+    } else if (entry.key == "visualization_update_rate") {
+        auto value = std::get_if<double>(&entry.value);
+        if (value && (*value <= 0.0 || *value > 1000.0)) {
+            return "Visualization update rate must be positive and reasonable";
+        }
+    }
+    
+    return "";
+}
+
+// Get validation errors as a single string
+std::string Config::getValidationErrors() const {
+    auto errors = validate();
+    if (errors.empty()) {
+        return "";
+    }
+    
+    std::ostringstream oss;
+    oss << "Configuration validation errors:";
+    for (const auto& error : errors) {
+        oss << "\n  - " << error;
+    }
+    return oss.str();
+}
+
+// Enhanced validation with specific error reporting
+bool Config::validateAndSet(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // First set the value
+    set(key, value, source);
+    
+    // Then validate and rollback if invalid
+    auto errors = validate();
+    if (!errors.empty()) {
+        // Rollback: remove the key we just set
+        remove(key);
+        
+        // Report validation errors
+        std::cerr << "Configuration validation failed for key '" << key << "':";
+        for (const auto& error : errors) {
+            std::cerr << "\n  - " << error;
+        }
+        std::cerr << std::endl;
+        return false;
+    }
+    
+    return true;
+}
+
+// Check if configuration is valid
+bool Config::isValid() const {
+    return validate().empty();
+}
+
+// Get validation warnings
+std::vector<std::string> Config::getWarnings() const {
+    std::vector<std::string> warnings;
+    
+    for (const auto& entry : pImpl->entries) {
+        std::string warning = getWarningForEntry(entry);
+        if (!warning.empty()) {
+            warnings.push_back(entry.key + ": " + warning);
+        }
+    }
+    
+    return warnings;
+}
+
+// Get warning for a configuration entry
+std::string Config::getWarningForEntry(const ConfigEntry& entry) const {
+    // TODO PHASE 3: Implement configuration warnings for potential issues
+    // For now, just a placeholder
+    
+    if (entry.key == "neuron_count" && entry.source == ConfigSource::Default) {
+        return "Using default neuron count may limit brain complexity";
+    } else if (entry.key == "simulation_timestep" && entry.source == ConfigSource::Default) {
+        return "Default simulation timestep may not be optimal for your use case";
+    }
+    
+    return "";
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
