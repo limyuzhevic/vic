@@ -301,20 +301,58 @@ region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
 ```
 
-#### Config Class
+#### Creation
+
+# Creation
+
+Creates a default configuration for the brain.
 
 ```python
-# Create
 config = pynlm.createDefaultConfig()
+```
 
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
+#### Modification
 
-# Modify
+Modifies a configuration value. The parameter uses dot notation for nested settings.
+
+```python
+# Brain parameters
 config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
+config.set("brain.synapse_density", 0.1)
 
+# Plasticity rules
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.stdp.learning_rate", 0.001)
+
+# Neuromodulation
+config.set("neuromod.dopamine.scale", 1.0)
+
+# Memory systems
+config.set("memory.working.capacity", 50)
+config.set("memory.episodic.max_episodes", 1000)
+
+# Development
+config.set("development.plasticity_rate", 0.01)
+```
+
+#### Query
+
+Queries the value of a configuration parameter. The `has()` method checks if a key exists.
+
+```python
+# Query configuration
+if config.has("brain.neuron_count"):
+    neuron_count = config.get("brain.neuron_count")
+    
+# Get all configuration keys
+keys = config.getKeys()
+```
+
+#### File I/O
+
+Loads configuration from and saves configuration to files. The file format is JSON.
+
+```python
 # File I/O
 config.loadFromFile("config.json")
 config.saveToFile("config.json")

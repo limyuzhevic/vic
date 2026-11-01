@@ -24,20 +24,28 @@ public:
     Phase3Demo() {}
     ~Phase3Demo() {}
     
-    void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
+    void run(int numEpisodes = 5, int stepsPerEpisode = 200, int64_t randomSeed = 42) {
         std::cout << "===========================================\n";
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
         
+        // Print custom settings when CLI arguments are used
+        if (numEpisodes != 5 || stepsPerEpisode != 200 || randomSeed != 42) {
+            std::cout << "Custom settings from command-line arguments:\n";
+            std::cout << "  Episodes: " << numEpisodes << "\n";
+            std::cout << "  Steps per episode: " << stepsPerEpisode << "\n";
+            std::cout << "  Random seed: " << randomSeed << "\n\n";
+        }
+        
         // Create configuration
         auto config = std::make_shared<Config>();
         configureEnvironment(config);
-        configureBrain(config);
+        configureBrain(config, randomSeed);
         
         // Create world
         SimpleWorld world;
         world.configure(20.0f, 20.0f, 16, 16);
-        world.setRandomSeed(42);
+        world.setRandomSeed(randomSeed);
         
         // Create brain
         auto brain = std::make_shared<Brain>(config);
@@ -212,11 +220,16 @@ public:
             
             allMetrics.push_back(metrics);
             
+            // Print concise episode summary
             std::cout << "--- Episode " << episode << " ended ---\n";
-            std::cout << "  Steps: " << metrics.steps << "\n";
-            std::cout << "  Total Reward: " << metrics.totalReward << "\n";
-            std::cout << "  Final Energy: " << metrics.finalEnergy << "\n";
-            std::cout << "  Synapses: " << metrics.totalSynapses << "\n";
+            std::cout << "  Total Reward: " << std::fixed << std::setprecision(2) 
+                      << metrics.totalReward << " | Energy: " 
+                      << metrics.finalEnergy << " | Synapses: " 
+                      << metrics.totalSynapses << "\n";
+            std::cout << "  Novelty: " << std::fixed << std::setprecision(3) 
+                      << metrics.finalNovelty << " | Curiosity: " 
+                      << metrics.finalCuriosity << " | Prediction Error: " 
+                      << metrics.predictionError << "\n";
             std::cout << "  Action counts: fwd=" << metrics.forwardCount
                       << ", bwd=" << metrics.backwardCount
                       << ", left=" << metrics.turnLeftCount
@@ -225,30 +238,8 @@ public:
                       << ", wait=" << metrics.waitCount
                       << ", lookL=" << metrics.lookLeftCount
                       << ", lookR=" << metrics.lookRightCount
-                      << ", avgFiringRate=" << metrics.averageFiringRate
+                      << ", avgFiringRate=" << std::setprecision(1) << metrics.averageFiringRate
                       << "\n";
-            std::cout << "  Phase5 metrics: visitedCells=" << visitedCells.size()
-                      << ", resources=" << resourcesConsumed
-                      << ", hazards=" << hazardsHit
-                      << ", emptyInteracts=" << emptyInteracts
-                      << ", oscillations=" << oscillations
-                      << ", finalNovelty=" << metrics.finalNovelty
-                      << ", finalCuriosity=" << metrics.finalCuriosity
-                      << ", tooSoon=" << tooSoonCount
-                      << ", executed=" << (stepsPerEpisode - tooSoonCount)
-                      << ", reflexBonus=" << agentBrain.getReflexBonusCount()
-                      << ", reflexSuppress=" << agentBrain.getReflexSuppressCount()
-                      << ", wtaPulses=" << agentBrain.getWtaPulseCount()
-                      << ", plannerOverride=" << agentBrain.getPlannerOverrideCount()
-                      << ", plannerAgree=" << agentBrain.getPlannerAgreementCount()
-                      << "/" << agentBrain.getPlannerDecisionCount()
-                      << ", conceptBias=" << agentBrain.getConceptBiasCount()
-                      << ", selfBias=" << agentBrain.getSelfBiasCount()
-                      << ", socialBias=" << agentBrain.getSocialBiasCount()
-                      << ", concepts=" << agentBrain.getConceptCount()
-                      << ", selfConf=" << agentBrain.getSelfModelConfidence()
-                      << ", wmTraces=" << (brain->getWorkingMemory() ? brain->getWorkingMemory()->getActiveTraces() : 0)
-                      << "\n\n";
         }
         
         // Summary
@@ -299,11 +290,11 @@ private:
         config->set("vision_height", 16);
     }
     
-    void configureBrain(std::shared_ptr<Config> config) {
+    void configureBrain(std::shared_ptr<Config> config, int64_t randomSeed = 42) {
         config->set("neuron_count", 500);
         config->set("region_count", 2);
         config->set("connection_probability", 0.1f);
-        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("random_seed", static_cast<int64_t>(randomSeed));
         config->set("simulation_timestep", 0.001);
         config->set("stdp_ltp_weight", 0.01f);
         config->set("stdp_ltd_weight", 0.012f);
@@ -342,8 +333,24 @@ private:
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
+    // Check for help/usage flags
+    if (argc > 1 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
+        std::cout << "Phase 3 Demo Usage:\n";
+        std::cout << "  Phase3Demo [numEpisodes] [stepsPerEpisode] [randomSeed]\n";
+        std::cout << "\nArguments:\n";
+        std::cout << "  numEpisodes      Number of episodes to run (default: 5)\n";
+        std::cout << "  stepsPerEpisode  Steps per episode (default: 200)\n";
+        std::cout << "  randomSeed       Random seed for world and brain (default: 42)\n";
+        std::cout << "\nExamples:\n";
+        std::cout << "  Phase3Demo                      # Run with defaults\n";
+        std::cout << "  Phase3Demo 10 500 12345        # Custom settings\n";
+        std::cout << "  Phase3Demo -h                    # Show this help\n";
+        return 0;
+    }
+    
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    int64_t randomSeed = 42;
     
     if (argc > 1) {
         numEpisodes = std::atoi(argv[1]);
@@ -351,9 +358,20 @@ int main(int argc, char* argv[]) {
     if (argc > 2) {
         stepsPerEpisode = std::atoi(argv[2]);
     }
+    if (argc > 3) {
+        randomSeed = std::atoi(argv[3]);
+    }
+    
+    // Output showing custom settings when CLI arguments are used
+    if (argc > 1 || argc > 2 || argc > 3) {
+        std::cout << "Custom settings from command-line arguments:\n";
+        std::cout << "  Episodes: " << numEpisodes << "\n";
+        std::cout << "  Steps per episode: " << stepsPerEpisode << "\n";
+        std::cout << "  Random seed: " << randomSeed << "\n\n";
+    }
     
     nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
+    demo.run(numEpisodes, stepsPerEpisode, randomSeed);
     
     return 0;
 }
