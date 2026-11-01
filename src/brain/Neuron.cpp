@@ -23,8 +23,22 @@ struct Neuron::Impl {
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
+    // Rate-based neuron parameters
+    float maxFiringRate;  // Maximum firing rate in Hz
+    float inputScaleFactor;  // Scale factor for input-to-rate conversion
+    float rateFeedbackFactor;  // Strength of rate feedback to membrane potential
+    float developmentFactor;  // Factor that affects neuron properties during development
+    float plasticityLearningRate;  // Learning rate for plasticity rules
+    bool rateDependentPlasticity;  // Enable plasticity that depends on firing rate
+    
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             maxFiringRate(1000.0f),  // 1000 Hz max (realistic)
+             inputScaleFactor(100.0f),  // Scale input to rate
+             rateFeedbackFactor(0.01f),  // Rate feedback strength
+             developmentFactor(1.0f),  // Normal development
+             plasticityLearningRate(0.01f),  // Default learning rate
+             rateDependentPlasticity(true) {}  // Enable rate-dependent plasticity by default
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -276,10 +290,190 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     return fired;
 }
 
-void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+bool Neuron::stepRateBased(Timestamp currentTime, TimestepDuration dt) {
+    // Rate-based neural dynamics with integrate-and-fire
+    // Combines continuous rate dynamics with discrete spike events
+    
+    bool fired = false;
+    
+    // Handle refractory period
+    if (pImpl->state.refractoryRemaining > 0) {
+        --pImpl->state.refractoryRemaining;
+        pImpl->synapticInput = 0.0f;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+        pImpl->state.firingRate *= 0.9f;  // Decay firing rate during refractory
+        return false;
+    }
+    
+    // Rate-based dynamics: dV/dt = (V_rest - V)/tau + I/C + rate_feedback
+    float V = pImpl->state.membranePotential;
+    float V_rest = pImpl->state.restingPotential;
+    float threshold = pImpl->state.threshold;
+    float tau = Impl::TIME_CONSTANT;  // ms
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Calculate input contribution
+    float inputContribution = pImpl->synapticInput / C;
+    
+    // Leak contribution
+    float leakContribution = (V_rest - V) / tau;
+    
+    // Rate feedback term: higher firing rates increase adaptation
+    float rateFeedback = pImpl->state.firingRate * 0.01f;
+    
+    // Update membrane potential with rate feedback
+    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + inputContribution - rateFeedback);
+    
+    // Apply spike-frequency adaptation
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        V -= pImpl->state.adaptationVariable * 0.01f;
+        pImpl->state.adaptationVariable *= 0.95f;
+    }
+    
+    // Clamp membrane potential
+    V = std::clamp(V, -100.0f, 50.0f);
+    
+    // Update firing rate using exponential moving average
+    if (dt > 0.0) {
+        // Decay existing rate
+        pImpl->state.firingRate *= 0.95f;
+        
+        // Add contribution from input current (convert current to rate)
+        float inputRate = std::max(0.0f, inputContribution * 100.0f);  // Scale factor
+        pImpl->state.firingRate += inputRate * 0.1f;
+        
+        // Cap firing rate at biologically plausible maximum
+        pImpl->state.firingRate = std::min(pImpl->state.firingRate, 1000.0f);
+    }
+    
+    // Check for spike based on both potential AND rate
+    bool spikeFromPotential = V >= threshold;
+    bool spikeFromRate = (pImpl->state.firingRate > 500.0f) && (currentTime - pImpl->state.lastSpikeTime > 1.0f);
+    
+    if (spikeFromPotential || spikeFromRate) {
+        fired = true;
+        if (dt > 0.0) {
+            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+        }
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        // Record spike
+        recordSpike(currentTime);
+        
+        // Reset membrane potential
+        V = pImpl->state.resetPotential;
+        
+        // Enter refractory period
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.firingState = FiringState::Refractory;
+        
+        // Update adaptation for spike-frequency adaptation
+        pImpl->state.adaptationVariable += 1.0f;
+    } else {
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.membranePotential = V;
+    }
+    
+    // Clear synaptic input for next step
+    pImpl->synapticInput = 0.0f;
+    
+    return fired;
+}
+
+void Neuron::stepRateBased(Timestamp currentTime, TimestepDuration dt) {
+    // Rate-based neural dynamics with integrate-and-fire
+    // Combines continuous rate dynamics with discrete spike events
+    
+    bool fired = false;
+    
+    // Handle refractory period
+    if (pImpl->state.refractoryRemaining > 0) {
+        --pImpl->state.refractoryRemaining;
+        pImpl->synapticInput = 0.0f;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+        pImpl->state.firingRate *= 0.9f;  // Decay firing rate during refractory
+        return false;
+    }
+    
+    // Rate-based dynamics: dV/dt = (V_rest - V)/tau + I/C + rate_feedback
+    float V = pImpl->state.membranePotential;
+    float V_rest = pImpl->state.restingPotential;
+    float threshold = pImpl->state.threshold;
+    float tau = Impl::TIME_CONSTANT;  // ms
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Calculate input contribution
+    float inputContribution = pImpl->synapticInput / C;
+    
+    // Leak contribution
+    float leakContribution = (V_rest - V) / tau;
+    
+    // Rate feedback term: higher firing rates increase adaptation
+    float rateFeedback = pImpl->state.firingRate * 0.01f;
+    
+    // Update membrane potential with rate feedback
+    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + inputContribution - rateFeedback);
+    
+    // Apply spike-frequency adaptation
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        V -= pImpl->state.adaptationVariable * 0.01f;
+        pImpl->state.adaptationVariable *= 0.95f;
+    }
+    
+    // Clamp membrane potential
+    V = std::clamp(V, -100.0f, 50.0f);
+    
+    // Update firing rate using exponential moving average
+    if (dt > 0.0) {
+        // Decay existing rate
+        pImpl->state.firingRate *= 0.95f;
+        
+        // Add contribution from input current (convert current to rate)
+        float inputRate = std::max(0.0f, inputContribution * 100.0f);  // Scale factor
+        pImpl->state.firingRate += inputRate * 0.1f;
+        
+        // Cap firing rate at biologically plausible maximum
+        pImpl->state.firingRate = std::min(pImpl->state.firingRate, 1000.0f);
+    }
+    
+    // Check for spike based on both potential AND rate
+    bool spikeFromPotential = V >= threshold;
+    bool spikeFromRate = (pImpl->state.firingRate > 500.0f) && (currentTime - pImpl->state.lastSpikeTime > 1.0f);
+    
+    if (spikeFromPotential || spikeFromRate) {
+        fired = true;
+        if (dt > 0.0) {
+            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+        }
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        // Record spike
+        recordSpike(currentTime);
+        
+        // Reset membrane potential
+        V = pImpl->state.resetPotential;
+        
+        // Enter refractory period
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.firingState = FiringState::Refractory;
+        
+        // Update adaptation for spike-frequency adaptation
+        pImpl->state.adaptationVariable += 1.0f;
+    } else {
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.membranePotential = V;
+    }
+    
+    // Clear synaptic input for next step
+    pImpl->synapticInput = 0.0f;
+    
+    return fired;
 }
 
 void Neuron::reset() {
@@ -316,20 +510,206 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
-NeuronId Neuron::getId() const { return pImpl->id; }
-NeuronType Neuron::getType() const { return pImpl->type; }
-const NeuronState& Neuron::getState() const { return pImpl->state; }
-MembranePotential Neuron::getMembranePotential() const { return pImpl->state.membranePotential; }
-MembranePotential Neuron::getThreshold() const { return pImpl->state.threshold; }
-bool Neuron::isFiring() const { return pImpl->state.firingState == FiringState::Active; }
-bool Neuron::isRefractory() const { return pImpl->state.refractoryRemaining > 0; }
-FiringRate Neuron::getFiringRate() const { return pImpl->state.firingRate; }
-MembranePotential Neuron::getTotalCurrent() const { return pImpl->totalCurrent; }
-const std::vector<Timestamp>& Neuron::getSpikeHistory() const { return pImpl->spikeHistory; }
-const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const { return pImpl->incomingSynapses; }
-const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const { return pImpl->outgoingSynapses; }
-const PlasticityFlags& Neuron::getPlasticityFlags() const { return pImpl->plasticityFlags; }
-RegionId Neuron::getRegionId() const { return pImpl->regionId; }
-PopulationId Neuron::getPopulationId() const { return pImpl->populationId; }
+// Implementation of new rate-based neuron methods
+
+// Rate-based firing model parameters
+definition void Neuron::setMaxFiringRate(FiringRate rate) {
+    pImpl->maxFiringRate = rate;
+}
+
+definition FiringRate Neuron::getMaxFiringRate() const {
+    return pImpl->maxFiringRate;
+}
+
+definition void Neuron::setInputScaleFactor(float factor) {
+    pImpl->inputScaleFactor = factor;
+}
+
+definition float Neuron::getInputScaleFactor() const {
+    return pImpl->inputScaleFactor;
+}
+
+definition void Neuron::setRateFeedbackFactor(float factor) {
+    pImpl->rateFeedbackFactor = factor;
+}
+
+definition float Neuron::getRateFeedbackFactor() const {
+    return pImpl->rateFeedbackFactor;
+}
+
+definition void Neuron::setDevelopmentFactor(float factor) {
+    pImpl->developmentFactor = factor;
+    
+    // Apply development factor to neuron properties
+    float scale = std::max(0.1f, pImpl->developmentFactor);
+    pImpl->state.threshold = std::max(-60.0f, pImpl->state.threshold * scale);
+    pImpl->state.leakConductance = std::min(20.0f, pImpl->state.leakConductance * scale);
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(std::max(2.0f, pImpl->state.refractoryPeriod * scale));
+}
+
+definition float Neuron::getDevelopmentFactor() const {
+    return pImpl->developmentFactor;
+}
+
+definition void Neuron::setPlasticityLearningRate(float rate) {
+    pImpl->plasticityLearningRate = rate;
+}
+
+definition float Neuron::getPlasticityLearningRate() const {
+    return pImpl->plasticityLearningRate;
+}
+
+definition void Neuron::enableRateDependentPlasticity(bool enable) {
+    pImpl->rateDependentPlasticity = enable;
+}
+
+definition bool Neuron::isRateDependentPlasticityEnabled() const {
+    return pImpl->rateDependentPlasticity;
+}
+
+definition size_t Neuron::getTotalSpikes() const {
+    return pImpl->spikeHistory.size();
+}
+
+definition float Neuron::getMeanInterSpikeInterval() const {
+    if (pImpl->spikeHistory.size() < 2) {
+        return 0.0f;
+    }
+    
+    float totalInterval = 0.0f;
+    for (size_t i = 1; i < pImpl->spikeHistory.size(); ++i) {
+        totalInterval += pImpl->spikeHistory[i] - pImpl->spikeHistory[i - 1];
+    }
+    
+    return totalInterval / static_cast<float>(pImpl->spikeHistory.size() - 1);
+}
+
+definition float Neuron::getFiringCoefficientOfVariation() const {
+    if (pImpl->spikeHistory.size() < 2) {
+        return 0.0f;
+    }
+    
+    // Calculate inter-spike intervals
+    std::vector<float> intervals;
+    for (size_t i = 1; i < pImpl->spikeHistory.size(); ++i) {
+        intervals.push_back(pImpl->spikeHistory[i] - pImpl->spikeHistory[i - 1]);
+    }
+    
+    // Calculate mean and standard deviation
+    float mean = 0.0f;
+    for (float interval : intervals) {
+        mean += interval;
+    }
+    mean /= intervals.size();
+    
+    float variance = 0.0f;
+    for (float interval : intervals) {
+        variance += (interval - mean) * (interval - mean);
+    }
+    variance /= intervals.size();
+    
+    float stdDev = std::sqrt(variance);
+    
+    // Coefficient of variation = stdDev / mean
+    if (mean > 0.0f) {
+        return stdDev / mean;
+    }
+    return 0.0f;
+}
+
+// Update stepLIF to use rate-dependent plasticity if enabled
+bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+    bool fired = false;
+    
+    // Handle refractory period
+    if (pImpl->state.refractoryRemaining > 0) {
+        --pImpl->state.refractoryRemaining;
+        // During refractory period, clear synaptic input but don't integrate
+        pImpl->synapticInput = 0.0f;
+        if (pImpl->state.refractoryRemaining == 0) {
+            pImpl->state.firingState = FiringState::Resting;
+        }
+        // Keep the firing-rate metric decaying even while refractory, so it
+        // reflects recent activity instead of freezing at its spike value.
+        pImpl->state.firingRate *= 0.9f;
+        return false;
+    }
+    
+    // LIF dynamics: Leaky Integrate-and-Fire
+    // dV/dt = (V_rest - V)/tau + I/C
+    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    
+    MembranePotential& V = pImpl->state.membranePotential;
+    MembranePotential V_rest = pImpl->state.restingPotential;
+    MembranePotential V_reset = pImpl->state.resetPotential;
+    MembranePotential threshold = pImpl->state.threshold;
+    float tau = Impl::TIME_CONSTANT;  // ms
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Synaptic input contributes to membrane potential change
+    float synapticContribution = pImpl->synapticInput / C;
+    
+    // Leak contribution
+    float leakContribution = (V_rest - V) / tau;
+    
+    // Enhanced leak with development factor
+    leakContribution *= pImpl->developmentFactor;
+    
+    // Input contribution with plasticity learning rate scaling
+    synapticContribution *= (1.0f + pImpl->plasticityLearningRate);
+    
+    // Update membrane potential using exponential Euler integration
+    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    
+    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        V -= pImpl->state.adaptationVariable * 0.01f * pImpl->developmentFactor;
+        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    }
+    
+    // Clamp membrane potential to prevent instability
+    V = std::clamp(V, -100.0f, 50.0f);
+    
+    // Update the firing-rate metric from counted spikes, in Hz.
+    // Previously setFiringRate() was never called anywhere, so
+    // getAverageFiringRate() summed zeros even with thousands of spikes.
+    // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
+    // dt is in seconds (0.001 in the demos), so a neuron firing every
+    // step would approach 1000 Hz, and refractory periods cap it well
+    // below that in practice.
+    if (dt > 0.0) {
+        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+    }
+    
+    // Check for spike
+    if (V >= threshold) {
+        fired = true;
+        if (dt > 0.0) {
+            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+        }
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        // Record spike
+        recordSpike(currentTime);
+        
+        // Reset membrane potential
+        V = V_reset;
+        
+        // Enter refractory period
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.firingState = FiringState::Refractory;
+        
+        // Update adaptation for spike-frequency adaptation
+        pImpl->state.adaptationVariable += 1.0f * pImpl->developmentFactor;
+    } else {
+        pImpl->state.firingState = FiringState::Active;
+    }
+    
+    // Clear synaptic input for next step
+    pImpl->synapticInput = 0.0f;
+    
+    return fired;
+}
 
 } // namespace nlm

@@ -103,17 +103,35 @@ public:
     MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
     
-    // Spike detection
-    bool checkThreshold() const;
-    float getLastSpikeTime() const;
+    // Rate-based firing model parameters
+    void setMaxFiringRate(FiringRate rate);
+    FiringRate getMaxFiringRate() const;
     
-    // LIF step function - returns true if neuron fired
-    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
+    // Rate-based step function (integrate continuous firing rate)
+    bool stepRateBased(Timestamp currentTime, TimestepDuration dt);
     
-    // Incoming signals (post-synaptic potentials)
-    void receiveExcitatoryInput(MembranePotential amplitude);
-    void receiveInhibitoryInput(MembranePotential amplitude);
-    void receiveModulatoryInput(MembranePotential amplitude);
+    // Input/output rate functions for advanced applications
+    void setInputScaleFactor(float factor);
+    float getInputScaleFactor() const;
+    void setRateFeedbackFactor(float factor);
+    float getRateFeedbackFactor() const;
+    
+    // Spike statistics for analysis
+    size_t getTotalSpikes() const;
+    float getMeanInterSpikeInterval() const;
+    float getFiringCoefficientOfVariation() const;  // Measure of firing regularity
+    
+    // Development parameters
+    void setDevelopmentFactor(float factor);
+    float getDevelopmentFactor() const;
+    
+    // Enhanced plasticity parameters
+    void setPlasticityLearningRate(float rate);
+    float getPlasticityLearningRate() const;
+    
+    // Rate-dependent plasticity
+    void enableRateDependentPlasticity(bool enable);
+    bool isRateDependentPlasticityEnabled() const;
     
     // Current injection (from external sources)
     void injectCurrent(MembranePotential current);
