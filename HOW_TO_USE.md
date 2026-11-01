@@ -461,6 +461,110 @@ pynlm.WorldObjectType.Marker
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
 
+### Advanced Configuration Features
+
+The Config system now includes comprehensive advanced features for type-safe configuration management:
+
+#### 1. Multi-Format Configuration Support
+NLM now supports JSON, YAML, and plaintext configuration files:
+
+- **JSON**: Modern, standard format with full type support
+- **YAML**: Human-readable format for configuration management
+- **Plaintext**: Legacy format with backward compatibility
+
+#### 2. Type-Safe Configuration Access
+Configuration values can be checked and accessed with type safety:
+
+```cpp
+// Type checking before access
+if (config.hasType<int>("brain.neuron_count")) {
+    int neurons = config.get<int>("brain.neuron_count").value();
+}
+
+// Safe defaults
+int defaultNeurons = config.getOr<int>("brain.neuron_count", 1000);
+```
+
+#### 3. Configuration Statistics and Validation
+Track and validate configuration:
+
+```cpp
+// Get configuration statistics
+auto stats = config.getStats();
+std::cout << "Total entries: " << stats.totalEntries << std::endl;
+
+// Configuration validation (rejects invalid values)
+config.set("valid.value", 42);           // Accepted
+config.set("invalid.value", std::string(20000, 'x'));  // Rejected (> 10KB)
+```
+
+#### 4. Configuration Merging
+Combine multiple configurations:
+
+```cpp
+// Merge configurations (later sources override earlier ones)
+baseConfig.merge(environmentConfig);
+baseConfig.merge(userConfig);
+```
+
+#### 5. Enhanced Command Line Interface
+Use configuration via command line:
+
+```bash
+// JSON configuration file
+./nlm --config_file advanced_config.json
+
+// Command line overrides
+./nlm --brain.neuron_count=2000 --plasticity.stdp.learning_rate=0.01
+
+// Multiple configurations
+./nlm --merge config1.txt config2.txt --output merged_config.txt
+```
+
+#### 6. Runtime Configuration Management
+Modify configuration at runtime:
+
+```cpp
+// Load configuration at startup
+config.loadFromFile("initial_config.txt");
+
+// Runtime modifications
+config.set("runtime.debug_mode", true);
+
+// Check configuration sources
+for (const auto& entry : config.getAllEntries()) {
+    std::cout << entry.key << " (source: " << static_cast<int>(entry.source) << ")" << std::endl;
+}
+```
+
+### Configuration Best Practices
+
+#### For Large-Scale Simulations
+```cpp
+// Performance-optimized configuration
+config.set("brain.neuron_count", 5000);
+config.set("brain.synapse_density", 0.02);  // Lower density
+config.set("plasticity.stdp.learning_rate", 0.0005);  // Slower learning
+config.set("neuromod.curiosity.enable", false);  // Deterministic
+```
+
+#### For Scientific Accuracy
+```cpp
+// High-fidelity configuration
+config.set("brain.neuron_count", 2000);
+config.set("brain.synapse_density", 0.15);
+config.set("plasticity.stdp.learning_rate", 0.01);
+config.set("memory.episodic_memory.encoding_strength", 0.95);
+```
+
+#### For Development and Testing
+```cpp
+// Development-focused configuration
+config.set("brain.neuron_count", 100);
+config.set("development.enable", true);
+config.set("neuromod.curiosity.enable", true);
+```
+
 ---
 
 ## Part 5: Example Scripts

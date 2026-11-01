@@ -22,48 +22,112 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Internal) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        internalNeurons_.push_back(n);
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
-                }
+    // Initialize neuron groups by type
+    initializeNeuronGroups();
+}
+
+// Helper function to initialize neuron groups based on brain regions
+void AgentBrain::initializeNeuronGroups() {
+    if (!brain_) return;
+    
+    // Use a more efficient approach for large numbers of neurons
+    for (const auto& region : brain_->getRegions()) {
+        for (auto& pop : region->getPopulations()) {
+            NeuronType type = pop->getNeuronType();
+            
+            switch (type) {
+                case NeuronType::Motor:
+                    distributeMotorNeurons(pop->getNeurons());
+                    break;
+                case NeuronType::Internal:
+                    collectInternalNeurons(pop->getNeurons());
+                    break;
+                case NeuronType::Sensory:
+                    distributeSensoryNeurons(pop->getNeurons());
+                    break;
+                case NeuronType::Modulatory:
+                case NeuronType::Inhibitory:
+                case NeuronType::Excitatory:
+                    // These neuron types are handled by the core brain
+                    break;
+                case NeuronType::Wait:
+                    // Wait neurons are not used by agent
+                    break;
             }
         }
+    }
+}
+
+// Distribute motor neurons to action groups using a more deterministic approach
+void AgentBrain::distributeMotorNeurons(const std::vector<Neuron*>& neurons) {
+    // Use modulo 6 for 6 motor actions, but with better distribution
+    for (size_t i = 0; i < neurons.size(); ++i) {
+        Neuron* n = neurons[i];
+        
+        // Better distribution: use i modulo 6 for simple round-robin
+        // Add some variety based on neuron properties if needed
+        size_t groupIndex = i % 6;
+        
+        switch (groupIndex) {
+            case 0: motorForward_.push_back(n); break;
+            case 1: motorBackward_.push_back(n); break;
+            case 2: motorTurnLeft_.push_back(n); break;
+            case 3: motorTurnRight_.push_back(n); break;
+            case 4: motorInteract_.push_back(n); break;
+            case 5: motorWait_.push_back(n); break;
+        }
+    }
+}
+
+// Collect internal neurons for recall probe
+void AgentBrain::collectInternalNeurons(const std::vector<Neuron*>& neurons) {
+    internalNeurons_.insert(internalNeurons_.end(), neurons.begin(), neurons.end());
+}
+
+// Distribute sensory neurons to different modalities
+void AgentBrain::distributeSensoryNeurons(const std::vector<Neuron*>& neurons) {
+    // Use modulo 4 for 4 sensory modalities
+    for (size_t i = 0; i < neurons.size(); ++i) {
+        Neuron* n = neurons[i];
+        
+        size_t groupIndex = i % 4;
+        
+        switch (groupIndex) {
+            case 0: sensoryVision_.push_back(n); break;
+            case 1: sensoryTouch_.push_back(n); break;
+            case 2: sensoryInternal_.push_back(n); break;
+            case 3: sensoryProprioception_.push_back(n); break;
+        }
+    }
+}
+
+// Convert MotorCommand to ActionType (helper function)
+ActionType AgentBrain::motorCommandToAction(MotorCommand cmd) {
+    switch (cmd) {
+        case MotorCommand::MoveForward: return ActionType::MoveForward;
+        case MotorCommand::MoveBackward: return ActionType::MoveBackward;
+        case MotorCommand::TurnLeft: return ActionType::TurnLeft;
+        case MotorCommand::TurnRight: return ActionType::TurnRight;
+        case MotorCommand::Interact: return ActionType::Interact;
+        case MotorCommand::LookLeft: return ActionType::Wait; // Special case
+        case MotorCommand::LookRight: return ActionType::Wait; // Special case
+        case MotorCommand::Wait: return ActionType::Wait;
+        default: return ActionType::Wait;
+    }
+}
+
+// Convert ActionType to MotorCommand (helper function)
+MotorCommand AgentBrain::actionToMotorCommand(ActionType action) {
+    switch (action) {
+        case ActionType::MoveForward: return MotorCommand::MoveForward;
+        case ActionType::MoveBackward: return MotorCommand::MoveBackward;
+        case ActionType::TurnLeft: return MotorCommand::TurnLeft;
+        case ActionType::TurnRight: return MotorCommand::TurnRight;
+        case ActionType::Interact: return MotorCommand::Interact;
+        case ActionType::Wait: return MotorCommand::Wait;
+        case ActionType::LookLeft: return MotorCommand::LookLeft; // Phase 4 only
+        case ActionType::LookRight: return MotorCommand::LookRight; // Phase 4 only
+        default: return MotorCommand::Wait;
     }
 }
 
@@ -144,15 +208,7 @@ size_t AgentBrain::getSocialObservationCount() const {
 void AgentBrain::observeOtherAgent(MotorCommand observed, const std::vector<float>& beforeVision,
                                    const std::vector<float>& afterVision) {
     if (!socialReady_ && brain_) { socialLearning_.initialize(brain_.get()); socialReady_ = true; }
-    ActionType act = ActionType::Wait;
-    switch (observed) {
-        case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
-        case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
-        case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
-        case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
-        case MotorCommand::Interact: act = ActionType::Interact; break;
-        default: break;
-    }
+    ActionType act = motorCommandToAction(observed);
     socialLearning_.observeAgentAction(act, beforeVision, afterVision);
 }
 
@@ -191,15 +247,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // library. It records from the loop's own percepts only.
     if (hasLastDecoded_ && !lastVision_.empty() && !percept.getVision().empty()) {
         if (!selfModelReady_) { selfModel_.initialize(brain_.get()); selfModelReady_ = true; }
-        ActionType act = ActionType::Wait;
-        switch (lastDecoded_) {
-            case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
-            case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
-            case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
-            case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
-            case MotorCommand::Interact: act = ActionType::Interact; break;
-            default: break;
-        }
+        ActionType act = motorCommandToAction(lastDecoded_);
         selfModel_.recordSelfAction(act, lastVision_, percept.getVision());
     }
     lastText_ = percept.getText();
@@ -420,14 +468,7 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // from real rewards in applyRewardModulation.
     if (brain_->getPlanner() && !lastVision_.empty()) {
         ActionType planned = brain_->getPlanner()->planAction(lastVision_);
-        switch (planned) {
-            case ActionType::MoveForward: thoughtPlanned_ = MotorCommand::MoveForward; break;
-            case ActionType::MoveBackward: thoughtPlanned_ = MotorCommand::MoveBackward; break;
-            case ActionType::TurnLeft: thoughtPlanned_ = MotorCommand::TurnLeft; break;
-            case ActionType::TurnRight: thoughtPlanned_ = MotorCommand::TurnRight; break;
-            case ActionType::Interact: thoughtPlanned_ = MotorCommand::Interact; break;
-            default: thoughtPlanned_ = MotorCommand::Wait; break;
-        }
+        thoughtPlanned_ = actionToMotorCommand(planned);
         hasThoughtPlanned_ = true;
     }
 
@@ -915,26 +956,18 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     //    (a resource reward makes interacting more attractive, a
     //    hazard penalty less so), by 0.1 * reward/10 per event. This
     //    is the trait the checkpoint carries across a reload.
-    if (hasLastDecoded_) {
-        ActionType taken = ActionType::Wait;
-        switch (lastDecoded_) {
-            case MotorCommand::MoveForward: taken = ActionType::MoveForward; break;
-            case MotorCommand::MoveBackward: taken = ActionType::MoveBackward; break;
-            case MotorCommand::TurnLeft: taken = ActionType::TurnLeft; break;
-            case MotorCommand::TurnRight: taken = ActionType::TurnRight; break;
-            case MotorCommand::Interact: taken = ActionType::Interact; break;
-            default: break;
+        if (hasLastDecoded_) {
+            ActionType taken = motorCommandToAction(lastDecoded_);
+            if (brain_->getPlanner()) {
+                float q = brain_->getPlanner()->getActionQuality(taken);
+                float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
+                brain_->getPlanner()->setActionQuality(taken, 0.9f * q + 0.1f * r);
+            }
+            if (lastDecoded_ == MotorCommand::Interact && std::abs(reward) > 0.01f) {
+                float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
+                brain_->setLearnedPreference(brain_->getLearnedPreference() + 0.1f * r);
+            }
         }
-        if (brain_->getPlanner()) {
-            float q = brain_->getPlanner()->getActionQuality(taken);
-            float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
-            brain_->getPlanner()->setActionQuality(taken, 0.9f * q + 0.1f * r);
-        }
-        if (lastDecoded_ == MotorCommand::Interact && std::abs(reward) > 0.01f) {
-            float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
-            brain_->setLearnedPreference(brain_->getLearnedPreference() + 0.1f * r);
-        }
-    }
     
     // Compute prediction error
     predictionError_ = reward - predictedReward;

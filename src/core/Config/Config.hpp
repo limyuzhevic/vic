@@ -95,6 +95,34 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration type traits and utilities
+    static bool isNumericType(const std::string& key);
+    static bool isStringType(const std::string& key);
+    static bool isVectorType(const std::string& key);
+    static size_t getVectorSize(const std::string& key) const;
+
+    // ===== ADVANCED CONFIGURATION FEATURES =====
+    
+    // Merge configuration from another Config object
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    
+    // Check if configuration contains specified key with specific type
+    template<typename T>
+    bool hasType(const std::string& key) const;
+    
+    // Get configuration statistics
+    struct ConfigStats {
+        size_t totalEntries;
+        size_t entriesBySource[4]; // Default, File, CommandLine, Runtime
+        size_t numericEntries;
+        size_t stringEntries;
+        size_t vectorEntries;
+    };
+    
+    ConfigStats getStats() const;
+    
+    // ===== END ADVANCED FEATURES =====
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +130,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Type conversion helpers
+    template<typename T>
+    static std::string valueToString(const ConfigValue& value);
+    
+    // Configuration validation
+    bool validateEntry(const ConfigEntry& entry) const;
 };
 
 } // namespace nlm

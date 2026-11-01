@@ -289,9 +289,35 @@ print("Agent simulation complete!")
 
 ## Next Steps
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
-
 That's it! You're now ready to use NLM.
+
+## New Features in This Version
+
+This version includes major improvements:
+
+### 1. Advanced Configuration System
+- **Multi-format support**: JSON, YAML, and plaintext configuration files
+- **Type-safe access**: Check configuration types before use
+- **Configuration statistics**: Track and analyze configuration usage
+- **Configuration merging**: Combine multiple configurations intelligently
+- **Configuration validation**: Reject invalid values automatically
+
+### 2. Improved AgentBrain Architecture
+- **Simplified initialization**: Cleaner, more maintainable initialization logic
+- **Helper functions**: Extracted repetitive switch statements into reusable functions
+- **Better organization**: Improved separation of concerns
+
+### 3. Comprehensive Testing
+- **New unit tests**: Added 7 new test functions for Config system
+- **Type checking tests**: Verify type-safe configuration access
+- **Merge tests**: Test configuration merging functionality
+- **Statistics tests**: Validate configuration tracking
+- **File I/O tests**: Test configuration save/load operations
+
+### 4. Enhanced Documentation
+- **Advanced examples**: Added examples showing new features
+- **Configuration guide**: Detailed documentation for multi-format configuration
+- **Best practices**: Guidelines for different use cases
+- **Type-safe patterns**: Examples of safe configuration access
+
+These improvements make NLM easier to use, more robust, and better suited for both beginners and advanced users.

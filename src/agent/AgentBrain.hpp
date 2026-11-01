@@ -131,11 +131,39 @@ public:
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
     
+    // Configuration
+    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
+    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
+    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
+    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // ===== AGENT BRAIN HELPERS =====
+    
+    // Initialize neuron groups from brain regions
+    void initializeNeuronGroups();
+    
+    // Distribute motor neurons to action groups
+    void distributeMotorNeurons(const std::vector<Neuron*>& neurons);
+    
+    // Collect internal neurons for recall probe
+    void collectInternalNeurons(const std::vector<Neuron*>& neurons);
+    
+    // Distribute sensory neurons to different modalities
+    void distributeSensoryNeurons(const std::vector<Neuron*>& neurons);
+    
+    // Convert MotorCommand to ActionType (helper)
+    ActionType motorCommandToAction(MotorCommand cmd);
+    
+    // Convert ActionType to MotorCommand (helper)
+    MotorCommand actionToMotorCommand(ActionType action);
+    
+    // ===== END HELPERS =====
+
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
