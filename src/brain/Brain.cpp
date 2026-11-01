@@ -931,6 +931,12 @@ struct P5Reader {
 bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
+    // Use the checkpoint manager for consistency with automated checkpointing
+    if (pImpl->checkpointManager) {
+        NLM_LOG_INFO("Using checkpoint manager for save operation");
+        return pImpl->checkpointManager->saveImmediately(filepath);
+    }
+    
     try {
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
@@ -1100,6 +1106,12 @@ bool Brain::save(const std::string& filepath) const {
 
 bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
+    
+    // Use the checkpoint manager for consistency with automated checkpointing
+    if (pImpl->checkpointManager) {
+        NLM_LOG_INFO("Using checkpoint manager for load operation");
+        return pImpl->checkpointManager->load(filepath);
+    }
     
     try {
         CheckpointReader reader;

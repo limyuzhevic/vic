@@ -948,6 +948,15 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
+    // Signal the brain's dopamine neuromodulator if available (Phase 6 integration)
+    if (brain_ && brain_->getDopamine()) {
+        brain_->getDopamine()->signalReward(reward);
+        brain_->getDopamine()->signalRewardPredictionError(predictionError_);
+        NLM_LOG_INFO("AgentBrain: Signaled brain dopamine system (reward=" + std::to_string(reward) + ", prediction_error=" + std::to_string(predictionError_) + ")");
+    } else {
+        NLM_LOG_INFO("AgentBrain: Reward modulation complete but no brain dopamine system available");
+    }
+    
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (const auto& syn : region->getSynapses()) {

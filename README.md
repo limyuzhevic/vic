@@ -18,7 +18,7 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
-## Current status (honest, 2026-10-31)
+## Current status (honest, 2026-11-01)
 
 Phase 1 made the repo build again. Phase 2 made the brain real at the
 substrate level: populations now actually create neurons, random
@@ -29,12 +29,20 @@ steps), and a controlled STDP test potentiates its synapse
 population) and inhibitory plasticity keeps its sign instead of
 flipping to excitatory.
 
-Still not a working brain in the behavioural sense: Phase 3 and Phase 6
-demos still report 0 reward, and checkpointing does not work (it is a
-stub that honestly returns false). Activity is still very high
-(~200 spikes/step) and learning in the main demo is mostly
-saturation, not selective pattern learning. Those are the next
-problems, not hidden ones.
+Phase 3/6 demos are working better:
+- Phase 3 demo now successfully processes rewards (resource: +10, hazard: -15)
+- AgentBrain now signals the brain's dopamine neuromodulator system
+- All neuromodulators are properly connected and updating
+- Phase 6 integration test verifies all systems are connected
+
+Still issues:
+- Some checkpointing integration needs consolidation (Phase 4 vs Phase 5 systems)
+- Developmental stages affect plasticity rates and are partially functional
+- Phase 5 optimized implementations work but Phase 6 integration still has some refinement needs
+- Replay and consolidation are functional but could be refined further
+
+Next phase: Phase 7 (advanced integration and expansion) is being developed.
+
 
 ## Current Phase
 
