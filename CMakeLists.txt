@@ -132,7 +132,19 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Enhanced demo framework with unified interface
+add_executable(nlm_demo
+    src/core/DemoFrameworkMain.cpp
+)
+target_link_libraries(nlm_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+
+# Enhanced main executable with new demo framework
+add_executable(nlm_enhanced
+    src/core/EnhancedMain.cpp
+)
+target_link_libraries(nlm_enhanced PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+
+# Main executable (original)
 add_executable(nlm
     src/main.cpp
 )
@@ -210,4 +222,9 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Install the demo framework header
+install(FILES src/core/DemoFramework.hpp
+    DESTINATION include/nlm
 )
