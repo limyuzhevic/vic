@@ -144,6 +144,18 @@ add_executable(nlm_phase3_demo
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
+# Enhanced Phase 3 demo executable
+add_executable(nlm_enhanced_phase3_demo
+    src/experiments/EnhancedPhase3Demo.cpp
+)
+target_link_libraries(nlm_enhanced_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Advanced demo executable (combines enhanced features from multiple phases)
+add_executable(nlm_advanced_demo
+    src/experiments/AdvancedDemo.cpp
+)
+target_link_libraries(nlm_advanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5)
+
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
