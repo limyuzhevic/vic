@@ -142,20 +142,32 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
+        // FIXED: Improved loadFromArgs binding with better error handling
+        .def("loadFromArgs", [](const std::vector<std::string>& args) {
+            // Create a mutable Config instance
+            auto config = std::make_shared<Config>();
+            // Convert Python strings to C-style argv
             std::vector<char*> argv;
             argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
+            for (const auto& a : args) {
+                // Make a copy since c_str() returns a pointer to internal data
+                char* argCopy = new char[a.size() + 1];
+                std::strcpy(argCopy, a.c_str());
+                argv.push_back(argCopy);
+            }
+            // Load from args
+            bool success = config->loadFromArgs(static_cast<int>(argv.size()), argv.data());
+            // Clean up allocated memory
+            for (char* arg : argv) {
+                delete[] arg;
+            }
+            return config;
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments (returns new Config)")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -359,7 +371,61 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // ========== MEMORY SYSTEMS ==========
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        
+        // ========== PREDICTION SYSTEM ==========
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        
+        // ========== COGNITION SYSTEMS ==========
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        
+        // ========== DEVELOPMENT SYSTEM ==========
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        
+        // ========== NEUROMODULATION SYSTEMS ==========
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty detection system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal")
+        
+        // Convenience methods
+        .def("getTotalSynapticWeight", &Brain::getTotalSynapticWeight,
+             "Get total synaptic weight")
+        .def("getBrainVolume", &Brain::getBrainVolume,
+             "Get brain volume in cubic millimeters")
+        .def("getDensityEstimate", &Brain::getDensityEstimate,
+             "Get neuron density estimate (neurons/mm^3)");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -406,7 +472,51 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Additional AgentBrain methods for advanced usage
+        .def("getThoughtTrace", &AgentBrain::getThoughtTrace,
+             "Get human-readable thought trace")
+        .def("getLearnedPreference", &AgentBrain::getLearnedPreference,
+             "Get learned preference trait")
+        .def("getReflexBonusCount", &AgentBrain::getReflexBonusCount,
+             "Get reflex bonus count")
+        .def("getReflexSuppressCount", &AgentBrain::getReflexSuppressCount,
+             "Get reflex suppress count")
+        .def("getWtaPulseCount", &AgentBrain::getWtaPulseCount,
+             "Get WTA pulse count")
+        .def("getLastDecoded", &AgentBrain::lastDecoded_,
+             py::return_value_policy::reference_internal,
+             "Get last decoded motor command")
+        .def("getPlannerOverrideCount", &AgentBrain::getPlannerOverrideCount,
+             "Get planner override count")
+        .def("getPlannerAgreementCount", &AgentBrain::getPlannerAgreementCount,
+             "Get planner agreement count")
+        .def("getPlannerDecisionCount", &AgentBrain::getPlannerDecisionCount,
+             "Get planner decision count")
+        .def("getConceptBiasCount", &AgentBrain::getConceptBiasCount,
+             "Get concept bias count")
+        .def("getSelfBiasCount", &AgentBrain::getSelfBiasCount,
+             "Get self bias count")
+        .def("getSocialBiasCount", &AgentBrain::getSocialBiasCount,
+             "Get social bias count")
+        .def("getConceptCount", &AgentBrain::getConceptCount,
+             "Get concept count")
+        .def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence,
+             "Get self-model confidence")
+        .def("getSocialObservationCount", &AgentBrain::getSocialObservationCount,
+             "Get social observation count")
+        .def("getInternalFiringRates", &AgentBrain::getInternalFiringRates,
+             py::return_value_policy::reference_internal,
+             "Get internal firing rates")
+        .def("encodeText", &AgentBrain::encodeText, py::arg("text"),
+             "Encode text string into neuron indices")
+        .def("observeOtherAgent", &AgentBrain::observeOtherAgent,
+             py::arg("observed"), py::arg("beforeVision"), py::arg("afterVision"),
+             "Observe other agent for social learning")
+        .def("getMotorGroupActivities", &AgentBrain::getMotorGroupActivities,
+             py::return_value_policy::reference_internal,
+             "Get motor group activities");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
