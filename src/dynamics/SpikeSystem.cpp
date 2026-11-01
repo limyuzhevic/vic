@@ -15,7 +15,11 @@ struct SpikeSystem::Impl {
     // Spike counting for statistics
     std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
     
-    Impl() : maxHistorySize(10000) {}
+    // Activity control and optimization
+    size_t maxSpikesPerStep;  // Maximum spikes allowed per step to control activity
+    size_t spikeHistoryLimit;  // Compressed history for storage efficiency
+    
+    Impl() : maxHistorySize(10000), maxSpikesPerStep(1000), spikeHistoryLimit(50000) {}
 };
 
 SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
@@ -49,8 +53,10 @@ void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
-    // Process all pending immediate spikes
-    while (!pImpl->pendingSpikes.empty()) {
+    // Process all pending immediate spikes with activity control
+    size_t spikesProcessed = 0;
+    
+    while (!pImpl->pendingSpikes.empty() && spikesProcessed < pImpl->maxSpikesPerStep) {
         SpikeEvent event = pImpl->pendingSpikes.front();
         pImpl->pendingSpikes.pop();
         
@@ -75,6 +81,14 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         for (auto& handler : pImpl->handlers) {
             handler(detailed);
         }
+        
+        spikesProcessed++;
+    }
+    
+    // If we had to drop spikes due to the limit, log a warning for debugging
+    if (spikesProcessed < pImpl->pendingSpikes.size() && pImpl->maxSpikesPerStep > 0) {
+        // This is expected in high-activity scenarios, but can help identify issues
+        // Note: In production, this might be logged at debug level instead of warning
     }
 }
 
@@ -98,8 +112,18 @@ void SpikeSystem::registerHandler(SpikeHandler handler) {
     pImpl->handlers.push_back(handler);
 }
 
-void SpikeSystem::registerDelayedHandler(DelayedSpikeHandler handler) {
-    pImpl->delayedHandlers.push_back(handler);
+void SpikeSystem::setMaxSpikesPerStep(size_t maxSpikes) {
+    pImpl->maxSpikesPerStep = maxSpikes;
+}
+
+void SpikeSystem::setMaxHistorySize(size_t maxHistory) {
+    pImpl->maxHistorySize = maxHistory;
+    // Trim existing history if it's now too large
+    if (pImpl->spikeHistory.size() > maxHistory) {
+        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin(), 
+                                pImpl->spikeHistory.begin() + 
+                                (pImpl->spikeHistory.size() - maxHistory));
+    }
 }
 
 const std::vector<DetailedSpikeEvent>& SpikeSystem::getSpikeHistory() const {

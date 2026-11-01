@@ -28,6 +28,9 @@ SimpleWorld::SimpleWorld()
     , simTime_(0.0)
     , rngSeed_(42)
     , rngState_(42)
+    , explorationReward_(0.5f)  // New: Reward for exploring new areas
+    , discoveryBonus_(1.0f)      // New: Bonus for discovering new object types
+    , healthRestoreReward_(0.5f) // New: Reward for maintaining good health
 {
     agent_.reset();
 }
@@ -52,22 +55,27 @@ void SimpleWorld::reset() {
     agent_.x = urand(rngState_, 2.0f, width_ - 2.0f);
     agent_.y = urand(rngState_, 2.0f, height_ - 2.0f);
     agent_.energy = maxEnergy_;
+    agent_.health = 1.0f;
     rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
     
     objects_.clear();
     
-    // Place some resource objects (positive reward when touched)
-    for (int i = 0; i < 5; ++i) {
+    // Track visited areas for exploration rewards
+    visitedAreas_.clear();
+    
+    // Place more resource objects (positive reward when touched)
+    for (int i = 0; i < 8; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+        float value = urand(rngState_, resourceEnergyGain_, resourceEnergyGain_ * 2.0f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Resource, value, 0.4f);
     }
     
-    // Place some hazard objects (negative reward when touched)
-    for (int i = 0; i < 3; ++i) {
+    // Place more hazard objects (negative reward when touched)
+    for (int i = 0; i < 4; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -urand(rngState_, 10.0f, 25.0f), 0.3f);
     }
     
     generateVision();
@@ -98,12 +106,17 @@ void SimpleWorld::update(double timestep) {
     if (agent_.y < 0.0f) { agent_.y = 0.0f; agent_.velocityY = 0.0f; }
     if (agent_.y >= height_) { agent_.y = height_ - 0.01f; agent_.velocityY = 0.0f; }
     
-    // Energy decay
+    // Energy decay (more gradual now)
     agent_.energy -= energyDecayRate_;
     if (agent_.energy < 0.0f) agent_.energy = 0.0f;
     
     // Update age
     agent_.age += timestep;
+    
+    // Health regeneration (slow recovery)
+    if (agent_.health < 1.0f) {
+        agent_.health += 0.001f * timestep;  // Gradual health recovery
+    }
     
     // Generate vision
     generateVision();
@@ -140,11 +153,13 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
+                result.reward = -0.005f;  // Smaller cost for exploration
                 result.success = true;
+                result.message = "moved_forward";
             } else {
-                result.reward = -0.05f;  // Cost for hitting wall
+                result.reward = -0.02f;  // Cost for hitting wall
                 result.success = false;
+                result.message = "wall_collision";
             }
             break;
         }
@@ -160,11 +175,13 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.02f;
+                result.reward = -0.01f;  // Backward movement penalty
                 result.success = true;
+                result.message = "moved_backward";
             } else {
-                result.reward = -0.05f;
+                result.reward = -0.03f;  // Cost for hitting wall
                 result.success = false;
+                result.message = "wall_collision_backward";
             }
             break;
         }
@@ -172,26 +189,30 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
         case MotorCommand::TurnLeft:
             agent_.angularVelocity = -turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -0.002f;  // Very small turning cost
             result.success = true;
+            result.message = "turned_left";
             break;
             
         case MotorCommand::TurnRight:
             agent_.angularVelocity = turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -0.002f;  // Very small turning cost
             result.success = true;
+            result.message = "turned_right";
             break;
             
         case MotorCommand::LookLeft:
             // Pan sensor (no movement)
-            result.reward = 0.0f;
+            result.reward = 0.0f;  // No cost for looking
             result.success = true;
+            result.message = "looked_left";
             break;
             
         case MotorCommand::LookRight:
-            result.reward = 0.0f;
+            result.reward = 0.0f;  // No cost for looking
             result.success = true;
+            result.message = "looked_right";
             break;
             
         case MotorCommand::Interact:
@@ -201,13 +222,14 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
         case MotorCommand::Wait:
         default:
             // Decay velocities
-            agent_.velocityX *= 0.9f;
-            agent_.velocityY *= 0.9f;
-            agent_.angularVelocity *= 0.9f;
+            agent_.velocityX *= 0.95f;
+            agent_.velocityY *= 0.95f;
+            agent_.angularVelocity *= 0.95f;
             agent_.isMoving = false;
             agent_.isTurning = false;
-            result.reward = 0.0f;
+            result.reward = 0.0f;  // Wait has no cost
             result.success = true;
+            result.message = "waited";
             break;
     }
     
@@ -218,6 +240,7 @@ ActionResult SimpleWorld::interact() {
     ActionResult result;
     result.reward = 0.0f;
     result.success = false;
+    result.message = "no_object";
     
     // Check for objects in interaction range
     const float interactRange = 1.0f;
@@ -237,20 +260,38 @@ ActionResult SimpleWorld::interact() {
                 result.reward = obj.value;  // Positive reward
                 result.success = true;
                 result.message = "consumed_resource";
+                
+                // Exploration reward for visiting new areas
+                result.reward += explorationReward_;
+                
+                // Track this area for discovery bonus
+                std::pair<float, float> areaKey(
+                    std::floor(agent_.x / 1.0f),  // 1.0f unit areas
+                    std::floor(agent_.y / 1.0f)
+                );
+                visitedAreas_.push_back(areaKey);
+                
+                // Discovery bonus if this is a new type of area
+                if (visitedAreas_.size() % 5 == 0) {  // Bonus every 5 new areas
+                    result.reward += discoveryBonus_;
+                    result.message = "consumed_resource_and_discovery";
+                }
+                
             } else if (obj.type == WorldObjectType::Hazard) {
                 agent_.health -= 0.2f;
                 result.reward = obj.value;  // Negative reward
                 result.success = true;
                 result.message = "hit_hazard";
+                
+                // Health penalty (negative reward already in obj.value)
+                if (agent_.health < 0.5f) {
+                    result.reward += -healthRestoreReward_;  // Additional penalty for low health
+                }
             }
             
             // Only interact with one object at a time
             break;
         }
-    }
-    
-    if (!result.success) {
-        result.message = "no_object";
     }
     
     return result;
@@ -397,6 +438,18 @@ void SimpleWorld::checkCollisions() {
     WorldObject* obj = getObjectAt(agent_.x, agent_.y);
     if (obj != nullptr && obj->type == WorldObjectType::Hazard) {
         agent_.health -= 0.01f;  // Passive damage
+        if (agent_.health < 0.0f) agent_.health = 0.0f;
+    }
+    
+    // Health and energy rewards for survival
+    if (agent_.health > 0.8f) {
+        // Bonus reward for good health - should be given by agent via neuromodulators
+        // This will be collected by the agent's reward prediction error system
+    }
+    
+    if (agent_.energy > 0.8f * maxEnergy_) {
+        // Bonus reward for having abundant energy
+        // This will be collected by the agent's reward prediction error system
     }
 }
 

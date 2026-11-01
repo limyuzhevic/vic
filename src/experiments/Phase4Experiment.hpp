@@ -63,15 +63,45 @@ struct Phase4Results {
     std::string toCSV() const;
 };
 
+// Base class for Phase 4 experiments to reduce code duplication
+class BaseExperiment {
+public:
+    BaseExperiment() = default;
+    virtual ~BaseExperiment() {}
+    
+    // Run the experiment
+    virtual Phase4Results run(Brain* brain, size_t numTrials = 100) = 0;
+    
+    // Helper methods for common patterns
+    static float computePatternSimilarity(const std::vector<float>& a, const std::vector<float>& b) {
+        if (a.size() != b.size() || a.empty()) return 0.0f;
+        
+        float dot = 0.0f, normA = 0.0f, normB = 0.0f;
+        for (size_t i = 0; i < a.size(); ++i) {
+            dot += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+        }
+        
+        if (normA < 0.0001f || normB < 0.0001f) return 0.0f;
+        
+        return dot / (std::sqrt(normA) * std::sqrt(normB));
+    }
+    
+    static float generatePatternSimilarity(const std::vector<float>& a, const std::vector<float>& b) {
+        return computePatternSimilarity(a, b);
+    }
+};
+
 // Experiment: Temporal Prediction Learning
 // Tests if NLM can learn that state A predicts state B
-class TemporalPredictionExperiment {
+class TemporalPredictionExperiment : public BaseExperiment {
 public:
     TemporalPredictionExperiment();
     ~TemporalPredictionExperiment();
     
     // Run the experiment
-    Phase4Results run(Brain* brain, size_t numTrials = 100);
+    Phase4Results run(Brain* brain, size_t numTrials = 100) override;
     
     // Get prediction error over time
     const std::vector<float>& getErrorHistory() const { return errorHistory_; }
@@ -82,13 +112,13 @@ private:
 
 // Experiment: Working Memory Test
 // Tests if information can be maintained after stimulus disappears
-class WorkingMemoryExperiment {
+class WorkingMemoryExperiment : public BaseExperiment {
 public:
     WorkingMemoryExperiment();
     ~WorkingMemoryExperiment();
     
     // Run delayed response test
-    Phase4Results run(Brain* brain, size_t numTrials = 50);
+    Phase4Results run(Brain* brain, size_t numTrials = 50) override;
     
     // Get retention over delay periods
     std::vector<float> getRetentionByDelay() const { return retentionByDelay_; }
@@ -99,13 +129,13 @@ private:
 
 // Experiment: Episodic Memory Recall
 // Tests if past experiences influence future behavior
-class EpisodicRecallExperiment {
+class EpisodicRecallExperiment : public BaseExperiment {
 public:
     EpisodicRecallExperiment();
     ~EpisodicRecallExperiment();
     
     // Run episodic memory test
-    Phase4Results run(Brain* brain, size_t numTrials = 50);
+    Phase4Results run(Brain* brain, size_t numTrials = 50) override;
     
     // Get recall accuracy over time
     std::vector<float> getRecallAccuracyHistory() const { return recallHistory_; }
@@ -116,13 +146,13 @@ private:
 
 // Experiment: Concept Formation
 // Tests if recurring patterns form stable representations
-class ConceptFormationExperiment {
+class ConceptFormationExperiment : public BaseExperiment {
 public:
     ConceptFormationExperiment();
     ~ConceptFormationExperiment();
     
     // Run concept formation test
-    Phase4Results run(Brain* brain, size_t numTrials = 100);
+    Phase4Results run(Brain* brain, size_t numTrials = 100) override;
     
     // Get concept stability over time
     std::vector<float> getConceptStabilityHistory() const { return stabilityHistory_; }
@@ -133,13 +163,13 @@ private:
 
 // Experiment: Attention Selection
 // Tests if competing signals produce selective processing
-class AttentionExperiment {
+class AttentionExperiment : public BaseExperiment {
 public:
     AttentionExperiment();
     ~AttentionExperiment();
     
     // Run attention test
-    Phase4Results run(Brain* brain, size_t numTrials = 50);
+    Phase4Results run(Brain* brain, size_t numTrials = 50) override;
     
     // Get attention selectivity over time
     std::vector<float> getSelectivityHistory() const { return selectivityHistory_; }
@@ -150,13 +180,13 @@ private:
 
 // Experiment: Multi-Step Planning
 // Tests if NLM can plan multi-step sequences to achieve goals
-class PlanningExperiment {
+class PlanningExperiment : public BaseExperiment {
 public:
     PlanningExperiment();
     ~PlanningExperiment();
     
     // Run planning test
-    Phase4Results run(Brain* brain, size_t numTrials = 30);
+    Phase4Results run(Brain* brain, size_t numTrials = 30) override;
     
     // Get planning success over time
     std::vector<float> getSuccessHistory() const { return successHistory_; }
@@ -167,13 +197,13 @@ private:
 
 // Experiment: Self-Action Prediction
 // Tests if NLM learns that its actions cause predictable sensory changes
-class SelfModelExperiment {
+class SelfModelExperiment : public BaseExperiment {
 public:
     SelfModelExperiment();
     ~SelfModelExperiment();
     
     // Run self-model test
-    Phase4Results run(Brain* brain, size_t numTrials = 50);
+    Phase4Results run(Brain* brain, size_t numTrials = 50) override;
     
     // Get self-prediction accuracy over time
     std::vector<float> getSelfPredictionHistory() const { return selfPredHistory_; }
@@ -184,13 +214,13 @@ private:
 
 // Experiment: Object Permanence
 // Tests if hidden objects remain relevant to behavior
-class ObjectPermanenceExperiment {
+class ObjectPermanenceExperiment : public BaseExperiment {
 public:
     ObjectPermanenceExperiment();
     ~ObjectPermanenceExperiment();
     
     // Run object permanence test
-    Phase4Results run(Brain* brain, size_t numTrials = 30);
+    Phase4Results run(Brain* brain, size_t numTrials = 30) override;
     
 private:
     std::vector<float> searchBehaviorHistory_;
@@ -198,13 +228,13 @@ private:
 
 // Experiment: Social Observation
 // Tests if NLM can learn from observing another agent
-class SocialLearningExperiment {
+class SocialLearningExperiment : public BaseExperiment {
 public:
     SocialLearningExperiment();
     ~SocialLearningExperiment();
     
     // Run social learning test
-    Phase4Results run(Brain* brain, size_t numTrials = 30);
+    Phase4Results run(Brain* brain, size_t numTrials = 30) override;
     
     // Get imitation accuracy over time
     std::vector<float> getImitationHistory() const { return imitationHistory_; }
@@ -215,13 +245,13 @@ private:
 
 // Experiment: Continual Learning
 // Tests if NLM can learn new tasks without forgetting old ones
-class ContinualLearningExperiment {
+class ContinualLearningExperiment : public BaseExperiment {
 public:
     ContinualLearningExperiment();
     ~ContinualLearningExperiment();
     
     // Run continual learning test
-    Phase4Results run(Brain* brain, size_t numTrials = 100);
+    Phase4Results run(Brain* brain, size_t numTrials = 100) override;
     
     // Get performance across tasks
     std::vector<float> getTaskPerformance() const { return taskPerformance_; }
@@ -232,13 +262,13 @@ private:
 
 // Experiment: Generalization
 // Tests if learned knowledge transfers to new situations
-class GeneralizationExperiment {
+class GeneralizationExperiment : public BaseExperiment {
 public:
     GeneralizationExperiment();
     ~GeneralizationExperiment();
     
     // Run generalization test
-    Phase4Results run(Brain* brain, size_t numTrials = 50);
+    Phase4Results run(Brain* brain, size_t numTrials = 50) override;
     
     // Get transfer performance
     float getTransferRatio() const { return transferRatio_; }
@@ -249,13 +279,13 @@ private:
 
 // Integrated Phase 4 Experiment
 // Combines all Phase 4 mechanisms in a complex environment
-class Phase4IntegratedExperiment {
+class Phase4IntegratedExperiment : public BaseExperiment {
 public:
     Phase4IntegratedExperiment();
     ~Phase4IntegratedExperiment();
     
     // Run integrated experiment
-    Phase4Results run(Brain* brain, size_t numEpisodes = 100, size_t stepsPerEpisode = 200);
+    Phase4Results run(Brain* brain, size_t numEpisodes = 100, size_t stepsPerEpisode = 200) override;
     
     // Get metrics over time
     const std::vector<Phase4Results>& getEpisodeResults() const { return episodeResults_; }

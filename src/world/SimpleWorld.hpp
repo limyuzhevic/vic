@@ -123,9 +123,45 @@ private:
     // Random seed
     uint64_t rngSeed_;
     
+    // World geometry
+    float width_;
+    float height_;
+    
+    // Agent
+    AgentBody agent_;
+    
+    // Objects in world
+    std::vector<WorldObject> objects_;
+    
+    // Sensory state
+    SensoryPercept sensory_;
+    
+    // Vision configuration
+    size_t visionWidth_;
+    size_t visionHeight_;
+    
+    // Energy system
+    float maxEnergy_;
+    float energyDecayRate_;
+    float resourceEnergyGain_;
+    
+    // Simulation time
+    double simTime_;
+    
+    // Random seed
+    uint64_t rngSeed_;
+    
     // Simple RNG state
     uint64_t rngState_;
     uint64_t nextRandom();
+    
+    // Exploration and discovery tracking
+    std::vector<std::pair<float, float>> visitedAreas_;
+    
+    // Reward enhancement parameters
+    float explorationReward_;
+    float discoveryBonus_;
+    float healthRestoreReward_;
 };
 
 } // namespace nlm

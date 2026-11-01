@@ -56,6 +56,10 @@ public:
     using DelayedSpikeHandler = std::function<void(const DelayedSpikeEvent&)>;
     void registerDelayedHandler(DelayedSpikeHandler handler);
     
+// Register delayed spike handler (called when delayed spikes are delivered)
+    using DelayedSpikeHandler = std::function<void(const DelayedSpikeEvent&)>;
+    void registerDelayedHandler(DelayedSpikeHandler handler);
+    
     // Get spike history
     const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
     void clearHistory();
@@ -72,11 +76,20 @@ public:
     // step grouping is restored by restorePendingDelayedSpikes).
     std::vector<DelayedSpikeEvent> getPendingDelayedSpikes() const;
     void restorePendingDelayedSpikes(const std::vector<DelayedSpikeEvent>& events);
-    
+
     // Statistics
     float getAverageSpikeRate() const;
     std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
     
+    // Activity control and optimization
+    // Configure maximum spikes per step to control network activity
+    void setMaxSpikesPerStep(size_t maxSpikes);
+    size_t getMaxSpikesPerStep() const { return pImpl->maxSpikesPerStep; }
+    
+    // Configure spike history size for storage efficiency
+    void setMaxHistorySize(size_t maxHistory);
+    size_t getMaxHistorySize() const { return pImpl->maxHistorySize; }
+
     // Reset
     void reset();
     

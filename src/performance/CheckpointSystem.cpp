@@ -459,7 +459,13 @@ bool CheckpointManager::load(const std::string& name) {
     std::string path = (std::filesystem::path(checkpointDir_) / name).string();
     CheckpointReader reader;
     if (!reader.open(path)) return false;
-    return reader.validate();
+    if (!reader.validate()) return false;
+    
+    // Successful load means the checkpoint can be validated and is usable
+    // The actual brain state loading is done by Brain::load(), which calls
+    // CheckpointReader to read the data. Here we just verify the checkpoint
+    // structure and integrity.
+    return true;
 }
 
 std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoints() const {
