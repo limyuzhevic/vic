@@ -34,6 +34,17 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
         }
         pImpl->predictionError = sumError / predData.size();
         pImpl->errorHistory.push_back(pImpl->predictionError);
+        
+        // Update confidence based on error history
+        if (!pImpl->errorHistory.empty()) {
+            float avgError = 0.0f;
+            for (float error : pImpl->errorHistory) {
+                avgError += error;
+            }
+            avgError /= pImpl->errorHistory.size();
+            // Confidence is inverse of average error (normalized)
+            pImpl->confidence = std::max(0.0f, std::min(1.0f, 1.0f - avgError));
+        }
     }
 }
 
@@ -51,10 +62,16 @@ const std::vector<float>& PredictionSystem::getErrorHistory() const {
 
 void PredictionSystem::clearHistory() {
     pImpl->errorHistory.clear();
+    pImpl->predictionError = 0.0f;
+    pImpl->confidence = 0.5f;
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
     // TODO PHASE 2: Train prediction model
+    // For now, just store the observation for prediction
+    // A real implementation would learn patterns from this observation
+    // This is a placeholder - real training would use the brain's plasticity systems
+    (void)observation;  // TODO: Use observation to train the model
 }
 
 } // namespace nlm

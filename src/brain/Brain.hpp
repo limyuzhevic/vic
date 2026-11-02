@@ -31,6 +31,11 @@ class Curiosity;
 class Novelty;
 class PredictionError;
 
+// New neuromodulators for Phase 6 integration
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
     RegionId sourceRegion;
@@ -176,6 +181,15 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
+    
+    // Norepinephrine - arousal and vigilance
+    Norepinephrine* getNorepinephrine();
+    
+    // Serotonin - mood, impulsivity, and social behavior
+    Serotonin* getSerotonin();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
