@@ -56,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -66,12 +66,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -79,6 +79,17 @@ template<typename T>
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Type-safe getters/setters for common patterns
+    bool getBool(const std::string& key, bool defaultValue = false) const;
+    int getInt(const std::string& key, int defaultValue = 0) const;
+    double getDouble(const std::string& key, double defaultValue = 0.0) const;
+    std::string getString(const std::string& key, const std::string& defaultValue = "") const;
+    
+    void setBool(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    void setInt(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    void setDouble(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    void setString(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -95,9 +106,17 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Error handling
+    std::string getLastError() const { return lastError_; }
+    void clearLastError() { lastError_.clear(); }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Error handling
+    std::string lastError_;
+    void setLastError(const std::string& error);
     
     // Internal helpers
     static std::string trim(const std::string& str);

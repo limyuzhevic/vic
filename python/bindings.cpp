@@ -145,7 +145,8 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON file",
+             py::call_guard<py::call_guard<>>())  // Guard against exceptions
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
@@ -155,9 +156,11 @@ PYBIND11_MODULE(pynlm, m) {
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments",
+            py::call_guard<py::call_guard<>>())  // Guard against exceptions
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a JSON file",
+             py::call_guard<py::call_guard<>>())  // Guard against exceptions
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -298,7 +301,8 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+             "Initialize the brain with configuration",
+             py::call_guard<py::call_guard<>>())  // Guard against exceptions
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
@@ -315,13 +319,16 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("type"), py::arg("current"),
              "Inject current into all neurons of a specific type")
         .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
+             "Produce motor action based on neural activity",
+             py::return_value_policy::take_ownership)
         .def("reset", &Brain::reset,
              "Reset brain state")
         .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
+             "Save brain state to file",
+             py::call_guard<py::call_guard<>>())  // Guard against exceptions
         .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
+             "Load brain state from file",
+             py::call_guard<py::call_guard<>>())  // Guard against exceptions
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         // getRegion is const/non-const overloaded; bind the mutable one.
@@ -382,31 +389,50 @@ PYBIND11_MODULE(pynlm, m) {
              "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
-             "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
-             "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
-             "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
-             "Get prediction error")
-        .def("reset", &AgentBrain::reset,
-             "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
-             py::return_value_policy::reference_internal,
-             "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("getThoughtTrace", &AgentBrain::getThoughtTrace,
+             "Get thought trace (Phase 5)")
+        .def("getLearnedPreference", &AgentBrain::getLearnedPreference,
+             "Get learned preference trait")
+        // Phase 6: text encoder: a teacher word becomes a sparse sensory
+        // pattern, never a string the brain can match on. Lower-case, trim,
+        // FNV-1a hash, then splitmix to pick 4 distinct neurons out of 16
+        // dedicated text neurons. Different words get different (overlapping,
+        // as in real sensory codes) patterns; the same word always gets the
+        // same pattern, which is what makes paired learning possible at all.
+        // The pattern is injected on sensoryVision_ neurons 16..30 — the
+        // tail vision neurons that vision itself never uses (vision is 16
+        // rays, the vision group has 31 neurons), so text has its own
+        // channel and cannot masquerade as a visual scene.
+        .def("encodeText", &AgentBrain::encodeText,
+             py::arg("text"),
+             "Encode text into neuron indices (Phase 6)")
+        // Internal (non-motor, non-sensory) firing rates, for the
+        // text-association recall probe: a learned association means the
+        // internal pattern evoked by text alone moves toward the pattern
+        // evoked by the paired visual scene.
+        .def("getInternalFiringRates", &AgentBrain::getInternalFiringRates,
+             "Get internal firing rates (Phase 6)")
+        .def("getPlannerOverrideCount", &AgentBrain::getPlannerOverrideCount,
+             "Get planner override count (Phase 6)")
+        .def("getPlannerAgreementCount", &AgentBrain::getPlannerAgreementCount,
+             "Get planner agreement count (Phase 6)")
+        .def("getPlannerDecisionCount", &AgentBrain::getPlannerDecisionCount,
+             "Get planner decision count (Phase 6)")
+        .def("getConceptBiasCount", &AgentBrain::getConceptBiasCount,
+             "Get concept bias count (Phase 6)")
+        .def("getSelfBiasCount", &AgentBrain::getSelfBiasCount,
+             "Get self bias count (Phase 6)")
+        .def("getSocialBiasCount", &AgentBrain::getSocialBiasCount,
+             "Get social bias count (Phase 6)")
+        .def("getConceptCount", &AgentBrain::getConceptCount,
+             "Get concept count (Phase 6)")
+        .def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence,
+             "Get self model confidence (Phase 6)")
+        .def("getSocialObservationCount", &AgentBrain::getSocialObservationCount,
+             "Get social observation count (Phase 6)")
+        .def("observeOtherAgent", &AgentBrain::observeOtherAgent,
+             py::arg("observed"), py::arg("beforeVision"), py::arg("afterVision"),
+             "Observe other agent (Phase 6)");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
