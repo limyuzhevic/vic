@@ -19,16 +19,17 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        // Log error instead of silently failing
+        std::cerr << "Error: Could not open configuration file: " << filepath << std::endl;
         return false;
     }
     
     std::string line;
+    size_t line_num = 0;
     while (std::getline(file, line)) {
+        line_num++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,7 +49,52 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Attempt to parse value based on content (intelligent type detection)
+            bool success = false;
+            
+            // Try integer
+            try {
+                size_t pos_end;
+                int64_t int_val = std::stoll(value, &pos_end);
+                if (pos_end == value.size()) {
+                    set(key, int_val, ConfigSource::File);
+                    success = true;
+                }
+            } catch (...) {}
+            
+            // Try floating point
+            if (!success) {
+                try {
+                    size_t pos_end;
+                    double float_val = std::stod(value, &pos_end);
+                    if (pos_end == value.size()) {
+                        set(key, float_val, ConfigSource::File);
+                        success = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // Try boolean
+            if (!success) {
+                std::string lower_val = toLower(value);
+                if (lower_val == "true") {
+                    set(key, true, ConfigSource::File);
+                    success = true;
+                } else if (lower_val == "false") {
+                    set(key, false, ConfigSource::File);
+                    success = true;
+                }
+            }
+            
+            // If not parsed as numeric/boolean, treat as string
+            if (!success) {
+                set(key, value, ConfigSource::File);
+            }
+            
+            if (!success) {
+                std::cerr << "Warning: Could not parse value at line " << line_num 
+                         << " in config file " << filepath << ": " << line << std::endl;
+            }
         }
     }
     
@@ -81,12 +127,27 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        std::cerr << "Error: Could not write configuration file: " << filepath << std::endl;
         return false;
     }
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format value based on type
+        file << entry.key << " = ";
+        std::visit([&file](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << v << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (v ? "true" : "false");
+            } else {
+                file << v;
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
