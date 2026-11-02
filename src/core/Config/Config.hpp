@@ -11,6 +11,7 @@ namespace nlm {
 
 // Forward declarations
 class Config;
+class JsonParser;
 
 // Configuration value types
 using ConfigValue = std::variant<

@@ -18,11 +18,13 @@ struct NeuralWorkingMemory::Impl {
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Initialize activeTraces_ in Impl to avoid uninitialized references
+    pImpl->activeTraces_.clear();
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -92,17 +94,37 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // clear()/restoreSnapshot() reset the list with the content.
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
-        bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
-        if (activation > 0.1f && !present) activeTraces_.push_back(idx);
+        bool present = std::find(pImpl->activeTraces_.begin(), pImpl->activeTraces_.end(), idx) != pImpl->activeTraces_.end();
+        if (activation > 0.1f && !present) pImpl->activeTraces_.push_back(idx);
         if (activation <= 0.1f && present) {
-            activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
-                                activeTraces_.end());
+            pImpl->activeTraces_.erase(std::remove(pImpl->activeTraces_.begin(), pImpl->activeTraces_.end(), idx),
+                                pImpl->activeTraces_.end());
         }
     }
     
     // Inject current to maintain activation
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);
+    }
+}
+
+// Helper method to rebuild activeTraces_ from current memory state
+void NeuralWorkingMemory::rebuildActiveTraces() {
+    pImpl->activeTraces_.clear();
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) {
+            pImpl->activeTraces_.push_back(i);
+        }
+    }
+}
+
+// Helper method to rebuild activeTraces_ from current memory state
+void NeuralWorkingMemory::rebuildActiveTraces() {
+    pImpl->activeTraces_.clear();
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) {
+            pImpl->activeTraces_.push_back(i);
+        }
     }
 }
 
@@ -165,7 +187,7 @@ void NeuralWorkingMemory::clear() {
     memoryNeurons_.clear();
     memoryActivations_.clear();
     memoryTimestamps_.clear();
-    activeTraces_.clear();
+    pImpl->activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
 }
 
@@ -262,9 +284,9 @@ void NeuralWorkingMemory::decayWeakTraces() {
     // Phase 6: erasing shifts memory indices, so the trace list
     // cannot survive removal untouched — rebuild it from the
     // remaining activations instead of leaving stale indices.
-    activeTraces_.clear();
+    pImpl->activeTraces_.clear();
     for (size_t i = 0; i < memoryActivations_.size(); ++i) {
-        if (memoryActivations_[i] > 0.1f) activeTraces_.push_back(i);
+        if (memoryActivations_[i] > 0.1f) pImpl->activeTraces_.push_back(i);
     }
 }
 

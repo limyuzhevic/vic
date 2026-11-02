@@ -1,8 +1,10 @@
 #include "Config.hpp"
+#include "JsonParser.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 
 namespace nlm {
 
@@ -19,9 +21,18 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON parser first (more modern and flexible)
+    std::vector<ConfigEntry> entries;
+    bool parsedAsJson = JsonParser::parseJsonFile(filepath, entries);
     
+    if (parsedAsJson) {
+        // Clear existing entries and add JSON ones
+        pImpl->entries.clear();
+        pImpl->entries = std::move(entries);
+        return true;
+    }
+    
+    // Fallback to simple key=value format for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +54,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -84,10 +95,8 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
+    // Save in JSON format for better compatibility
+    file << JsonParser::entriesToJson(pImpl->entries);
     
     return true;
 }
@@ -197,8 +206,6 @@ std::optional<T> Config::get(const std::string& key) const {
     if (it == pImpl->entries.end()) {
         return std::nullopt;
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
     return std::visit([](auto&& v) -> std::optional<T> {
         using V = std::decay_t<decltype(v)>;
         if constexpr (std::is_same_v<V, T>) {

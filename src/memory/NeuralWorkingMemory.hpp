@@ -100,6 +100,9 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Rebuild activeTraces_ from current memory state
+    void rebuildActiveTraces();
+
 private:
     // Create recurrent connection for maintenance
     void createRecurrentConnection(NeuronId from, NeuronId to, float strength);

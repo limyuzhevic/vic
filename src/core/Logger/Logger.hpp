@@ -52,9 +52,28 @@ public:
     void setUseColors(bool useColors);
     bool getUseColors() const;
     
-    // Set output file (in addition to console)
-    void setOutputFile(const std::string& filepath);
+    // Timestamp control
+    void setUseTimestamps(bool useTimestamps);
+    bool getUseTimestamps() const;
+    
+    // File output with rotation
+    void setOutputFile(const std::string& filepath, size_t maxSizeMB = 10, size_t rotationCount = 5);
     void closeOutputFile();
+    
+    // Level filtering
+    void setLogLevelFilter(bool debug, bool info, bool warning, bool error, bool critical);
+    
+    // Statistics
+    uint64_t getTotalLogs() const;
+    uint64_t getDebugLogs() const;
+    uint64_t getInfoLogs() const;
+    uint64_t getWarningLogs() const;
+    uint64_t getErrorLogs() const;
+    uint64_t getCriticalLogs() const;
+    
+    // Utility methods
+    std::string getLogFileSize() const;
+    std::string getLogFilePath() const;
     
 private:
     struct Impl;
@@ -103,7 +122,7 @@ public:
     
     // Set global logger
     static void setGlobal(std::shared_ptr<Logger> logger);
-
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
