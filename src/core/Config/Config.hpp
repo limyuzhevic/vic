@@ -56,22 +56,38 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
+// Main configuration class
+class Config {
+public:
+    Config();
+    ~Config();
+    
+    // Disable copying, enable moving
+    Config(const Config&) = delete;
+    Config& operator=(const Config&) = delete;
+    Config(Config&&) noexcept;
+    Config& operator=(Config&&) noexcept;
+    
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Load from specific format
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromLegacy(const std::string& filepath);
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -102,6 +118,17 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Loading from specific formats
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromLegacy(const std::string& filepath);
+    
+    // File I/O
+    bool saveToFile(const std::string& filepath) const;
+    
+    // Configuration validation
+    bool validate() const;
+    bool isValidValue(const std::string& key, const ConfigValue& value) const;
 };
 
 } // namespace nlm
