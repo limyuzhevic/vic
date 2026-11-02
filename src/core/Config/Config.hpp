@@ -6,6 +6,9 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <nlohmann/json.hpp>  // Simple JSON library
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -56,13 +59,13 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports both JSON and key=value formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
@@ -71,7 +74,7 @@ template<typename T>
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -102,6 +105,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON conversion helpers
+    static ConfigValue jsonToConfigValue(const json& j);
+    static json configValueToJson(const ConfigValue& value);
 };
 
 } // namespace nlm

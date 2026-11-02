@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>  // Simple JSON library
+#include <iostream>  // For error messages
+
+using json = nlohmann::json;
 
 namespace nlm {
 
@@ -19,40 +23,123 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to parse as JSON first
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Read the entire file to detect format
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    file.close();
+    
+    // Strip whitespace for initial check
+    std::string trimmed = trim(content);
+    
+    try {
+        // Try to parse as JSON
+        auto jsonData = json::parse(content);
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Successfully parsed JSON - process it
+        clear();  // Clear existing entries
+        
+        for (auto it = jsonData.begin(); it != jsonData.end(); ++it) {
+            std::string key = it.key();
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Convert JSON value to ConfigValue
+            ConfigValue configValue;
+            const auto& value = *it;
+            
+            if (value.is_string()) {
+                configValue = value.get<std::string>();
+            } else if (value.is_number_integer()) {
+                configValue = value.get<int64_t>();
+            } else if (value.is_number_unsigned()) {
+                configValue = value.get<uint64_t>();
+            } else if (value.is_number_float()) {
+                configValue = value.get<double>();
+            } else if (value.is_boolean()) {
+                configValue = value.get<bool>();
+            } else if (value.is_array()) {
+                // Handle arrays - determine element type
+                const auto& arr = value.get<std::vector<json>>();
+                if (!arr.empty()) {
+                    if (arr[0].is_number_integer()) {
+                        std::vector<int64_t> intArray;
+                        for (const auto& item : arr) {
+                            intArray.push_back(item.get<int64_t>());
+                        }
+                        configValue = intArray;
+                    } else if (arr[0].is_number_float()) {
+                        std::vector<double> doubleArray;
+                        for (const auto& item : arr) {
+                            doubleArray.push_back(item.get<double>());
+                        }
+                        configValue = doubleArray;
+                    } else if (arr[0].is_string()) {
+                        std::vector<std::string> stringArray;
+                        for (const auto& item : arr) {
+                            stringArray.push_back(item.get<std::string>());
+                        }
+                        configValue = stringArray;
+                    } else {
+                        NLM_LOG_WARNING("JSON array with unsupported element type at key: " + key);
+                        continue;
+                    }
+                } else {
+                    // Empty array
+                    configValue = std::vector<std::string>{};
+                }
+            } else {
+                NLM_LOG_WARNING("Unsupported JSON value type at key: " + key);
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            set(key, configValue, ConfigSource::File);
         }
+        
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        return true;
+        
+    } catch (const json::parse_error& e) {
+        // Failed to parse as JSON - fall back to old key=value format
+        file.open(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Process as old format
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
+        }
+        
+        file.close();
+        NLM_LOG_INFO("Loaded configuration from file (key=value format): " + filepath);
+        return true;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,10 +171,46 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Create JSON object
+    json jsonData;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        std::string key = entry.key;
+        
+        // Convert ConfigValue to JSON
+        const auto& value = entry.value;
+        
+        if (std::holds_alternative<int>(value)) {
+            jsonData[key] = std::get<int>(value);
+        } else if (std::holds_alternative<int64_t>(value)) {
+            jsonData[key] = std::get<int64_t>(value);
+        } else if (std::holds_alternative<uint64_t>(value)) {
+            jsonData[key] = std::get<uint64_t>(value);
+        } else if (std::holds_alternative<double>(value)) {
+            jsonData[key] = std::get<double>(value);
+        } else if (std::holds_alternative<float>(value)) {
+            jsonData[key] = std::get<float>(value);
+        } else if (std::holds_alternative<bool>(value)) {
+            jsonData[key] = std::get<bool>(value);
+        } else if (std::holds_alternative<std::string>(value)) {
+            jsonData[key] = std::get<std::string>(value);
+        } else if (std::holds_alternative<std::vector<int>>(value)) {
+            std::vector<int> intArray = std::get<std::vector<int>>(value);
+            jsonData[key] = intArray;
+        } else if (std::holds_alternative<std::vector<double>>(value)) {
+            std::vector<double> doubleArray = std::get<std::vector<double>>(value);
+            jsonData[key] = doubleArray;
+        } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+            std::vector<std::string> stringArray = std::get<std::vector<std::string>>(value);
+            jsonData[key] = stringArray;
+        } else {
+            // Skip unsupported types
+            continue;
+        }
     }
+    
+    // Write JSON with pretty formatting
+    file << jsonData.dump(2);
     
     return true;
 }

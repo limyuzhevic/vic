@@ -1,0 +1,18 @@
+{
+  "random_seed": 42,
+  "simulation_timestep": 0.001,
+  "neuron_count": 500,
+  "region_count": 2,
+  "connection_probability": 0.1,
+  "stdp_ltp_weight": 0.01,
+  "stdp_ltd_weight": 0.012,
+  "stdp_tau": 20.0,
+  "synaptogenesis_rate": 0.0001,
+  "pruning_rate": 0.00001,
+  "environment_width": 20,
+  "environment_height": 20,
+  "vision_width": 16,
+  "vision_height": 16,
+  "log_level": "INFO",
+  "log_to_file": false
+}
