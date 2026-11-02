@@ -25,15 +25,28 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
+    // Create configuration with enhanced learning parameters
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount));
     cfg->set("region_count", static_cast<int64_t>(config.regionCount));
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    
+    // Enhanced learning parameters for better reward-based learning
+    cfg->set("stdp_ltp_weight", 0.02f);  // Stronger potentiation for positive learning
+    cfg->set("stdp_ltd_weight", 0.015f);  // Stronger depression for negative learning
+    cfg->set("stdp_tau", 20.0f);
+    
+    // Structural plasticity parameters
+    cfg->set("synaptogenesis_rate", 0.0002f);  // More synapse creation for exploration
+    cfg->set("pruning_rate", 0.00002f);  // Less aggressive pruning
+    
+    // Memory parameters
+    cfg->set("working_memory_size", 20);
+    cfg->set("episodic_memory_capacity", 100);
+    
+    // Neuromodulation parameters
+    cfg->set("dopamine_sensitivity", 0.8f);  // Higher reward sensitivity
+    cfg->set("curiosity_base_rate", 0.1f);   // Base exploration drive
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);

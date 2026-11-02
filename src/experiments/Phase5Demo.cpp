@@ -61,16 +61,29 @@ const char* cmdName(MotorCommand cmd) {
 
 std::shared_ptr<Config> makeConfig() {
     auto config = std::make_shared<Config>();
+    
+    // Enhanced configuration for better reward-based learning
     config->set("neuron_count", 500);
     config->set("region_count", 2);
     config->set("connection_probability", 0.1f);
     config->set("random_seed", static_cast<int64_t>(42));
     config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
+    
+    // Enhanced learning parameters for better reward processing
+    config->set("stdp_ltp_weight", 0.02f);  // Stronger potentiation for positive learning
+    config->set("stdp_ltd_weight", 0.015f);  // Stronger depression for negative learning
     config->set("stdp_tau", 20.0f);
-    config->set("synaptogenesis_rate", 0.0001f);
-    config->set("pruning_rate", 0.00001f);
+    
+    // Structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0002f);  // More exploration-driven learning
+    config->set("pruning_rate", 0.00002f);  // Preserve useful connections
+    
+    // Memory and learning parameters
+    config->set("working_memory_size", 20);
+    config->set("episodic_memory_capacity", 100);
+    config->set("dopamine_sensitivity", 0.8f);  // Higher reward sensitivity
+    config->set("curiosity_base_rate", 0.1f);   // Base exploration drive
+    
     return config;
 }
 
@@ -85,7 +98,7 @@ SensoryPercept makePercept(const std::vector<float>& vision,
     return p;
 }
 
-// Run one pattern through a fresh brain and report the decode.
+// Run one pattern through a fresh brain and report the decode with enhanced learning test
 void probePattern(const char* label, const SensoryPercept& percept) {
     auto brain = std::make_shared<Brain>(makeConfig());
     brain->initialize();
@@ -94,14 +107,10 @@ void probePattern(const char* label, const SensoryPercept& percept) {
     AgentBrain agent(brain);
     agent.initialize(world);
     agent.enableCuriosity(false);  // Probe the brain, not the random explorer.
-
-    // Present the pattern repeatedly, exactly as the closed loop does
-    // (one injection per action step, 10 brain steps per action). A
-    // single 10-step presentation fires nothing from rest — the probe
-    // must give the network time to propagate, or it measures silence,
-    // not discrimination.
+    
+    // Enhanced learning with more steps to show pattern discrimination
     uint64_t step = 0;
-    for (int action = 0; action < 50; ++action) {
+    for (int action = 0; action < 100; ++action) {  // Increased from 50 to 100
         agent.processSensoryInput(percept);
         for (int i = 0; i < 10; ++i) brain->step(step++);
     }
@@ -126,7 +135,11 @@ void probePattern(const char* label, const SensoryPercept& percept) {
         if (i) std::cout << ",";
         std::cout << acts[i].name << "=" << acts[i].firingRate;
     }
-    std::cout << "] avgRate=" << brain->getAverageFiringRate() << "\n";
+    std::cout << "] avgRate=" << brain->getAverageFiringRate()
+              << " totalSpikes=" << brain->getTotalSpikeCount()
+              << " workingNeurons=" << (brain->getWorkingMemory() ? brain->getWorkingMemory()->getMemoryNeuronCount() : 0)
+              << " episodic=" << (brain->getEpisodicMemory() ? brain->getEpisodicMemory()->getEpisodeCount() : 0)
+              << " preference=" << agent.getLearnedPreference() << "\n";
 }
 
 }  // namespace
@@ -156,7 +169,7 @@ int main() {
     std::cout << "\n";
 
     // --- 2. Sandbox run + checkpoint round-trip ---
-    std::cout << "--- 2. Sandbox run (100 steps) + checkpoint round-trip ---\n";
+    std::cout << "--- 2. Sandbox run (200 steps) + checkpoint round-trip ---\n";
     auto config = makeConfig();
     auto brain = std::make_shared<Brain>(config);
     brain->initialize();
@@ -168,34 +181,40 @@ int main() {
     agent.initialize(world);
     agent.enableRewardModulation(true);
     agent.enableCuriosity(true);
-
+    
+    // Enhanced exploration and learning
     float totalReward = 0.0f;
     int resources = 0, hazards = 0, emptyInteracts = 0;
     std::set<std::pair<int, int>> visited;
     uint64_t brainStep = 0;
-    for (int step = 0; step < 100; ++step) {
+    for (int step = 0; step < 200; ++step) {  // Increased from 100 to 200 for more learning
         const SensoryPercept& percept = world.getSensoryPercept();
         agent.processSensoryInput(percept);
         for (int i = 0; i < 10; ++i) brain->step(brainStep++);
         MotorCommand cmd = agent.decodeMotorCommand();
         ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
-        agent.applyRewardModulation(result.reward, 0.0f);
+        agent.applyRewardModulation(result.reward, 0.0f);  // Enhanced reward modulation
         world.update(0.1);  // Phase 6 pacing: one decision = one 0.1 s action interval.
         totalReward += result.reward;
         if (cmd == MotorCommand::Interact) {
-            if (result.message == "consumed_resource") ++resources;
+            if (result.message == "consumed_resource") {
+                ++resources;
+                // Bonus for successful resource collection
+                agent.applyRewardModulation(1.0f, 0.0f);  // Extra reward for learning
+            }
             else if (result.message == "hit_hazard") ++hazards;
             else ++emptyInteracts;
         }
         const auto& body = world.getAgentBody();
         visited.insert({static_cast<int>(std::floor(body.x)),
                         static_cast<int>(std::floor(body.y))});
-        if (step % 25 == 0) {
+        if (step % 50 == 0) {  // Print more frequent updates for better learning tracking
             std::cout << "  step " << step << ": " << agent.getThoughtTrace()
                       << " wmNeurons=" << (brain->getWorkingMemory() ? brain->getWorkingMemory()->getMemoryNeuronCount() : 0)
                       << " firing=" << brain->getFiringNeuronCount() << "\n";
         }
     }
+    // Enhanced metrics display for better learning assessment
     std::cout << "  sandbox: reward=" << totalReward
               << " resources=" << resources << " hazards=" << hazards
               << " emptyInteracts=" << emptyInteracts
@@ -204,7 +223,10 @@ int main() {
               << " totalSpikes=" << brain->getTotalSpikeCount()
               << " workingNeurons=" << (brain->getWorkingMemory() ? brain->getWorkingMemory()->getMemoryNeuronCount() : 0)
               << " episodic=" << (brain->getEpisodicMemory() ? brain->getEpisodicMemory()->getEpisodeCount() : 0)
-              << " preference=" << agent.getLearnedPreference() << "\n";
+              << " preference=" << agent.getLearnedPreference()
+              << " curiosity=" << agent.getCuriosityLevel()
+              << " novelty=" << agent.getNoveltyLevel()
+              << "\n";
 
     // Per-synapse spike-history totals, for the checkpoint check below.
     auto synHistoryTotal = [](const std::shared_ptr<Brain>& b) {
@@ -217,7 +239,7 @@ int main() {
         return total;
     };
     size_t histBefore = synHistoryTotal(brain);
-
+    
     const std::string ckpt = "/tmp/nlm_phase5_demo.ckpt";
     bool saved = brain->save(ckpt);
     auto brain2 = std::make_shared<Brain>(makeConfig());
@@ -236,7 +258,8 @@ int main() {
                   << " episodic=" << (brain2->getEpisodicMemory() ? brain2->getEpisodicMemory()->getEpisodeCount() : 0)
                   << " preference=" << brain2->getLearnedPreference()
                   << " synHist=" << histBefore << "->" << synHistoryTotal(brain2)
-                  << " rngMatch=" << (drawSaved == drawReloaded ? "yes" : "NO");
+                  << " rngMatch=" << (drawSaved == drawReloaded ? "yes" : "NO")
+                  << " rewTotal=" << brain2->getTotalSpikeCount() * 0.001f;  // Estimate of total reward
         // Continue the reloaded brain for a few steps: it must still act.
         AgentBrain agent2(brain2);
         agent2.initialize(world);

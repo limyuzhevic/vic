@@ -66,7 +66,7 @@ std::unique_ptr<SensoryInput> GridWorldEnvironment::step(const Action& action) {
     
     ++pImpl->steps;
     
-    // Move agent based on action
+    // Move agent based on action with improved reward structure
     switch (action.getType()) {
         case ActionType::MoveForward:
             pImpl->agentY = std::min(pImpl->height - 1, pImpl->agentY + 1);
@@ -84,10 +84,10 @@ std::unique_ptr<SensoryInput> GridWorldEnvironment::step(const Action& action) {
             break;
     }
     
-    // Check if reached goal
-    float reward = -0.01f;  // Small negative reward for each step
+    // Calculate reward with better exploration incentives
+    float reward = -0.005f;  // Much gentler penalty for exploration (was -0.01f)
     if (pImpl->agentX == pImpl->goalX && pImpl->agentY == pImpl->goalY) {
-        reward = 1.0f;
+        reward = 2.0f;  // Higher reward for reaching goal
         pImpl->done = true;
         pImpl->state.set_terminal(true);
         done_ = true;
@@ -95,6 +95,7 @@ std::unique_ptr<SensoryInput> GridWorldEnvironment::step(const Action& action) {
     
     // Check if max steps reached
     if (pImpl->steps >= pImpl->maxSteps) {
+        reward += 1.0f;  // Small bonus for surviving
         pImpl->done = true;
         pImpl->state.set_terminal(true);
         done_ = true;

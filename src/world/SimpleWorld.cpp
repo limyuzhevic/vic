@@ -39,6 +39,29 @@ void SimpleWorld::configure(float width, float height, size_t visionWidth, size_
     height_ = height;
     visionWidth_ = visionWidth;
     visionHeight_ = visionHeight;
+    
+    // Increase object density for better learning
+    // Default: 5 resources, 3 hazards
+    // Enhanced: 8 resources, 4 hazards for more varied experiences
+    objects_.clear();
+    
+    // Enhanced resource placement (positive learning opportunities)
+    for (int i = 0; i < 8; ++i) {
+        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
+        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 
+                            std::max(5.0f, 15.0f * (0.8f + urand(rngState_, 0.0f, 0.2f))), 
+                            std::max(0.4f, 0.6f + urand(rngState_, 0.0f, 0.2f)));
+    }
+    
+    // Enhanced hazard placement (controlled negative learning)
+    for (int i = 0; i < 4; ++i) {
+        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
+        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Hazard,
+                            std::min(-5.0f, -10.0f * (0.8f + urand(rngState_, 0.0f, 0.2f))),
+                            std::max(0.3f, 0.4f + urand(rngState_, 0.0f, 0.2f)));
+    }
 }
 
 void SimpleWorld::setRandomSeed(uint64_t seed) {
@@ -264,17 +287,21 @@ ActionResult SimpleWorld::interact() {
         if (dist < interactRange + obj.radius) {
             obj.active = false;  // Consume the object
             
-            if (obj.type == WorldObjectType::Resource) {
-                agent_.energy = std::min(maxEnergy_, agent_.energy + resourceEnergyGain_);
-                result.reward = obj.value;  // Positive reward
-                result.success = true;
-                result.message = "consumed_resource";
-            } else if (obj.type == WorldObjectType::Hazard) {
-                agent_.health -= 0.2f;
-                result.reward = obj.value;  // Negative reward
-                result.success = true;
-                result.message = "hit_hazard";
-            }
+    if (obj.type == WorldObjectType::Resource) {
+        agent_.energy = std::min(maxEnergy_, agent_.energy + resourceEnergyGain_);
+        result.reward = obj.value;  // Positive reward
+        result.success = true;
+        result.message = "consumed_resource";
+        // Bonus for collecting resources (encourages learning)
+        result.reward += 2.0f;  // Bonus reward for successful resource collection
+    } else if (obj.type == WorldObjectType::Hazard) {
+        agent_.health -= 0.2f;
+        result.reward = obj.value;  // Negative reward
+        result.success = true;
+        result.message = "hit_hazard";
+        // Penalty for hitting hazards (but not too harsh to encourage exploration)
+        result.reward -= 1.0f;  // Additional penalty for hitting hazards
+    }
             
             // Only interact with one object at a time
             break;

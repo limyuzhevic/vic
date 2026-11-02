@@ -45,15 +45,25 @@ int main(int argc, char* argv[]) {
         numTrials = std::stoi(argv[1]);
     }
     
-    // Create configuration
+    // Enhanced configuration for better reward-based learning
     auto config = std::make_shared<Config>();
     config->set("neuron_count", static_cast<int64_t>(1000));
     config->set("region_count", static_cast<int64_t>(2));
     config->set("connection_probability", 0.1f);
     config->set("random_seed", static_cast<int64_t>(42));
     config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
+    
+    // Enhanced learning parameters for better reward processing
+    config->set("stdp_ltp_weight", 0.02f);  // Stronger potentiation for positive reward
+    config->set("stdp_ltd_weight", 0.015f);  // Stronger depression for negative reward
+    config->set("synaptogenesis_rate", 0.0002f);  // More exploration-driven learning
+    config->set("pruning_rate", 0.00002f);  // Preserve useful connections
+    
+    // Memory and learning parameters
+    config->set("working_memory_size", 20);
+    config->set("episodic_memory_capacity", 100);
+    config->set("dopamine_sensitivity", 0.8f);  // Higher reward sensitivity
+    config->set("curiosity_base_rate", 0.1f);   // Base exploration drive
     
     // Create brain
     std::cout << "Initializing brain...\n";

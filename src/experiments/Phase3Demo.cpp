@@ -297,6 +297,10 @@ private:
         config->set("environment_height", 20);
         config->set("vision_width", 16);
         config->set("vision_height", 16);
+        
+        // Enhance exploration and learning
+        config->set("vision_range", 8);  // Increased vision for better spatial awareness
+        config->set("environment_noise", 0.1f);  // Add sensory noise for robustness
     }
     
     void configureBrain(std::shared_ptr<Config> config) {
@@ -305,11 +309,23 @@ private:
         config->set("connection_probability", 0.1f);
         config->set("random_seed", static_cast<int64_t>(42));
         config->set("simulation_timestep", 0.001);
-        config->set("stdp_ltp_weight", 0.01f);
-        config->set("stdp_ltd_weight", 0.012f);
+        
+        // Enhanced learning parameters for better reward-based learning
+        config->set("stdp_ltp_weight", 0.02f);  // Stronger potentiation for positive learning
+        config->set("stdp_ltd_weight", 0.015f);  // Stronger depression for negative learning
         config->set("stdp_tau", 20.0f);
-        config->set("synaptogenesis_rate", 0.0001f);
-        config->set("pruning_rate", 0.00001f);
+        
+        // Structural plasticity parameters
+        config->set("synaptogenesis_rate", 0.0002f);  // More synapse creation for exploration
+        config->set("pruning_rate", 0.00002f);  // Less aggressive pruning to preserve useful connections
+        
+        // Memory parameters for better reward storage
+        config->set("working_memory_size", 20);
+        config->set("episodic_memory_capacity", 100);
+        
+        // Neuromodulation parameters
+        config->set("dopamine_sensitivity", 0.8f);  // Higher sensitivity to rewards
+        config->set("curiosity_base_rate", 0.1f);   // Base curiosity for exploration
     }
     
     const char* motorCommandToString(MotorCommand cmd) {

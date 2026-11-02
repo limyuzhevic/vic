@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <random>
 #include <functional>
+#include <algorithm>
 #include <stdexcept>
 
 namespace nlm {
@@ -33,9 +34,9 @@ public:
     // Seed operations
     void seed(uint64_t seed);
     uint64_t getSeed() const;
-
+    
     // Phase 5 checkpoint support: serialize the full mt19937_64 engine
-    // state (not just the seed — reseeding would replay the whole
+    // state (not just the seed \u2014 reseeding would replay the whole
     // random sequence from the start, so a reloaded brain would repeat
     // its earlier random choices). The format is the standard library
     // stream format for mt19937_64; restoreState returns false on a
@@ -90,8 +91,8 @@ public:
     const std::mt19937_64& engine() const;
     
     // Static minimum/maximum for mt19937_64
-    static constexpr result_type min() { return std::mt19937_64::min(); }
-    static constexpr result_type max() { return std::mt19937_64::max(); }
+    static constexpr result_type min() { return static_cast<result_type>(std::mt19937_64::min()); }
+    static constexpr result_type max() { return static_cast<result_type>(std::mt19937_64::max()); }
     
     // Operator for compatibility with std functions
     result_type operator()() { return static_cast<result_type>(engine()()); }
