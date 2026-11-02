@@ -38,19 +38,41 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     oss << " " << entry.message;
     
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
+    // Include file and line information if available
+    if (!entry.file.empty() && entry.line > 0) {
+        oss << " (" << entry.file << ":" << entry.line << ")";
+        if (!entry.function.empty()) {
+            oss << " in " << entry.function;
+        }
     }
     
-    // File output if set
+    std::string output = oss.str();
+    
+    // Console output with error handling
+    try {
+        if (pImpl->useColors) {
+            std::cout << levelToColor(entry.level) << output << "\033[0m\n";
+        } else {
+            std::cout << output << "\n";
+        }
+    } catch (const std::exception& e) {
+        // If console output fails, try without colors
+        try {
+            std::cout << output << " [ERROR: Console output failed]" << std::endl;
+        } catch (...) {
+            // Ultimate fallback - completely silent
+        }
+    }
+    
+    // File output if set with error handling
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::exception& e) {
+            // If file output fails, close the file to prevent further attempts
+            pImpl->fileOut.close();
+        }
     }
 }
 
@@ -71,12 +93,36 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    try {
+        // Close existing file if open
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut.close();
+        }
+        
+        // Open new file with error handling
+        pImpl->fileOut.open(filepath, std::ios::app);
+        if (!pImpl->fileOut.is_open()) {
+            // Try alternative paths or throw error
+            // For now, just silently fail as the logger should be resilient
+        }
+    } catch (const std::exception& e) {
+        // Log error but don't crash the application
+        std::cerr << "[Logger] Error opening log file '" << filepath << "': " << e.what() << std::endl;
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    try {
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut.close();
+        }
+    } catch (const std::exception& e) {
+        // Log error but don't crash the application
+        std::cerr << "[Logger] Error closing log file: " << e.what() << std::endl;
     }
 }
 
@@ -130,19 +176,33 @@ void Logger::setLevel(LogLevel level) {
 }
 
 void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    LogEntry entry;
-    entry.level = level;
-    entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
-    entry.timestamp = std::chrono::system_clock::now();
-    
-    for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
+                 const std::string& file, int line, const std::string& function) {
+    try {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        
+        LogEntry entry;
+        entry.level = level;
+        entry.message = message;
+        entry.file = file;
+        entry.line = line;
+        entry.function = function;
+        entry.timestamp = std::chrono::system_clock::now();
+        
+        for (auto& logger : pImpl->loggers) {
+            try {
+                logger->log(entry);
+            } catch (const std::exception& e) {
+                // If one logger fails, continue with others
+                // Don't let logging failures break the application
+            }
+        }
+    } catch (const std::exception& e) {
+        // Ultimate fallback - if even the mutex fails, try to write to stderr
+        try {
+            std::cerr << "[Logger] CRITICAL: Logging failed: " << e.what() << std::endl;
+        } catch (...) {
+            // If everything fails, we can't do anything
+        }
     }
 }
 
@@ -186,8 +246,16 @@ Logger& Logger::getGlobal() {
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    if (logger) {
-        globalLoggerPtr() = logger;
+    try {
+        if (logger) {
+            globalLoggerPtr() = logger;
+        } else {
+            // Reset to default global logger
+            globalLoggerPtr() = std::make_shared<Logger>();
+        }
+    } catch (const std::exception& e) {
+        // Log error but don't crash the application
+        std::cerr << "[Logger] Error setting global logger: " << e.what() << std::endl;
     }
 }
 
@@ -196,7 +264,17 @@ LogStream::LogStream(LogLevel level, const std::string& file, int line, const st
     : level_(level), file_(file), line_(line), function_(function) {}
 
 LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    try {
+        Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    } catch (const std::exception& e) {
+        // If logging fails in the destructor, we can't do much about it
+        // Just try to write to stderr as a last resort
+        try {
+            std::cerr << "[Logger] ERROR in destructor: " << e.what() << std::endl;
+        } catch (...) {
+            // If everything fails, we can't do anything
+        }
+    }
 }
 
 } // namespace nlm

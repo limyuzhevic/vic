@@ -164,6 +164,12 @@ add_executable(nlm_phase6_demo
 )
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
+# Experiment configuration manager executable
+add_executable(experiment_config
+    src/experiments/ExperimentConfigManager.cpp
+)
+target_link_libraries(experiment_config PUBLIC nlm_core nlm_agent nlm_world)
+
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
 # association probe, concept/social probes, and a sandbox run with
 # a teacher, planner overrides, and a checkpoint round-trip. The old
@@ -179,7 +185,35 @@ add_executable(nlm_benchmark
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
-# Python bindings (Phase 5: this is what `pip install .` builds).
+# Performance profiler executable
+add_executable(performance_profiler
+    src/experiments/PerformanceProfiler.cpp
+)
+target_link_libraries(performance_profiler PUBLIC nlm_core nlm_agent nlm_world)
+
+# Visualization dashboard executable
+add_executable(visualization_dashboard
+    src/experiments/VisualizationDashboard.cpp
+)
+target_link_libraries(visualization_dashboard PUBLIC nlm_core nlm_agent nlm_world)
+
+# Checkpoint manager executable
+add_executable(checkpoint_manager
+    src/experiments/CheckpointManager.cpp
+)
+target_link_libraries(checkpoint_manager PUBLIC nlm_core nlm_agent nlm_world nlm_performance)
+
+# Parameter tuner executable
+add_executable(parameter_tuner
+    src/experiments/ParameterTuner.cpp
+)
+target_link_libraries(parameter_tuner PUBLIC nlm_core nlm_agent nlm_world)
+
+# Experiment configuration manager executable
+add_executable(experiment_config
+    src/experiments/ExperimentConfigManager.cpp
+)
+target_link_libraries(experiment_config PUBLIC nlm_core nlm_agent nlm_world)
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
 # but the root CMakeLists never built the module — pip install
 # succeeded yet `import pynlm` failed. The option is OFF by default so
