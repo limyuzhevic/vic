@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <cctype>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,40 +22,53 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    // Try to parse as JSON first
+    try {
+        nlohmann::json json;
+        file >> json;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Parse JSON object recursively
+        parseJsonToConfig(json, "");
+        return true;
+    } catch (const nlohmann::json::parse_error& e) {
+        // If JSON parsing fails, try simple key=value format
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        return true;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,10 +100,52 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Create JSON representation of configuration
+    nlohmann::json json;
+    
+    // Group entries by source for better organization
+    std::unordered_map<ConfigSource, std::vector<ConfigEntry>> entriesBySource;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        entriesBySource[entry.source].push_back(entry);
     }
+    
+    // Add entries to JSON
+    for (const auto& [source, entries] : entriesBySource) {
+        std::string section;
+        switch (source) {
+            case ConfigSource::Default: section = "default"; break;
+            case ConfigSource::File: section = "file"; break;
+            case ConfigSource::CommandLine: section = "command_line"; break;
+            case ConfigSource::Runtime: section = "runtime"; break;
+        }
+        
+        nlohmann::json& sectionJson = json[section];
+        
+        for (const auto& entry : entries) {
+            // Convert ConfigValue to JSON
+            if (std::holds_alternative<int>(entry.value)) {
+                sectionJson[entry.key] = std::get<int>(entry.value);
+            } else if (std::holds_alternative<int64_t>(entry.value)) {
+                sectionJson[entry.key] = std::get<int64_t>(entry.value);
+            } else if (std::holds_alternative<double>(entry.value)) {
+                sectionJson[entry.key] = std::get<double>(entry.value);
+            } else if (std::holds_alternative<bool>(entry.value)) {
+                sectionJson[entry.key] = std::get<bool>(entry.value);
+            } else if (std::holds_alternative<std::string>(entry.value)) {
+                sectionJson[entry.key] = std::get<std::string>(entry.value);
+            } else if (std::holds_alternative<std::vector<int>>(entry.value)) {
+                sectionJson[entry.key] = std::get<std::vector<int>>(entry.value);
+            } else if (std::holds_alternative<std::vector<double>>(entry.value)) {
+                sectionJson[entry.key] = std::get<std::vector<double>>(entry.value);
+            } else if (std::holds_alternative<std::vector<std::string>>(entry.value)) {
+                sectionJson[entry.key] = std::get<std::vector<std::string>>(entry.value);
+            }
+        }
+    }
+    
+    // Write JSON to file with pretty formatting
+    file << json.dump(2); // Pretty print with 2-space indentation
+    file.flush();
     
     return true;
 }
@@ -188,6 +246,32 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+// Helper function to parse JSON into Config entries
+void parseJsonToConfig(const nlohmann::json& json, const std::string& prefix, ConfigSource source) {
+    if (json.is_object()) {
+        for (const auto& [key, value] : json.items()) {
+            std::string fullKey = prefix.empty() ? key : prefix + "." + key;
+            parseJsonToConfig(value, fullKey, source);
+        }
+    } else if (json.is_array()) {
+        // Store arrays as JSON strings for now
+        set(prefix, json.dump(), source);
+    } else {
+        // Store primitive values
+        if (json.is_string()) {
+            set(prefix, json.get<std::string>(), source);
+        } else if (json.is_boolean()) {
+            set(prefix, json.get<bool>(), source);
+        } else if (json.is_number_integer()) {
+            set(prefix, json.get<int64_t>(), source);
+        } else if (json.is_number_unsigned()) {
+            set(prefix, json.get<uint64_t>(), source);
+        } else if (json.is_number_float()) {
+            set(prefix, json.get<double>(), source);
+        }
+    }
 }
 
 template<typename T>
