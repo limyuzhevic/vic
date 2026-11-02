@@ -8,6 +8,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../orchestration/BrainOrchestrator.hpp"
 #include <memory>
 #include <string>
 
@@ -49,6 +50,7 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+// Now uses BrainOrchestrator for system coordination and separation of concerns
 
 class Brain {
 public:
@@ -188,7 +190,7 @@ public:
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;
-    
+
     // Get random generator
     RandomGenerator* getRandomGenerator();
 
@@ -201,13 +203,16 @@ public:
     // it does not, on its own, make the brain a human brain.
     float getLearnedPreference() const;
     void setLearnedPreference(float preference);
-    
+
     // Logging
     void logStatus() const;
-    
+
 private:
     struct Impl;
     Impl* pImpl;
+
+    // BrainOrchestrator for system coordination
+    std::shared_ptr<BrainOrchestrator> orchestrator_;
 };
 
 } // namespace nlm

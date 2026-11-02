@@ -4,6 +4,11 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <chrono>
+#include <algorithm>
+#include <numeric>
+#include <unordered_map>
+#include <thread>
 
 namespace nlm {
 
@@ -12,69 +17,157 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    
+    // Enhanced metrics and performance tracking
+    std::unordered_map<LogLevel, size_t> logCounts;
+    std::chrono::steady_clock::time_point startTime;
+    size_t totalMessagesLogged;
+    double averageLogTime;
+    std::vector<double> logTimeSamples;
+    
+    // Thread safety for concurrent logging
+    mutable std::mutex metricsMutex;
+    
+    Impl() : startTime(std::chrono::steady_clock::now()), totalMessagesLogged(0), averageLogTime(0.0) {
+        logTimeSamples.reserve(1000);
+        logCounts[LogLevel::Debug] = 0;
+        logCounts[LogLevel::Info] = 0;
+        logCounts[LogLevel::Warning] = 0;
+        logCounts[LogLevel::Error] = 0;
+        logCounts[LogLevel::Critical] = 0;
+    }
 };
 
-ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
+ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {
+    NLM_LOG_DEBUG("ConsoleLogger initialized");
+}
 
 ConsoleLogger::ConsoleLogger(LogLevel level) : pImpl(std::make_unique<Impl>()) {
     pImpl->level = level;
+    NLM_LOG_DEBUG("ConsoleLogger initialized with level: " + std::to_string(static_cast<int>(level)));
 }
 
-ConsoleLogger::~ConsoleLogger() = default;
+ConsoleLogger::~ConsoleLogger() {
+    // Log final metrics before destruction
+    if (pImpl) {
+        NLM_LOG_INFO("ConsoleLogger destroyed - Total messages logged: " + std::to_string(pImpl->totalMessagesLogged));
+    }
+}
 
 void ConsoleLogger::log(const LogEntry& entry) {
     if (entry.level < pImpl->level) {
         return;
     }
     
+    auto logStartTime = std::chrono::steady_clock::now();
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp with high precision
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        entry.timestamp.time_since_epoch()).milliseconds() % 1000;
+    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "." 
+        << std::setfill('0') << std::setw(3) << ms;
+    
+    // Add thread ID for multi-threaded debugging
+    oss << " [T" << std::this_thread::get_id() << "] ";
+    
+    // Add file and line number for easier debugging
+    if (!entry.file.empty()) {
+        oss << " " << entry.file;
+        if (entry.line > 0) {
+            oss << ":" << entry.line;
+        }
+    }
     
     oss << " " << entry.message;
     
+    if (!entry.function.empty()) {
+        oss << " (" << entry.function << ")";
+    }
+    
     std::string output = oss.str();
     
-    // Console output
+    // Enhanced console output with better formatting
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
     } else {
         std::cout << output << "\n";
     }
     
-    // File output if set
+    // File output if set with rotation
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();
+        
+        // Log to file with size-based rotation check (simplified)
+        static size_t fileSize = 0;
+        fileSize += output.length() + 1;
+        if (fileSize > 100 * 1024 * 1024) { // 100MB limit
+            pImpl->fileOut.close();
+            // In production, would rename and reopen with rotation
+            pImpl->fileOut.open(pImpl->fileOut.name(), std::ios::app);
+            fileSize = 0;
+        }
+    }
+    
+    // Update metrics
+    {
+        std::lock_guard<std::mutex> metricsLock(pImpl->metricsMutex);
+        pImpl->logCounts[entry.level]++;
+        pImpl->totalMessagesLogged++;
+        
+        auto logEndTime = std::chrono::steady_clock::now();
+        double logDuration = std::chrono::duration<double, std::chrono::milliseconds::period>(logEndTime - logStartTime).count();
+        
+        pImpl->logTimeSamples.push_back(logDuration);
+        if (pImpl->logTimeSamples.size() > 100) {
+            pImpl->logTimeSamples.erase(pImpl->logTimeSamples.begin());
+        }
+        
+        // Calculate average log time
+        if (!pImpl->logTimeSamples.empty()) {
+            double sum = std::accumulate(pImpl->logTimeSamples.begin(), pImpl->logTimeSamples.end(), 0.0);
+            pImpl->averageLogTime = sum / pImpl->logTimeSamples.size();
+        }
     }
 }
 
 void ConsoleLogger::setLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->level = level;
 }
 
 LogLevel ConsoleLogger::getLevel() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->level;
 }
 
 void ConsoleLogger::setUseColors(bool useColors) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->useColors = useColors;
 }
 
 bool ConsoleLogger::getUseColors() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->useColors;
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->fileOut.close();
     pImpl->fileOut.open(filepath, std::ios::app);
+    if (pImpl->fileOut.is_open()) {
+        NLM_LOG_INFO("Logger output redirected to file: " + filepath);
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
@@ -106,11 +199,20 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    std::chrono::steady_clock::time_point startTime;
+    size_t totalLogEvents;
+    std::chrono::duration<double> totalLogTime;
+    
+    Impl() : startTime(std::chrono::steady_clock::now()), totalLogEvents(0), totalLogTime(0.0) {}
 };
 
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
+Logger::Logger() : pImpl(std::make_unique<Impl>()) {
+    NLM_LOG_DEBUG("Global Logger initialized");
+}
 
-Logger::~Logger() = default;
+Logger::~Logger() {
+    NLM_LOG_DEBUG("Global Logger being destroyed");
+}
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
@@ -131,6 +233,8 @@ void Logger::setLevel(LogLevel level) {
 
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
+    auto logStartTime = std::chrono::steady_clock::now();
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
     LogEntry entry;
@@ -141,9 +245,16 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
     
+    // Update metrics
+    pImpl->totalLogEvents++;
+    
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
     }
+    
+    // Track performance
+    auto logEndTime = std::chrono::steady_clock::now();
+    pImpl->totalLogTime += (logEndTime - logStartTime);
 }
 
 void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
@@ -193,10 +304,17 @@ void Logger::setGlobal(std::shared_ptr<Logger> logger) {
 
 // LogStream implementation
 LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
+    : level_(level), file_(file), line_(line), function_(function) {
+    // Initialize oss_ with proper capacity
+    oss_ = std::ostringstream();
+}
 
 LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    // Ensure the log entry is properly captured
+    std::string message = oss_.str();
+    if (!message.empty()) {
+        Logger::getGlobal().log(level_, message, file_, line_, function_);
+    }
 }
 
 } // namespace nlm
