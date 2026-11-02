@@ -107,7 +107,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
+    result.totalReward = totalReward;                    // Total cumulative reward (not average)
     result.avgFiringRate = totalFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
@@ -155,8 +155,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
     
     NLM_LOG_INFO("=== Experiment Complete ===");
-    NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
-    NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));
+    NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));                    // Actual total reward
+    NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));              // Average firing rate per neuron
     NLM_LOG_INFO("Episodes stored: " + std::to_string(result.memoryEpisodesStored));
     NLM_LOG_INFO("Wall time: " + std::to_string(result.totalWallClockTime) + "s");
     

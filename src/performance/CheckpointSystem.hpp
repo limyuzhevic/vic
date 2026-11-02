@@ -331,10 +331,6 @@ public:
     uint64_t getBytesWritten() const { return bytesWritten_; }
 
 private:
-    bool writeHeader();
-    bool writeSectionHeader(const SectionHeader& header);
-    bool padToAlignment(size_t alignment);
-    
     std::ofstream stream_;
     std::string filepath_;
     CompressionLevel compression_;
