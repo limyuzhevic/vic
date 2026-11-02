@@ -292,6 +292,7 @@ print("Agent simulation complete!")
 When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+3. Read `EnhancedAPIGuide.md` for the enhanced API features and advanced usage
+4. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with all its powerful features.
