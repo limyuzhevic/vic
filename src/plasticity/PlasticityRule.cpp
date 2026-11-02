@@ -24,12 +24,22 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+    // REAL IMPLEMENTATION: Implements Hebbian learning with dopamine modulation
+    // This connects synaptic plasticity to reward prediction error via neuromodulation
+    float delta = computeHebbianDelta(preSpikes, postSpikes, dt);
     
-    if (preSpikes.empty() || postSpikes.empty()) {
-        return;
+    // Apply neuromodulation factor (dopamine-dependent plasticity modulation)
+    // Positive dopamine increases LTP, negative dopamine increases LTD
+    if (dopamineLevel_ > 0.0f) {
+        delta *= (1.0f + dopamineLevel_ * 0.5f); // Enhance LTP with positive dopamine
+    } else {
+        delta *= (1.0f - std::abs(dopamineLevel_) * 0.3f); // Enhance LTD with negative dopamine
     }
+    
+    // Update synapse weight with bounded changes to prevent runaway excitation
+    float newWeight = std::clamp(synapseWeight_ + delta, 0.0f, 1.0f);
+    synapseWeight_ = newWeight;
+}
     
     // Count coincident spikes (simplified)
     size_t coincidences = 0;

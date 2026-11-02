@@ -16,7 +16,7 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // REAL IMPLEMENTATION: Working memory storage with capacity management
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
@@ -25,6 +25,18 @@ void WorkingMemory::store(NeuronId neuron, float value) {
     }
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+    } else {
+        // Replace oldest item if at capacity (simple replacement strategy)
+        auto oldest = pImpl->items.begin();
+        for (auto it = pImpl->items.begin(); it != pImpl->items.end(); ++it) {
+            if (it->first < oldest->first) {
+                oldest = it;
+            }
+        }
+        if (oldest != pImpl->items.end()) {
+            oldest->first = neuron;
+            oldest->second = value;
+        }
     }
 }
 

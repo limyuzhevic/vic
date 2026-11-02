@@ -906,7 +906,23 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
         }
     }
+    // Phase 6: neural attention, wired into the loop. The brain owns
+    // attention, but AgentBrain calls it from the loop so it's no longer
+    // library-only classes. It processes competition among sensory inputs
+    // and selects winners. The planner suggestion is advisory: the brain's
+    // motor decode still decides the action, so attention selection can
+    // modulate the planning threshold.
+    if (brain_->getAttention() && !lastVision_.empty()) {
+        std::vector<NeuronId> competitors = getSensoryNeurons();
+        brain_->getAttention()->processCompetition(competitors);
+    }
+    
     // Phase 5 learning for the thought/preference systems, from the
+    // same reward the synaptic modulation below uses:
+    //  - Planner action quality: EMA toward reward/10 for the action
+    //    actually taken, so the planner's next suggestion reflects
+    //    experienced outcomes, not its initial zeros.
+    //  - Learned preference trait: only Interact outcomes move it
     // same reward the synaptic modulation below uses:
     //  - Planner action quality: EMA toward reward/10 for the action
     //    actually taken, so the planner's next suggestion reflects
@@ -939,14 +955,31 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Compute prediction error
     predictionError_ = reward - predictedReward;
     
+    // Update brain's prediction error signal
+    if (brain_->getPredictionErrorSignal()) {
+        brain_->getPredictionErrorSignal()->update(predictionError_);
+    }
+    
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Update brain's novelty detection
+    if (brain_->getNovelty()) {
+        brain_->getNovelty()->update();
+    }
     
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    // Update brain's curiosity system (takes novelty and prediction error as input)
+    if (brain_->getCuriosity() && brain_->getNovelty() && brain_->getPredictionErrorSignal()) {
+        float novelty = brain_->getNovelty()->getLevel();
+        float predError = brain_->getPredictionErrorSignal()->getError();
+        curiosityLevel_ = novelty * 2.0f + std::abs(predError) * 0.5f + 0.6f * curiosityLevel_;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Update brain's dopamine system (reward prediction error)
+    if (brain_->getDopamine()) {
+        brain_->getDopamine()->update(predictionError_);
+    }
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -973,9 +1006,9 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Modulate plasticity based on dopamine
+    // Modulate plasticity based on brain's dopamine system
     // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    float plasticityFactor = 0.5f + 0.5f * (brain_->getDopamine() ? brain_->getDopamine()->getLevel() : 0.0f);
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
