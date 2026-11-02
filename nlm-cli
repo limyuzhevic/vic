@@ -1,0 +1,448 @@
+#!/usr/bin/env python3
+"""
+NLM Command Line Utilities
+Advanced command-line interface for NLM (Neural Learning Machine)
+Provides enhanced control over simulations, experiments, and debugging.
+"""
+
+import sys
+import os
+import argparse
+import json
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+
+# Add the Python bindings to the path
+sys.path.insert(0, str(Path(__file__).parent / "python"))
+
+try:
+    import pynlm
+    PYNLM_AVAILABLE = True
+except ImportError:
+    PYNLM_AVAILABLE = False
+    print("Warning: pynlm Python bindings not available. Some commands will not work.")
+
+
+class NLMCLI:
+    """NLM Command Line Interface"""
+    
+    def __init__(self):
+        self.config = None
+        self.brain = None
+        self.world = None
+        self.agent = None
+    
+    def create_brain(self, config_file: Optional[str] = None, 
+                     neuron_count: int = 1000, 
+                     connection_prob: float = 0.1) -> bool:
+        """Create a brain with specified configuration"""
+        try:
+            if not PYNLM_AVAILABLE:
+                print("Error: pynlm bindings not available")
+                return False
+            
+            self.config = pynlm.createDefaultConfig()
+            
+            # Load config file if provided
+            if config_file and Path(config_file).exists():
+                with open(config_file, 'r') as f:
+                    config_data = json.load(f)
+                self.config.update(config_data)
+            
+            # Set basic parameters
+            self.config.set("brain.neuron_count", neuron_count)
+            self.config.set("brain.connection_probability", connection_prob)
+            self.config.set("random_seed", 42)
+            
+            self.brain = pynlm.createBrain(self.config)
+            self.brain.initialize()
+            
+            print(f"✓ Brain created with {neuron_count} neurons")
+            return True
+        except Exception as e:
+            print(f"✗ Error creating brain: {e}")
+            return False
+    
+    def create_world(self, width: int = 20, height: int = 20,
+                     vision_width: int = 8, vision_height: int = 8) -> bool:
+        """Create a simulation world"""
+        try:
+            if not PYNLM_AVAILABLE:
+                print("Error: pynlm bindings not available")
+                return False
+            
+            self.world = pynlm.createSimpleWorld()
+            self.world.configure(width, height, vision_width, vision_height)
+            self.world.reset()
+            
+            print(f"✓ World created: {width}x{height} with {vision_width}x{vision_height} vision")
+            return True
+        except Exception as e:
+            print(f"✗ Error creating world: {e}")
+            return False
+    
+    def create_agent(self) -> bool:
+        """Create an agent brain interface"""
+        try:
+            if not PYNLM_AVAILABLE or not self.brain:
+                print("Error: Brain not available")
+                return False
+            
+            self.agent = pynlm.createAgentBrain(self.brain)
+            
+            if self.world:
+                self.agent.initialize(self.world)
+            
+            # Enable subsystems by default
+            self.agent.enableRewardModulation(True)
+            self.agent.enableStructuralPlasticity(True)
+            self.agent.enableDevelopment(True)
+            self.agent.enableCuriosity(True)
+            
+            print("✓ Agent created and initialized")
+            return True
+        except Exception as e:
+            print(f"✗ Error creating agent: {e}")
+            return False
+    
+    def run_simulation(self, steps: int, timestep: float = 0.1) -> bool:
+        """Run a complete simulation"""
+        try:
+            if not PYNLM_AVAILABLE or not all([self.brain, self.world, self.agent]):
+                print("Error: Missing components")
+                return False
+            
+            print(f"Running simulation for {steps} steps...")
+            
+            for step in range(steps):
+                # Update world
+                self.world.update(timestep)
+                
+                # Get sensory input
+                percept = self.world.getSensoryPercept()
+                
+                # Process sensory input
+                self.agent.processSensoryInput(percept)
+                
+                # Run brain step
+                self.brain.step(step)
+                
+                # Get action from agent
+                action = self.agent.decodeMotorCommand()
+                
+                # Apply action to world
+                self.world.applyMotorCommand(action, self.world.getSimulationTime())
+                
+                # Apply reward modulation
+                internal = percept.getInternal()
+                reward = internal[0] if internal else 0.0
+                self.agent.applyRewardModulation(reward, 0.0)
+                
+                # Update development
+                self.agent.updateDevelopment(timestep)
+                
+                # Print progress every 10% or at key milestones
+                if step % max(1, steps // 10) == 0 or step == steps - 1:
+                    stats = pynlm.collectStats(self.brain, self.world, self.agent)
+                    print(f"  Step {step:4d}: "
+                          f"Reward={stats['agent_neuromodulation']:.3f}, "
+                          f"Firing={stats['brain_firing_neurons']}, "
+                          f"Spikes={stats['brain_total_spikes']}")
+            
+            print("✓ Simulation completed successfully")
+            return True
+        except Exception as e:
+            print(f"✗ Error during simulation: {e}")
+            return False
+    
+    def save_brain(self, filepath: str) -> bool:
+        """Save brain state to file"""
+        try:
+            if not self.brain:
+                print("Error: Brain not available")
+                return False
+            
+            self.brain.save(filepath)
+            print(f"✓ Brain saved to {filepath}")
+            return True
+        except Exception as e:
+            print(f"✗ Error saving brain: {e}")
+            return False
+    
+    def load_brain(self, filepath: str) -> bool:
+        """Load brain state from file"""
+        try:
+            if not self.brain:
+                print("Error: Brain not available")
+                return False
+            
+            success = self.brain.load(filepath)
+            if success:
+                print(f"✓ Brain loaded from {filepath}")
+            else:
+                print(f"✗ Failed to load brain from {filepath}")
+            return success
+        except Exception as e:
+            print(f"✗ Error loading brain: {e}")
+            return False
+    
+    def run_experiment(self, config_file: Optional[str] = None,
+                      steps: int = 1000, 
+                      episodes: int = 5) -> bool:
+        """Run an experiment with multiple episodes"""
+        try:
+            if not PYNLM_AVAILABLE:
+                print("Error: pynlm bindings not available")
+                return False
+            
+            print(f"Running experiment: {episodes} episodes, {steps} steps each")
+            
+            for episode in range(episodes):
+                print(f"\n--- Episode {episode + 1}/{episodes} ---")
+                
+                # Reset components for new episode
+                if self.config:
+                    self.brain = pynlm.createBrain(self.config)
+                    self.brain.initialize()
+                
+                if self.world:
+                    self.world.reset()
+                
+                if self.brain and self.world:
+                    self.agent = pynlm.createAgentBrain(self.brain)
+                    self.agent.initialize(self.world)
+                    
+                    # Enable subsystems
+                    self.agent.enableRewardModulation(True)
+                    self.agent.enableStructuralPlasticity(True)
+                    self.agent.enableDevelopment(True)
+                    self.agent.enableCuriosity(True)
+                
+                # Run episode
+                for step in range(steps):
+                    self.world.update(0.1)
+                    percept = self.world.getSensoryPercept()
+                    self.agent.processSensoryInput(percept)
+                    self.brain.step(step)
+                    action = self.agent.decodeMotorCommand()
+                    self.world.applyMotorCommand(action, self.world.getSimulationTime())
+                    
+                    internal = percept.getInternal()
+                    reward = internal[0] if internal else 0.0
+                    self.agent.applyRewardModulation(reward, 0.0)
+                    
+                    self.agent.updateDevelopment(0.1)
+                    
+                    if step % 200 == 0:
+                        stats = pynlm.collectStats(self.brain, self.world, self.agent)
+                        print(f"    Step {step}: Reward={stats['agent_neuromodulation']:.3f}, "
+                              f"Firing={stats['brain_firing_neurons']}")
+                
+                # Save brain at end of episode
+                if self.brain:
+                    self.save_brain(f"experiment_episode_{episode + 1}.bin")
+            
+            print("\n✓ Experiment completed successfully")
+            return True
+        except Exception as e:
+            print(f"✗ Error during experiment: {e}")
+            return False
+
+
+def main():
+    """Main command line interface"""
+    parser = argparse.ArgumentParser(
+        description="NLM Command Line Interface - Advanced NLM simulation control",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  nlm-cli create brain --neurons 500 --connection-prob 0.1
+  nlm-cli create world --width 30 --height 30
+  nlm-cli run --steps 1000 --timestep 0.1
+  nlm-cli experiment --episodes 10 --steps 500
+  nlm-cli benchmark --steps 1000
+        """)
+    
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Create brain command
+    brain_parser = subparsers.add_parser("create", help="Create NLM components")
+    brain_subparsers = brain_parser.add_subparsers(dest="component", help="Component to create")
+    
+    brain_create_parser = brain_subparsers.add_parser("brain", help="Create brain")
+    brain_create_parser.add_argument("--neurons", type=int, default=1000, help="Number of neurons")
+    brain_create_parser.add_argument("--connection-prob", type=float, default=0.1, help="Connection probability")
+    brain_create_parser.add_argument("--config", help="Configuration file (JSON)")
+    brain_create_parser.set_defaults(func=lambda args: cli.create_brain(args.config, args.neurons, args.connection_prob))
+    
+    world_create_parser = brain_subparsers.add_parser("world", help="Create world")
+    world_create_parser.add_argument("--width", type=int, default=20, help="World width")
+    world_create_parser.add_argument("--height", type=int, default=20, help="World height")
+    world_create_parser.add_argument("--vision-width", type=int, default=8, help="Vision width")
+    world_create_parser.add_argument("--vision-height", type=int, default=8, help="Vision height")
+    world_create_parser.set_defaults(func=lambda args: cli.create_world(args.width, args.height, args.vision_width, args.vision_height))
+    
+    agent_create_parser = brain_subparsers.add_parser("agent", help="Create agent")
+    agent_create_parser.set_defaults(func=lambda args: cli.create_agent())
+    
+    # Run command
+    run_parser = subparsers.add_parser("run", help="Run simulation")
+    run_parser.add_argument("--steps", type=int, default=1000, help="Number of steps")
+    run_parser.add_argument("--timestep", type=float, default=0.1, help="Time step")
+    run_parser.set_defaults(func=lambda args: cli.run_simulation(args.steps, args.timestep))
+    
+    # Save/Load commands
+    save_parser = subparsers.add_parser("save", help="Save brain state")
+    save_parser.add_argument("filepath", help="File to save to")
+    save_parser.set_defaults(func=lambda args: cli.save_brain(args.filepath))
+    
+    load_parser = subparsers.add_parser("load", help="Load brain state")
+    load_parser.add_argument("filepath", help="File to load from")
+    load_parser.set_defaults(func=lambda args: cli.load_brain(args.filepath))
+    
+    # Experiment command
+    experiment_parser = subparsers.add_parser("experiment", help="Run experiment")
+    experiment_parser.add_argument("--episodes", type=int, default=5, help="Number of episodes")
+    experiment_parser.add_argument("--steps", type=int, default=1000, help="Steps per episode")
+    experiment_parser.add_argument("--config", help="Configuration file")
+    experiment_parser.set_defaults(func=lambda args: cli.run_experiment(args.config, args.steps, args.episodes))
+    
+    # Stats command
+    stats_parser = subparsers.add_parser("stats", help="Print current simulation statistics")
+    stats_parser.set_defaults(func=lambda args: print_stats())
+    
+    # Benchmark command
+    benchmark_parser = subparsers.add_parser("benchmark", help="Benchmark performance")
+    benchmark_parser.add_argument("--steps", type=int, default=1000, help="Number of steps to benchmark")
+    benchmark_parser.set_defaults(func=lambda args: benchmark_performance(args.steps))
+    
+    # Configuration command
+    config_parser = subparsers.add_parser("config", help="Configuration management")
+    config_subparsers = config_parser.add_subparsers(dest="config_action", help="Configuration actions")
+    
+    config_create_parser = config_subparsers.add_parser("create", help="Create configuration")
+    config_create_parser.add_argument("--preset", choices=['small', 'medium', 'large', 'fast'], default='medium', help="Preset configuration")
+    config_create_parser.set_defaults(func=lambda args: create_preset_config(args.preset))
+    
+    # Version command
+    version_parser = subparsers.add_parser("version", help="Show version information")
+    version_parser.set_defaults(func=lambda args: print_version())
+    
+    # Help command
+    help_parser = subparsers.add_parser("help", help="Show help information")
+    help_parser.set_defaults(func=lambda args: print_help())
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Initialize CLI
+    global cli
+    cli = NLMCLI()
+    
+    # Execute command
+    if hasattr(args, 'func'):
+        args.func(args)
+    else:
+        parser.print_help()
+
+
+def print_stats():
+    """Print current simulation statistics (requires active simulation)"""
+    if PYNLM_AVAILABLE:
+        print("Statistics collection requires active brain/world/agent")
+        print("Use 'nlm-cli run' to start a simulation first")
+    else:
+        print("pynlm bindings not available")
+
+
+def benchmark_performance(steps: int):
+    """Run performance benchmark"""
+    if PYNLM_AVAILABLE:
+        print(f"Running benchmark: {steps} steps")
+        # Use the benchmark function from pynlm
+        import time
+        start = time.time()
+        
+        config = pynlm.createDefaultConfig()
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        for i in range(steps):
+            brain.step(i)
+        
+        end = time.time()
+        duration = end - start
+        
+        print(f"Benchmark results:")
+        print(f"  Steps: {steps}")
+        print(f"  Wall time: {duration:.2f} seconds")
+        print(f"  Avg time per step: {duration/steps*1000:.2f} ms")
+        print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+        print(f"  Avg firing rate: {brain.getAverageFiringRate()}")
+    else:
+        print("pynlm bindings not available for benchmarking")
+
+
+def create_preset_config(preset: str):
+    """Create preset configuration"""
+    if PYNLM_AVAILABLE:
+        print(f"Creating {preset} preset configuration...")
+        
+        if preset == "small":
+            config = pynlm.createDefaultConfig()
+            config.set("brain.neuron_count", 200)
+            config.set("brain.synapse_density", 0.05)
+            print("  Small: 200 neurons, low density")
+        elif preset == "medium":
+            config = pynlm.createDefaultConfig()
+            config.set("brain.neuron_count", 1000)
+            config.set("brain.synapse_density", 0.1)
+            print("  Medium: 1000 neurons, standard density")
+        elif preset == "large":
+            config = pynlm.createDefaultConfig()
+            config.set("brain.neuron_count", 5000)
+            config.set("brain.synapse_density", 0.15)
+            print("  Large: 5000 neurons, high density")
+        elif preset == "fast":
+            config = pynlm.createDefaultConfig()
+            config.set("brain.neuron_count", 100)
+            config.set("brain.synapse_density", 0.02)
+            print("  Fast: 100 neurons, minimal density")
+        
+        print("  Configuration created successfully")
+    else:
+        print("pynlm bindings not available")
+
+
+def print_version():
+    """Print version information"""
+    print("NLM Command Line Interface v1.0.0")
+    print("Python Bindings: pynlm (if available)")
+    print("Enhanced with advanced utilities for simulation control")
+
+
+def print_help():
+    """Print help information"""
+    print("NLM Command Line Interface Help")
+    print("===============================")
+    print()
+    print("Available Commands:")
+    print("  nlm-cli create brain     - Create a neural brain")
+    print("  nlm-cli create world     - Create simulation world")
+    print("  nlm-cli create agent     - Create agent interface")
+    print("  nlm-cli run             - Run simulation")
+    print("  nlm-cli experiment       - Run experiment with multiple episodes")
+    print("  nlm-cli save <file>     - Save brain state")
+    print("  nlm-cli load <file>     - Load brain state")
+    print("  nlm-cli stats           - Print statistics")
+    print("  nlm-cli benchmark       - Run performance benchmark")
+    print("  nlm-cli config create   - Create preset configuration")
+    print("  nlm-cli version         - Show version info")
+    print("  nlm-cli help            - Show this help")
+    print()
+    print("For more details on a specific command:")
+    print("  nlm-cli help <command>" if hasattr(sys.modules[__name__], 'help') else "  nlm-cli <command> --help")
+
+
+if __name__ == "__main__":
+    main()
