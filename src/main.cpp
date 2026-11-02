@@ -339,6 +339,22 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        } else if (arg == "--version" || arg == "-v") {
+            printVersion();
+            return 0;
+        } else if (arg == "--verbose" || arg == "-V") {
+            consoleLogger->setLevel(LogLevel::Debug);
+        } else if (arg == "--quiet" || arg == "-q") {
+            consoleLogger->setLevel(LogLevel::Error);
+        } else if (arg == "--save-config") {
+            if (i + 1 < argc) {
+                saveConfiguration(*config, argv[++i]);
+            } else {
+                NLM_LOG_WARNING("Missing output file for --save-config");
+            }
         }
     }
     
@@ -350,7 +366,10 @@ int main(int argc, char** argv) {
     }
     
     // Override with command line args
-    config->loadFromArgs(argc, argv);
+    if (!config->loadFromArgs(argc, argv)) {
+        NLM_LOG_ERROR("Error loading configuration from command line arguments");
+        return 1;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -368,6 +387,12 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Add Phase 3/Phase 5/Phase 6 configuration options
+    config->set("hebbian_learning_rate", 0.01f, ConfigSource::Default);
+    config->set("reward_modulation_enabled", true, ConfigSource::Default);
+    config->set("curiosity_enabled", true, ConfigSource::Default);
+    config->set("development_enabled", true, ConfigSource::Default);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -376,7 +401,18 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  stdp_tau: " + std::to_string(config->getOr<float>("stdp_tau", 20.0f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
+    NLM_LOG_INFO("  hebbian_learning_rate: " + std::to_string(config->getOr<float>("hebbian_learning_rate", 0.01f)));
     NLM_LOG_INFO("");
+    
+    // Welcome message for first-time users
+    if (argc == 1) {
+        printWelcomeMessage();
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -417,7 +453,7 @@ int main(int argc, char** argv) {
     
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("") ;
     NLM_LOG_INFO("Phase 2 Objectives Completed:");
     NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
     NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
@@ -426,10 +462,60 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("") ;
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("") ;
     
     return 0;
+}
+
+void printUsage() {
+    std::cout << "NLM (Neural Learning Machine) Phase 2\n"
+              << "Usage: nlm [OPTIONS]\n\n"
+              << "Options:\n"
+              << "  --config <file>           Load configuration from file (default: configs/default.cfg)\n"
+              << "  --help, -h                Show this help message and exit\n"
+              << "  --version, -v             Show version information and exit\n"
+              << "  --verbose, -V              Set log level to DEBUG\n"
+              << "  --quiet, -q               Set log level to ERROR only\n"
+              << "  --save-config <file>       Save current configuration to file\n\n"
+              << "Advanced Configuration:\n"
+              << "  --random_seed <value>      Random seed for reproducible experiments\n"
+              << "  --neuron_count <value>     Number of neurons in the network\n"
+              << "  --simulation_timestep <value> Simulation timestep in seconds\n"
+              << "  --region_count <value>     Number of neural regions\n"
+              << "  --connection_probability <value> Probability of synapse formation\n"
+              << "  --stdp_ltp_weight <value>   STDP LTP weight parameter\n"
+              << "  --stdp_ltd_weight <value>   STDP LTD weight parameter\n"
+              << "  --stdp_tau <value>          STDP time constant in ms\n"
+              << "  --synaptogenesis_rate <value> Structural plasticity synaptogenesis rate\n"
+              << "  --pruning_rate <value>      Structural plasticity pruning rate\n"
+              << "  --hebbian_learning_rate <value> Hebbian learning rate\n\n"
+              << "Examples:\n"
+              << "  nlm --config myconfig.cfg\n"
+              << "  nlm --neuron_count 1000 --simulation_timestep 0.0005\n"
+              << "  nlm --verbose --save-config output.cfg\n";
+}
+
+void printVersion() {
+    std::cout << "NLM (Neural Learning Machine) Phase 2 - Real Neural Computation\n"
+              << "Version: 2.0.0\n"
+              << "Built with C++14 and extensive neural network simulation capabilities.\n";
+}
+
+void printWelcomeMessage() {
+    NLM_LOG_INFO("\n=== NLM Neural Learning Machine - Welcome ===\n");
+    NLM_LOG_INFO("This is an experimental artificial developmental brain system.");
+    NLM_LOG_INFO("The NLM implements real spiking neural computation with advanced plasticity rules.");
+    NLM_LOG_INFO("\nTo get started:");
+    NLM_LOG_INFO("  - Run './nlm' for default configuration");
+    NLM_LOG_INFO("  - Use './nlm --help' for command-line options");
+    NLM_LOG_INFO("  - Use './nlm --config <file>' to load a custom configuration");
+    NLM_LOG_INFO("  - Use './nlm --verbose' for detailed debugging output");
+    NLM_LOG_INFO("\nFor documentation and examples, refer to the project documentation.");
+}
+
+bool saveConfiguration(const nlm::Config& config, const std::string& filepath) {
+    return config.saveToFile(filepath);
 }

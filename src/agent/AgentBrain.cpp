@@ -418,71 +418,21 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     // disagreements honestly. The planner's state (vision) is the
     // percept the brain already has; its action quality is updated
     // from real rewards in applyRewardModulation.
-    if (brain_->getPlanner() && !lastVision_.empty()) {
-        ActionType planned = brain_->getPlanner()->planAction(lastVision_);
-        switch (planned) {
-            case ActionType::MoveForward: thoughtPlanned_ = MotorCommand::MoveForward; break;
-            case ActionType::MoveBackward: thoughtPlanned_ = MotorCommand::MoveBackward; break;
-            case ActionType::TurnLeft: thoughtPlanned_ = MotorCommand::TurnLeft; break;
-            case ActionType::TurnRight: thoughtPlanned_ = MotorCommand::TurnRight; break;
-            case ActionType::Interact: thoughtPlanned_ = MotorCommand::Interact; break;
-            default: thoughtPlanned_ = MotorCommand::Wait; break;
-        }
-        hasThoughtPlanned_ = true;
-    }
+    recordPlannerThought();
 
     MotorCommand decoded = decodeFromMotorNeurons();
 
-    // Phase 5 winner-take-all state for the next presentation: the
-    // winning group (in decode order) and its margin over the
-    // runner-up, from raw motor firing rates (before reflex/bias
-    // adjustments, so the inhibition reflects the brain, not the bias).
-    {
-        auto acts = getMotorGroupActivities();
-        float best = 0.0f, second = 0.0f;
-        int bestIdx = -1;
-        for (int i = 0; i < 5 && i < static_cast<int>(acts.size()); ++i) {
-            float r = acts[i].firingRate;
-            if (r > best) { second = best; best = r; bestIdx = i; }
-            else if (r > second) { second = r; }
-        }
-        if (bestIdx == lastWinnerGroup_) {
-            ++consecutiveWinnerCount_;
-        } else {
-            consecutiveWinnerCount_ = 1;
-        }
-        lastWinnerGroup_ = bestIdx;
-        lastWinnerMargin_ = best - second;
-    }
+    // Phase 5 winner-take-all state for the next presentation
+    updateWinnerTakeAllState();
 
-    // Apply curiosity-based exploration. Phase 4: the old code gated
-    // exploration behind curiosity > 0.3 (decode) and > 0.5
-    // (selectWithCuriosity), thresholds novelty could never reach after
-    // step 0, so exploration was dead. Exploration is now proportional
-    // to curiosity (see selectWithCuriosity) with no hard gate.
-    if (curiosityEnabled_) {
-        decoded = selectWithCuriosity(decoded);
-    }
+    // Apply curiosity-based exploration
+    applyCuriosityExploration(decoded);
 
-    // Phase 6 planner agreement: planned vs finally acted, after
-    // curiosity exploration (which can still override both).
-    if (hasThoughtPlanned_) {
-        ++plannerDecisionCount_;
-        if (thoughtPlanned_ == decoded) ++plannerAgreementCount_;
-    }
+    // Track planner agreement
+    trackPlannerAgreement(decoded);
 
-    // Phase 5 diversity counters, from the final action actually taken.
-    if (decoded == MotorCommand::TurnLeft || decoded == MotorCommand::TurnRight) {
-        stepsSinceTurn_ = 0;
-    } else {
-        ++stepsSinceTurn_;
-    }
-    if (hasLastDecoded_ && decoded == lastDecoded_ &&
-        (decoded == MotorCommand::MoveForward || decoded == MotorCommand::MoveBackward)) {
-        ++repeatCount_;
-    } else {
-        repeatCount_ = 1;
-    }
+    // Update diversity counters
+    updateDiversityCounters(decoded);
 
     lastDecoded_ = decoded;
     hasLastDecoded_ = true;
@@ -513,6 +463,66 @@ std::vector<AgentBrain::MotorGroupActivity> AgentBrain::getMotorGroupActivities(
         calc(motorInteract_, "interact"),
         calc(motorWait_, "wait"),
     };
+}
+
+void AgentBrain::recordPlannerThought() {
+    if (brain_->getPlanner() && !lastVision_.empty()) {
+        ActionType planned = brain_->getPlanner()->planAction(lastVision_);
+        switch (planned) {
+            case ActionType::MoveForward: thoughtPlanned_ = MotorCommand::MoveForward; break;
+            case ActionType::MoveBackward: thoughtPlanned_ = MotorCommand::MoveBackward; break;
+            case ActionType::TurnLeft: thoughtPlanned_ = MotorCommand::TurnLeft; break;
+            case ActionType::TurnRight: thoughtPlanned_ = MotorCommand::TurnRight; break;
+            case ActionType::Interact: thoughtPlanned_ = MotorCommand::Interact; break;
+            default: thoughtPlanned_ = MotorCommand::Wait; break;
+        }
+        hasThoughtPlanned_ = true;
+    }
+}
+
+void AgentBrain::updateWinnerTakeAllState() {
+    auto acts = getMotorGroupActivities();
+    float best = 0.0f, second = 0.0f;
+    int bestIdx = -1;
+    for (int i = 0; i < 5 && i < static_cast<int>(acts.size()); ++i) {
+        float r = acts[i].firingRate;
+        if (r > best) { second = best; best = r; bestIdx = i; }
+        else if (r > second) { second = r; }
+    }
+    if (bestIdx == lastWinnerGroup_) {
+        ++consecutiveWinnerCount_;
+    } else {
+        consecutiveWinnerCount_ = 1;
+    }
+    lastWinnerGroup_ = bestIdx;
+    lastWinnerMargin_ = best - second;
+}
+
+void AgentBrain::applyCuriosityExploration(MotorCommand& decoded) {
+    if (curiosityEnabled_) {
+        decoded = selectWithCuriosity(decoded);
+    }
+}
+
+void AgentBrain::trackPlannerAgreement(MotorCommand decoded) {
+    if (hasThoughtPlanned_) {
+        ++plannerDecisionCount_;
+        if (thoughtPlanned_ == decoded) ++plannerAgreementCount_;
+    }
+}
+
+void AgentBrain::updateDiversityCounters(MotorCommand decoded) {
+    if (decoded == MotorCommand::TurnLeft || decoded == MotorCommand::TurnRight) {
+        stepsSinceTurn_ = 0;
+    } else {
+        ++stepsSinceTurn_;
+    }
+    if (hasLastDecoded_ && decoded == lastDecoded_ &&
+        (decoded == MotorCommand::MoveForward || decoded == MotorCommand::MoveBackward)) {
+        ++repeatCount_;
+    } else {
+        repeatCount_ = 1;
+    }
 }
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
