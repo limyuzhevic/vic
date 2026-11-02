@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,43 +20,60 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
+    try {
+        // Parse JSON configuration file
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+        // Convert JSON to key-value pairs
+        std::vector<std::pair<std::string, std::string>> entries;
+        
+        for (auto it = jsonConfig.begin(); it != jsonConfig.end(); ++it) {
+            std::string key = it.key();
+            std::string value;
             
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+            // Handle different value types
+            if (it->is_string()) {
+                value = it->get<std::string>();
+            } else if (it->is_number_integer()) {
+                value = std::to_string(it->get<int64_t>());
+            } else if (it->is_number_unsigned()) {
+                value = std::to_string(it->get<uint64_t>());
+            } else if (it->is_number_float()) {
+                value = std::to_string(it->get<double>());
+            } else if (it->is_boolean()) {
+                value = it->get<bool>() ? "true" : "false";
+            } else if (it->is_array()) {
+                // Convert array to JSON string representation
+                value = it->dump();
+            } else {
+                // Skip null values
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            entries.emplace_back(key, value);
         }
+        
+        // Add entries to config
+        for (const auto& entry : entries) {
+            set(entry.first, entry.second, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse config file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool success = true;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -65,31 +83,94 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                try {
+                    set(key, value, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    NLM_LOG_WARNING("Failed to parse command line argument --" + key + "=" + value + ": " + std::string(e.what()));
+                    success = false;
+                }
+            } else {
+                NLM_LOG_WARNING("Invalid command line argument format: " + arg);
+                success = false;
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            try {
+                set(key, value, ConfigSource::CommandLine);
+            } catch (const std::exception& e) {
+                NLM_LOG_WARNING("Failed to parse command line argument -" + key + " " + value + ": " + std::string(e.what()));
+                success = false;
+            }
+        }
+        // Handle --key value (without =)
+        else if (arg.substr(0, 2) == "--") {
+            // Check if next argument is a value (not another --option)
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                std::string key = arg.substr(2);
+                std::string value = argv[++i];
+                try {
+                    set(key, value, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    NLM_LOG_WARNING("Failed to parse command line argument --" + key + " " + value + ": " + std::string(e.what()));
+                    success = false;
+                }
+            } else {
+                NLM_LOG_WARNING("Missing value for command line argument: " + arg);
+                success = false;
+            }
         }
     }
-    return true;
+    
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        nlohmann::json jsonConfig;
+        
+        for (const auto& entry : pImpl->entries) {
+            std::string key = entry.key;
+            
+            // Convert ConfigValue to JSON
+            std::visit([&jsonConfig, &key](auto&& value) {
+                using T = std::decay_t<decltype(value)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    jsonConfig[key] = value;
+                } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                    jsonConfig[key] = static_cast<int64_t>(value);
+                } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                    jsonConfig[key] = static_cast<double>(value);
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    jsonConfig[key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    jsonConfig[key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    jsonConfig[key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    jsonConfig[key] = value;
+                }
+            }, entry.value);
+        }
+        
+        // Write formatted JSON to file
+        file << std::setw(2) << jsonConfig << std::endl;
+        
+        NLM_LOG_INFO("Configuration saved to: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to save config file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
@@ -172,7 +253,7 @@ std::string Config::summary() const {
                 oss << arg;
             }
         }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        oss << "] (source=" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
 }
@@ -190,49 +271,344 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
+// Define configuration-specific exceptions
+namespace nlm {
+    
+class ConfigException : public std::runtime_error {
+public:
+    ConfigException(const std::string& message) : std::runtime_error(message) {}
+};
+
+class ConfigFileException : public ConfigException {
+public:
+    ConfigFileException(const std::string& filepath, const std::string& reason)
+        : ConfigException("Config file error: " + filepath + " - " + reason) {}
+};
+
+class ConfigParseException : public ConfigException {
+public:
+    ConfigParseException(const std::string& filepath, const std::string& reason)
+        : ConfigException("Config parse error: " + filepath + " - " + reason) {}
+};
+
+class ConfigArgumentException : public ConfigException {
+public:
+    ConfigArgumentException(const std::string& argument, const std::string& reason)
+        : ConfigException("Config argument error: --" + argument + " - " + reason) {}
+};
+
+// Helper function to validate configuration entries
+bool Config::validateEntry(const std::string& key, const ConfigValue& value) const {
+    // Basic validation - can be extended with type-specific validation
+    if (key.empty()) {
+        return false;
+    }
+    
+    // Check for invalid key characters
+    if (key.find('\n') != std::string::npos || key.find('\r') != std::string::npos ||
+        key.find('\t') != std::string::npos) {
+        return false;
+    }
+    
+    return true;
+}
+
+// Enhanced set method with validation and exception support
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    if (!validateEntry(key, value)) {
+        throw ConfigException("Invalid configuration entry: key or value validation failed");
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+    
+    if (it != pImpl->entries.end()) {
+        // Update existing entry
+        it->value = value;
+        it->source = source;
+        NLM_LOG_INFO("Updated configuration entry: " + key + " = " + getValueString(value));
+    } else {
+        // Add new entry
+        pImpl->entries.emplace_back(key, value, source, "Configuration entry");
+        NLM_LOG_INFO("Added configuration entry: " + key + " = " + getValueString(value));
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
+}
+
+void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, int64_t value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, double value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, bool value, ConfigSource source) {
+    set(key, ConfigValue(value), source);
+}
+
+// Helper function to convert ConfigValue to string for logging
+std::string Config::getValueString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& v) {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << v << "\"";
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+            oss << v;
+        } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+            oss << v;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (v ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                             std::is_same_v<T, std::vector<double>> ||
+                             std::is_same_v<T, std::vector<std::string>>) {
+            oss << "[";
+            for (size_t i = 0; i < v.size(); ++i) {
+                if (i) oss << ", ";
+                oss << v[i];
+            }
+            oss << "]";
         } else {
-            return std::nullopt;
+            oss << "<unknown>";
         }
-    }, it->value);
+    }, value);
+    return oss.str();
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+// Enhanced loadFromFile with better error handling
+bool Config::loadFromFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
+        return false;
+    }
+    
+    try {
+        // Parse JSON configuration file
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
+        
+        // Validate JSON structure
+        if (!jsonConfig.is_object()) {
+            throw ConfigParseException(filepath, "Root element must be a JSON object");
+        }
+        
+        // Convert JSON to key-value pairs
+        std::vector<std::pair<std::string, std::string>> entries;
+        
+        for (auto it = jsonConfig.begin(); it != jsonConfig.end(); ++it) {
+            std::string key = it.key();
+            std::string value;
+            
+            // Handle different value types
+            if (it->is_string()) {
+                value = it->get<std::string>();
+            } else if (it->is_number_integer()) {
+                value = std::to_string(it->get<int64_t>());
+            } else if (it->is_number_unsigned()) {
+                value = std::to_string(it->get<uint64_t>());
+            } else if (it->is_number_float()) {
+                value = std::to_string(it->get<double>());
+            } else if (it->is_boolean()) {
+                value = it->get<bool>() ? "true" : "false";
+            } else if (it->is_array()) {
+                // Convert array to JSON string representation
+                value = it->dump();
+            } else {
+                // Skip null values
+                NLM_LOG_WARNING("Skipping null value for key: " + key);
+                continue;
+            }
+            
+            if (validateEntry(key, ConfigValue(value))) {
+                entries.emplace_back(key, value);
+            } else {
+                NLM_LOG_WARNING("Invalid configuration entry (key: " + key + ") - skipping");
+            }
+        }
+        
+        // Add entries to config
+        for (const auto& entry : entries) {
+            try {
+                set(entry.first, entry.second, ConfigSource::File);
+            } catch (const ConfigException& e) {
+                NLM_LOG_ERROR("Failed to set configuration entry " + entry.first + ": " + e.what());
+                // Continue processing other entries
+            }
+        }
+        
+        NLM_LOG_INFO("Successfully loaded " + std::to_string(entries.size()) + " configuration entries from: " + filepath);
+        return true;
+        
+    } catch (const ConfigParseException& e) {
+        NLM_LOG_ERROR(std::string(e.what()));
+        return false;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Unexpected error parsing config file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Enhanced saveToFile with better error handling
+bool Config::saveToFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonConfig;
+        
+        for (const auto& entry : pImpl->entries) {
+            std::string key = entry.key;
+            
+            // Convert ConfigValue to JSON
+            std::visit([&jsonConfig, &key](auto&& value) {
+                using T = std::decay_t<decltype(value)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    jsonConfig[key] = value;
+                } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                    jsonConfig[key] = static_cast<int64_t>(value);
+                } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                    jsonConfig[key] = static_cast<double>(value);
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    jsonConfig[key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    jsonConfig[key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    jsonConfig[key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    jsonConfig[key] = value;
+                }
+            }, entry.value);
+        }
+        
+        // Write formatted JSON to file
+        file << std::setw(2) << jsonConfig << std::endl;
+        
+        NLM_LOG_INFO("Configuration saved to: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to save config file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Enhanced loadFromArgs with better argument validation
+bool Config::loadFromArgs(int argc, char** argv) {
+    bool success = true;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                try {
+                    set(key, value, ConfigSource::CommandLine);
+                } catch (const ConfigException& e) {
+                    NLM_LOG_WARNING("Failed to parse command line argument --" + key + "=" + value + ": " + e.what());
+                    success = false;
+                } catch (const std::exception& e) {
+                    NLM_LOG_WARNING("Failed to parse command line argument --" + key + "=" + value + ": " + std::string(e.what()));
+                    success = false;
+                }
+            } else {
+                NLM_LOG_WARNING("Invalid command line argument format: " + arg);
+                success = false;
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            try {
+                set(key, value, ConfigSource::CommandLine);
+            } catch (const ConfigException& e) {
+                NLM_LOG_WARNING("Failed to parse command line argument -" + key + " " + value + ": " + e.what());
+                success = false;
+            } catch (const std::exception& e) {
+                NLM_LOG_WARNING("Failed to parse command line argument -" + key + " " + value + ": " + std::string(e.what()));
+                success = false;
+            }
+        }
+        // Handle --key value (without =)
+        else if (arg.substr(0, 2) == "--" && i + 1 < argc && argv[i + 1][0] != '-') {
+            std::string key = arg.substr(2);
+            std::string value = argv[++i];
+            try {
+                set(key, value, ConfigSource::CommandLine);
+            } catch (const ConfigException& e) {
+                NLM_LOG_WARNING("Failed to parse command line argument --" + key + " " + value + ": " + e.what());
+                success = false;
+            } catch (const std::exception& e) {
+                NLM_LOG_WARNING("Failed to parse command line argument --" + key + " " + value + ": " + std::string(e.what()));
+                success = false;
+            }
+        } else {
+            // Unknown argument
+            NLM_LOG_WARNING("Unknown argument ignored: " + arg);
+            success = false;
+        }
+    }
+    
+    return success;
+}
+
+// Clear all entries
+void Config::clear() {
+    if (!pImpl->entries.empty()) {
+        NLM_LOG_INFO("Cleared " + std::to_string(pImpl->entries.size()) + " configuration entries");
+    }
+    pImpl->entries.clear();
+}
+
+// Enhanced summary with more details
+std::string Config::summary() const {
+    std::ostringstream oss;
+    oss << "Configuration Summary (" << pImpl->entries.size() << " entries):\n";
+    oss << "  Entries by source:" << std::endl;
+    
+    // Count entries by source
+    int defaultCount = 0, fileCount = 0, commandLineCount = 0, runtimeCount = 0;
+    for (const auto& entry : pImpl->entries) {
+        switch (entry.source) {
+            case ConfigSource::Default: ++defaultCount; break;
+            case ConfigSource::File: ++fileCount; break;
+            case ConfigSource::CommandLine: ++commandLineCount; break;
+            case ConfigSource::Runtime: ++runtimeCount; break;
+        }
+    }
+    
+    if (defaultCount > 0) oss << "    Default: " << defaultCount << std::endl;
+    if (fileCount > 0) oss << "    File: " << fileCount << std::endl;
+    if (commandLineCount > 0) oss << "    Command Line: " << commandLineCount << std::endl;
+    if (runtimeCount > 0) oss << "    Runtime: " << runtimeCount << std::endl;
+    
+    oss << std::endl << "Detailed entries:" << std::endl;
+    for (const auto& entry : pImpl->entries) {
+        oss << "  " << entry.key << " = [";
+        oss << getValueString(entry.value) << "] (" << static_cast<int>(entry.source) << ")";
+        if (!entry.description.empty()) {
+            oss << " - " << entry.description;
+        }
+        oss << std::endl;
+    }
+    
+    return oss.str();
+}
 
 } // namespace nlm

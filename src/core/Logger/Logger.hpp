@@ -9,6 +9,9 @@
 
 namespace nlm {
 
+// Forward declarations
+class AsyncConsoleLogger;
+
 // Log severity levels
 enum class LogLevel {
     Debug = 0,
@@ -37,7 +40,43 @@ public:
     virtual LogLevel getLevel() const = 0;
 };
 
-// Console logger implementation
+// Async console logger implementation with filtering
+class AsyncConsoleLogger : public ILogger {
+public:
+    AsyncConsoleLogger();
+    explicit AsyncConsoleLogger(LogLevel level);
+    ~AsyncConsoleLogger() override;
+    
+    void log(const LogEntry& entry) override;
+    void setLevel(LogLevel level) override;
+    LogLevel getLevel() const override;
+    
+    // Enable/disable colors
+    void setUseColors(bool useColors);
+    bool getUseColors() const;
+    
+    // Set output file (in addition to console)
+    void setOutputFile(const std::string& filepath);
+    void closeOutputFile();
+    
+    // Queue management
+    void setMaxQueueSize(size_t maxSize);
+    
+    // Filtering capabilities
+    void addIncludePattern(const std::string& pattern);
+    void addExcludePattern(const std::string& pattern);
+    void addIncludeLevel(LogLevel level);
+    void setIncludeAllMessages(bool include);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+    
+    std::string levelToString(LogLevel level) const;
+    std::string levelToColor(LogLevel level) const;
+};
+
+// Original console logger implementation
 class ConsoleLogger : public ILogger {
 public:
     ConsoleLogger();
