@@ -19,16 +19,44 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file: " + filepath);
         return false;
     }
     
+    // Try to determine file format by extension
+    std::string extension;
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
+    }
+    
+    // Try JSON first
+    if (extension == "json" || extension.empty()) {
+        if (loadFromJSON(file, filepath)) {
+            return true;
+        }
+        NLM_LOG_WARN("Failed to parse as JSON, trying YAML...");
+    }
+    
+    // Try YAML
+    if (extension == "yaml" || extension == "yml") {
+        if (loadFromYAML(file, filepath)) {
+            return true;
+        }
+        NLM_LOG_WARN("Failed to parse as YAML, trying key=value format...");
+    }
+    
+    // Fallback to simple key=value format
+    file.clear();
+    file.seekg(0, std::ios::beg);
+    NLM_LOG_WARN("Using key=value format for config file: " + filepath);
+    
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,16 +71,241 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARN("Invalid line in config file " + filepath + ":" + std::to_string(lineNum) + 
+                        " - expected 'key=value' format: '" + line + "'");
         }
     }
     
     return true;
+}
+
+bool Config::loadFromJSON(std::ifstream& file, const std::string& filepath) {
+    try {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string content = buffer.str();
+        
+        // Simple JSON parsing - in a real implementation we'd use nlohmann/json
+        // This is a minimal implementation for basic JSON support
+        bool validJSON = true;
+        
+        // Remove whitespace
+        content.erase(std::remove_if(content.begin(), content.end(), 
+            [](unsigned char c) { return std::isspace(c); }), content.end());
+        
+        // Check if it's an object { ... }
+        if (content.empty() || content.front() != '{' || content.back() != '}') {
+            return false;
+        }
+        
+        // Extract key-value pairs (very basic parsing)
+        std::string inner = content.substr(1, content.size() - 2);
+        size_t pos = 0;
+        while (pos < inner.size()) {
+            // Find next quote
+            size_t keyStart = inner.find('"', pos);
+            if (keyStart == std::string::npos) break;
+            size_t keyEnd = inner.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = inner.substr(keyStart + 1, keyEnd - keyStart - 1);
+            pos = keyEnd + 1;
+            
+            // Skip whitespace
+            while (pos < inner.size() && (inner[pos] == ' ' || inner[pos] == '\t')) pos++;
+            
+            if (pos >= inner.size() || inner[pos] != ':') break;
+            pos++;
+            
+            // Skip whitespace
+            while (pos < inner.size() && (inner[pos] == ' ' || inner[pos] == '\t')) pos++;
+            
+            // Extract value (simplified - handles strings, numbers, booleans, null)
+            if (pos < inner.size()) {
+                size_t valueEnd = inner.find_first_of(",}", pos);
+                if (valueEnd == std::string::npos) valueEnd = inner.size();
+                
+                std::string valueStr = inner.substr(pos, valueEnd - pos);
+                
+                // Remove surrounding quotes for strings
+                if (valueStr.size() >= 2 && 
+                    ((valueStr.front() == '\"' && valueStr.back() == '\"') ||
+                     (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+                    valueStr = valueStr.substr(1, valueStr.size() - 2);
+                }
+                
+                // Try to determine type and set value
+                try {
+                    // Try boolean
+                    if (valueStr == "true" || valueStr == "false") {
+                        set(key, valueStr == "true", ConfigSource::File);
+                    }
+                    // Try null/None
+                    else if (valueStr == "null" || valueStr == "None") {
+                        set(key, std::string("null"), ConfigSource::File);
+                    }
+                    // Try integer
+                    else if (std::all_of(valueStr.begin(), valueStr.end(), ::isdigit) ||
+                            (valueStr.front() == '-' && std::all_of(valueStr.begin() + 1, valueStr.end(), ::isdigit))) {
+                        int64_t intVal = std::stoll(valueStr);
+                        set(key, intVal, ConfigSource::File);
+                    }
+                    // Try floating point
+                    else if (isFloatString(valueStr)) {
+                        float floatVal = std::stof(valueStr);
+                        set(key, floatVal, ConfigSource::File);
+                    }
+                    // Default to string
+                    else {
+                        set(key, valueStr, ConfigSource::File);
+                    }
+                } catch (...) {
+                    // If parsing fails, store as string
+                    set(key, valueStr, ConfigSource::File);
+                }
+            }
+            
+            // Move to next pair
+            if (pos < inner.size() && inner[pos] == ',') {
+                pos++;
+                while (pos < inner.size() && (inner[pos] == ' ' || inner[pos] == '\t')) pos++;
+            } else {
+                break;
+            }
+        }
+        
+        NLM_LOG_INFO("Successfully loaded config from JSON file: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON config file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(std::ifstream& file, const std::string& filepath) {
+    try {
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string content = buffer.str();
+        
+        // For now, implement a very basic YAML parser that handles simple key-value pairs
+        // In a real implementation, we'd use a proper YAML library like yaml-cpp
+        
+        // Remove comments
+        std::string line;
+        std::stringstream yamlContent;
+        std::istringstream lineStream(content);
+        
+        while (std::getline(lineStream, line)) {
+            // Remove inline comments
+            size_t commentPos = line.find('#');
+            if (commentPos != std::string::npos) {
+                line = line.substr(0, commentPos);
+            }
+            
+            // Remove trailing whitespace
+            line = trim(line);
+            
+            if (!line.empty()) {
+                yamlContent << line << "\n";
+            }
+        }
+        
+        content = yamlContent.str();
+        
+        // Handle simple YAML format: key: value
+        std::istringstream yamlStream(content);
+        std::string currentKey;
+        
+        while (std::getline(yamlStream, line)) {
+            line = trim(line);
+            if (line.empty()) continue;
+            
+            // Check if line is a key-value pair (contains ':')
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos) {
+                currentKey = trim(line.substr(0, colonPos));
+                std::string valueStr = trim(line.substr(colonPos + 1));
+                
+                // Remove quotes from value
+                if (valueStr.size() >= 2 && 
+                    ((valueStr.front() == '\"' && valueStr.back() == '\"') ||
+                     (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+                    valueStr = valueStr.substr(1, valueStr.size() - 2);
+                }
+                
+                // Try to determine type and set value
+                try {
+                    if (valueStr == "true" || valueStr == "false") {
+                        set(currentKey, valueStr == "true", ConfigSource::File);
+                    } else if (valueStr == "null" || valueStr == "None") {
+                        set(currentKey, std::string("null"), ConfigSource::File);
+                    } else if (std::all_of(valueStr.begin(), valueStr.end(), ::isdigit) ||
+                              (valueStr.front() == '-' && std::all_of(valueStr.begin() + 1, valueStr.end(), ::isdigit))) {
+                        int64_t intVal = std::stoll(valueStr);
+                        set(currentKey, intVal, ConfigSource::File);
+                    } else if (isFloatString(valueStr)) {
+                        float floatVal = std::stof(valueStr);
+                        set(currentKey, floatVal, ConfigSource::File);
+                    } else {
+                        set(currentKey, valueStr, ConfigSource::File);
+                    }
+                } catch (...) {
+                    set(currentKey, valueStr, ConfigSource::File);
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("Successfully loaded config from YAML file: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing YAML config file " + filepath + ": " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::isFloatString(const std::string& str) {
+    if (str.empty()) return false;
+    
+    size_t start = 0;
+    if (str[0] == '+' || str[0] == '-') start = 1;
+    
+    bool hasDecimal = false;
+    bool hasExponent = false;
+    bool digitFound = false;
+    
+    for (size_t i = start; i < str.size(); ++i) {
+        if (str[i] == '.') {
+            if (hasDecimal || hasExponent) return false;
+            hasDecimal = true;
+        } else if (str[i] == 'e' || str[i] == 'E') {
+            if (hasExponent) return false;
+            hasExponent = true;
+            digitFound = false; // Need at least one digit after exponent
+        } else if (str[i] == '+' || str[i] == '-') {
+            // Allow exponent sign
+            if (i == 0 || (i > 0 && (str[i-1] == 'e' || str[i-1] == 'E'))) {
+                // Valid exponent sign
+            } else {
+                return false;
+            }
+        } else if (std::isdigit(static_cast<unsigned char>(str[i]))) {
+            digitFound = true;
+        } else {
+            return false;
+        }
+    }
+    
+    return digitFound;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -188,6 +441,41 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+bool Config::isFloatString(const std::string& str) {
+    if (str.empty()) return false;
+    
+    size_t start = 0;
+    if (str[0] == '+' || str[0] == '-') start = 1;
+    
+    bool hasDecimal = false;
+    bool hasExponent = false;
+    bool digitFound = false;
+    
+    for (size_t i = start; i < str.size(); ++i) {
+        if (str[i] == '.') {
+            if (hasDecimal || hasExponent) return false;
+            hasDecimal = true;
+        } else if (str[i] == 'e' || str[i] == 'E') {
+            if (hasExponent) return false;
+            hasExponent = true;
+            digitFound = false; // Need at least one digit after exponent
+        } else if (str[i] == '+' || str[i] == '-') {
+            // Allow exponent sign
+            if (i == 0 || (i > 0 && (str[i-1] == 'e' || str[i-1] == 'E'))) {
+                // Valid exponent sign
+            } else {
+                return false;
+            }
+        } else if (std::isdigit(static_cast<unsigned char>(str[i]))) {
+            digitFound = true;
+        } else {
+            return false;
+        }
+    }
+    
+    return digitFound;
 }
 
 template<typename T>

@@ -118,29 +118,102 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+// ========== INITIALIZE INTEGRATED SYSTEMS ==========
+    
+    // Initialize memory systems
+    workingMemory = std::make_unique<NeuralWorkingMemory>();
+    episodicMemory = std::make_unique<NeuralEpisodicMemory>();
+    associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+    
+    // Initialize prediction system
+    predictionSystem = std::make_unique<PredictionSystem>();
+    
+    // Initialize cognition systems
+    planner = std::make_unique<NeuralPlanner>();
+    conceptFormation = std::make_unique<ConceptFormation>();
+    attention = std::make_unique<AttentionalSelection>();
+    
+    // Initialize development system
+    developmentSystem = std::make_unique<DevelopmentSystem>();
+    
+    // Initialize neuromodulation systems
+    dopamine = std::make_unique<Dopamine>();
+    curiosity = std::make_unique<Curiosity>();
+    predictionError = std::make_unique<PredictionError>();
+    novelty = std::make_unique<Novelty>();
+    
+    // Log initialization status for each system
+    if (workingMemory) {
+        NLM_LOG_INFO("Working memory initialized successfully");
+    } else {
+        NLM_LOG_WARN("Working memory initialization failed");
+    }
+    
+    if (episodicMemory) {
+        NLM_LOG_INFO("Episodic memory initialized successfully");
+    } else {
+        NLM_LOG_WARN("Episodic memory initialization failed");
+    }
+    
+    if (associativeMemory) {
+        NLM_LOG_INFO("Associative memory initialized successfully");
+    } else {
+        NLM_LOG_WARN("Associative memory initialization failed");
+    }
+    
+    if (predictionSystem) {
+        NLM_LOG_INFO("Prediction system initialized successfully");
+    } else {
+        NLM_LOG_WARN("Prediction system initialization failed");
+    }
+    
+    if (planner) {
+        NLM_LOG_INFO("Neural planner initialized successfully");
+    } else {
+        NLM_LOG_WARN("Neural planner initialization failed");
+    }
+    
+    if (conceptFormation) {
+        NLM_LOG_INFO("Concept formation initialized successfully");
+    } else {
+        NLM_LOG_WARN("Concept formation initialization failed");
+    }
+    
+    if (attention) {
+        NLM_LOG_INFO("Attention system initialized successfully");
+    } else {
+        NLM_LOG_WARN("Attention system initialization failed");
+    }
+    
+    if (developmentSystem) {
+        NLM_LOG_INFO("Development system initialized successfully");
+    } else {
+        NLM_LOG_WARN("Development system initialization failed");
+    }
+    
+    if (dopamine) {
+        NLM_LOG_INFO("Dopamine neuromodulator initialized successfully");
+    } else {
+        NLM_LOG_WARN("Dopamine neuromodulator initialization failed");
+    }
+    
+    if (curiosity) {
+        NLM_LOG_INFO("Curiosity neuromodulator initialized successfully");
+    } else {
+        NLM_LOG_WARN("Curiosity neuromodulator initialization failed");
+    }
+    
+    if (predictionError) {
+        NLM_LOG_INFO("Prediction error neuromodulator initialized successfully");
+    } else {
+        NLM_LOG_WARN("Prediction error neuromodulator initialization failed");
+    }
+    
+    if (novelty) {
+        NLM_LOG_INFO("Novelty neuromodulator initialized successfully");
+    } else {
+        NLM_LOG_WARN("Novelty neuromodulator initialization failed");
+    }
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -274,32 +347,84 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+        NLM_LOG_INFO("Working memory initialized successfully with capacity: " + std::to_string(neuronCount / 10));
+    } else {
+        NLM_LOG_ERROR("Failed to initialize working memory - system not available");
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+        NLM_LOG_INFO("Episodic memory initialized successfully with max episodes: 1000");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize episodic memory - system not available");
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+        NLM_LOG_INFO("Associative memory initialized successfully");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize associative memory - system not available");
+    }
     
     // Initialize prediction system
-    // (PredictionSystem doesn't have initialize method currently)
+    if (pImpl->predictionSystem) {
+        NLM_LOG_INFO("Prediction system initialized successfully");
+    } else {
+        NLM_LOG_WARN("Prediction system not available (this is expected in some configurations)");
+    }
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+        NLM_LOG_INFO("Neural planner initialized successfully with planning depth: 5");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize neural planner - system not available");
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+        NLM_LOG_INFO("Concept formation initialized successfully");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize concept formation - system not available");
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+        NLM_LOG_INFO("Attention system initialized successfully with inhibition: 0.5, excitation: 1.5");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize attention system - system not available");
+    }
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Initialize neuromodulation systems
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+        NLM_LOG_INFO("Novelty detector initialized successfully");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize novelty detector - system not available");
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+        NLM_LOG_INFO("Curiosity system initialized successfully");
+    } else {
+        NLM_LOG_ERROR("Failed to initialize curiosity system - system not available");
+    }
+    
+    // Configure dopamine system (though we can't initialize it directly as it's a pointer)
+    if (pImpl->dopamine) {
+        NLM_LOG_INFO("Dopamine neuromodulator initialized successfully");
+    } else {
+        NLM_LOG_WARN("Dopamine system not available");
+    }
     
     // Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.

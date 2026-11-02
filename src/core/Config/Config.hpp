@@ -6,6 +6,8 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
 
 namespace nlm {
 
