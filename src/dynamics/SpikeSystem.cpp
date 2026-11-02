@@ -1,6 +1,8 @@
 #include "SpikeSystem.hpp"
 #include <algorithm>
 #include <limits>
+#include <cmath>
+#include "../core/Validation.h"
 
 namespace nlm {
 
@@ -15,10 +17,31 @@ struct SpikeSystem::Impl {
     // Spike counting for statistics
     std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
     
-    Impl() : maxHistorySize(10000) {}
+    Impl() : maxHistorySize(10000) {
+        // Validate max history size
+        if (maxHistorySize == 0 || maxHistorySize > 1000000) {
+            maxHistorySize = 10000; // Reset to reasonable default
+            NLM_LOG_WARNING("Invalid spike history size, using default: 10000");
+        }
+    }
 };
 
-SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
+SpikeSystem::SpikeSystem() : pImpl(new Impl) {
+    // Additional validation in constructor
+    if (pImpl) {
+        try {
+            // Validate initial state
+            if (pImpl->maxHistorySize > 1000000) {
+                NLM_LOG_ERROR("Spike system configured with invalid max history size: " + 
+                             std::to_string(pImpl->maxHistorySize));
+                // Force reset to safe value
+                pImpl->maxHistorySize = 10000;
+            }
+        } catch (...) {
+            NLM_LOG_ERROR("Exception during spike system initialization");
+        }
+    }
+}
 
 SpikeSystem::~SpikeSystem() = default;
 

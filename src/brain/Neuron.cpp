@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include "../core/Validation.h"
 
 namespace nlm {
 
@@ -18,13 +19,40 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
+    // LIF parameters with validation constraints
+    static constexpr float MEMBRANE_CAPACITANCE_MIN = 0.1f;   // nF
+    static constexpr float MEMBRANE_CAPACITANCE_MAX = 10.0f; // nF
+    static constexpr float TIME_CONSTANT_MIN = 1.0f;        // ms
+    static constexpr float TIME_CONSTANT_MAX = 100.0f;      // ms
+    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;     // nF (nominal)
+    static constexpr float TIME_CONSTANT = 20.0f;          // ms (nominal)
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
+    
+    void validateLIFParameters() {
+        // Validate membrane parameters
+        if (state.leakConductance < MEMBRANE_CAPACITANCE_MIN || 
+            state.leakConductance > MEMBRANE_CAPACITANCE_MAX) {
+            NLM_LOG_WARNING("Leak conductance out of optimal range: " + 
+                           std::to_string(state.leakConductance) + 
+                           " nS (optimal: " + std::to_string(MEMBRANE_CAPACITANCE_MIN) + 
+                           "-" + std::to_string(MEMBRANE_CAPACITANCE_MAX) + " nS)");
+        }
+        
+        // Validate threshold range
+        if (state.threshold < -100.0f || state.threshold > 50.0f) {
+            NLM_LOG_WARNING("Threshold outside typical biological range: " + 
+                           std::to_string(state.threshold) + " mV");
+        }
+        
+        // Validate refractory period
+        if (state.refractoryPeriod < 1 || state.refractoryPeriod > 1000) {
+            NLM_LOG_WARNING("Refractory period outside typical range: " + 
+                           std::to_string(state.refractoryPeriod) + " steps");
+        }
+    }
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -33,6 +61,14 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    
+    // Validate neuron parameters after construction
+    try {
+        pImpl->validateLIFParameters();
+    } catch (...) {
+        NLM_LOG_ERROR("Failed to validate LIF parameters during neuron initialization");
+    }
+}
 }
 
 Neuron::~Neuron() = default;
