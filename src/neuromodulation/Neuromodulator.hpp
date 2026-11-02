@@ -44,6 +44,12 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
+    // Reset dopamine to baseline state
+    void reset();
+    
+    // Configure dopamine dynamics with custom parameters
+    void setParameters(float baseline, float peak, float decayRate, float releaseRate);
+    
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);

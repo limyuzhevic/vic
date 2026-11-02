@@ -30,6 +30,11 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class NeuronPool;
+class SynapsePool;
+class EventQueue;
+class ThreadPool;
+class PerformanceMetrics;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {

@@ -433,3 +433,44 @@ int main(int argc, char** argv) {
     
     return 0;
 }
+
+void printUsage() {
+    std::cout << "NLM - Neural Learning Machine Phase 2" << std::endl;
+    std::cout << "====================================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: ./nlm [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Basic Options:" << std::endl;
+    std::cout << "  --help, -h              Show this help message" << std::endl;
+    std::cout << "  --config=file.cfg       Load configuration file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --experiment=name       Select experiment type" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Advanced Options:" << std::endl;
+    std::cout << "  --visualization, --viz  Enable network visualization" << std::endl;
+    std::cout << "  --benchmark             Enable performance benchmarking" << std::endl;
+    std::cout << "  --debug, --debug-all    Enable debug logging" << std::endl;
+    std::cout << "  --log-level=LEVEL       Set log level (0=Error, 1=Warning, 2=Info, 3=Debug)" << std::endl;
+    std::cout << "  --log-file=file.log     Log output to file" << std::endl;
+    std::cout << "  --timestep=MULTIPLIER    Multiply simulation timestep" << std::endl;
+    std::cout << "  --neurons=COUNT         Override neuron count" << std::endl;
+    std::cout << "  --memory=MB             Set memory limit (MB)" << std::endl;
+    std::cout << "  --checkpoints, --checkpoint    Enable checkpoint saving" << std::endl;
+    std::cout << "  --checkpoint-dir=DIR    Set checkpoint directory" << std::endl;
+    std::cout << "  --no-neuromodulation     Disable neuromodulation systems" << std::endl;
+    std::cout << "  --no-cognition          Disable cognitive systems" << std::endl;
+    std::cout << "  --no-memory             Disable memory systems" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Configuration File Format:" << std::endl;
+    std::cout << "  key = value             Simple key=value pairs" << std::endl;
+    std::cout << "  # comments              Line comments" << std::endl;
+    std::cout << "  """multi-line"""           Multi-line strings in quotes" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Experiment Types:" << std::endl;
+    std::cout << "  default                Standard connectivity/plasticity tests" << std::endl;
+    std::cout << "  learning               Focus on learning and adaptation" << std::endl;
+    std::cout << "  plasticity             Detailed plasticity rule verification" << std::endl;
+    std::cout << "  connectivity           Network connectivity analysis" << std::endl;
+    std::cout << "  neuromodulation         Neuromodulation system testing" << std::endl;
+    std::cout << "  memory                 Memory system validation" << std::endl;
+    std::cout << "  all                    Run all available tests" << std::endl;
+}

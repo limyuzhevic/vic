@@ -16,6 +16,8 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/Performance.hpp"
 #include <fstream>
 #include <algorithm>
 #include <unordered_map>
@@ -81,14 +83,15 @@ struct Brain::Impl {
     std::unordered_map<uint64_t, Neuron*> neuronById;
     bool spikeHandlersRegistered = false;
     
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
+    // ========== PERFORMANCE SYSTEMS ==========
+    std::unique_ptr<NeuronPool> neuronPool;
+    std::unique_ptr<SynapsePool> synapsePool;
+    std::unique_ptr<EventQueue> eventQueue;
+    std::unique_ptr<ThreadPool> threadPool;
+    PerformanceMetrics performanceMetrics;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Event delivery cache for performance
+    std::unordered_map<uint64_t, std::vector<DelayedSpikeEvent>> delayedSpikeCache;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -201,10 +204,47 @@ bool Brain::initialize() {
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     
-    // Get configuration values
-    size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000));
-    size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", 1));
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    // Configure performance systems
+    bool useMemoryPools = config->getOr<bool>("use_memory_pools", true);
+    bool useSOAAccess = config->getOr<bool>("use_soa_access", true);
+    bool useEventQueue = config->getOr<bool>("use_event_queue", true);
+    bool useSparseConnectivity = config->getOr<bool>("use_sparse_connectivity", true);
+    bool useParallelProcessing = config->getOr<bool>("use_parallel_processing", false);
+    
+    // Configure memory pools if enabled
+    if (useMemoryPools) {
+        NLM_LOG_INFO("Initializing performance systems with memory pools...");
+        
+        // Configure neuron pool
+        size_t neuronPoolSize = static_cast<size_t>(neuronCount * 1.2);  // 20% overhead
+        pImpl->neuronPool = std::make_unique<NeuronPool>(neuronPoolSize);
+        
+        // Configure synapse pool
+        size_t synapsePoolSize = static_cast<size_t>(neuronCount * connectionProbability * neuronCount * 1.2);
+        pImpl->synapsePool = std::make_unique<SynapsePool>(synapsePoolSize);
+        
+        NLM_LOG_INFO("Neuron pool capacity: " + std::to_string(pImpl->neuronPool->size()) + " neurons");
+        NLM_LOG_INFO("Synapse pool capacity: " + std::to_string(pImpl->synapsePool->size()) + " synapses");
+    }
+    
+    // Configure event queue if enabled
+    if (useEventQueue) {
+        NLM_LOG_INFO("Initializing event queue system...");
+        pImpl->eventQueue = std::make_unique<EventQueue>();
+        pImpl->eventQueue->setMaxEvents(neuronCount * 10);  // Reasonable upper bound
+        NLM_LOG_INFO("Event queue capacity: " + std::to_string(pImpl->eventQueue->getMaxEvents()) + " events");
+    }
+    
+    // Configure parallel processing if enabled and multiple cores available
+    if (useParallelProcessing) {
+        // TODO: Configure thread pool for parallel processing
+        NLM_LOG_INFO("Parallel processing enabled - will use thread pool for neuron updates");
+    }
+    
+    // Configure SoA access if enabled
+    if (useSOAAccess) {
+        NLM_LOG_INFO("SoA access enabled - will use structure-of-arrays data layout");
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");

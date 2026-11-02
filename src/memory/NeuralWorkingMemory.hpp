@@ -100,37 +100,41 @@ public:
     // Get overall memory activity level
     float getMemoryActivity() const;
 
+    // Memory optimization options
+    bool getUseHashLookup() const { return useHashLookup_; }
+    void setUseHashLookup(bool use) { useHashLookup_ = use; }
+    
+    bool getUseCacheFriendlyLayout() const { return cacheFriendlyLayout_; }
+    void setCacheFriendlyLayout(bool use) { cacheFriendlyLayout_ = use; }
+    
+    bool getEnableMemoryProfiling() const { return enableMemoryProfiling_; }
+    void setMemoryProfiling(bool enable) { enableMemoryProfiling_ = enable; }
+    
+    // Get memory usage statistics
+    size_t getMemoryUsageBytes() const;
+    size_t getPeakMemoryUsageBytes() const;
+    float getMemoryUtilizationRatio() const;
+    
+    // Memory optimization for large-scale networks
+    void optimizeForLargeScale(size_t neuronCount);
+    
+    // Memory pressure handling
+    void handleMemoryPressure(float pressureLevel);
+    
 private:
-    // Create recurrent connection for maintenance
-    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
-
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
-
-    // Decay weak memory traces
-    void decayWeakTraces();
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    size_t capacity_;
-    float decayRate_;
+    // Performance optimization
+    bool useHashLookup_;
+    bool cacheFriendlyLayout_;
+    bool enableMemoryProfiling_;
+    size_t peakMemoryUsage_;
     
-    // Memory content
-    std::vector<NeuronId> memoryNeurons_;
-    std::vector<float> memoryActivations_;
-    std::vector<SimulationStep> memoryTimestamps_;
+    // Optimized lookup structures
+    std::unordered_map<uint64_t, size_t> neuronLookupMap_;
+    std::vector<NeuronId> cacheFriendlyNeuronOrder_;
     
-    // Active memory traces
-    std::vector<size_t> activeTraces_;
-    
-    // Recurrent connections for maintenance
-    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
-    
-    // Winner neurons (for competition)
-    std::vector<NeuronId> winners_;
-};
+    // Memory pressure management
+    float memoryPressureLevel_;
+    size_t lastCleanupStep_;
 
 // AttentionalSelection: Neural attention through competition
 // NOT Transformer attention - uses lateral inhibition and gain modulation

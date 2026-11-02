@@ -22,7 +22,16 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , useHashLookup_(true)  // Enable hash lookup for faster access
+    , cacheFriendlyLayout_(false)  // Default to list-based for simplicity
+    , enableMemoryProfiling_(false)
+    , peakMemoryUsage_(0)
+    , memoryPressureLevel_(0.0f)
+    , lastCleanupStep_(0)
 {
+    // Initialize lookup structures
+    neuronLookupMap_.reserve(1024);  // Pre-allocate for better performance
+    cacheFriendlyNeuronOrder_.reserve(1024);
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
