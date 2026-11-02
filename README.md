@@ -103,11 +103,36 @@ currently separate demos per phase, not a single unified binary:
 ./nlm_benchmark
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+## Python Bindings
 
-## Project Structure
+The Python bindings are now enabled by default in CMake builds. You can
+build the Python module with:
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_BUILD_PYTHON_BINDINGS=ON
+make -j4
+```
+
+Alternatively, install via pip (recommended):
+
+```bash
+pip install .
+```
+
+This will build and install the `pynlm` Python module with all NLM
+functionality accessible from Python.
+
+The Python bindings provide access to:
+- Brain simulation with real neural dynamics
+- Configuration management
+- Sensory input processing
+- Motor output generation
+- World interaction
+- Memory systems
+- Prediction and cognition
+- Checkpoint/save functionality
 
 ```
 NLM/

@@ -125,12 +125,20 @@ add_library(nlm_phase5 STATIC
 target_include_directories(nlm_phase5 PUBLIC src)
 target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Phase 6 experiments
-add_library(nlm_phase6 STATIC
-    src/experiments/Phase6IntegratedExperiment.cpp
+# SynapseNetwork component (refactored Brain functionality)
+add_library(synapse_network STATIC
+    src/brain/SynapseNetwork.cpp
 )
-target_include_directories(nlm_phase6 PUBLIC src)
-target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+
+target_include_directories(synapse_network PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/brain
+)
+
+target_compile_options(synapse_network PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+target_link_libraries(synapse_network PUBLIC nlm_core)
 
 # Main executable
 add_executable(nlm
@@ -188,7 +196,7 @@ target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 # it must not be added here as a subdirectory: it defines its own
 # nlm_core/nlm_agent/nlm_world targets, which would collide with the
 # ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
+option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" ON)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 CONFIG REQUIRED)
@@ -201,9 +209,8 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Demo system (including help utilities)
+add_subdirectory(src/demo)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark

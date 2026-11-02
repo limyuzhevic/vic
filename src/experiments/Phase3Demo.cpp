@@ -6,6 +6,7 @@
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../demo/Help.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -342,14 +343,31 @@ private:
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
+    // Parse command line arguments with help support
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    bool showHelp = false;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (i == 1) {
+            numEpisodes = std::atoi(argv[1]);
+        } else if (i == 2) {
+            stepsPerEpisode = std::atoi(argv[2]);
+        }
     }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    
+    if (showHelp) {
+        nlm::demo::printHelp(
+            "nlm_phase3_demo",
+            "NLM Phase 3: World Interaction Demo",
+            {"[num_episodes]      Number of episodes (default: 5)",
+             "[steps_per_episode] Number of steps per episode (default: 200)",
+             "--help, -h           Show this help message"}
+        );
+        return 0;
     }
     
     nlm::Phase3Demo demo;

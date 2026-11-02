@@ -13,8 +13,7 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
-
-using namespace nlm;
+#include "demo/Help.hpp"
 
 void printHeader(const std::string& title) {
     std::cout << "\n" << std::string(60, '=') << "\n";
@@ -36,14 +35,31 @@ void printSection(const std::string& title) {
 }
 
 int main(int argc, char* argv[]) {
+    // Parse command line arguments with help support
+    size_t numTrials = 50;
+    bool showHelp = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else {
+            numTrials = std::stoi(arg);
+        }
+    }
+    
+    if (showHelp) {
+        nlm::demo::printHelp(
+            "nlm_phase4_demo",
+            "NLM Phase 4: Emerging Cognition Demo",
+            {"[num_trials]        Number of trials (default: 50)",
+             "--help, -h           Show this help message"}
+        );
+        return 0;
+    }
+    
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
-    
-    // Parse command line arguments
-    size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
-    }
     
     // Create configuration
     auto config = std::make_shared<Config>();

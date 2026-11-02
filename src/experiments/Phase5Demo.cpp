@@ -35,6 +35,7 @@
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../demo/Help.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -130,6 +131,10 @@ void probePattern(const char* label, const SensoryPercept& percept) {
 }
 
 }  // namespace
+
+}  // namespace nlm
+
+} // namespace
 
 }  // namespace nlm
 

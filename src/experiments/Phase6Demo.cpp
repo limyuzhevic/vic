@@ -7,11 +7,58 @@
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
+#include "demo/Help.hpp"
 #include <iostream>
 
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
+    // Parse command line arguments with help support
+    bool showHelp = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        }
+    }
+    
+    if (showHelp) {
+        nlm::demo::printHelp(
+            "nlm_phase6_demo",
+            "NLM Phase 6: Integration Demo",
+            {"--help, -h           Show this help message"}
+        );
+        return 0;
+    }
+    
+    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
+    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    
+    // Initialize logging
+    Logger::getGlobal().setLevel(LogLevel::Info);
+    
+    // Create experiment
+    Phase6IntegratedExperiment experiment;
+    // Parse command line arguments with help support
+    bool showHelp = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        }
+    }
+    
+    if (showHelp) {
+        nlm::demo::printHelp(
+            "nlm_phase6_demo",
+            "NLM Phase 6: Integration Demo",
+            {"--help, -h           Show this help message"}
+        );
+        return 0;
+    }
+    
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     

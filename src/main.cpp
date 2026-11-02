@@ -18,6 +18,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "demo/Help.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +26,7 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <cstring>
 
 using namespace nlm;
 
@@ -308,9 +310,49 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    // Parse command line arguments
+    std::string configFile = "configs/default.cfg";
+    bool showHelp = false;
+    bool showVersion = false;
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            showVersion = true;
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg == "--help-demo") {
+            showHelp = true;
+        } else {
+            std::cerr << "Warning: Unknown argument: " << arg << std::endl;
+        }
+    }
+    
+    if (showVersion) {
+        std::cout << "NLM Phase 2 Demo" << std::endl;
+        std::cout << "Version: 0.1.0" << std::endl;
+        std::cout << "Built with C++20" << std::endl;
+        return 0;
+    }
+    
+    if (showHelp) {
+        nlm::demo::printHelp(
+            "nlm",
+            "NLM Phase 2: Real Neural Computation Demo",
+            {"--config <file>  Load configuration from file",
+             "--help, -h         Show this help message",
+             "--version, -v      Show version information"}
+        );
+        return 0;
+    }
+    
+    printBanner();
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
