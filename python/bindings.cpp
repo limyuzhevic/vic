@@ -14,7 +14,10 @@
 #include "../src/sensory/SensoryInput.hpp"
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/experiments/Experiment.hpp"
+#include "../src/experiments/ExperimentRunner.hpp"
+#include "../src/experiments/Metrics.hpp"
+#include "../src/environment/Environment.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -39,6 +42,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
@@ -71,7 +77,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__hash__", [](const PopulationId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const PopulationId& id) {
+            return std::to_string(id.value);
+        });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -424,10 +437,65 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Convenience helper functions for common operations
+    m.def("run_demo", [](std::shared_ptr<Brain> brain, SimulationStep steps) {
+        for (SimulationStep i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+    }, py::arg("brain"), py::arg("steps"), "Run a demo simulation for the given number of steps");
+
+    m.def("get_neuron_stats", [](const Brain& brain) {
+        std::map<std::string, double> stats;
+        stats["total_neurons"] = brain.getTotalNeuronCount();
+        stats["total_synapses"] = brain.getTotalSynapseCount();
+        stats["active_neurons"] = brain.getActiveNeuronCount();
+        stats["firing_neurons"] = brain.getFiringNeuronCount();
+        stats["avg_firing_rate"] = brain.getAverageFiringRate();
+        stats["exc_inh_ratio"] = brain.getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain.getTotalSpikeCount();
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics as a dictionary");
+
+    m.def("reset_brain", [](std::shared_ptr<Brain> brain) {
+        brain->reset();
+        if (brain->getConfig()) {
+            brain->initialize();
+        }
+    }, py::arg("brain"), "Reset brain to initial state and reinitialize");
+
+    // Experimental system helper
+    m.def("create_experiment", [](const std::string& name) -> std::shared_ptr<Experiment> {
+        auto exp = std::make_shared<Experiment>(name);
+        exp->setSeed(42); // Default seed for reproducibility
+        return exp;
+    }, py::arg("name"), "Create a new experiment with the given name");
+
+    m.def("run_experiment", [](std::shared_ptr<Experiment> experiment,
+                              std::shared_ptr<Brain> brain,
+                              std::shared_ptr<Environment> environment,
+                              SimulationStep maxSteps) {
+        return std::make_shared<ExperimentRunner>()->runExperiment(experiment, brain, environment, maxSteps);
+    }, py::arg("experiment"), py::arg("brain"), py::arg("environment"), py::arg("maxSteps"), "Run an experiment with the given brain and environment");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
 } // namespace nlm
