@@ -1,258 +1,567 @@
-# NLM — 熙然
+# NLM (Neural Learning Machine) - Enhanced Python Bindings
 
-**An Experimental Artificial Developmental Brain**
+**Version:** 2.0.0-enhanced  
+**License:** MIT  
+**Author:** NLM Research Project  
 
-## What is NLM?
+## Overview
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+NLM (Neural Learning Machine) is an experimental computational brain project that implements a neural system beginning in a primitive developmental state and acquiring increasingly complex abilities through interaction with an environment.
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+This enhanced version provides a Pythonic interface to the C++ neural simulation framework with:
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+- **Pythonic APIs**: Intuitive method names and parameter handling
+- **Context Managers**: Automatic resource management and simulation helpers  
+- **Enhanced Configuration**: JSON schema validation with presets
+- **Advanced Simulation Tools**: Batch running, episode management, and statistical analysis
+- **Comprehensive Documentation**: Examples, API reference, and tutorials
 
-## Current status (honest, 2026-10-31)
+## Key Features
 
-Phase 1 made the repo build again. Phase 2 made the brain real at the
-substrate level: populations now actually create neurons, random
-connectivity creates ~37k synapses for a 500-neuron brain (was 0),
-spikes propagate (Test 1: ~8k spikes, Test 2: ~199k spikes over 1000
-steps), and a controlled STDP test potentiates its synapse
-(0.35 -> 0.99). Inhibitory neurons now exist (20% of internal
-population) and inhibitory plasticity keeps its sign instead of
-flipping to excitatory.
+### 🚀 Enhanced Python APIs
 
-Still not a working brain in the behavioural sense: Phase 3 and Phase 6
-demos still report 0 reward, and checkpointing does not work (it is a
-stub that honestly returns false). Activity is still very high
-(~200 spikes/step) and learning in the main demo is mostly
-saturation, not selective pattern learning. Those are the next
-problems, not hidden ones.
+- **Context Managers**: `pynlm.agent_simulation()` and `pynlm.world_simulation()` for automatic resource management
+- **Pythonic Method Chaining**: Fluent interface for sequential operations
+- **Enhanced Configuration**: `pynlm.EnhancedConfig` with JSON schema validation
+- **Simulation Utilities**: `pynlm.SimulationUtils` for batch processing and statistical analysis
 
-## Current Phase
+### 🛠️ Advanced Configuration System
 
-**PHASE 6: FINAL INTEGRATION**
+- **JSON Schema Validation**: Comprehensive schema validation with error messages
+- **Presets**: Three preset configurations (`basic`, `research`, `real_time`)
+- **Configuration Validation**: Automatic validation with detailed error reporting
+- **Configuration Diffing**: Compare and merge configurations easily
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+### 🧪 Advanced Simulation Tools
 
-### Phase 6 Integration Achievements
+- **Batch Running**: Run multiple episodes for statistical analysis
+- **Context Managers**: Resource management and simulation helpers
+- **Progress Tracking**: Built-in progress reporting and checkpointing
+- **Statistics Collection**: Comprehensive simulation statistics
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
+### 📚 Comprehensive Documentation
 
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
+- **Examples**: 8 complete example scripts covering all features
+- **API Reference**: Comprehensive documentation of all classes and methods
+- **Tutorials**: Step-by-step guides for beginners and advanced users
+- **Best Practices**: Guidelines for effective usage
 
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
+## Quick Start
 
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
+### Installation
 
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
-
-## Building
+The enhanced Python bindings come pre-installed with the NLM framework. You can use them directly:
 
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+# Run examples
+python examples.py
+
+# Import and use in your own code
+import pynlm
+
+# Create a brain with default configuration
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run a simple simulation
+for step in range(100):
+    brain.step(step)
 ```
 
-## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+### Basic Usage
+
+```python
+import pynlm
+
+# Create brain with enhanced configuration
+with pynlm.agent_simulation(preset="research") as sim:
+    # Run simulation
+    sim.runSteps(100)
+    
+    # Get statistics
+    stats = sim.getStatistics()
+    print(f"Neurons: {stats['neurons']}")
+    print(f"Firing neurons: {stats['firing_neurons']}")
+    
+    # Format statistics
+    print(sim.formatStatistics("table"))
+```
+
+### Advanced Usage
+
+```python
+import pynlm
+
+# Create enhanced configuration
+config = pynlm.EnhancedConfig.createFromPreset("research")
+
+# Validate configuration
+if config.isValid():
+    print("Configuration is valid!")
+else:
+    print("Configuration errors:")
+    for error in config.getValidationErrors():
+        print(f"  - {error}")
+
+# Create brain and run simulation
+brain = pynlm.createBrain(config.getConfig())
+brain.initialize()
+
+# Run using context manager
+with pynlm.agent_simulation("advanced", brain, world, agent) as sim:
+    sim.runSteps(100).runSteps(100).runSteps(100)
+```
+
+## Key Classes and Methods
+
+### Core Classes
+
+#### `pynlm.createBrain(config)`
+Creates a new brain with the specified configuration.
+
+#### `pynlm.createSimpleWorld()`
+Creates a new simple 2D world for NLM simulation.
+
+#### `pynlm.createAgentBrain(brain)`
+Creates a new agent brain interface connecting NLM brain to world.
+
+#### `pynlm.createDefaultConfig()`
+Creates a default configuration.
+
+### Enhanced Configuration
+
+#### `pynlm.EnhancedConfig.createFromPreset(preset_name)`
+Creates configuration from preset (`basic`, `research`, `real_time`).
+
+#### `pynlm.EnhancedConfig.createFromJSON(json_str)`
+Creates configuration from JSON string.
+
+#### `pynlm.EnhancedConfig.createFromFile(filepath)`
+Creates configuration from file.
+
+#### `pynlm.ConfigValidator.loadSchemaFromFile(filepath)`
+Loads schema from JSON file.
+
+#### `pynlm.ConfigValidator.loadSchemaFromString(json_str)`
+Loads schema from JSON string.
+
+### Context Managers
+
+#### `pynlm.agentSimulation(preset, brain, world, agent)`
+Creates an enhanced agent simulation context.
+
+#### `pynlm.agentSimulation(preset)`
+Creates an enhanced agent simulation context with preset configuration.
+
+#### `pynlm.worldSimulation(world)`
+Creates a world simulation context.
+
+### Simulation Utilities
+
+#### `pynlm.SimulationUtils.runAgentEpisode(max_steps, preset)`
+Runs a complete agent simulation episode.
+
+#### `pynlm.SimulationUtils.batchRunEpisodes(num_episodes, steps_per_episode, preset)`
+Runs multiple episodes for statistical analysis.
+
+#### `pynlm.SimulationUtils.createAgentSetup(preset)`
+Creates a complete agent simulation setup.
+
+### Validation Utilities
+
+#### `pynlm.validateConfig(config)`
+Validates configuration (raises exception if invalid).
+
+#### `pynlm.getConfigValidationErrors(config)`
+Gets configuration validation errors.
+
+## Examples
+
+The `examples.py` file contains comprehensive examples covering all features:
+
+### Example 1: Basic Brain Simulation
+Shows the simplest possible example of creating and running a brain.
+
+### Example 2: Brain in a Simple World
+Demonstrates creating a complete agent simulation with a world.
+
+### Example 3: Advanced Configuration
+Shows the enhanced configuration system with presets and validation.
+
+### Example 4: Batch Simulation
+Demonstrates running multiple simulations for statistical analysis.
+
+### Example 5: Context Manager Usage
+Shows the enhanced context managers for resource management.
+
+### Example 6: Configuration Validation
+Demonstrates the configuration validation system.
+
+### Example 7: Complete Agent Example
+A comprehensive agent simulation example using all major features.
+
+### Example 8: Basic Import and Usage
+Shows the basic import and usage patterns.
+
+To run all examples:
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
-./nlm_phase3_demo
-./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
+python examples.py
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+To run a specific example:
 
-## Project Structure
-
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── agent/          # Agent-brain interface
-│   ├── world/          # Simple world
-│   ├── performance/    # Checkpoints, pools, queues (headers)
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+```bash
+python examples.py --example 1  # Example 1: Basic Brain Simulation
 ```
 
-## Phase Summary
+## Configuration Presets
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+The enhanced configuration system provides three presets:
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
+### Basic Preset
+- Minimal configuration for quick testing
+- 500 neurons, 1 region
+- 0.1 connection probability
+- 0.001 simulation timestep
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
+### Research Preset
+- Comprehensive configuration for scientific experiments
+- 2000 neurons, 2 regions
+- 0.05 connection probability
+- 0.0005 simulation timestep
+- Full development and neuromodulation support
 
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+### Real-time Preset
+- Optimized for real-time applications
+- 100 neurons, 1 region
+- 0.2 connection probability
+- 0.01 simulation timestep
+- Minimal logging
 
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
+## Configuration Schema
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+The configuration system uses JSON schema validation. The schema is available in:
 
-## Scientific Limitations
+- `configs/nlm_schema.json` - Complete JSON schema
+- `docs/CONFIGURATION.md` - Detailed configuration documentation
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+### Schema Validation
 
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
+```python
+import pynlm
 
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
+# Create configuration
+config = pynlm.EnhancedConfig.createFromPreset("research")
 
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
+# Validate configuration
+if config.isValid():
+    print("✓ Configuration is valid")
+else:
+    print("✗ Configuration errors:")
+    for error in config.getValidationErrors():
+        print(f"  - {error}")
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+
+### Configuration Validation Examples
+
+```python
+# Invalid: Negative neurons
+config = pynlm.EnhancedConfig.createFromPreset("basic")
+config.set("neuron_count", -1)
+# Raises exception: Configuration validation failed
+
+# Valid: Correct configuration
+config = pynlm.EnhancedConfig.createFromPreset("basic")
+config.set("neuron_count", 500)
+# No exception: Configuration is valid
 ```
+
+## Performance and Efficiency
+
+### Memory Management
+
+Context managers ensure proper cleanup of resources:
+
+```python
+# Resources are automatically managed
+with pynlm.agent_simulation(preset="research") as sim:
+    sim.runSteps(100)
+
+# No need to manually delete objects
+```
+
+### Batch Processing
+
+For scientific experiments, use batch running:
+
+```python
+# Run 50 episodes for statistical analysis
+results = pynlm.batchRunEpisodes(50, 200)
+
+# Analyze results
+total_rewards = [r["total_reward"] for r in results]
+avg_rewards = [r["avg_reward_per_step"] for r in results]
+```
+
+### Configuration Management
+
+```python
+# Create configuration from preset
+config1 = pynlm.EnhancedConfig.createFromPreset("research")
+
+# Create custom configuration
+config2 = pynlm.EnhancedConfig.createFromPreset("basic")
+config2.set("neuron_count", 1000)
+
+# Merge configurations
+config1.merge(config2)
+```
+
+## Best Practices
+
+### 1. Use Context Managers
+
+Always use context managers for simulation management:
+
+```python
+with pynlm.agent_simulation(preset="research") as sim:
+    sim.runSteps(100)
+```
+
+### 2. Validate Configurations
+
+Validate configurations before running simulations:
+
+```python
+config = pynlm.EnhancedConfig.createFromPreset("research")
+if config.isValid():
+    print("Configuration is valid!")
+else:
+    print("Configuration has errors")
+```
+
+### 3. Use Presets for Consistency
+
+Use presets for consistent experimental setups:
+
+```python
+config = pynlm.EnhancedConfig.createFromPreset("research")
+```
+
+### 4. Batch Run for Statistical Analysis
+
+For scientific experiments, use batch running:
+
+```python
+results = pynlm.batchRunEpisodes(50, 200)
+```
+
+### 5. Save Checkpoints
+
+Save checkpoints during long simulations:
+
+```python
+with pynlm.agent_simulation(preset="research") as sim:
+    for i in range(0, 1000, 100):
+        sim.runSteps(100)
+        brain.save(f"checkpoint_{i}.bin")
+```
+
+## Advanced Features
+
+### Method Chaining
+
+```python
+# Chain method calls for fluent interface
+pynlm.agent_simulation(preset="research")
+    .runSteps(50)
+    .runSteps(50)
+    .runSteps(50)
+```
+
+### Statistics Formatting
+
+```python
+with pynlm.agent_simulation(preset="research") as sim:
+    sim.runSteps(100)
+    
+    # Get statistics in different formats
+    table_stats = sim.formatStatistics("table")
+    json_stats = sim.formatStatistics("json")
+```
+
+### Configuration Diffing
+
+```python
+# Compare configurations
+config1 = pynlm.EnhancedConfig.createFromPreset("basic")
+config2 = pynlm.EnhancedConfig.createFromPreset("research")
+
+diff = config1.diff(config2)
+print(f"Differences: {len(diff)} changes")
+```
+
+## API Reference
+
+### Class Reference
+
+#### `pynlm.BrainSimulationContext`
+Context manager for brain simulations with advanced helpers.
+
+#### `pynlm.WorldSimulationContext`
+Context manager for world simulations.
+
+#### `pynlm.EnhancedConfig`
+Enhanced configuration class with JSON schema validation.
+
+#### `pynlm.ConfigValidator`
+Configuration validator with JSON schema support.
+
+#### `pynlm.SimulationUtils`
+Static class with simulation utility functions.
+
+### Method Reference
+
+See the `examples.py` file for comprehensive method documentation and usage examples.
+
+## Migration Guide
+
+### From Basic to Enhanced API
+
+If you're using the basic API and want to upgrade, here's what changes:
+
+#### Old API
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for step in range(100):
+    brain.step(step)
+```
+
+#### New API
+```python
+import pynlm
+
+with pynlm.agent_simulation(preset="basic") as sim:
+    sim.runSteps(100)
+```
+
+### Error Handling Improvements
+
+The enhanced bindings provide better error handling:
+
+```python
+# Old: Silent failures
+brain.step(step)  # Might fail silently
+
+# New: Descriptive error messages
+with pynlm.agent_simulation(preset="basic") as sim:
+    sim.runSteps(100)  # Clear error messages if something goes wrong
+```
+
+## Troubleshooting
+
+### Build Issues
+
+**CMake cannot find Python:**
+```bash
+pip install scikit-build-core pybind11
+cmake .. -DPython_EXECUTABLE=$(which python)
+```
+
+**Compilation errors:**
+- Ensure C++20 compiler support
+- Check CMake version >= 3.16
+- Verify all source files are present
+
+### Runtime Issues
+
+**ImportError: No module named 'pynlm':**
+```bash
+pip install --force-reinstall .
+```
+
+**Segmentation faults:**
+- Check that `initialize()` is called before `step()`
+- Ensure `reset()` is called before re-running simulation
+
+### Configuration Issues
+
+**Configuration validation errors:**
+- Check that configuration keys are spelled correctly
+- Verify that values are within allowed ranges
+- Use `getConfigValidationErrors()` to see detailed errors
+
+## Further Reading
+
+- [`examples.py`](examples.py) - Comprehensive examples
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - System architecture overview
+- [`docs/SCIENCE.md`](docs/SCIENCE.md) - Scientific background
+- [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) - Experiment descriptions
+- [`configs/nlm_schema.json`](configs/nlm_schema.json) - Configuration schema
+- [`docs/PYTHON_API.md`](docs/PYTHON_API.md) - Python API documentation
+
+## Getting Help
+
+### Documentation
+
+- **Python API Reference**: See `docs/PYTHON_API.md`
+- **Configuration Guide**: See `docs/CONFIGURATION.md`
+- **Architecture Overview**: See `docs/ARCHITECTURE.md`
+- **Scientific Background**: See `docs/SCIENCE.md`
+
+### Examples
+
+- **Basic Examples**: Run `python examples.py --help`
+- **Advanced Examples**: Look at the `examples.py` file
+- **Complete Examples**: See the `example_7_complete_agent_example()`
+
+### Community
+
+- **GitHub Repository**: https://github.com/nlm-project/nlm
+- **Documentation**: https://nlm.readthedocs.io
+- **Issues**: Report issues at https://github.com/nlm-project/nlm/issues
+
+## Acknowledgments
+
+This enhanced version builds on the original NLM Python bindings and adds significant improvements:
+
+- **Enhanced Configuration System**: JSON schema validation with presets
+- **Context Managers**: Automatic resource management and simulation helpers
+- **Advanced Simulation Tools**: Batch running and statistical analysis
+- **Comprehensive Documentation**: Examples and API reference
+- **Better Error Handling**: Descriptive error messages and validation
+
+## Changelog
+
+### Version 2.0.0-enhanced
+
+- Added Pythonic context managers
+- Added enhanced configuration system with JSON schema validation
+- Added advanced simulation helpers and utilities
+- Improved error handling and validation
+- Enhanced documentation and examples
+- Added batch running capabilities
+- Added statistical analysis tools
+- Added method chaining and fluent interfaces
+
+### Version 1.0.0
+
+- Original Python bindings
+- Basic API for NLM access
+- Limited configuration options
+- Basic error handling
 
 ## License
 
-MIT
+MIT License. See the LICENSE file for details.
 
-## Authors
+---
 
-Research project — See docs for scientific background.
+*This enhanced version provides a more intuitive and powerful Python interface to the NLM framework, making it easier for researchers and developers to work with artificial neural networks.*

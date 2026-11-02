@@ -1,0 +1,252 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "NLM Configuration Schema",
+    "description": "JSON Schema for NLM (Neural Learning Machine) configuration files",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "random_seed": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Random seed for reproducible experiments"
+        },
+        "simulation_timestep": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Simulation timestep in seconds"
+        },
+        "neuron_count": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Number of neurons in the brain"
+        },
+        "region_count": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Number of brain regions"
+        },
+        "connection_probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Connection probability for random connectivity"
+        },
+        "stdp_ltp_weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "STDP LTP (Long-Term Potentiation) weight"
+        },
+        "stdp_ltd_weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "STDP LTD (Long-Term Depression) weight"
+        },
+        "stdp_time_constant": {
+            "type": "number",
+            "minimum": 0,
+            "description": "STDP time constant in milliseconds"
+        },
+        "development_synaptogenesis_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.1,
+            "description": "Synaptogenesis rate during development"
+        },
+        "development_pruning_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.01,
+            "description": "Pruning rate during development"
+        },
+        "dopamine_baseline": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Baseline dopamine level"
+        },
+        "reward_discount_factor": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Reward discount factor"
+        },
+        "environment_name": {
+            "type": "string",
+            "description": "Name of the environment"
+        },
+        "environment_width": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Width of the environment"
+        },
+        "environment_height": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Height of the environment"
+        },
+        "log_level": {
+            "type": "string",
+            "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"],
+            "description": "Logging level"
+        },
+        "log_to_file": {
+            "type": "boolean",
+            "description": "Whether to log to file"
+        },
+        "log_filename": {
+            "type": "string",
+            "description": "Log file name"
+        },
+        "max_simulation_steps": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Maximum simulation steps"
+        },
+        "simulation_time_limit": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Simulation time limit in seconds"
+        },
+        "visualization_enabled": {
+            "type": "boolean",
+            "description": "Whether visualization is enabled"
+        },
+        "visualization_update_rate": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Visualization update rate in Hz"
+        },
+        "brain": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "neuron_count": {"type": "number", "minimum": 1},
+                "synapse_density": {"type": "number", "minimum": 0, "maximum": 1},
+                "connection_probability": {"type": "number", "minimum": 0, "maximum": 1},
+                "initial_weight_mean": {"type": "number", "minimum": 0, "maximum": 1},
+                "initial_weight_std": {"type": "number", "minimum": 0, "maximum": 1},
+                "v_thresh": {"type": "number"},
+                "v_rest": {"type": "number"},
+                "v_reset": {"type": "number"},
+                "tau_mem": {"type": "number", "minimum": 0},
+                "tau_ref": {"type": "number", "minimum": 0}
+            }
+        },
+        "plasticity": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "stdp": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enable": {"type": "boolean"},
+                        "learning_rate": {"type": "number", "minimum": 0, "maximum": 1},
+                        "tau_plus": {"type": "number", "minimum": 0},
+                        "tau_minus": {"type": "number", "minimum": 0}
+                    }
+                },
+                "hebbian": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enable": {"type": "boolean"},
+                        "learning_rate": {"type": "number", "minimum": 0, "maximum": 1}
+                    }
+                },
+                "structural": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enable": {"type": "boolean"},
+                        "synaptogenesis_rate": {"type": "number", "minimum": 0, "maximum": 0.1},
+                        "pruning_rate": {"type": "number", "minimum": 0, "maximum": 0.01}
+                    }
+                }
+            }
+        },
+        "neuromod": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "dopamine": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "scale": {"type": "number", "minimum": 0, "maximum": 1}
+                    }
+                },
+                "curiosity": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enable": {"type": "boolean"},
+                        "threshold": {"type": "number", "minimum": 0, "maximum": 1}
+                    }
+                },
+                "novelty": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enable": {"type": "boolean"},
+                        "threshold": {"type": "number", "minimum": 0, "maximum": 1}
+                    }
+                }
+            }
+        }
+    },
+    "required": [
+        "neuron_count",
+        "region_count",
+        "connection_probability",
+        "simulation_timestep",
+        "random_seed"
+    ],
+    "examples": [
+        {
+            "name": "basic",
+            "description": "Basic configuration for quick testing",
+            "config": {
+                "neuron_count": 500,
+                "region_count": 1,
+                "connection_probability": 0.1,
+                "simulation_timestep": 0.001,
+                "random_seed": 42
+            }
+        },
+        {
+            "name": "research",
+            "description": "Comprehensive configuration for scientific experiments",
+            "config": {
+                "neuron_count": 2000,
+                "region_count": 2,
+                "connection_probability": 0.05,
+                "simulation_timestep": 0.0005,
+                "random_seed": 42,
+                "stdp_ltp_weight": 0.005,
+                "stdp_ltd_weight": 0.006,
+                "stdp_time_constant": 50.0,
+                "development_synaptogenesis_rate": 0.001,
+                "development_pruning_rate": 0.0001,
+                "log_level": "INFO",
+                "log_to_file": true
+            }
+        },
+        {
+            "name": "real_time",
+            "description": "Optimized for real-time applications",
+            "config": {
+                "neuron_count": 100,
+                "region_count": 1,
+                "connection_probability": 0.2,
+                "simulation_timestep": 0.01,
+                "random_seed": 42,
+                "log_level": "WARN"
+            }
+        }
+    ]
+}
