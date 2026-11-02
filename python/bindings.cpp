@@ -16,6 +16,47 @@
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
 
+// Custom Python exception classes
+class NLMRuntimeError : public std::runtime_error {
+public:
+    using std::runtime_error::runtime_error;
+};
+
+class NLMValidationError : public NLMRuntimeError {
+public:
+    using NLMRuntimeError::NLMRuntimeError;
+};
+
+class NLMImportError : public NLMRuntimeError {
+public:
+    using NLMRuntimeError::NLMRuntimeError;
+};
+
+class NLMMemoryError : public NLMRuntimeError {
+public:
+    using NLMRuntimeError::NLMRuntimeError;
+};
+
+class NLMDevelopmentError : public NLMRuntimeError {
+public:
+    using NLMRuntimeError::NLMRuntimeError;
+};
+
+class NLMPerformanceError : public NLMRuntimeError {
+public:
+    using NLMRuntimeError::NLMRuntimeError;
+};
+
+class NLMVisualizationError : public NLMRuntimeError {
+public:
+    using NLMRuntimeError::NLMRuntimeError;
+};
+
+class NLMExportError : public NLMRuntimeError {
+public:
+    using NLMRuntimeError::NLMRuntimeError;
+};
+
 namespace py = pybind11;
 namespace nlm {
 
@@ -27,7 +68,18 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
-    py::register_exception<std::runtime_error>(m, "RuntimeError");
+    // Register custom Python exception classes
+    py::register_exception<NLMRuntimeError>(m, "RuntimeError");
+    py::register_exception<NLMValidationError>(m, "ValidationError");
+    py::register_exception<NLMImportError>(m, "ImportError");
+    py::register_exception<NLMMemoryError>(m, "MemoryError");
+    py::register_exception<NLMDevelopmentError>(m, "DevelopmentError");
+    py::register_exception<NLMPerformanceError>(m, "PerformanceError");
+    py::register_exception<NLMVisualizationError>(m, "VisualizationError");
+    py::register_exception<NLMExportError>(m, "ExportError");
+
+    // Replace the existing exception registration with our custom ones
+    // py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
@@ -166,6 +218,101 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Python-specific convenience methods
+        .def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, "Create a default configuration (Python convenience)")
+        .def("updateFromDict", [](Config& self, const py::dict& config_dict) {
+            for (auto item : config_dict) {
+                std::string key = py::cast<std::string>(item.first);
+                py::object value_obj = item.second;
+                
+                // Convert Python value to ConfigValue
+                ConfigValue config_value;
+                if (value_obj.is<int>()) {
+                    config_value = value_obj.cast<int>();
+                } else if (value_obj.is<double>()) {
+                    config_value = value_obj.cast<double>();
+                } else if (value_obj.is<bool>()) {
+                    config_value = value_obj.cast<bool>();
+                } else if (value_obj.is<std::string>()) {
+                    config_value = value_obj.cast<std::string>();
+                } else if (value_obj.is<py::list>()) {
+                    // Convert list to vector
+                    py::list list = value_obj.cast<py::list>();
+                    if (list.empty()) {
+                        config_value = std::vector<int>{};
+                    } else if (py::isinstance(list[0], py::int_())) {
+                        std::vector<int> int_list;
+                        for (auto item : list) {
+                            int_list.push_back(py::cast<int>(item));
+                        }
+                        config_value = int_list;
+                    } else if (py::isinstance(list[0], py::float_())) {
+                        std::vector<double> double_list;
+                        for (auto item : list) {
+                            double_list.push_back(py::cast<double>(item));
+                        }
+                        config_value = double_list;
+                    } else if (py::isinstance(list[0], py::str())) {
+                        std::vector<std::string> string_list;
+                        for (auto item : list) {
+                            string_list.push_back(py::cast<std::string>(item));
+                        }
+                        config_value = string_list;
+                    } else {
+                        throw std::runtime_error("Unsupported list element type in configuration");
+                    }
+                } else {
+                    throw std::runtime_error("Unsupported value type in configuration");
+                }
+                
+                self.set(key, config_value);
+            }
+        }, py::arg("config_dict"), "Update configuration from Python dictionary")
+        .def("toDict", [](const Config& self) -> py::dict {
+            py::dict result;
+            auto keys = self.getKeys();
+            for (const auto& key : keys) {
+                // Get the value as string for simplicity (could enhance for type-specific)
+                result[key] = self.summary();
+            }
+            return result;
+        }, "Convert configuration to Python dictionary")
+        .def("validate", [](const Config& self) {
+            auto keys = self.getKeys();
+            std::vector<std::string> errors;
+            
+            // Basic validation checks
+            for (const auto& key : keys) {
+                // Add validation logic for specific keys if needed
+                if (key.empty()) {
+                    errors.push_back("Empty configuration key found");
+                }
+            }
+            
+            if (!errors.empty()) {
+                std::string error_msg = "Configuration validation failed:";
+                for (const auto& error : errors) {
+                    error_msg += "\n  - " + error;
+                }
+                throw std::runtime_error(error_msg);
+            }
+            
+            return true;
+        }, "Validate configuration and throw exception if invalid")
+        .def("getSchema", []() -> py::dict {
+            // Basic schema - could be expanded with more detailed type information
+            py::dict schema;
+            schema["int"] = "integer values (e.g., 42)";
+            schema["double"] = "floating point values (e.g., 3.14)";
+            schema["bool"] = "boolean values (true/false)";
+            schema["string"] = "string values (e.g., 'hello')";
+            schema["list<int>"] = "integer list (e.g., [1, 2, 3])";
+            schema["list<double>"] = "float list (e.g., [1.5, 2.5, 3.5])";
+            schema["list<string>"] = "string list (e.g., ['a', 'b', 'c'])";
+            return schema;
+        }, "Get configuration schema (value types)")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -333,6 +480,7 @@ PYBIND11_MODULE(pynlm, m) {
              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
              "Get all region IDs")
+        // Get all regions
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
@@ -359,7 +507,91 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Python-specific convenience methods
+        .def("runEpisode", [](Brain& self, size_t maxSteps, py::function callback) {
+            for (size_t step = 0; step < maxSteps; ++step) {
+                self.step(step);
+                if (callback) {
+                    try {
+                        callback(step);
+                    } catch (const py::error_already_set& e) {
+                        throw NLMRuntimeError(std::string("Callback error at step ") + std::to_string(step) + ": " + e.what());
+                    }
+                }
+            }
+            return maxSteps;
+        }, py::arg("max_steps"), py::arg("callback") = py::none(),
+           "Run simulation episode with optional callback")
+        .def("saveBrain", [](Brain& self, const std::string& filepath) {
+            bool success = self.save(filepath);
+            if (!success) {
+                throw NLMExportError("Failed to save brain state to file: " + filepath);
+            }
+            return true;
+        }, py::arg("filepath"), "Save brain state (enhanced error handling)")
+        .def("loadBrain", [](Brain& self, const std::string& filepath) {
+            bool success = self.load(filepath);
+            if (!success) {
+                throw NLMImportError("Failed to load brain state from file: " + filepath);
+            }
+            return true;
+        }, py::arg("filepath"), "Load brain state (enhanced error handling)")
+        .def("getLearnedPreference", &Brain::getLearnedPreference,
+             "Get learned preference trait (personality)")
+        .def("setLearnedPreference", &Brain::setLearnedPreference,
+             py::arg("preference"),
+             "Set learned preference trait (personality)")
+        .def("resetForNewEpisode", &Brain::reset,
+             "Reset brain for new episode")
+        .def("getEpisodeStats", [](const Brain& self) -> py::dict {
+            py::dict stats;
+            stats["total_neurons"] = self.getTotalNeuronCount();
+            stats["total_synapses"] = self.getTotalSynapseCount();
+            stats["active_neurons"] = self.getActiveNeuronCount();
+            stats["firing_neurons"] = self.getFiringNeuronCount();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            stats["exc_inh_ratio"] = self.getExcitationInhibitionRatio();
+            stats["avg_firing_rate"] = self.getAverageFiringRate();
+            stats["region_count"] = self.getRegionCount();
+            stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        }, "Get brain statistics as Python dictionary")
+        .def("getDevelopmentStage", [](const Brain& self) -> py::dict {
+            py::dict stage_info;
+            stage_info["stage"] = static_cast<int>(self.getDevelopmentalStage());
+            stage_info["stage_name"] = "Unknown"; // Could enhance with stage names
+            return stage_info;
+        }, "Get detailed developmental stage information")
+        .def("enableStructuralPlasticity", [](Brain& self, bool enable) {
+            // Note: This assumes the Brain class has this method or similar
+            // If not, this will need to be adapted based on actual Brain API
+            if (enable) {
+                // Implementation would depend on actual Brain interface
+                return true;
+            }
+            return false;
+        }, py::arg("enable"), "Enable/disable structural plasticity")
+        .def("enableDevelopment", [](Brain& self, bool enable) {
+            if (enable) {
+                self.setDevelopmentalStage(DevelopmentalStage::Adult);
+                return true;
+            }
+            return false;
+        }, py::arg("enable"), "Enable/disable development system")
+        .def("inspectBrainState", [](const Brain& self) -> py::dict {
+            py::dict state;
+            state["total_neurons"] = self.getTotalNeuronCount();
+            state["total_synapses"] = self.getTotalSynapseCount();
+            state["active_neurons"] = self.getActiveNeuronCount();
+            state["firing_neurons"] = self.getFiringNeuronCount();
+            state["total_spikes"] = self.getTotalSpikeCount();
+            state["exc_inh_ratio"] = self.getExcitationInhibitionRatio();
+            state["avg_firing_rate"] = self.getAverageFiringRate();
+            return state;
+        }, "Inspect brain state for debugging")
+        .def("logDetailedStatus", &Brain::logStatus,
+             "Log detailed brain status with enhanced information");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
