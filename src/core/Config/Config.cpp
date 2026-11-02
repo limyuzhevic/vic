@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,9 +20,13 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON format first
+    bool loaded = loadFromJSON(filepath);
+    if (loaded) {
+        return true;
+    }
     
+    // Fall back to simple key=value format for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +48,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -53,6 +58,73 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // Parse JSON file
+        json = json::parse(file);
+        
+        // Load configuration from JSON object
+        for (const auto& item : json.items()) {
+            const std::string& key = item.key();
+            const json& value = item.value();
+            
+            // Convert JSON value to ConfigValue
+            ConfigValue configValue;
+            
+            if (value.is_string()) {
+                configValue = value.get<std::string>();
+            } else if (value.is_number_integer()) {
+                configValue = value.get<int64_t>();
+            } else if (value.is_number_unsigned()) {
+                configValue = value.get<uint64_t>();
+            } else if (value.is_number_float()) {
+                configValue = value.get<double>();
+            } else if (value.is_boolean()) {
+                configValue = value.get<bool>();
+            } else if (value.is_array()) {
+                // Load array
+                if (value.empty()) {
+                    configValue = std::vector<int>{};
+                } else if (value.front().is_number_integer()) {
+                    std::vector<int> intArray;
+                    intArray.reserve(value.size());
+                    for (const auto& item : value) {
+                        intArray.push_back(item.get<int>());
+                    }
+                    configValue = intArray;
+                } else if (value.front().is_number_float()) {
+                    std::vector<double> doubleArray;
+                    doubleArray.reserve(value.size());
+                    for (const auto& item : value) {
+                        doubleArray.push_back(item.get<double>());
+                    }
+                    configValue = doubleArray;
+                } else if (value.front().is_string()) {
+                    std::vector<std::string> stringArray;
+                    stringArray.reserve(value.size());
+                    for (const auto& item : value) {
+                        stringArray.push_back(item.get<std::string>());
+                    }
+                    configValue = stringArray;
+                }
+            }
+            
+            set(key, configValue, ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        // JSON parsing failed, fall back to simple format
+        NLM_LOG_WARNING("Failed to parse JSON config file \"" + filepath + "\": " + std::string(e.what()) + ". Falling back to simple key=value format.");
+        return false;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,17 +151,55 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Save in JSON format for better interoperability
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        // Create JSON object
+        nlohmann::json json;
+        
+        // Add configuration entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            // Convert ConfigValue to JSON
+            std::visit([&json, &entry](auto&& value) {
+                using T = std::decay_t<decltype(value)>;
+                
+                if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                    json[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                    json[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    json[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    json[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    json[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    json[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    json[entry.key] = value;
+                }
+            }, entry.value);
+            
+            // Add description as comment (JSON doesn't support comments)
+            if (!entry.description.empty()) {
+                // Store description in a separate field
+                json[entry.key + "_description"] = entry.description;
+            }
+        }
+        
+        // Write JSON with indentation
+        file << json.dump(2);
+        file.flush();
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to save config to JSON file \"" + filepath + "\": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

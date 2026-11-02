@@ -56,6 +56,9 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
+    // Load from JSON file (Phase 2 enhancement)
+    bool loadFromJSON(const std::string& filepath);
+    
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
