@@ -79,6 +79,13 @@ void Neuron::decrementRefractory() {
     }
 }
 
+void Neuron::incrementRefractory() {
+    if (pImpl->state.refractoryRemaining == 0) {
+        pImpl->state.firingState = FiringState::Refractory;
+    }
+    pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+}
+
 void Neuron::setFiringRate(FiringRate rate) {
     pImpl->state.firingRate = rate;
 }
@@ -219,11 +226,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak contribution (convert dt from seconds to milliseconds for tau in ms)
+    float leakContribution = (V_rest - V) / (tau / 1000.0f);  // V_rest - V in mV, tau in ms, dt in seconds
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // dt is in seconds, tau is in ms, so we need to convert units
+    V = V + dt * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
