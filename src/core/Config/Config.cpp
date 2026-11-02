@@ -3,8 +3,121 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
+// Include JSON library for modern config file support
+// Simple JSON parsing utilities (since we can't rely on external dependencies)
 namespace nlm {
+
+// Simple JSON parsing utilities (since we can't rely on external dependencies)
+namespace JsonUtils {
+    
+    // Parse a simple key=value format with support for JSON-like syntax
+    bool parseKeyValue(const std::string& line, std::string& key, std::string& value) {
+        size_t pos = line.find('=');
+        if (pos == std::string::npos) return false;
+        
+        key = line.substr(0, pos);
+        value = line.substr(pos + 1);
+        
+        // Trim whitespace
+        key.erase(0, key.find_first_not_of(" \t\r\n"));
+        key.erase(key.find_last_not_of(" \t\r\n") + 1);
+        
+        value.erase(0, value.find_first_not_of(" \t\r\n"));
+        value.erase(value.find_last_not_of(" \t\r\n") + 1);
+        
+        // Remove quotes from value if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        return true;
+    }
+    
+    // Convert string to appropriate type
+    template<typename T>
+    T convertString(const std::string& str);
+    
+    template<>
+    std::string convertString<std::string>(const std::string& str) {
+        return str;
+    }
+    
+    template<>
+    int convertString<int>(const std::string& str) {
+        try {
+            return std::stoi(str);
+        } catch (const std::exception&) {
+            throw std::runtime_error("Failed to convert string to int: " + str);
+        }
+    }
+    
+    template<>
+    int64_t convertString<int64_t>(const std::string& str) {
+        try {
+            return std::stoll(str);
+        } catch (const std::exception&) {
+            throw std::runtime_error("Failed to convert string to int64_t: " + str);
+        }
+    }
+    
+    template<>
+    double convertString<double>(const std::string& str) {
+        try {
+            return std::stod(str);
+        } catch (const std::exception&) {
+            throw std::runtime_error("Failed to convert string to double: " + str);
+        }
+    }
+    
+    template<>
+    bool convertString<bool>(const std::string& str) {
+        std::string lowerStr = str;
+        std::transform(lowerStr.begin(), lowerStr.end(), lowerStr.begin(), ::tolower);
+        
+        if (lowerStr == "true" || lowerStr == "1" || lowerStr == "yes") return true;
+        if (lowerStr == "false" || lowerStr == "0" || lowerStr == "no") return false;
+        
+        throw std::runtime_error("Failed to convert string to bool: " + str);
+    }
+    
+    // Parse vector values (simple [] format)
+    template<typename T>
+    std::vector<T> parseVector(const std::string& str) {
+        std::vector<T> result;
+        if (str.empty() || (str.size() > 1 && str.front() == '[' && str.back() == ']')) {
+            std::string content = str;
+            if (content.size() > 2) content = content.substr(1, content.size() - 2);
+            
+            if (content.empty()) return result;
+            
+            size_t pos = 0;
+            while (pos < content.size()) {
+                size_t commaPos = content.find(',', pos);
+                std::string element;
+                if (commaPos == std::string::npos) {
+                    element = content.substr(pos);
+                    pos = content.size();
+                } else {
+                    element = content.substr(pos, commaPos - pos);
+                    pos = commaPos + 1;
+                }
+                
+                // Trim whitespace
+                element.erase(0, element.find_first_not_of(" \t\r\n"));
+                element.erase(element.find_last_not_of(" \t\r\n") + 1);
+                
+                if (!element.empty()) {
+                    result.push_back(convertString<T>(element));
+                }
+            }
+        }
+        return result;
+    }
+} // namespace JsonUtils
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,36 +132,90 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Remove inline comments
+        size_t commentPos = line.find('#');
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+            line = trim(line);
+            if (line.empty()) continue;
+        }
+        
+        try {
+            // Parse key=value pair
+            std::string key, valueStr;
+            if (!JsonUtils::parseKeyValue(line, key, valueStr)) {
+                NLM_LOG_WARNING("Config: Invalid line " + std::to_string(lineNumber) + ": " + line);
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Determine the appropriate type for the value
+            ConfigValue configValue;
+            
+            // Try parsing as boolean first (true/false, 1/0, yes/no)
+            try {
+                bool boolVal = JsonUtils::convertString<bool>(valueStr);
+                configValue = boolVal;
+            } catch (const std::exception&) {
+                // Not a boolean, try other types
+                try {
+                    int intVal = JsonUtils::convertString<int>(valueStr);
+                    configValue = intVal;
+                } catch (const std::exception&) {
+                    try {
+                        int64_t int64Val = JsonUtils::convertString<int64_t>(valueStr);
+                        configValue = int64Val;
+                    } catch (const std::exception&) {
+                        try {
+                            double doubleVal = JsonUtils::convertString<double>(valueStr);
+                            configValue = doubleVal;
+                        } catch (const std::exception&) {
+                            // Try parsing as vector
+                            try {
+                                std::vector<int> intVec = JsonUtils::parseVector<int>(valueStr);
+                                if (!intVec.empty()) {
+                                    configValue = intVec;
+                                } else {
+                                    configValue = valueStr;  // Fall back to string
+                                }
+                            } catch (const std::exception&) {
+                                try {
+                                    std::vector<double> doubleVec = JsonUtils::parseVector<double>(valueStr);
+                                    if (!doubleVec.empty()) {
+                                        configValue = doubleVec;
+                                    } else {
+                                        configValue = valueStr;  // Fall back to string
+                                    }
+                                } catch (const std::exception&) {
+                                    configValue = valueStr;  // Final fallback to string
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            set(key, configValue, ConfigSource::File);
+            
+        } catch (const std::exception& e) {
+            NLM_LOG_WARNING(std::string("Config: Error parsing line ") + std::to_string(lineNumber) + ": " + e.what());
+            continue;
         }
     }
     
@@ -84,9 +251,50 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write configuration in key=value format with descriptions
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Visit the value and write it in an appropriate format
+        std::visit([&file](auto&& value) {
+            using T = std::decay_t<decltype(value)>;
+            
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings to preserve formatting
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (value ? "true" : "false");
+            } else if constexpr (std::is_arithmetic_v<T>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]";
+            } else {
+                // Default fallback for unknown types
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
