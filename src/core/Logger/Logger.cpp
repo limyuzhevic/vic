@@ -4,14 +4,25 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <atomic>
+#include <filesystem>
+#include <algorithm>
+#include <cctype>
 
 namespace nlm {
 
+// ConsoleLogger implementation
 struct ConsoleLogger::Impl {
     LogLevel level = LogLevel::Info;
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    std::string filepath;
+    size_t maxFileSize = 10 * 1024 * 1024;  // 10 MB
+    int fileRotationCount = 5;
+    size_t currentFileSize = 0;
+    
+    std::shared_ptr<LogFormatter> formatter = std::make_shared<ColoredFormatter>();
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -29,83 +40,243 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
-    std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
+    // Format the message
+    std::string formattedMessage = pImpl->formatter->format(entry);
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Write to console
+    writeToConsole(formattedMessage);
     
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
-    
-    // Console output
-    if (pImpl->useColors) {
-        std::cout << levelToColor(entry.level) << output << "\033[0m\n";
-    } else {
-        std::cout << output << "\n";
-    }
-    
-    // File output if set
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
-    }
+    // Write to file if set
+    writeToFile(formattedMessage);
 }
 
 void ConsoleLogger::setLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->level = level;
 }
 
 LogLevel ConsoleLogger::getLevel() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->level;
 }
 
+void ConsoleLogger::setFormatter(std::shared_ptr<LogFormatter> formatter) {
+    if (formatter) {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        pImpl->formatter = formatter;
+    }
+}
+
+std::shared_ptr<LogFormatter> ConsoleLogger::getFormatter() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    return pImpl->formatter;
+}
+
 void ConsoleLogger::setUseColors(bool useColors) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->useColors = useColors;
 }
 
 bool ConsoleLogger::getUseColors() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     return pImpl->useColors;
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->filepath = filepath;
+    ensureFileOpen();
 }
 
 void ConsoleLogger::closeOutputFile() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
 }
 
-std::string ConsoleLogger::levelToString(LogLevel level) const {
-    switch (level) {
-        case LogLevel::Debug: return "DEBUG";
-        case LogLevel::Info: return "INFO";
-        case LogLevel::Warning: return "WARN";
-        case LogLevel::Error: return "ERROR";
-        case LogLevel::Critical: return "CRIT";
-        default: return "UNKNOWN";
+void ConsoleLogger::ensureFileOpen() {
+    if (!pImpl->filepath.empty() && !pImpl->fileOut.is_open()) {
+        pImpl->fileOut.open(pImpl->filepath, std::ios::app);
+        if (pImpl->fileOut.is_open()) {
+            // Get file size for rotation check
+            pImpl->fileOut.seekp(0, std::ios::end);
+            pImpl->currentFileSize = pImpl->fileOut.tellp();
+        }
     }
 }
 
-std::string ConsoleLogger::levelToColor(LogLevel level) const {
-    switch (level) {
-        case LogLevel::Debug: return "\033[36m";    // Cyan
-        case LogLevel::Info: return "\033[32m";      // Green
-        case LogLevel::Warning: return "\033[33m";   // Yellow
-        case LogLevel::Error: return "\033[31m";     // Red
-        case LogLevel::Critical: return "\033[35m"; // Magenta
-        default: return "\033[0m";
+void ConsoleLogger::writeToConsole(const std::string& formattedMessage) {
+    if (pImpl->useColors) {
+        std::cout << formattedMessage << "\n";
+    } else {
+        std::cout << formattedMessage << "\n";
     }
 }
 
-// Logger class implementation
+void ConsoleLogger::writeToFile(const std::string& formattedMessage) {
+    if (!pImpl->filepath.empty() && pImpl->fileOut.is_open()) {
+        pImpl->fileOut << formattedMessage << "\n";
+        pImpl->currentFileSize += formattedMessage.size() + 1;  // +1 for newline
+        
+        // Rotate if needed
+        rotateIfNeeded();
+        
+        pImpl->fileOut.flush();
+    }
+}
+
+void ConsoleLogger::rotateIfNeeded() {
+    if (pImpl->currentFileSize >= pImpl->maxFileSize) {
+        closeOutputFile();
+        
+        // Rotate files
+        std::error_code ec;
+        for (int i = pImpl->fileRotationCount - 1; i >= 0; --i) {
+            std::string from = pImpl->filepath;
+            std::string to = pImpl->filepath;
+            
+            if (i < pImpl->fileRotationCount - 1) {
+                from += "." + std::to_string(i + 1);
+            } else {
+                from += "." + std::to_string(i);
+            }
+            
+            if (i < pImpl->fileRotationCount - 1) {
+                to += "." + std::to_string(i + 2);
+            } else {
+                to += "." + std::to_string(i + 1);
+            }
+            
+            std::filesystem::rename(from, to, ec);
+        }
+        
+        // Create new file
+        ensureFileOpen();
+        pImpl->currentFileSize = 0;
+    }
+}
+
+// FileLogger implementation
+struct FileLogger::Impl {
+    std::ofstream fileOut;
+    LogLevel level = LogLevel::Info;
+    std::string filepath;
+    size_t maxFileSize = 10 * 1024 * 1024;  // 10 MB
+    int maxFiles = 5;
+    size_t currentFileSize = 0;
+    std::mutex mutex;
+    
+    std::shared_ptr<LogFormatter> formatter = std::make_shared<TextFormatter>();
+    std::atomic<bool> shouldRotate{false};
+};
+
+FileLogger::FileLogger() : pImpl(std::make_unique<Impl>()) {}
+
+FileLogger::FileLogger(const std::string& filepath, LogLevel level) : pImpl(std::make_unique<Impl>()) {
+    setOutputFile(filepath);
+    pImpl->level = level;
+}
+
+FileLogger::~FileLogger() = default;
+
+void FileLogger::log(const LogEntry& entry) {
+    if (entry.level < pImpl->level) {
+        return;
+    }
+    
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Format the message
+    std::string formattedMessage = pImpl->formatter->format(entry);
+    
+    // Write to file
+    fileOut << formattedMessage << "\n";
+    currentFileSize += formattedMessage.size() + 1;  // +1 for newline
+    
+    // Rotate if needed
+    rotateIfNeeded();
+    
+    fileOut.flush();
+}
+
+void FileLogger::setLevel(LogLevel level) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->level = level;
+}
+
+LogLevel FileLogger::getLevel() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    return pImpl->level;
+}
+
+void FileLogger::setFormatter(std::shared_ptr<LogFormatter> formatter) {
+    if (formatter) {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        pImpl->formatter = formatter;
+    }
+}
+
+std::shared_ptr<LogFormatter> FileLogger::getFormatter() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    return pImpl->formatter;
+}
+
+void FileLogger::setMaxFileSize(size_t maxSizeBytes) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->maxFileSize = maxSizeBytes;
+}
+
+void FileLogger::setMaxFiles(int maxFiles) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    pImpl->maxFiles = maxFiles;
+}
+
+std::string FileLogger::getCurrentLogFile() const {
+    return pImpl->filepath;
+}
+
+void FileLogger::rotateIfNeeded() {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    if (currentFileSize >= pImpl->maxFileSize) {
+        if (fileOut.is_open()) {
+            fileOut.close();
+        }
+        
+        // Rotate files
+        std::error_code ec;
+        for (int i = pImpl->maxFiles - 1; i >= 0; --i) {
+            std::string from = pImpl->filepath;
+            std::string to = pImpl->filepath;
+            
+            if (i < pImpl->maxFiles - 1) {
+                from += "." + std::to_string(i + 1);
+            } else {
+                from += "." + std::to_string(i);
+            }
+            
+            if (i < pImpl->maxFiles - 1) {
+                to += "." + std::to_string(i + 2);
+            } else {
+                to += "." + std::to_string(i + 1);
+            }
+            
+            std::filesystem::rename(from, to, ec);
+        }
+        
+        // Create new file
+        fileOut.open(pImpl->filepath, std::ios::trunc);
+        currentFileSize = 0;
+    }
+}
+
+// Logger implementation
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    std::shared_ptr<LogFormatter> globalFormatter;
+    std::atomic<bool> shouldRotate{false};
 };
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
@@ -113,8 +284,10 @@ Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    if (logger) {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        pImpl->loggers.push_back(logger);
+    }
 }
 
 void Logger::clearLoggers() {
@@ -129,19 +302,26 @@ void Logger::setLevel(LogLevel level) {
     }
 }
 
-void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
+void Logger::setFormatter(std::shared_ptr<LogFormatter> formatter) {
+    if (formatter) {
+        std::lock_guard<std::mutex> lock(pImpl->mutex);
+        pImpl->globalFormatter = formatter;
+        for (auto& logger : pImpl->loggers) {
+            logger->setFormatter(formatter);
+        }
+    }
+}
+
+void Logger::log(LogLevel level, const std::string& message, 
+                 const std::string& file, int line, 
+                 const std::string& function) {
+    LogEntry entry(level, message, file, line, function);
+    
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    LogEntry entry;
-    entry.level = level;
-    entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
-    entry.timestamp = std::chrono::system_clock::now();
-    
     for (auto& logger : pImpl->loggers) {
+        if (pImpl->globalFormatter) {
+            logger->setFormatter(pImpl->globalFormatter);
+        }
         logger->log(entry);
     }
 }
@@ -176,27 +356,32 @@ bool Logger::isEnabled(LogLevel level) const {
     return false;
 }
 
-static std::shared_ptr<Logger>& globalLoggerPtr() {
-    static std::shared_ptr<Logger> ptr = std::make_shared<Logger>();
-    return ptr;
+Logger::LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
+    : level_(level), file_(file), line_(line), function_(function) {}
+
+Logger::LogStream::~LogStream() {
+    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
 }
 
+// Global logger singleton
+static std::shared_ptr<Logger> globalLoggerPtr;
+static std::mutex globalLoggerMutex;
+
 Logger& Logger::getGlobal() {
-    return *globalLoggerPtr();
+    std::lock_guard<std::mutex> lock(globalLoggerMutex);
+    if (!globalLoggerPtr) {
+        globalLoggerPtr = std::make_shared<Logger>();
+        auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        globalLoggerPtr->addLogger(consoleLogger);
+    }
+    return *globalLoggerPtr;
 }
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     if (logger) {
-        globalLoggerPtr() = logger;
+        std::lock_guard<std::mutex> lock(globalLoggerMutex);
+        globalLoggerPtr = logger;
     }
-}
-
-// LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
-
-LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
 }
 
 } // namespace nlm
