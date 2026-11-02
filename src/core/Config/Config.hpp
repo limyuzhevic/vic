@@ -6,6 +6,7 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_set>
 
 namespace nlm {
 
@@ -56,22 +57,22 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML compatible with enhanced key=value support)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
+    // Load from command line arguments with enhanced parsing
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file with comprehensive metadata
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -92,8 +93,15 @@ template<typename T>
     // Clear all
     void clear();
     
-    // Get configuration summary
+    // Get configuration summary with enhanced details
     std::string summary() const;
+    
+    // Advanced configuration features
+    bool validate() const;                           // Validate configuration
+    std::vector<std::string> getValidationErrors() const;  // Get validation error messages
+    bool merge(const Config& other);                // Merge another config
+    bool saveAsJSON(const std::string& filepath) const;    // Save as JSON format
+    bool loadFromJSON(const std::string& content);         // Load from JSON string
     
 private:
     struct Impl;
@@ -102,6 +110,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getValueString(const ConfigValue& value);
+    
+    // Advanced parsing methods
+    void parseAndSetValue(const std::string& key, const std::string& value, ConfigSource source);
+    void parseVectorValue(const std::string& key, const std::string& value, ConfigSource source);
+    void parseArrayContent(const std::string& key, const std::string& content, ConfigSource source);
+    void parseListValue(const std::string& key, const std::string& value, ConfigSource source);
 };
 
 } // namespace nlm

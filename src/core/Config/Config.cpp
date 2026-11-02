@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <limits>
+#include <unordered_set>
 
 namespace nlm {
 
@@ -19,77 +22,353 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first (if nlohmann::json is available)
+    // For now, use the simple key=value format
     std::string line;
+    bool hasValidEntries = false;
+    size_t lineNumber = 0;
+    
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNumber;
         line = trim(line);
+        
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (pos == std::string::npos) {
+            std::cerr << "Warning: Invalid config format at line " << lineNumber 
+                     << ": '" << line << "' (missing '=')" << std::endl;
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key
+        if (key.empty()) {
+            std::cerr << "Warning: Empty key at line " << lineNumber << std::endl;
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '\"' && value.back() == '\"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Handle different value types intelligently
+        parseAndSetValue(key, value, ConfigSource::File);
+        hasValidEntries = true;
+    }
+    
+    return hasValidEntries;
+}
+
+void Config::parseAndSetValue(const std::string& key, const std::string& value, ConfigSource source) {
+    // Try to parse as different types in order of specificity
+    bool parsed = false;
+    
+    // Try boolean first (true/false, yes/no, on/off)
+    if (!parsed) {
+        std::string lowerValue = toLower(value);
+        if (lowerValue == "true" || lowerValue == "yes" || lowerValue == "on" || lowerValue == "1") {
+            set(key, true, source);
+            parsed = true;
+        } else if (lowerValue == "false" || lowerValue == "no" || lowerValue == "off" || lowerValue == "0") {
+            set(key, false, source);
+            parsed = true;
         }
     }
     
-    return true;
+    // Try integer
+    if (!parsed) {
+        try {
+            size_t pos = 0;
+            long int intValue = std::stol(value, &pos);
+            if (pos == value.size()) {
+                set(key, intValue, source);
+                parsed = true;
+            }
+        } catch (...) {}
+    }
+    
+    // Try int64_t
+    if (!parsed) {
+        try {
+            size_t pos = 0;
+            long long intValue = std::stoll(value, &pos);
+            if (pos == value.size()) {
+                set(key, intValue, source);
+                parsed = true;
+            }
+        } catch (...) {}
+    }
+    
+    // Try floating point
+    if (!parsed) {
+        try {
+            size_t pos = 0;
+            double floatValue = std::stod(value, &pos);
+            if (pos == value.size()) {
+                // Check if it looks like an integer (e.g., "42.0") and store as int
+                if (value.find('.') != std::string::npos && value.find('.') + 1 < value.size()) {
+                    // Has fractional part, store as double
+                    set(key, floatValue, source);
+                } else {
+                    // Looks like integer, store as int
+                    set(key, static_cast<int>(floatValue), source);
+                }
+                parsed = true;
+            }
+        } catch (...) {}
+    }
+    
+    // Try vector types
+    if (!parsed) {
+        parseVectorValue(key, value, source);
+    }
+    
+    // Fall back to string
+    if (!parsed) {
+        set(key, value, source);
+    }
+}
+
+void Config::parseVectorValue(const std::string& key, const std::string& value, ConfigSource source) {
+    // Try to parse as JSON array first (simplified detection)
+    if (value.front() == '[' && value.back() == ']') {
+        // Try to parse as JSON array of basic types
+        std::string content = value.substr(1, value.size() - 2);
+        parseArrayContent(key, content, source);
+    } else if (value.find(';') != std::string::npos || value.find(',') != std::string::npos) {
+        // Parse as comma or semicolon separated list
+        parseListValue(key, value, source);
+    }
+}
+
+void Config::parseArrayContent(const std::string& key, const std::string& content, ConfigSource source) {
+    // Simplified JSON array parsing
+    std::vector<std::string> elements;
+    size_t start = 0;
+    bool inQuotes = false;
+    char quoteChar = '\0';
+    
+    for (size_t i = 0; i <= content.size(); ++i) {
+        if (i == content.size() || (content[i] == ',' && !inQuotes)) {
+            if (start < i) {
+                std::string element = content.substr(start, i - start);
+                element = trim(element);
+                if (!element.empty()) {
+                    elements.push_back(element);
+                }
+            }
+            start = i + 1;
+        } else if (content[i] == '\"' || content[i] == '\'') {
+            if (!inQuotes) {
+                inQuotes = true;
+                quoteChar = content[i];
+            } else if (quoteChar == content[i]) {
+                inQuotes = false;
+                quoteChar = '\0';
+            }
+        }
+    }
+    
+    if (!elements.empty()) {
+        // Try to infer the type of the first element to determine vector type
+        std::string firstElement = elements[0];
+        bool allInts = true;
+        bool allFloats = true;
+        
+        for (const auto& element : elements) {
+            try {
+                std::stoll(element);
+            } catch (...) {
+                allInts = false;
+            }
+            try {
+                std::stod(element);
+            } catch (...) {
+                allFloats = false;
+            }
+        }
+        
+        if (allInts) {
+            std::vector<int64_t> intVec;
+            intVec.reserve(elements.size());
+            for (const auto& element : elements) {
+                intVec.push_back(std::stoll(element));
+            }
+            set(key, intVec, source);
+        } else if (allFloats) {
+            std::vector<double> floatVec;
+            floatVec.reserve(elements.size());
+            for (const auto& element : elements) {
+                floatVec.push_back(std::stod(element));
+            }
+            set(key, floatVec, source);
+        } else {
+            // Fall back to string vector
+            std::vector<std::string> stringVec;
+            stringVec.reserve(elements.size());
+            for (const auto& element : elements) {
+                // Remove quotes from string elements
+                std::string cleanElement = element;
+                if ((cleanElement.front() == '\"' && cleanElement.back() == '\"') ||
+                    (cleanElement.front() == '\'' && cleanElement.back() == '\'')) {
+                    cleanElement = cleanElement.substr(1, cleanElement.size() - 2);
+                }
+                stringVec.push_back(cleanElement);
+            }
+            set(key, stringVec, source);
+        }
+    }
+}
+
+void Config::parseListValue(const std::string& key, const std::string& value, ConfigSource source) {
+    std::vector<std::string> elements;
+    size_t start = 0;
+    char delimiter = (value.find(';') != std::string::npos) ? ';' : ',';
+    
+    for (size_t i = 0; i <= value.size(); ++i) {
+        if (i == value.size() || value[i] == delimiter) {
+            if (start < i) {
+                std::string element = value.substr(start, i - start);
+                element = trim(element);
+                if (!element.empty()) {
+                    elements.push_back(element);
+                }
+            }
+            start = i + 1;
+        }
+    }
+    
+    if (!elements.empty()) {
+        set(key, elements, source);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Track which keys we've seen to detect conflicts
+    std::unordered_set<std::string> seenKeys;
+    std::vector<std::string> conflicts;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        // Parse --key=value or -key value format
+        bool isLongOption = (arg.substr(0, 2) == "--");
+        bool isShortOption = (arg[0] == '-' && arg.size() > 1 && arg[1] != '-');
+        
+        if (!isLongOption && !isShortOption) {
+            // Could be a file path or other argument
+            continue;
+        }
+        
+        std::string key;
+        std::string value;
+        
+        if (isLongOption) {
+            // Handle --key=value format
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                key = arg.substr(2, pos - 2);
+                value = arg.substr(pos + 1);
+            } else {
+                // Handle --key value format (alternative)
+                key = arg.substr(2);
+                value = "true";  // Default value for flag
+            }
+        } else {
+            // Handle -key value format
+            key = arg.substr(1);
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                value = argv[++i];
+            } else {
+                value = "true";  // Default value for flag
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+        
+        // Track key usage for conflict detection
+        if (seenKeys.find(key) != seenKeys.end()) {
+            conflicts.push_back(key);
+        } else {
+            seenKeys.insert(key);
+        }
+        
+        // Parse and set the value with better error handling
+        parseAndSetValue(key, value, ConfigSource::CommandLine);
+    }
+    
+    // Report conflicts if any
+    if (!conflicts.empty()) {
+        std::cerr << "Warning: Potential key conflicts detected in command line arguments:" << std::endl;
+        for (const auto& key : conflicts) {
+            std::cerr << "  --" << key << " (appears multiple times)" << std::endl;
         }
     }
+    
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        std::cerr << "Error: Cannot open file for writing: " << filepath << std::endl;
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM Configuration System\n";
+    file << "# Format: key = value (type preserved)\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# " << entry.key << " = " << "(type: ";
+        
+        // Describe the value type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) file << "int";
+            else if constexpr (std::is_same_v<T, int64_t>) file << "int64_t";
+            else if constexpr (std::is_same_v<T, double>) file << "double";
+            else if constexpr (std::is_same_v<T, bool>) file << "bool";
+            else if constexpr (std::is_same_v<T, std::string>) file << "string";
+            else if constexpr (std::is_same_v<T, std::vector<int>>) file << "int[]";
+            else if constexpr (std::is_same_v<T, std::vector<double>>) file << "double[]";
+            else if constexpr (std::is_same_v<T, std::vector<std::string>>) file << "string[]";
+            else file << "unknown";
+        }, entry.value);
+        
+        file << ")\n";
+        file << entry.key << " = " << getValueString(entry.value) << "\n\n";
     }
     
     return true;
+}
+
+std::string Config::getValueString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (arg ? "true" : "false");
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
