@@ -16,12 +16,16 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../plasticity/PlasticityRule.hpp"
+#include "../dynamics/NeuralDynamics.hpp"
 #include <fstream>
 #include <algorithm>
 #include <unordered_map>
 #include <cmath>
 #include <cstring>
 #include <sstream>
+#include <map>
+#include <chrono>
 
 namespace nlm {
 
@@ -1579,13 +1583,5 @@ void Brain::logStatus() const {
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
-    }
 }
-
-} // namespace nlm
+}

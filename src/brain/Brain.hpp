@@ -10,6 +10,8 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <map>
 
 namespace nlm {
 
@@ -30,6 +32,113 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+
+// Statistical data structures
+struct NeuronStatistics {
+    size_t neuronId;
+    float membranePotential;
+    float refractoryTime;
+    float lastSpikeTime;
+    size_t spikeCount;
+    float averageFiringRate;
+    float inputCurrent;
+    float outputCurrent;
+};
+
+struct SynapseStatistics {
+    SynapseId synapseId;
+    NeuronId sourceNeuron;
+    NeuronId destinationNeuron;
+    float weight;
+    float delay;
+    float eligibilityTrace;
+    float preSpikeHistory;
+    float postSpikeHistory;
+    size_t connectionCount;
+};
+
+struct RegionStatistics {
+    RegionId regionId;
+    std::string name;
+    size_t neuronCount;
+    size_t synapseCount;
+    float averageFiringRate;
+    float excitationInhibitionRatio;
+    float totalInput;
+    float totalOutput;
+};
+
+struct MemoryStatistics {
+    size_t workingMemorySize;
+    size_t episodicMemorySize;
+    size_t associativeMemorySize;
+    float workingMemoryActivation;
+    float episodicReplayFrequency;
+    float consolidationRate;
+};
+
+struct PredictionStatistics {
+    float predictionAccuracy;
+    float predictionError;
+    float confidence;
+    size_t predictionCount;
+    float averagePredictionTime;
+};
+
+struct CognitionStatistics {
+    float planningAccuracy;
+    float conceptClarity;
+    float attentionFocus;
+    float cognitiveLoad;
+    size_t planningSteps;
+    float conceptFormationRate;
+};
+
+struct NeuromodulationStatistics {
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+    float predictionErrorLevel;
+    float neuromodulationStrength;
+    size_t neuromodulationEvents;
+};
+
+struct PlasticityStatistics {
+    float stdpLTPRate;
+    float stdpLTDRate;
+    float hebbianLearningRate;
+    float structuralPlasticityRate;
+    size_t plasticityEvents;
+    float homeostaticCorrection;
+};
+
+struct DevelopmentStatistics {
+    DevelopmentalStage developmentalStage;
+    float developmentalAge;
+    float plasticityModifier;
+    float criticalPeriodActive;
+    size_t developmentEvents;
+    float maturationProgress;
+};
+
+struct PerformanceMetrics {
+    float simulationSpeed;
+    float energyEfficiency;
+    float memoryUtilization;
+    float computationalLoad;
+    float accuracyScore;
+    float stabilityScore;
+};
+
+struct LearningStatistics {
+    float learningRate;
+    float explorationRate;
+    float exploitationRate;
+    size_t patternsLearned;
+    float patternRecallAccuracy;
+    float forgettingRate;
+    size_t trainingSessions;
+};
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
