@@ -135,6 +135,7 @@ target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 # Main executable
 add_executable(nlm
     src/main.cpp
+    src/error_handling.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
@@ -181,7 +182,7 @@ target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
+# but the root CMakeLists never built the module, so `pip install`
 # succeeded yet `import pynlm` failed. The option is OFF by default so
 # a plain C++ build needs no Python/pybind11; pyproject.toml turns it
 # ON. The standalone python/CMakeLists.txt build still works too, but
@@ -199,6 +200,15 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
     target_include_directories(pynlm PRIVATE src)
     install(TARGETS pynlm LIBRARY DESTINATION .)
+    
+    # Enhanced Python bindings (additional convenience functions)
+    option(NLM_BUILD_ENHANCED_PYTHON_BINDINGS "Build the enhanced pynlm_enhanced Python module" OFF)
+    if(NLM_BUILD_ENHANCED_PYTHON_BINDINGS)
+        pybind11_add_module(pynlm_enhanced python/bindings_enhanced.cpp)
+        target_link_libraries(pynlm_enhanced PRIVATE nlm_core nlm_agent nlm_world)
+        target_include_directories(pynlm_enhanced PRIVATE src)
+        install(TARGETS pynlm_enhanced LIBRARY DESTINATION .)
+    endif()
 endif()
 
 # Testing
