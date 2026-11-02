@@ -71,21 +71,7 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
-
-## Simple Analogy
-
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
+### Example 3: The Simplest Possible Example
 
 ```python
 import pynlm
@@ -155,29 +141,112 @@ agent.enableCuriosity(True)             # Explore new things
 
 ---
 
-## What Each Part Does
+## The Simplest Possible Example
 
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+```python
+import pynlm
 
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
+# One line to create a virtual brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
 
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
+# Initialize it
+brain.initialize()
 
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
+# Make it active
+brain.step(0)
 
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
+print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+```
 
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
+---
+
+## Mini Projects
+
+### Project 1: Silent Brain (Just Neurons)
+
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+for i in range(10):
+    brain.step(i)
+
+print("Silent brain test done!")
+```
+
+### Project 2: Brain Watching a World
+
+```python
+import pynlm
+
+# Setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Watch the world for 30 steps
+for i in range(30):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(i)
+    
+print("Watched world for 30 steps")
+print("Firing rate:", brain.getAverageFiringRate())
+```
+
+### Project 3: Complete Agent
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
+# Run agent
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+print("Agent simulation complete!")
+```
+
+---
+
+## Quick Reference
+
+| What you want | Code |
+|--------------|------|
+| Create brain | `pynlm.createBrain(config)` |
+| Start brain | `brain.initialize()` |
+| Make brain think | `brain.step(step)` |
+| Create world | `pynlm.createSimpleWorld()` |
+| Create agent | `pynlm.createAgentBrain(brain)` |
+| Get brain stats | `brain.getFiringNeuronCount()` |
+| See world | `world.getSensoryPercept()` |
+| Make action | `agent.decodeMotorCommand()` |
 
 ---
 
@@ -295,3 +364,5 @@ When you're comfortable:
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+If you have any questions or run into issues, check the troubleshooting section above or look at the more detailed documentation in `HOW_TO_USE.md`.
