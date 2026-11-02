@@ -16,11 +16,16 @@ public:
     ~PredictionSystem();
     
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
+    // PLACEHOLDER: Return current state as prediction for now
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
+    
+    // Update prediction system with new observation and compute prediction error
+    // This is called periodically by the brain to train prediction models
+    void update(TimestepDuration dt);
     
     // Get prediction error
     float getPredictionError() const;

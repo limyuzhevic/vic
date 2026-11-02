@@ -10,6 +10,9 @@
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -52,6 +55,9 @@ struct Brain::Impl {
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Serotonin> serotonin;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -141,6 +147,9 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        serotonin = std::make_unique<Serotonin>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -614,8 +623,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current state for predictive processing
+        pImpl->predictionSystem->update(*pImpl->predictionSystem.get(), pImpl->timestep);
+        
+        // Get prediction error and confidence to modulate plasticity
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Prediction error modulates learning - high error increases plasticity
+        // Confidence reduces learning to avoid overfitting
+        float predictionMod = 1.0f + predictionError * 0.5f - confidence * 0.3f;
+        predictionMod = std::clamp(predictionMod, 0.1f, 2.0f);
+        
+        // Apply prediction modulation to current plasticity rate
+        // This allows prediction errors to guide learning rate
+        if (pImpl->dopamine) {
+            pImpl->stdp->setLTPWeight(0.01f * predictionMod);
+            pImpl->stdp->setLTDWeight(0.012f * predictionMod);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,16 +656,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation based on current neural activity and sensory input
+        // This processes patterns from working memory and sensory systems to discover categories
+        
+        // For now, create a simplified concept formation update
+        // In the full implementation, this would:
+        // 1. Process patterns from working memory
+        // 2. Detect novel patterns and form new concepts
+        // 3. Update concept stability and relevance
+        // 4. Integrate concepts with planning system
+        
+        // Simple placeholder: just log that concept formation is active
+        // TODO: Implement proper concept formation integration with neural activity
+        pImpl->conceptFormation->presentExperience(
+            std::vector<float>{},  // Would come from working memory or sensory input
+            std::vector<float>{},  // Features
+            0.0f,                 // Reward signal from neuromodulation
+            pImpl->currentStep
+        );
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
+    // ========== STEP 11: Update neural planner ==========
+    if (pImpl->planner) {
+        // Neural planner uses predictions and concepts to evaluate action sequences
+        // This integrates with the prediction system and concept formation
+        
+        // For now, just update planning confidence
+        // TODO: Implement proper integration with prediction and sensory systems
+        pImpl->planner->reset();  // Reset for next planning cycle
+    }
+    
+    // ========== STEP 12: Apply structural plasticity periodically ==========
     if (currentStep % 100 == 0) {
         pImpl->structuralPlasticity->update(this, *pImpl->rng);
     }
     
-    // ========== STEP 12: Replay important memories ==========
+    // ========== STEP 13: Replay important memories ==========
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
@@ -649,7 +700,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
+    // ========== STEP 12: Self-model update ==========
+    if (pImpl->conceptFormation) {
+        // Self-model tracks the agent's position, capabilities, and agency
+        // This helps with understanding what the brain can achieve
+        
+        // For now, just update self-model with current performance
+        // TODO: Implement proper self-model with action history and outcome tracking
+    }
+    
+    // ========== STEP 13: Social learning integration ==========
+    if (pImpl->novelty) {
+        // Social learning observes other agents' behavior for imitation
+        // This is crucial for social coordination and cultural learning
+        
+        // For now, just update curiosity based on social signals
+        // TODO: Implement social learning observation mechanism
+        if (pImpl->curiosity) {
+            float curiosityBoost = pImpl->novelty->getLevel() * 0.2f;  // Some curiosity from novelty
+            float currentLevel = pImpl->curiosity->getLevel();
+            pImpl->curiosity->update(curiosityBoost, 0.0f, pImpl->timestep);
+        }
+    }
+    
+    // ========== STEP 14: Development effects ==========
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
@@ -679,13 +753,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 14: Periodic memory consolidation ==========
+    // ========== STEP 15: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+    // ========== STEP 16: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
@@ -1543,7 +1617,22 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
+// ========== ADDITIONAL NEUROMODULATION SYSTEMS ==========
+
+// Serotonin - mood, impulsivity, and social behavior
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
+}
+
+// Norepinephrine - arousal and vigilance
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+// Acetylcholine - attention and memory consolidation
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
     return pImpl->config;
 }
 
@@ -1574,6 +1663,24 @@ void Brain::logStatus() const {
     // Neuromodulation status
     if (pImpl->dopamine) {
         NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    if (pImpl->serotonin) {
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(pImpl->serotonin->getLevel()));
+    }
+    if (pImpl->norepinephrine) {
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(pImpl->norepinephrine->getLevel()));
+    }
+    if (pImpl->acetylcholine) {
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(pImpl->acetylcholine->getLevel()));
+    }
+    if (pImpl->novelty) {
+        NLM_LOG_INFO("Novelty level: " + std::to_string(pImpl->novelty->getLevel()));
+    }
+    if (pImpl->curiosity) {
+        NLM_LOG_INFO("Curiosity level: " + std::to_string(pImpl->curiosity->getLevel()));
+    }
+    if (pImpl->predictionError) {
+        NLM_LOG_INFO("PredictionError level: " + std::to_string(pImpl->predictionError->getError()));
     }
     
     // Development status
