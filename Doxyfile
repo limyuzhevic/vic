@@ -1,0 +1,550 @@
+# Doxygen configuration for NLM (Neural Learning Machine)
+# Generated automatically for the unified command-line interface project
+
+# The PROJECT_NAME tag is a text string that should identify the project for which
+# the documentation is generated. This tag is used in the title of most generated
+# pages and in a few other places.
+PROJECT_NAME           = "NLM - Neural Learning Machine"
+
+# The PROJECT_NUMBER tag can be used to enter a project or revision number. This
+# could be handy for archiving the generated documentation or if some version
+# control system is used.
+PROJECT_NUMBER         = 0.1.0
+
+# The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute) path into
+# which the generated documentation will be written. If a relative path is entered,
+# it will be relative to the location where doxygen is run.
+OUTPUT_DIRECTORY      = docs/doxygen
+
+# If the CREATE_SUBDIRS tag is set to YES, then doxygen will create 4096 sub-directories
+# (in 2 levels) under the output directory of each output format, and all the .css
+# files in the stylesheets directory are being copied to each of these directories
+# as well. The "file://" protocol is NOT supported in the HTML output, but is
+# supported in the LATEX, RTF and DOCX output.
+CREATE_SUBDIRS        = NO
+
+# The PROJECT_BRIEF tag can be used to enter a project brief description which
+# appears at the beginning of the documentation.
+PROJECT_BRIEF         = "An experimental artificial developmental brain that implements real spiking neural computation"
+
+# The PROJECT_LOGO tag specifies a logo or an icon to be used as an identifier for
+# the project. The logo should be in PNG format. If no logo is specified,
+# doxygen will use a default logo.
+PROJECT_LOGO          = docs/nlm_logo.png
+
+# The OUTPUT_LANGUAGE tag is used to specify the language in which all
+# documentation comments are written. Doxygen will translate all comments
+# written in a different language.
+OUTPUT_LANGUAGE       = English
+
+# If the BRIEF_MEMBER_DESC tag is set to YES, doxygen will include brief member
+# descriptions after the members that are listed in the file and class
+# documentation pages, but before the implementation details.
+BRIEF_MEMBER_DESC     = YES
+
+# If the REPEAT_BRIEF tag is set to YES, doxygen will prepend the brief
+# description of a member or function before the detailed description. Note that
+# if a member or function has a brief description, the brief description is
+# included verbatim following the brief description of the preceding context,
+# unless there is a sub-section that describes the member or function in more
+# detail and the BRIEF_MEMBER_DESC tag is set to NO.
+REPEAT_BRIEF          = YES
+
+# If the INLINE_INCLUDES tag is set to YES, doxygen will include the content of
+# non-documentation includes in the documentation.
+INLINE_INCLUDES       = NO
+
+# If the USE_MDFILE_ASMAINPAGE tag refers to an existing file in the documentation,
+# but not in the source tree then it will be included in the main page (doxygenindex.html)
+# This can be useful if you have a separate documentation file that you want to
+# include in the main page.
+USE_MDFILE_ASMAINPAGE = docs/DoxygenOverview.md
+
+# The INPUT tag can be used to specify the files and/or directories that contain
+# documented source files. You can enter file names here or use a wildcard
+# expression that resolves to a matching files in the directory. If empty,
+# the current directory is assumed.
+INPUT                 = \
+    src/ \
+    src/brain/ \
+    src/core/ \
+    src/experiments/ \
+    src/experiments/Phase6IntegratedExperiment.hpp \
+    src/core/Config/Config.hpp \
+    src/core/CommandLineInterface.hpp \
+    docs/
+
+# This tag can be used to specify the relative or absolute path to the directory
+# where the documented classes are located. If left blank, the directory where
+# the documentation is generated will be used.
+EXCLUDE               = \
+    */build/ \
+    */.git/ \
+    */.vscode/ \
+    */.idea/ \
+    */cmake-build-*
+
+# The INPUT_FILTER tag can be used to specify a program that doxygen should
+# invoke to filter for each input file. Doxygen will invoke the filter program
+# under the shell:
+# <filter> <input-file>
+# If the FILTER_SOURCE_FILES tag is set to YES, the input filter (if set using
+# INPUT_FILTER) will be used to filter the input files when their contents are
+# read by doxygen.
+INPUT_FILTER          =
+
+# The FILTER_SOURCE_PATTERNS tag can be used to specify source patterns that
+# should be included in the filter (set using INPUT_FILTER). The patterns are
+# relative to the input directory and may contain wildcard characters.
+FILTER_SOURCE_PATTERNS = *.cpp;*.hpp;*.h;*.md
+
+# If the INLINE_GROUPED_CLASSES tag is set to YES, then doxygen will
+# show all grouped classes under the same header group.
+INLINE_GROUPED_CLASSES = NO
+
+# If the INCLUDE_GRAPH, INCLUDE_FILES, or HAVE_DOT tags are set to YES, then
+# doxygen will include the graph of all files included by a file.
+INCLUDE_GRAPH         = YES
+
+# If the INCLUDED_BY_GRAPH, INCLUDE_FILES, or HAVE_DOT tags are set to YES, then
+# doxygen will include the graph of all files included by a file.
+INCLUDED_BY_GRAPH     = YES
+
+# If the CALL_GRAPH, SOURCE_BROWSER and HAVE_DOT tags are set to YES then doxygen
+# will include the call graph for every global function, global method or class
+# method.
+CALL_GRAPH            = YES
+
+# If the CALLER_GRAPH, SOURCE_BROWSER and HAVE_DOT tags are set to YES then doxygen
+# will include the caller graph for every global function, global method or class
+# method.
+CALLER_GRAPH          = YES
+
+# If the GRAPHICAL_HIERARCHY, SOURCE_BROWSER and HAVE_DOT tags are set to YES then
+# doxygen will include a graphical hierarchy of all classes.
+GRAPHICAL_HIERARCHY   = YES
+
+# If the DIRECTORY_GRAPH, SOURCE_BROWSER and HAVE_DOT tags are set to YES,
+# doxygen will include the dependency graph between all source files.
+DIRECTORY_GRAPH       = YES
+
+# The DOT_IMAGE_FORMAT tag can be used to set the format of the generated images
+# by dot. Possible values are: svg, png, svg, png, emf, eps and dot.
+# Note: If you use the dot tool on a system with X11, the default value is svg.
+DOT_IMAGE_FORMAT      = svg
+
+# The DOT_TOOLTIP_GIF tag specifies the image file to be used as tooltip (instead
+# of .png) for the class and item graphs generated by dot. Note that .gif files
+# are not displayed when sources are included, but can be included in the same
+# page as the class and item graphs if the HAVE_DOT tag is set to YES.
+DOT_TOOLTIP_GIF       = YES
+
+# If the GENERATE_HTML tag is set to YES, doxygen will generate HTML output
+GENERATE_HTML         = YES
+
+# If the GENERATE_LATEX tag is set to YES, doxygen will generate the LATEX output
+GENERATE_LATEX        = NO
+
+# If the GENERATE_RTF tag is set to YES, doxygen will generate the RTF output
+GENERATE_RTF          = NO
+
+# If the GENERATE_MAN tag is set to YES, doxygen will generate a Unix man page
+GENERATE_MAN          = NO
+
+# If the GENERATE_XML tag is set to YES, doxygen will generate an XML file that
+# captures the structure of the code, comments and arguments etc. that doxygen
+# is able to analyze.
+GENERATE_XML          = YES
+
+# If the GENERATE_DOCSET tag is set to YES, doxygen will generate a DOCSET file
+# that can be used to create an Xcode Xcode 12 project.
+GENERATE_DOCSET       = NO
+
+# If the GENERATE_ANNOTATED tag is set to YES, doxygen will generate an
+# annotated version of the C++ source file that is a copy of the original file
+# with additions to indicate potential documentation in the comments and/or
+# function declarations.
+GENERATE_ANNOTATED    = YES
+
+# If the GENERATE_SQLITE tag is set to YES, doxygen will generate a SQLite database
+# file of all the documented classes, methods, and data structures.
+GENERATE_SQLITE       = NO
+
+# The GENERATE_HTML tag can be used to specify if the generated documentation
+# should be optimized for HTML (YES) or XHTML (NO). This applies to the HTML
+# output format only.
+HTML_COLORSTYLE_HUE   = 220
+HTML_COLORSTYLE_SAT   = 100
+HTML_COLORSTYLE_GAMMA = 80
+
+# The HTML_INDEX_NUM_ENTRIES tag specifies the number of entries in the HTML
+# index. This can be reduced to speed up the download time of the index.html.
+# Note: An entry will be generated for each symbol.
+HTML_INDEX_NUM_ENTRIES = 100
+
+# The HTML_EXTRA_STYLESHEET tag can be used to specify a set of cascading style
+# sheets that are included after the standard style sheets created by doxygen.
+# This tag must be a list of .css files. See also CSS_STYLE_SHEET
+# Note: This tag depends on the HTML output, so if the HTML output is disabled,
+# this tag will be ignored.
+HTML_EXTRA_STYLESHEET = docs/nlm_stylesheet.css
+
+# The HTML_EXTRA_FILES tag can be used to specify one or more extra images or
+# other source files which should be included in the HTML output. This can be
+# relative to the HTML output folder, or an absolute path to the folder itself.
+# See also HTML_EXTRA_STYLESHEET
+# Note: This tag depends on the HTML output, so if the HTML output is disabled,
+# this tag will be ignored.
+HTML_EXTRA_FILES     = \
+    docs/nlm_logo.png \
+    docs/neural_network_diagram.svg \
+    docs/brain_architecture.png
+
+# The LATEX_PAPER_SIZE tag can be used to set the paper size for the generated
+# LATEX documents.
+LATEX_PAPER_SIZE      = a4
+
+# The LATEX_FOOTER tag can be used to specify the footer text that appears at
+# the bottom of the generated LATEX documents.
+LATEX_FOOTER          = Copyright © 2026 NLM Research Team
+
+# The LATEX_EXTRA_FILES tag can be used to specify one or more extra images or
+# other source files which should be included in the LATEX output. This can be
+# relative to the LATEX output folder, or an absolute path to the folder itself.
+# See also HTML_EXTRA_FILES
+# Note: This tag depends on the LATEX output, so if the LATEX output is disabled,
+# this tag will be ignored.
+LATEX_EXTRA_FILES    = \
+    docs/nlm_logo.png
+
+# If the GENERATE_RTF tag is set to YES, doxygen will generate RTF output.
+RTF_EXTENSIONS        = NO
+
+# If the WORD_FORMAT tag is set to YES, doxygen will generate a Word document
+# RTF output that can be opened in Microsoft Word.
+WORD_FORMAT           = NO
+
+# If the GENERATE_MAN tag is set to YES, doxygen will generate a Unix man page.
+# The output is text formatted like man pages.
+MAN_INDEX_URL        = "nlm-main.html"
+
+# The MAN_SUBDIR tag specifies the directory to place the man pages in.
+# If left empty, the current directory is used.
+MAN_SUBDIR            = man
+
+# The MAN_EXTENSION tag specifies the extension of the man page files.
+# The default is: .3.
+MAN_EXTENSION        = .3
+
+# If the GENERATE_XML tag is set to YES, doxygen will generate an XML file that
+# captures the structure of the code, comments and arguments etc. that doxygen
+# is able to analyze.
+XML_OUTPUT           = xml
+
+# The XML_COMBINED_FILE tag can be used to make combined documentation in a single
+# XML file that combines the XML files of the different packages, classes, and so on.
+# See also XML_PROGRAMLISTING
+XML_COMBINED_FILE    = nlm_combined.xml
+
+# The XML_HEADER tag can be used to specify a custom header for the XML output.
+# If not specified, the standard doxygen XML header is used.
+XML_HEADER          = docs/nlm_xml_header.xml
+
+# The XML_NAMESPACE tag can be used to specify a custom namespace for the XML output.
+# If not specified, the doxygen default namespace is used.
+XML_NAMESPACE        = "https://github.com/nlm-research"
+
+# The XML_SCHEMA tag can be used to specify a custom schema for the XML output.
+# If not specified, the doxygen default schema is used.
+XML_SCHEMA          = schemas/nlm_schema.xsd
+
+# The XML_DOCSTRING_STYLE tag can be used to specify the style of the docstrings
+# for C++. If set to "JavaDoc", the docstrings will follow the JavaDoc documentation
+# style. If set to "Qt", the docstrings will follow the Qt documentation style.
+# If set to "Multi-line C++", the docstrings will be written with multiple lines
+# allowing line breaks. If set to "AsciiDoc", the docstrings will be in AsciiDoc format.
+XML_DOCSTRING_STYLE  = "Multi-line C++"
+
+# The XML_PROGRAMLISTING tag is used to specify the program listing (in text files)
+# that will be dumped by the XML writer. If set to YES, doxygen will dump the
+# program listing.
+XML_PROGRAMLISTING   = YES
+
+# The XML_KINDURLLENGTH tag can be used to specify the maximum length of the URLs
+# when linking to the XML documentation.
+XML_KINDURLLENGTH    = 1000
+
+# If you want doxygen to preserve the file extension of each file, use
+# FILE_EXTENSION instead of XML_FILE_EXTENSION.
+# Note: This option is only valid when using the XML output format.
+# The XML_FILE_EXTENSION tag is used to specify the extension for the
+# generated XML files.
+XML_FILE_EXTENSION   = .xml
+
+# The DOCSET_FEEDNAME tag specifies the name of the feed. It is used in the title of
+# the feed. The feed name is displayed in the list of feeds.
+DOCSET_FEEDNAME      = "NLM Documentation"
+
+# The DOCSET_BUNDLE_ID tag specifies the bundle ID of the documentation package.
+# It is used to identify the bundle when distributing documentation.
+DOCSET_BUNDLE_ID     = org.nlm.nlm
+
+# The DOCSET_PUBLISHER_NAME tag specifies the name of the organization that owns the
+# documentation package.
+DOCSET_PUBLISHER_NAME = "NLM Research Team"
+
+# The DOCSET_PUBLISHER_URL tag specifies the URL of the organization that owns the
+# documentation package.
+DOCSET_PUBLISHER_URL  = "https://github.com/nlm-research"
+
+# The DOCSET_GENERATOR tag specifies the tool used to generate the documentation
+# for the DOCSET package. The default value is doxygen for the XML-based DOCSET
+# generation.
+DOCSET_GENERATOR      = doxygen
+
+# The DOCSET_SLOT_ROLE_NAME tag specifies the role name of the docSet slot. This
+# role name is used when generating the DOCSET package to specify the role of each
+# slot in the resulting package. The role name is a single string that describes
+# the purpose of the slot in the package.
+DOCSET_SLOT_ROLE_NAME = "nlm-documentation"
+
+# The DOCSET_SLOT_FILE_PATH tag specifies the path to the file containing the
+# docSet slot information. It is used to generate the documentation package.
+DOCSET_SLOT_FILE_PATH = docs/nlm_docset_slot.xml
+
+# The DOCSET_FEEDURL tag specifies the URL of the documentation feed.
+DOCSET_FEEDURL       = "https://github.com/nlm-research/releases/latest/download/nlm-docs.docset.zip"
+
+# The DOCSET_COPYRIGHT tag specifies the copyright notice that appears in the
+# documentation feed. The default is: "Copyright © 2026 NLM Research Team."
+DOCSET_COPYRIGHT     = "Copyright © 2026 NLM Research Team"
+
+# The DOCSET_BUNDLE_VERSION tag specifies the version of the documentation package.
+DOCSET_BUNDLE_VERSION = "0.1.0"
+
+# The DOCSET_GENERATOR tag specifies the tool used to generate the documentation
+# for the DOCSET package. The default value is doxygen for the XML-based DOCSET
+# generation.
+DOCSET_GENERATOR      = doxygen
+
+# The GENERATE_ECLIPSEHELP tag determines if an Eclipse Help plugin should be
+# generated (YES). This option is only available if doxygen is compiled with
+# the MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_ECLIPSEHELP  = NO
+
+# The GENERATE_TEXHELP tag determines if a LaTeX help text (also known as
+# "extras" help) should be generated (YES). This option is only available if
+# doxygen is compiled with the MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_TEXHELP     = NO
+
+# The GENERATE_HTMLHELP tag determines if a help file in the .chm format should
+# be generated (YES). This option is only available if doxygen is compiled with
+# the MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_HTMLHELP    = YES
+
+# The CHM_FILE_NAME tag specifies the name of the resulting .chm file. You can
+# enter a file name without the .chm extension.
+CHM_FILE_NAME        = nlm-docs.chm
+
+# The HHC_LOCATION tag can be used to specify the location (absolute path or
+# relative URL) of the Windows help viewer (hh.exe). If left blank,
+# the default help viewer is used.
+HHC_LOCATION         = "C:/Program Files (x86)/Help Workshop/hh.exe"
+
+# The GENERATE_QHP tag determines if a Qt Help Project file should be generated
+# (YES). This option is only available if doxygen is compiled with the MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_QHP         = NO
+
+# The QHG_LOCATION tag can be used to specify the location (absolute path or
+# relative URL) of the Qt Help generator.
+QHG_LOCATION         = qt-help-generator
+
+# The GENERATE_CUSTOM_CSS tag determines if an extra customized CSS file will be
+# generated (YES). This option is only available if doxygen is compiled with
+# the MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_CUSTOM_CSS  = YES
+
+# The GENERATE_DOCSET tag determines if an Apple Help Book should be generated
+# (YES). This option is only available if doxygen is compiled with the 
+# MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_DOCSET      = NO
+
+# The GENERATE_HTMLEXTRA tag determines if an extra index file should be generated
+# (YES). This option is only available if doxygen is compiled with the
+# MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_HTMLEXTRA   = NO
+
+# The ENABLE_EXTERNAL_LINKS tag determines if external links should be opened in
+# a new browser tab (YES). This option is only available if doxygen is compiled
+# with the MOZILLA_HTML_SUPPORT option enabled.
+ENABLE_EXTERNAL_LINKS = YES
+
+# The USE_EXTERNAL_TOOLS tag determines if doxygen will use external tools to
+# generate the documentation (YES). This option is only available if doxygen is
+# compiled with the MOZILLA_HTML_SUPPORT option enabled.
+USE_EXTERNAL_TOOLS  = YES
+
+# The USE_MATHJAX tag determines if MathJax should be used for math formulas
+# (YES). This option is only available if doxygen is compiled with the
+# MOZILLA_HTML_SUPPORT option enabled.
+USE_MATHJAX          = YES
+
+# The MATHJAX_FORMAT tag specifies the MathJax format to use.
+# Can be: HTML-CSS, NativeMML or MathML
+MATHJAX_FORMAT       = HTML-CSS
+
+# The MATHJAX_RELPATH tag specifies the relationship between the MathJax package
+# and the documentation. It can be absolute or relative to the documentation.
+# The default value is: ../..
+MATHJAX_RELPATH      = "../.."
+
+# The MATHJAX_EXTENSIONS tag specifies a list of MathJax extensions to include.
+# The extensions are in the format: "EXTENSION_NAME", or "EXTENSION_NAME;EXTENSION_OPTIONS"
+MATHJAX_EXTENSIONS   = ["config.js"]
+
+# The MATHJAX_CDATA_TAG tag specifies a string that will be appended to the
+# MathJax script tag, just before the closing script tag, to insert a CDATA
+# block with the contents of the MathJax configuration. This can be used to
+# add custom JavaScript to MathJax.
+MATHJAX_CDATA_TAG    = ""
+
+# The GENERATED_DOCSET_FILE tag specifies the file that will be generated if
+# the GENERATE_DOCSET tag is set to YES. The name of the generated file
+# includes the Doxygen version, package and bundle ids.
+GENERATED_DOCSET_FILE = "nlm_${PROJECT_NUMBER}_${DOCSET_BUNDLE_ID}.docset.zip"
+
+# If the GENERATE_HTMLHELP tag is set to YES, doxygen generates a Windows help
+# file (a .chm file) that contains the generated HTML pages and a help viewer.
+# The contents of the help viewer are indexed in a file called .hhc. The
+# index, header and footer files are generated by doxygen if the
+# GENERATE_HTMLHELP tag is set to YES.
+# See also: http://msdn.microsoft.com/en-us/library/windows/desktop/aa820403.aspx
+GENERATE_HTMLHELP   = YES
+
+# The GENERATE_DOCSET tag determines if an Apple Help Book should be generated
+# (YES). This option is only available if doxygen is compiled with the
+# ENABLE_DOCSET option set to YES.
+GENERATE_DOCSET      = YES
+
+# The GENERATED_DOCSET_FILE tag specifies the file that will be generated if
+# the GENERATE_DOCSET tag is set to YES. The name of the generated file
+# includes the Doxygen version, package and bundle ids.
+GENERATED_DOCSET_FILE = "nlm_${PROJECT_NUMBER}_${DOCSET_BUNDLE_ID}.docset.zip"
+
+# If the GENERATE_HTMLHELP tag is set to YES, doxygen generates a Windows help
+# file (a .chm file) that contains the generated HTML pages and a help viewer.
+# The contents of the help viewer are indexed in a file called .hhc. The
+# index, header and footer files are generated by doxygen if the
+# GENERATE_HTMLHELP tag is set to YES.
+# See also: http://msdn.microsoft.com/en-us/library/windows/desktop/aa820403.aspx
+GENERATE_HTMLHELP   = YES
+
+# The GENERATE_QHP tag determines if a Qt Help Project file should be generated
+# (YES). This option is only available if doxygen is compiled with the
+# MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_QHP         = YES
+
+# The QHG_LOCATION tag can be used to specify the location (absolute path or
+# relative URL) of the Qt Help generator.
+QHG_LOCATION         = "C:/Qt/tools/QtCreator/bin/qhelpgenerator.exe"
+
+# The GENERATE_CUSTOM_CSS tag determines if an extra customized CSS file will be
+# generated (YES). This option is only available if doxygen is compiled with the
+# MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_CUSTOM_CSS  = YES
+
+# The GENERATE_HTMLEXTRA tag determines if an extra index file should be generated
+# (YES). This option is only available if doxygen is compiled with the
+# MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_HTMLEXTRA   = YES
+
+# The ENABLE_EXTERNAL_LINKS tag determines if external links should be opened in
+# a new browser tab (YES). This option is only available if doxygen is compiled
+# with the MOZILLA_HTML_SUPPORT option enabled.
+ENABLE_EXTERNAL_LINKS = YES
+
+# The USE_EXTERNAL_TOOLS tag determines if doxygen will use external tools to
+# generate the documentation (YES). This option is only available if doxygen is
+# compiled with the MOZILLA_HTML_SUPPORT option enabled.
+USE_EXTERNAL_TOOLS  = YES
+
+# The USE_MATHJAX tag determines if MathJax should be used for math formulas
+# (YES). This option is only available if doxygen is compiled with the
+# MOZILLA_HTML_SUPPORT option enabled.
+USE_MATHJAX          = YES
+
+# The MATHJAX_FORMAT tag specifies the MathJax format to use.
+# Can be: HTML-CSS, NativeMML or MathML
+MATHJAX_FORMAT       = HTML-CSS
+
+# The MATHJAX_RELPATH tag specifies the relationship between the MathJax package
+# and the documentation. It can be absolute or relative to the documentation.
+# The default value is: ../..
+MATHJAX_RELPATH      = "../.."
+
+# The MATHJAX_EXTENSIONS tag specifies a list of MathJax extensions to include.
+# The extensions are in the format: "EXTENSION_NAME", or "EXTENSION_NAME;EXTENSION_OPTIONS"
+MATHJAX_EXTENSIONS   = ["config.js"]
+
+# The MATHJAX_CDATA_TAG tag specifies a string that will be appended to the
+# MathJax script tag, just before the closing script tag, to insert a CDATA
+# block with the contents of the MathJax configuration. This can be used to
+# add custom JavaScript to MathJax.
+MATHJAX_CDATA_TAG    = ""
+
+# The GENERATED_DOCSET_FILE tag specifies the file that will be generated if
+# the GENERATE_DOCSET tag is set to YES. The name of the generated file
+# includes the Doxygen version, package and bundle ids.
+GENERATED_DOCSET_FILE = "nlm_${PROJECT_NUMBER}_${DOCSET_BUNDLE_ID}.docset.zip"
+
+# If the GENERATE_HTMLHELP tag is set to YES, doxygen generates a Windows help
+# file (a .chm file) that contains the generated HTML pages and a help viewer.
+# The contents of the help viewer are indexed in a file called .hhc. The
+# index, header and footer files are generated by doxygen if the
+# GENERATE_HTMLHELP tag is set to YES.
+# See also: http://msdn.microsoft.com/en-us/library/windows/desktop/aa820403.aspx
+GENERATE_HTMLHELP   = YES
+
+# The GENERATE_TEXHELP tag determines if a LaTeX help text (also known as
+# "extras" help) should be generated (YES). This option is only available if
+# doxygen is compiled with the MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_TEXHELP    = YES
+
+# The GENERATE_ECLIPSEHELP tag determines if an Eclipse Help plugin should be
+# generated (YES). This option is only available if doxygen is compiled with
+# the MOZILLA_HTML_SUPPORT option enabled.
+GENERATE_ECLIPSEHELP = YES
+
+# The ENABLE_EXTERNAL_LINKS tag determines if external links should be opened in
+# a new browser tab (YES). This option is only available if doxygen is compiled
+# with the MOZILLA_HTML_SUPPORT option enabled.
+ENABLE_EXTERNAL_LINKS = YES
+
+# The USE_EXTERNAL_TOOLS tag determines if doxygen will use external tools to
+# generate the documentation (YES). This option is only available if doxygen is
+# compiled with the MOZILLA_HTML_SUPPORT option enabled.
+USE_EXTERNAL_TOOLS  = YES
+
+# The USE_MATHJAX tag determines if MathJax should be used for math formulas
+# (YES). This option is only available if doxygen is compiled with the
+# MOZILLA_HTML_SUPPORT option enabled.
+USE_MATHJAX          = YES
+
+# The MATHJAX_FORMAT tag specifies the MathJax format to use.
+# Can be: HTML-CSS, NativeMML or MathML
+MATHJAX_FORMAT       = HTML-CSS
+
+# The MATHJAX_RELPATH tag specifies the relationship between the MathJax package
+# and the documentation. It can be absolute or relative to the documentation.
+# The default value is: ../..
+MATHJAX_RELPATH      = "../.."
+
+# The MATHJAX_EXTENSIONS tag specifies a list of MathJax extensions to include.
+# The extensions are in the format: "EXTENSION_NAME", or "EXTENSION_NAME;EXTENSION_OPTIONS"
+MATHJAX_EXTENSIONS   = ["config.js"]
+
+# The MATHJAX_CDATA_TAG tag specifies a string that will be appended to the
+# MathJax script tag, just before the closing script tag, to insert a CDATA
+# block with the contents of the MathJax configuration. This can be used to
+# add custom JavaScript to MathJax.
+MATHJAX_CDATA_TAG    = ""
