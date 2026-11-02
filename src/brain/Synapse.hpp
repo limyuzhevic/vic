@@ -85,6 +85,16 @@ public:
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
     
+    // Phase 4: Short-term plasticity (STP) helpers
+    void updateShortTermFacilitation(Timestamp currentTime);
+    void updateShortTermDepression(Timestamp currentTime);
+    void decayEligibilityTrace();
+    void clampWeightBounds();
+    
+    // Short-term state management
+    void updateLastSpikeTimes(Timestamp preTime, Timestamp postTime);
+    float computeTimeSinceActivity(Timestamp currentTime, Timestamp lastPreTime, Timestamp lastPostTime) const;
+    
 private:
     struct Impl;
     Impl* pImpl;

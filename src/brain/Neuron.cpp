@@ -188,7 +188,63 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+void Neuron::resetAdaptation() {
+    pImpl->state.adaptationVariable = 0.0f;
+}
+
+// LIF computation helpers
+float Neuron::computeLeakContribution(MembranePotential V, 
+                                     MembranePotential V_rest) const {
+    return (V_rest - V) / Impl::TIME_CONSTANT;
+}
+
+float Neuron::computeSynapticContribution(MembranePotential synapticInput) const {
+    return synapticInput / Impl::MEMBRANE_CAPACITANCE;
+}
+
+void Neuron::applySpikeFrequencyAdaptation(MembranePotential& V) {
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        V -= pImpl->state.adaptationVariable * 0.01f;
+        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    }
+}
+
+void Neuron::updateFiringRate(float dt, bool spiked) {
+    if (dt > 0.0) {
+        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+    }
+    
+    if (spiked && dt > 0.0) {
+        pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+    }
+}
+
+bool Neuron::handleSpiking(MembranePotential& V, Timestamp currentTime) {
+    bool fired = false;
+    
+    if (V >= pImpl->state.threshold) {
+        fired = true;
+        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+        
+        // Record spike
+        recordSpike(currentTime);
+        
+        // Reset membrane potential
+        V = pImpl->state.resetPotential;
+        
+        // Enter refractory period
+        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        pImpl->state.firingState = FiringState::Refractory;
+        
+        // Update adaptation for spike-frequency adaptation
+        pImpl->state.adaptationVariable += 1.0f;
+    }
+    
+    return fired;
+}
+
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
     // Handle refractory period
@@ -211,25 +267,20 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
     // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    float synapticContribution = computeSynapticContribution(pImpl->synapticInput);
     
     // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    float leakContribution = computeLeakContribution(V, V_rest);
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
-    }
+    applySpikeFrequencyAdaptation(V);
     
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
@@ -241,45 +292,13 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // dt is in seconds (0.001 in the demos), so a neuron firing every
     // step would approach 1000 Hz, and refractory periods cap it well
     // below that in practice.
-    if (dt > 0.0) {
-        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
-    }
-
-    // Check for spike
-    if (V >= threshold) {
-        fired = true;
-        if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
-        }
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
-        
-        // Record spike
-        recordSpike(currentTime);
-        
-        // Reset membrane potential
-        V = V_reset;
-        
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
-    } else {
-        pImpl->state.firingState = FiringState::Active;
-    }
+    bool spiked = handleSpiking(V, currentTime);
+    updateFiringRate(dt, spiked);
     
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
     
-    return fired;
-}
-
-void Neuron::step(Timestamp currentTime) {
-    // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
-    stepLIF(currentTime, dt);
+    return spiked;
 }
 
 void Neuron::reset() {
@@ -316,20 +335,79 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
-NeuronId Neuron::getId() const { return pImpl->id; }
-NeuronType Neuron::getType() const { return pImpl->type; }
-const NeuronState& Neuron::getState() const { return pImpl->state; }
-MembranePotential Neuron::getMembranePotential() const { return pImpl->state.membranePotential; }
-MembranePotential Neuron::getThreshold() const { return pImpl->state.threshold; }
-bool Neuron::isFiring() const { return pImpl->state.firingState == FiringState::Active; }
-bool Neuron::isRefractory() const { return pImpl->state.refractoryRemaining > 0; }
-FiringRate Neuron::getFiringRate() const { return pImpl->state.firingRate; }
-MembranePotential Neuron::getTotalCurrent() const { return pImpl->totalCurrent; }
-const std::vector<Timestamp>& Neuron::getSpikeHistory() const { return pImpl->spikeHistory; }
-const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const { return pImpl->incomingSynapses; }
-const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const { return pImpl->outgoingSynapses; }
-const PlasticityFlags& Neuron::getPlasticityFlags() const { return pImpl->plasticityFlags; }
-RegionId Neuron::getRegionId() const { return pImpl->regionId; }
-PopulationId Neuron::getPopulationId() const { return pImpl->populationId; }
+// Spike recording consolidation
+
+// Enhanced spike recording with statistics and analysis
+void Neuron::recordSpike(Timestamp timestamp) {
+    pImpl->spikeHistory.push_back(timestamp);
+    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    }
+}
+
+void Neuron::clearSpikeHistory() {
+    pImpl->spikeHistory.clear();
+}
+
+void Neuron::resetSpikeHistory() {
+    pImpl->spikeHistory.clear();
+}
+
+size_t Neuron::getSpikeCount() const {
+    return pImpl->spikeHistory.size();
+}
+
+Timestamp Neuron::getLastSpikeTime() const {
+    if (pImpl->spikeHistory.empty()) {
+        return -1.0f;
+    }
+    return pImpl->spikeHistory.back();
+}
+
+Timestamp Neuron::getFirstSpikeTime() const {
+    if (pImpl->spikeHistory.empty()) {
+        return -1.0f;
+    }
+    return pImpl->spikeHistory.front();
+}
+
+float Neuron::getLastSpikeInterval() const {
+    if (pImpl->spikeHistory.size() < 2) {
+        return -1.0f;
+    }
+    size_t size = pImpl->spikeHistory.size();
+    return pImpl->spikeHistory[size - 1] - pImpl->spikeHistory[size - 2];
+}
+
+float Neuron::getAverageInterSpikeInterval() const {
+    if (pImpl->spikeHistory.size() < 2) {
+        return -1.0f;
+    }
+    
+    float totalInterval = 0.0f;
+    size_t count = 0;
+    
+    for (size_t i = 1; i < pImpl->spikeHistory.size(); ++i) {
+        float interval = pImpl->spikeHistory[i] - pImpl->spikeHistory[i - 1];
+        totalInterval += interval;
+        count++;
+    }
+    
+    return totalInterval / static_cast<float>(count);
+}
+
+float Neuron::getFiringRate() const {
+    if (getLastSpikeTime() < 0.0f) {
+        return 0.0f;
+    }
+    
+    // Calculate firing rate based on spike history
+    float timeSpan = getLastSpikeTime() - getFirstSpikeTime();
+    if (timeSpan <= 0.0f) {
+        return 0.0f;
+    }
+    
+    return (static_cast<float>(getSpikeCount()) - 1.0f) / timeSpan * 1000.0f;  // Convert to Hz
+}
 
 } // namespace nlm

@@ -202,10 +202,28 @@ public:
     float getLearnedPreference() const;
     void setLearnedPreference(float preference);
     
-    // Logging
+// Logging
     void logStatus() const;
-    
+
 private:
+    // Phase 6: Integrated brain simulation helper methods
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateNeurons(SimulationStep currentStep, Timestamp currentTime);
+    void detectAndProcessSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemory();
+    void applyNeuromodulationEffects();
+    void applyPlasticityRules(float plasticityMod);
+    void applyHomeostaticSynapticScaling(SimulationStep currentStep);
+    void updateEpisodicMemory(SimulationStep currentStep);
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    void periodicMemoryConsolidation(SimulationStep currentStep);
+    void checkpointManagement(SimulationStep currentStep, Timestamp currentTime);
+    
     struct Impl;
     Impl* pImpl;
 };

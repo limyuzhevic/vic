@@ -28,27 +28,45 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+NLM - Neural Learning Machine (Phase 2)
+
+USAGE: nlm [OPTIONS]
+
+OPTIONS:
+  --config FILE        Load configuration from FILE (default: configs/default.cfg)
+  --neuron_count N    Set number of neurons (default: 500)
+  --region_count R     Set number of regions (default: 1)
+  --timestep T         Set simulation timestep in seconds (default: 0.001)
+  --seed S             Set random seed (default: 42)
+  --connection_prob P  Set connection probability (default: 0.15)
+  --verbose LEVEL      Set logging verbosity: DEBUG, INFO, WARNING, ERROR (default: INFO)
+  --log_file FILE      Write log output to FILE
+  --output_format FMT  Output format: JSON or KEYVALUE (default: KEYVALUE)
+  --checkpoint DIR      Enable checkpointing to directory DIR (saves brain state)
+  --phase3, --phase4    Run specific phase demo (Phase 3/4 experiments)
+  --phase6             Run Phase 6 integrated brain demo
+  --benchmark          Run benchmark tests
+  --help               Show this help message
+
+EXAMPLES:
+  nlm --config myconfig.json --neuron_count 1000 --verbose DEBUG
+  nlm --timestep 0.0001 --checkpoint ./checkpoints
+  nlm --phase6 --output_format JSON
+
+For more information, visit: https://github.com/nlm/neural-learning-machine
+
+) " << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Neural Learning Machine v0.1.0 - Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Built with C++20, supporting LIF neurons, STDP, Hebbian plasticity, and structural plasticity." << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
+// Refactored to reduce duplication and improve maintainability
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -60,47 +78,34 @@ struct LearningExperiment {
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
         : brain(b), seed(s), initialSynapseCount(0) {}
     
+    // Record initial state for comparison
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
-        
-        // Record initial weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                initialWeights.push_back(syn->getWeight());
-            }
-        }
+        recordWeightsFromRegion(initialWeights);
         
         NLM_LOG_INFO("Initial state recorded:");
         NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
         if (!initialWeights.empty()) {
-            float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-            float mean = sum / initialWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+            NLM_LOG_INFO("  Mean weight: " + std::to_string(computeMean(initialWeights)));
         }
     }
     
+    // Record final state for comparison
     void recordFinalState() {
         finalWeights.clear();
-        
-        // Record final weights from first region
-        if (auto* region = brain->getRegion(RegionId(1))) {
-            for (const auto& syn : region->getSynapses()) {
-                finalWeights.push_back(syn->getWeight());
-            }
-        }
+        recordWeightsFromRegion(finalWeights);
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
         
         NLM_LOG_INFO("Final state recorded:");
         NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
         if (!finalWeights.empty()) {
-            float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-            float mean = sum / finalWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+            NLM_LOG_INFO("  Mean weight: " + std::to_string(computeMean(finalWeights)));
         }
     }
     
+    // Compute and display learning statistics
     void computeStatistics() {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("=== Learning Experiment Results ===");
@@ -111,11 +116,8 @@ struct LearningExperiment {
             return;
         }
         
-        // Compute weight changes
-        float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
-        float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
-        float initialMean = initialSum / initialWeights.size();
-        float finalMean = finalSum / finalWeights.size();
+        float initialMean = computeMean(initialWeights);
+        float finalMean = computeMean(finalWeights);
         
         NLM_LOG_INFO("Weight Statistics:");
         NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
@@ -123,23 +125,13 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
         
         // Count synapses that changed significantly
-        size_t strengthened = 0;
-        size_t weakened = 0;
-        size_t unchanged = 0;
-        
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
-            float delta = finalWeights[i] - initialWeights[i];
-            if (delta > 0.01f) ++strengthened;
-            else if (delta < -0.01f) ++weakened;
-            else ++unchanged;
-        }
+        auto changes = countSynapticChanges(initialWeights, finalWeights);
         
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Synaptic Changes:");
-        NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
-        NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
+        NLM_LOG_INFO("  Strengthened: " + std::to_string(changes.strengthened));
+        NLM_LOG_INFO("  Weakened: " + std::to_string(changes.weakened));
+        NLM_LOG_INFO("  Unchanged: " + std::to_string(changes.unchanged));
         
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Spike Activity:");
@@ -148,7 +140,7 @@ struct LearningExperiment {
         
         // Determine if learning occurred
         bool learningOccurred = (std::abs(finalMean - initialMean) > 0.001f) ||
-                                (strengthened > 0 || weakened > 0);
+                                (changes.strengthened > 0 || changes.weakened > 0);
         
         NLM_LOG_INFO("");
         if (learningOccurred) {
@@ -156,6 +148,44 @@ struct LearningExperiment {
         } else {
             NLM_LOG_INFO("✗ NO LEARNING: Weights did not change significantly");
         }
+    }
+    
+private:
+    // Helper function to record weights from the first brain region
+    void recordWeightsFromRegion(std::vector<float>& weights) {
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (const auto& syn : region->getSynapses()) {
+                weights.push_back(syn->getWeight());
+            }
+        }
+    }
+    
+    // Helper function to compute mean of a vector
+    float computeMean(const std::vector<float>& values) const {
+        if (values.empty()) return 0.0f;
+        float sum = std::accumulate(values.begin(), values.end(), 0.0f);
+        return sum / values.size();
+    }
+    
+    // Helper structure to hold synaptic change counts
+    struct SynapticChanges {
+        size_t strengthened = 0;
+        size_t weakened = 0;
+        size_t unchanged = 0;
+    };
+    
+    // Helper function to count synaptic changes
+    SynapticChanges countSynapticChanges(const std::vector<float>& initial,
+                                         const std::vector<float>& final) const {
+        SynapticChanges changes;
+        size_t minSize = std::min(initial.size(), final.size());
+        for (size_t i = 0; i < minSize; ++i) {
+            float delta = final[i] - initial[i];
+            if (delta > 0.01f) changes.strengthened++;
+            else if (delta < -0.01f) changes.weakened++;
+            else changes.unchanged++;
+        }
+        return changes;
     }
 };
 
