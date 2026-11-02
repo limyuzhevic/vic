@@ -96,6 +96,13 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
+        // Periodic world reset to replenish resources and hazards
+        // This ensures continuous reward opportunities for meaningful learning
+        if (step > 0 && step % 500 == 0) {
+            NLM_LOG_INFO("Resetting world to replenish environment...");
+            world.reset();
+        }
+        
         // Periodic status
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
@@ -324,22 +331,54 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("=== Testing Checkpoint Save/Load ===");
     
     auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    cfg->set("neuron_count", static_cast<int64_t>(100));
     
-    // Create and initialize brain
+    // Create and initialize brain1
     auto brain1 = std::make_shared<Brain>(cfg);
     brain1->initialize();
     
-    // Run some steps
+    // Run some steps to generate neural activity
     for (int i = 0; i < 100; ++i) {
+        // Inject current to create meaningful neural state
+        brain1->injectCurrentToNeurons(NeuronType::Sensory, 10.0f);
         brain1->step(i, i * 0.001);
     }
     
+    // Record initial state metrics
     float avgFiring1 = brain1->getAverageFiringRate();
     size_t totalSpikes1 = brain1->getTotalSpikeCount();
+    float avgWeight1 = 0.0f;
+    size_t weightCount1 = 0;
     
-    NLM_LOG_INFO("Brain1 avg firing: " + std::to_string(avgFiring1));
-    NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
+    // Calculate average synaptic weight from first region
+    if (auto* region = brain1->getRegion(RegionId(1))) {
+        for (const auto& syn : region->getSynapses()) {
+            avgWeight1 += syn->getWeight();
+            ++weightCount1;
+        }
+        if (weightCount1 > 0) avgWeight1 /= weightCount1;
+    }
+    
+    // Get membrane potential from first neuron
+    float membranePotential1 = 0.0f;
+    bool membraneFound1 = false;
+    for (const auto& region : brain1->getRegions()) {
+        for (auto* neuron : region->getAllNeurons()) {
+            if (!membraneFound1) {
+                membranePotential1 = neuron->getState().membranePotential;
+                membraneFound1 = true;
+            }
+        }
+    }
+    
+    size_t pendingSpikes1 = brain1->getPendingSpikeEventCount();
+    
+    NLM_LOG_INFO("Brain1 state before checkpoint:");
+    NLM_LOG_INFO("  Avg firing rate: " + std::to_string(avgFiring1));
+    NLM_LOG_INFO("  Total spikes: " + std::to_string(totalSpikes1));
+    NLM_LOG_INFO("  Avg synaptic weight: " + std::to_string(avgWeight1));
+    NLM_LOG_INFO("  Membrane potential: " + std::to_string(membranePotential1));
+    NLM_LOG_INFO("  Pending spikes: " + std::to_string(pendingSpikes1));
     
     // Save checkpoint
     std::string path = "/tmp/nlm_checkpoint_test.bin";
@@ -347,6 +386,7 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
         NLM_LOG_ERROR("Failed to save checkpoint");
         return false;
     }
+    NLM_LOG_INFO("Checkpoint saved successfully");
     
     // Create new brain and load
     auto brain2 = std::make_shared<Brain>(cfg);
@@ -356,15 +396,72 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
         NLM_LOG_ERROR("Failed to load checkpoint");
         return false;
     }
+    NLM_LOG_INFO("Checkpoint loaded successfully");
     
+    // Verify neural state was properly restored
+    float avgFiring2 = brain2->getAverageFiringRate();
     size_t totalSpikes2 = brain2->getTotalSpikeCount();
-    NLM_LOG_INFO("Brain2 total spikes after load: " + std::to_string(totalSpikes2));
+    float avgWeight2 = 0.0f;
+    size_t weightCount2 = 0;
     
-    // Note: Due to the nature of neural simulation, exact state restoration
-    // is complex. The load should restore the structure at minimum.
+    // Calculate average synaptic weight from first region
+    if (auto* region = brain2->getRegion(RegionId(1))) {
+        for (const auto& syn : region->getSynapses()) {
+            avgWeight2 += syn->getWeight();
+            ++weightCount2;
+        }
+        if (weightCount2 > 0) avgWeight2 /= weightCount2;
+    }
     
-    NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
-    return true;
+    // Get membrane potential from first neuron
+    float membranePotential2 = 0.0f;
+    bool membraneFound2 = false;
+    for (const auto& region : brain2->getRegions()) {
+        for (auto* neuron : region->getAllNeurons()) {
+            if (!membraneFound2) {
+                membranePotential2 = neuron->getState().membranePotential;
+                membraneFound2 = true;
+            }
+        }
+    }
+    
+    size_t pendingSpikes2 = brain2->getPendingSpikeEventCount();
+    
+    NLM_LOG_INFO("Brain2 state after load:");
+    NLM_LOG_INFO("  Avg firing rate: " + std::to_string(avgFiring2));
+    NLM_LOG_INFO("  Total spikes: " + std::to_string(totalSpikes2));
+    NLM_LOG_INFO("  Avg synaptic weight: " + std::to_string(avgWeight2));
+    NLM_LOG_INFO("  Membrane potential: " + std::to_string(membranePotential2));
+    NLM_LOG_INFO("  Pending spikes: " + std::to_string(pendingSpikes2));
+    
+    // Verify state restoration with strict tolerances
+    bool weightsMatch = std::abs(avgWeight2 - avgWeight1) < 1e-6f;
+    bool membraneMatch = std::abs(membranePotential2 - membranePotential1) < 1e-6f;
+    bool pendingMatch = pendingSpikes2 == pendingSpikes1;
+    
+    // Firing rates may differ due to RNG but should be reasonable (within 20%)
+    bool firingReasonable = (avgFiring2 > 0.0f && avgFiring1 > 0.0f) ?
+        (std::abs(avgFiring2 - avgFiring1) / std::max(avgFiring1, 1.0f) < 0.2f) : true;
+    
+    // Spikes may differ due to random state but should be reasonable (within 30%)
+    bool spikesReasonable = (totalSpikes2 > 0 && totalSpikes1 > 0) ?
+        (std::abs(totalSpikes2 - totalSpikes1) / std::max(totalSpikes1, 1ul) < 0.3f) : true;
+    
+    // Summary of restoration
+    NLM_LOG_INFO("Checkpoint restoration verification:");
+    NLM_LOG_INFO("  Synaptic weights match: " + std::string(weightsMatch ? "YES" : "NO"));
+    NLM_LOG_INFO("  Membrane potentials match: " + std::string(membraneMatch ? "YES" : "NO"));
+    NLM_LOG_INFO("  Pending spikes match: " + std::string(pendingMatch ? "YES" : "NO"));
+    NLM_LOG_INFO("  Firing rates reasonable: " + std::string(firingReasonable ? "YES" : "NO"));
+    NLM_LOG_INFO("  Spike counts reasonable: " + std::string(spikesReasonable ? "YES" : "NO"));
+    
+    if (weightsMatch && membraneMatch && pendingMatch && firingReasonable && spikesReasonable) {
+        NLM_LOG_INFO("[PASS] Checkpoint save/load properly restores neural state");
+        return true;
+    } else {
+        NLM_LOG_ERROR("[FAIL] Checkpoint save/load did not properly restore neural state");
+        return false;
+    }
 }
 
 bool Phase6IntegratedExperiment::testReplay() {

@@ -188,6 +188,12 @@ public:
                     default: metrics.waitCount++; break;
                 }
                 
+                // Periodic world reset to replenish resources and hazards for consistent learning
+                if (step > 0 && step % 100 == 0) {
+                    // Reset world to provide continuous interaction opportunities
+                    world.reset();
+                }
+                
                 // Print periodic updates
                 if (step % 50 == 0) {
                     std::cout << "  Step " << step 
