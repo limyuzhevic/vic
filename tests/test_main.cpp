@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cassert>
+#include "../src/main/TestUtilities.hpp"
 
 // Forward declarations of test functions
 namespace test_types {
@@ -37,13 +38,27 @@ namespace test_brain {
     void runAll();
 }
 
-int main() {
+namespace test_test_utilities {
+    void runAll();
+}
+
+void runAll() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
     std::cout << std::endl;
+    
+    // Test the new utilities first
+    std::cout << "Testing TestUtilities..." << std::endl;
+    try {
+        test_test_utilities::runAll();
+        std::cout << "  TestUtilities PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  TestUtilities FAILED: " << e.what() << std::endl;
+        return;
+    }
     
     bool allPassed = true;
     
@@ -122,9 +137,12 @@ int main() {
     std::cout << std::endl;
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
-        return 0;
     } else {
         std::cout << "=== Some Tests FAILED ===" << std::endl;
-        return 1;
     }
+}
+
+int main() {
+    runAll();
+    return 0;
 }

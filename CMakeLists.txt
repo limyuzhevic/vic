@@ -135,6 +135,10 @@ target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 # Main executable
 add_executable(nlm
     src/main.cpp
+    src/main/TestUtilities.cpp
+    src/main/BasicConnectivityTest.cpp
+    src/main/PlasticityExperiment.cpp
+    src/main/StdpVerification.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
@@ -188,7 +192,7 @@ target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 # it must not be added here as a subdirectory: it defines its own
 # nlm_core/nlm_agent/nlm_world targets, which would collide with the
 # ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
+option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" ON)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 CONFIG REQUIRED)
@@ -199,6 +203,19 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
     target_include_directories(pynlm PRIVATE src)
     install(TARGETS pynlm LIBRARY DESTINATION .)
+endif()
+
+# Enhanced Python bindings
+option(NLM_BUILD_ENHANCED_PYTHON_BINDINGS "Build the enhanced pynlm_enhanced Python module" ON)
+if(NLM_BUILD_ENHANCED_PYTHON_BINDINGS)
+    find_package(Python REQUIRED COMPONENTS Interpreter Development)
+    find_package(pybind11 CONFIG REQUIRED)
+    set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
+        POSITION_INDEPENDENT_CODE ON)
+    pybind11_add_module(pynlm_enhanced python/bindings_enhanced.cpp)
+    target_link_libraries(pynlm_enhanced PRIVATE nlm_core nlm_agent nlm_world)
+    target_include_directories(pynlm_enhanced PRIVATE src python ${CMAKE_CURRENT_SOURCE_DIR})
+    install(TARGETS pynlm_enhanced LIBRARY DESTINATION .)
 endif()
 
 # Testing

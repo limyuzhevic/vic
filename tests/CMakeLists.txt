@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 # Test configuration
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src/main)
 
 # Create test executable
 add_executable(nlm_test
@@ -14,6 +15,9 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_utilities.cpp
+    test_refactoring.cpp
+    test_improvements.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core nlm_agent)
