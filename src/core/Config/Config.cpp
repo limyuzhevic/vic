@@ -1,10 +1,77 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
-
-namespace nlm {
+// Simple YAML parser (limited scope for configuration files)
+class SimpleYamlParser {
+public:
+    static std::map<std::string, std::string> parse(const std::string& yamlStr) {
+        std::map<std::string, std::string> result;
+        std::string currentLine;
+        std::string currentKey;
+        std::string currentValue;
+        bool inValue = false;
+        
+        std::istringstream stream(yamlStr);
+        std::string line;
+        while (std::getline(stream, line)) {
+            // Trim whitespace
+            size_t start = line.find_first_not_of(" \t\r\n");
+            if (start == std::string::npos) continue;
+            
+            size_t end = line.find_last_not_of(" \t\r\n");
+            line = line.substr(start, end - start + 1);
+            
+            // Skip comments
+            if (line.find('#') != std::string::npos) {
+                size_t commentPos = line.find('#');
+                line = line.substr(0, commentPos);
+                // Trim again
+                start = line.find_first_not_of(" \t");
+                if (start == std::string::npos) continue;
+                end = line.find_last_not_of(" \t");
+                line = line.substr(start, end - start + 1);
+            }
+            
+            // Parse key: value
+            size_t colonPos = line.find(':');
+            if (colonPos != std::string::npos) {
+                currentKey = line.substr(0, colonPos);
+                // Trim key
+                start = currentKey.find_first_not_of(" \t");
+                if (start != std::string::npos) {
+                    end = currentKey.find_last_not_of(" \t");
+                    currentKey = currentKey.substr(start, end - start + 1);
+                }
+                
+                currentValue = line.substr(colonPos + 1);
+                // Trim value
+                start = currentValue.find_first_not_of(" \t");
+                if (start != std::string::npos) {
+                    end = currentValue.find_last_not_of(" \t");
+                    currentValue = currentValue.substr(start, end - start + 1);
+                }
+                
+                // Remove quotes if present
+                if (!currentValue.empty() && ((currentValue.front() == '"' && currentValue.back() == '"') ||
+                                            (currentValue.front() == '\'' && currentValue.back() == '\''))) {
+                    currentValue = currentValue.substr(1, currentValue.size() - 2);
+                }
+                
+                result[currentKey] = currentValue;
+            }
+        }
+        
+        return result;
+    }
+    
+    static std::string format(const std::map<std::string, std::string>& data) {
+        std::stringstream ss;
+        bool first = true;
+        for (const auto& pair : data) {
+            if (!first) ss << "\n";
+            first = false;
+            ss << pair.first << ": " << pair.second;
+        }
+        return ss.str();
+    }
+};
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,40 +86,36 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Determine file format based on extension
+    if (isJsonFile(filepath)) {
+        return loadFromYaml(filepath); // For now, treat .json as .yaml since YAML is simpler
+    } else if (isYamlFile(filepath)) {
+        return loadFromYaml(filepath);
+    } else {
+        // Fallback to simple key=value format
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string line;
+        while (std::getline(file, line)) {
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        return true;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -78,15 +141,113 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
+bool Config::loadFromYaml(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    auto parsed = SimpleYamlParser::parse(content);
+    
+    for (const auto& pair : parsed) {
+        set(pair.first, pair.second, ConfigSource::File);
+    }
+    
+    return true;
+}
+
+bool Config::saveToYaml(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Convert entries to string map
+    std::map<std::string, std::string> yamlData;
+    
+    for (const auto& entry : pImpl->entries) {
+        std::visit([&yamlData, &entry](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+            std::string strValue;
+            
+            if constexpr (std::is_same_v<T, std::string>) {
+                strValue = "\"" + v + "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                strValue = "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i > 0) strValue += ", ";
+                    strValue += std::to_string(v[i]);
+                }
+                strValue += "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                strValue = "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i > 0) strValue += ", ";
+                    strValue += std::to_string(v[i]);
+                }
+                strValue += "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                strValue = "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i > 0) strValue += ", ";
+                    strValue += "\"" + v[i] + "\"";
+                }
+                strValue += "]";
+            } else {
+                strValue = std::to_string(v);
+            }
+            
+            yamlData[entry.key] = strValue;
+        }, entry.value);
+    }
+    
+    std::string yamlContent = SimpleYamlParser::format(yamlData);
+    file << yamlContent;
+    
+    return true;
+}
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Convert ConfigValue to string representation
+        std::visit([&file](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << v << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << v[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << v[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << v[i] << "\"";
+                }
+                file << "]";
+            } else {
+                // Handle arithmetic types
+                file << v;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -234,5 +395,16 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// File format detection
+bool Config::isJsonFile(const std::string& filepath) {
+    std::string lower = toLower(filepath);
+    return lower.ends_with(".json") || lower.ends_with(".jsonl");
+}
+
+bool Config::isYamlFile(const std::string& filepath) {
+    std::string lower = toLower(filepath);
+    return lower.ends_with(".yaml") || lower.ends_with(".yml") || lower.ends_with(".cfg");
+}
 
 } // namespace nlm

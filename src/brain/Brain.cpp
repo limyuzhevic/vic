@@ -1,4 +1,5 @@
 #include "Brain.hpp"
+#include "BrainHelper.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -30,6 +31,9 @@ struct Brain::Impl {
     std::unique_ptr<RandomGenerator> rng;
     std::vector<std::unique_ptr<NeuralRegion>> regions;
     std::vector<InterRegionConnection> interRegionConnections;
+    
+    // Brain helper for managing complex operations
+    std::unique_ptr<BrainHelper> brainHelper;
     
     // ========== INTEGRATED MEMORY SYSTEMS ==========
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
@@ -67,7 +71,7 @@ struct Brain::Impl {
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
-
+    
     // Phase 5 learned preference trait (see Brain.hpp). Updated only
     // from sandbox reward via AgentBrain; checkpointed with the
     // simulation state so a reloaded brain keeps what it learned.
@@ -93,6 +97,7 @@ struct Brain::Impl {
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
+        , brainHelper(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
@@ -105,6 +110,8 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
+        brainHelper = std::make_unique<BrainHelper>(this);
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<int64_t>("random_seed")) {
@@ -345,30 +352,39 @@ void Brain::step(SimulationStep currentStep) {
 }
 
 void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
-    /*
-     * PHASE 6: INTEGRATED ARTIFICIAL BRAIN LOOP
-     * 
-     * This implements the complete integrated brain simulation:
-     * 
-     * 1. Process pending delayed spike events (deliver synaptic input)
-     * 2. Update all neuron membrane potentials (LIF dynamics)
-     * 3. Detect spikes and schedule outgoing spike events
-     * 4. Update working memory (maintenance and competition)
-     * 5. Apply neuromodulation effects on neural excitability
-     * 6. Apply plasticity rules (STDP, Hebbian)
-     * 7. Update episodic memory with current experience
-     * 8. Update prediction system
-     * 9. Update attention system
-     * 10. Update concept formation
-     * 11. Apply structural plasticity (synaptogenesis, pruning)
-     * 12. Replay important memories (during rest or periodically)
-     * 13. Apply development effects
-     * 14. Collect statistics
-     */
-    
+    // Use BrainHelper to manage the complex step logic
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
+    
+    // Delegate all step operations to BrainHelper
+    pImpl->brainHelper->processDelayedSpikeDelivery(currentStep, currentTime);
+    pImpl->brainHelper->updateAllNeurons(currentStep, currentTime);
+    pImpl->brainHelper->detectAndScheduleSpikes(currentStep, currentTime);
+    pImpl->brainHelper->processSpikes(currentStep);
+    
+    pImpl->brainHelper->updateWorkingMemory();
+    pImpl->brainHelper->applyNeuromodulationEffects();
+    
+    // Calculate plasticity modulation from dopamine
+    float plasticityMod = 1.0f;
+    if (pImpl->dopamine) {
+        plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    pImpl->brainHelper->applyPlasticityRules(plasticityMod);
+    pImpl->brainHelper->applyHomeostaticSynapticScaling(currentStep);
+    
+    pImpl->brainHelper->updateEpisodicMemory(currentStep);
+    pImpl->brainHelper->updatePredictionSystem();
+    pImpl->brainHelper->updateAttentionSystem();
+    pImpl->brainHelper->updateConceptFormation();
+    pImpl->brainHelper->applyStructuralPlasticity(currentStep);
+    pImpl->brainHelper->replayImportantMemories(currentStep);
+    pImpl->brainHelper->applyDevelopmentEffects(currentStep);
+    pImpl->brainHelper->consolidateMemories(currentStep);
+    pImpl->brainHelper->manageCheckpoints(currentStep, currentTime);
+}
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);

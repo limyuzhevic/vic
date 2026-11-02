@@ -59,19 +59,25 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from YAML file
+    bool loadFromYaml(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
+    // Save to YAML file
+    bool saveToYaml(const std::string& filepath) const;
+    
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +101,15 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration
+    bool validate() const;
+    
+    // Get default values for key
+    std::optional<ConfigValue> getDefaultValue(const std::string& key) const;
+    
+    // Set default value
+    void setDefault(const std::string& key, const ConfigValue& value, const std::string& description = "");
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +117,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML helper methods
+    static std::optional<ConfigValue> jsonValueToConfigValue(const std::string& jsonStr);
+    static std::string configValueToJsonString(const ConfigValue& value);
+    static std::optional<ConfigValue> yamlValueToConfigValue(const std::string& yamlStr);
+    static std::string configValueToYamlString(const ConfigValue& value);
+    
+    // File format detection
+    static bool isJsonFile(const std::string& filepath);
+    static bool isYamlFile(const std::string& filepath);
 };
 
 } // namespace nlm

@@ -3,12 +3,15 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <memory>
+#include <string>
 
 namespace nlm {
 
 // Forward declarations
 class Synapse;
 class RandomGenerator;
+class Config;
 
 // Neuron state structure for efficient storage
 struct NeuronState {
@@ -47,7 +50,179 @@ struct NeuronState {
         , refractoryPeriod(9)
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
+    
+    // Validate neuron state
+    bool validate() const {
+        if (threshold <= restingPotential) return false;
+        if (refractoryPeriod == 0) return false;
+        if (leakConductance <= 0.0f) return false;
+        if (membranePotential < -100.0f || membranePotential > 50.0f) return false;
+        return true;
+    }
 };
+
+// Neuron parameters for configuration
+struct NeuronParameters {
+    // LIF dynamics parameters
+    float restingPotential = -70.0f;          // mV, typical -70mV
+    float threshold = -55.0f;                // mV, typical -55mV
+    float resetPotential = -70.0f;           // mV, typically close to resting
+    float leakConductance = 10.0f;           // nS, typical 10nS
+    uint32_t refractoryPeriod = 9;           // steps, typical 9ms (2-10ms range)
+    
+    // Biological constraints
+    float minMembranePotential = -100.0f;     // mV, hard limit
+    float maxMembranePotential = 50.0f;       // mV, hard limit
+    float adaptationDecay = 0.95f;            // adaptation variable decay rate
+    float adaptationIncrement = 1.0f;        // adaptation increment per spike
+    
+    // Randomization ranges
+    float restingPotentialRange = 2.0f;       // mV, ±2mV around typical
+    float thresholdRange = 2.0f;             // mV, ±2mV around typical
+    float resetPotentialRange = 5.0f;        // mV, 0-5mV above resting
+    float leakConductanceRange = 5.0f;       // nS, ±5nS around typical
+    
+    // Validation
+    bool validate() const {
+        if (threshold <= restingPotential) return false;
+        if (refractoryPeriod == 0) return false;
+        if (leakConductance <= 0.0f) return false;
+        if (minMembranePotential >= maxMembranePotential) return false;
+        if (adaptationDecay <= 0.0f || adaptationDecay >= 1.0f) return false;
+        return true;
+    }
+};
+
+// Neuron class representing a single neuron
+// Implements Leaky Integrate-and-Fire (LIF) dynamics with configuration support
+class Neuron {
+public:
+    // Create neuron with ID and optional configuration
+    explicit Neuron(NeuronId id, std::shared_ptr<Config> config = nullptr);
+    
+    ~Neuron();
+    
+    // Disable copying, enable moving
+    Neuron(const Neuron&) = delete;
+    Neuron& operator=(const Neuron&) = delete;
+    Neuron(Neuron&&) noexcept;
+    Neuron& operator=(Neuron&&) noexcept;
+    
+    // Identity
+    NeuronId getId() const;
+    
+    // Type
+    NeuronType getType() const;
+    void setType(NeuronType type);
+    
+    // State access
+    const NeuronState& getState() const;
+    NeuronState& getState();
+    
+    // Membrane potential
+    MembranePotential getMembranePotential() const;
+    void setMembranePotential(MembranePotential potential);
+    void addToMembranePotential(MembranePotential delta);
+    
+    // Threshold
+    MembranePotential getThreshold() const;
+    void setThreshold(MembranePotential threshold);
+    
+    // Firing state
+    bool isFiring() const;
+    bool isRefractory() const;
+    void setFiringState(FiringState state);
+    void setRefractoryPeriod(uint32_t steps);
+    void decrementRefractory();
+    
+    // Firing rate (for rate-based computation)
+    FiringRate getFiringRate() const;
+    void setFiringRate(FiringRate rate);
+    
+    // LIF neuron parameters
+    void setLeakConductance(MembranePotential conductance);
+    MembranePotential getLeakConductance() const;
+    uint32_t getRefractoryPeriod() const;
+    void setRestingPotential(MembranePotential potential);
+    MembranePotential getRestingPotential() const;
+    void setResetPotential(MembranePotential potential);
+    MembranePotential getResetPotential() const;
+    
+    // Configuration integration
+    void setParameters(const NeuronParameters& params);
+    NeuronParameters getParameters() const;
+    bool validateParameters() const;
+    
+    // Spike detection
+    bool checkThreshold() const;
+    float getLastSpikeTime() const;
+    
+    // LIF step function - returns true if neuron fired
+    bool stepLIF(Timestamp currentTime, TimestepDuration dt);
+    
+    // Incoming signals (post-synaptic potentials)
+    void receiveExcitatoryInput(MembranePotential amplitude);
+    void receiveInhibitoryInput(MembranePotential amplitude);
+    void receiveModulatoryInput(MembranePotential amplitude);
+    
+    // Current injection (from external sources)
+    void injectCurrent(MembranePotential current);
+    MembranePotential getTotalCurrent() const;
+    void clearTotalCurrent();
+    
+    // Spike history (recent spikes for STDP)
+    void recordSpike(Timestamp timestamp);
+    const std::vector<Timestamp>& getSpikeHistory() const;
+    void clearSpikeHistory();
+    
+    // Synapse management (incoming and outgoing)
+    void addIncomingSynapse(SynapseHandle handle);
+    void addOutgoingSynapse(SynapseHandle handle);
+    const std::vector<SynapseHandle>& getIncomingSynapses() const;
+    const std::vector<SynapseHandle>& getOutgoingSynapses() const;
+    
+    // Plasticity state
+    const PlasticityFlags& getPlasticityFlags() const;
+    PlasticityFlags& getPlasticityFlags();
+    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    
+    // Region/population membership
+    void setRegionId(RegionId region);
+    RegionId getRegionId() const;
+    void setPopulationId(PopulationId population);
+    PopulationId getPopulationId() const;
+    
+    // Update neuron for one simulation step
+    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    void step(Timestamp currentTime);
+    
+    // Reset to initial state
+    void reset();
+    
+    // Initialize with random parameters
+    void initializeRandom(RandomGenerator& rng);
+    
+    // Configuration-based initialization
+    void initializeFromConfig(const std::string& prefix, const NeuronParameters& defaultParams);
+    
+    // Statistics
+    float getFiringRateForStep(TimestepDuration dt) const;
+    bool isStable() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+    
+    // Configuration
+    std::shared_ptr<Config> config_;
+    NeuronParameters parameters_;
+    
+    // Internal helpers
+    void validateState() const;
+    void clampMembranePotential();
+};
+
+} // namespace nlm
 
 // Neuron class representing a single neuron
 // Implements Leaky Integrate-and-Fire (LIF) dynamics
