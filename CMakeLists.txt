@@ -21,6 +21,9 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Find nlohmann_json package for JSON support
+find_package(nlohmann_json 3.11.0 REQUIRED)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
@@ -29,6 +32,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/CLIUtility.cpp  # NEW: Command-line interface utility
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -86,7 +90,9 @@ add_library(nlm_core STATIC
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/core>
     $<INSTALL_INTERFACE:include>
+    ${nlohmann_json_INCLUDE_DIR}
 )
 
 # Agent system (body, sensory percept, agent-brain interface)
@@ -132,7 +138,7 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable with enhanced CLI
 add_executable(nlm
     src/main.cpp
 )

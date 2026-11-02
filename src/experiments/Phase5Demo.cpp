@@ -26,15 +26,16 @@
 // reloaded brain behaves differently from a fresh one because of what
 // it experienced, not because of a scripted persona.
 
-#include "../agent/AgentBrain.hpp"
-#include "../agent/SensoryPercept.hpp"
-#include "../world/SimpleWorld.hpp"
-#include "../brain/Brain.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../memory/NeuralEpisodicMemory.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Random/Random.hpp"
-#include "../core/Logger/Logger.hpp"
+#include "agent/AgentBrain.hpp"
+#include "agent/SensoryPercept.hpp"
+#include "world/SimpleWorld.hpp"
+#include "brain/Brain.hpp"
+#include "memory/NeuralWorkingMemory.hpp"
+#include "memory/NeuralEpisodicMemory.hpp"
+#include "core/Config/Config.hpp"
+#include "core/Random/Random.hpp"
+#include "core/Logger/Logger.hpp"
+#include "core/CLIUtility.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -42,7 +43,7 @@
 #include <string>
 #include <utility>
 
-namespace nlm {
+using namespace nlm;
 
 namespace {
 
@@ -133,13 +134,23 @@ void probePattern(const char* label, const SensoryPercept& percept) {
 
 }  // namespace nlm
 
-int main() {
-    using namespace nlm;
-    Logger::getGlobal().setLevel(LogLevel::Error);
-    std::cout << "===========================================\n";
-    std::cout << "NLM PHASE 5 - BRAIN-PERSONALITY / SANDBOX DEMO\n";
-    std::cout << "===========================================\n\n";
-
+int main(int argc, char* argv[]) {
+    // Parse command-line arguments using enhanced CLI utility
+    CLIOptions options;
+    if (!CLIUtility::parseArguments(argc, argv, options)) {
+        return 1;
+    }
+    
+    // Setup logging based on CLI options
+    CLIUtility::setupLogging(options.logLevel, options.verbose, options.debug);
+    
+    // Print banner if not in help/verbose mode
+    if (!options.help && !options.debug) {
+        std::cout << "===========================================\n";
+        std::cout << "NLM PHASE 5 - BRAIN-PERSONALITY / SANDBOX DEMO\n";
+        std::cout << "===========================================\n\n";
+    }
+    
     // --- 1. Pattern probe ---
     std::cout << "--- 1. Pattern probe (fresh brain per pattern, seed 42) ---\n";
     std::vector<float> emptyVision(16, 1.0f);
@@ -154,7 +165,7 @@ int main() {
     for (int i = 5; i <= 10; ++i) darkVision[i] = 0.25f;  // dark = hazard encoding
     probePattern("dark ahead+touch  ", makePercept(darkVision, fwdTouch));
     std::cout << "\n";
-
+    
     // --- 2. Sandbox run + checkpoint round-trip ---
     std::cout << "--- 2. Sandbox run (100 steps) + checkpoint round-trip ---\n";
     auto config = makeConfig();
@@ -168,7 +179,7 @@ int main() {
     agent.initialize(world);
     agent.enableRewardModulation(true);
     agent.enableCuriosity(true);
-
+    
     float totalReward = 0.0f;
     int resources = 0, hazards = 0, emptyInteracts = 0;
     std::set<std::pair<int, int>> visited;
@@ -205,7 +216,7 @@ int main() {
               << " workingNeurons=" << (brain->getWorkingMemory() ? brain->getWorkingMemory()->getMemoryNeuronCount() : 0)
               << " episodic=" << (brain->getEpisodicMemory() ? brain->getEpisodicMemory()->getEpisodeCount() : 0)
               << " preference=" << agent.getLearnedPreference() << "\n";
-
+    
     // Per-synapse spike-history totals, for the checkpoint check below.
     auto synHistoryTotal = [](const std::shared_ptr<Brain>& b) {
         size_t total = 0;
@@ -217,7 +228,7 @@ int main() {
         return total;
     };
     size_t histBefore = synHistoryTotal(brain);
-
+    
     const std::string ckpt = "/tmp/nlm_phase5_demo.ckpt";
     bool saved = brain->save(ckpt);
     auto brain2 = std::make_shared<Brain>(makeConfig());

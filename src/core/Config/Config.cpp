@@ -3,11 +3,14 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>  // Include nlohmann JSON library
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    nlohmann::json jsonCache;  // Cache for JSON serialization
+    bool dirty = false;        // Track if changes need to be reflected
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,7 +22,7 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
+    // TODO: Implement proper JSON/YAML parser (Phase 3+)
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
     std::ifstream file(filepath);
@@ -55,40 +58,150 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+bool Config::loadFromJSON(const std::string& jsonStr) {
+    try {
+        auto json = nlohmann::json::parse(jsonStr);
+        pImpl->entries.clear();
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+        // Convert JSON to Config entries
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            
+            // Handle different JSON value types
+            if (it->is_string()) {
+                set(key, it->get<std::string>(), ConfigSource::File);
+            } else if (it->is_number_integer()) {
+                set(key, it->get<int64_t>(), ConfigSource::File);
+            } else if (it->is_number_float()) {
+                set(key, it->get<double>(), ConfigSource::File);
+            } else if (it->is_boolean()) {
+                set(key, it->get<bool>(), ConfigSource::File);
+            } else if (it->is_array()) {
+                // For arrays, convert to string representation
+                std::vector<std::string> strArray;
+                for (const auto& item : *it) {
+                    strArray.push_back(item.dump());
+                }
+                set(key, strArray, ConfigSource::File);
+            } else {
+                // Default to string representation for other types
+                set(key, it->dump(), ConfigSource::File);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+        
+        pImpl->dirty = false;
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("JSON parsing error: " + std::string(e.what()));
+        return false;
     }
-    return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
+bool Config::loadFromYAML(const std::string& yamlStr) {
+    // TODO: Implement YAML parsing (Phase 3+)
+    // For now, treat YAML as JSON
+    return loadFromJSON(yamlStr);
+}
+
+bool Config::saveToJSON(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    nlohmann::json json;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert ConfigEntry back to JSON
+        std::visit([&json, &entry](auto&& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                json[entry.key] = value;
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t> ||
+                                 std::is_same_v<T, uint64_t>) {
+                json[entry.key] = static_cast<int64_t>(value);
+            } else if constexpr (std::is_same_v<T, float> || 
+                                 std::is_same_v<T, double>) {
+                json[entry.key] = static_cast<double>(value);
+            } else if constexpr (std::is_same_v<T, bool>) {
+                json[entry.key] = value;
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                nlohmann::json arr;
+                for (const auto& item : value) {
+                    arr.push_back(item);
+                }
+                json[entry.key] = arr;
+            } else {
+                json[entry.key] = "UNKNOWN_TYPE";
+            }
+        }, entry.value);
     }
     
+    file << json.dump(4);  // Pretty print with 4-space indentation
+    return true;
+}
+
+std::string Config::toJSON() const {
+    nlohmann::json json;
+    
+    for (const auto& entry : pImpl->entries) {
+        std::visit([&json, &entry](auto&& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                json[entry.key] = value;
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t> ||
+                                 std::is_same_v<T, uint64_t>) {
+                json[entry.key] = static_cast<int64_t>(value);
+            } else if constexpr (std::is_same_v<T, float> || 
+                                 std::is_same_v<T, double>) {
+                json[entry.key] = static_cast<double>(value);
+            } else if constexpr (std::is_same_v<T, bool>) {
+                json[entry.key] = value;
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                nlohmann::json arr;
+                for (const auto& item : value) {
+                    arr.push_back(item);
+                }
+                json[entry.key] = arr;
+            } else {
+                json[entry.key] = "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+    }
+    
+    return json.dump(4);  // Pretty print
+}
+
+std::string Config::toYAML() const {
+    // For now, return JSON representation as YAML
+    // TODO: Implement proper YAML serialization (Phase 3+)
+    return toJSON();
+}
+
+bool Config::validate() const {
+    // Basic validation - check for required keys
+    for (const auto& entry : pImpl->entries) {
+        // Log validation warnings for certain keys
+        if (entry.key == "neuron_count" && entry.value.index() == 0) {  // int64_t
+            int64_t count = std::get<int64_t>(entry.value);
+            if (count <= 0) {
+                NLM_LOG_WARNING("neuron_count should be positive: " + std::to_string(count));
+                return false;
+            }
+        } else if (entry.key == "connection_probability" && entry.value.index() == 2) {  // double
+            double prob = std::get<double>(entry.value);
+            if (prob < 0.0 || prob > 1.0) {
+                NLM_LOG_WARNING("connection_probability should be between 0 and 1: " + std::to_string(prob));
+                return false;
+            }
+        }
+    }
     return true;
 }
 
@@ -102,6 +215,8 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
+    
+    pImpl->dirty = true;
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
