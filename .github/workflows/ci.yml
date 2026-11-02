@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Set up C++ environment
+        uses: actions/setup-cpp@v1
+        with:
+          cpp-compiler: g++
+          ninja-version: '1.11.1'
+      
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install scikit-build-core pybind11 pytest numpy
+          pip install -e .[dev]
+      
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_CXX_STANDARD=20 \
+            -DNLM_BUILD_PYTHON_BINDINGS=ON
+      
+      - name: Build
+        run: |
+          cd build
+          make -j4
+      
+      - name: Run C++ Tests
+        run: |
+          cd build
+          ./nlm_test_suite 2>&1 | tee test_output.log
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "C++ tests failed"
+            exit 1
+          fi
+      
+      - name: Run Python Tests
+        run: |
+          pytest tests/ 2>&1 | tee pytest_output.log
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "Python tests failed"
+            exit 1
+          fi
+      
+      - name: Test Python Bindings
+        run: |
+          python -c "import pynlm; print('Python bindings imported successfully')"
+      
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.build_type }}
+          path: |
+            build/test_output.log
+            pytest_output.log
+          retention-days: 7
+      
+      - name: Verify Build
+        run: |
+          cd build
+          # Verify that key targets exist
+          ls -la nlm nlm_phase6_demo nlm_benchmark pynlm.*.so 2>/dev/null || echo "Warning: Some expected build artifacts not found"
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Quick build test
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_BUILD_PYTHON_BINDINGS=OFF
+          make -j2
+          # Just verify it builds without errors

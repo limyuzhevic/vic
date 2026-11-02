@@ -3,14 +3,15 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
+// Helper functions to convert between ConfigValue and JSON
+nlohmann::json configValueToJson(const ConfigValue& value);
+ConfigValue jsonToConfigValue(const nlohmann::json& jsonValue);
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+} // namespace nlm
 
 Config::~Config() = default;
 
@@ -19,36 +20,62 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to load as JSON first
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Parse the file to determine if it's JSON or plain text
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0);
+    
+    // Try to parse as JSON
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // JSON parsing succeeded
+        clear();
+        
+        if (jsonData.is_object()) {
+            for (const auto& [key, value] : jsonData.items()) {
+                ConfigValue configValue = jsonToConfigValue(value);
+                set(key, configValue, ConfigSource::File);
+            }
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        return true;
+    } catch (const nlohmann::json::parse_error&) {
+        // JSON parsing failed, fall back to plain text format
+        file.clear();
+        file.seekg(0);
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -84,10 +111,18 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    nlohmann::json jsonData;
+    
     for (const auto& entry : pImpl->entries) {
+        // Add description as a comment
         file << "# " << entry.description << "\n";
+        jsonData[entry.key] = configValueToJson(entry.value);
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
     }
+    
+    // Write pretty-printed JSON for readability
+    file << "\n# JSON configuration (for programmatic access):\n";
+    file << jsonData.dump(4);
     
     return true;
 }
@@ -235,4 +270,94 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
+// Helper functions to convert between ConfigValue and JSON
+nlohmann::json configValueToJson(const ConfigValue& value);
+ConfigValue jsonToConfigValue(const nlohmann::json& jsonValue);
+
+// Implementation of helper functions
+namespace nlm {
+
+nlohmann::json configValueToJson(const ConfigValue& value) {
+    nlohmann::json jsonValue;
+    std::visit([&jsonValue](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            jsonValue = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            jsonValue = arg;
+        }
+    }, value);
+    return jsonValue;
+}
+
+ConfigValue jsonToConfigValue(const nlohmann::json& jsonValue) {
+    ConfigValue configValue;
+    
+    if (jsonValue.is_number_integer()) {
+        configValue = jsonValue.get<int>();
+    } else if (jsonValue.is_number_unsigned()) {
+        configValue = jsonValue.get<uint64_t>();
+    } else if (jsonValue.is_number_float()) {
+        configValue = jsonValue.get<double>();
+    } else if (jsonValue.is_boolean()) {
+        configValue = jsonValue.get<bool>();
+    } else if (jsonValue.is_string()) {
+        configValue = jsonValue.get<std::string>();
+    } else if (jsonValue.is_array()) {
+        if (!jsonValue.empty()) {
+            const auto& firstElement = jsonValue[0];
+            if (firstElement.is_number_integer()) {
+                std::vector<int> intArray;
+                for (const auto& element : jsonValue) {
+                    intArray.push_back(element.get<int>());
+                }
+                configValue = intArray;
+            } else if (firstElement.is_number_float()) {
+                std::vector<double> doubleArray;
+                for (const auto& element : jsonValue) {
+                    doubleArray.push_back(element.get<double>());
+                }
+                configValue = doubleArray;
+            } else if (firstElement.is_string()) {
+                std::vector<std::string> stringArray;
+                for (const auto& element : jsonValue) {
+                    stringArray.push_back(element.get<std::string>());
+                }
+                configValue = stringArray;
+            }
+        }
+    }
+    
+    return configValue;
+}
+
 } // namespace nlm
+
+// Explicit template instantiations
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
+template std::optional<float> Config::get<float>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
+template float Config::getOr<float>(const std::string&, const float&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;

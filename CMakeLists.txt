@@ -29,6 +29,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/Error/ErrorHandling.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -180,15 +181,10 @@ add_executable(nlm_benchmark
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
+# Build the pynlm Python module by default when using scikit-build.
+# The python/CMakeLists.txt is kept for compatibility but the root
+# CMakeLists handles the actual Python bindings build.
+option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" ON)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 CONFIG REQUIRED)

@@ -6,6 +6,7 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 

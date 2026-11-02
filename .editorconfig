@@ -1,0 +1,43 @@
+# Editor configuration for consistent code formatting
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 2
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 100
+
+[*.{cpp,h,cc,hh,c++,h++,hpp,hxx,cppm,hppm}]
+# C++ files configuration
+indent_size = 2
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.py]
+# Python files configuration
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+# Markdown files configuration
+trim_trailing_whitespace = false
+line_endings = lf
+
+[*.{yml,yaml,github/workflows/*}]
+# YAML configuration files
+indent_size = 2
+indent_style = space
+insert_final_newline = true
+
+[Makefile,*.mk,*.make]
+# Makefile configuration
+indent_size = 4
+indent_style = tab
+insert_final_newline = true
