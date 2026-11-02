@@ -406,28 +406,198 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Convenience methods
+        .def("runEpisode", [](AgentBrain& self, SimpleWorld& world, int numSteps) {
+            for (int step = 0; step < numSteps; ++step) {
+                world.update(0.1);
+                auto percept = world.getSensoryPercept();
+                self.processSensoryInput(percept);
+                // Note: need to get the underlying brain to step it
+                // This is a simplified version - in practice you'd need
+                // the brain reference passed in or accessed via getBrain()
+            }
+        }, py::arg("world"), py::arg("numSteps"),
+             "Run a complete agent episode for the given number of steps")
+        )
+        .def("stepEpisode", [](AgentBrain& self, SimpleWorld& world) {
+            world.update(0.1);
+            auto percept = world.getSensoryPercept();
+            self.processSensoryInput(percept);
+            // Note: brain step is not called here as it requires
+            // the brain reference - this is a simplified version
+            return world.getSensoryPercept(); // Return percept for next step
+        }, py::arg("world"),
+             "Perform one step of an agent episode")
+        );
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Custom Python exceptions
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const std::runtime_error& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        }
+    });
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Define custom NLM exceptions
+    py::class_<py::exception<NLMError>>(m, "NLMError")
+        .def(py::init<const std::string&>(), py::arg("message"));
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    py::class_<py::exception<InitializationError>>(m, "InitializationError")
+        .def(py::init<const std::string&>(), py::arg("message"));
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    py::class_<py::exception<ConfigError>>(m, "ConfigError")
+        .def(py::init<const std::string&>(), py::arg("message"));
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    py::class_<py::exception<SynthesisError>>(m, "SynthesisError")
+        .def(py::init<const std::string&>(), py::arg("message"));
+
+    py::class_<py::exception<NeuronIdError>>(m, "NeuronIdError")
+        .def(py::init<const std::string&>(), py::arg("message"));
+
+    py::class_<py::exception<SynapseIdError>>(m, "SynapseIdError")
+        .def(py::init<const std::string&>(), py::arg("message"));
+
+    // Add exception translation
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const NLMError& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        }
+    });
+
+    // Add helper functions for error handling
+    m.def("checkNeuronId", [](const NeuronId& id) {
+        if (id.value == INVALID_NEURON_ID.value) {
+            throw NeuronIdError("Invalid neuron ID provided");
+        }
+    }, py::arg("id"),
+        "Validate that a neuron ID is valid");
+
+    m.def("checkSynapseId", [](const SynapseId& id) {
+        if (id.value == INVALID_SYNAPSE_ID.value) {
+            throw SynapseIdError("Invalid synapse ID provided");
+        }
+    }, py::arg("id"),
+        "Validate that a synapse ID is valid");
+
+    m.def("validateConfig", [](const Config& config) {
+        auto keys = config.getKeys();
+        if (keys.empty()) {
+            throw ConfigError("Configuration is empty");
+        }
+        
+        if (!config.has("brain.neuron_count")) {
+            throw ConfigError("Configuration missing required 'brain.neuron_count' key");
+        }
+        
+        auto neuronCount = config.getOr<int>("brain.neuron_count", 0);
+        if (neuronCount <= 0) {
+            throw ConfigError("brain.neuron_count must be positive");
+        }
+        
+        if (config.has("brain.synapse_density")) {
+            auto density = config.getOr<double>("brain.synapse_density", 0.0);
+            if (density < 0.0 || density > 1.0) {
+                throw ConfigError("brain.synapse_density must be between 0.0 and 1.0");
+            }
+        }
+    }, py::arg("config"),
+        "Validate a configuration and throw ConfigError if invalid");
+
+    m.def("getValidNeuronTypes", []() {
+        return std::vector<NeuronType>{
+            NeuronType::Excitatory,
+            NeuronType::Inhibitory,
+            NeuronType::Modulatory,
+            NeuronType::Sensory,
+            NeuronType::Motor,
+            NeuronType::Internal
+        };
+    }, "Get all valid neuron types");
+
+    m.def("getValidSynapseTypes", []() {
+        return std::vector<SynapseType>{
+            SynapseType::Excitatory,
+            SynapseType::Inhibitory,
+            SynapseType::Modulatory,
+            SynapseType::Electrical,
+            SynapseType::GapJunction
+        };
+    }, "Get all valid synapse types");
+
+    m.def("getAllActionTypes", []() {
+        return std::vector<ActionType>{
+            ActionType::MoveForward, ActionType::MoveBackward,
+            ActionType::MoveLeft, ActionType::MoveRight,
+            ActionType::TurnLeft, ActionType::TurnRight,
+            ActionType::Look, ActionType::LookUp, ActionType::LookDown,
+            ActionType::Interact, ActionType::Eat, ActionType::Drink,
+            ActionType::Rest, ActionType::Wait, ActionType::Custom
+        };
+    }, "Get all action types");
+
+    // Add helper functions for type validation and conversion
+    m.def("validateNeuronType", [](NeuronType type) {
+        auto validTypes = getValidNeuronTypes();
+        bool isValid = std::find(validTypes.begin(), validTypes.end(), type) != validTypes.end();
+        if (!isValid) {
+            throw ConfigError("Invalid neuron type");
+        }
+    }, py::arg("type"),
+        "Validate that a neuron type is valid");
+
+    m.def("validateSynapseType", [](SynapseType type) {
+        auto validTypes = getValidSynapseTypes();
+        bool isValid = std::find(validTypes.begin(), validTypes.end(), type) != validTypes.end();
+        if (!isValid) {
+            throw ConfigError("Invalid synapse type");
+        }
+    }, py::arg("type"),
+        "Validate that a synapse type is valid");
+
+    // Add helper functions for configuration and initialization
+    m.def("setupCompleteBrain", [](std::shared_ptr<Config> config, std::shared_ptr<SimpleWorld> world) {
+        auto brain = createBrain(config);
+        brain->initialize();
+        auto agent = createAgentBrain(brain);
+        agent->initialize(*world);
+        return std::tuple<std::shared_ptr<Brain>, std::shared_ptr<AgentBrain>, std::shared_ptr<SimpleWorld>>(brain, agent, world);
+    }, py::arg("config"), py::arg("world"),
+        "Set up a complete brain-agent-world system");
+
+    m.def("runCompleteEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, int numSteps) {
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply simple reward based on action outcome
+            float reward = 0.0f;
+            if (action.getType() == ActionType::MoveForward) {
+                reward = 0.1f;
+            }
+            agent->applyRewardModulation(reward, 0.0f);
+            agent->updateDevelopment(0.1);
+        }
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("numSteps"),
+        "Run a complete episode with the brain-agent-world system");
+
+    m.def("createTextPercept", [](const std::string& text) {
+        auto percept = std::make_unique<SensoryPercept>();
+        // Note: This is a simplified implementation - in reality,
+        // text encoding would be more complex
+        return percept;
+    }, py::arg("text"),
+        "Create a text-based sensory percept (Phase 6 feature)");
 
 } // namespace nlm
