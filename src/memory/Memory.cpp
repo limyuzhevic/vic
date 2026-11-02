@@ -114,11 +114,18 @@ void EpisodicMemory::consolidate(float relevanceThreshold) {
 // Semantic Memory Implementation
 struct SemanticMemory::Impl {
     std::vector<std::pair<std::string, std::string>> facts;
+    class Brain* brain;
 };
 
-SemanticMemory::SemanticMemory() : pImpl(new Impl) {}
+SemanticMemory::SemanticMemory() : pImpl(new Impl) {
+    pImpl->brain = nullptr;
+}
 
 SemanticMemory::~SemanticMemory() = default;
+
+void SemanticMemory::initialize(class Brain* brain) {
+    pImpl->brain = brain;
+}
 
 void SemanticMemory::storeFact(const std::string& key, const std::string& value) {
     for (auto& fact : pImpl->facts) {
@@ -159,11 +166,18 @@ void SemanticMemory::clear() {
 // Procedural Memory Implementation
 struct ProceduralMemory::Impl {
     std::vector<Skill> skills;
+    class Brain* brain;
 };
 
-ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {}
+ProceduralMemory::ProceduralMemory() : pImpl(new Impl) {
+    pImpl->brain = nullptr;
+}
 
 ProceduralMemory::~ProceduralMemory() = default;
+
+void ProceduralMemory::initialize(class Brain* brain) {
+    pImpl->brain = brain;
+}
 
 void ProceduralMemory::learnSkill(const std::string& name, const std::vector<NeuronId>& pattern) {
     for (auto& skill : pImpl->skills) {

@@ -96,11 +96,10 @@ Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
 ./nlm_phase3_demo
 ./nlm_phase4_demo
+./nlm_phase5_demo
 ./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
 ```
 
 `nlm_phase6_demo` runs a comprehensive integration test verifying all

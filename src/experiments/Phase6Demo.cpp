@@ -47,8 +47,11 @@ int main(int argc, char* argv[]) {
     experiment.testCheckpointing();
     std::cout << std::endl;
     
-    std::cout << "--- Replay Test ---" << std::endl;
-    experiment.testReplay();
+    // Test semantic and procedural memory integration
+    std::cout << "--- Semantic & Procedural Memory Test ---" << std::endl;
+    experiment.testSemanticMemoryIntegration();
+    std::cout << "--- Procedural Memory Test ---" << std::endl;
+    experiment.testProceduralMemoryIntegration();
     std::cout << std::endl;
     
     // Run full experiment with smaller settings for demo

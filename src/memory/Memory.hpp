@@ -88,6 +88,9 @@ public:
     SemanticMemory();
     ~SemanticMemory();
     
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
     // Store fact
     void storeFact(const std::string& key, const std::string& value);
     
@@ -106,6 +109,7 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    class Brain* brain;
 };
 
 // Procedural memory: learned skills and habits
@@ -119,10 +123,16 @@ struct Skill {
     Skill() : proficiency(0.0f) {}
 };
 
+// Procedural memory: learned skills and habits
+// PLACEHOLDER - Phase 2 will implement real procedural memory
+
 class ProceduralMemory {
 public:
     ProceduralMemory();
     ~ProceduralMemory();
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
     
     // Learn skill
     void learnSkill(const std::string& name, const std::vector<NeuronId>& pattern);
@@ -142,6 +152,7 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    class Brain* brain;
 };
 
 // Associative memory: relationships between representations

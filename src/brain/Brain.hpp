@@ -21,6 +21,8 @@ class Logger;
 class NeuralWorkingMemory;
 class NeuralEpisodicMemory;
 class NeuralAssociativeMemory;
+class SemanticMemory;
+class ProceduralMemory;
 class PredictionSystem;
 class NeuralPlanner;
 class ConceptFormation;
@@ -44,6 +46,23 @@ struct InterRegionConnection {
     
     InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
+};
+
+// Skill struct for ProceduralMemory
+struct Skill {
+    std::string name;
+    std::vector<NeuronId> neuralPattern;
+    float proficiency;
+    
+    Skill() : proficiency(0.0f) {}
+};
+
+struct Skill {
+    std::string name;
+    std::vector<NeuronId> neuralPattern;
+    float proficiency;
+    
+    Skill() : proficiency(0.0f) {}
 };
 
 // Brain: The central coordinator of the neural system
@@ -149,6 +168,30 @@ public:
     
     // Associative memory - pattern associations
     NeuralAssociativeMemory* getAssociativeMemory();
+    
+    // Semantic memory - facts and knowledge
+    SemanticMemory* getSemanticMemory();
+    
+    // Procedural memory - skills and habits
+    ProceduralMemory* getProceduralMemory();
+    
+    // Get semantic memory facts and knowledge
+    std::vector<std::pair<std::string, std::string>> getSemanticMemoryFacts() const;
+    
+    // Get procedural memory skills
+    std::vector<Skill> getProceduralMemorySkills() const;
+    
+    // Store fact in semantic memory
+    void storeSemanticFact(const std::string& key, const std::string& value);
+    
+    // Retrieve fact from semantic memory
+    std::string retrieveSemanticFact(const std::string& key) const;
+    
+    // Learn skill in procedural memory
+    void learnProceduralSkill(const std::string& name, const std::vector<NeuronId>& pattern);
+    
+    // Get skill from procedural memory
+    Skill* getProceduralSkill(const std::string& name);
     
     // ========== PREDICTION SYSTEM ==========
     

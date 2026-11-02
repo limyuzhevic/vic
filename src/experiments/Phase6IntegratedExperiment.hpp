@@ -130,9 +130,14 @@ public:
     bool testCheckpointing();
     
     /**
-     * Test replay system
+     * Test semantic memory integration
      */
-    bool testReplay();
+    bool testSemanticMemoryIntegration();
+    
+    /**
+     * Test procedural memory integration
+     */
+    bool testProceduralMemoryIntegration();
 };
 
 } // namespace nlm

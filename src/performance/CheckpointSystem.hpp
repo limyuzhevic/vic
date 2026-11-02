@@ -64,12 +64,14 @@ enum class CheckpointSection : uint32_t {
     Development = 6,
     Neuromodulation = 7,
     Memory = 8,
-    SpikeHistory = 9,
-    RandomState = 10,
-    SimulationState = 11,
-    Environment = 12,
-    Checksum = 13,
-    End = 14
+    SemanticMemory = 9,        // Added for SemanticMemory facts
+    ProceduralMemory = 10,      // Added for ProceduralMemory skills
+    SpikeHistory = 11,
+    RandomState = 12,
+    SimulationState = 13,
+    Environment = 14,
+    Checksum = 15,
+    End = 16
 };
 
 /**

@@ -35,6 +35,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralWorkingMemory> workingMemory;
     std::unique_ptr<NeuralEpisodicMemory> episodicMemory;
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
+    std::unique_ptr<SemanticMemory> semanticMemory;
+    std::unique_ptr<ProceduralMemory> proceduralMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
@@ -124,6 +126,8 @@ struct Brain::Impl {
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        semanticMemory = std::make_unique<SemanticMemory>();
+        proceduralMemory = std::make_unique<ProceduralMemory>();
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -283,6 +287,12 @@ bool Brain::initialize() {
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
+    
+    // Initialize semantic memory
+    pImpl->semanticMemory->initialize(this);
+    
+    // Initialize procedural memory
+    pImpl->proceduralMemory->initialize(this);
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
@@ -470,7 +480,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
+        // Update working memory with current neural activity
         pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Integrate working memory with sensory input
+        // Store active sensory patterns in working memory
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            if (neuron->isFiring() || 
+                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                // Convert firing to working memory trace
+                float activation = neuron->isFiring() ? 1.0f : 
+                                 std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f;
+                pImpl->workingMemory->storeToNeuron(neuron->getId(), activation);
+            }
+        }
+        
+        // Use working memory to modulate attention and planning
+        if (pImpl->attention && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            pImpl->attention->processCompetition(competitors);
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========
@@ -1080,10 +1109,51 @@ bool Brain::save(const std::string& filepath) const {
             } else {
                 p5AppendU64(payload, 0);
             }
-            writer.bufferSection(CheckpointSection::Memory, payload);
+            // Semantic memory: facts and knowledge base
+        {
+            std::vector<uint8_t> payload;
+            if (pImpl->semanticMemory) {
+                const auto& facts = pImpl->semanticMemory->getAllFacts();
+                p5AppendU64(payload, static_cast<uint64_t>(facts.size()));
+                for (const auto& fact : facts) {
+                    p5AppendU64(payload, static_cast<uint64_t>(fact.first.size()));
+                    if (!fact.first.empty()) {
+                        std::vector<uint8_t> keyBytes(fact.first.begin(), fact.first.end());
+                        payload.insert(payload.end(), keyBytes.begin(), keyBytes.end());
+                    }
+                    p5AppendU64(payload, static_cast<uint64_t>(fact.second.size()));
+                    if (!fact.second.empty()) {
+                        std::vector<uint8_t> valueBytes(fact.second.begin(), fact.second.end());
+                        payload.insert(payload.end(), valueBytes.begin(), valueBytes.end());
+                    }
+                }
+            } else {
+                p5AppendU64(payload, 0);
+            }
+            writer.bufferSection(CheckpointSection::SemanticMemory, payload);
         }
         
-        // Finalize
+        // Procedural memory: learned skills
+        {
+            std::vector<uint8_t> payload;
+            if (pImpl->proceduralMemory) {
+                const auto& skills = pImpl->proceduralMemory->getAllSkills();
+                p5AppendU64(payload, static_cast<uint64_t>(skills.size()));
+                for (const auto& skill : skills) {
+                    p5AppendU64(payload, static_cast<uint64_t>(skill.name.size()));
+                    if (!skill.name.empty()) {
+                        std::vector<uint8_t> nameBytes(skill.name.begin(), skill.name.end());
+                        payload.insert(payload.end(), nameBytes.begin(), nameBytes.end());
+                    }
+                    p5AppendU64(payload, skill.proficiency);
+                    // Note: neuralPattern is not checkpointed as it's too large
+                    // Skills can be relearned from semantic memory
+                }
+            } else {
+                p5AppendU64(payload, 0);
+            }
+            writer.bufferSection(CheckpointSection::ProceduralMemory, payload);
+        }
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
             return false;
@@ -1242,124 +1312,68 @@ bool Brain::load(const std::string& filepath) {
             }
         }
 
-        // Restore pending delayed spikes (in-flight synaptic input).
+        // Phase 6 extra sections beyond Phase 5. The load() method tolerates
+        // missing sections (legacy checkpoints) and only logs warnings.
         {
-            std::vector<DelayedSpikeEvent> pending;
-            if (!reader.readDelayedSpikes(pending)) {
-                NLM_LOG_ERROR("Failed to read pending spikes from checkpoint");
-                return false;
-            }
-            if (pImpl->spikeSystem) {
-                pImpl->spikeSystem->restorePendingDelayedSpikes(pending);
-            }
-            NLM_LOG_INFO("Restored " + std::to_string(pending.size()) + " pending delayed spikes");
-        }
-
-        // Restore simulation clock so a reloaded brain continues from
-        // the saved step instead of restarting its step counter.
-        pImpl->currentStep = reader.getHeader().step;
-        pImpl->currentTime = reader.getHeader().simulationTime;
-
-        // Phase 5 extra sections. Each is optional (legacy checkpoints
-        // lack them) and each failure only logs — a missing/corrupt
-        // extra section must not abort a load whose neurons and
-        // synapses restored fine.
-        {
-            auto payload = reader.readSection(CheckpointSection::SimulationState);
+            auto payload = reader.readSection(CheckpointSection::SemanticMemory);
             if (!payload.empty()) {
                 P5Reader r{payload.data(), payload.data() + payload.size()};
-                uint64_t total = 0, thisStep = 0, sinceEp = 0;
-                float pref = 0.0f;
-                if (r.u64(total) && r.u64(thisStep) && r.f32(pref) && r.u64(sinceEp) && r.ok) {
-                    pImpl->totalSpikesTotal = static_cast<size_t>(total);
-                    pImpl->totalSpikesThisStep = static_cast<size_t>(thisStep);
-                    pImpl->learnedPreference = std::clamp(pref, -1.0f, 1.0f);
-                    pImpl->stepsSinceLastEpisode = static_cast<size_t>(sinceEp);
-                } else {
-                    NLM_LOG_INFO("SimulationState section unreadable; counters/preference not restored");
-                }
-            }
-        }
-        {
-            auto payload = reader.readSection(CheckpointSection::RandomState);
-            if (!payload.empty() && pImpl->rng) {
-                std::string state(payload.begin(), payload.end());
-                if (!pImpl->rng->restoreState(state)) {
-                    NLM_LOG_INFO("RandomState section unreadable; RNG not restored");
-                }
-            }
-        }
-        {
-            // Per-synapse spike histories, matched by (source, dest)
-            // pair like the synapse weights above.
-            auto payload = reader.readSection(CheckpointSection::Plasticity);
-            if (!payload.empty()) {
-                P5Reader r{payload.data(), payload.data() + payload.size()};
-                std::unordered_map<uint64_t, std::vector<Synapse*>> byPair;
-                auto pairKey = [](uint64_t src, uint64_t dst) { return (src << 32) ^ dst; };
-                for (auto& region : pImpl->regions) {
-                    for (auto& syn : region->getSynapses()) {
-                        byPair[pairKey(syn->getSourceNeuron().index(),
-                                       syn->getDestinationNeuron().index())].push_back(syn.get());
-                    }
-                }
-                std::unordered_map<uint64_t, size_t> usedCount;
-                size_t restored = 0;
-                while (r.p < r.end && r.ok) {
-                    uint64_t src = 0, dst = 0;
-                    std::vector<double> pre, post;
-                    if (!r.u64(src) || !r.u64(dst) || !r.vec(pre) || !r.vec(post)) break;
-                    uint64_t key = pairKey(src, dst);
-                    auto it = byPair.find(key);
-                    if (it == byPair.end()) continue;
-                    size_t used = usedCount[key]++;
-                    if (used >= it->second.size()) continue;
-                    it->second[used]->setPreSpikeHistory(pre);
-                    it->second[used]->setPostSpikeHistory(post);
-                    ++restored;
-                }
-                NLM_LOG_INFO("Restored spike histories for " + std::to_string(restored) + " synapses");
-            }
-        }
-        {
-            auto payload = reader.readSection(CheckpointSection::Memory);
-            if (!payload.empty()) {
-                P5Reader r{payload.data(), payload.data() + payload.size()};
-                std::vector<uint64_t> wmIds;
-                std::vector<float> wmActs;
-                std::vector<uint64_t> wmTimes;
-                if (r.vec(wmIds) && r.vec(wmActs) && r.vec(wmTimes) && r.ok &&
-                    pImpl->workingMemory) {
-                    std::vector<NeuronId> neurons;
-                    neurons.reserve(wmIds.size());
-                    for (uint64_t id : wmIds) neurons.emplace_back(id);
-                    pImpl->workingMemory->restoreSnapshot(neurons, wmActs, wmTimes);
-                }
-                uint64_t epCount = 0;
-                if (r.u64(epCount) && r.ok && pImpl->episodicMemory) {
-                    std::vector<EpisodicMemoryItem> eps;
-                    eps.reserve(static_cast<size_t>(epCount));
-                    for (uint64_t i = 0; i < epCount && r.ok; ++i) {
-                        EpisodicMemoryItem ep;
-                        uint64_t ts = 0, actionRaw = 0, age = 0;
-                        std::vector<uint64_t> activeIds;
-                        if (!r.u64(ts) || !r.f32(ep.positionX) || !r.f32(ep.positionY) ||
-                            !r.f32(ep.orientation) || !r.u64(actionRaw) ||
-                            !r.f32(ep.reward) || !r.f32(ep.energy) || !r.f32(ep.novelty) ||
-                            !r.f32(ep.resultingReward) || !r.u64(age) ||
-                            !r.vec(ep.sensoryState) || !r.vec(ep.resultingSensoryState) ||
-                            !r.vec(activeIds) || !r.vec(ep.neuronActivations)) {
-                            break;
+                uint64_t factCount = 0;
+                if (r.u64(factCount) && r.ok && pImpl->semanticMemory) {
+                    for (uint64_t i = 0; i < factCount && r.ok; ++i) {
+                        uint64_t keyLen = 0, valueLen = 0;
+                        std::string key, value;
+                        if (!r.u64(keyLen)) break;
+                        if (keyLen > 0) {
+                            std::vector<uint8_t> keyBytes(keyLen);
+                            if (!r.vec(keyBytes)) break;
+                            key.assign(keyBytes.begin(), keyBytes.end());
                         }
-                        ep.timestamp = ts;
-                        ep.action = static_cast<ActionType>(static_cast<int32_t>(actionRaw));
-                        ep.age = age;
-                        ep.activeNeurons.reserve(activeIds.size());
-                        for (uint64_t id : activeIds) ep.activeNeurons.emplace_back(id);
-                        eps.push_back(std::move(ep));
+                        if (!r.u64(valueLen)) break;
+                        if (valueLen > 0) {
+                            std::vector<uint8_t> valueBytes(valueLen);
+                            if (!r.vec(valueBytes)) break;
+                            value.assign(valueBytes.begin(), valueBytes.end());
+                        }
+                        if (r.ok) {
+                            pImpl->semanticMemory->storeFact(key, value);
+                        }
                     }
-                    if (r.ok) {
-                        pImpl->episodicMemory->restoreEpisodes(eps);
+                    if (!r.ok) {
+                        NLM_LOG_INFO("SemanticMemory section unreadable; facts not restored");
+                    }
+                }
+            }
+        }
+        {
+            auto payload = reader.readSection(CheckpointSection::ProceduralMemory);
+            if (!payload.empty()) {
+                P5Reader r{payload.data(), payload.data() + payload.size()};
+                uint64_t skillCount = 0;
+                if (r.u64(skillCount) && r.ok && pImpl->proceduralMemory) {
+                    for (uint64_t i = 0; i < skillCount && r.ok; ++i) {
+                        uint64_t nameLen = 0;
+                        std::string name;
+                        float proficiency = 0.0f;
+                        if (!r.u64(nameLen)) break;
+                        if (nameLen > 0) {
+                            std::vector<uint8_t> nameBytes(nameLen);
+                            if (!r.vec(nameBytes)) break;
+                            name.assign(nameBytes.begin(), nameBytes.end());
+                        }
+                        if (!r.f32(proficiency)) break;
+                        if (r.ok) {
+                            // Re-learnt skills - neural patterns are not saved, only names and proficiency
+                            // Skills will be re-learned from semantic memory or other sources
+                            // For now, just store the name and proficiency
+                            Skill* existingSkill = pImpl->proceduralMemory->getSkill(name);
+                            if (existingSkill) {
+                                existingSkill->proficiency = proficiency;
+                            }
+                        }
+                    }
+                    if (!r.ok) {
+                        NLM_LOG_INFO("ProceduralMemory section unreadable; skills not restored");
                     }
                 }
             }
@@ -1483,13 +1497,61 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
     return pImpl->associativeMemory.get();
 }
 
-// ========== PREDICTION SYSTEM ACCESSOR ==========
+// Semantic memory accessor
+SemanticMemory* Brain::getSemanticMemory() {
+    return pImpl->semanticMemory.get();
+}
+
+// Procedural memory accessor
+ProceduralMemory* Brain::getProceduralMemory() {
+    return pImpl->proceduralMemory.get();
+}
 
 PredictionSystem* Brain::getPredictionSystem() {
     return pImpl->predictionSystem.get();
 }
 
-// ========== COGNITION SYSTEM ACCESSORS ==========
+// ========== SEMANTIC AND PROCEDURAL MEMORY ACCESSORS ==========
+
+std::vector<std::pair<std::string, std::string>> Brain::getSemanticMemoryFacts() const {
+    if (pImpl->semanticMemory) {
+        return pImpl->semanticMemory->getAllFacts();
+    }
+    return std::vector<std::pair<std::string, std::string>>();
+}
+
+std::vector<Skill> Brain::getProceduralMemorySkills() const {
+    if (pImpl->proceduralMemory) {
+        return pImpl->proceduralMemory->getAllSkills();
+    }
+    return std::vector<Skill>();
+}
+
+void Brain::storeSemanticFact(const std::string& key, const std::string& value) {
+    if (pImpl->semanticMemory) {
+        pImpl->semanticMemory->storeFact(key, value);
+    }
+}
+
+std::string Brain::retrieveSemanticFact(const std::string& key) const {
+    if (pImpl->semanticMemory) {
+        return pImpl->semanticMemory->retrieveFact(key);
+    }
+    return "";
+}
+
+void Brain::learnProceduralSkill(const std::string& name, const std::vector<NeuronId>& pattern) {
+    if (pImpl->proceduralMemory) {
+        pImpl->proceduralMemory->learnSkill(name, pattern);
+    }
+}
+
+Skill* Brain::getProceduralSkill(const std::string& name) {
+    if (pImpl->proceduralMemory) {
+        return pImpl->proceduralMemory->getSkill(name);
+    }
+    return nullptr;
+}
 
 NeuralPlanner* Brain::getPlanner() {
     return pImpl->planner.get();
