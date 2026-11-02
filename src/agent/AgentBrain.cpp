@@ -4,6 +4,7 @@
 #include "../core/Random/Random.hpp"
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -21,6 +22,24 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , maxTouch_(0.0f)
+    , forwardTouch_(0.0f)
+    , forwardObjectVision_(1.0f)
+    , lastWinnerGroup_(-1)
+    , lastWinnerMargin_(0.0f)
+    , consecutiveWinnerCount_(0)
+    , stepsSinceTurn_(0)
+    , repeatCount_(0)
+    , reflexBonusCount_(0)
+    , reflexSuppressCount_(0)
+    , wtaPulseCount_(0)
+    , lastDecoded_(MotorCommand::Wait)
+    , hasLastDecoded_(false)
+    , selfModelReady_(false)
+    , socialReady_(false)
+    , hasThoughtPlanned_(false)
+    , hasThoughtOutcome_(false)
+    , thoughtReward_(0.0f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -35,13 +54,16 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                                     motorTurnLeft_.size() + motorTurnRight_.size() +
                                     motorInteract_.size() + motorWait_.size();
                         
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
+                        // Safety check - bounds checking for motor group assignment
+                        if (idx < 6) {
+                            switch (idx) {
+                                case 0: motorForward_.push_back(n); break;
+                                case 1: motorBackward_.push_back(n); break;
+                                case 2: motorTurnLeft_.push_back(n); break;
+                                case 3: motorTurnRight_.push_back(n); break;
+                                case 4: motorInteract_.push_back(n); break;
+                                case 5: motorWait_.push_back(n); break;
+                            }
                         }
                     }
                 } else if (type == NeuronType::Internal) {
@@ -54,11 +76,14 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
                         size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
                                     sensoryInternal_.size() + sensoryProprioception_.size();
                         
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
+                        // Safety check - bounds checking for sensory group assignment
+                        if (idx < 4) {
+                            switch (idx) {
+                                case 0: sensoryVision_.push_back(n); break;
+                                case 1: sensoryTouch_.push_back(n); break;
+                                case 2: sensoryInternal_.push_back(n); break;
+                                case 3: sensoryProprioception_.push_back(n); break;
+                            }
                         }
                     }
                 }
@@ -101,7 +126,12 @@ std::vector<size_t> AgentBrain::encodeText(const std::string& text) {
         z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
         z = z ^ (z >> 31);
         size_t idx = static_cast<size_t>(z % 15);
-        if (std::find(out.begin(), out.end(), idx) == out.end()) out.push_back(idx);
+        // Safety check - bounds checking for index
+        if (idx < 15 && std::find(out.begin(), out.end(), idx) == out.end()) {
+            out.push_back(idx);
+        } else {
+            break; // Cannot find 4 unique indices
+        }
     }
     return out;
 }
@@ -139,21 +169,6 @@ float AgentBrain::getSelfModelConfidence() const {
 
 size_t AgentBrain::getSocialObservationCount() const {
     return socialReady_ ? socialLearning_.getObservationCount() : 0;
-}
-
-void AgentBrain::observeOtherAgent(MotorCommand observed, const std::vector<float>& beforeVision,
-                                   const std::vector<float>& afterVision) {
-    if (!socialReady_ && brain_) { socialLearning_.initialize(brain_.get()); socialReady_ = true; }
-    ActionType act = ActionType::Wait;
-    switch (observed) {
-        case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
-        case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
-        case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
-        case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
-        case MotorCommand::Interact: act = ActionType::Interact; break;
-        default: break;
-    }
-    socialLearning_.observeAgentAction(act, beforeVision, afterVision);
 }
 
 void AgentBrain::initialize(const SimpleWorld& world) {
@@ -262,6 +277,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!percept.getText().empty()) {
         for (size_t idx : encodeText(percept.getText())) {
             size_t neuronIdx = 16 + idx;
+            // Safety check - bounds checking for text neuron index
             if (neuronIdx < sensoryVision_.size() && sensoryVision_[neuronIdx]) {
                 sensoryVision_[neuronIdx]->injectCurrent(8.0f);
             }
@@ -464,8 +480,15 @@ MotorCommand AgentBrain::decodeMotorCommand() {
         decoded = selectWithCuriosity(decoded);
     }
 
-    // Phase 6 planner agreement: planned vs finally acted, after
-    // curiosity exploration (which can still override both).
+    // Phase 6 planner IN the loop (was advisory only). The planner
+    // suggests from learned action quality; that suggestion now
+    // biases the motor decode, but only once the planner has actually
+    // learned something (some action quality beyond +-0.05 from
+    // experienced rewards) and only when its suggestion is clearly
+    // better in its own units (quality gap > 0.15, on a -1..1
+    // reward/10 scale) than the action the motor pattern would pick.
+    // A +15 Hz bias can overturn a near-tie, not a decisive motor
+    // pattern, and the override is counted at winner selection below.
     if (hasThoughtPlanned_) {
         ++plannerDecisionCount_;
         if (thoughtPlanned_ == decoded) ++plannerAgreementCount_;
@@ -870,15 +893,20 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
         if (r < exploreChance) {
             // Random motor command
             int choice = brain_->getRandomGenerator()->uniformInt(uint32_t(0), uint32_t(7));
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
+            // Safety check - bounds checking for random choice
+            if (choice >= 0 && choice < 8) {
+                switch (choice) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::LookLeft;
+                    case 5: return MotorCommand::LookRight;
+                    case 6: return MotorCommand::Interact;
+                    default: return MotorCommand::Wait;
+                }
+            } else {
+                return MotorCommand::Wait;
             }
         }
     }
@@ -1058,53 +1086,75 @@ const char* phase5CmdName(MotorCommand cmd) {
 
 std::string AgentBrain::getThoughtTrace() const {
     std::string out = "perceived=[" + thoughtPercept_ + "] -> planned=[";
-    out += hasThoughtPlanned_ ? phase5CmdName(thoughtPlanned_) : "none";
-    out += "] -> acted=[" + std::string(phase5CmdName(lastDecoded_)) + "] -> outcome=[";
-    out += hasThoughtOutcome_ ? ("reward=" + std::to_string(thoughtReward_)) : "none";
-    out += "] novelty=" + std::to_string(noveltyLevel_) +
-           " curiosity=" + std::to_string(curiosityLevel_);
+
+    // Add planned action
+    switch (thoughtPlanned_) {
+        case MotorCommand::MoveForward: out += "MoveForward"; break;
+        case MotorCommand::MoveBackward: out += "MoveBackward"; break;
+        case MotorCommand::TurnLeft: out += "TurnLeft"; break;
+        case MotorCommand::TurnRight: out += "TurnRight"; break;
+        case MotorCommand::Interact: out += "Interact"; break;
+        default: out += "Wait"; break;
+    }
+    out += "] -> acted=[";
+
+    // Add acted action
+    switch (lastDecoded_) {
+        case MotorCommand::MoveForward: out += "MoveForward"; break;
+        case MotorCommand::MoveBackward: out += "MoveBackward"; break;
+        case MotorCommand::TurnLeft: out += "TurnLeft"; break;
+        case MotorCommand::TurnRight: out += "TurnRight"; break;
+        case MotorCommand::Interact: out += "Interact"; break;
+        default: out += "Wait"; break;
+    }
+    out += "] -> reward=[" + std::to_string(thoughtReward_) + "]";
+
     return out;
 }
 
-float AgentBrain::getLearnedPreference() const {
-    return brain_ ? brain_->getLearnedPreference() : 0.0f;
-}
-
 void AgentBrain::reset() {
+    // Reset agent for new episode
+    predictedVision_.clear();
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    
+    // Reset counters
+    maxTouch_ = 0.0f;
+    forwardTouch_ = 0.0f;
+    forwardObjectVision_ = 1.0f;
+    lastWinnerGroup_ = -1;
+    lastWinnerMargin_ = 0.0f;
+    consecutiveWinnerCount_ = 0;
+    stepsSinceTurn_ = 0;
+    repeatCount_ = 0;
+    lastDecoded_ = MotorCommand::Wait;
+    hasLastDecoded_ = false;
+    
+    // Reset counters for advanced diagnostics
+    reflexBonusCount_ = 0;
+    reflexSuppressCount_ = 0;
+    wtaPulseCount_ = 0;
+    hasThoughtPlanned_ = false;
+    hasThoughtOutcome_ = false;
+    thoughtReward_ = 0.0f;
+    
+    // Reset neuromodulation state
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;
     expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
     
-    // Clear the visual prediction (a new episode's first scene is
-    // novel again) and the touch state.
-    predictedVision_.clear();
-    maxTouch_ = 0.0f;
-    forwardTouch_ = 0.0f;
-    forwardObjectVision_ = 1.0f;
-    lastVision_.clear();
-    lastWinnerGroup_ = -1;
-    lastWinnerMargin_ = 0.0f;
-    consecutiveWinnerCount_ = 0;
-    reflexBonusCount_ = 0;
-    reflexSuppressCount_ = 0;
-    wtaPulseCount_ = 0;
-    plannerOverrideCount_ = 0;
-    plannerAgreementCount_ = 0;
-    plannerDecisionCount_ = 0;
-    conceptBiasCount_ = 0;
-    selfBiasCount_ = 0;
-    socialBiasCount_ = 0;
-    lastTouch_.clear();
-    lastText_.clear();
-    stepsSinceTurn_ = 0;
-    repeatCount_ = 0;
-    hasLastDecoded_ = false;
-    hasThoughtPlanned_ = false;
-    hasThoughtOutcome_ = false;
+    // Reset thought trace
+    thoughtPercept_ = "none";
+    
+    // Reset self-model and social learning
+    selfModel_.reset();
+    socialLearning_.reset();
+    selfModelReady_ = false;
+    socialReady_ = false;
+    
+    NLM_LOG_INFO("AgentBrain reset complete");
 }
 
 } // namespace nlm
