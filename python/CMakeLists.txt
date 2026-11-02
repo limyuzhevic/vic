@@ -3,7 +3,7 @@ project(pynlm_bindings LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 # Phase 5 fix: the module is a shared library, so the static NLM libs
 # it links must be position-independent, or the link fails with
 # "recompile with -fPIC".
@@ -18,6 +18,7 @@ find_package(pybind11 CONFIG REQUIRED)
 
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
+# Core NLM libraries (unchanged from original)
 set(NLM_CORE_SOURCES
     ${NLM_SOURCE_DIR}/core/Types/Types.cpp
     ${NLM_SOURCE_DIR}/core/Config/Config.cpp
@@ -93,9 +94,18 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+# Main Python module (using new modular structure)
+pybind11_add_module(pynlm pynlm.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+# Additional modular components
+target_sources(pynlm PRIVATE
+    bindings_id_types.cpp
+    bindings_enums.cpp
+    bindings_core.cpp
+    bindings_factory.cpp
+)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
