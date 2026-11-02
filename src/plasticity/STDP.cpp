@@ -77,13 +77,19 @@ void STDP::update(Synapse* synapse,
         float efficacy = synapse->getEfficacy();
         totalDelta *= efficacy;
 
-        // Inhibitory plasticity must strengthen inhibition, not flip it:
-        // pre-before-post on an inhibitory synapse should make its weight
-        // more negative, not positive. Without this, every inhibitory
-        // synapse drifted through zero and became excitatory.
-        if (synapse->getType() == SynapseType::Inhibitory) {
-            totalDelta = -totalDelta;
+        // Add bounds checking to prevent weight saturation
+        // Scale weight change by remaining distance to bounds
+        float currentWeight = synapse->getWeight();
+        float distanceToMax = pImpl->maxWeight - currentWeight;
+        float distanceToMin = currentWeight - pImpl->minWeight;
+        float boundScaling = 1.0f;
+        
+        if (distanceToMax < 0.01f) {
+            boundScaling *= distanceToMax / 0.01f;  // Scale down if near max
+        } else if (distanceToMin < 0.01f) {
+            boundScaling *= distanceToMin / 0.01f;  // Scale down if near min
         }
+        totalDelta *= boundScaling;
 
         // Soft (weight-dependent) bounds, Phase 4: the old rule added a
         // fixed ~0.01 to every co-active synapse on every step, so with

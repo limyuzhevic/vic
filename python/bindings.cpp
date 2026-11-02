@@ -151,11 +151,48 @@ PYBIND11_MODULE(pynlm, m) {
         // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
-            argv.reserve(args.size());
+            argv.reserve(args.size() + 1);  // +1 for program name
+            argv.push_back(const_cast<char*>("nlm"));  // Add dummy program name
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
            "Load configuration from command line arguments")
+        // Add convenience method for Python-style dict-like access
+        .def("get", [](Config& self, const std::string& key, const ConfigValue& defaultValue) {
+            auto val = self.get<ConfigValue>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a configuration value by key with default")
+        // Add string-based convenience methods
+        .def("getString", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            auto val = self.get<std::string>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a string configuration value by key")
+        .def("getInt", [](Config& self, const std::string& key, int64_t defaultValue) {
+            auto val = self.get<int64_t>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get an integer configuration value by key")
+        .def("getDouble", [](Config& self, const std::string& key, double defaultValue) {
+            auto val = self.get<double>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a double configuration value by key")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue) {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a boolean configuration value by key")
+        // Add methods to set values conveniently
+        .def("setString", &Config::set<std::string>, py::arg("key"), py::arg("value"),
+             "Set a string configuration value")
+        .def("setInt", &Config::set<int64_t>, py::arg("key"), py::arg("value"),
+             "Set an integer configuration value")
+        .def("setDouble", &Config::set<double>, py::arg("key"), py::arg("value"),
+             "Set a double configuration value")
+        .def("setBool", &Config::set<bool>, py::arg("key"), py::arg("value"),
+             "Set a boolean configuration value")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -395,18 +432,103 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+    // Add convenience methods for brain management
+    .def("runSimulation", [](Brain& self, uint64_t steps, bool verbose = false) {
+        for (uint64_t step = 0; step < steps; ++step) {
+            self.step(step);
+            if (verbose && step % 100 == 0) {
+                NLM_LOG_INFO("Step " + std::to_string(step) + 
+                           " | Firing: " + std::to_string(self.getFiringNeuronCount()) +
+                           " | Spikes: " + std::to_string(self.getTotalSpikeCount()));
+            }
+        }
+    }, py::arg("steps"), py::arg("verbose") = false,
+       "Run simulation for specified number of steps")
+    
+    // Add convenience methods for agent operations
+    .def("runEpisode", [](AgentBrain& self, SimpleWorld& world, uint64_t steps, bool verbose = false) {
+        for (uint64_t step = 0; step < steps; ++step) {
+            // Get sensory input from world
+            SensoryPercept percept = world.getSensoryPercept();
+            
+            // Process sensory input
+            self.processSensoryInput(percept);
+            
+            // Run brain step
+            auto brain = self.getBrain();
+            brain->step(step);
+            
+            // Get motor command
+            MotorCommand cmd = self.decodeMotorCommand();
+            
+            // Apply action to world
+            ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
+            
+            // Apply reward modulation
+            self.applyRewardModulation(result.reward, 0.0f);
+            
+            // Update development
+            self.updateDevelopment(world.getSimulationTime());
+            
+            if (verbose && step % 50 == 0) {
+                NLM_LOG_INFO("Step " + std::to_string(step) + 
+                           " | Reward: " + std::to_string(result.reward) +
+                           " | Action: " + std::to_string(static_cast<int>(cmd)) +
+                           " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+            }
+        }
+    }, py::arg("world"), py::arg("steps"), py::arg("verbose") = false,
+       "Run a complete episode in the world")
+    
+    // Add statistical convenience methods
+    .def("getStatistics", [](Brain& self) {
+        std::ostringstream oss;
+        oss << "=== Brain Statistics ===\n";
+        oss << "Neurons: " << self.getTotalNeuronCount() << "\n";
+        oss << "Synapses: " << self.getTotalSynapseCount() << "\n";
+        oss << "Firing neurons: " << self.getFiringNeuronCount() << "\n";
+        oss << "Active neurons: " << self.getActiveNeuronCount() << "\n";
+        oss << "Total spikes: " << self.getTotalSpikeCount() << "\n";
+        oss << "Average firing rate: " << self.getAverageFiringRate() << "\n";
+        oss << "E/I ratio: " << self.getExcitationInhibitionRatio() << "\n";
+        oss << "Developmental stage: " << static_cast<int>(self.getDevelopmentalStage()) << "\n";
+        
+        auto config = self.getConfig();
+        if (config) {
+            oss << "\n=== Configuration Summary ===\n";
+            oss << config->summary();
+        }
+        
+        return oss.str();
+    }, "Get comprehensive statistics about the brain");
+
+    // Add agent statistics convenience method
+    .def("getStatistics", [](AgentBrain& self) {
+        std::ostringstream oss;
+        oss << "=== Agent Statistics ===\n";
+        
+        auto brain = self.getBrain();
+        if (brain) {
+            oss << "Underlying brain statistics:\n";
+            oss << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
+            oss << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
+            oss << "  Firing neurons: " << brain->getFiringNeuronCount() << "\n";
+            oss << "  Total spikes: " << brain->getTotalSpikeCount() << "\n";
+        }
+        
+        oss << "\nAgent-specific:\n";
+        oss << "  Curiosity level: " << self.getCuriosityLevel() << "\n";
+        oss << "  Novelty level: " << self.getNoveltyLevel() << "\n";
+        oss << "  Prediction error: " << self.getPredictionError() << "\n";
+        oss << "  Neuromodulation level: " << self.getNeuromodulationLevel() << "\n";
+        oss << "  Developmental stage: " << static_cast<int>(self.getDevelopmentalStage()) << "\n";
+        oss << "  Reward modulation enabled: " << (self.isRewardModulationEnabled() ? "yes" : "no") << "\n";
+        oss << "  Structural plasticity enabled: " << (self.isStructuralPlasticityEnabled() ? "yes" : "no") << "\n";
+        oss << "  Development enabled: " << (self.isDevelopmentEnabled() ? "yes" : "no") << "\n";
+        oss << "  Curiosity enabled: " << (self.isCuriosityEnabled() ? "yes" : "no") << "\n";
+        
+        return oss.str();
+    }, "Get comprehensive statistics about the agent");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

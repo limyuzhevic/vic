@@ -68,7 +68,20 @@ void Hebbian::update(Synapse* synapse,
     // without this, Hebbian alone added a fixed 0.01 per co-active step
     // and saturated every weight together with STDP.
     if (std::abs(delta) > 1e-6f) {
-        delta *= (1.0f - std::abs(synapse->getWeight()));
+        // Add bounds checking to prevent weight saturation
+        // Scale weight change by remaining distance to bounds
+        float currentWeight = synapse->getWeight();
+        float distanceToMax = pImpl->maxWeight - currentWeight;
+        float distanceToMin = currentWeight - pImpl->minWeight;
+        float boundScaling = 1.0f;
+        
+        if (distanceToMax < 0.01f) {
+            boundScaling *= distanceToMax / 0.01f;  // Scale down if near max
+        } else if (distanceToMin < 0.01f) {
+            boundScaling *= distanceToMin / 0.01f;  // Scale down if near min
+        }
+        delta *= boundScaling;
+        
         applyWeightChange(synapse, delta);
         if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
             synapse->setWeight(-0.01f);

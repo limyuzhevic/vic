@@ -220,9 +220,10 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Applying selective input patterns (500 steps)...");
+    NLM_LOG_INFO("Only stimulating 5 sensory neurons each step (vs. 20 previously).");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
+    // A selective pattern, not a seizure: stimulate only the first 5 sensory neurons
     // each step. The old code injected 30.0f into *every* sensory neuron
     // 20 times per step (600.0f), so the whole network fired synchronously
     // and every weight saturated to 1.0 - learning was measurable but not
@@ -230,14 +231,14 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 5) {
                 patternNeurons.push_back(neuron->getId());
             }
         }
     }
-    for (SimulationStep step = 0; step < 1000; ++step) {
+    for (SimulationStep step = 0; step < 500; ++step) {
         for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+            brain->injectCurrent(id, 20.0f);
         }
         
         brain->step(step, step * 0.001);
@@ -290,11 +291,11 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
 
-    float delta = syn->getWeight() - beforeWeight;
+    NLM_LOG_INFO(
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -352,21 +353,24 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Set default values for Phase 2 - REDUCED to prevent saturation
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("connection_probability", 0.05f, ConfigSource::Default);  // REDUCED: fewer connections
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // STDP parameters - SLOWED to prevent rapid saturation
+    config->set("stdp_ltp_weight", 0.002f, ConfigSource::Default);  // REDUCED: smaller weight changes
+    config->set("stdp_ltd_weight", 0.0015f, ConfigSource::Default);  // REDUCED: smaller weight changes
+    config->set("stdp_tau", 50.0f, ConfigSource::Default);  // INCREASED: longer time constant
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Structural plasticity parameters - REDUCED
+    config->set("synaptogenesis_rate", 0.00001f, ConfigSource::Default);  // REDUCED: slower growth
+    config->set("pruning_rate", 0.000005f, ConfigSource::Default);  // REDUCED: slower pruning
+    
+    // Hebbian learning parameters - REDUCED
+    config->set("hebbian_learning_rate", 0.001f, ConfigSource::Default);  // REDUCED: smaller changes
     
     // Log configuration summary
     NLM_LOG_INFO("");

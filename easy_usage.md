@@ -71,6 +71,84 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### NEW: Advanced Usage Examples
+
+#### Pattern Probe (Phase 5 feature)
+
+```python
+import pynlm
+
+# Create brain and agent
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+
+# Test different sensory patterns
+emptyVision = [1.0] * 16
+brightVision = [1.0] * 16
+brightVision[5:11] = [0.7] * 6  # Bright object
+
+darkVision = [1.0] * 16  
+darkVision[5:11] = [0.25] * 6  # Dark object
+
+# Present patterns and observe responses
+for vision in [emptyVision, brightVision, darkVision]:
+    touch = [0.0] * 8
+    if vision != emptyVision:
+        touch[0] = 0.8  # Agent touched
+    
+    percept = pynlm.SensoryInput()
+    percept.setVision(vision)
+    percept.setTouch(touch)
+    
+    agent.processSensoryInput(percept)
+    
+    # Run brain computation
+    for i in range(50):
+        brain.step(i)
+    
+    action = agent.decodeMotorCommand()
+    print(f"Pattern analyzed: action={action}, firing={brain.getFiringNeuronCount()}")
+```
+
+#### Checkpoint Round-trip (Phase 5 feature)
+
+```python
+import pynlm
+import os
+
+# Create and run brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run some steps
+for i in range(100):
+    brain.step(i)
+    if i % 25 == 0:
+        print(f"Step {i}: {brain.getFiringNeuronCount()} neurons firing")
+
+# Save checkpoint
+checkpoint_path = "/tmp/nlm_checkpoint_test.bin"
+saved = brain.save(checkpoint_path)
+print(f"Checkpoint saved: {saved}")
+
+# Create new brain and load
+brain2 = pynlm.createBrain(pynlm.createDefaultConfig())
+brain2.initialize()
+
+loaded = brain2.load(checkpoint_path)
+print(f"Checkpoint loaded: {loaded}")
+
+# Continue with loaded brain
+for i in range(50):
+    brain2.step(i + 100)
+    print(f"Step after load: {brain2.getFiringNeuronCount()} neurons firing")
+
+# Cleanup
+if os.path.exists(checkpoint_path):
+    os.remove(checkpoint_path)
+```
+
 ---
 
 ## Simple Analogy
@@ -221,7 +299,7 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### NEW: Complete Agent with Learning
 
 ```python
 import pynlm
@@ -268,6 +346,10 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Run full episode | `run_simulation(brain, world, agent, steps)` |
+| Get statistics | `brain.getStatistics()` |
+| Save/load checkpoint | `brain.save(path)`, `brain.load(path)` |
+| Enable learning | `agent.enableRewardModulation(True)` |
 
 ---
 
@@ -285,6 +367,21 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Checkpoint failed to save/load"**
+- Check file permissions
+- Ensure directory exists
+- Try with a simpler filename
+
+**"Learning is saturating too quickly"**
+- Enable curiosity to explore
+- Use longer simulation times
+- Reduce learning rates
+
+**"Pattern probe gives no difference"**
+- Use different vision patterns (dark vs bright objects)
+- Include touch input to differentiate patterns
+- Run more brain steps per pattern
+
 ---
 
 ## Next Steps
@@ -294,4 +391,12 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+**NEW**: Try the advanced features:
+1. Pattern probe to test different sensory inputs
+2. Checkpoint round-trip to save and resume simulations
+3. Enhanced statistics for better monitoring
+4. Configuration JSON files for persistent settings
+
+That's it! You're now ready to use NLM with both basic and advanced features.
+
+(End of file - total 418 lines)

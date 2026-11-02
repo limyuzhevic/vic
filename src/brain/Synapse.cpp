@@ -46,12 +46,15 @@ struct Synapse::Impl {
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
 };
 
-Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
+    Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     : pImpl(new Impl) {
     pImpl->id = id;
     pImpl->sourceNeuron = source;
     pImpl->destinationNeuron = destination;
-    pImpl->weight = 0.0f;
+    // Initialize weight to a small value centered around zero to prevent
+    // runaway potentiation from the first learning events. This helps
+    // prevent saturation where all weights quickly reach their bounds.
+    pImpl->weight = 0.01f * ((static_cast<float>(rand()) / RAND_MAX) - 0.5f) * 2.0f;
     pImpl->delay = 1;  // Default: 1 step delay
     pImpl->type = SynapseType::Excitatory;
     pImpl->eligibilityTrace = 0.0f;
