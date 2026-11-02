@@ -355,39 +355,265 @@ agent.getPredictionError()
 agent.getNeuromodulationLevel()
 ```
 
-#### SimpleWorld Class
+#### Advanced SimpleWorld Features
 
 ```python
-# Creation
+# Create extended environment simulation
+agentPath, environmentSnapshots = world.create_environment_simulation(
+    duration=1000, 
+    agentStart=[5.0, 5.0]
+)
+
+# Analyze environment state
+analysis = world.analyze_environment()
+print(f"Agent position: ({analysis['agent_x']}, {analysis['agent_y']})")
+print(f"Agent energy: {analysis['agent_energy']}")
+print(f"Vision quality: {analysis['vision_variance']:.3f}")
+
+# Create demonstration scenarios
+world.create_demonstration_scenario("resource_discovery")
+world.create_demonstration_scenario("obstacle_course")
+
+# Export/import world data
+world.export_data("world_state.csv")
+world.import_data("world_state.csv")
+```
+
+### Advanced Configuration and Brain Management
+
+#### Optimized Brain Configurations
+
+```python
+# Create optimized configurations for different use cases
+config_fast = pynlm.createDefaultConfig()
+# Fast profile: small brain, minimal plasticity
+config_balanced = pynlm.createDefaultConfig()
+# Balanced profile: standard brain, moderate plasticity
+config_deep = pynlm.createDefaultConfig()
+# Deep profile: large brain, maximum plasticity
+```
+
+#### Advanced Brain Operations
+
+```python
+# Run batch processing
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+firing_rates = brain.run_batch(steps=1000, timeStep=0.01, logStats=True)
+
+# Performance profiling
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+perf_stats = brain.profile_performance(steps=100)
+print(f"Duration: {perf_stats.totalTime:.2f}s")
+print(f"Steps/second: {perf_stats.stepsPerSecond:.1f}")
+print(f"Average firing rate: {perf_stats.avgFiringRate:.3f}")
+print(f"Memory usage: {perf_stats.memoryUsage} bytes")
+
+# Get brain region by name
+cortex = brain.get_region_by_name("cortex")
+if cortex:
+    print("Found cortex region")
+
+# Advanced plasticity control
+brain.enable_advanced_features(
+    stdp=True,
+    hebbian=True,
+    structural=True,
+    neuromod=True
+)
+```
+
+#### AgentBrain Advanced Features
+
+```python
+# Create complete agent simulation
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
 world = pynlm.createSimpleWorld()
-
-# Configuration
 world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
 
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
+# Run agent with learning enabled
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
 
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
+# Get trajectory data
+trajectory = agent.create_agent_simulation(world, steps=500, enableLearning=True)
 
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
+# Analyze behavior
+metrics = agent.analyze_behavior()
+print(f"Firing rate: {metrics['firing_rate']:.3f}")
+print(f"Curiosity level: {metrics['curiosity_level']:.3f}")
+print(f"Novelty level: {metrics['novelty_level']:.3f}")
 
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
+# Multi-behavior training
+successful = agent.create_advanced_training(
+    world=world,
+    behaviors=["exploration", "cognition", "memory"],
+    stepsPerBehavior=200
+)
+print(f"Successfully trained behaviors: {successful}")
+```
 
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
+#### Configuration Management
+
+```python
+# Create and validate configurations
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1500)
+config.set("brain.synapse_density", 0.15)
+
+# Validate configuration
+errors = config.validate_config()
+if errors:
+    print("Configuration errors:", errors)
+else:
+    print("Configuration is valid")
+
+# Merge configurations
+config1 = pynlm.createDefaultConfig()
+config2 = pynlm.createDefaultConfig()
+merged = config1.merge_configs([config1, config2])
+
+# Export/import configurations
+config_dict = config.export_to_dict()
+config.import_from_dict(config_dict)
+```
+
+### Training and Simulation Examples
+
+#### Complete Agent Episode
+
+```python
+def run_training_episode(brain, world, agent, steps=1000):
+    """Run a complete training episode and return results."""
+    total_reward, successful_actions, duration = agent.run_agent_episode(
+        brain=brain,
+        world=world,
+        agent=agent,
+        steps=steps
+    )
+    
+    return {
+        "total_reward": total_reward,
+        "success_rate": successful_actions / steps,
+        "duration": duration,
+        "actions_per_second": steps / duration
+    }
+
+# Example usage
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(20, 20, 8, 8)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+results = run_training_episode(brain, world, agent, 500)
+print(f"Training completed!")
+print(f"Total reward: {results['total_reward']:.2f}")
+print(f"Success rate: {results['success_rate']:.2%}")
+print(f"Duration: {results['duration']:.2f}s")
+```
+
+#### Performance Benchmarking
+
+```python
+def benchmark_brain(brain, steps, profile="balanced"):
+    """Benchmark brain performance and return metrics."""
+    duration, steps_per_second, avg_firing_rate, total_spikes = pynlm.benchmark_brain(
+        brain=brain,
+        steps=steps,
+        profile=profile
+    )
+    
+    return {
+        "duration_seconds": duration,
+        "steps_per_second": steps_per_second,
+        "average_firing_rate": avg_firing_rate,
+        "total_spikes": total_spikes,
+        "performance_rating": "excellent" if steps_per_second > 1000 else "good" if steps_per_second > 100 else "needs_optimization"
+    }
+
+# Benchmark different configurations
+brain_fast = pynlm.createBrain(pynlm.createDefaultConfig())
+results_fast = benchmark_brain(brain_fast, 1000, "fast")
+
+brain_deep = pynlm.createBrain(pynlm.createDefaultConfig())
+results_deep = benchmark_brain(brain_deep, 1000, "deep")
+```
+
+#### Development Pipeline Management
+
+```python
+# Create development stages
+development_stages = pynlm.create_development_pipeline(
+    numStages=5,
+    transitionTime=100.0
+)
+
+# Simulate developmental progression
+current_stage = 0
+for transition in development_stages:
+    current_stage += 1
+    brain.setDevelopmentalStage(pynlm.DevelopmentalStage(current_stage))
+    print(f"Reached developmental stage {current_stage}")
+```
+
+### Text and Communication Examples
+
+```python
+# Text encoding for communication
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+
+# Encode text for teaching
+apple_pattern = pynlm.encode_text("apple")
+zebra_pattern = pynlm.encode_text("zebra")
+
+# Decode patterns back to text
+# decoded = pynlm.decode_text(apple_pattern)
+# print(f"Decoded text: {decoded}")
+```
+
+### Constants and Utility Functions
+
+```python
+# Access to useful constants
+world_width = pynlm.DEFAULT_WORLD_WIDTH
+vision_width = pynlm.DEFAULT_VISION_WIDTH
+simulation_timestep = pynlm.DEFAULT_SIMULATION_TIMESTEP
+neuron_count = pynlm.DEFAULT_NEURON_COUNT
+
+print(f"Default world dimensions: {world_width}x{world_width}")
+print(f"Default vision field: {vision_width}x{vision_width}")
+```
+
+#### Advanced SimpleWorld Features
+
+```python
+# Create extended environment simulation
+agentPath, environmentSnapshots = world.create_environment_simulation(
+    duration=1000, 
+    agentStart=[5.0, 5.0]
+)
+
+# Analyze environment state
+analysis = world.analyze_environment()
+print(f"Agent position: ({analysis['agent_x']}, {analysis['agent_y']})")
+print(f"Agent energy: {analysis['agent_energy']}")
+print(f"Vision quality: {analysis['vision_variance']:.3f}")
+
+# Create demonstration scenarios
+world.create_demonstration_scenario("resource_discovery")
+world.create_demonstration_scenario("obstacle_course")
+
+# Export/import world data
+world.export_data("world_state.csv")
+world.import_data("world_state.csv")
 ```
 
 ### Enumerations
