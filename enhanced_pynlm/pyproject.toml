@@ -1,0 +1,120 @@
+# enhanced_pynlm/pyproject.toml
+build-system = {requires = ["setuptools>=61.0", "wheel"], build-backend = "setuptools.build_meta"}
+
+[project]
+name = "enhanced-pynlm"
+version = "2.0.0"
+description = "Enhanced Python API for NLM Neural Learning Machine with improved interfaces, context managers, and performance monitoring"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Enhanced NLM Team", email = "team@nlm-project.org"}
+]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "AI", "artificial intelligence"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
+    "Framework :: Pytest"
+]
+dependencies = [
+    "numpy>=1.20,<3.0",
+    "scipy>=1.7.0",
+    "matplotlib>=3.4.0; extra == 'visualization'",
+    "pandas>=1.3.0; extra == 'data-analysis'",
+    "tqdm>=4.62.0; extra == 'progress'"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=2.12.0",
+    "black>=22.0",
+    "flake8>=4.0",
+    "mypy>=0.910",
+    "pre-commit>=2.15.0"
+]
+visualization = [
+    "matplotlib>=3.4.0",
+    "seaborn>=0.11.0"
+]
+data-analysis = [
+    "pandas>=1.3.0",
+    "scipy>=1.7.0"
+]
+progress = [
+    "tqdm>=4.62.0"
+]
+all = [
+    "enhanced-pynlm[visualization]",
+    "enhanced-pynlm[data-analysis]",
+    "enhanced-pynlm[progress]",
+    "enhanced-pynlm[dev]"
+]
+
+[project.urls]
+Homepage = "https://github.com/nlm-project/nlm"
+Documentation = "https://nlm.readthedocs.io"
+Repository = "https://github.com/nlm-project/nlm.git"
+Issues = "https://github.com/nlm-project/nlm/issues"
+
+[tool.setuptools]
+packages = ["enhanced_pynlm"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+enhanced_pynlm = ["*.md", "*.rst", "*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | env
+  | venv
+)/
+'''
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py38"
+select = ["E", "F", "I", "W"]
+ignore = ["E501", "W503"]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"

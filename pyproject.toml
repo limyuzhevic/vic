@@ -4,8 +4,9 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
-version = "0.1.0"
+version = "1.0.0"
 description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+extended-api-version = "2.0.0"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
