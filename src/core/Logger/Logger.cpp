@@ -1,9 +1,10 @@
-#include "Logger.hpp"
-#include <iostream>
+#include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <string>
 
 namespace nlm {
 
@@ -200,3 +201,18 @@ LogStream::~LogStream() {
 }
 
 } // namespace nlm
+
+// Utility function to convert string to LogLevel
+LogLevel stringToLogLevel(const std::string& levelStr) {
+    std::string upperLevel = levelStr;
+    std::transform(upperLevel.begin(), upperLevel.end(), upperLevel.begin(), ::toupper);
+    
+    if (upperLevel == "DEBUG") return LogLevel::Debug;
+    if (upperLevel == "INFO") return LogLevel::Info;
+    if (upperLevel == "WARN" || upperLevel == "WARNING") return LogLevel::Warning;
+    if (upperLevel == "ERROR") return LogLevel::Error;
+    if (upperLevel == "CRIT" || upperLevel == "CRITICAL") return LogLevel::Critical;
+    
+    // Default to INFO if unrecognized
+    return LogLevel::Info;
+}
