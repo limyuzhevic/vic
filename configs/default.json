@@ -1,0 +1,60 @@
+// NLM Configuration File
+// JSON format for Phase 2+
+
+{
+    "nlm_version": "2.0",
+    "simulation": {
+        "timestep": 0.001,
+        "max_steps": 10000,
+        "time_limit": 0.0
+    },
+    "brain": {
+        "neuron_count": 1000,
+        "region_count": 2,
+        "connection_probability": 0.1
+    },
+    "plasticity": {
+        "stdp": {
+            "ltp_weight": 0.01,
+            "ltd_weight": 0.012,
+            "time_constant": 20.0
+        },
+        "hebbian": {
+            "learning_rate": 0.01
+        },
+        "structural": {
+            "synaptogenesis_rate": 0.001,
+            "pruning_rate": 0.0001
+        }
+    },
+    "neuromodulation": {
+        "dopamine_baseline": 0.1,
+        "novelty_sensitivity": 0.5,
+        "curiosity_decay": 0.95
+    },
+    "memory": {
+        "working_memory_capacity": 100,
+        "episodic_memory_max_episodes": 1000,
+        "consolidation_interval": 1000
+    },
+    "environment": {
+        "name": "GridWorld",
+        "width": 10,
+        "height": 10
+    },
+    "logging": {
+        "level": "INFO",
+        "to_file": false,
+        "filename": "nlm.log",
+        "log_stats": true
+    },
+    "development": {
+        "enabled": true,
+        "stage_interval": 300.0
+    },
+    "performance": {
+        "checkpoint_dir": "./checkpoints",
+        "checkpoint_interval": 1000,
+        "replay_interval": 100
+    }
+}

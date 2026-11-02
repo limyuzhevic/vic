@@ -3,8 +3,15 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <regex>
+#include <stdexcept>
+#include <cctype>
 
 namespace nlm {
+
+// JSON parsing helpers
+static bool parseJSONValue(const std::string& str, ConfigValue& value);
+static bool parseJSONKeyValue(const std::string& line, std::string& key, std::string& value);
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,40 +26,25 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Determine file format by extension
+    std::string ext = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos && dotPos < filepath.size() - 1) {
+        ext = filepath.substr(dotPos + 1);
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
+    std::string lowerExt = toLower(ext);
     
-    return true;
+    // Try JSON format first
+    if (lowerExt == "json" || lowerExt == "jsonl" || lowerExt.empty()) {
+        return loadFromJSON(filepath);
+    } else if (lowerExt == "yaml" || lowerExt == "yml") {
+        return loadFromYAML(filepath);
+    } else {
+        // Fall back to simple key=value format for compatibility
+        NLM_LOG_WARN("Unknown config file format: " + ext + ". Using simple format");
+        return loadFromSimpleFormat(filepath);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
