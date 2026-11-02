@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
+// IMPLEMENTED: Real reward computation from environment observation
 
 class Reward {
 public:
