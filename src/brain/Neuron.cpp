@@ -278,7 +278,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 
 void Neuron::step(Timestamp currentTime) {
     // Default LIF step with standard timestep (1ms)
-    TimestepDuration dt = 0.001;  // 1ms default
+    // Phase 6: 1ms timestep matches neural activity patterns
+    TimestepDuration dt = 0.001;  // 1ms default for proper neural dynamics
     stepLIF(currentTime, dt);
 }
 

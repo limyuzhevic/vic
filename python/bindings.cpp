@@ -5,6 +5,10 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <chrono>
+#include <sstream>
+#include <tuple>
+#include <functional>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -15,9 +19,21 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/core/Logger/Logger.hpp"
 
 namespace py = pybind11;
 namespace nlm {
+
+// Forward declarations for ConsoleLogger
+class ConsoleLogger;
+
+// Helper function to create a default logger instance
+std::shared_ptr<Logger> getDefaultLogger() {
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    return logger;
+}
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -166,6 +182,39 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Convenience methods for common configuration patterns
+        .def("setNeuronCount", [](Config& self, int64_t count) {
+            self.set("neuron_count", count, ConfigSource::User);
+        }, py::arg("count"),
+             "Set the number of neurons in the brain")
+        .def("setRegionCount", [](Config& self, int64_t count) {
+            self.set("region_count", count, ConfigSource::User);
+        }, py::arg("count"),
+             "Set the number of brain regions")
+        .def("setConnectionProbability", [](Config& self, float probability) {
+            self.set("connection_probability", probability, ConfigSource::User);
+        }, py::arg("probability"),
+             "Set the connection probability for random connectivity")
+        .def("setPlasticityEnabled", [](Config& self, bool enabled) {
+            self.set("plasticity_enabled", enabled ? 1 : 0, ConfigSource::User);
+        }, py::arg("enabled"),
+             "Enable or disable plasticity")
+        .def("getInt", [](const Config& self, const std::string& key, int64_t defaultValue) {
+            return self.getOr<int64_t>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get an integer configuration value with default")
+        .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            return self.getOr<float>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get a float configuration value with default")
+        .def("getString", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            // For string values, we need to handle the case where the value doesn't exist
+            if (self.has(key)) {
+                return self.getAs<std::string>(key);
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+             "Get a string configuration value with default")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -408,26 +457,160 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    // Simulation utilities and convenience functions
+    m.def("createBrainFromDefaults", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    }, "Create a brain with default configuration");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, int numSteps, 
+                            std::function<void(std::shared_ptr<Brain>, int)> callback) {
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        for (int step = 0; step < numSteps; ++step) {
+            brain->step(step, step * 0.001);
+            if (callback) {
+                callback(brain, step);
+            }
+        }
+    }, py::arg("brain"), py::arg("numSteps"), py::arg("callback"),
+        "Run a complete simulation with brain stepping");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("runSimpleLearning", [](std::shared_ptr<Brain> brain, int numSteps) {
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        // Enable plasticity
+        if (auto* region = brain->getRegion(RegionId(1))) {
+            for (auto& syn : region->getSynapses()) {
+                syn->enablePlasticity(true, true, false);
+            }
+        }
+        
+        // Apply input to first few neurons to stimulate learning
+        auto neurons = brain->getRegion(RegionId(1)) ? brain->getRegion(RegionId(1))->getAllNeurons() : std::vector<Neuron*>();
+        if (!neurons.empty()) {
+            size_t numInputNeurons = std::min(size_t(5), neurons.size());
+            for (size_t i = 0; i < numInputNeurons; ++i) {
+                neurons[i]->injectCurrent(30.0f);
+            }
+        }
+        
+        for (int step = 0; step < numSteps; ++step) {
+            brain->step(step, step * 0.001);
+            if (step % 100 == 0) {
+                // Log progress
+                auto logger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+                Logger::getInstance()->addLogger(logger);
+                brain->logStatus();
+            }
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("numSteps"),
+        "Run a simple learning simulation with plasticity");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("compareBrainStates", [](std::shared_ptr<Brain> brain1, std::shared_ptr<Brain> brain2, int steps) {
+        if (!brain1->initialize() || !brain2->initialize()) {
+            throw std::runtime_error("Failed to initialize one or both brains");
+        }
+        
+        // Run same steps on both brains
+        for (int step = 0; step < steps; ++step) {
+            brain1->step(step, step * 0.001);
+            brain2->step(step, step * 0.001);
+        }
+        
+        // Compare spike counts
+        float spikeDiff = static_cast<float>(std::abs(
+            static_cast<int>(brain1->getTotalSpikeCount()) - 
+            static_cast<int>(brain2->getTotalSpikeCount())
+        ));
+        float spikeCount1 = static_cast<float>(brain1->getTotalSpikeCount());
+        float spikeCount2 = static_cast<float>(brain2->getTotalSpikeCount());
+        
+        // Compare average firing rates
+        float rate1 = brain1->getAverageFiringRate();
+        float rate2 = brain2->getAverageFiringRate();
+        
+        return std::make_tuple(spikeDiff, spikeCount1, spikeCount2, rate1, rate2);
+    }, py::arg("brain1"), py::arg("brain2"), py::arg("steps"),
+        "Compare two brain states and return differences");
+
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, int numSteps) {
+        auto start = std::chrono::high_resolution_clock::now();
+        if (brain->initialize()) {
+            for (int step = 0; step < numSteps; ++step) {
+                brain->step(step, step * 0.001);
+            }
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        return std::make_tuple(
+            duration.count(),
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            brain->getTotalNeuronCount()
+        );
+    }, py::arg("brain"), py::arg("numSteps"),
+        "Benchmark brain performance and return timing info");
+
+    m.def("exportBrainData", [](std::shared_ptr<Brain> brain, const std::string& filename) {
+        if (!brain->save(filename)) {
+            throw std::runtime_error("Failed to save brain to file: " + filename);
+        }
+        return true;
+    }, py::arg("brain"), py::arg("filename"),
+        "Export brain state to file");
+
+    m.def("importBrainData", [](const std::string& filename) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->load(filename)) {
+            throw std::runtime_error("Failed to load brain from file: " + filename);
+        }
+        return brain;
+    }, py::arg("filename"),
+        "Import brain state from file");
+
+    m.def("getExampleBrains", []() {
+        // Create different example brain configurations
+        auto simpleConfig = std::make_shared<Config>();
+        simpleConfig->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        simpleConfig->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        
+        auto complexConfig = std::make_shared<Config>();
+        complexConfig->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        complexConfig->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+        complexConfig->set("connection_probability", 0.2f, ConfigSource::Default);
+        
+        return std::make_tuple(
+            std::make_pair("Simple Brain", simpleConfig),
+            std::make_pair("Complex Brain", complexConfig)
+        );
+    }, "Get example brain configurations");
+
+    m.def("printBrainStats", [](std::shared_ptr<Brain> brain) {
+        if (brain->initialize()) {
+            brain->logStatus();
+        }
+    }, py::arg("brain"), "Print detailed brain statistics");
+
+    m.def("brainInfo", [](std::shared_ptr<Brain> brain) {
+        std::stringstream ss;
+        if (brain->initialize()) {
+            ss << "Brain Statistics:\n";
+            ss << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
+            ss << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
+            ss << "  Active Neurons: " << brain->getActiveNeuronCount() << "\n";
+            ss << "  Firing Neurons: " << brain->getFiringNeuronCount() << "\n";
+            ss << "  Total Spikes: " << brain->getTotalSpikeCount() << "\n";
+            ss << "  Average Firing Rate: " << brain->getAverageFiringRate() << " Hz\n";
+            ss << "  E/I Ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+            ss << "  Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        }
+        return ss.str();
+    }, py::arg("brain"), "Get formatted brain statistics as string");
 
 } // namespace nlm

@@ -14,6 +14,29 @@ That's it! NLM simulates all of this.
 
 ---
 
+## NEW: Simplified Brain Creation and Configuration
+
+Thanks to the new convenience methods in the Python bindings, creating and configuring brains is now much easier!
+
+### Example: Create Brain with Custom Settings
+
+```python
+import pynlm
+
+# Create a brain with specific settings in one line
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Easy configuration methods (NEW!)
+brain.getConfig().setNeuronCount(100)      # Set neuron count
+brain.getConfig().setRegionCount(2)        # Set region count
+brain.getConfig().setConnectionProbability(0.15)  # Set connection probability
+
+print("Brain created with", brain.getConfig().getInt("neuron_count", 100), "neurons")
+```
+
+---
+
 ## The 3 Things You Need to Know
 
 1. **Brain** - The virtual brain that thinks

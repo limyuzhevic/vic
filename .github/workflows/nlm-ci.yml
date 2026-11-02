@@ -1,0 +1,227 @@
+name: NLM CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Set up CMake
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake gcc g++ make
+    
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+    
+    - name: Build
+      run: |
+        cd build
+        make -j$(nproc)
+    
+    - name: Run Tests
+      run: |
+        cd build
+        ctest --output-on-failure
+    
+    - name: Run Python Tests
+      run: |
+        cd python
+        python3 -m pytest tests/ -v
+    
+    - name: Create Distribution
+      run: |
+        cd build
+        make package
+        cd ..
+        mkdir -p dist
+        cp build/*.deb dist/ || cp build/*.tar.gz dist/
+    
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: nlm-build-${{ matrix.build_type }}
+        path: dist/
+        retention-days: 7
+
+  python-bindings:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.10'
+    
+    - name: Install pybind11
+      run: |
+        pip install pybind11
+    
+    - name: Install scikit-build-core
+      run: |
+        pip install scikit-build-core
+    
+    - name: Build Python Bindings
+      run: |
+        cd python
+        pip install -e .
+    
+    - name: Test Python Bindings
+      run: |
+        cd python
+        python3 -c "import pynlm; print('Python bindings import successful')"
+        python3 -c "from pynlm import createBrain, createDefaultConfig; brain = createBrain(createDefaultConfig()); brain.initialize(); print('Basic brain creation and initialization works')"
+    
+    - name: Run Python Example Scripts
+      run: |
+        cd python
+        python3 example1_simple.py
+        python3 example2_world.py
+        python3 example3_learning.py
+
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r docs/requirements.txt
+    
+    - name: Build documentation
+      run: |
+        cd docs
+        make html
+    
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: docs/_build/html
+
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install clang-format
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-format
+    
+    - name: Check code formatting
+      run: |
+        find src -name "*.cpp" -o -name "*.hpp" | xargs clang-format --dry-run --Werror
+    
+    - name: Run linting
+      run: |
+        sudo apt-get install -y cppcheck
+        cppcheck src/ --std=c++20 --include=src/ --error-exitcode=1
+    
+    - name: Check Python linting
+      run: |
+        pip install flake8
+        flake8 python/
+
+  performance:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up CMake
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake gcc g++ make
+    
+    - name: Configure CMake with optimizations
+      run: |
+        mkdir build_perf
+        cd build_perf
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_BUILD_PYTHON_BINDINGS=ON
+    
+    - name: Build with optimizations
+      run: |
+        cd build_perf
+        make -j$(nproc)
+    
+    - name: Run performance benchmarks
+      run: |
+        cd build_perf
+        ./nlm_benchmark
+    
+    - name: Profile with Intel VTune (if available)
+      run: |
+        if command -v vtune; then
+          vtune -collect launch-application -- ./nlm
+        fi
+
+  deployment:
+    runs-on: ubuntu-latest
+    needs: [build, python-bindings, documentation, quality]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        name: nlm-build-Release
+        path: artifacts
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.run_number }}
+        name: "NLM Release ${{ github.run_number }}"
+        body: |
+          ## New Features
+          - Improved Python bindings with convenience methods
+          - Enhanced documentation and examples
+          - Command-line interface for easy interaction
+          - Performance improvements and bug fixes
+          
+          ## Bug Fixes
+          - Fixed duplicate configuration keys in default.cfg
+          - Implemented real integrate-and-fire dynamics in Neuron class
+          - Added proper error handling and validation
+          
+          ## Improvements
+          - Better simulation utilities and monitoring tools
+          - Enhanced brain analysis capabilities
+          - Improved configuration management
+          
+          ## Breaking Changes
+          - None - This is a feature release
+        draft: false
+        files: |
+          artifacts/*.deb
+          artifacts/*.tar.gz
+    
+    - name: Publish Python Package
+      run: |
+        cd python
+        python3 -m pip install build
+        python3 -m build
+        python3 -m pip upload --repository-url https://upload.pypi.org/legacy/ dist/*
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
