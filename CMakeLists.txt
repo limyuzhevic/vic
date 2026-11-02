@@ -80,8 +80,16 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
-    # Visualization
+    # Advanced visualization (Phase 6)
     src/visualization/VisualizationInterface.cpp
+    src/visualization/VisualizationManager.cpp
+    src/performance/Performance.cpp
+    src/performance/MemoryPool.cpp
+    src/performance/EventQueue.cpp
+    src/performance/SIMDVectorization.cpp
+    src/performance/ParallelProcessing.cpp
+    src/performance/CheckpointSystem.cpp
+    src/performance/OptimizedBrain.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
@@ -97,12 +105,28 @@ add_library(nlm_agent STATIC
 target_include_directories(nlm_agent PUBLIC src)
 target_link_libraries(nlm_agent PUBLIC nlm_core)
 
+# Agent system (body, sensory percept, agent-brain interface)
+add_library(nlm_agent STATIC
+    src/agent/SensoryPercept.cpp
+    src/agent/AgentBrain.cpp
+)
+target_include_directories(nlm_agent PUBLIC src)
+target_link_libraries(nlm_agent PUBLIC nlm_core)
+
 # World system (environment, objects, simple world)
 add_library(nlm_world STATIC
     src/world/SimpleWorld.cpp
 )
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core nlm_agent)
+
+# CLI system
+add_library(nlm_cli STATIC
+    src/cli/CommandLineInterface.cpp
+    src/cli/CommandLineInterface.tpp
+)
+target_include_directories(nlm_cli PUBLIC src)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
@@ -125,18 +149,11 @@ add_library(nlm_phase5 STATIC
 target_include_directories(nlm_phase5 PUBLIC src)
 target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Phase 6 experiments
-add_library(nlm_phase6 STATIC
-    src/experiments/Phase6IntegratedExperiment.cpp
-)
-target_include_directories(nlm_phase6 PUBLIC src)
-target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
-
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_cli)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
