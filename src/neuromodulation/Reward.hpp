@@ -1,11 +1,12 @@
 #pragma once
 
+#include "../sensory/SensoryInput.hpp"
 #include "Neuromodulator.hpp"
 
 namespace nlm {
 
 // Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
+// Implements real reward computation based on environmental observations
 
 class Reward {
 public:
@@ -23,12 +24,26 @@ public:
     void reset();
     
     // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
+    // Analyzes sensory input to compute meaningful rewards
+    float computeReward(const SensoryInput& sensoryInput) const;
+    
+    // Compute reward from observation
     float computeReward(const class Observation& observation) const;
     
     // Reward history
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    
+    // Get accumulated reward (lifetime total)
+    float getAccumulatedReward() const;
+    
+    // Set reward parameters
+    void setWeight(float weight);
+    void setBaseline(float baseline);
+    
+    // Get reward parameters
+    float getWeight() const;
+    float getBaseline() const;
     
 private:
     struct Impl;

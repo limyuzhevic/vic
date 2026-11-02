@@ -3,11 +3,12 @@
 #include "../core/Types/Types.hpp"
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Provides common functionality and interface for all neuromodulators
 
 class Neuromodulator {
 public:
@@ -21,18 +22,31 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
+    
+    // Get neuromodulator statistics
+    virtual float getMaxLevel() const { return 0.0f; }
+    virtual float getMinLevel() const { return 0.0f; }
+    virtual float getAverageLevel() const { return 0.0f; }
+    
+    // Reset to baseline
+    virtual void reset() {}
+    
+    // Set parameters
+    virtual void setBaseline(float baseline) {}
+    virtual void setDecayRate(float rate) {}
+    virtual void setReleaseRate(float rate) {}
     
 protected:
     Neuromodulator() = default;
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Implements biologically plausible dopamine dynamics for reward learning
+
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -48,42 +62,207 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Dopamine dynamics control
+    void setBaseline(float baseline) override;
+    void setDecayRate(float rate) override;
+    void setReleaseRate(float rate) override;
+    
+    // Statistics
+    float getMaxLevel() const override;
+    float getMinLevel() const override;
+    float getAverageLevel() const override;
+    
+    // History tracking
+    const std::vector<float>& getHistory() const;
+    void clearHistory();
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Implements cholinergic signaling for attention and working memory
+
 class Acetylcholine : public Neuromodulator {
 public:
-    const char* getName() const override { return "ACh"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Acetylcholine();
+    ~Acetylcholine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Cholinergic effects
+    void signalAttention(float attentionStrength);
+    void signalMemoryPriority(float priority);
+    
+    // Attention dynamics
+    void setBaseline(float baseline) override;
+    void setDecayRate(float rate) override;
+    void setReleaseRate(float rate) override;
+    
+    // Statistics
+    float getMaxLevel() const override;
+    float getMinLevel() const override;
+    float getAverageLevel() const override;
+    
+    // History tracking
+    const std::vector<float>& getHistory() const;
+    void clearHistory();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// Implements noradrenergic signaling for arousal and stress responses
+
 class Norepinephrine : public Neuromodulator {
 public:
-    const char* getName() const override { return "NE"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Norepinephrine();
+    ~Norepinephrine() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Arousal signaling
+    void signalArousal(float arousalLevel);
+    void signalStress(float stressLevel);
+    void signalLearning(float learningRate);
+    
+    // Arousal dynamics
+    void setBaseline(float baseline) override;
+    void setDecayRate(float rate) override;
+    void setReleaseRate(float rate) override;
+    
+    // Statistics
+    float getMaxLevel() const override;
+    float getMinLevel() const override;
+    float getAverageLevel() const override;
+    
+    // History tracking
+    const std::vector<float>& getHistory() const;
+    void clearHistory();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Implements serotonergic signaling for mood regulation and social behavior
+
 class Serotonin : public Neuromodulator {
 public:
-    const char* getName() const override { return "5-HT"; }
-    float getLevel() const override { return 0.0f; }
-    void setLevel(float level) override {}
-    float getPlasticityFactor() const override { return 1.0f; }
-    void update(TimestepDuration dt) override {}
+    Serotonin();
+    ~Serotonin() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Serotonergic effects
+    void signalMood(float moodLevel);
+    void signalSocialBehavior(float socialBehavior);
+    void signalImpulsivity(float impulsivityLevel);
+    
+    // Serotonin dynamics
+    void setBaseline(float baseline) override;
+    void setDecayRate(float rate) override;
+    void setReleaseRate(float rate) override;
+    
+    // Statistics
+    float getMaxLevel() const override;
+    float getMinLevel() const override;
+    float getAverageLevel() const override;
+    
+    // History tracking
+    const std::vector<float>& getHistory() const;
+    void clearHistory();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Curiosity: Exploration and novelty-driven learning
+// Placeholder - Phase 2
+class Curiosity : public Neuromodulator {
+public:
+    Curiosity();
+    ~Curiosity() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Curiosity dynamics
+    void update(float novelty, float predictionError, TimestepDuration dt);
+    
+    // Exploration drive
+    float getExplorationDrive() const;
+    void setNoveltyWeight(float weight);
+    void setPredictionErrorWeight(float weight);
+    
+    // Statistics
+    float getMaxLevel() const override;
+    float getMinLevel() const override;
+    float getAverageLevel() const override;
+    
+    // History tracking
+    const std::vector<float>& getHistory() const;
+    void clearHistory();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Novelty: Novelty detection and pattern recognition
+// Placeholder - Phase 2
+class Novelty : public Neuromodulator {
+public:
+    Novelty();
+    ~Novelty() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Novelty detection
+    void detectNovelty(const Observation& observation, const Observation& previousObservation);
+    void detectNovelty(const std::vector<float>& currentPattern, const std::vector<float>& previousPattern);
+    
+    // Novelty statistics
+    float getNoveltyLevel() const;
+    float getNoveltyThreshold() const;
+    void setNoveltyThreshold(float threshold);
+    
+    // Statistics
+    float getMaxLevel() const override;
+    float getMinLevel() const override;
+    float getAverageLevel() const override;
+    
+    // History tracking
+    const std::vector<float>& getHistory() const;
+    void clearHistory();
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
