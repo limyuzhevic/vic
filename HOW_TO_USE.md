@@ -4,10 +4,14 @@
 
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
+**Phase 6: Final Integration - All Systems Connected**
+
 This document covers:
 1. Building the C++ project from source
 2. Installing the Python library
 3. Using the NLM Python API
+4. Running comprehensive learning experiments
+5. Configuration and customization
 
 ---
 
@@ -46,13 +50,16 @@ After successful compilation, you will have:
 
 | Target | Type | Description |
 |--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
+| `nlm` | Executable | Main simulation executable (Phase 2: Basic Neural Computation) |
+| `nlm_phase3_demo` | Executable | Phase 3 demonstration (World interaction) |
+| `nlm_phase4_demo` | Executable | Phase 4 demonstration (Cognition and Memory) |
+| `nlm_phase5_demo` | Executable | Phase 5 demonstration (Performance and Optimization) |
+| `nlm_phase6_demo` | Executable | Phase 6 integration test (All systems connected) |
+| `nlm_phase6_text_demo` | Executable | Phase 6 text/thought demonstration |
+| `nlm_benchmark` | Executable | Performance benchmark |
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
-| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
-| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
-| `nlm_test` | Executable | Unit test suite |
 
 ### Build Options
 
@@ -62,6 +69,9 @@ cmake .. -DCMAKE_BUILD_TYPE=Debug
 
 # Build with specific compiler
 cmake .. -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc
+
+# Build with Python bindings
+ cmake .. -DNLM_BUILD_PYTHON_BINDINGS=ON
 
 # Install to custom prefix
 cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
@@ -86,7 +96,7 @@ pip install .
 pip install -e .
 ```
 
-> Phase 5 note: `pip install .` now genuinely builds `pynlm` (verified:
+> **Phase 6 Update**: `pip install .` now genuinely builds `pynlm` (verified:
 > fresh venv, `pip install .`, then `import pynlm` and the easy_usage
 > Example 1 flow run). Previously the root CMakeLists never built the
 > module, so `pip install .` succeeded yet `import pynlm` failed. A
@@ -120,11 +130,15 @@ print(pynlm.__version__)
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 print(f"Neurons: {brain.getTotalNeuronCount()}")
+
+# Run a quick test
+brain.initialize()
+print("Brain initialized successfully!")
 ```
 
 ---
 
-## Part 3: Using the Python Library
+## Part 3: Using the NLM Python API
 
 ### Basic Usage
 
@@ -137,8 +151,8 @@ import pynlm
 config = pynlm.createDefaultConfig()
 
 # Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+config.set("brain.neuron_count", 1000)
+config.set("brain.synapse_density", 0.1)
 
 # Create and initialize the brain
 brain = pynlm.createBrain(config)
@@ -193,7 +207,7 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Complete Agent Example (Phase 6)
 
 ```python
 import pynlm
@@ -201,8 +215,15 @@ import pynlm
 def run_agent_simulation(num_steps=1000):
     """Run a complete agent simulation with brain and world."""
     
-    # 1. Create configuration
+    # 1. Create configuration with Phase 6 settings
     config = pynlm.createDefaultConfig()
+    
+    # Enable all subsystems for Phase 6 integration
+    config.set("neuromodulation.enabled", True)
+    config.set("memory.episodic.enabled", True)
+    config.set("prediction.enabled", True)
+    config.set("cognition.enabled", True)
+    config.set("development.enabled", True)
     
     # 2. Create brain and initialize
     brain = pynlm.createBrain(config)
@@ -220,11 +241,13 @@ def run_agent_simulation(num_steps=1000):
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
+    # 6. Enable all subsystems
     agent.enableRewardModulation(True)
     agent.enableStructuralPlasticity(True)
     agent.enableDevelopment(True)
     agent.enableCuriosity(True)
+    agent.enableNoveltyDetection(True)
+    agent.enablePrediction(True)
     
     # 7. Run simulation loop
     for step in range(num_steps):
@@ -260,167 +283,41 @@ def run_agent_simulation(num_steps=1000):
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
             print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Preference: {brain.getLearnedPreference():.3f}")
 
 # Run the simulation
 run_agent_simulation(1000)
 ```
 
-### Key Classes and Methods
+### Learning Experiment Utilities
 
-#### Brain Class
+For advanced users interested in neural computation experiments:
 
 ```python
-# Creation
-brain = pynlm.createBrain(config)
+import pynlm
 
-# Initialization
+# Use the learning experiment utilities
+from nlm.experiments import LearningExperimentUtils
+
+# Create brain and run comprehensive learning experiments
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Simulation
-brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
+# Run basic connectivity test
+LearningExperimentUtils.runBasicConnectivityTest(brain)
 
-# Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
+# Reset and run plasticity experiment
+brain.reset()
+brain.initialize()
+LearningExperimentUtils.runPlasticityExperiment(brain)
 
-# Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
+# Reset and run STDP verification
+brain.reset()
+brain.initialize()
+LearningExperimentUtils.runStdpVerification(brain)
 
-# State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
-```
-
-#### Config Class
-
-```python
-# Create
-config = pynlm.createDefaultConfig()
-
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
-
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
-
-# File I/O
-config.loadFromFile("config.json")
-config.saveToFile("config.json")
-```
-
-#### AgentBrain Class
-
-```python
-# Creation
-agent = pynlm.createAgentBrain(brain)
-
-# Initialization
-agent.initialize(world)
-
-# Sensory processing
-agent.processSensoryInput(percept)
-
-# Motor decoding
-motor_cmd = agent.decodeMotorCommand()
-
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
-
-# Development
-agent.updateDevelopment(timestep)
-agent.getDevelopmentalStage()
-
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
-
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
-```
-
-#### SimpleWorld Class
-
-```python
-# Creation
-world = pynlm.createSimpleWorld()
-
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-
-# Control
-world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
-
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
-
-# State access
-percept = world.getSensoryPercept()
-body = world.getAgentBody()
-
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
-
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
-```
-
-### Enumerations
-
-```python
-# Neuron types
-pynlm.NeuronType.Excitatory
-pynlm.NeuronType.Inhibitory
-pynlm.NeuronType.Sensory
-pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
-pynlm.NeuronType.Internal
-
-# Developmental stages
-pynlm.DevelopmentalStage.Initial
-pynlm.DevelopmentalStage.CriticalPeriod
-pynlm.DevelopmentalStage.Maturation
-pynlm.DevelopmentalStage.Adult
-pynlm.DevelopmentalStage.Aging
-
-# Action types
-pynlm.ActionType.MoveForward
-pynlm.ActionType.TurnLeft
-pynlm.ActionType.Interact
-pynlm.ActionType.Eat
-# ... and more
-
-# World object types
-pynlm.WorldObjectType.Empty
-pynlm.WorldObjectType.Resource
-pynlm.WorldObjectType.Hazard
-pynlm.WorldObjectType.Wall
-pynlm.WorldObjectType.Marker
+print("All learning experiments completed successfully!")
 ```
 
 ---
@@ -442,6 +339,18 @@ pynlm.WorldObjectType.Marker
 | `brain.tau_mem` | float | 20.0 | Membrane time constant (ms) |
 | `brain.tau_ref` | float | 2.0 | Refractory period (ms) |
 
+### Phase 6 Integration Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `replay_interval` | int | 100 | Episode replay interval (steps) |
+| `consolidation_interval` | int | 1000 | Memory consolidation interval (steps) |
+| `memory_replay_enabled` | bool | true | Enable episodic memory replay |
+| `neuromodulation_enabled` | bool | true | Enable neuromodulation systems |
+| `prediction_enabled` | bool | true | Enable prediction systems |
+| `cognition_enabled` | bool | true | Enable cognitive systems |
+| `development_enabled` | bool | true | Enable developmental system |
+
 ### Plasticity Configuration
 
 | Parameter | Type | Default | Description |
@@ -457,6 +366,7 @@ pynlm.WorldObjectType.Marker
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `dopamine_baseline` | float | 0.1 | Baseline dopamine level |
 | `neuromod.dopamine.scale` | float | 1.0 | Dopamine modulation scale |
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
@@ -507,7 +417,53 @@ for _ in range(500):
 
 ---
 
-## Troubleshooting
+## Part 6: Running NLM Demonstrations
+
+### Command Line Examples
+
+```bash
+# Phase 2: Basic neural computation (learning experiments)
+./nlm
+
+# Phase 3: World interaction
+./nlm_phase3_demo
+
+# Phase 4: Cognition and memory
+./nlm_phase4_demo
+
+# Phase 5: Performance optimization
+./nlm_phase5_demo
+
+# Phase 6: Complete integration test
+./nlm_phase6_demo
+
+# Phase 6: Text and thought processing
+./nlm_phase6_text_demo
+
+# Performance benchmark
+./nlm_benchmark
+```
+
+### Python Examples
+
+```python
+import subprocess
+import sys
+
+# Run Phase 6 integration demo
+print("Running Phase 6 integration demo...")
+result = subprocess.run(["nlm_phase6_demo"], capture_output=True, text=True)
+if result.returncode == 0:
+    print("Phase 6 demo completed successfully!")
+    print(result.stdout)
+else:
+    print("Error running Phase 6 demo:")
+    print(result.stderr)
+```
+
+---
+
+## Part 7: Troubleshooting
 
 ### Build Issues
 
@@ -532,11 +488,95 @@ pip install --force-reinstall .
 **Segmentation faults:**
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
+- Verify configuration parameters are valid
+
+---
+
+## Part 8: Advanced Usage
+
+### Custom Configuration
+
+```python
+import pynlm
+
+# Create custom configuration
+config = pynlm.createDefaultConfig()
+
+# Customize parameters for specific experiments
+config.set("brain.neuron_count", 500)  # Smaller brain for faster testing
+config.set("brain.synapse_density", 0.05)
+config.set("simulation_timestep", 0.001)
+config.set("max_simulation_steps", 5000)
+
+# Enable/disable specific subsystems
+config.set("neuromodulation.enabled", True)
+config.set("memory.episodic.enabled", True)
+config.set("prediction.enabled", True)
+
+# Create and initialize brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+### Memory Management
+
+```python
+import pynlm
+
+# Configure memory systems for different experimental needs
+config = pynlm.createDefaultConfig()
+
+# For memory-intensive experiments
+config.set("memory.working_memory.capacity", 1000)
+config.set("memory.episodic.max_episodes", 10000)
+
+# For long-term experiments (checkpointing)
+config.set("performance.checkpoint.enabled", True)
+config.set("performance.checkpoint.interval", 1000)
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Save checkpoint at regular intervals
+if brain.save("checkpoint_001.bin"):
+    print("Checkpoint saved successfully!")
+```
+
+### Performance Optimization
+
+```python
+import pynlm
+
+# Configure for maximum performance
+config = pynlm.createDefaultConfig()
+
+# Use larger brain for better performance characteristics
+config.set("brain.neuron_count", 5000)
+config.set("region_count", 2)
+
+# Optimize for speed
+config.set("plasticity.stdp.enable", False)  # Disable for speed
+config.set("neuromodulation.enabled", False)  # Disable for speed
+
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print("High-performance brain configuration loaded!")
+```
 
 ---
 
 ## Further Reading
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [README.md](README.md) - Project overview and status
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
+- [docs/SCIENCE.md](docs/SCIENCE.md) - Scientific background
+- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [docs/PHASE6_FINAL_AUDIT.md](docs/PHASE6_FINAL_AUDIT.md) - Phase 6 audit documentation
+- [docs/PHASE6_FINAL_RESULTS.md](docs/PHASE6_FINAL_RESULTS.md) - Phase 6 final results
+
+---
+
+**Documentation Generated:** 2026-11-02
+**Version:** Phase 6 - Complete Integration
+**Status:** Ready for research and educational use
