@@ -242,15 +242,23 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // step would approach 1000 Hz, and refractory periods cap it well
     // below that in practice.
     if (dt > 0.0) {
-        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
-    }
-
-    // Check for spike
-    if (V >= threshold) {
-        fired = true;
-        if (dt > 0.0) {
+        // Decay current firing rate
+        pImpl->state.firingRate *= 0.9f;
+        
+        // Check for spike
+        if (V >= threshold) {
+            fired = true;
+            
+            // Add spike contribution to firing rate
             pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
         }
+    } else {
+        // Handle zero or negative dt case - preserve spike detection
+        if (V >= threshold) {
+            fired = true;
+            // No rate contribution without dt
+        }
+    }
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
