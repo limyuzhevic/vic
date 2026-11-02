@@ -473,6 +473,56 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->workingMemory->update(pImpl->timestep);
     }
     
+    // ========== STEP 5.5: Activity regulation (prevents runaway excitation) ==========
+    // Apply activity-dependent regulation to maintain firing rate stability
+    // This prevents runaway excitation and maintains firing rate within homeostatic bounds
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                // Check if neuron fired this step (by looking at spike history)
+                const auto& state = neuron->getState();
+                bool justFired = (state.firingState == FiringState::Refractory &&
+                                 state.lastSpikeTime >= 0.0f &&
+                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+                
+                if (justFired) {
+                    neuron->incrementActivity();
+                    
+                    // Apply homeostatic regulation if firing rate is too high
+                    if (neuron->shouldInhibit()) {
+                        // Increase adaptation variable to reduce future firing
+                        float adaptationIncrease = std::min(1.0f, neuron->getFiringRate() / neuron->getHomeostaticTarget() - 1.0f);
+                        neuron->setAdaptationConductance(std::max(0.0f, neuron->getAdaptationConductance() + adaptationIncrease));
+                        
+                        // Reduce firing rate gradually
+                        float rateReduction = std::min(0.5f, adaptationIncrease);
+                        neuron->setHomeostaticTarget(neuron->getHomeostaticTarget() * (1.0f - rateReduction));
+                        
+                        // Use energy budget
+                        neuron->setEnergy(std::max(0.0f, neuron->getEnergy() - 10.0f));
+                    }
+                }
+                
+                // Apply energy constraints
+                if (neuron->getEnergy() <= 0.0f) {
+                    // If neuron runs out of energy, reduce its firing rate
+                    neuron->setHomeostaticTarget(neuron->getHomeostaticTarget() * 0.1f);
+                    neuron->setAdaptationConductance(0.0f);  // Reset adaptation to recover
+                }
+            }
+        }
+    }
+    
+    // Decay activity history across all neurons
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                neuron->decayActivity(0.05f);  // Decay activity by 5% each step
+                neuron->adjustHomeostasis(pImpl->timestep);
+            }
+        }
+    }
+    
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {

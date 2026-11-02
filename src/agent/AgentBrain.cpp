@@ -890,11 +890,15 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     thoughtReward_ = reward;
     hasThoughtOutcome_ = true;
+    
+    // Use the predicted reward parameter if provided, otherwise use agent's internal prediction
+    float actualPredicted = (predictedReward > -1000.0f) ? predictedReward : expectedReward_;
+    
     // Phase 6 concept formation, wired into the loop: the pattern
     // that led to this action, paired with this action's reward.
     // Concepts therefore emerge from experienced pattern/reward
-    // pairings — a bright scene repeatedly followed by +10 becomes
-    // a different concept from a dark scene followed by -15 — and
+    // pairings — a bright scene repeatedly followed by +1 becomes
+    // a different concept from a dark scene followed by -1 — and
     // the concept bias in decode can then use them. The pattern is
     // closeness (1 - vision) plus touch, so an empty scene is the
     // zero pattern and is skipped (it is not a concept).
@@ -903,7 +907,9 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         float norm = 0.0f;
         for (float v : pat) norm += v * v;
         if (norm > 0.01f) {
-            brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
+            // Scale reward for concept learning to match new reward ranges
+            float scaledReward = std::clamp(reward / 10.0f, -1.0f, 1.0f);
+            brain_->getConceptFormation()->presentExperience(pat, lastTouch_, scaledReward, 0);
         }
     }
     // Phase 5 learning for the thought/preference systems, from the
@@ -927,7 +933,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
         if (brain_->getPlanner()) {
             float q = brain_->getPlanner()->getActionQuality(taken);
-            float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
+            float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);  // Scale reward for planner
             brain_->getPlanner()->setActionQuality(taken, 0.9f * q + 0.1f * r);
         }
         if (lastDecoded_ == MotorCommand::Interact && std::abs(reward) > 0.01f) {
@@ -937,7 +943,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     }
     
     // Compute prediction error
-    predictionError_ = reward - predictedReward;
+    predictionError_ = reward - actualPredicted;
     
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
@@ -957,7 +963,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
                 // Reward-modulated weight change. Phase 4: the old
                 // rule used delta = eligibility * dopamine with no
                 // learning rate, and eligibility traces accumulate
-                // STDP deltas to ~4, so a single +10 reward (dopamine
+                // STDP deltas to ~4, so a single +1 reward (dopamine
                 // clamped to 1) drove every eligible synapse straight
                 // to its clamp — one event saturated the network. A
                 // 0.05 learning rate and a +-0.1 per-event cap keep a

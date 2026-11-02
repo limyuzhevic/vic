@@ -16,9 +16,17 @@ struct Neuron::Impl {
     std::vector<Timestamp> spikeHistory;
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
-    PlasticityFlags plasticityFlags;
-    
-    // LIF parameters
+    // Activity regulation
+    MembranePotential activityThreshold;
+    MembranePotential adaptationConductance;
+    FiringRate homeostaticTarget;
+    float learningRate;
+    FiringRate maxFiringRate;
+    float energy;
+    bool structuralPlasticityEnabled;
+    DevelopmentalStage developmentalStage;
+    uint32_t activityCounter;
+    float activityHistory;
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
@@ -332,4 +340,221 @@ const PlasticityFlags& Neuron::getPlasticityFlags() const { return pImpl->plasti
 RegionId Neuron::getRegionId() const { return pImpl->regionId; }
 PopulationId Neuron::getPopulationId() const { return pImpl->populationId; }
 
-} // namespace nlm
+}
+
+namespace nlm {
+
+// Activity regulation implementations
+
+void Neuron::setAdaptationConductance(MembranePotential conductance) {
+    pImpl->adaptationConductance = conductance;
+}
+
+MembranePotential Neuron::getAdaptationConductance() const {
+    return pImpl->adaptationConductance;
+}
+
+void Neuron::setActivityThreshold(MembranePotential threshold) {
+    pImpl->activityThreshold = threshold;
+}
+
+MembranePotential Neuron::getActivityThreshold() const {
+    return pImpl->activityThreshold;
+}
+
+void Neuron::resetActivityCounter() {
+    pImpl->activityCounter = 0;
+}
+
+uint32_t Neuron::getActivityCounter() const {
+    return pImpl->activityCounter;
+}
+
+bool Neuron::shouldInhibit() const {
+    // Inhibit if firing rate exceeds threshold or adaptation variable is high
+    return (getFiringRate() > pImpl->homeostaticTarget * 2.0f) || 
+           (pImpl->state.adaptationVariable > 10.0f);
+}
+
+void Neuron::setHomeostaticTarget(FiringRate targetHz) {
+    pImpl->homeostaticTarget = targetHz;
+}
+
+FiringRate Neuron::getHomeostaticTarget() const {
+    return pImpl->homeostaticTarget;
+}
+
+FiringRate Neuron::getHomeostaticError() const {
+    return getFiringRate() - pImpl->homeostaticTarget;
+}
+
+void Neuron::adjustHomeostasis(TimestepDuration dt) {
+    // Implement homeostatic plasticity: slow, ongoing adjustment toward target firing rate
+    float error = getHomeostaticError() / pImpl->homeostaticTarget;  // Normalize to [-1, 1]
+    float adjustment = error * 0.001f * dt;  // Small homeostatic adjustment per timestep
+    
+    // Adjust leak conductance to maintain target firing rate
+    float currentConductance = getLeakConductance();
+    currentConductance = std::max(0.1f, std::min(currentConductance + adjustment, 100.0f));
+    setLeakConductance(currentConductance);
+}
+
+void Neuron::receiveNeuromodulationInput(float amount, NeuromodulatorType type) {
+    // Simplified neuromodulation: scale firing rate based on input
+    if (type == NeuromodulatorType::Dopamine) {
+        // Positive dopamine increases excitability, negative decreases
+        float excitabilityModifier = std::clamp(amount, -1.0f, 1.0f);
+        setThreshold(getThreshold() + excitabilityModifier * 5.0f);  // Shift threshold
+    } else if (type == NeuromodulatorType::Adenosine) {
+        // Adenosine is inhibitory, reduces excitability
+        float inhibitionModifier = -std::clamp(amount, 0.0f, 1.0f);
+        setThreshold(getThreshold() + inhibitionModifier * 5.0f);
+    }
+}
+
+float Neuron::getAverageMembranePotential() const {
+    return pImpl->state.membranePotential;  // Simplified: return current potential
+}
+
+FiringRate Neuron::getAverageFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
+float Neuron::getActivityHistogram() const {
+    // Simplified: return a simple activity counter
+    return static_cast<float>(pImpl->activityCounter);
+}
+
+void Neuron::setLearningRate(float rate) {
+    pImpl->learningRate = std::clamp(rate, 0.001f, 1.0f);
+}
+
+float Neuron::getLearningRate() const {
+    return pImpl->learningRate;
+}
+
+void Neuron::modulateLearningRate(float factor) {
+    pImpl->learningRate *= (1.0f + factor);
+    pImpl->learningRate = std::clamp(pImpl->learningRate, 0.001f, 1.0f);
+}
+
+void Neuron::enableStructuralPlasticity(bool enable) {
+    pImpl->structuralPlasticityEnabled = enable;
+}
+
+bool Neuron::isStructuralPlasticityEnabled() const {
+    return pImpl->structuralPlasticityEnabled;
+}
+
+void Neuron::growSynapse(NeuronId target, float initialWeight) {
+    if (pImpl->structuralPlasticityEnabled) {
+        // Create new synapse to target
+        // This would need to interact with the brain's synapse management system
+        // For now, just record that we want to grow
+        pImpl->activityCounter++;  // Increment activity counter as evidence of growth
+    }
+}
+
+void Neuron::pruneSynapse(SynapseHandle handle) {
+    if (pImpl->structuralPlasticityEnabled) {
+        // Remove synapse from list
+        // This would need to interact with the brain's synapse management system
+        pImpl->activityCounter++;  // Increment activity counter as evidence of pruning
+    }
+}
+
+void Neuron::setDevelopmentalStage(DevelopmentalStage stage) {
+    pImpl->developmentalStage = stage;
+    
+    // Adjust parameters based on developmental stage
+    switch (stage) {
+        case DevelopmentalStage::Initial:
+            // High plasticity, low firing thresholds
+            setThreshold(-45.0f);
+            setHomeostaticTarget(5.0f);
+            pImpl->learningRate = 0.05f;
+            break;
+        case DevelopmentalStage::CriticalPeriod:
+            // Even higher plasticity, sensitive to environment
+            setThreshold(-40.0f);
+            setHomeostaticTarget(10.0f);
+            pImpl->learningRate = 0.1f;
+            break;
+        case DevelopmentalStage::Maturation:
+            // Moderate plasticity, stabilizing patterns
+            setThreshold(-55.0f);
+            setHomeostaticTarget(15.0f);
+            pImpl->learningRate = 0.02f;
+            break;
+        case DevelopmentalStage::Adult:
+            // Low plasticity, stable function
+            setThreshold(-60.0f);
+            setHomeostaticTarget(20.0f);
+            pImpl->learningRate = 0.005f;
+            break;
+        case DevelopmentalStage::Aging:
+            // Decreased plasticity, reduced activity
+            setThreshold(-65.0f);
+            setHomeostaticTarget(10.0f);
+            pImpl->learningRate = 0.001f;
+            break;
+        default:
+            break;
+    }
+}
+
+DevelopmentalStage Neuron::getDevelopmentalStage() const {
+    return pImpl->developmentalStage;
+}
+
+float Neuron::getPlasticityRate() const {
+    // Plasticity rate depends on developmental stage
+    switch (pImpl->developmentalStage) {
+        case DevelopmentalStage::Initial:
+        case DevelopmentalStage::CriticalPeriod:
+            return 0.1f;
+        case DevelopmentalStage::Maturation:
+            return 0.05f;
+        case DevelopmentalStage::Adult:
+            return 0.01f;
+        case DevelopmentalStage::Aging:
+            return 0.005f;
+        default:
+            return 0.01f;
+    }
+}
+
+void Neuron::setMaxFiringRate(FiringRate maxRate) {
+    pImpl->maxFiringRate = std::max(1.0f, maxRate);
+}
+
+FiringRate Neuron::getMaxFiringRate() const {
+    return pImpl->maxFiringRate;
+}
+
+void Neuron::setEnergyThreshold(float energy) {
+    pImpl->energy = std::max(0.0f, energy);
+}
+
+float Neuron::getEnergy() const {
+    return pImpl->energy;
+}
+
+bool Neuron::hasEnergy(float required) const {
+    return pImpl->energy >= required;
+}
+
+// Update activity counter when neuron is active
+void Neuron::incrementActivity() {
+    pImpl->activityCounter++;
+}
+
+void Neuron::decayActivity(float decayRate) {
+    pImpl->activityHistory = pImpl->activityHistory * (1.0f - decayRate) + 
+                              static_cast<float>(pImpl->activityCounter) * decayRate;
+    pImpl->activityCounter = 0;  // Reset after recording
+}
+
+void Neuron::addActivity(float activityValue) {
+    pImpl->activityHistory = pImpl->activityHistory * 0.9f + activityValue * 0.1f;
+}

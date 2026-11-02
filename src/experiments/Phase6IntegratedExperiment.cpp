@@ -85,7 +85,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         totalReward += reward;
         
         // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        // Use expected reward for better prediction error calculation
+        agent.applyRewardModulation(reward, agent.getPredictionError());
         
         // Update development
         if (config.enableDevelopment) {
@@ -135,15 +136,20 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         if (brain->save(config.checkpointPath)) {
             NLM_LOG_INFO("Checkpoint saved successfully");
             
-            // Create new brain and load
+            // Create new brain WITHOUT initializing it first.
+            // Brain::initialize() resets neural state, so we need to
+            // create the brain first, then load directly.
             auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
+            // Don't initialize here - it would reset the brain's state
+            // brain2->initialize();
             
             if (brain2->load(config.checkpointPath)) {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
                 result.checkpointingWorks = true;
             } else {
                 NLM_LOG_ERROR("Failed to load checkpoint");
+                // If loading fails, it's okay for the test - checkpointing
+                // can be fragile. Just mark as not working.
             }
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
@@ -348,9 +354,12 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
         return false;
     }
     
-    // Create new brain and load
+    // Create new brain WITHOUT initializing it first.
+    // Brain::initialize() resets neural state, so we need to
+    // create the brain first, then load directly.
     auto brain2 = std::make_shared<Brain>(cfg);
-    brain2->initialize();
+    // Don't initialize here - it would reset the brain's state
+    // brain2->initialize();
     
     if (!brain2->load(path)) {
         NLM_LOG_ERROR("Failed to load checkpoint");

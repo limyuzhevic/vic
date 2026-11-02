@@ -60,14 +60,14 @@ void SimpleWorld::reset() {
     for (int i = 0; i < 5; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 1.0f, 0.4f);
     }
     
     // Place some hazard objects (negative reward when touched)
     for (int i = 0; i < 3; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -1.0f, 0.3f);
     }
     
     generateVision();

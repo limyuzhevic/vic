@@ -358,7 +358,7 @@ int main() {
             for (int i = 0; i < 10; ++i) b2->step(bs++);
             MotorCommand cmd = a2.decodeMotorCommand();
             ActionResult result = w2.applyMotorCommand(cmd, w2.getSimulationTime());
-            a2.applyRewardModulation(result.reward, 0.0f);
+            a2.applyRewardModulation(result.reward, a2.getPredictionError());
             w2.update(0.1);
             totalReward += result.reward;
             if (result.message == "too soon") ++tooSoon;

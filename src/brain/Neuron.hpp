@@ -142,19 +142,52 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
+    // Adaptation and regulation
+    void setAdaptationConductance(MembranePotential conductance);
+    MembranePotential getAdaptationConductance() const;
     
-    // Reset to initial state
-    void reset();
+    // Activity regulation (prevents runaway excitation)
+    void setActivityThreshold(MembranePotential threshold);
+    MembranePotential getActivityThreshold() const;
+    void resetActivityCounter();
+    uint32_t getActivityCounter() const;
+    bool shouldInhibit() const;
     
-    // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
+    // Homeostatic regulation (maintains firing rate stability)
+    void setHomeostaticTarget(FiringRate targetHz);
+    FiringRate getHomeostaticTarget() const;
+    FiringRate getHomeostaticError() const;
+    void adjustHomeostasis(TimestepDuration dt);
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+    // Neuromodulation inputs
+    void receiveNeuromodulationInput(float amount, NeuromodulatorType type);
+    
+    // Activity monitoring
+    float getAverageMembranePotential() const;
+    FiringRate getAverageFiringRate() const;
+    float getActivityHistogram() const;  // Returns activity per time window
+    
+    // Learning rate modulation
+    void setLearningRate(float rate);
+    float getLearningRate() const;
+    void modulateLearningRate(float factor);
+    
+    // Structural plasticity
+    void enableStructuralPlasticity(bool enable);
+    bool isStructuralPlasticityEnabled() const;
+    void growSynapse(NeuronId target, float initialWeight);
+    void pruneSynapse(SynapseHandle handle);
+    
+    // Development stage
+    void setDevelopmentalStage(DevelopmentalStage stage);
+    DevelopmentalStage getDevelopmentalStage() const;
+    float getPlasticityRate() const;
+    
+    // Energy/metabolic constraints
+    void setMaxFiringRate(FiringRate maxRate);
+    FiringRate getMaxFiringRate() const;
+    void setEnergyThreshold(float energy);
+    float getEnergy() const;
+    bool hasEnergy(float required) const;
 
 } // namespace nlm

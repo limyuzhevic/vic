@@ -136,7 +136,8 @@ public:
                 ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
                 
                 // 6. Apply reward modulation
-                agentBrain.applyRewardModulation(result.reward, 0.0f);
+                // Use actual expected reward for better prediction error calculation
+                agentBrain.applyRewardModulation(result.reward, agentBrain.getPredictionError());
                 
                 // 7. Update world — Phase 6 pacing fix: one decision
                 // is one world action interval (0.1 s). The old
