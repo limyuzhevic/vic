@@ -29,13 +29,16 @@ That's it! NLM simulates all of this.
 ```python
 import pynlm
 
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Step 1: Create a default configuration
+config = pynlm.createDefaultConfig()
 
-# Step 2: Turn it on
+# Step 2: Make a brain with the configuration
+brain = pynlm.createBrain(config)
+
+# Step 3: Turn it on
 brain.initialize()
 
-# Step 3: Make it think for 100 steps
+# Step 4: Make it think for 100 steps
 for i in range(100):
     brain.step(i)  # One step of thinking
 
@@ -47,18 +50,21 @@ print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```python
 import pynlm
 
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
+# Step 1: Create configuration and brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
 brain.initialize()
 
+# Step 2: Create and configure the world
 world = pynlm.createSimpleWorld()
 world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
 world.reset()
 
+# Step 3: Create agent brain interface
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Run for 50 steps
+# Step 4: Run for 50 steps
 for step in range(50):
     world.update(0.1)  # Update world
     percept = world.getSensoryPercept()  # What does the agent see?
