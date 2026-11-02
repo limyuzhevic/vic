@@ -13,8 +13,111 @@
 #include <cmath>
 #include <set>
 #include <utility>
+#include <chrono>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <map>
 
 namespace nlm {
+
+// Command line argument parsing for Phase 3 demo
+struct Phase3Args {
+    int numEpisodes = 5;
+    int stepsPerEpisode = 200;
+    bool help = false;
+    bool version = false;
+    std::string configFile = "configs/default.cfg";
+    std::string outputFile;
+    bool validate = false;
+    bool verbose = false;
+    bool quiet = false;
+};
+
+// Print help for Phase 3 demo
+void printHelp() {
+    std::cout << "===========================================\n";
+    std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
+    std::cout << "===========================================\n\n";
+    std::cout << "USAGE:\n";
+    std::cout << "  nlm_phase3_demo [OPTIONS]\n\n";
+    std::cout << "OPTIONS:\n";
+    std::cout << "  --help                      Show this help message and exit\n";
+    std::cout << "  --version                   Show version information and exit\n";
+    std::cout << "  --config <file>             Load configuration from file\n";
+    std::cout << "  --output <file>             Save results to output file\n";
+    std::cout << "  --validate                  Validate configuration before running\n";
+    std::cout << "  --verbose, -v               Enable verbose output\n";
+    std::cout << "  --quiet, -q                 Suppress non-essential output\n";
+    std::cout << "  --episodes <n>              Number of episodes (default: 5)\n";
+    std::cout << "  --steps-per-episode <n>     Steps per episode (default: 200)\n\n";
+    std::cout << "EXAMPLES:\n";
+    std::cout << "  nlm_phase3_demo --help                        Show help\n";
+    std::cout << "  nlm_phase3_demo --config my_config.json        Load JSON config\n";
+    std::cout << "  nlm_phase3_demo --episodes 10 --steps-per-episode 300 Run with 10 episodes of 300 steps each\n";
+    std::cout << "  nlm_phase3_demo --validate --output results.json Validate and save results\n\n";
+    std::cout << "The Phase 3 demo shows: experience -> neural activity -> action -> consequence -> learning\n";
+}
+
+// Print version information for Phase 3 demo
+void printVersion() {
+    std::cout << "===========================================\n";
+    std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
+    std::cout << "===========================================\n\n";
+    std::cout << "Version: 0.2.0 (Phase 3: World Interaction)\n";
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << "\n\n";
+    std::cout << "Phase 3 demonstrates world interaction with:\n";
+    std::cout << "  - Agent brain interface for action selection\n";
+    std::cout << "  - Simple world environment with navigation\n";
+    std::cout << "  - Reward-based learning and plasticity\n";
+    std::cout << "  - Development and curiosity-driven exploration\n\n";
+    std::cout << "This demo shows how neural systems learn from experience in dynamic environments.\n";
+}
+
+// Parse command line arguments for Phase 3 demo
+Phase3Args parseArguments(int argc, char* argv[]) {
+    Phase3Args args;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help") {
+            args.help = true;
+        } else if (arg == "--version") {
+            args.version = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            args.verbose = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            args.quiet = true;
+        } else if (arg == "--validate") {
+            args.validate = true;
+        } else if (arg.find("--config=") == 0) {
+            args.configFile = arg.substr(9);
+        } else if (arg == "--config" && i + 1 < argc) {
+            args.configFile = argv[++i];
+        } else if (arg.find("--output=") == 0) {
+            args.outputFile = arg.substr(9);
+        } else if (arg == "--output" && i + 1 < argc) {
+            args.outputFile = argv[++i];
+        } else if (arg.find("--episodes=") == 0) {
+            args.numEpisodes = std::stoi(arg.substr(11));
+        } else if (arg == "--episodes" && i + 1 < argc) {
+            args.numEpisodes = std::stoi(argv[++i]);
+        } else if (arg.find("--steps-per-episode=") == 0) {
+            args.stepsPerEpisode = std::stoi(arg.substr(21));
+        } else if (arg == "--steps-per-episode" && i + 1 < argc) {
+            args.stepsPerEpisode = std::stoi(argv[++i]);
+        } else if (arg[0] == '-') {
+            // Unknown option
+            continue;
+        } else {
+            // Unknown positional argument
+            continue;
+        }
+    }
+    
+    return args;
+}
 
 // Main Phase 3 demonstration
 // Shows: experience -> neural activity -> action -> consequence -> learning
@@ -28,6 +131,8 @@ public:
         std::cout << "===========================================\n";
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
         
         // Create configuration
         auto config = std::make_shared<Config>();
@@ -134,7 +239,7 @@ public:
                 
                 // 5. Apply motor command to world
                 ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
-                
+
                 // 6. Apply reward modulation
                 agentBrain.applyRewardModulation(result.reward, 0.0f);
                 
@@ -151,13 +256,13 @@ public:
 
                 // 8. Update development
                 agentBrain.updateDevelopment(0.1);
-                
+
                 // Track metrics
                 episodeReward += result.reward;
                 metrics.steps++;
                 metrics.totalReward += result.reward;
                 metrics.totalSpikes += brain->getFiringNeuronCount();
-                
+
                 // Phase 5 metrics: coverage, interact outcome, oscillation.
                 {
                     const auto& body = world.getAgentBody();
@@ -251,6 +356,9 @@ public:
                       << "\n\n";
         }
         
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
         // Summary
         std::cout << "===========================================\n";
         std::cout << "SUMMARY\n";
@@ -289,6 +397,14 @@ public:
         std::cout << "\nPhase 3 demonstration complete.\n";
         std::cout << "The brain received sensory input, produced actions,\n";
         std::cout << "experienced consequences, and modified its synapses.\n";
+        
+        std::cout << "\nPerformance:\n";
+        std::cout << "  Total runtime: " << duration.count() << " ms\n";
+        std::cout << "  Episodes: " << numEpisodes << "\n";
+        std::cout << "  Steps per episode: " << stepsPerEpisode << "\n";
+        std::cout << "  Total steps: " << numEpisodes * stepsPerEpisode << "\n";
+        
+        std::cout << "\nPhase 3 complete.\n";
     }
     
 private:
@@ -337,6 +453,28 @@ private:
         }
     }
 };
+
+// Main entry point for Phase 3 demo
+int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    Phase3Args args = parseArguments(argc, argv);
+    
+    // Handle special cases
+    if (args.help) {
+        printHelp();
+        return 0;
+    }
+    
+    if (args.version) {
+        printVersion();
+        return 0;
+    }
+    
+    nlm::Phase3Demo demo;
+    demo.run(args.numEpisodes, args.stepsPerEpisode);
+    
+    return 0;
+}
 
 } // namespace nlm
 
