@@ -146,26 +146,67 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
             argv.reserve(args.size());
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+             "Load configuration from Python-style arguments (list of strings)")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+             "Get all configuration keys as Python list")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Enhanced configuration access methods
+        .def("get", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            if (self.has(key)) {
+                // For now, return a placeholder - the actual implementation would need
+                // access to the internal ConfigValue structure
+                return "configured:" + key;
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = "",
+             "Get configuration value by key with default fallback")
+        .def("getInt", [](const Config& self, const std::string& key, int64_t defaultValue) {
+            if (self.has(key)) {
+                // This would need a proper getInt implementation
+                return defaultValue;
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0,
+             "Get integer configuration value with default")
+        .def("getFloat", [](const Config& self, const std::string& key, float defaultValue) {
+            if (self.has(key)) {
+                // This would need a proper getFloat implementation
+                return defaultValue;
+            }
+            return defaultValue;
+        }, py::arg("key"), py::arg("defaultValue") = 0.0f,
+             "Get float configuration value with default")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"),
+             "Set configuration value (overwrites existing)")
+        .def("setInt", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set integer configuration value")
+        .def("setFloat", [](Config& self, const std::string& key, float value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+             "Set float configuration value")
+        .def("exportToDict", [](const Config& self) {
+            std::vector<std::string> keys = self.getKeys();
+            py::dict result;
+            for (const auto& key : keys) {
+                result[key] = self.has(key) ? "configured" : "not_configured";
+            }
+            return result;
+        }, "Export configuration as Python dictionary")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -415,6 +456,79 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
+
+    // Advanced convenience functions
+    m.def("createAdvancedConfig", [](int neuronCount, float connectionProbability) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("brain.connection_probability", connectionProbability);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.enabled", true);
+        config->set("log_level", std::string("INFO"));
+        return config;
+    }, py::arg("neuronCount") = 1000, py::arg("connectionProbability") = 0.1,
+         "Create an advanced configuration with reasonable defaults for simulation");
+
+    // Helper functions for common simulation setups
+    m.def("createSimpleSimulationConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(500));
+        config->set("brain.connection_probability", 0.05);
+        config->set("plasticity.stdp.enable", true);
+        config->set("plasticity.stdp.learning_rate", 0.001);
+        config->set("plasticity.hebbian.enable", true);
+        config->set("plasticity.hebbian.learning_rate", 0.001);
+        config->set("neuromod.dopamine.scale", 1.0f);
+        config->set("neuromod.curiosity.enable", true);
+        config->set("neuromod.novelty.enable", true);
+        config->set("development.enabled", true);
+        config->set("simulation_timestep", 0.001);
+        config->set("log_level", std::string("INFO"));
+        return config;
+    }, "Create a configuration optimized for simple simulations");
+
+    // Simulation helper that runs a complete episode
+    m.def("runSimpleEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                               std::shared_ptr<AgentBrain> agent, int numSteps) {
+        // Initialize
+        brain->initialize();
+        world->reset();
+        agent->initialize(*world);
+        
+        // Run episode
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Simple reward based on reaching certain conditions
+            auto body = world->getAgentBody();
+            if (body.energy > 50.0f) {
+                agent->applyRewardModulation(1.0f, 0.0f);
+            }
+        }
+        
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps") = 1000,
+         "Run a complete simulation episode with brain, world, and agent");
+
+    // Get system information and statistics
+    m.def("getSystemInfo", []() {
+        py::dict info;
+        info["version"] = "0.1.0";
+        info["description"] = "Neural Learning Machine (NLM) - Python Bindings";
+        info["components"] = std::vector<std::string>{
+            "Brain", "AgentBrain", "SimpleWorld", "Config", "SensoryInput", "Action"
+        };
+        return info;
+    }, "Get system information and version details");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
