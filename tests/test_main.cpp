@@ -1,5 +1,5 @@
 // NLM Test Main
-// Phase 2: Real Neural Computation Tests
+// Enhanced test suite for NLM Phase 2: Real Neural Computation Tests
 
 #include <iostream>
 #include <cassert>
@@ -10,6 +10,10 @@ namespace test_types {
 }
 
 namespace test_config {
+    void runAll();
+}
+
+namespace test_config_enhanced {
     void runAll();
 }
 
@@ -38,16 +42,16 @@ namespace test_brain {
 }
 
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
-    std::cout << "  - LIF Neuron Dynamics" << std::endl;
-    std::cout << "  - Synaptic Transmission" << std::endl;
-    std::cout << "  - STDP Plasticity" << std::endl;
-    std::cout << std::endl;
+    std::cout << "=== NLM Enhanced Test Suite ===" << std::endl;
+    std::cout << "Testing Enhanced Configuration System:" << std::endl;
+    std::cout << "  - Schema-based configuration with validation" << std::endl;
+    stdcout << "  - Configuration presets (dev, prod, test, demo)" << std::endl;
+    stdcout << "  - Error handling and modification tracking" << std::endl;
+    stdcout << std::endl;
     
     bool allPassed = true;
     
-    std::cout << "Running Types tests..." << std::endl;
+    std::cout << "Running Core System tests..." << std::endl;
     try {
         test_types::runAll();
         std::cout << "  PASSED" << std::endl;
@@ -56,9 +60,18 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << "Running Config tests..." << std::endl;
+    std::cout << "Running Enhanced Config tests..." << std::endl;
     try {
         test_config::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Enhanced Config tests..." << std::endl;
+    try {
+        test_config_enhanced::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
@@ -122,9 +135,11 @@ int main() {
     std::cout << std::endl;
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
+        std::cout << "Enhanced test suite complete with validation, schema, and error handling!" << std::endl;
         return 0;
     } else {
         std::cout << "=== Some Tests FAILED ===" << std::endl;
+        std::cout << "Note: Enhanced tests may fail due to incomplete implementation of some features." << std::endl;
         return 1;
     }
 }
