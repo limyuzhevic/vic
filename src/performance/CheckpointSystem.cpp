@@ -401,9 +401,22 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    if (!stream_.is_open()) return false;
+    stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+    return !stream_;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    if (!stream_.is_open()) return false;
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    return !stream_;
+}
+
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    (void)alignment; // Currently not used, but implementation is no-op
+    return true;
+}
 
 // ---------------- CheckpointManager ----------------
 
