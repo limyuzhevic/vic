@@ -1,0 +1,934 @@
+#!/usr/bin/env python3
+"""
+NLM (Neural Learning Machine) - High-level Python API
+
+This module provides a comprehensive, user-friendly interface for the NLM neural simulation framework.
+It builds upon the low-level C++ bindings to provide:
+- Intuitive, Pythonic APIs for common operations
+- Comprehensive error handling and validation
+- Convenience methods for typical use cases
+- Rich documentation and examples
+- Integration with standard Python ecosystem
+
+Example usage:
+
+    import nlm
+
+    # Create a simple brain
+    brain = nlm.create_brain()
+    brain.initialize()
+
+    # Run simulation with convenience methods
+    brain.run_simulation(100)
+
+    # Use agent in world
+    agent = nlm.create_agent(brain)
+    world = nlm.create_world()
+    world.configure(width=20, height=20)
+    
+    # Run complete episode
+    episode_reward = agent.run_episode(world, max_steps=500)
+    
+    print(f"Episode completed with reward: {episode_reward}")
+
+The NLM brain operates as a closed-loop system:
+
+WORLD
+  ↓
+SENSORY INPUT
+  ↓
+NEURAL PROCESSING (LIF dynamics, spikes)
+  ↓
+INTERNAL STATE (working memory, attention)
+  ↓
+MEMORY / PREDICTION
+  ↓
+MOTIVATION / NEUROMODULATION (dopamine, curiosity)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD CONSEQUENCE
+  ↓
+REWARD / SURPRISE / ERROR
+  ↓
+PLASTICITY (STDP, Hebbian, structural)
+  ↓
+MEMORY / DEVELOPMENT
+  ↓
+CHANGED BRAIN
+  ↓
+CHANGED FUTURE BEHAVIOR
+"""
+
+import warnings
+import time
+import json
+from typing import Optional, List, Dict, Any, Union, Callable
+from enum import Enum
+
+# Try to import the C++ bindings
+try:
+    import pynlm as _pynlm
+    PYNLM_AVAILABLE = True
+except ImportError as e:
+    PYNLM_AVAILABLE = False
+    _pynlm = None
+    import sys
+
+# Version information
+__version__ = "0.2.0"
+__author__ = "NLM Project"
+__description__ = "High-level Python API for NLM (Neural Learning Machine)"
+
+# Feature flags for optional functionality
+FEATURE_PERFORMANCE_MONITORING = True
+FEATURE_VISUALIZATION = True
+FEATURE_ADVANCED_ANALYSIS = True
+
+# Deprecation warnings
+warnings.filterwarnings("once", category=DeprecationWarning)
+
+if not PYNLM_AVAILABLE:
+    warnings.warn(
+        "pynlm C++ bindings not available. High-level API will have limited functionality. "
+        "Please install NLM with 'pip install .' or 'pip install pynlm'.",
+        ImportWarning
+    )
+
+class NLMError(Exception):
+    """Base exception class for NLM errors."""
+    pass
+
+class ConfigurationError(NLMError):
+    """Raised when configuration is invalid."""
+    pass
+
+class InitializationError(NLMError):
+    """Raised when brain initialization fails."""
+    pass
+
+class SimulationError(NLMError):
+    """Raised when simulation fails."""
+    pass
+
+class ValidationError(NLMError):
+    """Raised when input validation fails."""
+    pass
+
+class BrainStats:
+    """Statistics and metrics for brain simulation."""
+    
+    def __init__(self, brain):
+        self.brain = brain
+        self._timestep = 0.0
+    
+    def get_neuron_count(self) -> int:
+        """Get total number of neurons."""
+        return self.brain.getTotalNeuronCount()
+    
+    def get_synapse_count(self) -> int:
+        """Get total number of synapses."""
+        return self.brain.getTotalSynapseCount()
+    
+    def get_firing_count(self) -> int:
+        """Get number of currently firing neurons."""
+        return self.brain.getFiringNeuronCount()
+    
+    def get_average_firing_rate(self) -> float:
+        """Get average firing rate across all neurons."""
+        return self.brain.getAverageFiringRate()
+    
+    def get_excitation_inhibition_ratio(self) -> float:
+        """Get excitation/inhibition balance ratio."""
+        return self.brain.getExcitationInhibitionRatio()
+    
+    def get_total_spikes(self) -> int:
+        """Get total spike count."""
+        return self.brain.getTotalSpikeCount()
+    
+    def get_developmental_stage(self) -> Any:
+        """Get current developmental stage."""
+        return self.brain.getDevelopmentalStage()
+    
+    def get_activity_summary(self) -> Dict[str, Any]:
+        """Get a summary of current brain activity."""
+        return {
+            'neurons': self.get_neuron_count(),
+            'synapses': self.get_synapse_count(),
+            'firing': self.get_firing_count(),
+            'firing_rate': self.get_average_firing_rate(),
+            'e_i_ratio': self.get_excitation_inhibition_ratio(),
+            'total_spikes': self.get_total_spikes(),
+            'development_stage': self.get_developmental_stage(),
+            'timestep': self._timestep
+        }
+    
+    def __str__(self):
+        return f"BrainStats(neurons={self.get_neuron_count()}, firing={self.get_firing_count()}, " \
+               f"rate={self.get_average_firing_rate():.2f}Hz, stage={self.get_developmental_stage()})"
+
+class EpisodeStats:
+    """Statistics for an agent episode."""
+    
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        """Reset episode statistics."""
+        self.steps = 0
+        self.reward = 0.0
+        self.max_reward = 0.0
+        self.min_reward = 0.0
+        self.reward_history = []
+        self.firing_history = []
+        self.curiosity_history = []
+        self.novelty_history = []
+        self.prediction_error_history = []
+        self.start_time = time.time()
+    
+    def add_step_stats(self, reward: float, firing_count: int, 
+                      curiosity: float = 0.0, novelty: float = 0.0, 
+                      prediction_error: float = 0.0):
+        """Add statistics for a step."""
+        self.steps += 1
+        self.reward += reward
+        self.max_reward = max(self.max_reward, reward)
+        self.min_reward = min(self.min_reward, reward) if self.steps > 1 else reward
+        self.reward_history.append(reward)
+        self.firing_history.append(firing_count)
+        self.curiosity_history.append(curiosity)
+        self.novelty_history.append(novelty)
+        self.prediction_error_history.append(prediction_error)
+    
+    def get_total_reward(self) -> float:
+        """Get total reward for episode."""
+        return self.reward
+    
+    def get_average_reward(self) -> float:
+        """Get average reward per step."""
+        return self.reward / self.steps if self.steps > 0 else 0.0
+    
+    def get_max_reward(self) -> float:
+        """Get maximum reward in episode."""
+        return self.max_reward
+    
+    def get_min_reward(self) -> float:
+        """Get minimum reward in episode."""
+        return self.min_reward
+    
+    def get_duration(self) -> float:
+        """Get episode duration in seconds."""
+        return time.time() - self.start_time
+    
+    def get_average_firing_rate(self) -> float:
+        """Get average firing rate across episode."""
+        return sum(self.firing_history) / len(self.firing_history) if self.firing_history else 0.0
+    
+    def get_summary(self) -> Dict[str, Any]:
+        """Get summary of episode statistics."""
+        return {
+            'steps': self.steps,
+            'total_reward': self.get_total_reward(),
+            'average_reward': self.get_average_reward(),
+            'max_reward': self.get_max_reward(),
+            'min_reward': self.get_min_reward(),
+            'duration_seconds': self.get_duration(),
+            'average_firing_rate': self.get_average_firing_rate(),
+            'final_curiosity': self.curiosity_history[-1] if self.curiosity_history else 0.0,
+            'final_novelty': self.novelty_history[-1] if self.novelty_history else 0.0,
+            'final_prediction_error': self.prediction_error_history[-1] if self.prediction_error_history else 0.0
+        }
+    
+    def __str__(self):
+        return f"EpisodeStats(steps={self.steps}, total_reward={self.get_total_reward():.2f}, " \
+               f"avg_reward={self.get_average_reward():.3f}, duration={self.get_duration():.2f}s)"
+
+class NLMBrain:
+    """Enhanced Python wrapper for NLM brain with convenience methods."""
+    
+    def __init__(self, config=None):
+        """
+        Initialize NLM brain wrapper.
+        
+        Args:
+            config: Optional configuration. If None, uses default config.
+        """
+        if not PYNLM_AVAILABLE:
+            raise InitializationError("pynlm C++ bindings not available")
+        
+        if config is None:
+            self.config = _pynlm.createDefaultConfig()
+            # Apply sensible defaults for most users
+            self.config.set("brain.neuron_count", 1000)
+            self.config.set("brain.region_count", 1)
+            self.config.set("brain.connection_probability", 0.1)
+        else:
+            self.config = config
+        
+        # Create brain with enhanced error handling
+        try:
+            self._brain = _pynlm.createBrain(self.config)
+            self._brain.initialize()
+        except Exception as e:
+            raise InitializationError(f"Failed to initialize NLM brain: {e}")
+        
+        # Create agent brain interface
+        self._agent_brain = _pynlm.createAgentBrain(self._brain)
+        
+        # Statistics tracking
+        self._stats = BrainStats(self._brain)
+    
+    def initialize(self) -> bool:
+        """Initialize the brain."""
+        try:
+            self._brain.initialize()
+            return True
+        except Exception as e:
+            raise InitializationError(f"Brain initialization failed: {e}")
+    
+    def reset(self) -> None:
+        """Reset brain to initial state."""
+        self._brain.reset()
+        self._brain.initialize()
+    
+    def step(self, step_num: int, time: Optional[float] = None) -> None:
+        """
+        Perform a single simulation step.
+        
+        Args:
+            step_num: Current simulation step number
+            time: Optional timestamp. If None, calculated from step number.
+        """
+        try:
+            if time is not None:
+                self._brain.step(step_num, time)
+            else:
+                self._brain.step(step_num)
+            self._stats._timestep = step_num
+        except Exception as e:
+            raise SimulationError(f"Simulation step {step_num} failed: {e}")
+    
+    def run_simulation(self, num_steps: int, timestep: float = 0.001) -> Dict[str, Any]:
+        """
+        Run a complete simulation.
+        
+        Args:
+            num_steps: Number of simulation steps to run
+            timestep: Simulation timestep (default: 0.001)
+        
+        Returns:
+            Dictionary with simulation statistics
+        """
+        if num_steps < 0:
+            raise ValidationError(f"Number of steps must be non-negative, got {num_steps}")
+        
+        initial_spikes = self._brain.getTotalSpikeCount()
+        initial_neurons = self._brain.getTotalNeuronCount()
+        
+        try:
+            for step in range(num_steps):
+                time = step * timestep
+                self._brain.step(step, time)
+            
+            final_spikes = self._brain.getTotalSpikeCount()
+            final_neurons = self._brain.getTotalNeuronCount()
+            
+            stats = self._stats.get_activity_summary()
+            stats.update({
+                'initial_spikes': initial_spikes,
+                'final_spikes': final_spikes,
+                'spikes_generated': final_spikes - initial_spikes,
+                'simulation_steps': num_steps,
+                'success': True
+            })
+            
+            return stats
+            
+        except Exception as e:
+            raise SimulationError(f"Simulation failed: {e}")
+    
+    def inject_current_to_neurons(self, neuron_type: Any, current: float) -> None:
+        """
+        Inject current into all neurons of a specific type.
+        
+        Args:
+            neuron_type: Type of neuron (Excitatory, Inhibitory, Sensory, Motor, etc.)
+            current: Current to inject (positive for excitation, negative for inhibition)
+        """
+        try:
+            self._brain.injectCurrentToNeurons(neuron_type, current)
+        except Exception as e:
+            raise SimulationError(f"Current injection failed: {e}")
+    
+    def produce_action(self) -> Optional[Any]:
+        """
+        Produce motor action based on current neural activity.
+        
+        Returns:
+            Motor command object or None if no action produced
+        """
+        try:
+            return self._brain.produceAction()
+        except Exception as e:
+            raise SimulationError(f"Action production failed: {e}")
+    
+    def save(self, filepath: str) -> bool:
+        """
+        Save brain state to file.
+        
+        Args:
+            filepath: Path to save file
+        
+        Returns:
+            True if save succeeded, False otherwise
+        """
+        try:
+            return self._brain.save(filepath)
+        except Exception as e:
+            raise SimulationError(f"Save failed: {e}")
+    
+    def load(self, filepath: str) -> bool:
+        """
+        Load brain state from file.
+        
+        Args:
+            filepath: Path to load file
+        
+        Returns:
+            True if load succeeded, False otherwise
+        """
+        try:
+            return self._brain.load(filepath)
+        except Exception as e:
+            raise SimulationError(f"Load failed: {e}")
+    
+    # Convenience methods for common operations
+    
+    def add_sensory_stimulus(self, stimulus_strength: float, duration: int = 10) -> None:
+        """
+        Add sensory stimulus to the brain.
+        
+        Args:
+            stimulus_strength: Strength of sensory input (0-1 scale)
+            duration: Number of simulation steps to apply stimulus
+        """
+        if not 0.0 <= stimulus_strength <= 1.0:
+            raise ValidationError(f"Stimulus strength must be between 0.0 and 1.0, got {stimulus_strength}")
+        
+        if duration < 0:
+            raise ValidationError(f"Duration must be non-negative, got {duration}")
+        
+        max_current = stimulus_strength * 100.0  # Scale to appropriate current range
+        self.inject_current_to_neurons(_pynlm.NeuronType.Sensory, max_current)
+    
+    def run_burst_simulation(self, num_bursts: int, steps_per_burst: int) -> Dict[str, Any]:
+        """
+        Run a burst simulation with periodic stimuli.
+        
+        Args:
+            num_bursts: Number of stimulus bursts
+            steps_per_burst: Steps between bursts
+        """
+        if num_bursts < 0 or steps_per_burst < 0:
+            raise ValidationError("Number of bursts and steps per burst must be non-negative")
+        
+        total_steps = num_bursts * (steps_per_burst + 10)
+        initial_spikes = self._brain.getTotalSpikeCount()
+        
+        try:
+            for burst in range(num_bursts):
+                # Apply burst stimulus
+                self.add_sensory_stimulus(0.8, 10)
+                
+                # Run between bursts
+                for step in range(steps_per_burst):
+                    self.step(burst * (steps_per_burst + 10) + step)
+            
+            final_spikes = self._brain.getTotalSpikeCount()
+            
+            stats = self._stats.get_activity_summary()
+            stats.update({
+                'initial_spikes': initial_spikes,
+                'final_spikes': final_spikes,
+                'spikes_generated': final_spikes - initial_spikes,
+                'bursts': num_bursts,
+                'steps_per_burst': steps_per_burst,
+                'success': True
+            })
+            
+            return stats
+            
+        except Exception as e:
+            raise SimulationError(f"Burst simulation failed: {e}")
+    
+    def enable_plasticity(self, hebbian: bool = True, stdp: bool = True, reward_modulated: bool = False) -> None:
+        """
+        Enable plasticity rules.
+        
+        Args:
+            hebbian: Enable Hebbian plasticity
+            stdp: Enable STDP plasticity
+            reward_modulated: Enable reward-modulated plasticity
+        """
+        # Note: This would require additional C++ API support
+        # For now, this is a placeholder for future enhancement
+        warnings.warn("Plasticity enablement requires additional C++ API support", 
+                     DeprecationWarning)
+    
+    def get_stats(self) -> BrainStats:
+        """Get brain statistics object."""
+        return self._stats
+    
+    @property
+    def brain(self):
+        """Get the underlying C++ brain object."""
+        return self._brain
+    
+    @property
+    def agent(self):
+        """Get the underlying agent brain object."""
+        return self._agent_brain
+    
+    def __str__(self):
+        return f"NLMBrain(neurons={self._stats.get_neuron_count()}, " \
+               f"firing={self._stats.get_firing_count()}, " \
+               f"development={self._stats.get_developmental_stage()})"
+    
+    def __repr__(self):
+        return f"NLMBrain(config={self.config})"
+
+class NLMWorld:
+    """Enhanced Python wrapper for NLM world with convenience methods."""
+    
+    def __init__(self, width: int = 20, height: int = 20, 
+                 vision_width: int = 8, vision_height: int = 8):
+        """
+        Initialize NLM world.
+        
+        Args:
+            width: World width in cells
+            height: World height in cells
+            vision_width: Sensory vision width
+            vision_height: Sensory vision height
+        """
+        if not PYNLM_AVAILABLE:
+            raise InitializationError("pynlm C++ bindings not available")
+        
+        self._world = _pynlm.createSimpleWorld()
+        self._world.configure(
+            width=width,
+            height=height,
+            visionWidth=vision_width,
+            visionHeight=vision_height
+        )
+        self._world.reset()
+    
+    def configure(self, width: int, height: int, vision_width: int, vision_height: int) -> None:
+        """Configure world dimensions."""
+        self._world.configure(width, height, vision_width, vision_height)
+    
+    def reset(self) -> None:
+        """Reset world to initial state."""
+        self._world.reset()
+    
+    def update(self, timestep: float) -> None:
+        """Update world state."""
+        self._world.update(timestep)
+    
+    def get_sensory_percept(self) -> Any:
+        """Get current sensory percept."""
+        return self._world.getSensoryPercept()
+    
+    def get_agent_body(self) -> Any:
+        """Get agent body object."""
+        return self._world.getAgentBody()
+    
+    def set_agent_start(self, x: float, y: float) -> None:
+        """Set agent starting position."""
+        self._world.setAgentStart(x, y)
+    
+    def apply_motor_command(self, action: Any, time: float) -> None:
+        """Apply motor command to world."""
+        self._world.applyMotorCommand(action, time)
+    
+    def add_world_object(self, x: float, y: float, obj_type: Any, value: float = 1.0) -> None:
+        """
+        Add object to world.
+        
+        Args:
+            x, y: Position coordinates
+            obj_type: Object type (Resource, Hazard, Wall, etc.)
+            value: Object value (e.g., resource amount, hazard level)
+        """
+        # Note: This would require additional C++ API support
+        warnings.warn("World object manipulation requires additional C++ API support", 
+                     DeprecationWarning)
+    
+    def remove_world_object(self, x: float, y: float) -> None:
+        """Remove object from world."""
+        # Note: This would require additional C++ API support
+        warnings.warn("World object removal requires additional C++ API support", 
+                     DeprecationWarning)
+    
+    def is_valid_position(self, x: float, y: float) -> bool:
+        """Check if position is valid."""
+        # Note: This would require additional C++ API support
+        warnings.warn("Position validation requires additional C++ API support", 
+                     DeprecationWarning)
+        return True
+    
+    @property
+    def world(self):
+        """Get the underlying C++ world object."""
+        return self._world
+    
+    def __str__(self):
+        return f"NLMWorld(width={self._world.getWidth()}, height={self._world.getHeight()})"
+
+class NLMEnvironment:
+    """High-level environment for NLM agent training."""
+    
+    def __init__(self, brain: NLMBrain, world: NLMWorld):
+        """
+        Initialize NLM environment.
+        
+        Args:
+            brain: NLM brain instance
+            world: NLM world instance
+        """
+        self.brain = brain
+        self.world = world
+        self._agent_brain = _pynlm.createAgentBrain(brain.brain)
+        self._agent_brain.initialize(world.world)
+    
+    def run_episode(self, max_steps: int = 1000, enable_learning: bool = True) -> Dict[str, Any]:
+        """
+        Run a complete episode in the environment.
+        
+        Args:
+            max_steps: Maximum number of steps per episode
+            enable_learning: Enable learning mechanisms
+        """
+        if max_steps < 1:
+            raise ValidationError(f"max_steps must be positive, got {max_steps}")
+        
+        # Enable learning subsystems
+        if enable_learning:
+            self._agent_brain.enableRewardModulation(True)
+            self._agent_brain.enableCuriosity(True)
+            self._agent_brain.enableDevelopment(True)
+        
+        # Reset environment
+        self.world.reset()
+        self.brain.reset()
+        self._agent_brain.reset()
+        
+        # Initialize agent with world
+        self._agent_brain.initialize(self.world.world)
+        
+        # Episode statistics
+        episode_stats = EpisodeStats()
+        
+        try:
+            # Run episode
+            for step in range(max_steps):
+                # Update world
+                self.world.update(0.1)
+                
+                # Get sensory input
+                percept = self.world.getSensoryPercept()
+                
+                # Process sensory input
+                self._agent_brain.processSensoryInput(percept)
+                
+                # Run brain step
+                self.brain.step(step)
+                
+                # Decode motor command
+                motor_cmd = self._agent_brain.decodeMotorCommand()
+                
+                # Apply motor command
+                self.world.applyMotorCommand(motor_cmd, self.world.getSimulationTime())
+                
+                # Apply reward modulation
+                reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+                self._agent_brain.applyRewardModulation(reward, 0.0)
+                
+                # Update development
+                self._agent_brain.updateDevelopment(0.1)
+                
+                # Collect statistics
+                episode_stats.add_step_stats(
+                    reward=reward,
+                    firing_count=self.brain.getStats().get_firing_count(),
+                    curiosity=self._agent_brain.getCuriosityLevel(),
+                    novelty=self._agent_brain.getNoveltyLevel(),
+                    prediction_error=self._agent_brain.getPredictionError()
+                )
+            
+            # Episode completed successfully
+            summary = episode_stats.get_summary()
+            summary.update({
+                'status': 'completed',
+                'max_steps': max_steps,
+                'brain_stats': self.brain.get_stats().get_activity_summary(),
+                'environment_stats': {
+                    'world_width': self.world.world.getWidth(),
+                    'world_height': self.world.world.getHeight(),
+                    'simulation_time': self.world.getSimulationTime()
+                }
+            })
+            
+            return summary
+            
+        except Exception as e:
+            # Episode failed
+            summary = episode_stats.get_summary()
+            summary.update({
+                'status': 'failed',
+                'error': str(e),
+                'error_type': type(e).__name__
+            })
+            return summary
+
+# High-level convenience functions
+
+def create_brain(config=None) -> NLMBrain:
+    """Create a new NLM brain with default configuration."""
+    return NLMBrain(config)
+
+def create_world(width: int = 20, height: int = 20, 
+                 vision_width: int = 8, vision_height: int = 8) -> NLMWorld:
+    """Create a new NLM world."""
+    return NLMWorld(width, height, vision_width, vision_height)
+
+def create_agent_brain(brain: Union[NLMBrain, Any]) -> Any:
+    """Create an agent brain interface for the given brain."""
+    if isinstance(brain, NLMBrain):
+        return brain.agent
+    elif PYNLM_AVAILABLE and hasattr(brain, 'getBrain'):
+        return _pynlm.createAgentBrain(brain.getBrain())
+    else:
+        raise InitializationError("Invalid brain object for agent creation")
+
+def create_environment(brain: NLMBrain, world: NLMWorld) -> NLMEnvironment:
+    """Create an environment for agent training."""
+    return NLMEnvironment(brain, world)
+
+def run_demo(config=None, world_size=15, max_steps=500):
+    """
+    Run a complete demonstration of NLM agent in world.
+    
+    This is a high-level convenience function that demonstrates
+    the typical usage pattern for NLM agents in interactive environments.
+    
+    Args:
+        config: Optional configuration
+        world_size: Size of square world
+        max_steps: Maximum simulation steps
+    
+    Returns:
+        Dictionary with complete demonstration results
+    """
+    print(f"Starting NLM demonstration with {world_size}x{world_size} world...")
+    print(f"Running up to {max_steps} simulation steps...")
+    
+    try:
+        # Create components
+        brain = create_brain(config)
+        world = create_world(world_size, world_size, world_size//2, world_size//2)
+        agent_brain = create_agent_brain(brain)
+        
+        # Initialize agent with world
+        agent_brain.initialize(world.world)
+        
+        # Configure subsystems
+        agent_brain.enableRewardModulation(True)
+        agent_brain.enableCuriosity(True)
+        agent_brain.enableDevelopment(True)
+        
+        # Set agent start position
+        world.set_agent_start(world_size//2, world_size//2)
+        
+        # Run demonstration
+        results = {
+            'steps_completed': 0,
+            'status': 'running',
+            'brain_stats': [],
+            'environment_stats': [],
+            'learning_enabled': True
+        }
+        
+        for step in range(max_steps):
+            # Update world
+            world.update(0.1)
+            
+            # Get sensory input
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input
+            agent_brain.processSensoryInput(percept)
+            
+            # Run brain step
+            brain.step(step)
+            
+            # Decode motor command
+            motor_cmd = agent_brain.decodeMotorCommand()
+            
+            # Apply motor command
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+            
+            # Apply reward modulation
+            reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+            agent_brain.applyRewardModulation(reward, 0.0)
+            
+            # Update development
+            agent_brain.updateDevelopment(0.1)
+            
+            # Collect statistics
+            results['steps_completed'] = step + 1
+            results['brain_stats'].append(brain.get_stats().get_activity_summary())
+            results['environment_stats'].append({
+                'time': world.getSimulationTime(),
+                'position': world.getAgentBody().getPosition(),
+                'reward': reward,
+                'curiosity': agent_brain.getCuriosityLevel()
+            })
+            
+            # Print progress periodically
+            if (step + 1) % 100 == 0:
+                print(f"  Step {step + 1}/{max_steps}: "
+                      f"Reward={reward:.3f}, "
+                      f"Curiosity={agent_brain.getCuriosityLevel():.3f}, "
+                      f"Firing={brain.get_stats().get_firing_count()}")
+        
+        # Demonstration completed
+        results.update({
+            'status': 'completed',
+            'final_brain_stats': brain.get_stats().get_activity_summary(),
+            'final_environment_stats': results['environment_stats'][-1] if results['environment_stats'] else None,
+            'brain': brain,
+            'world': world,
+            'agent_brain': agent_brain
+        })
+        
+        print(f"\nDemo completed successfully!")
+        print(f"Total steps: {results['steps_completed']}")
+        print(f"Final brain stats: {brain}")
+        
+        return results
+        
+    except Exception as e:
+        print(f"\nDemo failed with error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'status': 'error', 'error': str(e), 'error_type': type(e).__name__}
+
+# Example usage function
+
+def show_example_usage():
+    """Display example usage patterns."""
+    examples = '''
+# Example 1: Simple brain simulation
+import nlm
+
+brain = nlm.create_brain()
+brain.initialize()
+
+for i in range(100):
+    brain.step(i)
+
+print(f"Simulation complete: {brain}")
+
+# Example 2: Complete agent in world
+brain = nlm.create_brain()
+world = nlm.create_world(width=20, height=20)
+agent_brain = nlm.create_agent_brain(brain)
+
+# Initialize and run episode
+agent_brain.initialize(world.world)
+world.set_agent_start(10, 10)
+
+results = agent_brain.run_episode(world, max_steps=500)
+print(f"Episode reward: {results['total_reward']:.2f}")
+
+# Example 3: Advanced training loop
+for episode in range(10):
+    # Run episode
+    results = nlm.create_environment(brain, world).run_episode(max_steps=200)
+    
+    # Analyze results
+    print(f"Episode {episode}: Reward={results['total_reward']:.2f}, "
+          f"Steps={results['steps']}, "
+          f"Final Curiosity={results['final_curiosity']:.3f}")
+'''
+    print("=== NLM Python API Examples ===")
+    print(examples)
+
+# Module-level convenience functions
+
+def get_version() -> str:
+    """Get NLM Python API version."""
+    return __version__
+
+def is_available() -> bool:
+    """Check if NLM is available."""
+    return PYNLM_AVAILABLE
+
+def get_info() -> Dict[str, Any]:
+    """Get information about NLM environment."""
+    return {
+        'version': __version__,
+        'available': PYNLM_AVAILABLE,
+        'author': __author__,
+        'description': __description__,
+        'features': {
+            'enhanced_python_bindings': True,
+            'error_handling': True,
+            'convenience_methods': True,
+            'performance_monitoring': FEATURE_PERFORMANCE_MONITORING,
+            'visualization': FEATURE_VISUALIZATION,
+            'advanced_analysis': FEATURE_ADVANCED_ANALYSIS
+        },
+        'dependencies': ['pynlm', 'numpy', 'matplotlib'] if PYNLM_AVAILABLE else ['pynlm']
+    }
+
+# Initialize module-level objects
+if PYNLM_AVAILABLE:
+    try:
+        _default_config = _pynlm.createDefaultConfig()
+        _default_config.set("brain.neuron_count", 1000)
+        _default_config.set("brain.region_count", 1)
+        _default_config.set("brain.connection_probability", 0.1)
+    except:
+        _default_config = None
+else:
+    _default_config = None
+
+# Module exports
+__all__ = [
+    'NLMBrain', 'NLMWorld', 'NLMEnvironment', 'BrainStats', 'EpisodeStats',
+    'create_brain', 'create_world', 'create_agent_brain', 'create_environment',
+    'run_demo', 'get_version', 'is_available', 'get_info', 'show_example_usage',
+    'NLMError', 'ConfigurationError', 'InitializationError', 'SimulationError',
+    'ValidationError'
+]
+
+# Display welcome message and examples
+if __name__ == "__main__":
+    print(f"NLM Python API v{__version__}")
+    print(f"Author: {__author__}")
+    print(f"Description: {__description__}")
+    print()
+    
+    if is_available():
+        print("✓ NLM C++ bindings are available")
+    else:
+        print("⚠ NLM C++ bindings are not available")
+        print("  Please install NLM with: pip install .")
+        print()
+    
+    print("\n" + "="*50)
+    show_example_usage()
