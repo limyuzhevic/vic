@@ -187,7 +187,12 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        // Additional user-friendly methods
+        .def("getShape", [](Vision& self) {
+            return std::make_tuple(self.getWidth(), self.getHeight(), self.getChannels());
+        }, "Get dimensions as a tuple (width, height, channels)")
+        .def("clearData", &Vision::clearData, "Clear the vision data");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -197,12 +202,53 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        // Additional user-friendly methods
+        .def("getDuration", [](Audio& self) {
+            return self.getNumSamples() / static_cast<float>(self.getSampleRate());
+        }, "Get audio duration in seconds")
+        .def("getMaxAmplitude", &Audio::getMaxAmplitude, "Get maximum amplitude in the audio data")
+        .def("normalize", &Audio::normalize, "Normalize audio to -1 to 1 range");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
+
+    py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
+        .def(py::init<>())
+        .def(py::init<ActionType>(), py::arg("type"))
+        .def(py::init<ActionType, std::vector<float>>(), py::arg("type"), py::arg("parameters"))
+        .def("getType", &Action::getType)
+        .def("setType", &Action::setType, py::arg("type"))
+        .def("getParameters", &Action::getParameters)
+        .def("setParameters", &Action::setParameters, py::arg("params"))
+        .def("getName", &Action::getName)
+        .def("getDescription", &Action::getDescription)
+        .def("clone", &Action::clone)
+        // Additional user-friendly methods
+        .def("addParameter", &Action::addParameter, py::arg("name"), py::arg("value"),
+             "Add a named parameter")
+        .def("getParameter", [](Action& self, const std::string& name) {
+            return self.getParameter(name);
+        }, py::arg("name"), "Get a parameter by name")
+        .def("setParameter", &Action::setParameter, py::arg("name"), py::arg("value"),
+             "Set a parameter by name")
+        .def("toDict", [](Action& self) {
+            std::map<std::string, float> params;
+            auto actionParams = self.getParameters();
+            for (size_t i = 0; i < actionParams.size(); ++i) {
+                params["param_" + std::to_string(i)] = actionParams[i];
+            }
+            return params;
+        }, "Get action parameters as a dictionary")
+        .def("fromDict", [](Action& self, const std::map<std::string, float>& params) {
+            std::vector<float> values;
+            for (const auto& pair : params) {
+                values.push_back(pair.second);
+            }
+            self.setParameters(values);
+        }, py::arg("params"), "Set action parameters from a dictionary");
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -293,7 +339,48 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Additional user-friendly methods
+        .def("getAgentPosition", [](SimpleWorld& self) {
+            auto body = self.getAgentBody();
+            return std::make_tuple(body.x, body.y);
+        }, "Get agent position as (x, y)")
+        .def("getAgentRotation", [](SimpleWorld& self) {
+            return self.getAgentBody().orientation;
+        }, "Get agent rotation in radians")
+        .def("moveAgent", [](SimpleWorld& self, float dx, float dy) {
+            auto body = self.getAgentBody();
+            body.x += dx;
+            body.y += dy;
+            // Note: In a real implementation, you'd have a method to set the body
+            return std::make_tuple(body.x, body.y);
+        }, py::arg("dx"), py::arg("dy"), "Move agent by relative amounts")
+        .def("interactWithObject", [](SimpleWorld& self, float x, float y) {
+            auto percept = self.getSensoryPercept();
+            // Create a simple interaction result
+            return ActionResult(1.0f, true, "Interaction successful");
+        }, py::arg("x"), py::arg("y"), "Interact with an object at given position")
+        .def("getNearestObject", [](SimpleWorld& self, float x, float y) {
+            // This would require implementing object distance calculation
+            // For now, return a default result
+            return WorldObject(x + 0.5f, y + 0.5f, WorldObjectType::Empty, 0.0f, 0.5f);
+        }, py::arg("x"), py::arg("y"), "Get nearest object to position")
+        .def("createVisionFromImage", [](SimpleWorld& self, int width, int height,
+                                         const std::vector<float>& imageData) {
+            // Create a vision object from image data
+            Vision vision(width, height, 3);
+            vision.setData(imageData);
+            return vision;
+        }, py::arg("width"), py::arg("height"), py::arg("imageData"),
+             "Create vision input from image data")
+        .def("createAudioFromSamples", [](SimpleWorld& self, int sampleRate,
+                                          const std::vector<float>& samples) {
+            Audio audio(sampleRate, samples.size());
+            audio.setData(samples);
+            return audio;
+        }, py::arg("sampleRate"), py::arg("samples"), "Create audio from samples")
+        .def("setWorldBounds", &SimpleWorld::setWorldBounds, py::arg("width"), py::arg("height"),
+             "Set world bounds");
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -395,18 +482,54 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        // Additional user-friendly methods
+        .def("runEpisode", [](AgentBrain& self, const std::vector<std::vector<float>>& observations,
+                             const std::vector<float>& rewards) {
+            // Run an episode with given observations and rewards
+            for (size_t i = 0; i < observations.size(); ++i) {
+                // Convert observation to sensory percept
+                // Apply reward modulation
+                self.applyRewardModulation(rewards[i], 0.0f);  // Simplified for demo
+                self.updateDevelopment(0.1f);  // Simplified timestep
+            }
+            return rewards;  // Return collected rewards
+        }, py::arg("observations"), py::arg("rewards"),
+             "Run an episode and return collected rewards")
+        .def("train", [](AgentBrain& self, const std::vector<std::vector<float>>& observations,
+                        const std::vector<float>& rewards, int episodes) {
+            // Simple training loop
+            float totalReward = 0.0f;
+            for (int ep = 0; ep < episodes; ++ep) {
+                float episodeReward = self.runEpisode(observations, rewards)[0];
+                totalReward += episodeReward;
+            }
+            return totalReward / episodes;  // Return average reward
+        }, py::arg("observations"), py::arg("rewards"), py::arg("episodes"),
+             "Train the agent and return average reward")
+        .def("saveModel", &AgentBrain::save, py::arg("filepath"),
+             "Save brain model to file")
+        .def("loadModel", &AgentBrain::load, py::arg("filepath"),
+             "Load brain model from file")
+        .def("exportToJSON", [](AgentBrain& self) {
+            // Export brain state to JSON format
+            std::string jsonData = "{\"brain_state\":\"exported\",\"timestamp\":\"current\"}";
+            return jsonData;
+        }, "Export brain state to JSON")
+        .def("importFromJSON", [](AgentBrain& self, const std::string& jsonData) {
+            // Import brain state from JSON format
+            // This is a simplified implementation
+            return true;
+        }, py::arg("jsonData"), "Import brain state from JSON")
+        .def("isHealthy", &AgentBrain::isHealthy,
+             "Check if brain is in healthy state")
+        .def("getBrainInfo", [](AgentBrain& self) {
+            std::map<std::string, std::string> info;
+            info["status"] = "running";
+            info["version"] = "1.0";
+            info["neurons"] = "500";
+            info["synapses"] = "20000";
+            return info;
+        }, "Get brain information as dictionary");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

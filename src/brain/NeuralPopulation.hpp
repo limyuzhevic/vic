@@ -72,9 +72,35 @@ public:
     float getMeanMembranePotential() const;
     float getVarianceMembranePotential() const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
-
-} // namespace nlm
+    // Step all neurons with simulation timestep
+    void updateNeurons(Timestamp currentTime, Timestamp timestep);
+    
+    // Detect spikes and manage spike events
+    void detectSpikes(SimulationStep currentStep, Timestamp currentTime, 
+                     Timestamp timestep, class SpikeSystem* spikeSystem);
+    
+    // Apply neuromodulation effects to all neurons
+    void applyDopamineEffects(float level, Timestamp timestep);
+    
+    // Apply plasticity to all synapses in this population
+    void applyPlasticity(class STDP* stdp, class Hebbian* hebbian,
+                        float plasticityMod, Timestamp currentTime,
+                        Timestamp timestep);
+    
+    // Get all synapses in this population
+    const std::vector<std::unique_ptr<class Synapse>>& getSynapses() const;
+    
+    // Get all neurons by type
+    std::vector<Neuron*> getNeuronsByType(NeuronType type);
+    
+    // Get neurons that have a specific property
+    std::vector<Neuron*> findNeurons(std::function<bool(const Neuron*)> predicate);
+    
+    // Clear all neurons
+    void clear();
+    
+    // Apply current injection to specific neurons
+    void injectCurrentToNeurons(NeuronType type, MembranePotential current);
+    
+    // Reset all neurons to initial state
+    void resetAll();

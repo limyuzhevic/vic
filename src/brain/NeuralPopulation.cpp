@@ -189,4 +189,146 @@ float NeuralPopulation::getVarianceMembranePotential() const {
     return sumSquares / static_cast<float>(pImpl->membranePotentials.size() - 1);
 }
 
+void NeuralPopulation::updateNeurons(Timestamp currentTime, Timestamp timestep) {
+    for (auto* neuron : pImpl->neurons) {
+        neuron->stepLIF(currentTime, timestep);
+    }
+}
+
+void NeuralPopulation::detectSpikes(SimulationStep currentStep, Timestamp currentTime,
+                                    Timestamp timestep, SpikeSystem* spikeSystem) {
+    for (auto* neuron : pImpl->neurons) {
+        const auto& state = neuron->getState();
+        bool justFired = (state.firingState == FiringState::Refractory &&
+                         state.lastSpikeTime >= 0.0f &&
+                         std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < timestep * 2.0f);
+
+        if (justFired) {
+            // Neuron fired this step - queue the spike
+            SpikeEvent event(neuron->getId(), currentTime, currentStep);
+            spikeSystem->queueSpike(event);
+        }
+    }
+}
+
+void NeuralPopulation::applyDopamineEffects(float level, Timestamp timestep) {
+    float excitabilityMod = level * 0.5f;
+    if (excitabilityMod > 0.0f) {
+        for (auto* neuron : pImpl->neurons) {
+            neuron->injectCurrent(excitabilityMod);
+        }
+    }
+}
+
+// Method to find neurons by type with better error handling
+std::vector<Neuron*> NeuralPopulation::getNeuronsByType(NeuronType type) {
+    std::vector<Neuron*> result;
+    for (auto* neuron : pImpl->neurons) {
+        if (neuron && neuron->getType() == type) {
+            result.push_back(neuron);
+        }
+    }
+    return result;
+}
+
+// Method to find neurons using a predicate function
+std::vector<Neuron*> NeuralPopulation::findNeurons(std::function<bool(const Neuron*)> predicate) {
+    std::vector<Neuron*> result;
+    for (auto* neuron : pImpl->neurons) {
+        if (neuron && predicate(neuron)) {
+            result.push_back(neuron);
+        }
+    }
+    return result;
+}
+
+// Method to clear the population
+void NeuralPopulation::clear() {
+    pImpl->neurons.clear();
+    pImpl->ownedNeurons.clear();
+    pImpl->size = 0;
+}
+
+// Method to inject current to neurons of a specific type
+void NeuralPopulation::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    for (auto* neuron : pImpl->neurons) {
+        if (neuron && neuron->getType() == type) {
+            neuron->injectCurrent(current);
+        }
+    }
+}
+
+// Method to reset all neurons in the population
+void NeuralPopulation::resetAll() {
+    for (auto* neuron : pImpl->neurons) {
+        if (neuron) {
+            neuron->reset();
+        }
+    }
+    pImpl->membranePotentials.clear();
+}
+
+// Method to apply dopamine effects to neurons in this population
+void NeuralPopulation::applyDopamineEffects(float level, float timestep) {
+    if (level <= 0.0f) return;  // Early return if no modulation
+    
+    float excitabilityMod = level * 0.5f;
+    if (excitabilityMod > 0.0f) {
+        for (auto* neuron : pImpl->neurons) {
+            if (neuron) {
+                neuron->injectCurrent(excitabilityMod);
+            }
+        }
+    }
+}
+
+// Method to update neurons with proper error checking
+void NeuralPopulation::updateNeurons(Timestamp currentTime, Timestamp timestep) {
+    for (auto* neuron : pImpl->neurons) {
+        if (neuron) {
+            neuron->stepLIF(currentTime, timestep);
+        }
+    }
+}
+
+// Method to detect spikes with proper error handling
+void NeuralPopulation::detectSpikes(SimulationStep currentStep, Timestamp currentTime,
+                                    Timestamp timestep, SpikeSystem* spikeSystem) {
+    if (!spikeSystem) return;
+    
+    for (auto* neuron : pImpl->neurons) {
+        if (!neuron) continue;
+        
+        const auto& state = neuron->getState();
+        bool justFired = (state.firingState == FiringState::Refractory &&
+                         state.lastSpikeTime >= 0.0f &&
+                         std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < timestep * 2.0f);
+
+        if (justFired) {
+            // Neuron fired this step - queue the spike
+            SpikeEvent event(neuron->getId(), currentTime, currentStep);
+            spikeSystem->queueSpike(event);
+        }
+    }
+}
+
+// Method to apply plasticity to neurons in this population
+void NeuralPopulation::applyPlasticity(class STDP* stdp, class Hebbian* hebbian,
+                                       float plasticityMod, Timestamp currentTime,
+                                       Timestamp timestep) {
+    // Note: Plasticity is typically applied to synapses at the region level
+    // This is a placeholder for population-level plasticity
+    // Real plasticity would involve:
+    // 1. Getting synapses from the parent region
+    // 2. Applying plasticity rules to those synapses
+    // 3. Returning updated synapses back to the region
+    
+    for (auto* neuron : pImpl->neurons) {
+        if (neuron) {
+            // Store current state for potential plasticity
+            // In practice, plasticity would modify synapses, not neurons directly
+        }
+    }
+}
+
 } // namespace nlm
