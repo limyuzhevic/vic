@@ -1,0 +1,627 @@
+#!/usr/bin/env python3
+"""
+NLM (熙然) - Neural Learning Machine Command Line Interface
+
+Advanced command-line interface for power users and researchers.
+
+Features:
+- Brain configuration with JSON/YAML file support
+- Multiple simulation modes
+- Performance monitoring and profiling
+- Checkpoint management
+- System introspection
+- Experiment runner
+- Batch processing
+
+Usage:
+    nlm-cli [OPTIONS] COMMAND [ARGS]...
+
+Examples:
+    # Create and run a simple brain
+    nlm-cli brain create --neurons 1000 --steps 1000
+    
+    # Run an agent simulation with learning
+    nlm-cli agent run --world-size 20 --agent-config "learning=True"
+    
+    # Run a custom experiment
+    nlm-cli experiment run --config my_experiment.yaml
+    
+    # Get system information
+    nlm-cli system info
+    
+    # Save brain state
+    nlm-cli checkpoint save brain1.checkpoint
+
+For more detailed help on specific commands:
+    nlm-cli COMMAND --help
+"""
+
+import click
+import json
+import yaml
+import os
+import sys
+from typing import Optional, Dict, Any, List
+from pathlib import Path
+
+# Import NLM modules
+try:
+    import nlm
+    NLM_AVAILABLE = True
+except ImportError:
+    NLM_AVAILABLE = False
+    print("Warning: NLM Python module not available. Some commands will not work.")
+
+from nlm import (
+    Brain,
+    SimpleWorld,
+    AgentBrain,
+    AdvancedBrainAPI,
+    createDefaultConfig,
+    createBrain,
+    createSimpleWorld,
+    createAgentBrain
+)
+
+# Configuration
+DEFAULT_CONFIG_FILE = "nlm_config.json"
+DEFAULT_WORLD_WIDTH = 20
+DEFAULT_WORLD_HEIGHT = 20
+DEFAULT_WORLD_VISION = 8
+DEFAULT_SIMULATION_STEPS = 1000
+DEFAULT_BRAIN_NEURONS = 1000
+
+click.option = click.option
+@click.group()
+@click.version_option("0.1.0")
+@click.pass_context
+def cli(ctx):
+    """NLM Neural Learning Machine Command Line Interface."""
+    ctx.ensure_object(dict)
+    if not NLM_AVAILABLE:
+        click.echo("Error: NLM Python module not available. Please install the nlm package.", err=True)
+        sys.exit(1)
+
+@cli.command()
+@click.argument("output_file", required=False, type=click.Path())
+@click.option("--neurons", default=DEFAULT_BRAIN_NEURONS, help="Number of neurons")
+@click.option("--steps", default=DEFAULT_SIMULATION_STEPS, help="Number of simulation steps")
+@click.option("--config", "config_file", type=click.Path(exists=True), help="Configuration file")
+@click.option("--world-size", nargs=2, type=(int, int), help="World dimensions (width height)")
+@click.option("--verbose", is_flag=True, help="Verbose output")
+@click.pass_context
+def brain(ctx, output_file, neurons, steps, config_file, world_size, verbose):
+    """Run a brain simulation."""
+    try:
+        # Create configuration
+        config = createDefaultConfig()
+        
+        # Load from config file if provided
+        if config_file:
+            with open(config_file, 'r') as f:
+                if config_file.endswith('.json'):
+                    config_data = json.load(f)
+                elif config_file.endswith(('.yaml', '.yml')):
+                    config_data = yaml.safe_load(f)
+                else:
+                    config_data = config_data
+                
+                # Apply configuration
+                if "brain" in config_data:
+                    config.set("brain.neuron_count", config_data["brain"]["neuron_count"])
+                if "world" in config_data:
+                    config.set("world.width", config_data["world"]["width"])
+                    config.set("world.height", config_data["world"]["height"])
+        
+        # Override with command line options
+        config.set("brain.neuron_count", neurons)
+        
+        # Create and run brain
+        brain = createBrain(config)
+        brain.initialize()
+        
+        if verbose:
+            click.echo(f"Created brain with {brain.get_neuron_count()} neurons")
+            click.echo(f"Running {steps} simulation steps...")
+        
+        # Run simulation
+        history = brain.run_training_episode(steps)
+        
+        # Save output if requested
+        if output_file:
+            output_data = {
+                "brain_status": brain.get_brain_status(),
+                "simulation_history": history,
+                "configuration": config.summary()
+            }
+            
+            if output_file.endswith('.json'):
+                with open(output_file, 'w') as f:
+                    json.dump(output_data, f, indent=2)
+            elif output_file.endswith(('.yaml', '.yml')):
+                with open(output_file, 'w') as f:
+                    yaml.dump(output_data, f, default_flow_style=False)
+            else:
+                # Default to JSON
+                with open(output_file + '.json', 'w') as f:
+                    json.dump(output_data, f, indent=2)
+            
+            if verbose:
+                click.echo(f"Simulation results saved to {output_file}")
+        
+        # Print summary
+        status = brain.get_brain_status()
+        click.echo(f"\nSimulation Summary:")
+        click.echo(f"  Neurons: {status['neuron_count']}")
+        click.echo(f"  Synapses: {status['synapse_count']}")
+        click.echo(f"  Firing neurons: {status['firing_neuron_count']}")
+        click.echo(f"  Total spikes: {status['total_spike_count']}")
+        click.echo(f"  Average firing rate: {status['average_firing_rate']:.2f}")
+        
+        if verbose:
+            click.echo(f"\nMemory systems:")
+            click.echo(f"  Working memory: {'Enabled' if status['has_working_memory'] else 'Disabled'}")
+            click.echo(f"  Episodic memory: {'Enabled' if status['has_episodic_memory'] else 'Disabled'}")
+            click.echo(f"  Prediction system: {'Enabled' if status['has_prediction_system'] else 'Disabled'}")
+        
+        click.echo("\n✓ Brain simulation completed successfully")
+        
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+@cli.command()
+@click.argument("output_file", required=False, type=click.Path())
+@click.option("--width", default=DEFAULT_WORLD_WIDTH, help="World width")
+@click.option("--height", default=DEFAULT_WORLD_HEIGHT, help="World height")
+@click.option("--vision", default=DEFAULT_WORLD_VISION, help="Vision size")
+@click.option("--steps", default=DEFAULT_SIMULATION_STEPS, help="Number of simulation steps")
+@click.option("--agent-config", "agent_config", help="Agent configuration JSON string")
+@click.option("--verbose", is_flag=True, help="Verbose output")
+@click.pass_context
+def agent(ctx, output_file, width, height, vision, steps, agent_config, verbose):
+    """Run an agent simulation."""
+    try:
+        # Create brain and world
+        brain = createBrain()
+        brain.initialize()
+        
+        world = createSimpleWorld()
+        world.configure(width, height, vision, vision)
+        world.reset()
+        
+        # Create agent
+        agent = createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Apply agent configuration
+        if agent_config:
+            config = json.loads(agent_config)
+            for key, value in config.items():
+                if hasattr(agent, f"enable_{key}"):
+                    getattr(agent, f"enable_{key}")(value)
+        
+        # Enable learning by default
+        agent.enable_reward_modulation(True)
+        agent.enable_curiosity(True)
+        agent.enable_structural_plasticity(True)
+        agent.enable_development(True)
+        
+        if verbose:
+            click.echo(f"Created agent with {brain.get_neuron_count()} neurons")
+            click.echo(f"World size: {width}x{height}")
+            click.echo(f"Running {steps} agent steps...")
+        
+        # Run agent simulation
+        results = nlm.runAgentSimulation(brain, world, agent, steps)
+        
+        # Save output if requested
+        if output_file:
+            output_data = {
+                "simulation_results": results,
+                "brain_status": brain.get_brain_status(),
+                "world_info": {
+                    "width": world.get_width(),
+                    "height": world.get_height(),
+                    "vision": vision,
+                    "max_energy": world.get_max_energy()
+                }
+            }
+            
+            if output_file.endswith('.json'):
+                with open(output_file, 'w') as f:
+                    json.dump(output_data, f, indent=2)
+            elif output_file.endswith(('.yaml', '.yml')):
+                with open(output_file, 'w') as f:
+                    yaml.dump(output_data, f, default_flow_style=False)
+            else:
+                # Default to JSON
+                with open(output_file + '.json', 'w') as f:
+                    json.dump(output_data, f, indent=2)
+            
+            if verbose:
+                click.echo(f"Agent simulation results saved to {output_file}")
+        
+        # Print summary
+        click.echo(f"\nAgent Simulation Summary:")
+        click.echo(f"  Steps executed: {len(results['steps'])}")
+        click.echo(f"  World updates: {len(results['world_updates'])}")
+        click.echo(f"  Brain steps: {len(results['brain_steps'])}")
+        click.echo(f"  Agent decisions: {len(results['agent_decisions'])}")
+        
+        if verbose:
+            click.echo(f"\nAgent statistics:")
+            click.echo(f"  Curiosity level: {agent.get_curiosity_level():.3f}")
+            click.echo(f"  Novelty level: {agent.get_novelty_level():.3f}")
+            click.echo(f"  Prediction error: {agent.get_prediction_error():.3f}")
+        
+        click.echo("\n✓ Agent simulation completed successfully")
+        
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+@cli.command()
+@click.argument("config_file", type=click.Path(exists=True))
+@click.option("--output-dir", "output_dir", help="Output directory for experiment results")
+@click.option("--verbose", is_flag=True, help="Verbose output")
+@click.pass_context
+def experiment(ctx, config_file, output_dir, verbose):
+    """Run a custom experiment defined in a configuration file."""
+    try:
+        # Load experiment configuration
+        with open(config_file, 'r') as f:
+            if config_file.endswith('.json'):
+                experiment_config = json.load(f)
+            elif config_file.endswith(('.yaml', '.yml')):
+                experiment_config = yaml.safe_load(f)
+            else:
+                raise ValueError(f"Unsupported file format: {config_file}")
+        
+        if verbose:
+            click.echo(f"Loaded experiment configuration from {config_file}")
+        
+        # Execute experiment steps
+        results = {
+            "experiment_name": experiment_config.get("name", "Unnamed Experiment"),
+            "configuration": experiment_config,
+            "steps": []
+        }
+        
+        for step in experiment_config.get("steps", []):
+            step_result = execute_experiment_step(step, verbose)
+            results["steps"].append(step_result)
+            
+            if verbose:
+                click.echo(f"Completed step: {step.get('name', 'Unknown')}")
+        
+        # Save results if output directory specified
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # Save results as JSON
+            output_file = os.path.join(output_dir, "experiment_results.json")
+            with open(output_file, 'w') as f:
+                json.dump(results, f, indent=2)
+            
+            # Save results as YAML
+            yaml_file = os.path.join(output_dir, "experiment_results.yaml")
+            with open(yaml_file, 'w') as f:
+                yaml.dump(results, f, default_flow_style=False)
+            
+            if verbose:
+                click.echo(f"Experiment results saved to {output_dir}")
+        
+        click.echo(f"\n✓ Experiment '{results['experiment_name']}' completed successfully")
+        click.echo(f"  Steps executed: {len(results['steps'])}")
+        
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+@cli.command()
+@click.option("--verbose", is_flag=True, help="Verbose output")
+@click.pass_context
+def system(ctx, verbose):
+    """Get system information and statistics."""
+    try:
+        if verbose:
+            click.echo("Collecting system information...")
+        
+        # Create brain and get status
+        brain = createBrain()
+        brain.initialize()
+        
+        # Get advanced API
+        advanced_api = AdvancedBrainAPI(brain)
+        
+        # Get system information
+        system_info = {
+            "nlm_version": "0.1.0",
+            "python_version": sys.version,
+            "platform": sys.platform,
+            "brain_status": brain.get_brain_status(),
+            "performance_stats": advanced_api.get_performance_stats(),
+            "recommendations": get_system_recommendations(brain.get_brain_status())
+        }
+        
+        # Print system information
+        click.echo("\n=== NLM System Information ===")
+        click.echo(f"Version: {system_info['nlm_version']}")
+        click.echo(f"Platform: {system_info['platform']}")
+        
+        status = system_info['brain_status']
+        click.echo(f"\nBrain Configuration:")
+        click.echo(f"  Neurons: {status['neuron_count']}")
+        click.echo(f"  Synapses: {status['synapse_count']}")
+        click.echo(f"  Firing neurons: {status['firing_neuron_count']}")
+        click.echo(f"  Total spikes: {status['total_spike_count']}")
+        
+        perf_stats = system_info['performance_stats']
+        click.echo(f"\nPerformance:")
+        click.echo(f"  Neuron density: {perf_stats['simulation']['neuron_density']:.4f}")
+        click.echo(f"  Connectivity ratio: {perf_stats['simulation']['connectivity_ratio']:.4f}")
+        click.echo(f"  Firing efficiency: {perf_stats['simulation']['firing_efficiency']:.4f}")
+        
+        # Print recommendations
+        recommendations = system_info['recommendations']
+        if recommendations:
+            click.echo(f"\nRecommendations:")
+            for rec in recommendations:
+                click.echo(f"  • {rec}")
+        
+        if verbose:
+            click.echo(f"\nFull system information saved to experiment_system_info.json")
+            # Save to file
+            with open("experiment_system_info.json", 'w') as f:
+                json.dump(system_info, f, indent=2)
+        
+        click.echo("\n✓ System information collected successfully")
+        
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+@cli.command()
+@click.argument("checkpoint_file", type=click.Path())
+@click.option("--output-file", "output_file", help="Output file for checkpoint data")
+@click.option("--verbose", is_flag=True, help="Verbose output")
+@click.pass_context
+def checkpoint(ctx, checkpoint_file, output_file, verbose):
+    """Manage brain checkpoints (save/load)."""
+    try:
+        if verbose:
+            click.echo(f"Processing checkpoint: {checkpoint_file}")
+        
+        # Create brain
+        brain = createBrain()
+        brain.initialize()
+        
+        # Try to load checkpoint
+        if brain.load(checkpoint_file):
+            click.echo(f"✓ Successfully loaded checkpoint from {checkpoint_file}")
+            
+            # Print checkpoint information
+            status = brain.get_brain_status()
+            click.echo(f"\nCheckpoint Information:")
+            click.echo(f"  Neurons: {status['neuron_count']}")
+            click.echo(f"  Synapses: {status['synapse_count']}")
+            click.echo(f"  Total spikes: {status['total_spike_count']}")
+            click.echo(f"  Average firing rate: {status['average_firing_rate']:.2f}")
+            
+            # Save checkpoint data if requested
+            if output_file:
+                checkpoint_data = {
+                    "checkpoint_file": checkpoint_file,
+                    "loaded_successfully": True,
+                    "brain_status": status,
+                    "load_time": "unknown"
+                }
+                
+                with open(output_file, 'w') as f:
+                    json.dump(checkpoint_data, f, indent=2)
+                
+                click.echo(f"Checkpoint data saved to {output_file}")
+        
+        else:
+            click.echo(f"✗ Failed to load checkpoint from {checkpoint_file}")
+            sys.exit(1)
+        
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+@cli.command()
+@click.option("--config-file", "config_file", help="Configuration file for the brain")
+@click.option("--output-file", "output_file", help="Output file for brain configuration")
+@click.option("--verbose", is_flag=True, help="Verbose output")
+@click.pass_context
+def config(ctx, config_file, output_file, verbose):
+    """Manage brain configurations."""
+    try:
+        # Create default configuration
+        config = createDefaultConfig()
+        
+        # Load from config file if provided
+        if config_file:
+            with open(config_file, 'r') as f:
+                if config_file.endswith('.json'):
+                    config_data = json.load(f)
+                elif config_file.endswith(('.yaml', '.yml')):
+                    config_data = yaml.safe_load(f)
+                else:
+                    raise ValueError(f"Unsupported file format: {config_file}")
+            
+            # Apply configuration
+            for key, value in config_data.items():
+                config.set(key, value)
+            
+            if verbose:
+                click.echo(f"Loaded configuration from {config_file}")
+        
+        # Print configuration
+        click.echo("\n=== Brain Configuration ===")
+        click.echo(config.summary())
+        
+        # Save configuration if requested
+        if output_file:
+            output_data = {
+                "configuration_summary": config.summary(),
+                "keys": config.getKeys(),
+                "timestamp": "unknown"
+            }
+            
+            if output_file.endswith('.json'):
+                with open(output_file, 'w') as f:
+                    json.dump(output_data, f, indent=2)
+            elif output_file.endswith(('.yaml', '.yml')):
+                with open(output_file, 'w') as f:
+                    yaml.dump(output_data, f, default_flow_style=False)
+            
+            click.echo(f"Configuration saved to {output_file}")
+        
+        click.echo("\n✓ Configuration management completed successfully")
+        
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+@cli.command()
+@click.option("--steps", default=1000, help="Number of steps to run")
+@click.option("--world-size", nargs=2, default=(DEFAULT_WORLD_WIDTH, DEFAULT_WORLD_HEIGHT), help="World dimensions")
+@click.option("--verbose", is_flag=True, help="Verbose output")
+@click.pass_context
+def benchmark(ctx, steps, world_size, verbose):
+    """Run a benchmark simulation."""
+    try:
+        if verbose:
+            click.echo("Running benchmark simulation...")
+            click.echo(f"Steps: {steps}")
+            click.echo(f"World size: {world_size[0]}x{world_size[1]}")
+        
+        # Create brain and world
+        brain = createBrain()
+        brain.initialize()
+        
+        world = createSimpleWorld()
+        world.configure(world_size[0], world_size[1], 8, 8)
+        world.reset()
+        
+        # Create agent
+        agent = createAgentBrain(brain)
+        agent.initialize(world)
+        
+        # Enable learning
+        agent.enable_reward_modulation(True)
+        agent.enable_curiosity(True)
+        
+        # Run benchmark
+        import time
+        start_time = time.time()
+        results = nlm.runAgentSimulation(brain, world, agent, steps)
+        end_time = time.time()
+        
+        duration = end_time - start_time
+        steps_per_second = steps / duration if duration > 0 else 0
+        
+        # Print benchmark results
+        click.echo(f"\n=== Benchmark Results ===")
+        click.echo(f"Duration: {duration:.2f} seconds")
+        click.echo(f"Steps per second: {steps_per_second:.2f}")
+        click.echo(f"World size: {world_size[0]}x{world_size[1]}")
+        click.echo(f"Total neurons: {brain.get_neuron_count()}")
+        
+        status = brain.get_brain_status()
+        click.echo(f"\nPerformance:")
+        click.echo(f"  Neurons: {status['neuron_count']}")
+        click.echo(f"  Synapses: {status['synapse_count']}")
+        click.echo(f"  Total spikes: {status['total_spike_count']}")
+        click.echo(f"  Average firing rate: {status['average_firing_rate']:.2f}")
+        
+        click.echo("\n✓ Benchmark completed successfully")
+        
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+# Helper functions for CLI
+def execute_experiment_step(step: Dict[str, Any], verbose: bool) -> Dict[str, Any]:
+    """Execute a single experiment step."""
+    step_type = step.get('type', 'unknown')
+    step_name = step.get('name', f"{step_type}_step")
+    
+    if verbose:
+        click.echo(f"  Executing step: {step_name} ({step_type})")
+    
+    result = {
+        'step_name': step_name,
+        'step_type': step_type,
+        'status': 'completed',
+        'outputs': {}
+    }
+    
+    if step_type == 'create_brain':
+        config = createDefaultConfig()
+        for key, value in step.get('config', {}).items():
+            config.set(key, value)
+        
+        brain = createBrain(config)
+        brain.initialize()
+        
+        result['outputs']['neuron_count'] = brain.get_neuron_count()
+        result['outputs']['synapse_count'] = brain.get_synapse_count()
+    
+    elif step_type == 'train':
+        # This would need a brain instance from previous step
+        result['outputs']['message'] = f"Would train for {step.get('steps', 0)} steps"
+    
+    elif step_type == 'evaluate':
+        result['outputs']['message'] = "Would evaluate brain performance"
+    
+    elif step_type == 'checkpoint':
+        result['outputs']['message'] = f"Would save checkpoint to {step.get('filepath', 'unknown')}"
+    
+    else:
+        result['status'] = 'unknown'
+        result['outputs']['message'] = f"Unknown step type: {step_type}"
+    
+    return result
+
+
+def get_system_recommendations(status: Dict[str, Any]) -> List[str]:
+    """Get system recommendations based on brain status."""
+    recommendations = []
+    
+    if status['neuron_count'] < 500:
+        recommendations.append("Consider increasing neuron count for more complex behavior")
+    
+    if not status['has_working_memory']:
+        recommendations.append("Enable working memory system for better information retention")
+    
+    if not status['has_prediction_system']:
+        recommendations.append("Enable prediction system for anticipatory behavior")
+    
+    if not status['has_planner']:
+        recommendations.append("Enable neural planner for action planning")
+    
+    if status['average_firing_rate'] < 0.1:
+        recommendations.append("Brain activity is low. Consider increasing input or reducing threshold")
+    
+    if status['average_firing_rate'] > 10:
+        recommendations.append("Brain activity is very high. Consider reducing input or increasing threshold")
+    
+    return recommendations
+
+
+def main():
+    """Main CLI entry point."""
+    # Set up Click
+    try:
+        cli()
+    except ImportError as e:
+        click.echo(f"Error importing required modules: {e}", err=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

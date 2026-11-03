@@ -4,6 +4,14 @@
 #include <algorithm>
 #include <filesystem>
 
+// nlohmann/json support - use try-catch to handle missing dependency
+try {
+    #include <nlohmann/json.hpp>
+    #define NLM_HAS_JSON 1
+} catch (...) {
+    #define NLM_HAS_JSON 0
+}
+
 namespace nlm {
 
 struct Config::Impl {
@@ -19,9 +27,63 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to parse as JSON first
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+        return loadFromJSON(filepath);
+    }
     
+    // Try to parse as YAML next
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".yaml") {
+        return loadFromYAML(filepath);
+    }
+    if (filepath.size() >= 4 && filepath.substr(filepath.size() - 4) == ".yml") {
+        return loadFromYAML(filepath);
+    }
+    
+    // Fall back to simple key=value format
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // Simple JSON parsing - looking for key-value pairs
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Parse all fields recursively
+        parseJSONRecursive(jsonData, "");
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Failed to parse JSON file " + filepath + ": " + e.what()));
+        // Fall back to simple format
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // Simple YAML parsing - looking for key-value pairs
+        // For now, fall back to simple format since full YAML requires external library
+        NLM_LOG_WARNING(std::string("YAML parsing not fully implemented, falling back to simple format for " + filepath));
+        return loadFromSimpleFormat(filepath);
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Failed to parse YAML file " + filepath + ": " + e.what()));
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +105,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -84,12 +146,21 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Try to parse as JSON first based on extension
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+        return saveToJSON(filepath);
     }
     
-    return true;
+    // Try to parse as YAML next based on extension
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".yaml") {
+        return saveToYAML(filepath);
+    }
+    if (filepath.size() >= 4 && filepath.substr(filepath.size() - 4) == ".yml") {
+        return saveToYAML(filepath);
+    }
+    
+    // Fall back to simple key=value format
+    return saveToSimpleFormat(filepath);
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
@@ -188,6 +259,122 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+bool Config::saveToSimpleFormat(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    }
+    
+    return true;
+}
+
+#if NLM_HAS_JSON
+
+bool Config::saveToJSON(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        
+        // Convert all entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            std::visit([&jsonData, &entry](auto&& value) {
+                // Convert value to appropriate JSON type based on variant type
+                using T = std::decay_t<decltype(value)>;
+                
+                if constexpr (std::is_same_v<T, std::string>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, int>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    jsonData[entry.key] = value;
+                } else {
+                    // Unknown type - skip
+                }
+            }, entry.value);
+        }
+        
+        // Write JSON with pretty formatting
+        file << jsonData.dump(2);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Failed to write JSON file " + filepath + ": " + e.what()));
+        return false;
+    }
+}
+
+void Config::parseJSONRecursive(const nlohmann::json& jsonData, const std::string& prefix) {
+    for (const auto& item : jsonData.items()) {
+        std::string key = prefix.empty() ? item.key() : prefix + "." + item.key();
+        
+        if (item.is_object()) {
+            // Nested object - recursively parse
+            parseJSONRecursive(item, key);
+        } else if (item.is_array()) {
+            // Array - store as vector (simplified approach)
+            set(key, std::vector<std::string>(), ConfigSource::File);
+        } else {
+            // Simple value - convert to appropriate type
+            setFromJSONValue(key, item);
+        }
+    }
+}
+
+void Config::setFromJSONValue(const std::string& key, const nlohmann::json& jsonValue) {
+    if (jsonValue.is_string()) {
+        set(key, jsonValue.get<std::string>(), ConfigSource::File);
+    } else if (jsonValue.is_number_integer()) {
+        set(key, jsonValue.get<int64_t>(), ConfigSource::File);
+    } else if (jsonValue.is_number_float()) {
+        set(key, jsonValue.get<double>(), ConfigSource::File);
+    } else if (jsonValue.is_boolean()) {
+        set(key, jsonValue.get<bool>(), ConfigSource::File);
+    } else if (jsonValue.is_array()) {
+        // For now, store as string representation
+        std::stringstream ss;
+        ss << jsonValue;
+        set(key, ss.str(), ConfigSource::File);
+    }
+}
+
+#endif
+
+bool Config::saveToYAML(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // For now, write as simple format with YAML extension hint
+    file << "# Configuration saved as YAML format (placeholder implementation)\n";
+    file << "# Full YAML parsing would require libyaml-cpp library\n\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " : PLACEHOLDER_VALUE\n\n";
+    }
+    
+    return true;
 }
 
 template<typename T>

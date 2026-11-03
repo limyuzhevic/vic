@@ -6,6 +6,16 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
+
+// Optional nlohmann/json include - will use simple fallback if not available
+try {
+    #include <nlohmann/json.hpp>
+    #define NLM_HAS_JSON 1
+} catch (...) {
+    #define NLM_HAS_JSON 0
+}
 
 namespace nlm {
 
@@ -56,22 +66,22 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/Simple format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON/YAML/Simple format)
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -102,6 +112,19 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // File format helpers
+    bool loadFromSimpleFormat(const std::string& filepath);
+    bool saveToSimpleFormat(const std::string& filepath) const;
+    
+#if NLM_HAS_JSON
+    bool loadFromJSON(const std::string& filepath);
+    bool saveToJSON(const std::string& filepath) const;
+    void parseJSONRecursive(const nlohmann::json& jsonData, const std::string& prefix);
+#endif
+    
+    bool loadFromYAML(const std::string& filepath);
+    bool saveToYAML(const std::string& filepath) const;
 };
 
 } // namespace nlm
