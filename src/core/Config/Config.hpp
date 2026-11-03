@@ -6,6 +6,7 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -44,6 +45,32 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration error types
+enum class ConfigErrorType {
+    None,
+    FileNotFound,
+    ParseError,
+    InvalidFormat,
+    InvalidValue,
+    DuplicateKey,
+    OutOfRange,
+    MissingRequiredKey
+};
+
+// Configuration exception class
+class ConfigException : public std::runtime_error {
+public:
+    ConfigException(const std::string& message, ConfigErrorType type = ConfigErrorType::None)
+        : std::runtime_error(message), errorType(type), message(message) {}
+    
+    ConfigErrorType getErrorType() const { return errorType; }
+    const std::string& getMessage() const { return message; }
+    
+private:
+    ConfigErrorType errorType;
+    std::string message;
+};
+
 // Main configuration class
 class Config {
 public:
@@ -56,7 +83,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML/simple format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -66,12 +93,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,13 +122,32 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Error handling
+    bool hasError() const { return !lastErrorMessage.empty(); }
+    std::string getLastError() const { return lastErrorMessage; }
+    void clearError() { lastErrorMessage.clear(); }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    std::string lastErrorMessage;
     
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper functions for file format detection
+    static bool endsWith(const std::string& str, const std::string& suffix);
+    static bool containsJSONBraces(const std::string& content);
+    static bool containsYAMLDash(const std::string& content);
+    
+    // JSON/YAML parsing
+    bool loadFromJSON(const std::string& content, ConfigSource source);
+    bool loadFromYAML(const std::string& content, ConfigSource source);
+    bool loadFromSimpleFormat(const std::string& content, ConfigSource source);
+    
+    // Error reporting
+    void setError(const std::string& message, ConfigErrorType type = ConfigErrorType::None);
 };
 
 } // namespace nlm

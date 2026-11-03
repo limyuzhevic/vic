@@ -132,7 +132,7 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable (unified CLI)
 add_executable(nlm
     src/main.cpp
 )
@@ -204,6 +204,9 @@ endif()
 # Testing
 enable_testing()
 add_subdirectory(tests)
+
+# Python bindings (Phase 5)
+add_subdirectory(python)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark

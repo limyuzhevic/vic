@@ -520,22 +520,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
-                if (!preSpikes.empty() && !postSpikes.empty()) {
+                // More selective STDP: require more correlated activity
+                if (!preSpikes.empty() && !postSpikes.empty() && preSpikes.size() >= 2 && postSpikes.size() >= 2) {
                     // Modify weight change based on dopamine
                     pImpl->stdp->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    
+                    // Add dopamine modulation with better limits
+                    float dopamineEffect = (plasticityMod - 1.0f) * 0.0005f;  // Reduced effect
+                    if (std::abs(dopamineEffect) > 0.01f) {
+                        weight += (weight > 0 ? 1.0f : -1.0f) * dopamineEffect;
+                    }
+                    
+                    // Apply weight limits to prevent runaway excitation
+                    weight = std::clamp(weight, 0.0f, 1.0f);
                     syn->setWeight(weight);
                 }
             }
             
-            // Apply Hebbian learning
+            // Apply Hebbian learning with better selectivity
             if (syn->getPlasticityFlags().hebbian) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
+                // More selective Hebbian: require correlated activity patterns
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    pImpl->hebbian->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
+                    // Check for temporal correlation (Hebbian learning window)
+                    bool hasCorrelation = false;
+                    for (auto preTime : preSpikes) {
+                        for (auto postTime : postSpikes) {
+                            float timeDiff = std::abs(preTime - postTime);
+                            if (timeDiff < 10.0f * pImpl->timestep) {  // Within 10 timesteps
+                                hasCorrelation = true;
+                                break;
+                            }
+                        }
+                        if (hasCorrelation) break;
+                    }
+                    
+                    if (hasCorrelation) {
+                        pImpl->hebbian->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
+                        
+                        // Apply weight limits and prevent excessive changes
+                        float weight = syn->getWeight();
+                        weight = std::clamp(weight, 0.0f, 1.0f);
+                        syn->setWeight(weight);
+                    }
                 }
             }
             
@@ -545,22 +575,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 6b: Homeostatic synaptic scaling (Phase 4) ==========
-    // Every 100 steps, cap each neuron's total incoming excitatory
-    // weight. STDP/Hebbian with soft bounds stop individual weights
-    // saturating, but they do not stop the *sum* of ~25 incoming
-    // weights growing until every neuron is driven over threshold on
-    // every refractory cycle — the periodic attractor of Phase 3.
-    // Rescaling only when the sum exceeds the cap, and scaling all
-    // incoming excitatory weights by the same factor, preserves the
-    // *relative* pattern of strengths (selectivity) while bounding
-    // total drive. Inhibitory weights are left untouched, so scaling
-    // also moves the E/I balance toward inhibition rather than away.
-    // Cap 3.0: with ~5 co-active presynaptic neurons per step, total
-    // drive is then at most ~5 * (3.0/25) * 10 = 6 mV per step before
-    // leak — below the ~15 mV spike gap, so a neuron must integrate
-    // over several steps to fire instead of firing every cycle.
-    if (currentStep > 0 && currentStep % 100 == 0) {
-        constexpr float kIncomingExcitatoryCap = 3.0f;
+    // More frequent scaling: every 50 steps instead of 100, providing
+    // better control over runaway excitation while preserving selectivity.
+    if (currentStep > 0 && currentStep % 50 == 0) {
+        constexpr float kIncomingExcitatoryCap = 2.0f;  // Reduced cap for better stability
         for (auto& region : pImpl->regions) {
             for (auto* neuron : region->getAllNeurons()) {
                 auto incoming = region->getSynapsesTo(neuron->getId());
@@ -570,10 +588,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
                 if (sum > kIncomingExcitatoryCap) {
                     float scale = kIncomingExcitatoryCap / sum;
+                    // Scale excitatory synapses, preserve inhibitory weights
                     for (Synapse* syn : incoming) {
                         if (syn->getWeight() > 0.0f) {
                             syn->setWeight(syn->getWeight() * scale);
                         }
+                    }
+                    // Log scaling event for debugging
+                    if (currentStep % 500 == 0) {
+                        NLM_LOG_INFO("Homeostatic scaling at step " + std::to_string(currentStep) +
+                                     ": neuron " + std::to_string(neuron->getId().index()) +
+                                     " sum=" + std::to_string(sum) +
+                                     " scaled by " + std::to_string(scale));
                     }
                 }
             }
