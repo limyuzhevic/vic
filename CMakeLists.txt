@@ -132,6 +132,29 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
+# Advanced tools (Phase 8: expert tools and debugging)
+add_library(nlm_advanced_tools STATIC
+    src/AdvancedTools.hpp
+    src/AdvancedTools.cpp
+    src/AdvancedBatchTools.hpp
+    src/AdvancedBatchTools.cpp
+    src/demo_advanced_tools.cpp
+)
+target_include_directories(nlm_advanced_tools PUBLIC src)
+target_link_libraries(nlm_advanced_tools PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Advanced demo executable
+add_executable(nlm_advanced_demo
+    src/demo_advanced_tools.cpp
+)
+target_link_libraries(nlm_advanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_advanced_tools)
+
+# Advanced tools executable for expert users
+add_executable(nlm_advanced_tools_exe
+    src/main_advanced.cpp
+)
+target_link_libraries(nlm_advanced_tools_exe PUBLIC nlm_core nlm_agent nlm_world nlm_advanced_tools)
+
 # Main executable
 add_executable(nlm
     src/main.cpp
