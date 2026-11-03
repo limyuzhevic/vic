@@ -24,27 +24,33 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
+    // Implement real Hebbian learning with STDP (Spike-Timing Dependent Plasticity)
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
+    // Calculate STDP weight change based on spike timing
+    float weightChange = 0.0f;
+    
+    // For each pre-post spike pair, calculate contribution
     for (Timestamp pre : preSpikes) {
         for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
+            float timeDiff = post - pre;  // Post minus pre spike time
+            
+            if (std::abs(timeDiff) < 20.0) {  // Within 20ms window
+                if (timeDiff > 0) {
+                    // Post fires after pre: LTP (Long-Term Potentiation)
+                    weightChange += pImpl->learningRate * std::exp(-std::abs(timeDiff) / 10.0f);
+                } else {
+                    // Pre fires after post: LTD (Long-Term Depression)
+                    weightChange -= pImpl->learningRate * std::exp(-std::abs(timeDiff) / 10.0f);
+                }
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
-    }
+    // Apply weight change with bounds
+    applyWeightChange(synapse, weightChange);
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {

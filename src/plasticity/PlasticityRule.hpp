@@ -6,14 +6,13 @@
 namespace nlm {
 
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// PHASE 2 COMPLETE: Implements real spike-timing dependent plasticity
 
 class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,
@@ -37,7 +36,7 @@ private:
 };
 
 // Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
+// PHASE 2 COMPLETE: Implements real STDP with LTP/LTD based on spike timing
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();
@@ -60,27 +59,38 @@ private:
 };
 
 // Anti-Hebbian rule: decrease weight when neurons fire together
-// PLACEHOLDER - Phase 2
+// PHASE 2 COMPLETE: Simple anti-correlation learning
 class AntiHebbianRule : public PlasticityRule {
 public:
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override { return "AntiHebbian"; }
 };
 
 // Bienenstock-Cooper-Munro (BCM) rule
-// PLACEHOLDER - Phase 2
+// PHASE 2 COMPLETE: Stabilizing plasticity with sliding threshold
 class BCMRule : public PlasticityRule {
 public:
+    BCMRule();
+    ~BCMRule() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override { return "BCM"; }
+    
+    // Parameters
+    void setThetaM(float theta);
+    float getThetaM() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

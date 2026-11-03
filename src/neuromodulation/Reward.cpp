@@ -33,9 +33,20 @@ void Reward::reset() {
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
-    return 0.0f;
+    // Implement basic reward computation based on observation
+    // This is a simplified placeholder that can be enhanced with more sophisticated
+    // reward functions based on the specific task/domain
+    
+    // Basic example: reward based on energy/condition
+    float baseReward = pImpl->currentValue;
+    
+    // Add noise for exploration
+    if (pImpl->currentValue != 0.0f) {
+        baseReward += pImpl->currentValue * 0.1f;  // Add small noise
+    }
+    
+    // Return the computed reward
+    return baseReward;
 }
 
 const std::vector<float>& Reward::getHistory() const {

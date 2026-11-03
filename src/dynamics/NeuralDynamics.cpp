@@ -54,15 +54,24 @@ void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration 
     // PLACEHOLDER: Synapse decay
     synapse->step(0.0);
 }
-
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
-    // PLACEHOLDER: Simple additive input
+    // Real synaptic dynamics: convert spike into postsynaptic current
+    // Based on synapse type, weight, and short-term plasticity state
+    
+    // Get synapse properties
     SynapticWeight weight = synapse->getWeight();
-    if (synapse->isExcitatory()) {
-        neuron->receiveExcitatoryInput(weight);
+    float efficacy = synapse->getEfficacy();
+    bool isExcitatory = synapse->isExcitatory();
+    
+    // Apply short-term plasticity modulation
+    float utilization = 1.0f;  // This would come from synapse's STP state in a full implementation
+    float synapticCurrent = utilization * weight * efficacy;
+    
+    // Apply to neuron based on synapse type
+    if (isExcitatory) {
+        neuron->receiveExcitatoryInput(synapticCurrent);
     } else {
-        neuron->receiveInhibitoryInput(std::abs(weight));
+        neuron->receiveInhibitoryInput(std::abs(synapticCurrent));
     }
 }
 

@@ -34,6 +34,9 @@ struct Synapse::Impl {
     // Synaptic efficacy (use-dependent modulation)
     float efficacy;
     
+    // Post-synaptic current accumulator (for spike transmission)
+    float postSynapticCurrent;  // Accumulated current for post-synaptic neuron
+    
     // Weight bounds
     static constexpr float MIN_WEIGHT = -1.0f;
     static constexpr float MAX_WEIGHT = 1.0f;
@@ -60,6 +63,7 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    pImpl->postSynapticCurrent = 0.0f;  // Initialize post-synaptic current accumulator
 }
 
 Synapse::~Synapse() = default;
@@ -218,6 +222,7 @@ void Synapse::step(Timestamp currentTime) {
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
+    // 4. Detect pre-synaptic spikes and transmit to post-synaptic neuron
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
@@ -242,6 +247,46 @@ void Synapse::step(Timestamp currentTime) {
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    
+    // Detect pre-synaptic spike and transmit to post-synaptic neuron
+    bool preSpike = false;
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        // Check if the spike occurred in this timestep (allowing for some tolerance)
+        if (currentTime - pImpl->lastPreSpikeTime < dt * 1.1f) {
+            preSpike = true;
+        }
+    }
+    
+    if (preSpike) {
+        // Calculate synaptic efficacy with STP
+        float utilization = pImpl->shortTermFacilitation * pImpl->shortTermDepression;
+        utilization = std::min(utilization, Impl::STP_U_MAX);
+        
+        // Calculate postsynaptic current
+        float synapticWeight = pImpl->weight * pImpl->efficacy;
+        float synapticCurrent = utilization * synapticWeight;
+        
+        // Apply to post-synaptic neuron based on type
+        if (isExcitatory()) {
+            // Excitatory current adds to membrane potential
+            pImpl->postSynapticCurrent += synapticCurrent;
+        } else {
+            // Inhibitory current subtracts from membrane potential
+            pImpl->postSynapticCurrent -= synapticCurrent;
+        }
+        
+        // Update eligibility trace for reward-modulated learning
+        if (pImpl->plasticityFlags.reward_modulated) {
+            pImpl->eligibilityTrace += synapticWeight;
+        }
+        
+        // Record this as the last spike
+        pImpl->lastPreSpikeTime = -1.0f;
+    }
+    
+    // Clear post-synaptic current accumulator for next step
+    pImpl->postSynapticCurrent = 0.0f;
+}
 }
 
 void Synapse::reset() {
@@ -256,6 +301,7 @@ void Synapse::reset() {
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->postSynapticCurrent = 0.0f;  // Reset post-synaptic current
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
@@ -288,6 +334,9 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     // Initialize last spike times
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    
+    // Initialize post-synaptic current accumulator
+    pImpl->postSynapticCurrent = 0.0f;
 }
 
 } // namespace nlm

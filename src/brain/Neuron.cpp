@@ -249,7 +249,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (V >= threshold) {
         fired = true;
         if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            pImpl->state.firingRate += 1.0f * static_cast<float>(1.0 / dt);
         }
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
