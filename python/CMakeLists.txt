@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.16)
-project(pynlm_bindings LANGUAGES CXX)
-
+# This file is removed - Python bindings are now handled by the root CMakeLists.txt
+# and scikit-build-core via pyproject.toml
+# See root CMakeLists.txt for the proper configuration
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
