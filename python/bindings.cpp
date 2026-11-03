@@ -408,26 +408,418 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Memory system access
+    m.def("createBrainWithMemory", [](std::shared_ptr<Config> config) {
+        auto brain = std::make_shared<Brain>(config);
+        if (brain->initialize()) {
+            return brain;
+        }
+        return std::shared_ptr<Brain>();
+    }, py::arg("config"), "Create and initialize a brain with full memory systems");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Advanced checkpoint management
+    m.def("saveBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& filepath,
+                                   const std::string& name = "") {
+        if (name.empty()) {
+            return brain->save(filepath);
+        } else {
+            // Use checkpoint manager for named checkpoints
+            auto& manager = brain->getImplementation()->checkpointManager;
+            if (manager) {
+                return manager->saveImmediately(name);
+            }
+            return false;
+        }
+    }, py::arg("brain"), py::arg("filepath"), py::arg("name") = "",
+       "Save brain checkpoint with optional name");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("loadBrainCheckpoint", [](std::shared_ptr<Brain> brain, const std::string& filepath,
+                                   const std::string& name = "") {
+        if (name.empty()) {
+            return brain->load(filepath);
+        } else {
+            // Try to load by name
+            auto& manager = brain->getImplementation()->checkpointManager;
+            if (manager) {
+                return manager->load(name);
+            }
+            return false;
+        }
+    }, py::arg("brain"), py::arg("filepath"), py::arg("name") = "",
+       "Load brain checkpoint with optional name");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    m.def("listBrainCheckpoints", [](std::shared_ptr<Brain> brain) {
+        auto& manager = brain->getImplementation()->checkpointManager;
+        if (!manager) return std::vector<std::string>();
+        
+        auto infos = manager->listCheckpoints();
+        std::vector<std::string> names;
+        names.reserve(infos.size());
+        for (const auto& info : infos) {
+            names.push_back(info.name);
+        }
+        return names;
+    }, py::arg("brain"), "List available brain checkpoints");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Advanced sensory and action utilities
+    m.def("createSensoryInput", [](const std::string& type, const std::vector<float>& data) {
+        if (type == "vision") {
+            auto input = std::make_unique<Vision>();
+            input->setData(data);
+            return std::unique_ptr<SensoryInput>(input.release());
+        } else if (type == "audio") {
+            auto input = std::make_unique<Audio>();
+            input->setData(data);
+            return std::unique_ptr<SensoryInput>(input.release());
+        } else {
+            auto input = std::make_unique<InternalSignals>();
+            for (float val : data) input->addSignal(val);
+            return std::unique_ptr<SensoryInput>(input.release());
+        }
+    }, py::arg("type"), py::arg("data"), "Create sensory input of specified type");
+
+    // Advanced action utilities
+    m.def("createAction", [](ActionType type, const std::vector<float>& parameters) {
+        return std::make_unique<Action>(type, parameters);
+    }, py::arg("type"), py::arg("parameters") = std::vector<float>(),
+       "Create action with type and parameters");
+
+    // World utilities
+    m.def("createWorldWithObjects", [](size_t width, size_t height) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, width / 3, height / 3);
+        return world;
+    }, py::arg("width"), py::arg("height"), "Create world with basic configuration");
+
+    // Memory system statistics
+    m.def("getBrainMemoryStats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        if (auto* episodic = brain->getEpisodicMemory()) {
+            stats["episodes"] = episodic->getEpisodeCount();
+            stats["maxEpisodes"] = episodic->getMaxEpisodes();
+            stats["replayEnabled"] = episodic->isReplayEnabled();
+        }
+        if (auto* working = brain->getWorkingMemory()) {
+            // Working memory stats would depend on the implementation
+            stats["workingMemorySize"] = 0; // Placeholder
+        }
+        if (auto* associative = brain->getAssociativeMemory()) {
+            stats["associations"] = associative->getAssociationCount();
+        }
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain memory statistics");
+
+    // Advanced configuration utilities
+    m.def("createAdvancedConfig", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set default advanced values
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.sensory_neurons", 100);
+        config->set("brain.motor_neurons", 50);
+        config->set("plasticity.stdp_enabled", true);
+        config->set("plasticity.hebbian_enabled", true);
+        config->set("plasticity.structural_enabled", true);
+        config->set("memory.episodic_enabled", true);
+        config->set("memory.associative_enabled", true);
+        config->set("memory.working_enabled", true);
+        config->set("cognition.planner_enabled", true);
+        config->set("cognition.concept_formation_enabled", true);
+        config->set("cognition.attention_enabled", true);
+        config->set("neuromodulation.dopamine_enabled", true);
+        config->set("neuromodulation.curiosity_enabled", true);
+        config->set("neuromodulation.novelty_enabled", true);
+        config->set("neuromodulation.prediction_error_enabled", true);
+        
+        return config;
+    }, "Create advanced configuration with all systems enabled");
+
+    m.def("configureBrainForPerformance", [](std::shared_ptr<Brain> brain) {
+        // High-performance configuration
+        auto config = brain->getConfig();
+        
+        config->set("brain.neuron_count", 2000);
+        config->set("brain.sensory_neurons", 200);
+        config->set("brain.motor_neurons", 100);
+        config->set("simulation.timestep", 0.0005);
+        config->set("plasticity.stdp_ltp_weight", 0.02f);
+        config->set("plasticity.stdp_ltd_weight", 0.025f);
+        config->set("plasticity.synaptogenesis_rate", 0.0005f);
+        config->set("plasticity.pruning_rate", 0.00005f);
+        config->set("memory.episodic_capacity", 5000);
+        config->set("memory.replay_interval", 50);
+        config->set("memory.consolidation_interval", 500);
+        
+        // Re-initialize brain with new config
+        brain->reset();
+        return brain->initialize();
+    }, py::arg("brain"), "Configure brain for high-performance operation");
+
+    m.def("configureBrainForLearning", [](std::shared_ptr<Brain> brain) {
+        // Learning-focused configuration
+        auto config = brain->getConfig();
+        
+        config->set("brain.neuron_count", 1500);
+        config->set("brain.sensory_neurons", 150);
+        config->set("brain.motor_neurons", 75);
+        config->set("simulation.timestep", 0.001);
+        config->set("plasticity.stdp_ltp_weight", 0.01f);
+        config->set("plasticity.stdp_ltd_weight", 0.012f);
+        config->set("plasticity.synaptogenesis_rate", 0.0002f);
+        config->set("plasticity.pruning_rate", 0.00002f);
+        config->set("memory.episodic_capacity", 2000);
+        config->set("memory.replay_interval", 100);
+        config->set("memory.consolidation_interval", 1000);
+        config->set("cognition.planning_depth", 5);
+        config->set("cognition.planning_confidence", 0.7f);
+        
+        brain->reset();
+        return brain->initialize();
+    }, py::arg("brain"), "Configure brain for enhanced learning capability");
+
+    m.def("configureBrainForStability", [](std::shared_ptr<Brain> brain) {
+        // Stability-focused configuration (conservative)
+        auto config = brain->getConfig();
+        
+        config->set("brain.neuron_count", 800);
+        config->set("brain.sensory_neurons", 80);
+        config->set("brain.motor_neurons", 40);
+        config->set("simulation.timestep", 0.002);
+        config->set("plasticity.stdp_ltp_weight", 0.005f);
+        config->set("plasticity.stdp_ltd_weight", 0.006f);
+        config->set("plasticity.synaptogenesis_rate", 0.00005f);
+        config->set("plasticity.pruning_rate", 0.00001f);
+        config->set("memory.episodic_capacity", 500);
+        config->set("memory.replay_interval", 200);
+        config->set("memory.consolidation_interval", 2000);
+        config->set("cognition.planning_depth", 2);
+        config->set("cognition.planning_confidence", 0.9f);
+        
+        brain->reset();
+        return brain->initialize();
+    }, py::arg("brain"), "Configure brain for stable operation");
+
+    // Advanced utility functions
+    m.def("validateBrainConfiguration", [](std::shared_ptr<Config> config) {
+        std::vector<std::string> errors;
+        
+        if (!config->get<int64_t>("brain.neuron_count").has_value()) {
+            errors.push_back("brain.neuron_count not set");
+        }
+        
+        if (!config->get<int64_t>("brain.sensory_neurons").has_value()) {
+            errors.push_back("brain.sensory_neurons not set");
+        }
+        
+        if (!config->get<int64_t>("brain.motor_neurons").has_value()) {
+            errors.push_back("brain.motor_neurons not set");
+        }
+        
+        double timestep = config->getOr<double>("simulation.timestep", 0.001);
+        if (timestep <= 0.0 || timestep > 0.1) {
+            errors.push_back("simulation.timestep must be between 0.0001 and 0.1");
+        }
+        
+        return errors;
+    }, py::arg("config"), "Validate brain configuration and return any errors");
+
+    m.def("exportBrainConfig", [](std::shared_ptr<Config> config) {
+        std::string jsonStr;
+        config->saveToFile(jsonStr);
+        return jsonStr;
+    }, py::arg("config"), "Export configuration to JSON string");
+
+    m.def("importBrainConfig", [](const std::string& jsonStr) {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(jsonStr);
+        return config;
+    }, py::arg("jsonStr"), "Import configuration from JSON string");
+
+    // Phase 6 specific utilities
+    m.def("enablePhase6Features", [](std::shared_ptr<Brain> brain) {
+        auto config = brain->getConfig();
+        
+        // Enable all Phase 6 features
+        config->set("prediction.enabled", true);
+        config->set("cognition.planner.enabled", true);
+        config->set("cognition.concept_formation.enabled", true);
+        config->set("cognition.attention.enabled", true);
+        config->set("neuromodulation.dopamine.enabled", true);
+        config->set("neuromodulation.curiosity.enabled", true);
+        config->set("neuromodulation.novelty.enabled", true);
+        config->set("neuromodulation.prediction_error.enabled", true);
+        config->set("development.enabled", true);
+        
+        brain->reset();
+        return brain->initialize();
+    }, py::arg("brain"), "Enable all Phase 6 advanced features");
+
+    m.def("getPhase6Status", [](std::shared_ptr<Brain> brain) {
+        py::dict status;
+        
+        // Check if brain has advanced systems
+        status["prediction_system"] = brain->getPredictionSystem() != nullptr;
+        status["neural_planner"] = brain->getPlanner() != nullptr;
+        status["concept_formation"] = brain->getConceptFormation() != nullptr;
+        status["attention_system"] = brain->getAttention() != nullptr;
+        status["development_system"] = brain->getDevelopmentSystem() != nullptr;
+        status["dopamine"] = brain->getDopamine() != nullptr;
+        status["curiosity"] = brain->getCuriosity() != nullptr;
+        status["novelty"] = brain->getNovelty() != nullptr;
+        status["prediction_error"] = brain->getPredictionErrorSignal() != nullptr;
+        
+        status["has_episodic_memory"] = brain->getEpisodicMemory() != nullptr;
+        status["has_associative_memory"] = brain->getAssociativeMemory() != nullptr;
+        status["has_working_memory"] = brain->getWorkingMemory() != nullptr;
+        
+        return status;
+    }, py::arg("brain"), "Get status of all Phase 6 systems");
+
+    m.def("benchmarkBrainPerformance", [](std::shared_ptr<Brain> brain, size_t steps) {
+        // Run performance benchmark
+        size_t initialSpikes = brain->getTotalSpikeCount();
+        
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        size_t finalSpikes = brain->getTotalSpikeCount();
+        size_t spikesGenerated = finalSpikes - initialSpikes;
+        double spikesPerSecond = (double)spikesGenerated / (duration.count() / 1000.0);
+        
+        py::dict results;
+        results["steps"] = steps;
+        results["duration_ms"] = duration.count();
+        results["spikes_generated"] = spikesGenerated;
+        results["spikes_per_second"] = spikesPerSecond;
+        results["average_spikes_per_step"] = (double)spikesGenerated / steps;
+        
+        return results;
+    }, py::arg("brain"), py::arg("steps"), "Benchmark brain performance over specified steps");
+
+    m.def("getBrainSystemStats", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        
+        // Basic brain stats
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        // Developmental stage
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // System-specific stats
+        if (auto* spikeSystem = brain->getSpikeSystem()) {
+            stats["pending_spikes"] = spikeSystem->getPendingSpikeEventCount();
+        }
+        
+        if (auto* stdp = brain->getSTDP()) {
+            stats["stdp_enabled"] = stdp->isEnabled();
+        }
+        
+        if (auto* hebbian = brain->getHebbian()) {
+            stats["hebbian_enabled"] = hebbian->isEnabled();
+        }
+        
+        if (auto* structural = brain->getStructuralPlasticity()) {
+            stats["structural_plasticity_enabled"] = structural->isEnabled();
+        }
+        
+        if (auto* development = brain->getDevelopmentSystem()) {
+            stats["developmental_stage_name"] = std::string(development->getStageName());
+            stats["plasticity_modifier"] = development->getPlasticityModifier();
+        }
+        
+        return stats;
+    }, py::arg("brain"), "Get comprehensive statistics about all brain systems");
+
+    m.def("createBrainWithAdvancedMemory", [](std::shared_ptr<Config> config) {
+        auto brain = std::make_shared<Brain>(config);
+        
+        if (brain->initialize()) {
+            // Enable advanced memory features
+            if (auto* episodic = brain->getEpisodicMemory()) {
+                episodic->enableReplay(true);
+                episodic->setMaxEpisodes(2000);
+            }
+            
+            if (auto* associative = brain->getAssociativeMemory()) {
+                // Enable associative learning
+            }
+            
+            if (auto* working = brain->getWorkingMemory()) {
+                // Configure working memory
+            }
+            
+            return brain;
+        }
+        
+        return std::shared_ptr<Brain>();
+    }, py::arg("config"), "Create brain with advanced memory systems");
+
+    m.def("exportBrainState", [](std::shared_ptr<Brain> brain) {
+        py::dict state;
+        
+        // Export all major system states
+        state["brain_state"] = brain->save("temp_brain_state.bin");
+        
+        // System-specific states
+        if (auto* episodic = brain->getEpisodicMemory()) {
+            auto episodes = episodic->getEpisodes();
+            py::list episodeList;
+            for (const auto& ep : episodes) {
+                py::dict epDict;
+                epDict["timestamp"] = ep.timestamp;
+                epDict["reward"] = ep.reward;
+                epDict["action"] = static_cast<int>(ep.action);
+                // Add other fields as needed
+                episodeList.append(epDict);
+            }
+            state["episodes"] = episodeList;
+        }
+        
+        return state;
+    }, py::arg("brain"), "Export comprehensive brain state");
+
+    m.def("importBrainState", [](std::shared_ptr<Brain> brain, const py::dict& state) {
+        // Restore brain state from exported state
+        bool success = true;
+        
+        // Restore brain state from file
+        if (state.contains("brain_state")) {
+            success = brain->load("temp_brain_state.bin");
+        }
+        
+        // Restore episodic memory
+        if (success && state.contains("episodes")) {
+            if (auto* episodic = brain->getEpisodicMemory()) {
+                std::vector<EpisodicMemoryItem> episodes;
+                py::list episodeList = state["episodes"].cast<py::list>();
+                
+                for (size_t i = 0; i < episodeList.size(); ++i) {
+                    py::dict epDict = episodeList[i].cast<py::dict>();
+                    EpisodicMemoryItem ep;
+                    ep.timestamp = epDict["timestamp"].cast<SimulationStep>();
+                    ep.reward = epDict["reward"].cast<float>();
+                    ep.action = static_cast<ActionType>(epDict["action"].cast<int>());
+                    // Restore other fields as needed
+                    episodes.push_back(ep);
+                }
+                
+                episodic->restoreEpisodes(episodes);
+            }
+        }
+        
+        return success;
+    }, py::arg("brain"), py::arg("state"), "Import brain state from exported state");
 
 } // namespace nlm

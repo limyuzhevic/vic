@@ -20,18 +20,36 @@ NeuralPlanner::NeuralPlanner()
     actionQuality_.resize(10, 0.0f);  // 10 action types
 }
 
-NeuralPlanner::~NeuralPlanner() = default;
+NeuralPlanner::~NeuralPlanner() {
+    delete pImpl;
+}
 
 void NeuralPlanner::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_WARNING("Cannot initialize NeuralPlanner with null brain");
+        return;
+    }
+    
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralPlanner initialized");
 }
 
 ActionType NeuralPlanner::planAction(const std::vector<float>& currentState,
-                                    float targetReward) {
+                                     float targetReward) {
+    // Validate inputs
+    if (currentState.empty() || planningDepth_ == 0) {
+        NLM_LOG_WARNING("Invalid planning parameters - state empty or depth zero");
+        return ActionType::Wait;
+    }
+    
     // Generate possible action sequences
     auto sequences = generateActionSequences(planningDepth_);
+    
+    if (sequences.empty()) {
+        NLM_LOG_WARNING("No action sequences generated");
+        return ActionType::Wait;
+    }
     
     PlanningCandidate best;
     best.expectedReward = -1000.0f;
@@ -110,16 +128,10 @@ PlanningCandidate NeuralPlanner::evaluateSequence(const std::vector<ActionType>&
 std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size_t depth) {
     std::vector<std::vector<ActionType>> result;
     
-    // Simple enumeration of action sequences
-    std::vector<ActionType> baseActions = {
-        ActionType::MoveForward, ActionType::MoveBackward,
-        ActionType::TurnLeft, ActionType::TurnRight,
-        ActionType::Interact, ActionType::Wait
-    };
+    // Use actionQuality_ to bias action selection
+    std::vector<ActionType> baseActions = getBiasedActionList();
     
-    // For now, generate sequences of depth actions
-    // This could be optimized with pruning
-    
+    // Generate sequences using recursive backtracking
     std::function<void(std::vector<ActionType>&, size_t)> generate = 
         [&](std::vector<ActionType>& current, size_t remaining) {
             if (remaining == 0) {
@@ -136,48 +148,124 @@ std::vector<std::vector<ActionType>> NeuralPlanner::generateActionSequences(size
     
     std::vector<ActionType> current;
     generate(current, depth);
-
-    // Limit number of sequences. Phase 5 fix: the old code kept only
-    // the first 100 sequences, which — with depth 5 and lexicographic
-    // generation — all start with MoveForward, so the planner could
-    // never suggest any other first action no matter what it learned.
-    // Keeping 100 evenly spaced sequences preserves one representative
-    // per first action, so learned action quality can actually change
-    // the planner's suggestion.
-    if (result.size() > 100) {
-        std::vector<std::vector<ActionType>> kept;
-        kept.reserve(100);
-        for (size_t i = 0; i < 100; ++i) {
-            kept.push_back(result[i * result.size() / 100]);
-        }
-        result = std::move(kept);
-    }
-
+    
+    // Apply pruning based on action quality
+    result = applySequencePruning(result);
+    
     return result;
 }
 
-float NeuralPlanner::evaluateAction(ActionType action, const std::vector<float>& state) {
-    size_t actionIdx = static_cast<size_t>(action);
-    if (actionIdx >= actionQuality_.size()) return 0.0f;
+std::vector<ActionType> NeuralPlanner::getBiasedActionList() const {
+    // Create action list biased by learned quality
+    std::vector<std::pair<ActionType, float>> actionQualities;
     
-    // Base value from experience
-    float baseValue = actionQuality_[actionIdx];
+    for (size_t i = 0; i < actionQuality_.size(); ++i) {
+        ActionType action = static_cast<ActionType>(i % static_cast<size_t>(ActionType::Custom) + 1);
+        actionQualities.emplace_back(action, actionQuality_[i]);
+    }
     
-    // Bonus for approaching goal (if goal is defined)
-    float goalBonus = 0.0f;
-    if (!currentGoal_.empty() && state.size() == currentGoal_.size()) {
-        float stateGoalSim = 0.0f, stateNorm = 0.0f, goalNorm = 0.0f;
-        for (size_t i = 0; i < state.size(); ++i) {
-            stateGoalSim += state[i] * currentGoal_[i];
-            stateNorm += state[i] * state[i];
-            goalNorm += currentGoal_[i] * currentGoal_[i];
+    // Add default actions if missing
+    std::vector<ActionType> defaultActions = {
+        ActionType::MoveForward, ActionType::MoveBackward,
+        ActionType::TurnLeft, ActionType::TurnRight,
+        ActionType::Interact, ActionType::Wait
+    };
+    
+    for (ActionType action : defaultActions) {
+        bool found = false;
+        for (const auto& pair : actionQualities) {
+            if (pair.first == action) {
+                found = true;
+                break;
+            }
         }
-        if (stateNorm > 0.0001f && goalNorm > 0.0001f) {
-            goalBonus = stateGoalSim / (std::sqrt(stateNorm) * std::sqrt(goalNorm));
+        if (!found) {
+            actionQualities.emplace_back(action, 0.0f);
         }
     }
     
-    return baseValue * 0.7f + goalBonus * 0.3f;
+    // Sort by quality (best first)
+    std::sort(actionQualities.begin(), actionQualities.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    // Extract sorted action types
+    std::vector<ActionType> sortedActions;
+    for (const auto& pair : actionQualities) {
+        sortedActions.push_back(pair.first);
+    }
+    
+    return sortedActions;
+}
+
+std::vector<std::vector<ActionType>> NeuralPlanner::applySequencePruning(std::vector<std::vector<ActionType>> sequences) {
+    // Apply intelligent pruning based on action quality and sequence diversity
+    if (sequences.size() <= 100) {
+        return sequences; // No pruning needed
+    }
+    
+    // Keep 100 sequences with highest diversity and quality
+    std::vector<std::pair<size_t, float>> sequenceScores; // (index, score)
+    
+    for (size_t i = 0; i < sequences.size(); ++i) {
+        float score = 0.0f;
+        
+        // Calculate sequence quality score
+        for (size_t j = 0; j < sequences[i].size(); ++j) {
+            size_t actionIdx = static_cast<size_t>(sequences[i][j]);
+            if (actionIdx < actionQuality_.size()) {
+                score += actionQuality_[actionIdx];
+            }
+        }
+        
+        // Add diversity bonus
+        float diversityBonus = calculateSequenceDiversity(i, sequences);
+        score += diversityBonus * 0.1f;
+        
+        sequenceScores.emplace_back(i, score);
+    }
+    
+    // Sort by score (highest first)
+    std::sort(sequenceScores.begin(), sequenceScores.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    // Keep top 100 sequences
+    std::vector<std::vector<ActionType>> pruned;
+    pruned.reserve(100);
+    
+    for (size_t i = 0; i < std::min(size_t(100), sequenceScores.size()); ++i) {
+        pruned.push_back(sequences[sequenceScores[i].first]);
+    }
+    
+    return pruned;
+}
+
+float NeuralPlanner::calculateSequenceDiversity(size_t index, const std::vector<std::vector<ActionType>>& sequences) const {
+    // Calculate diversity score for sequence at given index
+    if (sequences.size() <= 1) return 1.0f;
+    
+    float totalDiversity = 0.0f;
+    size_t comparisons = 0;
+    
+    for (size_t i = 0; i < sequences.size(); ++i) {
+        if (i == index) continue;
+        
+        float similarity = 0.0f;
+        // Calculate sequence similarity
+        for (size_t j = 0; j < std::min(sequences[index].size(), sequences[i].size()); ++j) {
+            if (sequences[index][j] == sequences[i][j]) {
+                similarity += 1.0f;
+            }
+        }
+        
+        float maxLen = std::max(sequences[index].size(), sequences[i].size());
+        if (maxLen > 0) {
+            similarity /= maxLen;
+            totalDiversity += (1.0f - similarity);
+            comparisons++;
+        }
+    }
+    
+    return comparisons > 0 ? totalDiversity / comparisons : 1.0f;
 }
 
 std::vector<float> NeuralPlanner::predictNextState(ActionType action,

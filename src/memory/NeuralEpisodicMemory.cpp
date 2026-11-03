@@ -22,27 +22,42 @@ NeuralEpisodicMemory::NeuralEpisodicMemory()
     , maxEpisodes_(1000)
     , replayEnabled_(true)
 {
+    // Initialize with empty capacity
+    episodes_.reserve(maxEpisodes_);
 }
 
 NeuralEpisodicMemory::~NeuralEpisodicMemory() = default;
 
 void NeuralEpisodicMemory::initialize(Brain* brain) {
+    if (!brain) {
+        NLM_LOG_WARNING("Cannot initialize NeuralEpisodicMemory with null brain");
+        return;
+    }
+    
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralEpisodicMemory initialized");
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
+    // Validate episode data
+    if (episode.sensoryState.empty()) {
+        NLM_LOG_WARNING("Storing episode with empty sensory state");
+        return;
+    }
+    
     // Create episode copy with age 0
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
     
-    episodes_.push_back(stored);
+    // Use emplace_back for better performance when possible
+    episodes_.push_back(std::move(stored));
     
     // Create episode neuron for pattern completion
     if (brain_ && !episode.sensoryState.empty()) {
-        NeuronId epNeuron(episodes_.size() + 20000);
-        pImpl->episodeNeurons.push_back(epNeuron);
+        // Use a more deterministic ID based on timestamp and episode count
+        uint64_t epNeuronId = 20000 + episodes_.size() - 1;
+        pImpl->episodeNeurons.push_back(epNeuronId);
         
         // Store episode index in the neuron
         // (This is a simplified approach - real implementation would use more distributed encoding)

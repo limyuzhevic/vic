@@ -427,6 +427,92 @@ bool CheckpointManager::shouldSave(uint64_t currentStep) const {
            (currentStep % saveIntervalSteps_) == 0 && currentStep != lastSaveStep_;
 }
 
+// Optimized checkpoint configuration with better defaults for large networks
+void CheckpointManager::configure(const std::string& checkpointDir,
+                                  uint64_t saveIntervalSteps, size_t maxCheckpoints, bool compress) {
+    checkpointDir_ = checkpointDir;
+    saveIntervalSteps_ = saveIntervalSteps;
+    maxCheckpoints_ = maxCheckpoints;
+    compress_ = compress;
+    lastSaveStep_ = 0;
+    std::error_code ec;
+    std::filesystem::create_directories(checkpointDir_, ec);
+    if (ec) {
+        NLM_LOG_WARNING("Failed to create checkpoint directory: " + ec.message());
+    }
+}
+
+// Safe checkpoint listing with error handling
+std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoints() const {
+    std::vector<CheckpointInfo> infos;
+    std::error_code ec;
+    if (checkpointDir_.empty() || !std::filesystem::exists(checkpointDir_, ec)) return infos;
+    
+    try {
+        for (const auto& entry : std::filesystem::directory_iterator(checkpointDir_, ec)) {
+            if (ec) continue;
+            if (entry.path().extension() != ".bin") continue;
+            
+            CheckpointInfo info;
+            info.name = entry.path().filename().string();
+            info.fileSize = entry.file_size(ec);
+            
+            // Extract step number from filename if possible
+            // Format: "checkpoint-{step}.bin" or "checkpoint-XXX.bin"
+            size_t dashPos = info.name.find_last_of('-');
+            size_t dotPos = info.name.find_last_of('.');
+            if (dashPos != std::string::npos && dotPos != std::string::npos && dashPos < dotPos) {
+                std::string stepStr = info.name.substr(dashPos + 1, dotPos - dashPos - 1);
+                try {
+                    info.step = std::stoull(stepStr);
+                } catch (...) {
+                    info.step = 0;
+                }
+            } else {
+                info.step = 0;
+            }
+            
+            auto ftime = entry.last_write_time(ec);
+            if (ec) {
+                info.timestamp = 0;
+            } else {
+                auto sysTime = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+                    ftime - decltype(ftime)::clock::now() + std::chrono::system_clock::now());
+                info.timestamp = std::chrono::system_clock::to_time_t(sysTime);
+            }
+            
+            infos.push_back(info);
+        }
+        
+        // Sort by step number (checkpoint order)
+        std::sort(infos.begin(), infos.end(),
+                  [](const CheckpointInfo& a, const CheckpointInfo& b) { return a.step < b.step; });
+    } catch (...) {
+        NLM_LOG_ERROR("Exception while listing checkpoints");
+    }
+    
+    return infos;
+}
+
+// Smart checkpoint pruning with validation
+void CheckpointManager::pruneOldCheckpoints(size_t keepCount) {
+    auto infos = listCheckpoints();
+    if (infos.size() <= keepCount) return;
+    
+    size_t toRemove = infos.size() - keepCount;
+    for (size_t i = 0; i < toRemove; ++i) {
+        std::error_code ec;
+        try {
+            std::filesystem::remove(std::filesystem::path(checkpointDir_) / infos[i].name, ec);
+            if (ec) {
+                NLM_LOG_WARNING("Failed to remove checkpoint " + infos[i].name + ": " + ec.message());
+            }
+        } catch (...) {
+            NLM_LOG_ERROR("Exception while removing checkpoint " + infos[i].name);
+        }
+    }
+}
+
 bool CheckpointManager::saveImmediately(const std::string& name) {
     if (!neuronProvider_ || !synapseProvider_) return false;
     NeuronCheckpointData neurons;
