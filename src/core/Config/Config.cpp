@@ -19,9 +19,36 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Detect file format by extension
+    std::string extension = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
+    }
     
+    if (extension == "json") {
+        return loadFromJSONFile(filepath);
+    } else if (extension == "yaml" || extension == "yml") {
+        return loadFromYAMLFile(filepath);
+    } else {
+        // Default to key=value format
+        return loadFromPlainFile(filepath);
+    }
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // TODO: Implement JSON parsing using nlohmann/json library
+    // For now, provide a stub implementation
+    return loadFromPlainFile(filepath);
+}
+
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    // TODO: Implement YAML parsing using yaml-cpp library
+    // For now, provide a stub implementation
+    return loadFromPlainFile(filepath);
+}
+
+bool Config::loadFromPlainFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,7 +113,45 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Serialize value based on type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                // Format vector<int> as [a,b,c]
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                // Format vector<double> as [a,b,c]
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                // Format vector<string> as ["a","b","c"]
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]";
+            } else {
+                // For int, int64_t, double, bool - just output the value
+                file << value;
+            }
+        }, entry.value);
+        
+        file << "\n\n"; // Add blank line for readability
     }
     
     return true;
@@ -234,5 +299,149 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+void Config::configureFromFile(const std::string& filepath) {
+    loadFromFile(filepath);
+}
+
+void Config::configureFromJSONFile(const std::string& filepath) {
+    loadFromJSONFile(filepath);
+}
+
+void Config::configureFromYAMLFile(const std::string& filepath) {
+    loadFromYAMLFile(filepath);
+}
+
+void Config::configureFromCommandLine(int argc, char** argv) {
+    loadFromArgs(argc, argv);
+}
+
+bool Config::validate() const {
+    // Validate configuration values based on known keys and expected types
+    for (const auto& entry : pImpl->entries) {
+        bool isValid = validateEntry(entry);
+        if (!isValid) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Config::validateEntry(const ConfigEntry& entry) const {
+    // Basic validation based on key patterns
+    if (entry.key.empty()) {
+        return false;
+    }
+    
+    // Validate specific keys
+    if (entry.key == "simulation_timestep") {
+        if (!std::holds_alternative<double>(entry.value)) {
+            return false;
+        }
+        double timestep = std::get<double>(entry.value);
+        if (timestep <= 0.0 || timestep > 1.0) {
+            return false;
+        }
+    }
+    else if (entry.key == "neuron_count") {
+        if (!std::holds_alternative<int>(entry.value)) {
+            return false;
+        }
+        int count = std::get<int>(entry.value);
+        if (count <= 0 || count > 100000) {
+            return false;
+        }
+    }
+    else if (entry.key == "region_count") {
+        if (!std::holds_alternative<int>(entry.value)) {
+            return false;
+        }
+        int count = std::get<int>(entry.value);
+        if (count <= 0 || count > 100) {
+            return false;
+        }
+    }
+    else if (entry.key == "random_seed") {
+        if (!std::holds_alternative<int>(entry.value)) {
+            return false;
+        }
+        int seed = std::get<int>(entry.value);
+        if (seed < 0 || seed > 2147483647) {
+            return false;
+        }
+    }
+    else if (entry.key.find("weight") != std::string::npos || 
+             entry.key.find("rate") != std::string::npos) {
+        // Weight and rate parameters
+        if (!std::holds_alternative<double>(entry.value)) {
+            return false;
+        }
+        double value = std::get<double>(entry.value);
+        if (value < -10.0 || value > 10.0) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+std::string Config::getConfigurationReport() const {
+    std::ostringstream oss;
+    oss << "=== NLM Configuration Report ===\n";
+    oss << "Total entries: " << pImpl->entries.size() << "\n\n";
+    
+    // Validate configuration
+    bool isValid = validate();
+    oss << "Validation: " << (isValid ? "PASSED" : "FAILED") << "\n\n";
+    
+    // Show configuration by source
+    oss << "Configuration by source:\n";
+    int defaultCount = 0, fileCount = 0, cmdlineCount = 0, runtimeCount = 0;
+    
+    for (const auto& entry : pImpl->entries) {
+        switch (entry.source) {
+            case ConfigSource::Default:
+                defaultCount++;
+                break;
+            case ConfigSource::File:
+                fileCount++;
+                break;
+            case ConfigSource::CommandLine:
+                cmdlineCount++;
+                break;
+            case ConfigSource::Runtime:
+                runtimeCount++;
+                break;
+        }
+    }
+    
+    oss << "  Default:     " << defaultCount << "\n";
+    oss << "  File:        " << fileCount << "\n";
+    oss << "  CommandLine: " << cmdlineCount << "\n";
+    oss << "  Runtime:     " << runtimeCount << "\n\n";
+    
+    // Show critical parameters
+    oss << "Critical Parameters:\n";
+    std::vector<std::string> criticalKeys = {
+        "simulation_timestep", "neuron_count", "region_count", "random_seed",
+        "plasticity_learning_rate", "stdp_ltp_weight", "stdp_ltd_weight",
+        "development_synaptogenesis_rate", "development_pruning_rate"
+    };
+    
+    for (const auto& key : criticalKeys) {
+        if (has(key)) {
+            oss << "  " << key << " = ";
+            
+            auto val = get<std::string>(key);
+            if (val.has_value()) {
+                oss << val.value() << "\n";
+            } else {
+                oss << "<unavailable>\n";
+            }
+        }
+    }
+    
+    return oss.str();
+}
 
 } // namespace nlm

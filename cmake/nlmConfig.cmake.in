@@ -1,0 +1,41 @@
+# nlm CMake configuration file for CMake package config
+
+# Import targets file
+include("${CMAKE_CURRENT_LIST_DIR}/nlm-targets.cmake")
+
+# Package version file
+set_and_check(NLM_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+
+# Check for dependencies
+find_dependency(CXXStandard 20 REQUIRED)
+
+# Export targets for use from build tree
+export(EXPORT nlm-targets
+    FILE "${NLM_CMAKE_DIR}/nlmTargets.cmake"
+    NAMESPACE nlm::
+)
+
+# Find Python bindings if requested
+if(NLM_BUILD_PYTHON_BINDINGS)
+    find_package(Python REQUIRED COMPONENTS Interpreter Development)
+    find_package(pybind11 REQUIRED)
+endif()
+
+# Find system dependencies
+find_package(SystemLib REQUIRED)
+
+# Find optional dependencies
+find_package(Threads QUIET)
+
+# Package options
+include("${CMAKE_CURRENT_LIST_DIR}/nlmOptions.cmake")
+
+# Documentation
+set(NLM_DESCRIPTION "Neural Learning Machine - Experimental Artificial Developmental Brain")
+set(NLM_URL "https://github.com/nlm-project/nlm")
+
+# Installation summary
+message(STATUS "NLM package configured successfully")
+message(STATUS "Targets exported: nlm::nlm_core, nlm::nlm_agent, nlm::nlm_world")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "Python bindings: ${NLM_BUILD_PYTHON_BINDINGS}")

@@ -56,8 +56,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (auto-detects JSON, YAML, or plain text format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON file
+    bool loadFromJSONFile(const std::string& filepath);
+    
+    // Load from YAML file
+    bool loadFromYAMLFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -66,12 +72,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +101,19 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Advanced configuration methods
+    void configureFromFile(const std::string& filepath);
+    void configureFromJSONFile(const std::string& filepath);
+    void configureFromYAMLFile(const std::string& filepath);
+    void configureFromCommandLine(int argc, char** argv);
+    
+    // Configuration validation
+    bool validate() const;
+    bool validateEntry(const ConfigEntry& entry) const;
+    
+    // Configuration reporting
+    std::string getConfigurationReport() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +121,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Legacy plain text format loader (private implementation)
+    bool loadFromPlainFile(const std::string& filepath);
 };
 
 } // namespace nlm

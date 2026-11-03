@@ -1,0 +1,102 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 16
+    },
+    "configurePresets": [
+        {
+            "name": "linux-default",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "NLM_BUILD_PYTHON_BINDINGS": "OFF"
+            },
+            "vendor": {
+                "cmakeLanguageVersion": "3.16"
+            }
+        },
+        {
+            "name": "linux-debug",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "NLM_BUILD_PYTHON_BINDINGS": "OFF",
+                "CMAKE_CXX_FLAGS": "-g -O0 -Wall -Wextra -Wpedantic -DDEBUG"
+            }
+        },
+        {
+            "name": "linux-optimized",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-optimized",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "NLM_BUILD_PYTHON_BINDINGS": "OFF",
+                "CMAKE_CXX_FLAGS": "-O3 -march=native -flto"
+            }
+        },
+        {
+            "name": "windows-release",
+            "generator": "Visual Studio 17 2022",
+            "binaryDir": "${sourceDir}/build-windows",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "NLM_BUILD_PYTHON_BINDINGS": "OFF",
+                "CMAKE_CXX_FLAGS": "/W4 /EHsc /MT"
+            }
+        },
+        {
+            "name": "python-bindings",
+            "inherits": "linux-default",
+            "cacheVariables": {
+                "NLM_BUILD_PYTHON_BINDINGS": "ON",
+                "Python_EXECUTABLE": "python3"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "linux-default",
+            "configurePreset": "linux-default",
+            "jobs": 4
+        },
+        {
+            "name": "linux-debug",
+            "configurePreset": "linux-debug",
+            "jobs": 4
+        },
+        {
+            "name": "linux-optimized",
+            "configurePreset": "linux-optimized",
+            "jobs": 8
+        },
+        {
+            "name": "windows-release",
+            "configurePreset": "windows-release",
+            "jobs": 4
+        },
+        {
+            "name": "python-bindings",
+            "configurePreset": "python-bindings",
+            "jobs": 4
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "default",
+            "configurePreset": "linux-default",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "debug",
+            "configurePreset": "linux-debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ]
+}
