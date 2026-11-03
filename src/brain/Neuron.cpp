@@ -219,6 +219,14 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
+    // Apply firing rate adaptation to limit excessive spiking
+    // High firing rates should reduce excitability
+    if (pImpl->state.firingRate > 200.0f) {  // More than 200 Hz = excessive
+        float adaptationFactor = (pImpl->state.firingRate - 200.0f) * 0.01f;
+        // Reduce synaptic contribution proportionally
+        synapticContribution *= std::max(0.1f, 1.0f - adaptationFactor);
+    }
+    
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
     
@@ -244,7 +252,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (dt > 0.0) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
-
+    
     // Check for spike
     if (V >= threshold) {
         fired = true;
