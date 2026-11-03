@@ -34,7 +34,8 @@ void Reward::reset() {
 
 float Reward::computeReward(const Observation& observation) const {
     // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
+    // PLACEHOLDER: Returns 0 - This is a known issue that needs fixing
+    // For now, return 0.0f as placeholder
     return 0.0f;
 }
 

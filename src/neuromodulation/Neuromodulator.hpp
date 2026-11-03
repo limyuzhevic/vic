@@ -27,12 +27,13 @@ public:
     // Update neuromodulator state
     virtual void update(TimestepDuration dt) = 0;
     
-protected:
-    Neuromodulator() = default;
-};
+    // Initialize neuromodulator with brain reference
+    virtual void initialize(class Brain* brain) {}
+    
+    // Get brain reference
+    virtual class Brain* getBrain() const { return nullptr; };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -44,6 +45,12 @@ public:
     float getPlasticityFactor() const override;
     void update(TimestepDuration dt) override;
     
+    // Initialize neuromodulator with brain reference
+    void initialize(class Brain* brain) override;
+    
+    // Get brain reference
+    class Brain* getBrain() const override { return brain_; }
+    
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
@@ -51,7 +58,8 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
-};
+    class Brain* brain_ = nullptr;
+}
 
 // Acetylcholine: Attention and memory consolidation
 // PLACEHOLDER - Phase 2

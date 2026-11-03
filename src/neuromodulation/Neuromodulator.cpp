@@ -9,8 +9,9 @@ struct Dopamine::Impl {
     float peak;
     float decayRate;
     float releaseRate;
+    class Brain* brain;  // Store brain reference for integration
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f), brain(nullptr) {}
 };
 
 Dopamine::Dopamine() : pImpl(new Impl) {}
@@ -53,4 +54,11 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
-} // namespace nlm
+void Dopamine::initialize(class Brain* brain) {
+    // Store brain reference for integration
+    pImpl->brain = brain;
+}
+
+class Brain* Dopamine::getBrain() const {
+    return pImpl->brain;
+}
