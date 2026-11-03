@@ -11,6 +11,14 @@ namespace test_types {
 
 namespace test_config {
     void runAll();
+    void testConfigFileLoading();
+    void testConfigFileLoadingFailure();
+    void testConfigSaveToFile();
+    void testConfigCommandLineLoading();
+    void testConfigTypeConversions();
+    void testConfigSourceTracking();
+    void testConfigDefaultValues();
+    void testConfigEmptyConfig();
 }
 
 namespace test_random {

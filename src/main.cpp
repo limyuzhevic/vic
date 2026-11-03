@@ -25,6 +25,8 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <unordered_map>
+#include <algorithm>
 
 using namespace nlm;
 
@@ -46,6 +48,36 @@ void printBanner() {
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+void printHelp() {
+    std::cout << R"(
+NLM - Neural Learning Machine
+Usage: nlm [OPTIONS]
+
+Core Operations:
+  --basic                 Run basic neural connectivity test (default)
+  --plasticity            Run plasticity learning experiment
+  --stdp                  Run STDP verification test
+  --all                   Run all tests (plasticity + stdp)
+  --single-test <name>    Run a specific test by name
+
+Configuration:
+  --config <file>         Load configuration from file (default: configs/default.cfg)
+  --help                  Show this help message
+  --version               Show version information
+
+Example usage:
+  nlm --basic --config my_config.cfg
+  nlm --plasticity --config custom.cfg
+  nlm --all
+  nlm --help
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM (熙然) v2.0 - Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "Experimental artificial developmental brain with real neural dynamics." << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -277,8 +309,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     float beforeWeight = syn->getWeight();
     NLM_LOG_INFO("  Testing STDP on 1 synapse:");
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
-                 " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
-                 ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
+                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
+                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
 
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
@@ -293,10 +325,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
-                 " (Δ=" + std::to_string(delta) + ")");
+                  " (Δ=" + std::to_string(delta) + ")");
 
     float totalDelta = delta;
-    
+
     NLM_LOG_INFO("");
     if (totalDelta > 0.001f) {
         NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
@@ -304,6 +336,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
         NLM_LOG_INFO("  ! STDP reversed: Check parameters");
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+    }
+}
+
+bool runTest(std::shared_ptr<Brain> brain, const std::string& testName) {
+    if (testName == "basic" || testName == "connectivity") {
+        runBasicConnectivityTest(brain);
+        return true;
+    } else if (testName == "plasticity") {
+        runPlasticityExperiment(brain);
+        return true;
+    } else if (testName == "stdp") {
+        runStdpVerification(brain);
+        return true;
+    } else {
+        NLM_LOG_ERROR("Unknown test: " + testName);
+        return false;
     }
 }
 
@@ -326,14 +374,29 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
+    // Parse command line arguments
     std::string configFile = "configs/default.cfg";
+    std::vector<std::string> testNames;
+    bool showHelp = false;
+    bool showVersion = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help") {
+            showHelp = true;
+        } else if (arg == "--version") {
+            showVersion = true;
+        } else if (arg == "--basic" || arg == "--connectivity") {
+            testNames.push_back("basic");
+        } else if (arg == "--plasticity") {
+            testNames.push_back("plasticity");
+        } else if (arg == "--stdp") {
+            testNames.push_back("stdp");
+        } else if (arg == "--all") {
+            testNames = {"basic", "plasticity", "stdp"};
+        } else if (arg == "--single-test" && i + 1 < argc) {
+            testNames.push_back(argv[++i]);
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
@@ -341,6 +404,23 @@ int main(int argc, char** argv) {
             }
         }
     }
+    
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    if (showVersion) {
+        printVersion();
+        return 0;
+    }
+    
+    if (testNames.empty()) {
+        testNames = {"basic"}; // Default test
+    }
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
@@ -352,21 +432,41 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 (if not already set)
+    if (!config->has("random_seed")) {
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    }
+    if (!config->has("simulation_timestep")) {
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    if (!config->has("neuron_count")) {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    }
+    if (!config->has("region_count")) {
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    if (!config->has("connection_probability")) {
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+    }
     
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    if (!config->has("stdp_ltp_weight")) {
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    }
+    if (!config->has("stdp_ltd_weight")) {
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    }
+    if (!config->has("stdp_tau")) {
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    }
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (!config->has("synaptogenesis_rate")) {
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    }
+    if (!config->has("pruning_rate")) {
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -395,20 +495,25 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run tests
+    bool allTestsPassed = true;
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Running Tests ===");
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    for (size_t i = 0; i < testNames.size(); ++i) {
+        const std::string& testName = testNames[i];
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Test " + std::to_string(i + 1) + "/" + std::to_string(testNames.size()) + ": " + testName);
+        
+        // Reset and reinitialize brain for each test to ensure clean state
+        brain->reset();
+        brain->initialize();
+        
+        if (!runTest(brain, testName)) {
+            allTestsPassed = false;
+            NLM_LOG_ERROR("Test '" + testName + "' failed!");
+        }
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -431,5 +536,11 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
     
-    return 0;
+    if (allTestsPassed) {
+        NLM_LOG_INFO("✓ All tests passed successfully!");
+        return 0;
+    } else {
+        NLM_LOG_ERROR("Some tests failed. See logs above for details.");
+        return 1;
+    }
 }
