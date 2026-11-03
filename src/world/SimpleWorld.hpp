@@ -126,6 +126,15 @@ private:
     // Simple RNG state
     uint64_t rngState_;
     uint64_t nextRandom();
+    
+    // Reward system state
+    int consecutiveWinnerCount_;           // Track consecutive successful actions
+    bool wasNearWall_;                    // Track if agent was near wall
+    bool rewardScalingEnabled_;           // Enable/disable reward scaling
+    
+    // Phase 6 integration
+    // Note: AgentBrain pointer would be added here if SimpleWorld
+    // needs to interface with the agent brain directly
 };
 
 } // namespace nlm

@@ -504,7 +504,43 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
         }
+        
+        // Connect dopamine to memory systems - strengthens important memories
+        if (pImpl->dopamine && pImpl->workingMemory) {
+            // Higher dopamine enhances working memory retention
+            float memoryMod = std::min(2.0f, 1.0f + dopamineLevel * 0.5f);  // Modulate decay
+            pImpl->workingMemory->setDecayRate(pImpl->workingMemory->getDecayRate() / memoryMod);
+        }
+        
+        if (pImpl->dopamine && pImpl->episodicMemory) {
+            // Dopamine modulates episodic memory consolidation
+            // Positive dopamine prioritizes reward-based memories for consolidation
+            float consolidationMod = 1.0f + dopamineLevel * 0.3f;
+            // This would affect consolidation strength in a full implementation
+            (void)consolidationMod;  // Placeholder for future implementation
+        }
+        
+        // Connect dopamine to attention - modulates attention strength
+        if (pImpl->dopamine && pImpl->attention) {
+            // Higher dopamine increases attentional focus and selection strength
+            float attentionMod = 1.0f + dopamineLevel * 0.4f;
+            pImpl->attention->setInhibitionStrength(pImpl->attention->getInhibitionStrength() * attentionMod);
+            pImpl->attention->setExcitationStrength(pImpl->attention->getExcitationStrength() * attentionMod);
+        }
     }
+    
+    // Update other neuromodulators (with stubs for now)
+    if (pImpl->curiosity) {
+        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, 
+                                pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
+    }
+    
+    if (pImpl->novelty) {
+        pImpl->novelty->update(pImpl->timestep);
+    }
+    
+    // Serotonin, Norepinephrine, Acetylcholine would be implemented here
+    // For now, they're stubs that can be expanded later
     
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
     // Calculate neuromodulation factor for plasticity
@@ -544,36 +580,118 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6b: Homeostatic synaptic scaling (Phase 4) ==========
-    // Every 100 steps, cap each neuron's total incoming excitatory
-    // weight. STDP/Hebbian with soft bounds stop individual weights
-    // saturating, but they do not stop the *sum* of ~25 incoming
-    // weights growing until every neuron is driven over threshold on
-    // every refractory cycle — the periodic attractor of Phase 3.
-    // Rescaling only when the sum exceeds the cap, and scaling all
-    // incoming excitatory weights by the same factor, preserves the
-    // *relative* pattern of strengths (selectivity) while bounding
-    // total drive. Inhibitory weights are left untouched, so scaling
-    // also moves the E/I balance toward inhibition rather than away.
-    // Cap 3.0: with ~5 co-active presynaptic neurons per step, total
-    // drive is then at most ~5 * (3.0/25) * 10 = 6 mV per step before
-    // leak — below the ~15 mV spike gap, so a neuron must integrate
-    // over several steps to fire instead of firing every cycle.
-    if (currentStep > 0 && currentStep % 100 == 0) {
-        constexpr float kIncomingExcitatoryCap = 3.0f;
-        for (auto& region : pImpl->regions) {
-            for (auto* neuron : region->getAllNeurons()) {
-                auto incoming = region->getSynapsesTo(neuron->getId());
-                float sum = 0.0f;
-                for (Synapse* syn : incoming) {
-                    if (syn->getWeight() > 0.0f) sum += syn->getWeight();
-                }
-                if (sum > kIncomingExcitatoryCap) {
-                    float scale = kIncomingExcitatoryCap / sum;
-                    for (Synapse* syn : incoming) {
-                        if (syn->getWeight() > 0.0f) {
-                            syn->setWeight(syn->getWeight() * scale);
+    // ========== STEP 6b: Enhanced homeostatic synaptic scaling ==========
+    // Instead of periodic global scaling, implement gradual, activity-dependent
+    // homeostatic regulation that preserves selectivity while preventing runaway excitation
+    
+    // Track neuron activity for adaptive regulation
+    for (auto& region : pImpl->regions) {
+        for (auto* neuron : region->getAllNeurons()) {
+            // Get neuron statistics
+            size_t totalSpikes = neuron->getTotalSpikeCount();
+            float firingRate = neuron->getFiringRate();
+            
+            // Activity-dependent homeostatic regulation
+            if (totalSpikes > 0) {
+                // For high-firing neurons, gradually reduce overall excitability
+                // but preserve relative pattern of weights
+                float activityLevel = std::min(2.0f, firingRate / 50.0f);  // 50 Hz baseline
+                
+                if (activityLevel > 1.2f) {  // Neuron is firing too much
+                    // Reduce overall weight contribution, but preserve selectivity
+                    float reductionFactor = std::max(0.8f, 1.0f / activityLevel);
+                    
+                    auto incoming = region->getSynapsesTo(neuron->getId());
+                    if (!incoming.empty()) {
+                        // Find the strongest and weakest weights to calculate ratio
+                        float maxWeight = 0.0f, minWeight = 1000.0f;
+                        for (Synapse* syn : incoming) {
+                            if (syn->getWeight() > maxWeight) maxWeight = syn->getWeight();
+                            if (syn->getWeight() < minWeight) minWeight = syn->getWeight();
                         }
+                        
+                        // Apply gentle reduction that preserves selectivity
+                        // Stronger synapses are reduced less to maintain selectivity
+                        for (Synapse* syn : incoming) {
+                            if (syn->getWeight() > 0.0f) {
+                                float weightRatio = syn->getWeight() / maxWeight;
+                                // Preserve strong connections, reduce weak ones gradually
+                                float newWeight = syn->getWeight() * (reductionFactor * 0.7f + weightRatio * 0.3f);
+                                syn->setWeight(newWeight);
+                            }
+                        }
+                    }
+                }
+                
+                // For low-firing neurons, allow weight growth to strengthen important connections
+                else if (activityLevel < 0.5f && totalSpikes > 10) {  // Has some activity but low rate
+                    // Selectively strengthen synapses that are already strong
+                    auto incoming = region->getSynapsesTo(neuron->getId());
+                    if (!incoming.empty()) {
+                        // Find the strongest synapse
+                        Synapse* strongest = nullptr;
+                        for (Synapse* syn : incoming) {
+                            if (syn->getWeight() > 0.0f && 
+                                (!strongest || syn->getWeight() > strongest->getWeight())) {
+                                strongest = syn;
+                            }
+                        }
+                        
+                        if (strongest) {
+                            // Strengthen the strongest connection slightly
+                            // This reinforces successful connectivity
+                            float newWeight = strongest->getWeight() * 1.02f;
+                            strongest->setWeight(newWeight);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Apply a background homeostatic pressure that affects all synapses gradually
+    // This prevents runaway growth over very long time scales
+    if (currentStep > 0 && currentStep % 500 == 0) {
+        constexpr float kBackgroundDecay = 0.995f;  // Gentle decay every 500 steps
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& syn : region->getSynapses()) {
+                if (syn->getWeight() > 0.0f) {
+                    // Gentle decay that preserves relative strength
+                    float newWeight = syn->getWeight() * kBackgroundDecay;
+                    syn->setWeight(newWeight);
+                }
+            }
+        }
+    }
+    
+    // Apply neuromodulation-enhanced homeostatic regulation
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        
+        if (dopamineLevel > 0.5f) {  // High reward environment
+            // In rewarding environments, preserve learned weights better
+            // Reduce background decay effect
+            constexpr float kRewardDecay = 0.998f;  // Slower decay with reward
+            
+            for (auto& region : pImpl->regions) {
+                for (auto& syn : region->getSynapses()) {
+                    if (syn->getWeight() > 0.0f) {
+                        float newWeight = syn->getWeight() * kRewardDecay;
+                        syn->setWeight(newWeight);
+                    }
+                }
+            }
+        } else if (dopamineLevel < -0.5f) {  // Punishing environment
+            // In punishing environments, reset weights to allow new learning
+            // This prevents maladaptive persistence
+            for (auto& region : pImpl->regions) {
+                for (auto& syn : region->getSynapses()) {
+                    if (syn->getWeight() > 0.0f) {
+                        // Reset to a safe baseline but preserve direction
+                        float resetWeight = 0.1f;  // Lower baseline for exploration
+                        if (syn->getWeight() > 0.5f) resetWeight = 0.3f;  // Still some strength
+                        syn->setWeight(resetWeight);
                     }
                 }
             }
@@ -581,41 +699,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
 
     // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
-        pImpl->stepsSinceLastEpisode = 0;
-        
-        if (pImpl->episodicMemory) {
-            // Capture current brain state as an episode
-            EpisodicMemoryItem episode;
-            episode.timestamp = currentStep;
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            // Store active neurons
-            for (auto& region : pImpl->regions) {
-                for (auto& pop : region->getPopulations()) {
-                    for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
-                            episode.activeNeurons.push_back(neuron->getId());
-                            episode.neuronActivations.push_back(
-                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
-                        }
-                    }
-                }
-            }
-            
-            // Store reward in episode
-            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
-            
-            pImpl->episodicMemory->storeEpisode(episode);
+    // Episodic memory is now primarily updated in receiveSensoryInput()
+    // to capture sensory-based experiences, and the stepsSinceLastEpisode
+    // counter is updated there to ensure proper timing.
+    // This provides more comprehensive episodic storage that includes
+    // both sensory inputs and neural states.
+    
+    // Note: If additional episodic memory updates based on internal neural
+    // activity are needed, they can be added here in the future.
+    if (pImpl->episodicMemory) {
+        // Get recent episodes to ensure the system is actively storing experiences
+        size_t recentEpisodeCount = pImpl->episodicMemory->getEpisodeCount();
+        if (recentEpisodeCount == 0) {
+            NLM_LOG_WARNING("Episodic memory exists but has no episodes - this may indicate storage issues");
         }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory observations
+        // This requires getting sensory input from the environment
+        // For now, we'll add this functionality in the integration work
+        // pImpl->predictionSystem->update(pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,8 +736,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation processes patterns from multiple sources for comprehensive learning
+        std::vector<float> conceptPattern;
+        
+        // Source 1: Attention winners (most relevant current information)
+        if (pImpl->attention) {
+            std::vector<NeuronId> attendedNeurons = pImpl->attention->getWinners();
+            for (NeuronId neuron : attendedNeurons) {
+                // Convert neuron ID to activation level
+                float activation = pImpl->attention->getExcitationFor(neuron);
+                if (activation > 0.1f) {
+                    conceptPattern.push_back(activation);
+                }
+            }
+        }
+        
+        // Source 2: Working memory content
+        if (pImpl->workingMemory) {
+            std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId neuron : memoryNeurons) {
+                float activation = pImpl->workingMemory->getNeuronActivation(neuron);
+                if (activation > 0.1f) {
+                    // Add to pattern if not already included
+                    bool alreadyAdded = false;
+                    for (float existingAct : conceptPattern) {
+                        if (std::abs(existingAct - activation) < 0.01f) {
+                            alreadyAdded = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyAdded) {
+                        conceptPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        // Only process if we have meaningful patterns
+        if (!conceptPattern.empty()) {
+            // Get current reward for concept formation
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present pattern to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(conceptPattern, conceptPattern, reward, currentStep);
+            if (conceptId > 0) {
+                NLM_LOG_INFO("ConceptFormation: Integrated multi-source pattern into concept " + std::to_string(conceptId));
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -701,7 +851,11 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
-    // Distribute input across sensory neurons
+    // Store the complete sensory pattern in working memory for concept formation
+    std::vector<float> sensoryPattern;
+    sensoryPattern.reserve(numSensory);
+    
+    // Distribute input across sensory neurons and store pattern
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
         float normalizedValue = 0.0f;
@@ -712,9 +866,58 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
+        // Store normalized value in pattern
+        sensoryPattern.push_back(normalizedValue / 10.0f);
+        
+        // Also store in working memory (all sensory input, not just high values)
+        if (pImpl->workingMemory) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        }
+    }
+    
+    // Present sensory pattern to concept formation system for learning
+    if (pImpl->conceptFormation && !sensoryPattern.empty()) {
+        // Use the actual sensory pattern for concept formation
+        // This allows concepts to form based on real sensory experiences
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        size_t conceptId = pImpl->conceptFormation->presentExperience(sensoryPattern, sensoryPattern, reward, currentStep);
+        
+        if (conceptId > 0) {
+            NLM_LOG_INFO("ConceptFormation: Integrated sensory pattern into concept " + std::to_string(conceptId));
+        }
+    }
+    
+    // Update episodic memory with the complete sensory experience
+    if (pImpl->episodicMemory && !sensoryPattern.empty()) {
+        pImpl->stepsSinceLastEpisode++;
+        if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+            pImpl->stepsSinceLastEpisode = 0;
+            
+            EpisodicMemoryItem episode;
+            episode.timestamp = currentStep;
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store the complete sensory pattern
+            episode.sensoryState = sensoryPattern;
+            
+            // Store current neural activity as part of the episode
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            episode.activeNeurons.push_back(neuron->getId());
+                            episode.neuronActivations.push_back(
+                                std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                        }
+                    }
+                }
+            }
+            
+            // Store reward in episode
+            episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            pImpl->episodicMemory->storeEpisode(episode);
         }
     }
 }
