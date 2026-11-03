@@ -217,7 +217,8 @@ void Synapse::step(Timestamp currentTime) {
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
-    // 3. Update efficacy based on use
+    // 3. Decay long-term weight (homeostatic)
+    // 4. Update efficacy based on use
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
@@ -239,6 +240,15 @@ void Synapse::step(Timestamp currentTime) {
     
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
+    
+    // Homeostatic weight decay: slowly decay weights toward 0 (neutral)
+    // This prevents runaway growth when STDP/Hebbian keep strengthening
+    const float HOMEOSTATIC_DECAY_RATE = 0.0001f;  // 0.01% per timestep
+    if (pImpl->weight > 0.0f) {
+        pImpl->weight -= HOMEOSTATIC_DECAY_RATE;
+    } else if (pImpl->weight < 0.0f) {
+        pImpl->weight += HOMEOSTATIC_DECAY_RATE;
+    }
     
     // Clamp weight bounds
     pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);

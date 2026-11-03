@@ -327,15 +327,51 @@ bool Brain::initialize() {
     });
     }  // spikeHandlersRegistered
     
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    // Initialize checkpoint providers
+    pImpl->checkpointManager->setNeuronProvider([this](NeuronCheckpointData& data) {
+        data = NeuronCheckpointData();
+        data.membranePotential.reserve(getTotalNeuronCount());
+        data.restingPotential.reserve(getTotalNeuronCount());
+        data.threshold.reserve(getTotalNeuronCount());
+        data.resetPotential.reserve(getTotalNeuronCount());
+        data.leakConductance.reserve(getTotalNeuronCount());
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    data.membranePotential.push_back(state.membranePotential);
+                    data.restingPotential.push_back(state.restingPotential);
+                    data.threshold.push_back(state.threshold);
+                    data.resetPotential.push_back(state.resetPotential);
+                    data.leakConductance.push_back(state.leakConductance);
+                    data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                    data.refractoryRemaining.push_back(state.refractoryRemaining);
+                    data.refractoryPeriod.push_back(state.refractoryPeriod);
+                    data.lastSpikeTime.push_back(state.lastSpikeTime);
+                    data.firingRate.push_back(state.firingRate);
+                }
+            }
+        }
+        return !data.membranePotential.empty();
+    });
     
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    pImpl->checkpointManager->setSynapseProvider([this](SynapseCheckpointData& data) {
+        data = SynapseCheckpointData();
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                data.weight.push_back(syn->getWeight());
+                data.delay.push_back(syn->getDelay());
+                data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                data.efficacy.push_back(syn->getEfficacy());
+            }
+        }
+        return !data.weight.empty();
+    });
     
     return true;
 }
@@ -489,17 +525,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->dopamine->update(pImpl->timestep);
         
         // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
+        // Dopamine modulates neural excitability by adjusting thresholds and leak conductances,
+        // NOT by injecting current to all neurons (which was causing universal excitation)
         float dopamineLevel = pImpl->dopamine->getLevel();
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
-                    float excitabilityMod = dopamineLevel * 0.5f;
-                    if (excitabilityMod > 0.0f) {
-                        neuron->injectCurrent(excitabilityMod);
+                    // Dopamine modulates excitability by adjusting neural thresholds
+                    // Higher dopamine lowers the threshold for firing (increases excitability)
+                    // but does NOT inject direct current to all neurons
+                    if (dopamineLevel > 0.0f) {
+                        // Scale threshold adjustment based on dopamine level
+                        // Dopamine reduces the effective threshold, making neurons easier to fire
+                        // Use a moderate effect to avoid runaway excitation
+                        float thresholdReduction = dopamineLevel * 0.5f;
+                        MembranePotential currentThreshold = neuron->getThreshold();
+                        // Ensure threshold doesn't drop below absolute minimum
+                        float newThreshold = std::max(-20.0f, currentThreshold - thresholdReduction);
+                        neuron->setThreshold(newThreshold);
                     }
                 }
             }
@@ -934,7 +977,7 @@ bool Brain::save(const std::string& filepath) const {
     try {
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath + " - file may be locked or path invalid");
             return false;
         }
         
@@ -974,7 +1017,8 @@ bool Brain::save(const std::string& filepath) const {
         }
         
         if (!writer.writeNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+            NLM_LOG_ERROR("Failed to write neurons to checkpoint: " + std::to_string(neuronData.membranePotential.size()) + " neurons, header expects " + std::to_string(writer.getHeader().neuronCount) + " neurons");
+            writer.abort();
             return false;
         }
         
@@ -993,7 +1037,8 @@ bool Brain::save(const std::string& filepath) const {
         }
         
         if (!writer.writeSynapses(synapseData)) {
-            NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            NLM_LOG_ERROR("Failed to write synapses to checkpoint: " + std::to_string(synapseData.weight.size()) + " synapses, header expects " + std::to_string(writer.getHeader().synapseCount) + " synapses");
+            writer.abort();
             return false;
         }
 
@@ -1003,7 +1048,8 @@ bool Brain::save(const std::string& filepath) const {
         if (pImpl->spikeSystem) {
             auto pending = pImpl->spikeSystem->getPendingDelayedSpikes();
             if (!writer.writeDelayedSpikes(pending)) {
-                NLM_LOG_ERROR("Failed to write pending spikes to checkpoint");
+                NLM_LOG_ERROR("Failed to write pending spikes to checkpoint: " + std::to_string(pending.size()) + " pending spikes");
+                writer.abort();
                 return false;
             }
         }
@@ -1085,7 +1131,8 @@ bool Brain::save(const std::string& filepath) const {
         
         // Finalize
         if (!writer.finalize()) {
-            NLM_LOG_ERROR("Failed to finalize checkpoint");
+            NLM_LOG_ERROR("Failed to finalize checkpoint - file may be incomplete or corrupted");
+            writer.abort();
             return false;
         }
         
