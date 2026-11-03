@@ -93,19 +93,19 @@ make -j4
 
 ## Running
 Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+now unified with the enhanced Phase 6 integration:
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
+./nlm                 # Enhanced Phase 6 integration demo (unified brain demo)
 ./nlm_phase3_demo
 ./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
+./nlm_phase5_demo     # New Phase 5 demo (checkpoint round-trip, personality)
+./nlm_phase6_demo      # Enhanced Phase 6 integration test (advanced features)
 ./nlm_benchmark
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+`nlm` now serves as the main Phase 6 integration demonstration with all systems integrated.
+`nlm_phase6_demo` provides advanced features for power users including performance profiling, memory tracking, neural activity analysis, and export capabilities.
 
 ## Project Structure
 
@@ -181,14 +181,19 @@ NLM/
 - Checkpoint system
 
 ### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+- **All systems integrated into coherent brain loop**
+- **Memory systems connected to neural processing**
+- **Neuromodulation affects plasticity and dynamics**
+- **Prediction integrated with learning**
+- **Development affects plasticity rates**
+- **Checkpoint save/load working**
+- **Replay and consolidation functional**
+- **Phase 6 integration experiment created**
+- **Enhanced with advanced features for power users**
+- **Improved reward system and neuromodulation**
+- **Better command-line interface with comprehensive options**
+- **Phase 2 demo refactored to be Phase 6 integration demo**
+- **Code organization and documentation improved**
 
 ## Scientific Limitations
 

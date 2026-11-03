@@ -80,17 +80,45 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Apply action to world
         ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
         
-        // Compute reward
+        // Compute reward with prediction error-based neuromodulation
         float reward = actionResult.reward;
-        totalReward += reward;
         
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        // Calculate prediction error for reward modulation
+        float predictionError = reward - agent.getExpectedReward();
         
-        // Update development
+        // Apply reward modulation with prediction error
+        agent.applyRewardModulation(reward, agent.getExpectedReward());
+        
+        // Update agent's expected reward (exponential moving average)
+        agent.setExpectedReward(0.95f * agent.getExpectedReward() + 0.05f * reward);
+        
+        // Apply novelty and curiosity modulation based on prediction error
         if (config.enableDevelopment) {
-            agent.updateDevelopment(0.001);
+            float noveltyLevel = agent.getNoveltyLevel();
+            float curiosityLevel = agent.getCuriosityLevel();
+            
+            // Novelty-based exploration bonus
+            if (std::abs(predictionError) > 0.5f) {
+                reward += noveltyLevel * predictionError * 0.1f;
+            }
+            
+            // Curiosity-driven exploration based on prediction error
+            if (curiosityLevel > 0.5f && std::abs(predictionError) > 0.1f) {
+                reward += curiosityLevel * predictionError * 0.05f;
+            }
         }
+        
+        // Apply dopaminergic modulation based on prediction error
+        agent.setDopamineLevel(std::clamp(predictionError, -1.0f, 1.0f));
+        
+        // Apply plasticity modulation based on combined neuromodulation
+        float plasticityFactor = 0.5f + 0.5f * agent.getDopamineLevel();
+        plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+        
+        // Update agent's plasticity modifier
+        agent.setPlasticityModifier(plasticityFactor);
+        
+        totalReward += reward;
         
         // Collect metrics
         totalFiringRate += brain->getAverageFiringRate();
