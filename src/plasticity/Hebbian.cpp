@@ -53,23 +53,39 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Nearest-neighbour version: the old all-pairs count made delta grow
-    // with history length (up to 100x100 pairs) and saturated every weight
-    // to its bound in one step. One correlated recent pair = one step.
-    // Timestamps are in seconds, so the 100ms window is 0.1s.
+    // Real Hebbian learning: strengthen when pre and post fire together
+    // Use nearest-neighbor approach for computational efficiency
     float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
-    float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
-    if (synapse->getType() == SynapseType::Inhibitory) {
-        delta = -delta;  // strengthen inhibition, don't flip it to excitatory
-    }
     
-    // Apply with bounds. Soft bound, Phase 4 (see STDP.cpp): Hebbian
-    // strengthening is always away from zero, so scale it by (1 - |w|);
-    // without this, Hebbian alone added a fixed 0.01 per co-active step
-    // and saturated every weight together with STDP.
+    // Hebbian rule: if pre fires shortly before post, potentiate
+    // The time window is 100ms as in the original implementation
+    float delta = 0.0f;
+    if (std::abs(dtSeconds) < 0.1f) {
+        // Positive correlation: strengthen synapse
+        delta = pImpl->learningRate;
+        if (synapse->getType() == SynapseType::Inhibitory) {
+            // For inhibitory synapses, strengthening means making them more negative
+            delta = -delta;
+        }
+    }
+    // If dtSeconds > 0.1f (post fired long after pre) or dtSeconds < -0.1f (post fired before pre),
+    // no Hebbian effect
+    
+    // Apply with soft bounds to prevent runaway potentiation
     if (std::abs(delta) > 1e-6f) {
-        delta *= (1.0f - std::abs(synapse->getWeight()));
+        // Weight-dependent scaling: potentiation (away from zero) scales by (1 - |w|)
+        // Depression (toward zero) scales by |w|
+        // This prevents all synapses from saturating together
+        {
+            float w = synapse->getWeight();
+            bool awayFromZero = std::abs(w + delta) > std::abs(w);
+            delta *= awayFromZero ? (1.0f - std::abs(w)) : std::abs(w);
+        }
+        
+        // Apply weight change
         applyWeightChange(synapse, delta);
+        
+        // Enforce sign: excitatory stays >= 0.01, inhibitory stays <= -0.01
         if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
             synapse->setWeight(-0.01f);
         } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
