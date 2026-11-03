@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Updated to include new framework tests
 
 #include <iostream>
 #include <cassert>
@@ -37,12 +38,21 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_new_framework {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
-    std::cout << "Testing Real Neural Computation:" << std::endl;
+    std::cout << "=== NLM Tests ===" << std::endl;
+    std::cout << "Testing Neural Learning Machine Components:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Demo Framework (new)" << std::endl;
+    std::cout << "  - Error Handling (new)" << std::endl;
+    std::cout << "  - Smart Pointers (new)" << std::endl;
+    std::cout << "  - Advanced Tools (new)" << std::endl;
+    std::cout << "  - Visualization & Config (new)" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -119,6 +129,15 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running New Framework Integration tests..." << std::endl;
+    try {
+        test_new_framework::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << std::endl;
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
@@ -128,3 +147,4 @@ int main() {
         return 1;
     }
 }
+
