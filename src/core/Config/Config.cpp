@@ -24,8 +24,13 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
+        NLMError::logError(NLMError::ErrorCode::FILE_NOT_FOUND, 
+                          "loadFromFile", "Could not open configuration file: " + filepath);
         return false;
     }
+    
+    NLM_LOG_INFO("Loading configuration from: " + filepath);
     
     std::string line;
     while (std::getline(file, line)) {
@@ -56,6 +61,12 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    CHECK_CONDITION(argc > 0 && argv != nullptr, 
+                   NLMError::ErrorCode::INVALID_PARAMETER,
+                   "Invalid command line arguments for configuration loading");
+    
+    NLM_LOG_INFO("Loading configuration from command line arguments");
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -66,6 +77,8 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARNING("Malformed command line argument: " + arg);
             }
         }
         // Handle -key value format
@@ -73,6 +86,8 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+        } else {
+            NLM_LOG_WARNING("Unrecognized command line argument format: " + arg);
         }
     }
     return true;
@@ -81,25 +96,46 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
+        NLMError::logError(NLMError::ErrorCode::FILE_NOT_FOUND,
+                          "saveToFile", "Could not open configuration file for writing: " + filepath);
         return false;
     }
+    
+    NLM_LOG_INFO("Saving configuration to: " + filepath);
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
     }
     
+    if (!file.good()) {
+        NLM_LOG_ERROR("Failed to write configuration to file: " + filepath);
+        return false;
+    }
+    
     return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    NLM_LOG_DEBUG("Setting configuration key: " + key + " = [value]");
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
+        std::string oldSourceStr;
+        switch (it->source) {
+            case ConfigSource::Default: oldSourceStr = "Default"; break;
+            case ConfigSource::File: oldSourceStr = "File"; break;
+            case ConfigSource::CommandLine: oldSourceStr = "CommandLine"; break;
+            case ConfigSource::Runtime: oldSourceStr = "Runtime"; break;
+        }
+        NLM_LOG_INFO("Updating existing config key: " + key + " (previous source: " + oldSourceStr + ")");
         it->value = value;
         it->source = source;
     } else {
+        NLM_LOG_INFO("Adding new config key: " + key);
         pImpl->entries.emplace_back(key, value, source);
     }
 }

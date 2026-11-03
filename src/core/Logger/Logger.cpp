@@ -40,6 +40,13 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::string output = oss.str();
     
+    // Log error to error handling system for critical and error level messages
+    if (entry.level >= LogLevel::Error) {
+        NLMError::logError(NLMError::ErrorCode::UNKNOWN_ERROR, 
+                         "Log message: " + entry.message,
+                         "Source: " + entry.file + ":" + std::to_string(entry.line));
+    }
+    
     // Console output
     if (pImpl->useColors) {
         std::cout << levelToColor(entry.level) << output << "\033[0m\n";
@@ -147,6 +154,10 @@ void Logger::log(LogLevel level, const std::string& message,
 }
 
 void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
+    // Check if debug logging is enabled
+    if (!isEnabled(LogLevel::Debug)) {
+        return;
+    }
     log(LogLevel::Debug, message, file, line, function);
 }
 

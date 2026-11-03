@@ -6,6 +6,7 @@
 #include <functional>
 #include <vector>
 #include <chrono>
+#include "../error_handling_improvements.hpp"
 
 namespace nlm {
 

@@ -97,6 +97,12 @@ pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
+# Ensure proper module name for Python
+add_custom_command(TARGET pynlm POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/nlm.py
+    COMMENT "Creating pynlm Python module wrapper"
+)
+
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
 endif()
@@ -105,4 +111,9 @@ install(TARGETS pynlm
     LIBRARY DESTINATION pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
+)
+
+# Create a proper Python package structure
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py
+    DESTINATION pynlm
 )

@@ -198,7 +198,16 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     pybind11_add_module(pynlm python/bindings.cpp)
     target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
     target_include_directories(pynlm PRIVATE src)
-    install(TARGETS pynlm LIBRARY DESTINATION .)
+    # Fix: Install Python module correctly to site-packages
+    install(TARGETS pynlm
+        LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages
+        RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages
+    )
+    # Create __init__.py if it doesn't exist
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/python/__init__.py")
+        file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/python/__init__.py" "# NLM Python module\nfrom .pynlm import *\n")
+    endif()
 endif()
 
 # Testing
