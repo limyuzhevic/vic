@@ -12,15 +12,11 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
----
-
 ## The 3 Things You Need to Know
 
 1. **Brain** - The virtual brain that thinks
 2. **World** - The environment the brain lives in
 3. **Agent** - The bridge connecting brain to world
-
----
 
 ## Quick Start (Copy & Paste)
 
@@ -71,7 +67,111 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
----
+### NEW Example 3: Advanced Configuration with Pythonic API
+
+```python
+import pynlm
+
+# Create a brain with custom configuration using the new convenient API
+brain = pynlm.createBrainWith(
+    neuron_count=2000,
+    region_count=3,
+    connection_probability=0.15,
+    random_seed=42
+)
+
+# Use context manager for automatic cleanup
+with brain as brain_context:
+    # Initialize the brain
+    brain_context.initialize()
+    
+    # Run simulation with diagnostic output
+    for step in range(500):
+        brain_context.step(step)
+        
+        # Print status every 100 steps
+        if step % 100 == 0:
+            status = brain_context.diagnoseBrainState()
+            print(f"Step {step}:")
+            print(status)
+
+print("Advanced simulation completed!")
+```
+
+### NEW Example 4: Complete Agent System with World
+
+```python
+import pynlm
+
+# Create a complete agent system using the new convenience function
+brain, world, agent = pynlm.createSimpleAgentBrain(
+    neuron_count=1500,
+    region_count=2,
+    random_seed=123
+)
+
+# Run a complete simulation
+reward = pynlm.runSimulation(brain, world, agent, steps=1000, verbose=True)
+
+print(f"Simulation completed with total reward: {reward}")
+print(f"Final stats: {brain.getTotalSpikeCount()} spikes, {brain.getFiringNeuronCount()} firing neurons")
+```
+
+### NEW Example 5: Statistical Analysis
+
+```python
+import pynlm
+
+# Create brain with configuration
+brain = pynlm.createBrainWith(neuron_count=1000)
+brain.initialize()
+
+# Run simulation and analyze statistics
+stats = pynlm.analyzeBrainStatistics(brain, steps=200, timestep=0.001)
+
+(mean_firing, max_firing, min_firing,
+ mean_spikes, max_spikes, firing_rates, spike_counts) = stats
+
+print(f"Firing Rate Statistics:")
+print(f"  Mean: {mean_firing:.2f} Hz, Max: {max_firing:.2f} Hz, Min: {min_firing:.2f} Hz")
+print(f"Spike Count Statistics:")
+print(f"  Mean: {mean_spikes:.0f}, Max: {max_spikes:.0f}")
+
+# Check if firing rates are within expected ranges
+if mean_firing < 10:
+    print("Note: Brain activity is quite low - consider increasing input")
+elif mean_firing > 100:
+    print("Note: Brain activity is quite high - consider reducing input")
+```
+
+### NEW Example 6: Checkpoint System
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrainWith(neuron_count=500, random_seed=99)
+brain.initialize()
+
+# Run some steps then checkpoint
+for step in range(100):
+    brain.step(step)
+
+# Save checkpoint
+checkpoint_file = "brain_checkpoint.bin"
+brain.save(checkpoint_file)
+print(f"Checkpoint saved to {checkpoint_file}")
+
+# Load checkpoint (should restore previous state)
+brain2 = pynlm.createBrainWith(neuron_count=500, random_seed=99)  # Different seed but same config
+brain2.initialize()
+brain2.load(checkpoint_file)
+print("Checkpoint loaded successfully")
+
+# Verify checkpoint worked
+brain2.save(checkpoint_file + "_2")
+print("Checkpoint verification completed")
+```
 
 ## Simple Analogy
 
@@ -82,8 +182,6 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 | You decide to act | `action = agent.decodeMotorCommand()` |
 | You do the action | `world.applyMotorCommand(action, time)` |
 | Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
 
 ## The Simplest Possible Example
 
@@ -101,8 +199,6 @@ brain.step(0)
 
 print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 ```
-
----
 
 ## Common Patterns
 
@@ -153,8 +249,6 @@ agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
 ```
 
----
-
 ## What Each Part Does
 
 ### `pynlm.createBrain(config)`
@@ -178,8 +272,6 @@ Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
-
----
 
 ## Mini Projects
 
@@ -254,8 +346,6 @@ for step in range(100):
 print("Agent simulation complete!")
 ```
 
----
-
 ## Quick Reference
 
 | What you want | Code |
@@ -268,8 +358,6 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
-
----
 
 ## Troubleshooting
 
@@ -285,8 +373,6 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
----
-
 ## Next Steps
 
 When you're comfortable:
@@ -294,4 +380,4 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with the improved Python API.

@@ -170,6 +170,121 @@ PYBIND11_MODULE(pynlm, m) {
             return "<Config: " + cfg.summary() + ">";
         });
 
+    // Convenience methods for easier configuration
+    m.def("createDefaultConfigWith", [](py::kwargs kwargs) {
+        auto config = std::make_shared<Config>();
+        // Apply common Python-friendly configuration settings
+        if (kwargs.contains("neuron_count")) {
+            config->set("neuron_count", static_cast<int64_t>(kwargs["neuron_count"].cast<int64_t>()), ConfigSource::Runtime);
+        }
+        if (kwargs.contains("region_count")) {
+            config->set("region_count", static_cast<int64_t>(kwargs["region_count"].cast<int64_t>()), ConfigSource::Runtime);
+        }
+        if (kwargs.contains("connection_probability")) {
+            config->set("connection_probability", kwargs["connection_probability"].cast<float>(), ConfigSource::Runtime);
+        }
+        if (kwargs.contains("random_seed")) {
+            config->set("random_seed", static_cast<int64_t>(kwargs["random_seed"].cast<int64_t>()), ConfigSource::Runtime);
+        }
+        return config;
+    }, py::kwds(), "Create a default configuration with optional parameters");
+
+    // Simplified brain creation with common parameters
+    m.def("createBrainWith", [](py::kwargs kwargs) {
+        auto config = std::make_shared<Config>();
+        // Apply common Python-friendly configuration settings
+        if (kwargs.contains("neuron_count")) {
+            config->set("neuron_count", static_cast<int64_t>(kwargs["neuron_count"].cast<int64_t>()), ConfigSource::Runtime);
+        }
+        if (kwargs.contains("region_count")) {
+            config->set("region_count", static_cast<int64_t>(kwargs["region_count"].cast<int64_t>()), ConfigSource::Runtime);
+        }
+        if (kwargs.contains("connection_probability")) {
+            config->set("connection_probability", kwargs["connection_probability"].cast<float>(), ConfigSource::Runtime);
+        }
+        if (kwargs.contains("random_seed")) {
+            config->set("random_seed", static_cast<int64_t>(kwargs["random_seed"].cast<int64_t>()), ConfigSource::Runtime);
+        }
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        return brain;
+    }, py::kwds(), "Create and initialize a brain with optional configuration parameters");
+
+    // Context manager for automatic cleanup
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "BrainContext")
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def("__enter__", [](std::shared_ptr<Brain> self) -> std::shared_ptr<Brain> {
+            return self;
+        })
+        .def("__exit__", [](std::shared_ptr<Brain> self, PyExcType exc_type, PyExcValue exc_value, PyExcTrace exc_trace) {
+            // Automatic cleanup on exit
+            self->reset();
+        })
+        .def("initialize", &Brain::initialize,
+             "Initialize the brain with configuration")
+        .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
+             py::arg("currentStep"),
+             "Perform a simulation step")
+        .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
+             py::arg("currentStep"), py::arg("currentTime"),
+             "Perform a simulation step with timestamp")
+        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
+             py::arg("input"),
+             "Inject sensory input into the brain")
+        .def("injectCurrent", &Brain::injectCurrent,
+             py::arg("neuron"), py::arg("current"),
+             "Inject current into a specific neuron")
+        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
+             py::arg("type"), py::arg("current"),
+             "Inject current into all neurons of a specific type")
+        .def("produceAction", &Brain::produceAction,
+             "Produce motor action based on neural activity")
+        .def("reset", &Brain::reset,
+             "Reset brain state")
+        .def("save", &Brain::save, py::arg("filepath"),
+             "Save brain state to file")
+        .def("load", &Brain::load, py::arg("filepath"),
+             "Load brain state from file")
+        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
+             "Add a new neural region")
+        .def("getRegion", static_cast<NeuralRegion* (Brain::*)(RegionId)>(&Brain::getRegion),
+             py::arg("id"),
+             py::return_value_policy::reference_internal,
+             "Get a region by ID")
+        .def("getRegionCount", &Brain::getRegionCount,
+             "Get the number of regions")
+        .def("getRegionIds", &Brain::getRegionIds,
+             "Get all region IDs")
+        .def("getRegions", &Brain::getRegions,
+             py::return_value_policy::reference_internal,
+             "Get all regions")
+        .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
+             "Get total neuron count across all regions")
+        .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
+             "Get total synapse count across all regions")
+        .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
+             "Get count of active neurons")
+        .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def("getAverageFiringRate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
+             py::arg("stage"),
+             "Set developmental stage")
+        .def("getConfig", &Brain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get the configuration")
+        .def("logStatus", &Brain::logStatus,
+             "Log brain status");
+
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
         .def("getData", &SensoryInput::getData, "Get the raw data as a vector")
@@ -424,10 +539,157 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Advanced convenience methods
+    m.def("createSimpleAgentBrain", [](py::kwargs kwargs) {
+        auto config = std::make_shared<Config>();
+        if (kwargs.contains("neuron_count")) {
+            config->set("neuron_count", static_cast<int64_t>(kwargs["neuron_count"].cast<int64_t>()), ConfigSource::Runtime);
+        }
+        if (kwargs.contains("random_seed")) {
+            config->set("random_seed", static_cast<int64_t>(kwargs["random_seed"].cast<int64_t>()), ConfigSource::Runtime);
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(100, 100, 8, 8);
+        world->reset();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Enable common features
+        agent->enableRewardModulation(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::kwds(), "Create a complete agent brain system with world and agent interface");
+
+    // Simulation convenience methods
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, 
+                           int steps, bool verbose = false) {
+        double totalReward = 0.0;
+        int stepCount = 0;
+        
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (verbose && step % 100 == 0) {
+                std::cout << "Step " << step << ": " 
+                         << "Reward: " << totalReward << ", "
+                         << "Firing: " << brain->getFiringNeuronCount() << ", "
+                         << "E/I Ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+            }
+        }
+        
+        return totalReward;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"), py::arg("verbose") = false,
+       "Run a complete simulation with brain, world, and agent");
+
+    // Diagnostic and monitoring
+    m.def("diagnoseBrainState", [](std::shared_ptr<Brain> brain) {
+        std::stringstream diag;
+        diag << "=== Brain State Diagnosis ===" << std::endl;
+        diag << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        diag << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        diag << "Firing: " << brain->getFiringNeuronCount() << "/" << brain->getTotalNeuronCount() << std::endl;
+        diag << "Spikes: " << brain->getTotalSpikeCount() << std::endl;
+        diag << "Firing Rate: " << brain->getAverageFiringRate() << " Hz" << std::endl;
+        diag << "E/I Ratio: " << brain->getExcitationInhibitionRatio() << std::endl;
+        diag << "Development Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << std::endl;
+        
+        if (brain->getTotalNeuronCount() > 0) {
+            float activityLevel = static_cast<float>(brain->getFiringNeuronCount()) / brain->getTotalNeuronCount();
+            if (activityLevel < 0.01f) {
+                diag << "WARNING: Very low activity level!" << std::endl;
+            } else if (activityLevel > 0.5f) {
+                diag << "WARNING: High activity level!" << std::endl;
+            }
+            
+            if (brain->getExcitationInhibitionRatio() < 0.1f) {
+                diag << "WARNING: Imbalanced excitation/inhibition!" << std::endl;
+            } else if (brain->getExcitationInhibitionRatio() > 10.0f) {
+                diag << "WARNING: Very imbalanced excitation/inhibition!" << std::endl;
+            }
+        }
+        
+        return diag.str();
+    }, py::arg("brain"), "Get a diagnostic report of brain state");
+
+    // Statistical analysis
+    m.def("analyzeBrainStatistics", [](std::shared_ptr<Brain> brain, int steps, double timestep = 0.001) {
+        std::vector<float> firingRates;
+        std::vector<size_t> spikeCounts;
+        
+        for (int step = 0; step < steps; ++step) {
+            brain->step(step, timestep);
+            firingRates.push_back(brain->getAverageFiringRate());
+            spikeCounts.push_back(brain->getTotalSpikeCount());
+        }
+        
+        // Calculate statistics
+        float meanFiring = std::accumulate(firingRates.begin(), firingRates.end(), 0.0f) / firingRates.size();
+        float maxFiring = *std::max_element(firingRates.begin(), firingRates.end());
+        float minFiring = *std::min_element(firingRates.begin(), firingRates.end());
+        
+        float meanSpikes = std::accumulate(spikeCounts.begin(), spikeCounts.end(), 0.0f) / spikeCounts.size();
+        float maxSpikes = *std::max_element(spikeCounts.begin(), spikeCounts.end());
+        
+        return std::make_tuple(
+            meanFiring, maxFiring, minFiring,
+            meanSpikes, maxSpikes,
+            firingRates, spikeCounts
+        );
+    }, py::arg("brain"), py::arg("steps"), py::arg("timestep") = 0.001,
+       "Analyze brain statistics over time");
+
+    // Checkpoint management
+    m.def("runCheckpointSimulation", [](std::shared_ptr<Brain> brain, const std::string& checkpointFile, 
+                                       int stepsBefore, int stepsAfter) {
+        // Save initial state
+        if (!brain->save(checkpointFile)) {
+            throw std::runtime_error("Failed to save checkpoint");
+        }
+        
+        // Run some steps
+        for (int step = 0; step < stepsBefore; ++step) {
+            brain->step(step);
+        }
+        
+        // Load checkpoint (should restore previous state)
+        if (!brain->load(checkpointFile)) {
+            throw std::runtime_error("Failed to load checkpoint");
+        }
+        
+        // Run more steps
+        for (int step = stepsBefore; step < stepsBefore + stepsAfter; ++step) {
+            brain->step(step);
+        }
+        
+        // Verify checkpoint worked
+        if (!brain->save(checkpointFile + "_2")) {
+            throw std::runtime_error("Failed to save second checkpoint");
+        }
+        
+        auto brain2 = std::make_shared<Brain>(brain->getConfig());
+        brain2->initialize();
+        if (!brain2->load(checkpointFile)) {
+            throw std::runtime_error("Failed to verify checkpoint restore");
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("checkpointFile"), py::arg("stepsBefore"), py::arg("stepsAfter"),
+       "Test checkpoint save/load functionality");
 
 } // namespace nlm

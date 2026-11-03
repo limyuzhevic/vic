@@ -6,6 +6,8 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <functional>
+#include <limits>
 
 namespace nlm {
 
@@ -32,16 +34,36 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+// Configuration range information
+struct ConfigRange {
+    double min = std::numeric_limits<double>::lowest();
+    double max = std::numeric_limits<double>::max();
+    double step = 0.0;  // For numeric values
+    bool inclusive = true;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigRange() = default;
+    ConfigRange(double min, double max) : min(min), max(max) {}
+    ConfigRange(double min, double max, double step) : min(min), max(max), step(step) {}
+    
+    bool isValid(double value) const {
+        return (inclusive ? value >= min && value <= max : value > min && value < max);
+    }
+};
+
+// Configuration schema definition
+struct ConfigSchema {
+    std::string key;
+    std::string type;
+    std::string description;
+    std::string defaultValue;
+    ConfigRange range;
+    std::function<bool(const ConfigValue& value)> validator;
+    bool required;
+    
+    ConfigSchema() : required(false) {}
+    ConfigSchema(const std::string& k, const std::string& t, const std::string& desc, 
+                const std::string& def = "", bool req = false)
+        : key(k), type(t), description(desc), defaultValue(def), required(req) {}
 };
 
 // Main configuration class
@@ -72,28 +94,22 @@ template<typename T>
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
 
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Validation
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime, const std::string& description = "");
+    bool validate(const std::string& key) const;
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Schema management
+    void addSchema(const ConfigSchema& schema);
+    void removeSchema(const std::string& key);
+    std::vector<ConfigSchema> getSchemas() const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Value validation helpers
+    static bool validateValue(const ConfigValue& value, const ConfigRange& range);
+    static bool validateValue(const ConfigValue& value, const std::string& type);
+    static ConfigValue convertToType(const ConfigValue& value, const std::string& targetType);
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration summary with validation status
+    std::string summary(bool includeValidation = true) const;
     
 private:
     struct Impl;

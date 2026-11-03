@@ -11,8 +11,8 @@ struct Neuron::Impl {
     NeuronState state;
     RegionId regionId;
     PopulationId populationId;
-    MembranePotential totalCurrent;  // Total synaptic current input this step
-    MembranePotential synapticInput;  // Accumulated synaptic input
+    MembranePotential totalCurrent;      // Total injected current (external sources)
+    MembranePotential synapticInput;      // Accumulated synaptic input
     std::vector<Timestamp> spikeHistory;
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
@@ -139,12 +139,15 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
 
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
+    pImpl->totalCurrent += current;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    return pImpl->totalCurrent;
 }
 
 void Neuron::clearTotalCurrent() {
-    pImpl->synapticInput = 0.0f;
+    pImpl->totalCurrent = 0.0f;
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
@@ -267,7 +270,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Don't override firingState here - neuron remains in whatever state it was in
     }
     
     // Clear synaptic input for next step
