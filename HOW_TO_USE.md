@@ -286,13 +286,15 @@ brain.receiveSensoryInput(sensory_input)  # Inject sensory data
 action = brain.produceAction()             # Get motor action
 
 # Statistics
-brain.getTotalNeuronCount()       # Total neurons
-brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
-brain.getAverageFiringRate()      # Average firing rate
-brain.getExcitationInhibitionRatio()  # E/I balance
-
-# State
+    brain.getTotalNeuronCount()       # Total neurons
+    brain.getTotalSynapseCount()      # Total synapses
+    brain.getTotalSpikeCount()        # Total spikes
+    brain.getFiringNeuronCount()     # Currently firing
+    brain.getAverageFiringRate()      # Average firing rate
+    brain.getDevelopmentalStage()    # Current developmental stage
+    brain.getExcitationInhibitionRatio()  # E/I balance
+    
+    # State
 brain.save("checkpoint.bin")       # Save state
 brain.load("checkpoint.bin")       # Load state
 

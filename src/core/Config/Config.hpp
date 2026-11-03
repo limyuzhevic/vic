@@ -59,6 +59,15 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON format
+    bool loadFromJSON(const std::string& content);
+    
+    // Load from YAML format
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Load from simple key=value format
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
@@ -95,6 +104,16 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    
+    // Configuration template generation
+    std::string generateConfigTemplate(const std::string& category = "") const;
+    
+    // Configuration export
+    void exportConfigForExport(const std::string& format, const std::string& filename) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +121,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
-};
+    
+    // Simple file format save (for export)
+    void saveToSimpleFormat(const std::string& filepath) const;
+}
 
 } // namespace nlm
