@@ -66,7 +66,7 @@ public:
     // Get object at position (if any)
     WorldObject* getObjectAt(float x, float y);
     
-    // World dimensions
+    // World geometry
     float getWidth() const { return width_; }
     size_t getVisionWidth() const { return visionWidth_; }
     size_t getVisionHeight() const { return visionHeight_; }
@@ -78,7 +78,19 @@ public:
     float getEnergyDecayRate() const { return energyDecayRate_; }
     void setEnergyDecayRate(float r) { energyDecayRate_ = r; }
     
-    // Time
+    // World object counts and configuration
+    size_t getResourceCount() const { return resourceCount_; }
+    size_t getHazardCount() const { return hazardCount_; }
+    void setResourceCount(size_t count) { resourceCount_ = count; }
+    void setHazardCount(size_t count) { hazardCount_ = count; }
+    
+    // World object management
+    void setObjectsConfig(size_t resourceCount, size_t hazardCount) {
+        resourceCount_ = resourceCount;
+        hazardCount_ = hazardCount;
+    }
+    
+    // Get or set simulation time
     double getSimulationTime() const { return simTime_; }
     
     // Seed for reproducibility
@@ -116,6 +128,10 @@ private:
     float maxEnergy_;
     float energyDecayRate_;
     float resourceEnergyGain_;
+    
+    // World object counts and configuration
+    size_t resourceCount_;
+    size_t hazardCount_;
     
     // Simulation time
     double simTime_;

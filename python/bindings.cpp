@@ -144,31 +144,30 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
-            std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
-        }, py::arg("args"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+.def("loadFromArgs", &Config::loadFromArgs, py::arg("argc"), py::arg("argv"),
+              "Load configuration from command line arguments (argc, argv)")
+         .def("loadFromArgsPython", [](Config& self, const std::vector<std::string>& args) {
+             std::vector<char*> argv;
+             argv.reserve(args.size() + 1);
+             argv.push_back(nullptr); // argv[0] should be program name
+             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+             int argc = static_cast<int>(argv.size());
+             return self.loadFromArgs(argc, argv.data());
+         }, py::arg("args"),
+            "Load configuration from command line arguments (Python-friendly version)")
+         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+              "Save configuration to a JSON file")
+         .def("has", &Config::has, py::arg("key"),
+              "Check if a configuration key exists")
+         .def("getKeys", &Config::getKeys,
+              "Get all configuration keys")
+         .def("clear", &Config::clear,
+              "Clear all configuration entries")
+         .def("summary", &Config::summary,
+              "Get a summary string of the configuration")
+         .def("__repr__", [](const Config& cfg) {
+             return "<Config: " + cfg.summary() + ">";
+         });
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -406,23 +405,238 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // NEW ADVANCED PYTHON API FOR EXPERT USERS
+        .def("getInternalFiringRates", &AgentBrain::getInternalFiringRates,
+             "Get firing rates of internal neurons")
+        .def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence,
+             "Get self-model confidence (0.0-1.0)")
+        .def("getSocialObservationCount", &AgentBrain::getSocialObservationCount,
+             "Get number of social observations")
+        .def("encodeText", &AgentBrain::encodeText, py::arg("text"),
+             "Encode text string as sensory pattern (Phase 6 feature)")
+        .def("getConceptCount", &AgentBrain::getConceptCount,
+             "Get number of learned concepts")
+        .def("getAgentBody", &AgentBrain::getAgentBody,
+             py::return_value_policy::reference_internal,
+             "Get complete agent body state")
+        .def("setAgentStart", &AgentBrain::setAgentStart,
+             py::arg("x"), py::arg("y"),
+             "Set agent starting position in world")
+        .def("getConfig", &AgentBrain::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get agent configuration")
+        .def("printDebugInfo", [](const AgentBrain& self) {
+            self.getBrain()->logStatus();
+            // Print additional agent-specific debug info
+            std::cout << "=== AgentBrain Debug ===" << std::endl;
+            std::cout << "  RewardModulation: " << (self.isRewardModulationEnabled() ? "ON" : "OFF") << std::endl;
+            std::cout << "  StructuralPlasticity: " << (self.isStructuralPlasticityEnabled() ? "ON" : "OFF") << std::endl;
+            std::cout << "  Development: " << (self.isDevelopmentEnabled() ? "ON" : "OFF") << std::endl;
+            std::cout << "  Curiosity: " << (self.isCuriosityEnabled() ? "ON" : "OFF") << std::endl;
+            std::cout << "  InternalNeurons: " << self.getInternalFiringRates().size() << std::endl;
+            std::cout << "  Concepts: " << self.getConceptCount() << std::endl;
+        }, "Print comprehensive debug information")
+        .def("benchmarkEpisode", [](AgentBrain& self, SimpleWorld& world, int steps) {
+            std::vector<float> rewards;
+            for (int i = 0; i < steps; ++i) {
+                world.update(0.1);
+                SensoryPercept percept = world.getSensoryPercept();
+                self.processSensoryInput(percept);
+                // Get underlying brain - need access to brain's parent
+                // This is a simplified version
+                MotorCommand cmd = self.decodeMotorCommand();
+                world.applyMotorCommand(cmd, world.getSimulationTime());
+                float reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0f;
+                self.applyRewardModulation(reward, 0.0f);
+                rewards.push_back(reward);
+            }
+            float avgReward = std::accumulate(rewards.begin(), rewards.end(), 0.0f) / rewards.size();
+            return std::make_tuple(avgReward, rewards.size());
+        }, py::arg("world"), py::arg("steps"),
+            "Run a benchmark episode and return (average_reward, steps)")
+        .def("exportBrainState", [](AgentBrain& self, const std::string& filepath) {
+            auto brain = self.getBrain();
+            return brain->save(filepath);
+        }, py::arg("filepath"),
+            "Export brain state to checkpoint file (returns success)")
+        .def("importBrainState", [](AgentBrain& self, const std::string& filepath) {
+            auto brain = self.getBrain();
+            return brain->load(filepath);
+        }, py::arg("filepath"),
+            "Import brain state from checkpoint file (returns success)");
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // ADVANCED PYTHON API FOR EXPERT USERS
+    m.def("createAdvancedConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set reasonable defaults for a more capable simulation
+        config->set("neuron_count", 2000, ConfigSource::Default);
+        config->set("region_count", 8, ConfigSource::Default);
+        config->set("connection_probability", 0.15, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+        config->set("synaptogenesis_rate", 0.0002f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00002f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("development.enable", true, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        return config;
+    }, "Create an advanced configuration with optimized settings for expert users");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Helper functions for enhanced configuration management
+    m.def("quickCreateConfig", [](int neuronCount = 1000, int regionCount = 4) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount, ConfigSource::Default);
+        config->set("region_count", regionCount, ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        return config;
+    }, py::arg("neuronCount") = 1000, py::arg("regionCount") = 4,
+       "Create a quick configuration with specified neuron and region counts");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Visualization and debugging utilities
+    m.def("createVisualizationConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("visualization.enable", true, ConfigSource::Default);
+        config->set("visualization.output_freq", 100, ConfigSource::Default);
+        config->set("visualization.performance_tracking", true, ConfigSource::Default);
+        return config;
+    }, "Create a configuration optimized for visualization");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Performance and scalability helpers
+    m.def("createScalableConfig", [](int numRegions = 8, float connectivity = 0.12f) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 5000, ConfigSource::Default);
+        config->set("region_count", numRegions, ConfigSource::Default);
+        config->set("connection_probability", connectivity, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("development.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        return config;
+    }, py::arg("numRegions") = 8, py::arg("connectivity") = 0.12f,
+       "Create a scalable configuration for large simulations");
+
+    // Experimental setup helpers
+    m.def("createResearchConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 10000, ConfigSource::Default);
+        config->set("region_count", 16, ConfigSource::Default);
+        config->set("connection_probability", 0.08f, ConfigSource::Default);
+        config->set("stdp_ltp_weight", 0.008f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.016f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("development.enable", true, ConfigSource::Default);
+        config->set("development.stage.synaptogenesis.enabled", true, ConfigSource::Default);
+        config->set("development.stage.pruning.enabled", true, ConfigSource::Default);
+        config->set("development.stage.maturation.enabled", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.2f, ConfigSource::Default);
+        return config;
+    }, "Create a research-grade configuration for experimental studies");
+
+    // Validation and diagnostic functions
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> errors;
+        
+        if (!config->has("neuron_count")) errors.push_back("Missing neuron_count");
+        else {
+            auto countOpt = config->get<int64_t>("neuron_count");
+            if (countOpt && *countOpt < 100) errors.push_back("Neuron count too low (< 100)");
+            else if (countOpt && *countOpt > 100000) errors.push_back("Neuron count too high (> 100,000)");
+        }
+        
+        if (!config->has("region_count")) errors.push_back("Missing region_count");
+        
+        if (!config->has("connection_probability")) errors.push_back("Missing connection_probability");
+        else {
+            auto probOpt = config->get<double>("connection_probability");
+            if (probOpt && (*probOpt < 0.0 || *probOpt > 1.0)) 
+                errors.push_back("connection_probability must be between 0.0 and 1.0");
+        }
+        
+        return std::make_pair(errors.empty(), errors);
+    }, py::arg("config"), "Validate configuration and return (is_valid, error_messages)");
+
+    // Configuration merging and comparison
+    m.def("mergeConfigs", [](const std::shared_ptr<Config>& base, const std::shared_ptr<Config>& override) {
+        auto result = std::make_shared<Config>();
+        
+        // Copy all keys from base config
+        auto baseKeys = base->getKeys();
+        for (const auto& key : baseKeys) {
+            if (auto valueOpt = base->get<ConfigValue>(key)) {
+                result->set(key, *valueOpt, ConfigSource::File);
+            }
+        }
+        
+        // Override with override config values
+        auto overrideKeys = override->getKeys();
+        for (const auto& key : overrideKeys) {
+            if (auto valueOpt = override->get<ConfigValue>(key)) {
+                result->set(key, *valueOpt, ConfigSource::CommandLine);
+            }
+        }
+        
+        return result;
+    }, py::arg("base"), py::arg("override"), "Merge two configurations, with override taking precedence");
+
+    // Configuration statistics and summary
+    m.def("getConfigStats", [](const std::shared_ptr<Config>& config) {
+        std::map<std::string, std::string> stats;
+        
+        stats["total_keys"] = std::to_string(config->getKeys().size());
+        
+        auto keys = config->getKeys();
+        int intCount = 0, floatCount = 0, boolCount = 0, strCount = 0, otherCount = 0;
+        
+        for (const auto& key : keys) {
+            if (auto valOpt = config->get<int64_t>(key)) intCount++;
+            else if (auto valOpt = config->get<double>(key)) floatCount++;
+            else if (auto valOpt = config->get<bool>(key)) boolCount++;
+            else if (auto valOpt = config->get<std::string>(key)) strCount++;
+            else otherCount++;
+        }
+        
+        stats["int_values"] = std::to_string(intCount);
+        stats["float_values"] = std::to_string(floatCount);
+        stats["bool_values"] = std::to_string(boolCount);
+        stats["string_values"] = std::to_string(strCount);
+        stats["other_values"] = std::to_string(otherCount);
+        
+        return stats;
+    }, py::arg("config"), "Get statistics about configuration contents");
+
+    // Quick setup helpers for different simulation scenarios
+    m.def("createExplorationConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 2000, ConfigSource::Default);
+        config->set("region_count", 6, ConfigSource::Default);
+        config->set("connection_probability", 0.12f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("development.enable", true, ConfigSource::Default);
+        return config;
+    }, "Create configuration optimized for exploration/learning scenarios");
+
+    m.def("createExploitationConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 3000, ConfigSource::Default);
+        config->set("region_count", 8, ConfigSource::Default);
+        config->set("connection_probability", 0.18f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", false, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("development.enable", true, ConfigSource::Default);
+        return config;
+    }, "Create configuration optimized for exploitation/stabilization scenarios");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

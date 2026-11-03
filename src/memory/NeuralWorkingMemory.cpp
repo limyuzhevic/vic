@@ -55,17 +55,40 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         
         // Update stored activation
         if (i < memoryActivations_.size()) {
+            float oldActivation = memoryActivations_[i];
             memoryActivations_[i] = activation;
+            
+            // Update active traces based on activation threshold (Phase 6 fix)
+            size_t idx = i;
+            bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
+            if (activation > 0.1f && !present) activeTraces_.push_back(idx);
+            if (activation <= 0.1f && present) {
+                activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
+                                    activeTraces_.end());
+            }
         } else {
             memoryActivations_.push_back(activation);
             memoryTimestamps_.push_back(0);
             memoryNeurons_.push_back(neuron);
+            
+            // Update active traces based on activation threshold (Phase 6 fix)
+            size_t idx = memoryNeurons_.size() - 1;
+            if (activation > 0.1f) activeTraces_.push_back(idx);
         }
     }
     
     // Create maintenance connections if needed
     for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
         createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], strength * 0.5f);
+    }
+    
+    // Initial population of active traces (Phase 6 fix - missing population)
+    // This ensures activeTraces_ starts with all stored neurons above threshold
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) {
+            bool present = std::find(activeTraces_.begin(), activeTraces_.end(), i) != activeTraces_.end();
+            if (!present) activeTraces_.push_back(i);
+        }
     }
 }
 

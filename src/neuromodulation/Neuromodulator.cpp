@@ -53,4 +53,52 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
+void Dopamine::setBaseline(float baseline) {
+    pImpl->baseline = std::clamp(baseline, 0.0f, 1.0f);
+}
+
+void Dopamine::setPeak(float peak) {
+    pImpl->peak = std::clamp(peak, 0.0f, 1.0f);
+}
+
+void Dopamine::setDecayRate(float decayRate) {
+    pImpl->decayRate = std::max(0.0f, decayRate);
+}
+
+void Dopamine::setReleaseRate(float releaseRate) {
+    pImpl->releaseRate = std::max(0.0f, releaseRate);
+}
+
+float Dopamine::getBaseline() const {
+    return pImpl->baseline;
+}
+
+float Dopamine::getPeak() const {
+    return pImpl->peak;
+}
+
+float Dopamine::getDecayRate() const {
+    return pImpl->decayRate;
+}
+
+float Dopamine::getReleaseRate() const {
+    return pImpl->releaseRate;
+}
+
+void Dopamine::reset() {
+    pImpl->level = pImpl->baseline;
+}
+
+const char* Dopamine::getDynamicsDescription() const {
+    return "Placeholder: Linear decay to baseline, reward-dependent increase with bounded release rate";
+}
+
+std::string Dopamine::getStateDescription() const {
+    std::ostringstream oss;
+    oss << "DA Level: " << pImpl->level << ", Baseline: " << pImpl->baseline 
+        << ", Peak: " << pImpl->peak << ", Decay Rate: " << pImpl->decayRate 
+        << ", Release Rate: " << pImpl->releaseRate;
+    return oss.str();
+}
+
 } // namespace nlm

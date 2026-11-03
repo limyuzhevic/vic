@@ -48,8 +48,10 @@ public:
     // Clear working memory
     void clear();
 
-    // Get number of active memory traces
-    size_t getActiveTraces() const { return activeTraces_.size(); }
+    // Get active memory trace indices
+    std::vector<size_t> getActiveTraceIndices() const {
+        return activeTraces_;
+    }
 
     // Phase 5 checkpoint support: the stored neurons/activations are
     // the actual working-memory content. Phase 6 fixed the stale

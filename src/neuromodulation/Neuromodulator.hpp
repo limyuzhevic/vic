@@ -48,9 +48,26 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Configuration methods
+    void setBaseline(float baseline);
+    void setPeak(float peak);
+    void setDecayRate(float decayRate);
+    void setReleaseRate(float releaseRate);
+    
+    // State access methods
+    float getBaseline() const;
+    float getPeak() const;
+    float getDecayRate() const;
+    float getReleaseRate() const;
+    
+    // State management
+    void reset();
+    const char* getDynamicsDescription() const;
+    std::string getStateDescription() const;
+    
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Acetylcholine: Attention and memory consolidation

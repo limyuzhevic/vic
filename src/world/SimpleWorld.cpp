@@ -25,6 +25,8 @@ SimpleWorld::SimpleWorld()
     , maxEnergy_(100.0f)
     , energyDecayRate_(0.01f)
     , resourceEnergyGain_(30.0f)
+    , resourceCount_(5)    // Default: 5 resource objects
+    , hazardCount_(3)       // Default: 3 hazard objects
     , simTime_(0.0)
     , rngSeed_(42)
     , rngState_(42)
@@ -57,14 +59,14 @@ void SimpleWorld::reset() {
     objects_.clear();
     
     // Place some resource objects (positive reward when touched)
-    for (int i = 0; i < 5; ++i) {
+    for (size_t i = 0; i < resourceCount_; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
         objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
     }
     
     // Place some hazard objects (negative reward when touched)
-    for (int i = 0; i < 3; ++i) {
+    for (size_t i = 0; i < hazardCount_; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
         objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
