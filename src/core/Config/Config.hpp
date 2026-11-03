@@ -1,5 +1,7 @@
 #pragma once
 
+#include "IConfiguration.hpp"
+#include "ConfigurationTemplate.hpp"
 #include <string>
 #include <memory>
 #include <vector>
@@ -12,7 +14,7 @@ namespace nlm {
 // Forward declarations
 class Config;
 
-// Configuration value types
+// Configuration value types (backward compatibility)
 using ConfigValue = std::variant<
     int,
     int64_t,
@@ -44,8 +46,8 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
-class Config {
+// Main configuration class - now implements IConfiguration interface
+class Config : public IConfiguration {
 public:
     Config();
     ~Config();
@@ -56,22 +58,52 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // IConfiguration interface implementation
+    void set(const std::string& key, const std::string& value) override;
+    std::optional<std::string> getString(const std::string& key) const override;
+    std::optional<int> getInt(const std::string& key) const override;
+    std::optional<double> getDouble(const std::string& key) const override;
+    std::optional<bool> getBool(const std::string& key) const override;
+    
+    std::string getString(const std::string& key, const std::string& defaultValue) const override;
+    int getInt(const std::string& key, int defaultValue) const override;
+    double getDouble(const std::string& key, double defaultValue) const override;
+    bool getBool(const std::string& key, bool defaultValue) const override;
+    
+    bool has(const std::string& key) const override;
+    void remove(const std::string& key) override;
+    std::vector<std::string> getKeys() const override;
+    void clear() override;
+    
+    ConfigSource getSource(const std::string& key) const override;
+    std::string getDescription(const std::string& key) const override;
+    
+    std::shared_ptr<IConfiguration> getSection(const std::string& section) const override;
+    void setSection(const std::string& section, const std::shared_ptr<IConfiguration>& config) override;
+    
+    void addChangeCallback(const ConfigurationChangeCallback& callback) override;
+    void removeChangeCallback(const ConfigurationChangeCallback& callback) override;
+    
+    std::string toString() const override;
+    bool fromString(const std::string& data) override;
+    
+    bool equals(const IConfiguration& other) const override;
+    
+    size_t getSize() const override;
+    double getMemoryUsage() const override;
+    
+    // Legacy configuration methods (backward compatibility)
     bool loadFromFile(const std::string& filepath);
-    
-    // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
-    
-    // Save to file
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +127,47 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate() const override;
+    
+    // Configuration conversion
+    template<typename T>
+    std::optional<T> getAs(const std::string& key) const {
+        return getOptional<T>(key);
+    }
+    
+    template<typename T>
+    T getAs(const std::string& key, const T& defaultValue) const {
+        return get<T>(key, defaultValue);
+    }
+    
+    // Configuration source management
+    void setSource(const std::string& key, ConfigSource source);
+    ConfigSource getSource(const std::string& key) const;
+    
+    // Configuration description
+    void setDescription(const std::string& key, const std::string& description);
+    std::string getDescription(const std::string& key) const;
+    
+    // Configuration statistics
+    struct Statistics {
+        size_t totalKeys = 0;
+        size_t stringKeys = 0;
+        size_t intKeys = 0;
+        size_t int64Keys = 0;
+        size_t doubleKeys = 0;
+        size_t boolKeys = 0;
+        size_t vectorKeys = 0;
+        double memoryUsage = 0.0;
+        double averageKeySize = 0.0;
+    };
+    
+    Statistics getStatistics() const;
+    
+    // Configuration optimization
+    void optimizeMemory() { /* Implementation for memory optimization */ }
+    void optimizeSpeed() { /* Implementation for speed optimization */ }
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +175,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Interface implementation helpers
+    std::shared_ptr<ConfigurationTemplate> getTemplateImpl() const;
 };
 
 } // namespace nlm
