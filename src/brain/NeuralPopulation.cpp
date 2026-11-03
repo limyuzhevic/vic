@@ -7,12 +7,11 @@ namespace nlm {
 struct NeuralPopulation::Impl {
     PopulationId id;
     size_t size;
-    std::vector<Neuron*> neurons;
-    std::vector<std::unique_ptr<Neuron>> ownedNeurons;
+    std::vector<std::unique_ptr<Neuron>> neurons;  // OWNING smart pointers
     NeuronType neuronType;
     std::vector<MembranePotential> membranePotentials;  // for statistics
     
-    Impl(PopulationId id, size_t size) : id(id), size(size), neuronType(NeuronType::Internal) {}
+    Impl(PopulationId id, size_t size) : id(id), size(size), neuronType(NeuronType::Internal) {};
 };
 
 NeuralPopulation::NeuralPopulation(PopulationId id, size_t size) : pImpl(new Impl(id, size)) {}
@@ -59,27 +58,34 @@ const Neuron* NeuralPopulation::getNeuron(NeuronIndex index) const {
 }
 
 void NeuralPopulation::createNeurons(NeuronId startId) {
-    pImpl->ownedNeurons.clear();
     pImpl->neurons.clear();
     pImpl->neurons.reserve(pImpl->size);
-    pImpl->ownedNeurons.reserve(pImpl->size);
     for (size_t i = 0; i < pImpl->size; ++i) {
         auto neuron = std::make_unique<Neuron>(NeuronId(startId.index() + i));
         neuron->setType(pImpl->neuronType);
-        pImpl->neurons.push_back(neuron.get());
-        pImpl->ownedNeurons.push_back(std::move(neuron));
+        pImpl->neurons.push_back(std::move(neuron));
     }
 }
 
-void NeuralPopulation::addNeuron(Neuron* neuron) {
-    pImpl->neurons.push_back(neuron);
+void NeuralPopulation::addNeuron(std::unique_ptr<Neuron> neuron) {
+    pImpl->neurons.push_back(std::move(neuron));
     if (pImpl->size < pImpl->neurons.size()) {
         pImpl->size = pImpl->neurons.size();
     }
 }
 
+// Note: This API should be updated to return unique_ptrs or Neuron* for better memory management
+// For now, we'll keep this for compatibility but it's not ideal
 const std::vector<Neuron*>& NeuralPopulation::getNeurons() const {
-    return pImpl->neurons;
+    // WARNING: This returns raw pointers to owned neurons - caller must not delete them
+    // This is kept for API compatibility but should be deprecated in favor of ownership
+    static std::vector<Neuron*> rawPtrs;
+    rawPtrs.clear();
+    rawPtrs.reserve(pImpl->neurons.size());
+    for (const auto& neuronPtr : pImpl->neurons) {
+        rawPtrs.push_back(neuronPtr.get());
+    }
+    return rawPtrs;
 }
 
 NeuronType NeuralPopulation::getNeuronType() const {
@@ -88,15 +94,15 @@ NeuronType NeuralPopulation::getNeuronType() const {
 
 void NeuralPopulation::setNeuronType(NeuronType type) {
     pImpl->neuronType = type;
-    for (auto* neuron : pImpl->neurons) {
-        neuron->setType(type);
+    for (auto& neuronPtr : pImpl->neurons) {
+        neuronPtr->setType(type);
     }
 }
 
 size_t NeuralPopulation::getActiveCount() const {
     size_t count = 0;
-    for (const auto* neuron : pImpl->neurons) {
-        if (neuron->isFiring() || neuron->getFiringRate() > 0.0f) {
+    for (const auto& neuronPtr : pImpl->neurons) {
+        if (neuronPtr->isFiring() || neuronPtr->getFiringRate() > 0.0f) {
             ++count;
         }
     }
@@ -105,8 +111,8 @@ size_t NeuralPopulation::getActiveCount() const {
 
 size_t NeuralPopulation::getFiringCount() const {
     size_t count = 0;
-    for (const auto* neuron : pImpl->neurons) {
-        if (neuron->isFiring()) {
+    for (const auto& neuronPtr : pImpl->neurons) {
+        if (neuronPtr->isFiring()) {
             ++count;
         }
     }
@@ -118,8 +124,8 @@ float NeuralPopulation::getAverageFiringRate() const {
         return 0.0f;
     }
     float sum = 0.0f;
-    for (const auto* neuron : pImpl->neurons) {
-        sum += neuron->getFiringRate();
+    for (const auto& neuronPtr : pImpl->neurons) {
+        sum += neuronPtr->getFiringRate();
     }
     return sum / static_cast<float>(pImpl->neurons.size());
 }
@@ -132,20 +138,20 @@ float NeuralPopulation::getActivityLevel() const {
 }
 
 void NeuralPopulation::initializeRandom(RandomGenerator& rng) {
-    for (auto* neuron : pImpl->neurons) {
-        neuron->initializeRandom(rng);
+    for (auto& neuronPtr : pImpl->neurons) {
+        neuronPtr->initializeRandom(rng);
     }
 }
 
 void NeuralPopulation::step(Timestamp currentTime) {
-    for (auto* neuron : pImpl->neurons) {
-        neuron->step(currentTime);
+    for (auto& neuronPtr : pImpl->neurons) {
+        neuronPtr->step(currentTime);
     }
 }
 
 void NeuralPopulation::reset() {
-    for (auto* neuron : pImpl->neurons) {
-        neuron->reset();
+    for (auto& neuronPtr : pImpl->neurons) {
+        neuronPtr->reset();
     }
     pImpl->membranePotentials.clear();
 }
@@ -153,8 +159,8 @@ void NeuralPopulation::reset() {
 std::vector<NeuronId> NeuralPopulation::getNeuronIds() const {
     std::vector<NeuronId> ids;
     ids.reserve(pImpl->neurons.size());
-    for (const auto* neuron : pImpl->neurons) {
-        ids.push_back(neuron->getId());
+    for (const auto& neuronPtr : pImpl->neurons) {
+        ids.push_back(neuronPtr->getId());
     }
     return ids;
 }
@@ -162,8 +168,8 @@ std::vector<NeuronId> NeuralPopulation::getNeuronIds() const {
 void NeuralPopulation::recordActivity() {
     pImpl->membranePotentials.clear();
     pImpl->membranePotentials.reserve(pImpl->neurons.size());
-    for (const auto* neuron : pImpl->neurons) {
-        pImpl->membranePotentials.push_back(neuron->getMembranePotential());
+    for (const auto& neuronPtr : pImpl->neurons) {
+        pImpl->membranePotentials.push_back(neuronPtr->getMembranePotential());
     }
 }
 
