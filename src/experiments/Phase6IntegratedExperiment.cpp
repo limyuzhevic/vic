@@ -180,19 +180,27 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     bool success = true;
     
     // Test 1: Memory systems exist and are connected
-    if (brain->getWorkingMemory() != nullptr) {
+    bool hasWorkingMemory = brain->getWorkingMemory() != nullptr;
+    bool hasEpisodicMemory = brain->getEpisodicMemory() != nullptr;
+    
+    if (hasWorkingMemory) {
         NLM_LOG_INFO("[PASS] Working memory is integrated");
     } else {
         NLM_LOG_ERROR("[FAIL] Working memory is NOT integrated");
         success = false;
     }
     
-    if (brain->getEpisodicMemory() != nullptr) {
+    if (hasEpisodicMemory) {
         NLM_LOG_INFO("[PASS] Episodic memory is integrated");
     } else {
         NLM_LOG_ERROR("[FAIL] Episodic memory is NOT integrated");
         success = false;
     }
+    
+    // Test 1b: Check for additional memory systems
+    bool hasSemanticMemory = brain->getSemanticMemory() != nullptr;
+    bool hasAssociativeMemory = brain->getAssociativeMemory() != nullptr;
+    bool hasProceduralMemory = brain->getProceduralMemory() != nullptr;
     
     // Test 2: Neuromodulation systems exist
     if (brain->getDopamine() != nullptr) {
@@ -240,11 +248,20 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
     }
     
     // Test 5: Development system exists
-    if (brain->getDevelopmentSystem() != nullptr) {
+    bool hasDevelopmentSystem = brain->getDevelopmentSystem() != nullptr;
+    
+    if (hasDevelopmentSystem) {
         NLM_LOG_INFO("[PASS] Development system is integrated");
     } else {
         NLM_LOG_ERROR("[FAIL] Development system is NOT integrated");
         success = false;
+    }
+    
+    // Summary of results
+    if (success) {
+        NLM_LOG_INFO("=== VERIFICATION COMPLETE: All critical systems integrated ===");
+    } else {
+        NLM_LOG_ERROR("=== VERIFICATION FAILED: Critical systems missing ===");
     }
     
     return success;

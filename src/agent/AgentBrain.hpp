@@ -41,13 +41,6 @@ public:
     // firingRate, because a neuron that just spiked resets its membrane
     // to rest, so membrane deviation at sampling time is 0 for exactly
     // the neurons that fired — the old metric erased its own signal.
-    struct MotorGroupActivity {
-        const char* name;
-        float activity;
-        size_t refractoryCount;  // neurons in Refractory state (recently spiked)
-        size_t size = 0;
-        float firingRate = 0.0f;
-    };
     std::vector<MotorGroupActivity> getMotorGroupActivities() const;
     
     // Apply neuromodulation based on reward
