@@ -195,7 +195,8 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     # The module is shared, so the static libs it links need PIC.
     set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
         POSITION_INDEPENDENT_CODE ON)
-    pybind11_add_module(pynlm python/bindings.cpp)
+    # Build the improved bindings (includes both original and enhanced API)
+    pybind11_add_module(pynlm python/bindings_improved.cpp)
     target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
     target_include_directories(pynlm PRIVATE src)
     install(TARGETS pynlm LIBRARY DESTINATION .)
