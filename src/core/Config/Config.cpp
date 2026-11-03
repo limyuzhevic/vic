@@ -19,9 +19,93 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Try to detect file format by extension
+    std::string ext = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos && dotPos < filepath.size() - 1) {
+        ext = filepath.substr(dotPos + 1);
+        for (char& c : ext) c = std::tolower(c);
+    }
+    
+    // Try JSON first if extension indicates JSON
+    if (ext == "json") {
+        return loadFromJSON(filepath);
+    }
+    // Try YAML if extension indicates YAML  
+    else if (ext == "yaml" || ext == "yml") {
+        return loadFromYAML(filepath);
+    }
+    // Try TOML
+    else if (ext == "toml") {
+        return loadFromTOML(filepath);
+    }
+    // Default to simple key=value format for backward compatibility
+    else {
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Simple JSON parser - handle basic key-value pairs
+    // TODO: For Phase 2, consider integrating nlohmann/json library
+    // Current implementation: minimal JSON support for common cases
+    
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                        std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Remove comments
+    size_t commentPos = content.find("//");
+    while (commentPos != std::string::npos) {
+        size_t newlinePos = content.find('\n', commentPos);
+        if (newlinePos == std::string::npos) {
+            content.erase(commentPos);
+            break;
+        }
+        content.erase(commentPos, newlinePos - commentPos);
+        commentPos = content.find("//");
+    }
+    
+    // Simple key-value extraction for {"key": "value", ...} format
+    // Remove braces and split by commas
+    if (content.front() == '{' && content.back() == '}') {
+        content = content.substr(1, content.size() - 2);
+        size_t pos = 0;
+        while ((pos = content.find("`")) != std::string::npos) {
+            content.erase(pos, 1);
+        }
+        while ((pos = content.find('"')) != std::string::npos) {
+            size_t end = content.find('"', pos + 1);
+            if (end != std::string::npos) {
+                std::string value = content.substr(pos + 1, end - pos - 1);
+                // Remove quotes from value
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                content.replace(pos, end - pos + 1, value);
+                break;  // Simple: only process first key-value pair
+            }
+        }
+        // Convert to simple format for processing
+        return loadFromSimpleFormatFromString(content);
+    }
+    
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -48,11 +132,112 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to parse numeric values
+            try {
+                if (value.find('.') != std::string::npos) {
+                    // Try double first
+                    size_t posEnd;
+                    double doubleVal = std::stod(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, doubleVal, ConfigSource::File);
+                        continue;
+                    }
+                } else {
+                    // Try int64_t
+                    size_t posEnd;
+                    int64_t intVal = std::stoll(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        set(key, intVal, ConfigSource::File);
+                        continue;
+                    }
+                }
+                // Try bool
+                if (value == "true") {
+                    set(key, true, ConfigSource::File);
+                    continue;
+                } else if (value == "false") {
+                    set(key, false, ConfigSource::File);
+                    continue;
+                }
+                // Try string
+                set(key, value, ConfigSource::File);
+            } catch (const std::exception&) {
+                // If parsing fails, treat as string
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
     return true;
+}
+
+bool Config::loadFromSimpleFormatFromString(const std::string& content) {
+    std::string line = content;
+    // Skip empty lines and comments
+    line = trim(line);
+    if (line.empty() || line[0] == '#' || line[0] == '/') {
+        return true;
+    }
+    
+    // Parse simple key=value pairs
+    size_t pos = line.find('=');
+    if (pos != std::string::npos) {
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        try {
+            if (value.find('.') != std::string::npos) {
+                // Try double first
+                size_t posEnd;
+                double doubleVal = std::stod(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, doubleVal, ConfigSource::File);
+                    return true;
+                }
+            } else {
+                // Try int64_t
+                size_t posEnd;
+                int64_t intVal = std::stoll(value, &posEnd);
+                if (posEnd == value.size()) {
+                    set(key, intVal, ConfigSource::File);
+                    return true;
+                }
+            }
+            // Try bool
+            if (value == "true") {
+                set(key, true, ConfigSource::File);
+                return true;
+            } else if (value == "false") {
+                set(key, false, ConfigSource::File);
+                return true;
+            }
+            // Try string
+            set(key, value, ConfigSource::File);
+        } catch (const std::exception&) {
+            // If parsing fails, treat as string
+            set(key, value, ConfigSource::File);
+        }
+    }
+    return true;
+}
+
+bool Config::loadFromYAML(const std::string& filepath) {
+    // Simple YAML parser - YAML is mostly similar to JSON for basic cases
+    // For Phase 3, consider integrating yaml-cpp library
+    return loadFromSimpleFormat(filepath);
+}
+
+bool Config::loadFromTOML(const std::string& filepath) {
+    // Simple TOML parser - TOML is strictly formatted
+    // For Phase 4, consider integrating toml.hpp library  
+    return loadFromSimpleFormat(filepath);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <weak_ptr>
 
 namespace nlm {
 
@@ -145,23 +146,24 @@ private:
     
     std::shared_ptr<Brain> brain_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
+    // Motor neuron groups - use weak_ptr to avoid ownership issues
+    // This is safer than raw pointers since AgentBrain doesn't own the neurons
+    std::vector<std::weak_ptr<Neuron>> motorForward_;
+    std::vector<std::weak_ptr<Neuron>> motorBackward_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnLeft_;
+    std::vector<std::weak_ptr<Neuron>> motorTurnRight_;
+    std::vector<std::weak_ptr<Neuron>> motorInteract_;
+    std::vector<std::weak_ptr<Neuron>> motorWait_;
     
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
+    // Sensory neuron groups - use weak_ptr to avoid ownership issues
+    std::vector<std::weak_ptr<Neuron>> sensoryVision_;
+    std::vector<std::weak_ptr<Neuron>> sensoryTouch_;
+    std::vector<std::weak_ptr<Neuron>> sensoryInternal_;
+    std::vector<std::weak_ptr<Neuron>> sensoryProprioception_;
     // Internal (hidden) neurons, for the recall probe. Sensory neurons
     // are the input layer; the association between a word and a scene
     // lives in which internal neurons the two inputs jointly recruit.
-    std::vector<Neuron*> internalNeurons_;
+    std::vector<std::weak_ptr<Neuron>> internalNeurons_;
     
     // Neuromodulation state
     float dopamineLevel_;
