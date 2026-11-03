@@ -11,6 +11,7 @@ namespace nlm {
 
 // Forward declarations
 class Config;
+class ConfigSchema;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -42,6 +43,24 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Configuration validation
+enum class ValidationError {
+    None = 0,
+    TypeMismatch,
+    ValueOutOfRange,
+    MissingRequired,
+    InvalidFormat,
+    OutOfBounds
+};
+
+// Schema validation constraints
+struct ValidationConstraint {
+    std::string key;
+    std::string constraintType; // "range", "enum", "format", "required", "pattern"
+    std::string constraintValue;
+    std::string errorMessage;
 };
 
 // Main configuration class
@@ -95,6 +114,18 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    ValidationError validate() const;
+    std::string getValidationError() const;
+    bool addValidationConstraint(const ValidationConstraint& constraint);
+    bool removeValidationConstraint(const std::string& key);
+    std::vector<ValidationConstraint> getValidationConstraints() const;
+    
+    // Schema management
+    bool loadSchemaFromFile(const std::string& filepath);
+    bool saveSchemaToFile(const std::string& filepath) const;
+    std::string getSchemaSummary() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +133,49 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    static ValidationError validateValue(const ConfigEntry& entry, const ValidationConstraint& constraint);
+    static bool parseRangeConstraint(const std::string& constraint, double& min, double& max);
+    static bool parseEnumConstraint(const std::string& constraint, std::vector<std::string>& values);
+    static bool parsePatternConstraint(const std::string& constraint, std::regex& pattern);
+};
+
+// Configuration schema class for managing validation rules
+class ConfigSchema {
+public:
+    ConfigSchema();
+    ~ConfigSchema();
+    
+    // Add validation rules
+    bool addRequiredField(const std::string& key, const std::string& description = "");
+    bool addRangeValidation(const std::string& key, double min, double max, const std::string& description = "");
+    bool addEnumValidation(const std::string& key, const std::vector<std::string>& validValues, const std::string& description = "");
+    bool addPatternValidation(const std::string& key, const std::string& pattern, const std::string& description = "");
+    
+    // Remove validation rules
+    bool removeField(const std::string& key);
+    
+    // Check if schema is valid
+    bool isValid() const;
+    
+    // Get field information
+    bool hasField(const std::string& key) const;
+    std::string getFieldDescription(const std::string& key) const;
+    
+    // Get all fields
+    std::vector<std::string> getFields() const;
+    
+    // Save/load schema
+    bool saveToFile(const std::string& filepath) const;
+    bool loadFromFile(const std::string& filepath);
+    
+    // Summary
+    std::string getSummary() const;
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
