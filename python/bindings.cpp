@@ -146,16 +146,44 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
+    // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+            argv.reserve(args.size() + 1);  // +1 for program name
+            argv.push_back(const_cast<char*>("nlm"));  // Dummy program name
+            for (const auto& a : args) {
+                argv.push_back(const_cast<char*>(a.c_str()));
+            }
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
            "Load configuration from command line arguments")
+        .def("getInt", &Config::getOr<int>, py::arg("key"), py::arg("defaultValue"),
+             "Get an integer value or default if not found")
+        .def("getDouble", &Config::getOr<double>, py::arg("key"), py::arg("defaultValue"),
+             "Get a double value or default if not found")
+        .def("getString", &Config::getOr<std::string>, py::arg("key"), py::arg("defaultValue"),
+             "Get a string value or default if not found")
+        .def("getBool", &Config::getOr<bool>, py::arg("key"), py::arg("defaultValue"),
+             "Get a boolean value or default if not found")
+        .def("getFloat", &Config::getOr<float>, py::arg("key"), py::arg("defaultValue"),
+             "Get a float value or default if not found")
+        .def("getInt64", &Config::getOr<int64_t>, py::arg("key"), py::arg("defaultValue"),
+             "Get an int64 value or default if not found")
+        .def("hasValue", &Config::has, py::arg("key"),
+             "Check if configuration contains a key")
+        .def("removeValue", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
+        .def("listKeys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("clearAll", &Config::clear,
+             "Clear all configuration entries")
+        .def("summary", &Config::summary,
+             "Get a summary string of the configuration")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),

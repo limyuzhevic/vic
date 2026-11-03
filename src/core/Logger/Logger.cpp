@@ -12,6 +12,7 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    mutable std::mutex time_mutex_;  // Separate mutex for timestamp formatting
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -34,7 +35,13 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // Add timestamp
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    std::tm tm_buf;
+    {
+        std::lock_guard<std::mutex> time_lock(time_mutex_);
+        std::tm* tm_ptr = std::localtime(&time);
+        if (tm_ptr) tm_buf = *tm_ptr;
+    }
+    oss << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S");
     
     oss << " " << entry.message;
     

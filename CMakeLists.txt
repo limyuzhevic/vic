@@ -27,7 +27,9 @@ add_library(nlm_core STATIC
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
     src/core/Random/Random.cpp
+    # Utilities (Phase 5-6 additions)
     src/core/Logger/Logger.cpp
+    src/nlm/Utilities.cpp
     src/core/SimulationClock/SimulationClock.cpp
     # Brain
     src/brain/Neuron.cpp
@@ -158,13 +160,7 @@ add_executable(nlm_phase5_demo
 )
 target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
 
-# Phase 6 demo executable
-add_executable(nlm_phase6_demo
-    src/experiments/Phase6Demo.cpp
-)
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
-
-# Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
+# Phase 6 demo executable (new in Phase 6): text/as-a-sense
 # association probe, concept/social probes, and a sandbox run with
 # a teacher, planner overrides, and a checkpoint round-trip. The old
 # nlm_phase6_demo integration demo is left unchanged.
@@ -178,6 +174,12 @@ add_executable(nlm_benchmark
     src/benchmark.cpp
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+
+# Advanced utilities demo executable
+add_executable(nlm_advanced_demo
+    src/main_advanced.cpp
+)
+target_link_libraries(nlm_advanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
