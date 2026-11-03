@@ -102,6 +102,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Internal parsing methods
+    bool parseJSONFile(const std::string& filepath);
+    bool parseYAMLFile(const std::string& filepath);
+    bool parseSimpleKeyValueFile(const std::string& filepath);
+    bool parseJSONObject(const std::string& json, size_t& pos);
+    bool parseJSONValue(const std::string& json, size_t& pos, ConfigValue& value);
+    
+    // Backward compatibility
+    std::string saveToJSONFile(const std::string& filepath) const;
 };
 
 } // namespace nlm

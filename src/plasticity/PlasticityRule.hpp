@@ -54,6 +54,10 @@ public:
     void setLearningRate(float rate);
     float getLearningRate() const;
     
+    // Reward-modulated learning support
+    float getEligibilityTrace() const;
+    void resetEligibilityTrace();
+    
 private:
     struct Impl;
     Impl* pImpl;

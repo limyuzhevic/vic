@@ -48,6 +48,10 @@ public:
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
     
+    // Reward-modulated plasticity support
+    float getEligibilityTrace() const;
+    void resetEligibilityTrace();
+    
 private:
     struct Impl;
     Impl* pImpl;
