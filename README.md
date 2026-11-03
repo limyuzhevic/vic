@@ -84,6 +84,8 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### Standard C++ Build (with Python bindings enabled by default)
+
 ```bash
 mkdir build
 cd build
@@ -91,7 +93,39 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Building Just the Python Module
+
+```bash
+mkdir build
+cd build
+cmake .. -DNLM_BUILD_PYTHON_BINDINGS=ON -DPYTHON_EXECUTABLE=$(which python3)
+make pynlm
+```
+
+### Building without Python Bindings (C++ only)
+
+```bash
+mkdir build
+cd build
+cmake .. -DNLM_BUILD_PYTHON_BINDINGS=OFF
+make -j4
+```
+
+### Development Installation
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DNLM_BUILD_PYTHON_BINDINGS=ON
+make -j4
+# Install to current Python environment
+make install
+```
+
 ## Running
+
+### C++ Demos and Tests
+
 Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
 
@@ -106,6 +140,86 @@ currently separate demos per phase, not a single unified binary:
 `nlm_phase6_demo` runs a comprehensive integration test verifying all
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
 library in CMake; it does not yet have a standalone demo executable.
+
+### Python Usage
+
+```bash
+python3 -c "import pynlm; print(pynlm.__version__)"
+```
+
+```python
+from pynlm import Config, Brain, SimpleWorld, Vision, Action
+
+# Create configuration
+config = Config()
+config.set("neuron_count", 100)
+config.set("connection_probability", 0.15)
+
+# Create brain
+brain = Brain(config)
+brain.initialize()
+
+# Create world
+world = SimpleWorld()
+world.configure(100, 100, 20, 20)
+
+# Run simulation
+for i in range(100):
+    brain.step(i)
+    percept = world.get_sensory_percept()
+    brain.receive_sensory_input(percept)
+    action = brain.produce_action()
+```
+
+## Python Package Information
+
+The Python bindings are built as the `pynlm` module and include:
+
+- **Core types**: NeuronId, SynapseId, RegionId, PopulationId
+- **Enumerations**: NeuronType, SynapseType, DevelopmentalStage, ActionType
+- **Main classes**: Config, Brain, Action, SensoryInput (Vision, Audio, InternalSignals)
+- **World simulation**: SimpleWorld
+- **Agent interface**: AgentBrain
+- **Advanced utilities**: text encoding, concept formation, simulation helpers
+
+### Installation via pip
+
+```bash
+pip install .
+```
+
+This will build the C++ extension and install it to your Python site-packages.
+
+### Development with Python Bindings
+
+For development work with the Python bindings:
+
+```bash
+# Build in development mode
+pip install -e .
+
+# Or build manually for debugging
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DNLM_BUILD_PYTHON_BINDINGS=ON
+make -j4
+```
+
+### Testing
+
+Run C++ tests:
+
+```bash
+mkdir build && cd build
+cmake ..
+make test
+```
+
+Run Python tests (when available):
+
+```bash
+python3 -m pytest tests/  # if tests exist
+```
 
 ## Project Structure
 

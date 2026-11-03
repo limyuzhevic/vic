@@ -180,25 +180,58 @@ add_executable(nlm_benchmark
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
+# This is the primary interface for NLM - Python bindings are enabled by default.
+# Users can disable with -DNLM_BUILD_PYTHON_BINDINGS=OFF if they only want C++.
+option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module (recommended)" ON)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 CONFIG REQUIRED)
-    # The module is shared, so the static libs it links need PIC.
+    
+    # Ensure the C++ libraries have position-independent code for the Python module
     set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
         POSITION_INDEPENDENT_CODE ON)
+    
+    # Create the Python module with optimized settings
     pybind11_add_module(pynlm python/bindings.cpp)
     target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
     target_include_directories(pynlm PRIVATE src)
-    install(TARGETS pynlm LIBRARY DESTINATION .)
+    
+    # Python module specific settings
+    target_compile_definitions(pynlm PRIVATE -DPYNLM_EXPORTS)
+    
+    # Install Python module to site-packages
+    if(CMAKE_INSTALL_PREFIX STREQUAL "/usr/local")
+        install(TARGETS pynlm
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        )
+    else()
+        # Development install path
+        install(TARGETS pynlm LIBRARY DESTINATION .)
+    endif()
+    
+    # Install Python headers and support files
+    install(FILES python/bindings.cpp
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/pynlm
+    )
+    
+    # Generate and install Python package metadata
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml.in
+        ${CMAKE_CURRENT_BINARY_DIR}/pyproject.toml
+        @ONLY
+    )
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pyproject.toml
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/site-packages/pynlm
+    )
+endif()
+
+# Legacy Python bindings option for backward compatibility
+option(NLM_BUILD_STANDALONE_PYTHON "Build standalone Python CMake (legacy, use NLM_BUILD_PYTHON_BINDINGS)" OFF)
+if(NLM_BUILD_STANDALONE_PYTHON)
+    message(WARNING "NLM_BUILD_STANDALONE_PYTHON is deprecated, use NLM_BUILD_PYTHON_BINDINGS instead")
+    add_subdirectory(python)
 endif()
 
 # Testing
