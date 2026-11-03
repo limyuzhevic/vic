@@ -245,8 +245,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         // Log progress every 100 steps
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
         }
     }
     
@@ -279,22 +279,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");

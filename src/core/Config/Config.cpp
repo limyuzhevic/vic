@@ -3,8 +3,73 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cctype>
+#include <iomanip>
 
 namespace nlm {
+
+namespace {
+
+// Helper functions for Config
+std::string Config::trim(const std::string& str) {
+    size_t first = str.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return "";
+    size_t last = str.find_last_not_of(" \t\r\n");
+    return str.substr(first, last - first + 1);
+}
+
+bool isNumeric(const std::string& str) {
+    if (str.empty()) return false;
+    
+    size_t start = 0;
+    if (str[0] == '+' || str[0] == '-') {
+        start = 1;
+    }
+    
+    bool hasDecimal = false;
+    bool hasExponent = false;
+    for (size_t i = start; i < str.size(); ++i) {
+        if (std::isdigit(str[i])) {
+            continue;
+        } else if (str[i] == '.' && !hasDecimal) {
+            hasDecimal = true;
+        } else if ((str[i] == 'e' || str[i] == 'E') && i > start && i < str.size() - 1 && !hasExponent) {
+            hasExponent = true;
+            // Skip exponent sign if present
+            if (str[i+1] == '+' || str[i+1] == '-') {
+                i++;
+            }
+        } else {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+std::string configValueToString(const ConfigValue& value) {
+    std::ostringstream oss;
+    
+    if (std::holds_alternative<int>(value)) {
+        oss << std::get<int>(value);
+    } else if (std::holds_alternative<int64_t>(value)) {
+        oss << std::get<int64_t>(value);
+    } else if (std::holds_alternative<double>(value)) {
+        oss << std::fixed << std::setprecision(6) << std::get<double>(value);
+    } else if (std::holds_alternative<float>(value)) {
+        oss << std::fixed << std::setprecision(6) << std::get<float>(value);
+    } else if (std::holds_alternative<bool>(value)) {
+        oss << (std::get<bool>(value) ? "true" : "false");
+    } else if (std::holds_alternative<std::string>(value)) {
+        oss << std::get<std::string>(value);
+    } else {
+        oss << "unknown";
+    }
+    
+    return oss.str();
+}
+
+} // anonymous namespace
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -20,7 +85,7 @@ Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PLACEHOLDER - Phase 1 uses a simple key=value format with proper type conversion
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -48,6 +113,45 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Try to infer type from value for proper storage
+            if (isNumeric(value)) {
+                // Try integer first
+                try {
+                    int intVal = std::stoi(value);
+                    set(key, intVal, ConfigSource::File);
+                    continue;
+                } catch (...) {}
+                
+                // Try int64_t
+                try {
+                    int64_t int64Val = std::stoll(value);
+                    set(key, int64Val, ConfigSource::File);
+                    continue;
+                } catch (...) {}
+                
+                // Try float
+                try {
+                    float floatVal = std::stof(value);
+                    set(key, floatVal, ConfigSource::File);
+                    continue;
+                } catch (...) {}
+                
+                // Try double
+                try {
+                    double doubleVal = std::stod(value);
+                    set(key, doubleVal, ConfigSource::File);
+                    continue;
+                } catch (...) {}
+            }
+            
+            // Try boolean values
+            if (value == "true" || value == "false") {
+                bool boolVal = (value == "true");
+                set(key, boolVal, ConfigSource::File);
+                continue;
+            }
+            
+            // Default to string
             set(key, value, ConfigSource::File);
         }
     }
@@ -85,8 +189,13 @@ bool Config::saveToFile(const std::string& filepath) const {
     }
     
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Get description from entry key if available
+        std::string description = "Configuration parameter: " + entry.key;
+        
+        file << "# " << description << "\n";
+        
+        // Save with proper formatting based on type
+        file << entry.key << " = " << configValueToString(entry.value) << "\n\n";
     }
     
     return true;
