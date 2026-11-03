@@ -294,4 +294,6 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
+**Note:** The `pynlm` Python module is included in the default build of NLM. You can import it directly with `import pynlm` and use the high-level API shown above, or use the lower-level C++ API for more detailed control over the neural simulation.
+
 That's it! You're now ready to use NLM.

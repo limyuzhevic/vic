@@ -5,6 +5,13 @@
 namespace nlm {
 
 // Hebbian learning implementation
+// Real implementation based on covariance rule: Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
+// Simplified version for spike-based systems: Δw = η * (coactivity - baseline)
+// This implements "neurons that fire together, wire together" but with a
+// threshold to prevent runaway potentiation.
+// Biological inspiration: AMPA receptor trafficking in hippocampus
+//                     : Correlation-based learning in visual cortex
+
 class Hebbian : public PlasticityRule {
 public:
     Hebbian();

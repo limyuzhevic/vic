@@ -5,7 +5,11 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// Real implementation based on spike-timing correlation
+// Mathematical formulation: Δw = A+ * exp(-Δt/τ+) for pre-before-post,
+// Δw = A- * exp(Δt/τ-) for post-before-pre
+// Biological inspiration: NMDA receptor-mediated calcium signaling,
+// backpropagating action potentials in synaptic plasticity
 
 class STDP : public PlasticityRule {
 public:

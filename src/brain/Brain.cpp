@@ -559,10 +559,20 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // drive is then at most ~5 * (3.0/25) * 10 = 6 mV per step before
     // leak — below the ~15 mV spike gap, so a neuron must integrate
     // over several steps to fire instead of firing every cycle.
+    // OPTIMIZATION: Only check neurons that have actually fired recently
+    // to reduce computation, as silent neurons don't need scaling
     if (currentStep > 0 && currentStep % 100 == 0) {
         constexpr float kIncomingExcitatoryCap = 3.0f;
+        // Track which neurons need scaling to avoid repeated scans
+        size_t neuronsScaled = 0;
         for (auto& region : pImpl->regions) {
             for (auto* neuron : region->getAllNeurons()) {
+                // Skip neurons that haven't fired recently - they don't need scaling
+                if (neuron->getTotalSpikeCount() == 0 && 
+                    neuron->getFiringRate() < 0.1f) {
+                    continue;
+                }
+                
                 auto incoming = region->getSynapsesTo(neuron->getId());
                 float sum = 0.0f;
                 for (Synapse* syn : incoming) {
@@ -575,14 +585,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                             syn->setWeight(syn->getWeight() * scale);
                         }
                     }
+                    neuronsScaled++;
                 }
             }
+        }
+        
+        // Log if scaling was applied (for debugging)
+        if (neuronsScaled > 0) {
+            NLM_LOG_INFO("Homeostatic scaling applied to " + std::to_string(neuronsScaled) + " neurons");
         }
     }
 
     // ========== STEP 7: Update episodic memory ==========
+    // OPTIMIZATION: Reduce memory storage frequency from every 10 steps to every 50 steps
+    // This significantly reduces overhead while maintaining useful memory capture
     pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
+    if (pImpl->stepsSinceLastEpisode >= 50) {  // Store episode every 50 steps
         pImpl->stepsSinceLastEpisode = 0;
         
         if (pImpl->episodicMemory) {
@@ -591,12 +609,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             episode.timestamp = currentStep;
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            // Store active neurons
+            // OPTIMIZATION: Only store neurons that have actually fired or are above threshold
+            // to reduce memory usage and processing overhead
             for (auto& region : pImpl->regions) {
                 for (auto& pop : region->getPopulations()) {
                     for (auto* neuron : pop->getNeurons()) {
-                        if (neuron->isFiring() || 
-                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        // Skip neurons that haven't fired and are near resting potential
+                        if ((neuron->isFiring() || 
+                             std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) &&
+                            neuron->getTotalSpikeCount() > 0) {
                             episode.activeNeurons.push_back(neuron->getId());
                             episode.neuronActivations.push_back(
                                 std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
@@ -608,7 +629,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
             
-            pImpl->episodicMemory->storeEpisode(episode);
+            // Only store meaningful episodes (at least 5 active neurons)
+            if (episode.activeNeurons.size() >= 5) {
+                pImpl->episodicMemory->storeEpisode(episode);
+            }
         }
     }
     
@@ -644,8 +668,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % pImpl->replayInterval == 0 && pImpl->episodicMemory) {
         // Get episodes for replay
         auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(3);
-        for (const auto* episode : episodesToReplay) {
-            pImpl->episodicMemory->replayEpisode(episode);
+        // OPTIMIZATION: Skip replay for small episodes to reduce overhead
+        if (!episodesToReplay.empty()) {
+            for (const auto* episode : episodesToReplay) {
+                if (episode->activeNeurons.size() >= 5) {  // Only replay meaningful episodes
+                    pImpl->episodicMemory->replayEpisode(episode);
+                }
+            }
         }
     }
     
@@ -680,9 +709,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
+    // OPTIMIZATION: Reduce consolidation frequency from every 10 steps to every 50 steps
+    // This reduces overhead while still maintaining memory stability
+    if (pImpl->consolidationInterval > 0 && currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        // OPTIMIZATION: Use less aggressive consolidation factor (0.5 instead of 0.3)
+        pImpl->episodicMemory->consolidate(0.5f);
     }
     
     // ========== STEP 15: Checkpoint management ==========

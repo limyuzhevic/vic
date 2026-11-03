@@ -223,12 +223,15 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
+    // Convert dt from seconds to milliseconds for consistency with tau
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
+        // Biologically realistic adaptation: V -= k * adaptation
         V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // Adaptable decay rate: adaptation decays naturally over time
+        pImpl->state.adaptationVariable *= 0.98f;  // More gradual decay (2% per ms)
     }
     
     // Clamp membrane potential to prevent instability
@@ -237,19 +240,20 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Update the firing-rate metric from counted spikes, in Hz.
     // Previously setFiringRate() was never called anywhere, so
     // getAverageFiringRate() summed zeros even with thousands of spikes.
-    // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
-    // dt is in seconds (0.001 in the demos), so a neuron firing every
-    // step would approach 1000 Hz, and refractory periods cap it well
-    // below that in practice.
+    // Improved EMA per brain step: exponential decay with small contribution
+    // to avoid overshooting and provide smooth rate tracking.
     if (dt > 0.0) {
-        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+        const float decayFactor = std::exp(-dt * 1000.0f / Impl::TIME_CONSTANT);
+        pImpl->state.firingRate = decayFactor * pImpl->state.firingRate;
     }
-
+    
     // Check for spike
     if (V >= threshold) {
         fired = true;
+        // More realistic firing rate update: add spike with proper scaling
         if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            // A single spike contributes approximately 1/dt Hz to the rate
+            pImpl->state.firingRate += 1.0f / (dt * 10.0f);  // Scale factor for stability
         }
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -257,16 +261,17 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Record spike
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to near-resting value (biologically realistic)
         V = V_reset;
         
         // Enter refractory period
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Update adaptation for spike-frequency adaptation (increment)
+        pImpl->state.adaptationVariable += 2.0f;  // More biologically plausible increment
     } else {
+        // Only set to Active if not firing and not refractory
         pImpl->state.firingState = FiringState::Active;
     }
     
