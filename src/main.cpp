@@ -20,15 +20,38 @@
 #include "experiments/ExperimentRunner.hpp"
 
 #include <iostream>
-#include <memory>
 #include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
 
-using namespace nlm;
-
-void printBanner() {
+void printHelp() {
+    std::cout << "NLM - Neural Learning Machine" << std::endl;
+    std::cout << "===========================" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Usage: nlm [OPTIONS]" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Phase 2: Real Neural Computation" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --config=<file>              Load configuration from file" << std::endl;
+    std::cout << "  --random_seed=<num>          Set random seed (default: 42)" << std::endl;
+    std::cout << "  --neuron_count=<num>         Set number of neurons (default: 500)" << std::endl;
+    std::cout << "  --region_count=<num>         Set number of regions (default: 1)" << std::endl;
+    std::cout << "  --connection_probability=<num> Set connection probability (default: 0.15)" << std::endl;
+    std::cout << "  --simulation_timestep=<num>   Set simulation timestep (default: 0.001)" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Configuration Files:" << std::endl;
+    std::cout << "  configs/default.cfg           Default configuration" << std::endl;
+    std::cout << "  configs/example.json         JSON configuration" << std::endl;
+    std::cout << "  configs/example.yaml         YAML configuration" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm                          Run with default configuration" << std::endl;
+    std::cout << "  nlm --config=myconfig.cfg     Load custom configuration" << std::endl;
+    std::cout << "  nlm --neuron_count=1000      Create 1000 neurons" << std::endl;
+    std::cout << "  nlm --random_seed=123         Set deterministic seed" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "For advanced usage, see the NLM documentation." << std::endl;
+}
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
@@ -309,6 +332,15 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 
 int main(int argc, char** argv) {
     printBanner();
+    
+    // Check for help option
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        }
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     

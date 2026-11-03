@@ -62,6 +62,10 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Additional load methods for different formats
+    bool loadFromJSON(const std::string& content, ConfigSource source);
+    bool loadFromYAML(const std::string& content, ConfigSource source);
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
@@ -98,6 +102,12 @@ template<typename T>
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
+    
+    // Internal validation helpers
+    static bool validateInt64(const std::string& str);
+    static bool validatePositiveInt(const std::string& str);
+    static bool validatePositiveDouble(const std::string& str);
+    static bool validateFloatRange(const std::string& str, float min, float max);
     
     // Internal helpers
     static std::string trim(const std::string& str);

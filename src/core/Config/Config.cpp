@@ -19,40 +19,95 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    // Read entire file to detect format
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Determine file format
+    bool isJSON = false;
+    bool isYAML = false;
+    
+    // Check for JSON format (starts with { or [)
+    if (!content.empty() && (content.front() == '{' || content.front() == '[')) {
+        isJSON = true;
     }
     
-    return true;
+    // Check for YAML format (has key: value patterns)
+    size_t colonPos = content.find(':');
+    if (colonPos != std::string::npos && colonPos > 0 && 
+        content.find(':', colonPos + 1) != std::string::npos && 
+        content.find('\n') != std::string::npos) {
+        isYAML = true;
+    }
+    
+    if (isJSON) {
+        return loadFromJSON(content, ConfigSource::File);
+    } else if (isYAML) {
+        return loadFromYAML(content, ConfigSource::File);
+    } else {
+        // Fallback to simple key=value format
+        std::istringstream stream(content);
+        std::string line;
+        size_t lineNum = 0;
+        bool validationErrors = false;
+        
+        while (std::getline(stream, line)) {
+            lineNum++;
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
+            }
+            
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Validate key format (should be alphanumeric with underscores)
+                if (!key.empty() && !std::isalnum(key[0]) && key[0] != '_') {
+                    NLM_LOG_WARNING("Config: Invalid key format at line " + std::to_string(lineNum) + ": " + key);
+                    validationErrors = true;
+                }
+                
+                // Validate key for known configuration parameters
+                if (key == "random_seed" && !validateInt64(value)) {
+                    NLM_LOG_ERROR("Config: Invalid random_seed value at line " + std::to_string(lineNum) + ": " + value);
+                    validationErrors = true;
+                } else if (key == "neuron_count" && !validatePositiveInt(value)) {
+                    NLM_LOG_ERROR("Config: Invalid neuron_count value at line " + std::to_string(lineNum) + ": " + value);
+                    validationErrors = true;
+                } else if (key == "simulation_timestep" && !validatePositiveDouble(value)) {
+                    NLM_LOG_ERROR("Config: Invalid simulation_timestep value at line " + std::to_string(lineNum) + ": " + value);
+                    validationErrors = true;
+                } else if (key == "connection_probability" && !validateFloatRange(value, 0.0f, 1.0f)) {
+                    NLM_LOG_ERROR("Config: Invalid connection_probability value at line " + std::to_string(lineNum) + ": " + value);
+                    validationErrors = true;
+                }
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            } else {
+                NLM_LOG_WARNING("Config: Invalid line format at line " + std::to_string(lineNum) + ": " + line);
+                validationErrors = true;
+            }
+        }
+        
+        return !validationErrors;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -234,5 +289,250 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+bool Config::loadFromJSON(const std::string& content, ConfigSource source) {
+    // Simple JSON parser for common formats
+    // This is a simplified implementation that handles basic JSON structures
+    try {
+        // Check if it's a JSON object (starts with {)
+        if (content.front() != '{') {
+            return false;
+        }
+        
+        // Parse key-value pairs
+        size_t pos = 1;  // Skip opening brace
+        while (pos < content.size() && content[pos] != '}') {
+            // Find next key (skip whitespace and "")
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t')) {
+                pos++;
+            }
+            
+            if (pos >= content.size() || content[pos] != '"') {
+                break;
+            }
+            
+            // Find key end
+            size_t keyStart = pos + 1;
+            pos = content.find('"', keyStart);
+            if (pos == std::string::npos) {
+                break;
+            }
+            
+            std::string key = content.substr(keyStart, pos - keyStart);
+            
+            // Skip whitespace and colon
+            pos++;
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t')) {
+                pos++;
+            }
+            
+            if (pos >= content.size() || content[pos] != ':') {
+                break;
+            }
+            
+            // Find value
+            pos++;
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t')) {
+                pos++;
+            }
+            
+            // Parse value based on first character
+            if (pos < content.size()) {
+                if (content[pos] == '"') {
+                    // String value
+                    size_t valueEnd = content.find('"', pos + 1);
+                    if (valueEnd != std::string::npos) {
+                        std::string value = content.substr(pos + 1, valueEnd - pos - 1);
+                        set(key, value, source);
+                        pos = valueEnd + 1;
+                    }
+                } else if (content[pos] == 't' || content[pos] == 'f') {
+                    // Boolean value
+                    if (content.substr(pos, 5) == "true") {
+                        set(key, true, source);
+                        pos += 4;
+                    } else if (content.substr(pos, 4) == "false") {
+                        set(key, false, source);
+                        pos += 5;
+                    }
+                } else if (content[pos] == '-' || (content[pos] >= '0' && content[pos] <= '9')) {
+                    // Number value
+                    size_t valueEnd = content.find_first_of(",}", pos);
+                    if (valueEnd != std::string::npos) {
+                        std::string valueStr = content.substr(pos, valueEnd - pos);
+                        
+                        // Try to parse as int64
+                        try {
+                            size_t endPos;
+                            int64_t intVal = std::stoll(valueStr, &endPos);
+                            if (endPos == valueStr.size()) {
+                                set(key, intVal, source);
+                                pos = valueEnd;
+                                continue;
+                            }
+                        } catch (...) {}
+                        
+                        // Try to parse as double
+                        try {
+                            size_t endPos;
+                            double doubleVal = std::stod(valueStr, &endPos);
+                            if (endPos == valueStr.size()) {
+                                set(key, doubleVal, source);
+                                pos = valueEnd;
+                                continue;
+                            }
+                        } catch (...) {}
+                        
+                        // If both fail, treat as string
+                        set(key, valueStr, source);
+                        pos = valueEnd;
+                    }
+                } else if (content[pos] == '[') {
+                    // Array value (simplified)
+                    size_t arrayEnd = content.find(']', pos);
+                    if (arrayEnd != std::string::npos) {
+                        // For now, store as string representation
+                        std::string arrayStr = content.substr(pos, arrayEnd - pos + 1);
+                        set(key, arrayStr, source);
+                        pos = arrayEnd + 1;
+                    }
+                }
+            }
+            
+            // Skip to next key or closing brace
+            while (pos < content.size() && content[pos] != ',' && content[pos] != '}') {
+                pos++;
+            }
+            
+            if (pos < content.size() && content[pos] == ',') {
+                pos++;
+            }
+        }
+        
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(const std::string& content, ConfigSource source) {
+    // Simple YAML parser for basic key: value format
+    try {
+        std::istringstream stream(content);
+        std::string line;
+        
+        while (std::getline(stream, line)) {
+            line = trim(line);
+            
+            // Skip empty lines, comments, and YAML document markers
+            if (line.empty() || line[0] == '#' || line == "---" || line == "...") {
+                continue;
+            }
+            
+            // Parse key: value pairs (YAML basic format)
+            size_t pos = line.find(':');
+            if (pos == std::string::npos) {
+                continue;  // Not a key-value pair
+            }
+            
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes from value
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            // Try to parse value as different types
+            bool parsed = false;
+            
+            // Try boolean
+            if (value == "true") {
+                set(key, true, source);
+                parsed = true;
+            } else if (value == "false") {
+                set(key, false, source);
+                parsed = true;
+            }
+            
+            // Try integer
+            if (!parsed) {
+                try {
+                    size_t endPos;
+                    int64_t intVal = std::stoll(value, &endPos);
+                    if (endPos == value.size()) {
+                        set(key, intVal, source);
+                        parsed = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // Try double
+            if (!parsed) {
+                try {
+                    size_t endPos;
+                    double doubleVal = std::stod(value, &endPos);
+                    if (endPos == value.size()) {
+                        set(key, doubleVal, source);
+                        parsed = true;
+                    }
+                } catch (...) {}
+            }
+            
+            // If not parsed as numeric, treat as string
+            if (!parsed) {
+                set(key, value, source);
+            }
+        }
+        
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+// Helper validation functions
+bool Config::validateInt64(const std::string& str) {
+    try {
+        size_t endPos;
+        int64_t val = std::stoll(str, &endPos);
+        return endPos == str.size();
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::validatePositiveInt(const std::string& str) {
+    try {
+        size_t endPos;
+        int64_t val = std::stoll(str, &endPos);
+        return endPos == str.size() && val > 0;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::validatePositiveDouble(const std::string& str) {
+    try {
+        size_t endPos;
+        double val = std::stod(str, &endPos);
+        return endPos == str.size() && val > 0.0;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::validateFloatRange(const std::string& str, float min, float max) {
+    try {
+        size_t endPos;
+        double val = std::stod(str, &endPos);
+        if (endPos != str.size()) return false;
+        return val >= min && val <= max;
+    } catch (...) {
+        return false;
+    }
+}
 
 } // namespace nlm
