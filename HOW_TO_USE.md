@@ -193,13 +193,13 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Complete Agent Example with Memory
 
 ```python
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+def run_agent_simulation_with_memory(num_steps=1000):
+    """Run a complete agent simulation with brain, world, and episodic memory."""
     
     # 1. Create configuration
     config = pynlm.createDefaultConfig()
@@ -213,18 +213,19 @@ def run_agent_simulation(num_steps=1000):
     
     # 4. Create and configure world
     world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+    world.configure(width=30, height=30, visionWidth=12, visionHeight=12)
     world.reset()
-    world.setAgentStart(10.0, 10.0)
+    world.setAgentStart(15.0, 15.0)
     
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
+    # 6. Enable advanced subsystems
     agent.enableRewardModulation(True)
     agent.enableStructuralPlasticity(True)
     agent.enableDevelopment(True)
     agent.enableCuriosity(True)
+    agent.enableEpisodicMemory(True)
     
     # 7. Run simulation loop
     for step in range(num_steps):
@@ -246,23 +247,116 @@ def run_agent_simulation(num_steps=1000):
         # Apply motor command to world
         world.applyMotorCommand(motor_cmd, world.getSimulationTime())
         
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
+        # Apply reward modulation with prediction error
+        reward = percept.getInternal()[0] if percept.getInternal() else 0.0
+        prediction = agent.getPredictionError()
+        agent.applyRewardModulation(reward, prediction)
         
         # Update development
         agent.updateDevelopment(0.1)
         
-        # Print progress
+        # Print progress with memory stats
         if step % 100 == 0:
             print(f"Step {step}:")
             print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
             print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
             print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+            print(f"  Prediction Error: {agent.getPredictionError():.3f}")
             print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+            print(f"  Working Memory: {brain.getWorkingMemory().getActiveTraces() if brain.getWorkingMemory() else 0}")
+            print(f"  Episodic Episodes: {brain.getEpisodicMemory().getEpisodeCount() if brain.getEpisodicMemory() else 0}")
+    
+    # Demonstrate episodic memory retrieval
+    if brain.getEpisodicMemory() and brain.getEpisodicMemory().getEpisodeCount() > 0:
+        print("\nEpisodic Memory Summary:")
+        recent_episodes = brain.getEpisodicMemory().getEpisodesForReplay(5)
+        for i, episode in enumerate(recent_episodes):
+            print(f"  Episode {i}: Pos({episode.positionX:.1f}, {episode.positionY:.1f}), Reward={episode.reward:.3f}")
+    
+    print("\nMemory-enabled simulation complete!")
+    print(f"Total episodic episodes stored: {brain.getEpisodicMemory().getEpisodeCount() if brain.getEpisodicMemory() else 0}")
 
 # Run the simulation
-run_agent_simulation(1000)
+run_agent_simulation_with_memory(1000)
+```
+
+### Advanced Configuration Example
+
+```python
+import pynlm
+
+def create_advanced_brain():
+    """Create a brain with advanced configuration for complex tasks."""
+    
+    # Create advanced configuration
+    config = pynlm.createDefaultConfig()
+    
+    # Basic brain configuration
+    config.set("brain.neuron_count", 2000)
+    config.set("brain.region_count", 3)
+    config.set("brain.connection_probability", 0.08)
+    
+    # Neural dynamics configuration
+    config.set("brain.v_thresh", -45.0)  # Higher threshold for fewer spikes
+    config.set("brain.v_rest", -65.0)
+    config.set("brain.v_reset", -70.0)
+    config.set("brain.tau_mem", 30.0)   # Longer time constant
+    config.set("brain.tau_ref", 5.0)   # Shorter refractory period
+    
+    # Plasticity configuration
+    config.set("plasticity.stdp.enable", True)
+    config.set("plasticity.stdp.learning_rate", 0.0005)  # Slower learning
+    config.set("plasticity.stdp.tau_plus", 30.0)
+    config.set("plasticity.stdp.tau_minus", 30.0)
+    
+    config.set("plasticity.hebbian.enable", True)
+    config.set("plasticity.hebbian.learning_rate", 0.0002)
+    
+    config.set("plasticity.structural.enable", True)
+    config.set("plasticity.structural.synapse_growth_rate", 0.00005)
+    config.set("plasticity.structural.pruning_rate", 0.00001)
+    
+    # Neuromodulation configuration
+    config.set("neuromod.dopamine.scale", 2.0)
+    config.set("neuromod.curiosity.enable", True)
+    config.set("neuromod.curiosity.strength", 1.5)
+    config.set("neuromod.novelty.enable", True)
+    config.set("neuromod.novelty.sensitivity", 0.8)
+    
+    # Memory configuration
+    config.set("memory.working_memory.capacity", 5000)
+    config.set("memory.episodic_memory.max_episodes", 2000)
+    config.set("memory.associative_memory.similarity_threshold", 0.7)
+    
+    # Development configuration
+    config.set("development.enabled", True)
+    config.set("development.initial_stage", "CriticalPeriod")
+    config.set("development.maturation_rate", 0.02)
+    
+    # Configuration for agent capabilities
+    config.set("agent.enable_planning", True)
+    config.set("agent.planning_horizon", 10)
+    config.set("agent.enable_attention", True)
+    config.set("agent.attention_strength", 1.0)
+    
+    # Environment configuration
+    config.set("environment.width", 50.0)
+    config.set("environment.height", 50.0)
+    config.set("environment.resource_density", 0.3)
+    config.set("environment.hazard_density", 0.1)
+    
+    # Create and return brain
+    brain = pynlm.createBrain(config)
+    return brain
+
+# Create and test advanced brain
+advanced_brain = create_advanced_brain()
+advanced_brain.initialize()
+
+print(f"Advanced brain created with:")
+print(f"  Neurons: {advanced_brain.getTotalNeuronCount()}")
+print(f"  Synapses: {advanced_brain.getTotalSynapseCount()}")
+print(f"  Development Stage: {advanced_brain.getDevelopmentalStage()}")
 ```
 
 ### Key Classes and Methods

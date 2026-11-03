@@ -106,8 +106,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         }
     }
     
-    // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
+    // Collect final metrics - total reward over whole simulation, not average
+    result.totalReward = totalReward;  // Don't divide by maxSteps - we want cumulative reward
     result.avgFiringRate = totalFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;

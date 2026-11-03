@@ -143,7 +143,7 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 4: Enable Advanced Features
 
 ```python
 # These are all optional:
@@ -151,6 +151,106 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+agent.enablePrediction(True)            # Learn temporal patterns
+agent.enablePlanning(True)              # Plan multiple-step actions
+agent.enableAttention(True)             # Focus on relevant information
+
+# Enable specific neuron types
+brain.enableNeuronType("Excitatory", True)
+brain.enableNeuronType("Inhibitory", True)
+brain.enableNeuronType("Sensory", True)
+brain.enableNeuronType("Motor", True)
+```
+
+### Pattern 5: Advanced Configuration
+
+```python
+import pynlm
+
+# Create advanced configuration
+config = pynlm.createDefaultConfig()
+
+# Configure neuron counts per region
+config.set("brain.region_0.neuron_count", 500)
+config.set("brain.region_1.neuron_count", 300)
+config.set("brain.region_2.neuron_count", 200)
+
+# Configure connectivity
+config.set("brain.connection_probability", 0.05)
+config.set("brain.initial_weight_mean", 0.3)
+config.set("brain.initial_weight_std", 0.1)
+
+# Configure learning rates
+config.set("plasticity.stdp.learning_rate", 0.001)
+config.set("plasticity.hebbian.learning_rate", 0.0005)
+config.set("plasticity.structural.rate", 0.0001)
+
+# Configure neuromodulation
+config.set("neuromod.dopamine.scale", 1.5)
+config.set("neuromod.curiosity.strength", 2.0)
+config.set("neuromod.novelty.threshold", 0.7)
+
+# Configure memory systems
+config.set("memory.working_memory.capacity", 1000)
+config.set("memory.episodic_memory.max_episodes", 500)
+config.set("memory.associative_memory.pattern_similarity", 0.8)
+
+# Configure development
+config.set("development.enabled", True)
+config.set("development.critical_period", 100.0)
+config.set("development.maturation_rate", 0.01)
+
+# Create brain with advanced config
+brain = pynlm.createBrain(config)
+brain.initialize()
+```
+
+### Pattern 6: Episodic Memory Demo
+
+```python
+import pynlm
+
+def demonstrate_episodic_memory():
+    """Demonstrate how episodic memory works in NLM."""
+    
+    # Setup
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    agent = pynlm.createAgentBrain(brain)
+    world = pynlm.createSimpleWorld()
+    world.configure(width=30, height=30, visionWidth=8, visionHeight=8)
+    world.reset()
+    agent.initialize(world)
+    
+    # Enable episodic memory
+    agent.enableEpisodicMemory(True)
+    
+    # Run simulation
+    for step in range(500):
+        world.update(0.1)
+        
+        # Store state before action
+        prev_position = world.getAgentBody().x, world.getAgentBody().y
+        
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Episodic memory automatically stores important experiences
+        if step % 50 == 0:
+            print(f"Step {step}: Stored episode at position ({prev_position[0]:.1f}, {prev_position[1]:.1f})")
+            print(f"  Episode count: {brain.getEpisodicMemory().getEpisodeCount()}")
+            print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+    
+    print("\nEpisodic memory demonstration complete!")
+    print(f"Total episodes stored: {brain.getEpisodicMemory().getEpisodeCount()}")
+
+# Run demonstration
+demonstrate_episodic_memory()
 ```
 
 ---

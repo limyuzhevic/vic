@@ -197,11 +197,14 @@ void CheckpointReader::close() {
 
 bool CheckpointReader::validate() const {
     if (!header_.validate()) return false;
-    bool hasNeurons = false, hasSynapses = false;
+    bool hasNeurons = false, hasSynapses = false, hasSpikeHistory = false;
     for (const auto& s : sections_) {
         if (s.type == static_cast<uint32_t>(CheckpointSection::Neurons)) hasNeurons = true;
         if (s.type == static_cast<uint32_t>(CheckpointSection::Synapses)) hasSynapses = true;
+        if (s.type == static_cast<uint32_t>(CheckpointSection::SpikeHistory)) hasSpikeHistory = true;
     }
+    return hasNeurons && hasSynapses && hasSpikeHistory;
+}
     return hasNeurons && hasSynapses;
 }
 
