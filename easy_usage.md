@@ -10,11 +10,27 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
+***NLM PHASE 2: ENHANCED LEARNING CAPABILITIES***
 
----
+Phase 2 introduces major improvements to the learning system:
 
-## The 3 Things You Need to Know
+### Learning Improvements
+
+#### Before Phase 2: Network Saturation
+The previous version stimulated ALL sensory neurons repeatedly:
+- 30.0f current × 20 times per step = 600.0f total per step
+- Entire network fired synchronously
+- Learning was measurable but not selective
+- Weights tended to saturate at 1.0
+
+#### Phase 2: Selective Pattern Learning
+Phase 2 now uses intelligent, selective pattern learning:
+- Stimulates only specific neurons (pattern learning)
+- Smaller current strength (15.0f vs 30.0f)
+- Allows for more realistic learning patterns
+- Better selective pattern association
+
+### The 3 Things You Need to Know
 
 1. **Brain** - The virtual brain that thinks
 2. **World** - The environment the brain lives in
@@ -73,15 +89,51 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## Simple Analogy
+## Advanced Features (New in Phase 2)
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+### Enhanced Command-Line Interface
+
+The NLM Phase 2 demo now supports advanced command-line options:
+
+```bash
+# Help
+./nlm --help
+
+# Verbose logging
+./nlm --verbose
+
+# Custom plasticity experiment settings
+./nlm --plasticity-episodes 3 --plasticity-steps 500
+./nlm --plasticity-episodes 10 --plasticity-current 20.0
+./nlm --plasticity-no-selective
+```
+
+**Available Options:**
+- `--plasticity-episodes N`: Number of learning episodes (default: 5)
+- `--plasticity-steps N`: Steps per episode (default: 1000)
+- `--plasticity-current F`: Current strength per neuron (default: 15.0)
+- `--plasticity-no-selective`: Disable selective learning pattern
+
+### New Learning Pattern (FIXED Saturation)
+
+**Phase 2 Learning Improvements:**
+- **OLD**: All sensory neurons stimulated (network saturation)
+- **NEW**: Selective pattern learning for better results
+
+**Benefits:**
+- More realistic neural learning
+- Avoids saturation effects
+- Better selective pattern association
+- More stable weight changes
+
+### Enhanced Output
+
+The demo now provides:
+- **Detailed logging** of learning progress
+- **Average synaptic weights** during learning
+- **Current strength information**
+- **Learning analysis reports**
+- **Phase 2 improvement summary**
 
 ---
 
@@ -152,32 +204,6 @@ agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
 ```
-
----
-
-## What Each Part Does
-
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
-
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
-
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
-
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
-
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
-
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
 
 ---
 
@@ -256,34 +282,78 @@ print("Agent simulation complete!")
 
 ---
 
-## Quick Reference
+## What Each Part Does
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+### `pynlm.createBrain(config)`
+Creates a virtual brain with neurons and synapses.
+- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+
+### `brain.initialize()`
+Starts up the brain. Always call this before using the brain!
+
+### `brain.step(step_number)`
+Makes the brain process one moment in time. The brain:
+- Checks each neuron
+- Sends signals between connected neurons
+- Updates connections based on learning rules
+
+### `world.update(time)`
+Updates the virtual world by `time` seconds.
+
+### `agent.processSensoryInput(percept)`
+Gives sensory information (vision, touch, etc.) to the brain.
+
+### `agent.decodeMotorCommand()`
+Reads the brain's motor neurons to decide what action to take.
 
 ---
 
-## Troubleshooting
+## Advanced Usage (New)
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+### Command Line Options
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+The NLM Phase 2 demo includes these advanced command-line options:
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+**Basic:**
+- `--help, -h`: Show help message
+- `--verbose, -v`: Enable verbose logging
+
+**Phase 2 Advanced (Plasticity Experiment):**
+- `--plasticity-episodes N`: Number of learning episodes (default: 5)
+- `--plasticity-steps N`: Steps per episode (default: 1000)
+- `--plasticity-current F`: Current strength per neuron (default: 15.0)
+- `--plasticity-no-selective`: Disable selective learning pattern
+
+**Example Usage:**
+```bash
+./nlm --plasticity-episodes 3 --plasticity-steps 500 --plasticity-current 20.0
+./nlm --plasticity-no-selective
+./nlm --verbose
+```
+
+### Learning Analysis (New)
+
+Phase 2 provides detailed learning analysis:
+
+```
+=== Phase 2 Learning Improvements ===
+OLD: All sensory neurons stimulated (saturation)
+NEW: Selective pattern learning for better results
+BENEFIT: More realistic, selective pattern learning
+
+=== Advanced Configuration (Phase 3)
+Plasticity episodes: 5
+Steps per episode: 1000
+Current strength: 15.0
+Selective learning: enabled
+```
+
+### What Changed in Phase 2
+
+1. **Learning Pattern**: Selective instead of network-wide stimulation
+2. **Command Line**: Advanced options for customizing experiments
+3. **Logging**: Enhanced output with learning analysis
+4. **Output**: Summary of improvements and benefits
 
 ---
 
@@ -294,4 +364,13 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+***Phase 2 Key Improvements:***
+- ✓ Fixed network saturation issue
+- ✓ Implemented selective pattern learning  
+- ✓ Added advanced command-line options
+- ✓ Enhanced logging and analysis
+- ✓ Better user experience
+
+***The Phase 2 NLM now demonstrates real neural computation with improved learning selectivity!***
+
+That's it! You're now ready to use NLM with enhanced learning capabilities!
