@@ -17,7 +17,7 @@ public:
     DevelopmentSystem();
     ~DevelopmentSystem();
     
-    // Get current developmental stage
+// Get current developmental stage
     DevelopmentalStage getStage() const;
     void setStage(DevelopmentalStage stage);
     
@@ -31,7 +31,16 @@ public:
     void update(Brain* brain, SimulationStep currentStep);
     
     // Update development with full parameters
+    void update(Brain* brain, SimulationStep currentStep, float synapseCreationRate, 
+               float pruningRate, float structuralPlasticityRate);
+    
+    // Update development with random generator
     void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt);
+    
+    // Update development with full parameters and random generator
+    void update(Brain* brain, RandomGenerator& rng, TimestepDuration dt,
+               float synapseCreationRate, float pruningRate,
+               float structuralPlasticityRate);
     
     // Get plasticity modifier for current stage
     float getPlasticityModifier() const;
@@ -46,10 +55,16 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Set developmental parameters
+    void setDevelopmentalParameters(float synapseCreationRate, float pruningRate,
+                                    float structuralPlasticityRate);
+    
 private:
     struct Impl;
     Impl* pImpl;
     double age_;
 };
+
+} // namespace nlm
 
 } // namespace nlm

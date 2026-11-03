@@ -151,11 +151,19 @@ PYBIND11_MODULE(pynlm, m) {
         // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
+            argv.reserve(args.size() + 1); // +1 for null terminator
+            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+            argv.push_back(nullptr); // Ensure null terminator
+            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
+        }, py::arg("args"),
+           "Load configuration from command line arguments")
+        .def("loadFromArgsLegacy", [](Config& self, const std::vector<std::string>& args) {
+            std::vector<char*> argv;
             argv.reserve(args.size());
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments (legacy - includes null terminator)")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),

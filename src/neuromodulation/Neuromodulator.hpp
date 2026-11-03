@@ -87,3 +87,43 @@ public:
 };
 
 } // namespace nlm
+
+// Neuromodulator Manager: Integrates all neuromodulators
+class NeuromodulatorManager {
+public:
+    NeuromodulatorManager();
+    ~NeuromodulatorManager();
+    
+    // Initialize with brain reference
+    void initialize(class Brain* brain);
+    
+    // Update all neuromodulators
+    void updateAll(TimestepDuration dt);
+    
+    // Apply neuromodulatory effects to brain
+    void applyToBrain(class Brain* brain);
+    
+    // Get total neuromodulatory drive
+    float getTotalDrive() const;
+    
+    // Signal environmental changes
+    void signalEnvironmentalChange();
+    
+    // Signal reward
+    void signalReward(float reward);
+    
+    // Signal prediction error
+    void signalPredictionError(float error);
+    
+    // Reset all neuromodulators
+    void resetAll();
+    
+    // Get neuromodulator by name
+    Neuromodulator* getNeuromodulator(const std::string& name);
+    
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+} // namespace nlm

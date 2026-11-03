@@ -95,6 +95,16 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    std::vector<std::string> validate() const;
+    bool isValid() const;
+    
+    // Get validation errors
+    const std::vector<std::string>& getValidationErrors() const;
+    
+    // Check if configuration has required parameters
+    bool hasRequiredParams(const std::set<std::string>& requiredParams) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +112,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helper
+    bool validateParameter(const std::string& key, const ConfigValue& value) const;
 };
 
 } // namespace nlm

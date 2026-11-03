@@ -8,7 +8,160 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<std::string> validationErrors;
 };
+
+struct ConfigValidationRule {
+    std::string paramName;
+    std::function<bool(const ConfigValue&)> validator;
+    std::string errorMessage;
+    
+    ConfigValidationRule(const std::string& name, std::function<bool(const ConfigValue&)> val, const std::string& error)
+        : paramName(name), validator(val), errorMessage(error) {}
+    
+    bool validate(const ConfigValue& value) const {
+        return validator(value);
+    }
+};
+
+class ConfigValidator {
+public:
+    static ConfigValidator& instance() {
+        static ConfigValidator validator;
+        return validator;
+    }
+    
+    void addRule(const ConfigValidationRule& rule) {
+        rules_.push_back(rule);
+    }
+    
+    std::vector<std::string> validate(const std::vector<ConfigEntry>& entries) const {
+        std::vector<std::string> errors;
+        for (const auto& entry : entries) {
+            auto it = std::find_if(rules_.begin(), rules_.end(),
+                                  [&entry](const ConfigValidationRule& rule) {
+                                      return rule.paramName == entry.key;
+                                  });
+            if (it != rules_.end()) {
+                if (!it->validate(entry.value)) {
+                    errors.push_back("Invalid value for parameter '" + entry.key + "': " + it->errorMessage);
+                }
+            }
+        }
+        return errors;
+    }
+    
+    bool validateRequired(const std::vector<ConfigEntry>& entries, const std::set<std::string>& requiredParams) const {
+        bool allPresent = true;
+        for (const auto& param : requiredParams) {
+            if (!std::any_of(entries.begin(), entries.end(),
+                           [&param](const ConfigEntry& e) { return e.key == param; })) {
+                allPresent = false;
+                break;
+            }
+        }
+        return allPresent;
+    }
+    
+private:
+    ConfigValidator() {
+        // Initialize validation rules for common NLM parameters
+        
+        // Numeric parameters that should be positive
+        addRule(ConfigValidationRule("random_seed", 
+            [](const ConfigValue& v) {
+                if (std::holds_alternative<int64_t>(v)) return std::get<int64_t>(v) > 0;
+                if (std::holds_alternative<int>(v)) return std::get<int>(v) > 0;
+                return false;
+            },
+            "must be a positive integer"));
+        
+        addRule(ConfigValidationRule("neuron_count",
+            [](const ConfigValue& v) {
+                if (std::holds_alternative<int64_t>(v)) return std::get<int64_t>(v) > 0;
+                if (std::holds_alternative<int>(v)) return std::get<int>(v) > 0 && std::get<int>(v) <= 100000;
+                return false;
+            },
+            "must be a positive integer between 1 and 100000"));
+        
+        addRule(ConfigValidationRule("region_count",
+            [](const ConfigValue& v) {
+                if (std::holds_alternative<int64_t>(v)) return std::get<int64_t>(v) > 0 && std::get<int64_t>(v) <= 1000;
+                return false;
+            },
+            "must be a positive integer between 1 and 1000"));
+        
+        addRule(ConfigValidationRule("simulation_timestep",
+            [](const ConfigValue& v) {
+                if (std::holds_alternative<double>(v)) return std::get<double>(v) > 0.0 && std::get<double>(v) <= 1.0;
+                return false;
+            },
+            "must be a positive double between 0.0001 and 1.0"));
+        
+        // Floating point parameters that should be within specific ranges
+        addRule(ConfigValidationRule("connection_probability",
+            [](const ConfigValue& v) {
+                if (std::holds_alternative<double>(v)) {
+                    double val = std::get<double>(v);
+                    return val >= 0.0 && val <= 1.0;
+                }
+                if (std::holds_alternative<float>(v)) {
+                    float val = std::get<float>(v);
+                    return val >= 0.0f && val <= 1.0f;
+                }
+                return false;
+            },
+            "must be a float between 0.0 and 1.0"));
+        
+        addRule(ConfigValidationRule("stdp_ltp_weight",
+            [](const ConfigValue& v) {
+                if (std::holds_alternative<double>(v)) return std::get<double>(v) >= 0.0;
+                if (std::holds_alternative<float>(v)) return std::get<float>(v) >= 0.0f;
+                return false;
+            },
+            "must be a non-negative float"));
+        
+        addRule(ConfigValidationRule("stdp_ltd_weight",
+            [](const ConfigValue& v) {
+                if (std::holds_alternative<double>(v)) return std::get<double>(v) >= 0.0;
+                if (std::holds_alternative<float>(v)) return std::get<float>(v) >= 0.0f;
+                return false;
+            },
+            "must be a non-negative float"));
+        
+        addRule(ConfigValidationRule("stdp_tau",
+            [](const ConfigValue& v) {
+                if (std::holds_alternative<double>(v)) return std::get<double>(v) > 0.0 && std::get<double>(v) <= 100.0;
+                if (std::holds_alternative<float>(v)) return std::get<float>(v) > 0.0f && std::get<float>(v) <= 100.0f;
+                return false;
+            },
+            "must be a positive float between 0.1 and 100.0"));
+        
+        addRule(ConfigValidationRule("synaptogenesis_rate",
+            [](const ConfigValue& v) {
+                if (std::holds_alternative<double>(v)) return std::get<double>(v) >= 0.0 && std::get<double>(v) <= 1.0;
+                if (std::holds_alternative<float>(v)) return std::get<float>(v) >= 0.0f && std::get<float>(v) <= 1.0f;
+                return false;
+            },
+            "must be a float between 0.0 and 1.0"));
+        
+        addRule(ConfigValidationRule("pruning_rate",
+            [](const ConfigValue& v) {
+                if (std::holds_alternative<double>(v)) return std::get<double>(v) >= 0.0 && std::get<double>(v) <= 1.0;
+                if (std::holds_alternative<float>(v)) return std::get<float>(v) >= 0.0f && std::get<float>(v) <= 1.0f;
+                return false;
+            },
+            "must be a float between 0.0 and 1.0"));
+    }
+    
+private:
+    std::vector<ConfigValidationRule> rules_;
+};
+
+// Global validator instance
+ConfigValidator& getValidator() {
+    return ConfigValidator::instance();
+}
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
 
@@ -19,9 +172,6 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -48,7 +198,9 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            if (!set(key, value, ConfigSource::File)) {
+                return false;
+            }
         }
     }
     
@@ -65,16 +217,23 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                if (!set(key, value, ConfigSource::CommandLine)) {
+                    return false;
+                }
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            if (!set(key, value, ConfigSource::CommandLine)) {
+                return false;
+            }
         }
     }
+    
+    // Validate configuration after loading
+    pImpl->validationErrors = validate();
     return true;
 }
 
@@ -86,13 +245,43 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert ConfigValue to string representation
+        std::string valueStr;
+        std::visit([&valueStr](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                valueStr = "\"" + arg + "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                valueStr = "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) valueStr += ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        valueStr += "\"" + arg[i] + "\"";
+                    } else {
+                        valueStr += std::to_string(arg[i]);
+                    }
+                }
+                valueStr += "]";
+            } else {
+                valueStr = std::to_string(arg);
+            }
+        }, entry.value);
+        
+        file << entry.key << " = " << valueStr << "\n";
     }
     
     return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate the value before setting it
+    if (!validateParameter(key, value)) {
+        return; // Silently ignore invalid values for now
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -102,6 +291,9 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
+    
+    // Clear validation errors since we just set a valid value
+    pImpl->validationErrors.clear();
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
@@ -211,10 +403,40 @@ std::optional<T> Config::get(const std::string& key) const {
     }, it->value);
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+bool Config::validateParameter(const std::string& key, const ConfigValue& value) const {
+    auto it = std::find_if(rules_.begin(), rules_.end(),
+                          [&key](const ConfigValidationRule& rule) {
+                              return rule.paramName == key;
+                          });
+    if (it == rules_.end()) {
+        return true; // No validation rule for this parameter
+    }
+    return it->validate(value);
+}
+
+std::vector<std::string> Config::validate() const {
+    std::vector<std::string> errors;
+    
+    // Validate parameter values
+    for (const auto& entry : pImpl->entries) {
+        if (!validateParameter(entry.key, entry.value)) {
+            errors.push_back("Invalid value for parameter '" + entry.key + "'");
+        }
+    }
+    
+    return errors;
+}
+
+bool Config::isValid() const {
+    return pImpl->validationErrors.empty();
+}
+
+const std::vector<std::string>& Config::getValidationErrors() const {
+    return pImpl->validationErrors;
+}
+
+bool Config::hasRequiredParams(const std::set<std::string>& requiredParams) const {
+    return getValidator().validateRequired(pImpl->entries, requiredParams);
 }
 
 // Explicit template instantiations

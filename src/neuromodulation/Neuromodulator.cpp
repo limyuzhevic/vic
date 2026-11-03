@@ -1,56 +1,160 @@
 #include "Neuromodulator.hpp"
+#include "src/neuromodulation/Dopamine.cpp"
+#include "src/neuromodulation/Curiosity.cpp"
+#include "src/neuromodulation/Novelty.cpp"
+#include "src/neuromodulation/PredictionError.cpp"
+#include "src/neuromodulation/Reward.cpp"
+#include "src/brain/Brain.hpp"
 #include <algorithm>
+#include <unordered_map>
 
 namespace nlm {
 
-struct Dopamine::Impl {
-    float level;
-    float baseline;
-    float peak;
-    float decayRate;
-    float releaseRate;
+struct NeuromodulatorManager::Impl {
+    class Brain* brain;
+    std::unordered_map<std::string, Neuromodulator*> neuromodulators;
     
-    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
+    Impl() : brain(nullptr) {}
 };
 
-Dopamine::Dopamine() : pImpl(new Impl) {}
+NeuromodulatorManager::NeuromodulatorManager() : pImpl(std::make_unique<Impl>()) {}
 
-Dopamine::~Dopamine() = default;
-
-const char* Dopamine::getName() const {
-    return "DA";
+NeuromodulatorManager::~NeuromodulatorManager() {
+    for (auto& pair : pImpl->neuromodulators) {
+        delete pair.second;
+    }
 }
 
-float Dopamine::getLevel() const {
-    return pImpl->level;
+void NeuromodulatorManager::initialize(class Brain* brain) {
+    pImpl->brain = brain;
+    
+    // Create all neuromodulators
+    pImpl->neuromodulators["DA"] = new Dopamine();
+    pImpl->neuromodulators["ACh"] = new Acetylcholine();
+    pImpl->neuromodulators["NE"] = new Norepinephrine();
+    pImpl->neuromodulators["5-HT"] = new Serotonin();
+    pImpl->neuromodulators["Curiosity"] = new Curiosity();
+    pImpl->neuromodulators["Novelty"] = new Novelty();
+    pImpl->neuromodulators["PredictionError"] = new PredictionError();
+    pImpl->neuromodulators["Reward"] = new Reward();
+    
+    // Initialize all neuromodulators with brain reference
+    for (auto& pair : pImpl->neuromodulators) {
+        pair.second->initialize(brain);
+    }
+    
+    NLM_LOG_INFO("Neuromodulator Manager initialized");
 }
 
-void Dopamine::setLevel(float level) {
-    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+void NeuromodulatorManager::updateAll(TimestepDuration dt) {
+    for (auto& pair : pImpl->neuromodulators) {
+        pair.second->update(dt);
+    }
 }
 
-float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+void NeuromodulatorManager::applyToBrain(class Brain* brain) {
+    if (!brain) return;
+    
+    // Update all neuromodulators
+    updateAll(0.1f); // Default timestep
+    
+    // Apply neuromodulatory effects to neural activity
+    float totalDrive = getTotalDrive();
+    
+    // Apply dopamine effects
+    if (auto* dopamine = dynamic_cast<Dopamine*>(pImpl->neuromodulators["DA"])) {
+        float level = dopamine->getLevel();
+        float plasticityFactor = dopamine->getPlasticityFactor();
+        
+        // Modulate neural excitability
+        for (auto* neuron : brain->getAllNeurons()) {
+            float excitabilityMod = level * 0.5f * plasticityFactor;
+            if (excitabilityMod > 0.0f) {
+                neuron->injectCurrent(excitabilityMod);
+            }
+        }
+    }
+    
+    // Apply curiosity effects
+    if (auto* curiosity = dynamic_cast<Curiosity*>(pImpl->neuromodulators["Curiosity"])) {
+        float level = curiosity->getLevel();
+        
+        // Modulate action selection based on curiosity
+        if (level > 0.5f) {
+            brain->setDevelopmentalStage(DevelopmentalStage::CriticalPeriod);
+        } else {
+            brain->setDevelopmentalStage(DevelopmentalStage::Maturation);
+        }
+    }
+    
+    // Apply novelty effects
+    if (auto* novelty = dynamic_cast<Novelty*>(pImpl->neuromodulators["Novelty"])) {
+        float level = novelty->getLevel();
+        
+        // Novelty increases plasticity rates
+        if (level > 0.0f) {
+            NLM_LOG_INFO("Novelty detected: " + std::to_string(level));
+        }
+    }
+    
+    NLM_LOG_INFO("Neuromodulatory effects applied to brain");
 }
 
-void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+float NeuromodulatorManager::getTotalDrive() const {
+    float drive = 0.0f;
+    
+    for (const auto& pair : pImpl->neuromodulators) {
+        drive += pair.second->getLevel();
+    }
+    
+    return std::min(1.0f, drive / pImpl->neuromodulators.size());
 }
 
-void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+void NeuromodulatorManager::signalEnvironmentalChange() {
+    if (auto* novelty = dynamic_cast<Novelty*>(pImpl->neuromodulators["Novelty"])) {
+        novelty->setLevel(1.0f);
+    }
+    
+    if (auto* predictionError = dynamic_cast<PredictionError*>(pImpl->neuromodulators["PredictionError"])) {
+        predictionError->setError(1.0f);
+    }
+    
+    NLM_LOG_INFO("Environmental change signaled to neuromodulation systems");
 }
 
-void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+void NeuromodulatorManager::signalReward(float reward) {
+    if (auto* dopamine = dynamic_cast<Dopamine*>(pImpl->neuromodulators["DA"])) {
+        dopamine->signalReward(reward);
+    }
+    
+    if (auto* curiosity = dynamic_cast<Curiosity*>(pImpl->neuromodulators["Curiosity"])) {
+        float currentCuriosity = curiosity->getLevel();
+        curiosity->setLevel(currentCuriosity + reward * 0.1f);
+    }
+}
+
+void NeuromodulatorManager::signalPredictionError(float error) {
+    if (auto* predictionError = dynamic_cast<PredictionError*>(pImpl->neuromodulators["PredictionError"])) {
+        predictionError->setError(error);
+    }
+    
+    if (auto* curiosity = dynamic_cast<Curiosity*>(pImpl->neuromodulators["Curiosity"])) {
+        float currentCuriosity = curiosity->getLevel();
+        curiosity->setLevel(currentCuriosity + error * 0.1f);
+    }
+}
+
+void NeuromodulatorManager::resetAll() {
+    for (auto& pair : pImpl->neuromodulators) {
+        pair.second->reset();
+    }
+    
+    NLM_LOG_INFO("All neuromodulation systems reset");
+}
+
+Neuromodulator* NeuromodulatorManager::getNeuromodulator(const std::string& name) {
+    auto it = pImpl->neuromodulators.find(name);
+    return it != pImpl->neuromodulators.end() ? it->second : nullptr;
 }
 
 } // namespace nlm
