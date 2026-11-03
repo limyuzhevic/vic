@@ -59,3 +59,10 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.kilo.summary]
+This project provides both C++ neural simulation capabilities and Python bindings.
+The C++ implementation includes a functioning Phase 2 brain with real neural computation,
+while higher phases (3-6) exist as frameworks and experimental demonstrations.
+The Python bindings provide access to all major NLM components including Brain,
+Config, AgentBrain, SimpleWorld, SensoryInput, and Action classes.

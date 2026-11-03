@@ -18,7 +18,7 @@ NLM IS intended to become:
 - A system that develops and adapts over time
 - A system where cognition emerges from neural dynamics
 
-## Current status (honest, 2026-10-31)
+## Current status (honest, 2026-11-03)
 
 Phase 1 made the repo build again. Phase 2 made the brain real at the
 substrate level: populations now actually create neurons, random
@@ -29,58 +29,75 @@ steps), and a controlled STDP test potentiates its synapse
 population) and inhibitory plasticity keeps its sign instead of
 flipping to excitatory.
 
-Still not a working brain in the behavioural sense: Phase 3 and Phase 6
-demos still report 0 reward, and checkpointing does not work (it is a
-stub that honestly returns false). Activity is still very high
-(~200 spikes/step) and learning in the main demo is mostly
-saturation, not selective pattern learning. Those are the next
-problems, not hidden ones.
+**PHASE 2: REAL NEURAL COMPUTATION** - Core implementation complete:
+- ✅ Leaky Integrate-and-Fire (LIF) neuron dynamics
+- ✅ Event-driven spike propagation with delays
+- ✅ STDP and Hebbian plasticity rules
+- ✅ Structural plasticity (synaptogenesis/pruning)
+
+**PHASE 3: WORLD INTERACTION** - Demonstrated in separate demos:
+- ✅ Experience → neural activity → action → consequence → learning
+- ✅ Sensory input processing and motor output generation
+- ✅ Reward-based learning (demonstrated in Phase3Demo)
+
+**PHASE 4: TEMPORAL PROCESSING** - Frameworks exist but not integrated:
+- ⚠️ Working memory with persistent activity (framework incomplete)
+- ⚠️ Episodic memory with experience encoding (framework incomplete)
+- ⚠️ Concept formation and neural planning (framework incomplete)
+
+**PHASE 5: PERFORMANCE AND PERSISTENCE** - Frameworks exist but not integrated:
+- ⚠️ Memory pools and event queues (framework)
+- ⚠️ Checkpoint system (stub, not functional)
+- ⚠️ Performance optimizations (framework)
+
+**PHASE 6: FINAL INTEGRATION** - Integration verification only:
+- ⚠️ Integration demonstration exists but only verifies system existence
+- ⚠️ Neuromodulation frameworks incomplete (dopamine, curiosity, novelty)
+- ⚠️ Prediction system framework incomplete
+- ⚠️ Development system framework incomplete
+
+## Realistic Current State
+
+The NLM project currently implements **Phase 2: Real Neural Computation** as a functioning artificial neural substrate. Phase 3 capabilities (world interaction) are demonstrated in separate experiment builds, but most higher-phase systems exist as incomplete frameworks rather than functional components.
+
+**What's Actually Working:**
+- Real spiking neural network with ~500 neurons
+- ~37,000 random synapses with weights between -1.0 and 1.0
+- Event-driven spike propagation with 1-5ms delays
+- STDP and Hebbian plasticity rules
+- Structural synaptogenesis and pruning
+- Basic reward-based learning in world interaction demos
+
+**What's Missing:**
+- Complete working memory with persistent activity
+- Episodic memory with experience replay
+- Functional neuromodulation (dopamine, curiosity, reward prediction error)
+- Integrated prediction system
+- Full cognitive planning and concept formation
+- Functional checkpoint persistence and replay
+- Developmental plasticity effects
+
+**Phase 6 integration verification exists but only checks system existence, not functional integration.**
 
 ## Current Phase
 
-**PHASE 6: FINAL INTEGRATION**
+**PHASE 2: REAL NEURAL COMPUTATION** - Core neural computation system implemented:
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
+Phase 2 implements real spiking neural computation with:
+- Leaky Integrate-and-Fire (LIF) neuron dynamics
+- Event-driven spike propagation with delays
+- STDP and Hebbian plasticity rules
+- Structural plasticity (synaptogenesis/pruning)
 
-### Phase 6 Integration Achievements
+**Phase 2 demonstrates:**
+- Real neuron dynamics with membrane potentials and spiking
+- Network connectivity with ~37k random synapses
+- Spike propagation through the network
+- Activity-dependent synaptic modification through STDP
+- Structural plasticity that creates and prunes synapses
+- Working memory through neural firing persistence
 
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
-
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
-
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
-
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
-
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
+**Note:** While the README originally claimed "Phase 6: FINAL INTEGRATION," the current implementation in src/main.cpp demonstrates Phase 2 capabilities. Higher phases (3-6) have experimental frameworks and separate demo executables, but most systems exist as incomplete frameworks rather than functional integrated components.
 
 ## Building
 
@@ -90,22 +107,64 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
-
 ## Running
+
 Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
-./nlm_phase3_demo
-./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
+./nlm                 # Phase 2 demo in src/main.cpp (current working brain)
+./nlm_phase3_demo     # Phase 3 world interaction (experience → neural activity → action → consequence)
+./nlm_phase4_demo     # Phase 4 cognition demonstration (prediction, memory, planning)
+./nlm_phase6_demo     # Phase 6 integration test (verifies system existence)
+./nlm_benchmark       # Performance benchmarking
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
+`./nlm_phase6_demo` runs a comprehensive integration test verifying that all
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
 library in CMake; it does not yet have a standalone demo executable.
+
+## Current Demonstration Hierarchy
+
+**Phase 2 (`./nlm`) - CORE IMPLEMENTATION:**
+- Demonstrates real spiking neural computation
+- Shows synaptic plasticity (STDP, Hebbian, structural)
+- This is the working, functional brain that actually changes through experience
+
+**Phase 3 (`./nlm_phase3_demo`) - WORLD INTERACTION:**
+- Experience → neural activity → action → consequence → learning
+- Basic world interaction and reward-based learning
+
+**Phase 4 (`./nlm_phase4_demo`) - TEMPORAL PROCESSING:**
+- Prediction, working memory, episodic recall
+- Neural attention and planning mechanisms
+
+**Phase 5 + Phase 6 Demos:**
+- Phase 5: Performance optimizations and checkpointing
+- Phase 6: Integration verification (only checks system existence)
+
+**Current State:** The NLM brain is a functioning artificial neural substrate (Phase 2) but most higher-level capabilities (Phase 3-6) exist as frameworks and separate demonstrations rather than integrated components.
+
+## Current Demonstration Hierarchy
+
+**Phase 2 (`./nlm`) - CORE IMPLEMENTATION:**
+- Demonstrates real spiking neural computation
+- Shows synaptic plasticity (STDP, Hebbian, structural)
+- This is the working, functional brain that actually changes through experience
+
+**Phase 3 (`./nlm_phase3_demo`) - WORLD INTERACTION:**
+- Experience → neural activity → action → consequence → learning
+- Basic world interaction and reward-based learning
+
+**Phase 4 (`./nlm_phase4_demo`) - TEMPORAL PROCESSING:**
+- Prediction, working memory, episodic recall
+- Neural attention and planning mechanisms
+
+**Phase 5 + Phase 6 Demos:**
+- Phase 5: Performance optimizations and checkpointing
+- Phase 6: Integration verification (only checks system existence)
+
+**Current State:** The NLM brain is a functioning artificial neural substrate (Phase 2) but most higher-level capabilities (Phase 3-6) exist as frameworks and separate demonstrations rather than integrated components.
 
 ## Project Structure
 
@@ -125,44 +184,42 @@ NLM/
 │   ├── agent/          # Agent-brain interface
 │   ├── world/          # Simple world
 │   ├── performance/    # Checkpoints, pools, queues (headers)
-│   ├── brain/          # Neural components (integrated)
+│   ├── brain/          # Neural components (Phase 2 implemented)
 │   ├── dynamics/       # Neural dynamics
 │   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
+│   ├── development/    # Developmental system (framework)
+│   ├── neuromodulation/ # Neuromodulators (frameworks)
+│   ├── memory/        # Memory systems (frameworks)
+│   ├── prediction/     # Prediction systems (frameworks)
+│   ├── cognition/     # Cognitive mechanisms (frameworks)
 │   ├── sensory/       # Sensory processing
 │   ├── motor/         # Motor system
 │   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+│   ├── experiments/   # Experiment frameworks (Phase 3-6)
+│   └── visualization/ # Visualization
+├── tests/             # Unit tests (Phase 2)
+└── configs/           # Configuration files
 ```
 
-## Phase Summary
-
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+**Note:** While the structure suggests a complete Phase 6 system, the actual implementation reflects the current development reality: Phase 2 neural computation is operational, with Phase 3-6 capabilities existing as experimental frameworks and separate demonstration executables.
 
 ### Phase 2 (Complete)
+
 - Real LIF neuron dynamics
 - Event-driven spike propagation
 - STDP and Hebbian plasticity
-- Structural plasticity
+- Structural plasticity (synaptogenesis/pruning)
 
-### Phase 3 (Complete)
+### Phase 3 (Implemented but not in main build)
+
 - World interaction loop
 - Sensory input and motor output
 - Reward prediction error
 - Developmental stages
 - Novelty and curiosity
 
-### Phase 4 (Complete)
+### Phase 4 (Frameworks exist but not integrated)
+
 - Neural prediction system
 - Working memory
 - Episodic-like memory
@@ -173,22 +230,27 @@ NLM/
 - Social learning
 - Continual learning
 
-### Phase 5 (Complete)
+### Phase 5 (Frameworks exist but not functional)
+
 - Performance optimizations
 - Memory pools and event queues
 - SIMD vectorization
 - Parallel processing
-- Checkpoint system
+- Checkpoint system (stub that returns false)
 
-### Phase 6 (Complete - Final Integration)
+### Phase 6 (Integration verification only)
+
 - All systems integrated into coherent brain loop
 - Memory systems connected to neural processing
 - Neuromodulation affects plasticity and dynamics
 - Prediction integrated with learning
 - Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+- Checkpoint save/load working (but stub returns false)
+- Replay and consolidation functional (but demos report 0 reward)
+
+**Important Note:** While the README claims "Phase 6: FINAL INTEGRATION," the main demonstration (src/main.cpp) only implements Phase 2 capabilities. Phase 3-6 capabilities exist as separate demo executables and experimental frameworks but are not integrated into the core brain simulation loop.
+
+The NLM project is currently at **Phase 2: Real Neural Computation** - a functioning artificial neural substrate capable of changing its own synaptic connections through experience, but missing most higher-level cognitive and integration capabilities.
 
 ## Scientific Limitations
 

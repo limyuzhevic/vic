@@ -72,27 +72,57 @@ make install
 
 ## Part 2: Installing the Python Library
 
-### From Source (Recommended for Development)
-
 ```bash
-# Install build dependencies (use a venv on PEP 668 systems, where
-# system pip refuses to install packages)
+# Build and install Python bindings using scikit-build-core (Phase 5 fix)
 pip install pybind11 scikit-build-core pytest numpy
-
-# Build and install
 pip install .
 
 # Or install in development mode
 pip install -e .
 ```
 
-> Phase 5 note: `pip install .` now genuinely builds `pynlm` (verified:
+> **Phase 5 Note**: `pip install .` now genuinely builds `pynlm` (verified:
 > fresh venv, `pip install .`, then `import pynlm` and the easy_usage
 > Example 1 flow run). Previously the root CMakeLists never built the
 > module, so `pip install .` succeeded yet `import pynlm` failed. A
 > plain C++ `cmake` build still does NOT include pynlm unless you pass
 > `-DNLM_BUILD_PYTHON_BINDINGS=ON` (and have pybind11 installed); the
 > standalone `cmake -S python -B build` route also still works.
+
+### Using pyproject.toml (Modern Python Packaging)
+
+```bash
+# Install with scikit-build-core (used automatically by pip)
+pip install .
+
+# Build only (without installing)
+pip install build
+python -m build
+
+# Install specific build from wheel
+pip install dist/*.whl
+```
+
+### Verifying Installation
+
+```python
+import pynlm
+
+# Check version
+print(pynlm.__version__)
+
+# Create a simple brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+```
+
+> **IMPORTANT**: The Python bindings require `pip install .` with scikit-build-core,
+> NOT a plain CMake build. The main C++ build (`cmake .. && make`) produces
+> native executables (`./nlm`, `./nlm_phase3_demo`, etc.) but does NOT include
+> the Python module `pynlm`. Build Python bindings separately using pip install.
+> For development, use `pip install -e .` which sets up the Python module
+> while allowing you to modify the C++ source code.
 
 ### Using pyproject.toml (Modern Python Packaging)
 
@@ -522,16 +552,91 @@ cmake .. -DPython_EXECUTABLE=$(which python)
 - Check CMake version >= 3.16
 - Verify all source files are present
 
-### Runtime Issues
+## Troubleshooting
 
-**ImportError: No module named 'pynlm':**
+### Build Issues
+
+**CMake cannot find Python:**
 ```bash
-pip install --force-reinstall .
+pip install scikit-build-core pybind11
+cmake .. -DPython_EXECUTABLE=$(which python)
 ```
 
-**Segmentation faults:**
-- Check that `initialize()` is called before `step()`
-- Ensure `reset()` is called before re-running simulation
+**Compilation errors:**
+- Ensure C++20 compiler support
+- Check CMake version >= 3.16
+- Verify all source files are present
+
+### Python vs C++ Build Issues
+
+**Python Bindings Not Working:**
+```bash
+# The issue: You tried to build Python bindings with plain CMake
+# Solution: Use pip install with scikit-build-core instead
+cd /path/to/nlm
+pip install pybind11 scikit-build-core pytest numpy
+pip install .
+```
+
+**Key Difference:**
+- `cmake .. && make` produces native executables (e.g., `./nlm`, `./nlm_phase3_demo`)
+- `pip install .` produces Python bindings (e.g., `import pynlm`)
+- They are separate build systems with different requirements
+- Plain CMake does NOT include Python bindings by default
+
+**Environment Issues:**
+**"My brain isn't doing anything"**
+- Did you call `brain.initialize()`?
+- Try increasing the number of steps
+
+**"The agent isn't moving"**
+- Did you call `world.applyMotorCommand()`?
+- Check that `world.update()` is being called
+
+**"Everything is 0"**
+- Brains need time to "warm up" - try more steps
+- Some neurons need input to fire - make sure sensory input is connected
+
+**Build vs Runtime:**
+- **Build issues**: Build system configuration, dependencies, CMake commands
+- **Runtime issues**: Python script errors, missing method calls, wrong parameters
+- **Root cause**: Python bindings and native C++ executables are built differently
+
+### Development Workflow
+
+**For C++ Development (native executables):**
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+# Now you can run: ./nlm, ./nlm_phase3_demo, etc.
+```
+
+**For Python Development (Python module):**
+```bash
+cd /path/to/nlm
+pip install pybind11 scikit-build-core pytest numpy
+pip install .
+# Now you can run: python your_script.py (with 'import pynlm')
+```
+
+**Mixed Development (both Python and C++):**
+```bash
+# Build C++ native executables
+cd build_cmake
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+
+# Build Python bindings
+cd ..
+pip install .
+```
+
+> **Summary**: The NLM project has two separate build systems:
+> 1. **C++ build** (`cmake .. && make`): Produces native executables
+> 2. **Python build** (`pip install .`): Produces Python bindings
+> Use the appropriate build system for your needs.
 
 ---
 

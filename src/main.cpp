@@ -4,8 +4,13 @@
 // This phase implements real spiking neural computation with:
 // - Leaky Integrate-and-Fire (LIF) neurons
 // - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
+// - STDP and Hebbian plasticity rules
 // - Structural plasticity (synaptogenesis/pruning)
+
+// Note: This represents the currently implemented core neural computation capabilities.
+// Higher phases (3-6) contain frameworks and partial implementations but are not
+// integrated into the main brain simulation loop. The NLM framework is built
+// with the goal of eventually achieving full integration of all components.
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"
@@ -310,7 +315,12 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM Phase 2: Real Neural Computation...\n" << std::endl;
+    
+    // Note: This implements Phase 2 capabilities. Higher phases (3-6) exist
+    // as frameworks and separate demo executables but are not integrated
+    // into the main simulation loop. The NLM framework is designed to eventually
+    // achieve full integration of all systems through future phases.
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -385,7 +395,7 @@ int main(int argc, char** argv) {
     
     // Initialize brain
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Initializing NLM Brain...");
+    NLM_LOG_INFO("Initializing NLM Brain (Phase 2: Core Neural Computation)...");
     auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
@@ -430,6 +440,8 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
+    NLM_LOG_INFO("Note: This demonstrates Phase 2 capabilities. Higher phases (3-6) exist");
+    NLM_LOG_INFO("as frameworks and separate demos but are not integrated into this simulation.");
     
     return 0;
 }

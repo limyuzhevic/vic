@@ -40,6 +40,10 @@ for i in range(100):
     brain.step(i)  # One step of thinking
 
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+
+> **Note**: This example works because we used `pip install .` which builds the Python bindings.
+> For C++ development, use `cmake .. && make` to build native executables like `./nlm`.
+> Python bindings require pip install, not plain CMake.
 ```
 
 ### Example 2: Brain in a Simple World
