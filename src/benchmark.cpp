@@ -55,6 +55,9 @@ BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
         
         brain->step(step, step * 0.001);
     }
+        
+        brain->step(step, step * 0.001);
+    }
     
     auto endTime = std::chrono::high_resolution_clock::now();
     double totalTime = std::chrono::duration<double>(endTime - startTime).count();

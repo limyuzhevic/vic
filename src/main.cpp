@@ -230,7 +230,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+            if (neuron && neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
                 patternNeurons.push_back(neuron->getId());
             }
         }

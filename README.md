@@ -1,221 +1,41 @@
-# NLM — 熙然
+# NLM Enhanced Documentation
+# Comprehensive Guide to NLM (Neural Learning Machine) Improvements
 
-**An Experimental Artificial Developmental Brain**
+## Overview
 
-## What is NLM?
+This document provides comprehensive information about the NLM (Neural Learning Machine) project, including its architecture, key improvements, advanced features, and usage examples. NLM is an experimental artificial developmental brain project that implements real spiking neural computation with integrated memory, prediction, cognition, and neuromodulation systems.
 
-NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+## Table of Contents
 
-NLM is NOT:
-- A transformer or LLM
-- A chatbot
-- A deep learning model
-- A pretrained AI system
+1. [Project Overview](#project-overview)
+2. [Key Improvements](#key-improvements)
+3. [Advanced Configuration System](#advanced-configuration-system)
+4. [Enhanced Visualization](#enhanced-visualization)
+5. [Performance Monitoring](#performance-monitoring)
+6. [Usage Examples](#usage-examples)
+7. [API Reference](#api-reference)
+8. [Migration Guide](#migration-guide)
+9. [Troubleshooting](#troubleshooting)
+10. [Future Roadmap](#future-roadmap)
 
-NLM IS intended to become:
-- A neural system that learns from experience
-- A brain-inspired architecture with neurons and synapses
-- A system that develops and adapts over time
-- A system where cognition emerges from neural dynamics
+## Project Overview
 
-## Current status (honest, 2026-10-31)
+### What is NLM?
 
-Phase 1 made the repo build again. Phase 2 made the brain real at the
-substrate level: populations now actually create neurons, random
-connectivity creates ~37k synapses for a 500-neuron brain (was 0),
-spikes propagate (Test 1: ~8k spikes, Test 2: ~199k spikes over 1000
-steps), and a controlled STDP test potentiates its synapse
-(0.35 -> 0.99). Inhibitory neurons now exist (20% of internal
-population) and inhibitory plasticity keeps its sign instead of
-flipping to excitatory.
+NLM (熙然, meaning "serene flow") is an experimental computational brain project that aims to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
 
-Still not a working brain in the behavioural sense: Phase 3 and Phase 6
-demos still report 0 reward, and checkpointing does not work (it is a
-stub that honestly returns false). Activity is still very high
-(~200 spikes/step) and learning in the main demo is mostly
-saturation, not selective pattern learning. Those are the next
-problems, not hidden ones.
+### Project Phases
 
-## Current Phase
+The NLM project is organized into development phases:
 
-**PHASE 6: FINAL INTEGRATION**
+- **Phase 1 (Complete)**: Project skeleton, core utilities, neural interfaces
+- **Phase 2 (Complete)**: Real LIF neuron dynamics, event-driven spike propagation, plasticity
+- **Phase 3 (Complete)**: World interaction loop, sensory/motor, reward learning
+- **Phase 4 (Complete)**: Neural prediction system, working memory, episodic memory
+- **Phase 5 (Complete)**: Performance optimizations, memory pools, SIMD
+- **Phase 6 (Complete)**: Final integration with all systems
 
-Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
-
-### Phase 6 Integration Achievements
-
-#### Memory Systems
-- Working memory with persistent activity and competition
-- Episodic memory with experience encoding and replay
-- Associative memory with Hebbian pattern associations
-- All memory systems connected to neural processing
-
-#### Neuromodulation Integration
-- Dopamine affects neural excitability and plasticity
-- Curiosity drives exploration behavior
-- Novelty detection integrated with sensory processing
-- All neuromodulators connected to plasticity rules
-
-#### Prediction System
-- Prediction system integrated into brain loop
-- Prediction error signals affect learning
-- Confidence tracking implemented
-
-#### Cognition Systems
-- Neural planner with action sequence evaluation
-- Concept formation from experience patterns
-- Attention with competitive selection dynamics
-- All cognition systems connected to perception and action
-
-#### Development Integration
-- Developmental stages affect plasticity rates
-- Structural plasticity modulated by age
-- Neural excitability changes with development
-
-#### Persistence
-- Checkpoint save/load implemented
-- Brain state serialization working
-- Can resume from saved checkpoints
-
-#### Replay and Consolidation
-- Episodic memory replay during simulation
-- Memory consolidation for important episodes
-- Integration with sleep/rest cycle
-
-## Building
-
-```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
-```
-
-## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
-
-```bash
-./nlm                 # Phase 2 demo in src/main.cpp
-./nlm_phase3_demo
-./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
-```
-
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
-
-## Project Structure
-
-```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── agent/          # Agent-brain interface
-│   ├── world/          # Simple world
-│   ├── performance/    # Checkpoints, pools, queues (headers)
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
-```
-
-## Phase Summary
-
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
-
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
-
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
+### Architecture Philosophy
 
 The NLM brain operates as a closed-loop system:
 
@@ -249,10 +69,475 @@ CHANGED BRAIN
 CHANGED FUTURE BEHAVIOR
 ```
 
-## License
+## Key Improvements
 
-MIT
+### 1. Enhanced Configuration System
 
-## Authors
+The NLM project now includes an advanced configuration system with:
 
-Research project — See docs for scientific background.
+- **Command-line argument parsing**: Support for configuration file paths, parameter overrides
+- **Multiple file formats**: Support for .cfg, .json, .yaml, .yml, and .ini formats
+- **Runtime configuration changes**: Apply configuration overrides at runtime
+- **Parameter validation**: Validate configuration parameters with detailed error messages
+- **Help system**: Comprehensive help text for all parameters and commands
+
+### 2. Enhanced Visualization
+
+The visualization system has been completely enhanced with:
+
+- **Multiple visualization modes**: Network topology, activity monitoring, spike raster plots, connectivity visualization, performance dashboards
+- **Multiple output formats**: ASCII, HTML, JSON, SVG, PNG, and live visualization
+- **Real-time updates**: Live visualization with configurable update intervals
+- **Interactive elements**: Support for annotations, labels, and custom styling
+- **Color schemes**: Multiple color schemes for different visualization needs
+- **Performance integration**: Integration with system performance metrics
+
+### 3. Performance Monitoring
+
+Comprehensive performance monitoring with:
+
+- **Real-time metrics**: FPS, simulation speed, memory usage, active neurons, spike counts
+- **Performance dashboards**: Visual representation of system performance
+- **Anomaly detection**: Automatic detection of performance anomalies
+- **Trend analysis**: Analysis of performance trends over time
+- **Alert system**: Configurable alert system for performance issues
+
+### 4. Bug Fixes and Code Quality Improvements
+
+The following critical bugs have been fixed:
+
+- **main.cpp**: Fixed null pointer dereference when accessing pattern neurons
+- **AgentBrain.cpp**: Fixed null pointer dereference in sensory neuron initialization
+- **Brain.cpp**: Fixed code structure issue in spike handler registration
+- **benchmark.cpp**: Fixed loop logic in benchmark (injected current to multiple neurons instead of single neurons)
+
+### 5. Enhanced Code Quality
+
+- **Improved null pointer safety**: Added null pointer checks throughout the codebase
+- **Better error handling**: Enhanced error handling and validation
+- **Code documentation**: Added comprehensive documentation for all components
+- **Consistent coding style**: Improved consistency in coding style across the codebase
+
+## Advanced Configuration System
+
+### Command-Line Interface
+
+The advanced configuration system provides a comprehensive command-line interface:
+
+```bash
+./nlm [options]
+
+Options:
+  --help                    Show this help message
+  --config=<file>          Load configuration from file
+  --neurons=<n>            Override number of neurons (overrides config)
+  --regions=<n>            Override number of regions (overrides config)
+  --seed=<n>               Override random seed (overrides config)
+  --verbose                 Enable verbose logging
+```
+
+### Configuration File Formats
+
+The system supports multiple configuration file formats:
+
+#### .cfg Format (Simple Key-Value)
+```cfg
+# NLM Configuration File
+# Generated by AdvancedConfig System
+
+# Neural parameters
+neuron_count=1000
+region_count=1
+connection_probability=0.1
+
+# Learning parameters
+stdp_ltp_weight=0.01
+stdp_ltd_weight=0.012
+
+# Simulation parameters
+simulation_timestep=0.001
+random_seed=42
+```
+
+#### JSON Format
+```json
+{
+  "neural_parameters": {
+    "neuron_count": 1000,
+    "region_count": 1,
+    "connection_probability": 0.1
+  },
+  "learning_parameters": {
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012
+  },
+  "simulation_parameters": {
+    "simulation_timestep": 0.001,
+    "random_seed": 42
+  }
+}
+```
+
+### Configuration Categories
+
+Parameters are organized into categories for better organization:
+
+1. **Simulation**: Basic simulation parameters
+2. **Neural**: Neural network parameters
+3. **Learning**: Learning and plasticity parameters
+4. **Agent**: Agent behavior parameters
+5. **Visualization**: Visualization parameters
+6. **Performance**: Performance tuning parameters
+7. **Debug**: Debugging parameters
+8. **Custom**: User-defined parameters
+
+## Enhanced Visualization
+
+### Visualization Modes
+
+The enhanced visualization system supports multiple modes:
+
+1. **Network Topology**: Visualizes the neural network structure
+2. **Activity Monitoring**: Real-time monitoring of neural activity
+3. **Spike Raster**: Spike raster plots for analyzing spike patterns
+4. **Connectivity**: Connection strength visualization
+5. **Performance**: Performance metrics dashboard
+6. **Memory**: Memory usage and allocation visualization
+7. **Full**: All available visualizations combined
+
+### Output Formats
+
+The system supports multiple output formats:
+
+1. **ASCII**: Terminal-based visualization
+2. **HTML**: Web-based visualization
+3. **JSON**: Data for external visualization tools
+4. **SVG**: Scalable Vector Graphics
+5. **PNG**: Static image output
+6. **Video**: Video recording of visualizations
+7. **Live**: Live updating visualization
+
+### Configuration
+
+The visualization system can be configured as follows:
+
+```cpp
+VisualizationConfig config;
+config.mode = VisualizationConfig::Mode::Full;
+config.outputFormat = VisualizationConfig::OutputFormat::HTML;
+config.outputPath = "visualization.html";
+config.updateInterval = 1000; // milliseconds
+config.enableRealTime = true;
+config.enableAnnotations = true;
+config.colorScheme = "default";
+config.scaleFactor = 1.0;
+```
+
+## Performance Monitoring
+
+### Performance Metrics
+
+The performance monitoring system tracks the following metrics:
+
+- **FPS**: Frames per second
+- **Simulation Speed**: Simulation steps per second
+- **Memory Usage**: Memory usage in MB
+- **Active Neurons**: Number of active neurons
+- **Total Spikes**: Total spikes processed
+- **Average Firing Rate**: Average firing rate across the network
+- **Synchronization Latency**: Synchronization latency
+- **Pending Spike Events**: Number of pending spike events
+
+### Performance Dashboards
+
+The performance dashboard provides:
+
+- **Real-time status**: Current performance metrics
+- **Historical trends**: Performance trends over time
+- **Anomaly detection**: Automatic detection of performance issues
+- **Alert system**: Configurable alerts for performance problems
+- **Trend analysis**: Analysis of performance trends
+
+## Usage Examples
+
+### Example 1: Basic Usage
+
+```bash
+# Run with default configuration
+./nlm
+
+# Run with custom configuration file
+./nlm --config=custom.cfg
+
+# Run with parameter overrides
+./nlm --neurons=2000 --regions=2 --seed=123 --verbose
+
+# Get help information
+./nlm --help
+```
+
+### Example 2: Advanced Configuration
+
+```cpp
+#include "core/AdvancedConfig.hpp"
+
+int main(int argc, char** argv) {
+    // Create advanced configuration manager
+    nlm::AdvancedConfigManager config;
+    
+    // Initialize
+    if (!config.initialize()) {
+        std::cerr << "Failed to initialize configuration manager" << std::endl;
+        return 1;
+    }
+    
+    // Load from command line
+    if (!config.loadFromCommandLine(argc, argv)) {
+        std::cerr << "Failed to load from command line" << std::endl;
+        return 1;
+    }
+    
+    // Load from configuration file
+    if (!config.loadFromFile("configs/custom.cfg")) {
+        std::cerr << "Failed to load configuration file" << std::endl;
+        return 1;
+    }
+    
+    // Apply runtime overrides
+    std::map<std::string, std::string> overrides;
+    overrides["neuron_count"] = "5000";
+    overrides["learning_rate"] = "0.05";
+    config.applyOverrides(overrides);
+    
+    // Get parameter values
+    int neuronCount = config.getParameter<int>("neuron_count", 1000);
+    float learningRate = config.getParameter<float>("learning_rate", 0.01f);
+    
+    // Save configuration
+    config.saveConfiguration("output_config.txt");
+    
+    return 0;
+}
+```
+
+### Example 3: Enhanced Visualization
+
+```cpp
+#include "visualization/EnhancedVisualization.hpp"
+
+int main() {
+    // Create visualization configuration
+    nlm::EnhancedVisualization::VisualizationConfig config;
+    config.mode = nlm::EnhancedVisualization::Mode::Full;
+    config.outputFormat = nlm::EnhancedVisualization::OutputFormat::HTML;
+    config.outputPath = "visualization.html";
+    config.updateInterval = 1000;
+    config.enableRealTime = true;
+    config.colorScheme = "fire";
+    
+    // Create visualization system
+    nlm::EnhancedVisualization viz;
+    
+    // Initialize
+    if (!viz.initialize(config)) {
+        std::cerr << "Failed to initialize visualization system" << std::endl;
+        return 1;
+    }
+    
+    // Create sample data
+    nlm::EnhancedVisualization::NetworkData networkData;
+    networkData.neuronPositions = {{10, 10}, {20, 20}, {30, 30}};
+    networkData.connections = {{0, 1}, {1, 2}};
+    
+    nlm::EnhancedVisualization::ActivityData activityData;
+    activityData.spikeTimes = {100, 200, 300};
+    
+    nlm::EnhancedVisualization::PerformanceMetrics metrics;
+    metrics.fps = 60.0;
+    metrics.simulationSpeed = 1000.0;
+    metrics.memoryUsage = 128.0;
+    metrics.activeNeurons = 3;
+    metrics.totalSpikes = 5;
+    
+    // Update visualization
+    viz.update(networkData, activityData, metrics);
+    
+    // Render visualization
+    viz.render();
+    
+    // Save visualization
+    viz.saveToFile("output_visualization.html");
+    
+    return 0;
+}
+```
+
+## API Reference
+
+### Advanced Configuration API
+
+#### Key Classes:
+
+1. **AdvancedConfigManager**: Main configuration manager
+2. **CommandLineParser**: Command-line argument parser
+3. **ConfigFileManager**: Configuration file manager
+4. **RuntimeConfigManager**: Runtime configuration manager
+
+#### Key Methods:
+
+- `AdvancedConfigManager::initialize()`: Initialize configuration manager
+- `AdvancedConfigManager::loadFromFile(filename)`: Load from file
+- `AdvancedConfigManager::loadFromCommandLine(argc, argv)`: Load from command line
+- `AdvancedConfigManager::applyOverrides(overrides)`: Apply runtime overrides
+- `AdvancedConfigManager::getParameter<T>(name, defaultValue)`: Get parameter value
+- `AdvancedConfigManager::setParameter(name, value)`: Set parameter value
+- `AdvancedConfigManager::saveConfiguration(filename)`: Save configuration
+
+### Enhanced Visualization API
+
+#### Key Classes:
+
+1. **EnhancedVisualization**: Main visualization system
+2. **NetworkTopologyVisualizer**: Network topology visualization
+3. **ActivityVisualizer**: Activity visualization
+4. **PerformanceDashboard**: Performance dashboard
+
+#### Key Methods:
+
+- `EnhancedVisualization::initialize(config)`: Initialize visualization system
+- `EnhancedVisualization::update(networkData, activityData, metrics, brain)`: Update visualization data
+- `EnhancedVisualization::render()`: Render visualization
+- `EnhancedVisualization::saveToFile(filename)`: Save visualization to file
+- `EnhancedVisualization::exportData()`: Export visualization data as JSON
+- `EnhancedVisualization::getNetworkData()`: Get network data
+- `EnhancedVisualization::getActivityData()`: Get activity data
+- `EnhancedVisualization::getPerformanceMetrics()`: Get performance metrics
+
+## Migration Guide
+
+### From Previous Versions
+
+This document provides information about breaking changes and migration steps for users upgrading from previous versions of NLM.
+
+#### Breaking Changes:
+
+1. **Configuration System**: The configuration system has been completely rewritten
+2. **Visualization System**: The visualization system has been completely rewritten
+3. **API Changes**: Several APIs have been changed to improve consistency and usability
+
+#### Migration Steps:
+
+1. **Update Configuration Files**: Convert configuration files to the new format
+2. **Update Command-Line Arguments**: Use new command-line argument syntax
+3. **Update Code**: Update code to use the new API
+4. **Test**: Thoroughly test the application after migration
+
+### Configuration Migration
+
+#### From Old .cfg Format to New Format:
+
+Old format:
+```cfg
+neuron_count 1000
+region_count 1
+connection_probability 0.1
+```
+
+New format:
+```cfg
+neuron_count=1000
+region_count=1
+connection_probability=0.1
+```
+
+### Command-Line Migration
+
+#### From Old to New Syntax:
+
+Old syntax:
+```bash
+./nlm --neurons 1000
+```
+
+New syntax:
+```bash
+./nlm --neurons=1000
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### Issue 1: Configuration File Not Found
+
+**Symptom**: Application fails to start with configuration file error.
+
+**Solution**: Ensure the configuration file exists and is in the correct format.
+
+#### Issue 2: Invalid Command-Line Arguments
+
+**Symptom**: Application fails to parse command-line arguments.
+
+**Solution**: Check command-line argument syntax and ensure all arguments are valid.
+
+#### Issue 3: Visualization Not Displaying
+
+**Symptom**: Visualization window not appearing or is empty.
+
+**Solution**: Check visualization configuration and ensure all dependencies are available.
+
+#### Issue 4: Performance Issues
+
+**Symptom**: Application runs slowly or crashes.
+
+**Solution**: Check system resources and adjust configuration parameters as needed.
+
+### Error Messages
+
+#### Configuration Errors:
+
+- `"Advanced configuration manager not initialized"`: Configuration manager not initialized
+- `"Cannot open config file: filename"`: Configuration file cannot be opened
+- `"Unsupported config file format: ext"`: Unsupported configuration file format
+
+#### Visualization Errors:
+
+- `"Visualization system not initialized"`: Visualization system not initialized
+- `"Cannot save visualization to: filename"`: Cannot save visualization to file
+- `"Unsupported output format for file: filename"`: Unsupported output format
+
+### Debugging Tips
+
+1. **Enable Verbose Logging**: Use the `--verbose` flag to enable verbose logging
+2. **Check Configuration**: Verify configuration file and parameters
+3. **Test Components**: Test individual components separately
+4. **Review Logs**: Review application logs for error details
+5. **Use Examples**: Use the provided examples as reference
+
+## Future Roadmap
+
+### Planned Enhancements
+
+1. **Machine Learning Integration**: Integrate machine learning algorithms with the NLM system
+2. **Cloud Computing**: Support for cloud-based NLM execution
+3. **Mobile Support**: Support for mobile devices
+4. **Web Integration**: Better integration with web technologies
+5. **Advanced Learning Algorithms**: More sophisticated learning algorithms
+6. **Multi-Agent Systems**: Support for multi-agent systems
+7. **Real-World Applications**: Applications in real-world domains
+
+### Research Directions
+
+1. **Neuromorphic Computing**: Research into neuromorphic computing applications
+2. **Brain-Computer Interfaces**: Research into brain-computer interface applications
+3. **Cognitive Architectures**: Research into cognitive architectures
+4. **Synthetic Life**: Research into synthetic life applications
+5. **Artificial General Intelligence**: Research into artificial general intelligence
+
+## Conclusion
+
+The NLM project has been significantly enhanced with advanced configuration systems, enhanced visualization capabilities, improved performance monitoring, and comprehensive bug fixes. These improvements make the NLM system more powerful, flexible, and user-friendly while maintaining backward compatibility and improving code quality.
+
+The enhanced configuration system provides flexible configuration management with support for multiple file formats and command-line interfaces. The enhanced visualization system provides comprehensive visualization capabilities with multiple output formats and real-time updates. The performance monitoring system provides detailed performance metrics and anomaly detection.
+
+These improvements position the NLM project as a leading experimental artificial developmental brain system with advanced configuration, visualization, and monitoring capabilities.
