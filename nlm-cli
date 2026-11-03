@@ -1,0 +1,510 @@
+#!/usr/bin/env bash
+
+# NLM Command Line Interface
+# Enhanced command-line interface for NLM operations
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+NLM_PYTHON_SCRIPT="${0%.*}.py"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Default configuration
+DEFAULT_NEURON_COUNT=1000
+DEFAULT_WORLD_WIDTH=20
+DEFAULT_WORLD_HEIGHT=20
+DEFAULT_STEPS=100
+
+# Function to print help
+print_help() {
+    cat << EOF
+NLM - Neural Learning Machine Command Line Interface
+
+USAGE:
+    nlm [OPTIONS] [COMMAND] [ARGS...]
+
+COMMANDS:
+    run                          Run a simulation episode
+    demo                          Run demo with example
+    create                        Create new agent setup
+    analyze                       Analyze brain state
+    config                        Configuration management
+    examples                      Show examples
+    help                          Show this help
+
+OPTIONS:
+    --neurons N                   Number of neurons (default: $DEFAULT_NEURON_COUNT)
+    --world-width W              World width (default: $DEFAULT_WORLD_WIDTH)
+    --world-height H             World height (default: $DEFAULT_WORLD_HEIGHT)
+    --steps S                     Number of simulation steps (default: $DEFAULT_STEPS)
+    --help, -h                   Show this help
+    --version, -v                Show version
+
+EXAMPLES:
+    nlm run --neurons 2000 --world-width 30 --world-height 30
+    nlm demo --steps 500
+    nlm create --neurons 500
+    nlm analyze --file brain.checkpoint
+
+For more information, visit: https://github.com/nlm-project/nlm
+EOF
+}
+
+# Function to show version
+print_version() {
+    echo "NLM Command Line Interface v1.0.0"
+    echo "Python bindings for Neural Learning Machine"
+}
+
+# Function to run simulation
+run_simulation() {
+    local neurons=${1:-$DEFAULT_NEURON_COUNT}
+    local world_width=${2:-$DEFAULT_WORLD_WIDTH}
+    local world_height=${3:-$DEFAULT_WORLD_HEIGHT}
+    local steps=${4:-$DEFAULT_STEPS}
+
+    echo -e "${GREEN}Starting NLM simulation...${NC}"
+    echo "Configuration:"
+    echo "  Neurons: $neurons"
+    echo "  World size: ${world_width}x${world_height}"
+    echo "  Steps: $steps"
+
+    # Create Python script for simulation
+    cat > "${SCRIPT_DIR}/temp_simulation.py" << EOF
+import pynlm
+import time
+import sys
+
+print("=== NLM Command Line Simulation ===")
+
+# Create agent setup
+brain, world, agent = pynlm.createAgentSetup(
+    neuronCount=$neurons,
+    worldWidth=$world_width,
+    worldHeight=$world_height
+)
+
+# Configure with custom settings
+brain.getConfig().set("neuron_count", $neurons)
+brain.getConfig().set("region_count", 1)
+brain.getConfig().set("connection_probability", 0.1)
+brain.getConfig().set("plasticity.stdp.learning_rate", 0.001)
+brain.getConfig().set("plasticity.hebbian.enable", True)
+brain.getConfig().set("neuromod.dopamine.scale", 1.0)
+brain.getConfig().set("neuromod.curiosity.enable", True)
+
+# Initialize and run
+brain.initialize()
+agent.initialize(*world)
+
+# Enable learning systems
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+print(f"Agent initialized with {brain.getTotalNeuronCount()} neurons")
+print(f"World size: ${world_width}x${world_height}")
+print(f"Running ${steps} simulation steps...")
+
+# Run simulation
+start_time = time.time()
+total_reward = 0.0
+
+for step in range(${steps}):
+    # Update world
+    world.update(0.1)
+
+    # Get sensory input
+    percept = world.getSensoryPercept()
+
+    # Process in brain
+    agent.processSensoryInput(percept)
+    brain.step(step)
+
+    # Get action
+    action = agent.decodeMotorCommand()
+
+    # Apply action and get reward
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+    # Simple reward function
+    reward = 0.1 if world.getAgentBody().x > 0 and world.getAgentBody().x < ${world_width} else -0.1
+    agent.applyRewardModulation(reward, 0.0)
+    total_reward += reward
+
+    # Log progress
+    if step % 50 == 0:
+        stats = pynlm.getBrainStats(brain)
+        print(f"  Step ${step}: ${stats['firing_neurons']} firing neurons, "
+              f"${stats['avg_firing_rate']:.2f} Hz, reward: ${reward:.2f}")
+
+# Analysis
+end_time = time.time()
+duration = end_time - start_time
+
+final_stats = pynlm.getBrainStats(brain)
+
+print(f"\n=== Simulation Results ===")
+print(f"Duration: ${duration:.2f} seconds")
+print(f"Total reward: ${total_reward:.2f}")
+print(f"Average reward per step: ${total_reward / ${steps}:.3f}")
+print(f"Final firing rate: ${final_stats['avg_firing_rate']:.2f} Hz")
+print(f"Total spikes: ${final_stats['total_spikes']}")
+print(f"E/I ratio: ${final_stats['e/i_ratio']:.2f}")
+print(f"Processing efficiency: ${final_stats['avg_firing_rate'] / ${neurons} * 100:.1f}%")
+
+# Save results
+pynlm.saveAgentState(
+    brain=agent.getBrain(),
+    world=world,
+    brainFile="simulated_brain.checkpoint",
+    worldFile="simulated_world.state"
+)
+
+print(f"\nResults saved to simulated_brain.checkpoint and simulated_world.state")
+
+# Health analysis
+health_report = brain.analyzeBrainHealth()
+print(f"\n=== Brain Health Report ===")
+print(health_report)
+
+EOF
+
+    # Run the simulation
+    python3 "${SCRIPT_DIR}/temp_simulation.py"
+    
+    # Clean up
+    rm -f "${SCRIPT_DIR}/temp_simulation.py"
+
+    echo -e "${GREEN}Simulation completed successfully!${NC}"
+}
+
+# Function to run demo
+run_demo() {
+    local steps=${1:-$DEFAULT_STEPS}
+
+    echo -e "${GREEN}Running NLM Demo...${NC}"
+    echo "This demo showcases the NLM's integrated brain systems."
+    echo "Running ${steps} simulation steps with full integration."
+
+    # Create Python script for demo
+    cat > "${SCRIPT_DIR}/temp_demo.py" << EOF
+import pynlm
+import time
+
+print("=== NLM Phase 6 Integration Demo ===")
+print("Testing the integrated artificial brain with all systems...")
+
+# Create simple demo setup
+brain, world, agent = pynlm.createAgentSetup(1000, 20, 20)
+
+# Configure for demo
+brain.getConfig().set("neuron_count", 1000)
+brain.getConfig().set("region_count", 1)
+brain.getConfig().set("connection_probability", 0.1)
+brain.getConfig().set("plasticity.stdp.learning_rate", 0.001)
+brain.getConfig().set("plasticity.hebbian.enable", True)
+brain.getConfig().set("neuromod.dopamine.scale", 1.0)
+brain.getConfig().set("neuromod.curiosity.enable", True)
+brain.getConfig().set("neuromod.novelty.enable", True)
+brain.getConfig().set("replay_interval", 50)
+brain.getConfig().set("consolidation_interval", 200)
+
+# Initialize
+brain.initialize()
+agent.initialize(*world)
+
+# Enable all learning systems
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+print(f"Demo brain initialized with {brain.getTotalNeuronCount()} neurons")
+print(f"Memory systems: Working (capacity={brain.getWorkingMemory().getMemoryCapacity()}), "
+      f"Episodic (max episodes={brain.getEpisodicMemory().getMaxEpisodes()})")
+print(f"Neuromodulation: Dopamine, Curiosity, Novelty enabled")
+print(f"Running demo for ${steps} steps...\n")
+
+# Run demo with comprehensive monitoring
+start_time = time.time()
+
+for step in range(${steps}):
+    # Update world
+    world.update(0.1)
+
+    # Get sensory input
+    percept = world.getSensoryPercept()
+
+    # Process sensory input
+    agent.processSensoryInput(percept)
+
+    # Run brain step
+    brain.step(step)
+
+    # Decode action
+    action = agent.decodeMotorCommand()
+
+    # Apply action
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+    # Apply reward modulation
+    reward = 0.0
+    if step % 10 == 0:  # Reward for surviving
+        reward = 0.1
+    agent.applyRewardModulation(reward, 0.0)
+
+    # Log every 100 steps
+    if step % 100 == 0:
+        stats = pynlm.getBrainStats(brain)
+        neuromod = agent.analyzeNeuromodulation()
+        print(f"  Step ${step:4d}: "
+              f"Firing: ${stats['firing_neurons']:4d}, "
+              f"Rate: ${stats['avg_firing_rate']:5.2f} Hz, "
+              f"Reward: ${reward:4.2f}, "
+              f"Dopamine: ${neurom.split('Dopamine level: ')[1].split('\\\\n')[0]}")
+
+# Demo results
+end_time = time.time()
+duration = end_time - start_time
+
+print(f"\n=== Demo Results ===")
+print(f"Total simulation time: ${duration:.2f} seconds")
+print(f"Real-time speed: ${${steps} / duration:.1f} steps/second")
+
+final_stats = pynlm.getBrainStats(brain)
+print(f"Final brain statistics:")
+print(f"  Total neurons: ${final_stats['total_neurons']}")
+print(f"  Total synapses: ${final_stats['total_synapses']}")
+print(f"  Firing neurons: ${final_stats['firing_neurons']}")
+print(f"  Average firing rate: ${final_stats['avg_firing_rate']:.2f} Hz")
+print(f"  E/I ratio: ${final_stats['e/i_ratio']:.2f}")
+print(f"  Total spikes: ${final_stats['total_spikes']}")
+print(f"  Processing efficiency: ${final_stats['avg_firing_rate'] / ${steps} * ${steps} / 1000:.1f}%")
+
+# Health analysis
+print(f"\n=== Brain Health Analysis ===")
+health_report = brain.analyzeBrainHealth()
+print(health_report)
+
+# Save demo results
+pynlm.saveAgentState(
+    brain=agent.getBrain(),
+    world=world,
+    brainFile="demo_brain.checkpoint",
+    worldFile="demo_world.state"
+)
+
+print(f"\nDemo results saved to demo_brain.checkpoint and demo_world.state")
+
+# Integration validation
+if brain.validateIntegration():
+    print(f"\n✅ All brain systems are properly integrated!")
+else:
+    print(f"\n❌ Some brain systems may not be properly integrated.")
+
+EOF
+
+    python3 "${SCRIPT_DIR}/temp_demo.py"
+    
+    rm -f "${SCRIPT_DIR}/temp_demo.py"
+}
+
+# Function to create agent setup
+create_agent_setup() {
+    local neurons=${1:-$DEFAULT_NEURON_COUNT}
+
+    echo -e "${GREEN}Creating agent setup with ${neurons} neurons...${NC}"
+
+    cat > "${SCRIPT_DIR}/temp_create.py" << EOF
+import pynlm
+
+print("=== NLM Agent Setup Creation ===")
+print(f"Creating new agent with ${neurons} neurons...")
+
+# Create agent setup
+brain, world, agent = pynlm.createAgentSetup(
+    neuronCount=${neurons},
+    worldWidth=20,
+    worldHeight=20
+)
+
+print(f"✅ Agent setup created successfully!")
+print(f"   Brain: ${brain.getTotalNeuronCount()} neurons")
+print(f"   World: ${world.getWidth()} x ${world.getHeight()} cells")
+print(f"   Agent: Ready for initialization")
+
+# Save configuration
+config = brain.getConfig()
+config.saveToFile("created_agent_config.json")
+print(f"   Configuration saved to created_agent_config.json")
+
+# Save agent state
+pynlm.saveAgentState(
+    brain=agent.getBrain(),
+    world=world,
+    brainFile="created_agent_brain.checkpoint",
+    worldFile="created_agent_world.state"
+)
+
+print(f"   Agent state saved to created_agent_*.checkpoint and created_agent_*.state")
+print(f"\nSetup complete! Use the following commands to use your agent:")
+print(f"  python3 -c \"import pynlm; brain, world, agent = pynlm.loadAgentState(...)\"")
+EOF
+
+    python3 "${SCRIPT_DIR}/temp_create.py"
+    rm -f "${SCRIPT_DIR}/temp_create.py"
+}
+
+# Function to analyze brain state
+analyze_brain() {
+    local file="${1:-brain.checkpoint}"
+
+    echo -e "${GREEN}Analyzing brain state from ${file}...${NC}"
+
+    cat > "${SCRIPT_DIR}/temp_analyze.py" << EOF
+import pynlm
+import sys
+
+print("=== NLM Brain Analysis ===")
+print(f"Loading brain from ${file}...")
+
+# Try to load the brain
+try:
+    # Create agent setup first
+    brain, world, agent = pynlm.createAgentSetup(1000, 20, 20)
+    
+    # Load the brain state
+    loaded = agent.getBrain().load("${file}")
+    
+    if loaded:
+        print("✅ Brain state loaded successfully!")
+        
+        # Analyze the brain
+        stats = pynlm.getBrainStats(agent.getBrain())
+        
+        print(f"\n=== Loaded Brain Statistics ===")
+        for key, value in stats.items():
+            print(f"  ${key}: ${value}")
+        
+        # Health analysis
+        health_report = agent.getBrain().analyzeBrainHealth()
+        print(f"\n=== Brain Health Report ===")
+        print(health_report)
+        
+        # Integration validation
+        if agent.getBrain().validateIntegration():
+            print(f"\n✅ All systems integrated correctly")
+        else:
+            print(f"\n❌ Some systems may have issues")
+            
+    else:
+        print("❌ Failed to load brain state")
+        sys.exit(1)
+        
+except Exception as e:
+    print(f"❌ Error: ${e}")
+    sys.exit(1)
+
+EOF
+
+    python3 "${SCRIPT_DIR}/temp_analyze.py"
+    rm -f "${SCRIPT_DIR}/temp_analyze.py"
+}
+
+# Function to show examples
+show_examples() {
+    echo -e "${BLUE}=== NLM Command Line Examples ===${NC}"
+    echo
+    echo -e "${YELLOW}Basic Usage:${NC}"
+    echo "  nlm run                    # Run simulation with default settings"
+    echo "  nlm run --neurons 2000    # Run with 2000 neurons"
+    echo "  nlm run --world-width 30 --world-height 30  # Larger world"
+    echo
+    echo -e "${YELLOW}Demo Examples:${NC}"
+    echo "  nlm demo                   # Run integration demo"
+    echo "  nlm demo --steps 1000     # Longer demo"
+    echo
+    echo -e "${YELLOW}Agent Setup:${NC}"
+    echo "  nlm create                 # Create new agent"
+    echo "  nlm create --neurons 500  # Create with 500 neurons"
+    echo
+    echo -e "${YELLOW}Analysis:${NC}"
+    echo "  nlm analyze                # Analyze brain.checkpoint"
+    echo "  nlm analyze --file mybrain.checkpoint  # Analyze custom file"
+    echo
+    echo -e "${YELLOW}Configuration:${NC}"
+    echo "  nlm config list            # List configuration options"
+    echo "  nlm config get neuron_count # Get current value"
+    echo "  nlm config set neuron_count 2000  # Set new value"
+    echo
+    echo -e "${YELLOW}Help:${NC}"
+    echo "  nlm help                   # Show this help"
+    echo "  nlm --help                # Show help"
+    echo "  nlm -h                    # Show help"
+    echo
+    echo -e "${YELLOW}Examples for Python:${NC}"
+    echo "  # Create and run agent"
+    echo "  python3 -c \""
+    echo "    import pynlm"
+    echo "    brain, world, agent = pynlm.createAgentSetup(1000, 20, 20)"
+    echo "    brain.initialize()"
+    echo "    agent.initialize(*world)"
+    echo "    for step in range(100):"
+    echo "        world.update(0.1)"
+    echo "        agent.processSensoryInput(world.getSensoryPercept())"
+    echo "        brain.step(step)"
+    echo "        action = agent.decodeMotorCommand()"
+    echo "        world.applyMotorCommand(action, world.getSimulationTime())"
+    echo "  \""
+    echo
+    echo -e "${YELLOW}Advanced Python Usage:${NC}"
+    echo "  # Run complete episode with learning"
+    echo "  python3 -c \""
+    echo "    import pynlm"
+    echo "    brain, world, agent = pynlm.createAgentSetup()"
+    echo "    stats = pynlm.runAgentEpisode(brain, world, agent, 500, True)"
+    echo "    print(f'Stats: {stats}')"
+    echo "  \""
+}
+
+# Main command processing
+case "${1}" in
+    run)
+        shift
+        run_simulation "${2}" "${3}" "${4}" "${5}"
+        ;;
+    demo)
+        shift
+        run_demo "${2}" "${3}" "${4}" "${5}"
+        ;;
+    create)
+        shift
+        create_agent_setup "${2}" "${3}" "${4}" "${5}"
+        ;;
+    analyze)
+        shift
+        analyze_brain "${2}" "${3}" "${4}" "${5}"
+        ;;
+    examples)
+        shift
+        show_examples
+        ;;
+    help|--help|-h)
+        print_help
+        ;;
+    version|--version|-v)
+        print_version
+        ;;
+    *)
+        echo -e "${RED}Error: Unknown command '${1}'${NC}"
+        echo "Use 'nlm help' for available commands."
+        exit 1
+        ;;
+esac
+
+EOF

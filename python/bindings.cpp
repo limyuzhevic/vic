@@ -424,6 +424,197 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Convenience function: Run a complete agent simulation episode
+    m.def("runAgentEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent, 
+                               size_t numSteps, bool enableLearning = true) {
+        if (!brain || !world || !agent) {
+            throw std::runtime_error("Invalid brain, world, or agent");
+        }
+        
+        brain->initialize();
+        agent->initialize(*world);
+        
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+            agent->enableCuriosity(true);
+        }
+        
+        float totalReward = 0.0f;
+        for (size_t step = 0; step < numSteps; ++step) {
+            // Update world
+            world->update(0.1f);
+            
+            // Get sensory input
+            auto percept = world->getSensoryPercept();
+            
+            // Process in brain
+            agent->processSensoryInput(percept);
+            brain->step(static_cast<SimulationStep>(step));
+            
+            // Get action and apply
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward if learning is enabled
+            if (enableLearning) {
+                float reward = 0.0f;
+                // Simple reward based on agent position and world state
+                if (world->getAgentBody().x > 0.0f && world->getAgentBody().x < world->getWidth()) {
+                    reward = 0.1f;  // Small positive reward for being in bounds
+                }
+                agent->applyRewardModulation(reward, 0.0f);
+                totalReward += reward;
+            }
+        }
+        
+        // Return simulation statistics
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            totalReward,
+            agent->getCuriosityLevel(),
+            agent->getNoveltyLevel()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"), py::arg("enableLearning") = true,
+       "Run a complete agent simulation episode with automatic world stepping and reward calculation");
+
+    // Convenience function: Create and initialize a complete agent setup
+    m.def("createAgentSetup", [](size_t neuronCount = 1000, size_t worldWidth = 20, size_t worldHeight = 20) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("region_count", 1);
+        
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(worldWidth, worldHeight, 8, 8);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("neuronCount") = 1000, py::arg("worldWidth") = 20, py::arg("worldHeight") = 20,
+       "Create a complete agent setup with brain, world, and agent brain interface");
+
+    // Convenience function: Get brain statistics as a dictionary
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Invalid brain");
+        }
+        
+        py::dict stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["e/i_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["pending_spikes"] = brain->getPendingSpikeEventCount();
+        
+        if (auto* wd = brain->getWorkingMemory()) {
+            stats["working_memory_size"] = wd->getMemoryCapacity();
+        }
+        
+        if (auto* epm = brain->getEpisodicMemory()) {
+            stats["episodic_episodes"] = epm->getEpisodeCount();
+        }
+        
+        if (auto* planner = brain->getPlanner()) {
+            stats["planner_action_count"] = planner->getActionCount();
+        }
+        
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics as a dictionary");
+
+    // Convenience function: Save brain and world together
+    m.def("saveAgentState", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                              const std::string& brainFile, const std::string& worldFile) {
+        if (!brain || !world) {
+            throw std::runtime_error("Invalid brain or world");
+        }
+        
+        bool brainOk = brain->save(brainFile);
+        bool worldOk = world->save(worldFile);
+        
+        if (!brainOk || !worldOk) {
+            throw std::runtime_error("Failed to save state");
+        }
+        
+        return std::make_tuple(brainOk, worldOk);
+    }, py::arg("brain"), py::arg("world"), py::arg("brainFile"), py::arg("worldFile"),
+       "Save brain state to a file and world state to another file");
+
+    // Convenience function: Load brain and world together
+    m.def("loadAgentState", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                              const std::string& brainFile, const std::string& worldFile) {
+        if (!brain || !world) {
+            throw std::runtime_error("Invalid brain or world");
+        }
+        
+        bool brainOk = brain->load(brainFile);
+        bool worldOk = world->load(worldFile);
+        
+        if (!brainOk || !worldOk) {
+            throw std::runtime_error("Failed to load state");
+        }
+        
+        // Re-initialize after loading
+        brain->initialize();
+        
+        return std::make_tuple(brainOk, worldOk);
+    }, py::arg("brain"), py::arg("world"), py::arg("brainFile"), py::arg("worldFile"),
+       "Load brain state from a file and world state from another file");
+
+    // Convenience function: Generate random action with given probabilities
+    m.def("generateRandomAction", [](const std::vector<float>& probabilities) {
+        if (probabilities.empty()) {
+            throw std::runtime_error("Probabilities vector cannot be empty");
+        }
+        
+        float totalProb = 0.0f;
+        for (float p : probabilities) {
+            totalProb += p;
+        }
+        
+        if (totalProb <= 0.0f) {
+            throw std::runtime_error("Total probability must be positive");
+        }
+        
+        // Normalize probabilities
+        std::vector<float> normalized(probabilities.size());
+        for (size_t i = 0; i < probabilities.size(); ++i) {
+            normalized[i] = probabilities[i] / totalProb;
+        }
+        
+        float randVal = static_cast<float>(rand()) / RAND_MAX;
+        float cumulative = 0.0f;
+        
+        for (size_t i = 0; i < normalized.size(); ++i) {
+            cumulative += normalized[i];
+            if (randVal <= cumulative) {
+                // Map to MotorCommand
+                int actionIndex = static_cast<int>(i) % 6;
+                switch (actionIndex) {
+                    case 0: return MotorCommand::MoveForward;
+                    case 1: return MotorCommand::MoveBackward;
+                    case 2: return MotorCommand::TurnLeft;
+                    case 3: return MotorCommand::TurnRight;
+                    case 4: return MotorCommand::Interact;
+                    default: return MotorCommand::Wait;
+                }
+            }
+        }
+        
+        return MotorCommand::Wait;
+    }, py::arg("probabilities"),
+       "Generate a random action based on probability distribution for motor commands");
+
+    // Constants for easy access
+    m.attr("DEFAULT_NEURON_COUNT") = 1000;
+    m.attr("DEFAULT_WORLD_WIDTH") = 20;
+    m.attr("DEFAULT_WORLD_HEIGHT") = 20;
+    m.attr("DEFAULT_VISION_WIDTH") = 8;
+    m.attr("DEFAULT_VISION_HEIGHT") = 8;
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

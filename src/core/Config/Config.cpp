@@ -8,6 +8,8 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::map<std::string, ConfigValue> defaults;
+    std::map<std::string, std::string> descriptions;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -92,16 +94,9 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
+// Set values
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
+    set(key, value, source, "");
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
@@ -122,6 +117,20 @@ void Config::set(const std::string& key, double value, ConfigSource source) {
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
+}
+
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description, const std::string& category) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->value = value;
+        it->source = source;
+        it->description = description;
+        it->category = category;
+    } else {
+        pImpl->entries.emplace_back(key, value, source, description, category);
+    }
 }
 
 bool Config::has(const std::string& key) const {
@@ -177,6 +186,7 @@ std::string Config::summary() const {
     return oss.str();
 }
 
+// Helper functions for category and key extraction
 std::string Config::trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
@@ -188,6 +198,30 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+bool Config::isValidKey(const std::string& key) {
+    return !key.empty() && key.find('=') == std::string::npos;
+}
+
+bool Config::isValidCategory(const std::string& category) {
+    return !category.empty();
+}
+
+std::string Config::extractCategory(const std::string& key) {
+    size_t dotPos = key.find('.');
+    if (dotPos != std::string::npos) {
+        return key.substr(0, dotPos);
+    }
+    return "general";
+}
+
+std::string Config::extractKey(const std::string& fullKey) {
+    size_t dotPos = fullKey.find('.');
+    if (dotPos != std::string::npos) {
+        return fullKey.substr(dotPos + 1);
+    }
+    return fullKey;
 }
 
 template<typename T>
@@ -217,6 +251,112 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
+// Implementation of advanced configuration methods
+bool Config::validate(const std::string& category) const {
+    bool isValid = true;
+    for (const auto& entry : pImpl->entries) {
+        if (category.empty() || entry.category == category) {
+            if (entry.key.empty()) {
+                NLM_LOG_ERROR("Config validation error: Empty key found");
+                isValid = false;
+            }
+            if (entry.value.index() == static_cast<size_t>(-1)) { // Invalid variant index
+                NLM_LOG_ERROR("Config validation error: Invalid value type for key " + entry.key);
+                isValid = false;
+            }
+        }
+    }
+    return isValid;
+}
+
+std::vector<std::string> Config::getCategories() const {
+    std::vector<std::string> categories;
+    std::set<std::string> uniqueCategories;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (uniqueCategories.find(entry.category) == uniqueCategories.end()) {
+            uniqueCategories.insert(entry.category);
+            categories.push_back(entry.category);
+        }
+    }
+    
+    return categories;
+}
+
+std::vector<std::string> Config::getKeysInCategory(const std::string& category) const {
+    std::vector<std::string> keys;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (entry.category == category) {
+            keys.push_back(entry.key);
+        }
+    }
+    
+    return keys;
+}
+
+void Config::setDefault(const std::string& key, const ConfigValue& value) {
+    pImpl->defaults[key] = value;
+    NLM_LOG_INFO("Config default set for key: " + key);
+}
+
+ConfigValue Config::getDefault(const std::string& key) const {
+    auto it = pImpl->defaults.find(key);
+    if (it != pImpl->defaults.end()) {
+        return it->second;
+    }
+    
+    // Fallback to hardcoded defaults for common keys
+    if (key == "neuron_count") return ConfigValue(static_cast<int64_t>(1000));
+    if (key == "region_count") return ConfigValue(static_cast<int64_t>(1));
+    if (key == "connection_probability") return ConfigValue(0.1f);
+    if (key == "random_seed") return ConfigValue(static_cast<int64_t>(42));
+    if (key == "simulation_timestep") return ConfigValue(0.001);
+    if (key == "replay_interval") return ConfigValue(static_cast<int64_t>(100));
+    if (key == "consolidation_interval") return ConfigValue(static_cast<int64_t>(1000));
+    
+    return ConfigValue();
+}
+
+void Config::setDefault(const std::string& key, const ConfigValue& value) {
+    // Store default values in a separate map for now
+    // This could be extended to use a defaults map stored in Impl
+    // For now, we'll just log the default setting
+    NLM_LOG_INFO("Config default set for key: " + key);
+}
+
+std::string Config::getDescription(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        return it->description;
+    }
+    
+    return "";
+}
+
+void Config::setDescription(const std::string& key, const std::string& description) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        it->description = description;
+    }
+}
+
+std::map<std::string, std::string> Config::getAllDescriptions() const {
+    std::map<std::string, std::string> descriptions;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (!entry.description.empty()) {
+            descriptions[entry.key] = entry.description;
+        }
+    }
+    
+    return descriptions;
+}
+
 // Explicit template instantiations
 // (uint64_t and size_t are the same type on this platform, so only one is listed)
 template std::optional<int> Config::get<int>(const std::string&) const;
@@ -234,5 +374,30 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Helper functions for category and key extraction
+bool Config::isValidKey(const std::string& key) {
+    return !key.empty() && key.find('=') == std::string::npos;
+}
+
+bool Config::isValidCategory(const std::string& category) {
+    return !category.empty();
+}
+
+std::string Config::extractCategory(const std::string& key) {
+    size_t dotPos = key.find('.');
+    if (dotPos != std::string::npos) {
+        return key.substr(0, dotPos);
+    }
+    return "general";
+}
+
+std::string Config::extractKey(const std::string& fullKey) {
+    size_t dotPos = fullKey.find('.');
+    if (dotPos != std::string::npos) {
+        return fullKey.substr(dotPos + 1);
+    }
+    return fullKey;
+}
 
 } // namespace nlm

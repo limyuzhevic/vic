@@ -205,6 +205,83 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== ADVANCED DEBUGGING AND ANALYSIS TOOLS ==========
+    
+    // Detailed brain health analysis
+    std::string analyzeBrainHealth() const;
+    
+    // Connectivity analysis
+    float analyzeConnectivityDensity() const;
+    float analyzePathLength() const;
+    size_t getConnectedComponentSize(RegionId regionId) const;
+    
+    // Network topology analysis
+    std::vector<std::vector<size_t>> buildAdjacencyMatrix() const;
+    float calculateClusteringCoefficient() const;
+    float calculateSmallWorldness() const;
+    
+    // Activity analysis
+    float analyzeFiringRateDistribution() const;
+    size_t getHighFiringNeurons(float threshold = 10.0f) const;
+    size_t getLowFiringNeurons(float threshold = 1.0f) const;
+    
+    // Plasticity analysis
+    float analyzePlasticityActivity() const;
+    size_t getPlasticSynapsesCount() const;
+    float calculateAverageSynapticWeight() const;
+    
+    // Memory system analysis
+    std::string analyzeMemorySystems() const;
+    float calculateWorkingMemoryEfficiency() const;
+    float calculateEpisodicMemoryCompleteness() const;
+    
+    // Neuromodulation analysis
+    std::string analyzeNeuromodulation() const;
+    float calculateDopamineEffect() const;
+    float calculateCuriosityEffect() const;
+    
+    // Developmental stage analysis
+    std::string analyzeDevelopmentStage() const;
+    float calculateDevelopmentalPlasticity() const;
+    
+    // System integration analysis
+    std::string analyzeSystemIntegration() const;
+    bool validateIntegration() const;
+    float calculateIntegrationScore() const;
+    
+    // Performance metrics
+    float calculateProcessingEfficiency() const;
+    size_t getOptimizationPotential() const;
+    std::string analyzePerformanceBottlenecks() const;
+    
+    // Error and anomaly detection
+    bool detectAnomalies() const;
+    std::vector<std::string> getDetectedAnomalies() const;
+    std::string analyzeErrorSources() const;
+    
+    // Configuration and parameter analysis
+    std::string analyzeConfiguration() const;
+    float getConfigurationEffectiveness() const;
+    std::vector<std::string> getSuboptimalParameters() const;
+    
+    // Network dynamics analysis
+    std::string analyzeNetworkDynamics() const;
+    float calculateSynchronizationLevel() const;
+    float calculateEntropy() const;
+    std::vector<float> getFiringRateHistogram(int bins = 10) const;
+    
+    // Learning progress analysis
+    std::string analyzeLearningProgress() const;
+    float calculateLearningRate() const;
+    float calculateGeneralization() const;
+    size_t getReceptiveFieldSize() const;
+    
+    // Experimental analysis
+    std::string analyzeExperimentalResults() const;
+    float calculateSuccessRate() const;
+    float calculateSampleEfficiency() const;
+    std::vector<float> getRewardHistory() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

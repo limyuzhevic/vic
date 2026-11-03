@@ -32,16 +32,17 @@ enum class ConfigSource {
     Runtime
 };
 
-// Configuration entry
+// Configuration entry with category support
 struct ConfigEntry {
     std::string key;
+    std::string category;
     ConfigValue value;
     ConfigSource source;
     std::string description;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : key(), category("general"), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "", const std::string& cat = "general")
+        : key(k), category(cat), value(v), source(s), description(desc) {}
 };
 
 // Main configuration class
@@ -79,6 +80,16 @@ template<typename T>
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Advanced configuration methods
+    bool validate(const std::string& category = "") const;
+    std::vector<std::string> getCategories() const;
+    std::vector<std::string> getKeysInCategory(const std::string& category) const;
+    ConfigValue getDefault(const std::string& key) const;
+    void setDefault(const std::string& key, const ConfigValue& value);
+    std::string getDescription(const std::string& key) const;
+    void setDescription(const std::string& key, const std::string& description);
+    std::map<std::string, std::string> getAllDescriptions() const;
     
     // Check existence
     bool has(const std::string& key) const;
