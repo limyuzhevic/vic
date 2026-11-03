@@ -82,7 +82,9 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
-## Building
+## Building and Running
+
+### Standard C++ Build
 
 ```bash
 mkdir build
@@ -91,21 +93,112 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+### Python Bindings (Phase 5)
+
+For Python users, the project includes comprehensive Python bindings:
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
-./nlm_phase3_demo
-./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
+# Install dependencies
+pip install pybind11 scikit-build-core pytest numpy
+
+# Build and install Python bindings
+pip install .
+
+# For development with editable install
+pip install -e .
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+### Quick Start Examples
+
+#### C++ High-Performance Usage
+
+```bash
+# Run Phase 2: Basic neural computation with real LIF neurons
+./nlm --neuron_count 500 --steps 1000
+
+# Run Phase 3: World interaction demo
+./nlm_phase3_demo
+
+# Run Phase 4: Cognitive capabilities demo
+./nlm_phase4_demo
+
+# Run Phase 5: Performance and checkpointing demo
+./nlm_phase5_demo
+
+# Run Phase 6: Full integration test
+./nlm_phase6_demo
+
+# Run performance benchmark
+./nlm_benchmark --iterations 1000
+```
+
+#### Python Usage (Recommended for research and prototyping)
+
+```python
+import pynlm
+
+# Create a brain with custom configuration
+config = pynlm.createDefaultConfig()
+config.set("brain.neuron_count", 1000)
+config.set("plasticity.stdp.enable", True)
+config.set("plasticity.hebbian.enable", True)
+
+# Initialize brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+# Save brain state for checkpointing
+brain.save("my_brain_checkpoint.bin")
+```
+
+### Demo executables
+
+| Executable | Phase | Description |
+|------------|-------|-------------|
+| `nlm` | Phase 2 | Basic neural computation, plasticity experiments |
+| `nlm_phase3_demo` | Phase 3 | World interaction with sensory-motor loop |
+| `nlm_phase4_demo` | Phase 4 | Cognitive capabilities (planning, memory, learning) |
+| `nlm_phase5_demo` | Phase 5 | Performance optimizations and checkpointing |
+| `nlm_phase6_demo` | Phase 6 | Full integration test of all brain systems |
+| `nlm_benchmark` | Benchmark | Performance testing with large-scale simulations |
+
+### Quick Demo Scripts
+
+Create `quick_start.py` for beginners:
+
+```python
+#!/usr/bin/env python3
+"""
+Quick start guide for NLM Python usage.
+Run: python3 quick_start.py
+"""
+import pynlm
+
+print("=== NLM Quick Start ===")
+print("1. Creating brain with default settings...")
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+print(f"2. Brain created with {brain.getTotalNeuronCount()} neurons")
+print(f"   and {brain.getTotalSynapseCount()} synapses")
+
+print("3. Running simulation...")
+for step in range(100):
+    brain.step(step)
+
+print("4. Simulation complete!")
+print(f"   Final firing rate: {brain.getAverageFiringRate():.2f} Hz")
+print(f"   Total spikes: {brain.getTotalSpikeCount()}")
+```
+
+Make it executable: `chmod +x quick_start.py` and run: `python3 quick_start.py`
 
 ## Project Structure
 
