@@ -7,6 +7,11 @@
 #include <optional>
 #include <algorithm>
 
+// Optional nlohmann/json support for enhanced configuration parsing
+#ifdef NLM_USE_NLOHMANN_JSON
+#include <nlohmann/json.hpp>
+#endif
+
 namespace nlm {
 
 // Forward declarations
@@ -56,14 +61,23 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON and simple key=value formats)
     bool loadFromFile(const std::string& filepath);
+    
+    // Internal helper for JSON parsing
+    bool parseJSONFile(const std::string& filepath);
+    
+    // Load from simple key=value format (backward compatibility)
+    bool loadFromSimpleFormat(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (supports JSON and simple formats)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to JSON format
+    bool saveToJSON(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>
@@ -71,7 +85,7 @@ template<typename T>
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
