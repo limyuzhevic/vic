@@ -3,8 +3,148 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <vector>
+#include <map>
+#include <cctype>
+#include <stack>
+#include <stdexcept>
 
+// JSON/YAML Parsing Helper Functions
 namespace nlm {
+
+// Simple JSON/YAML file format detection
+static bool isJSONFile(const std::string& content) {
+    // Check if content starts with { or [ (JSON object or array)
+    size_t startPos = 0;
+    while (startPos < content.size() && std::isspace(content[startPos])) {
+        startPos++;
+    }
+    return startPos < content.size() && (content[startPos] == '{' || content[startPos] == '[');
+}
+
+// Simple JSON parser (minimal implementation for config files)
+static bool parseJSONConfig(const std::string& content, std::map<std::string, std::string>& entries) {
+    try {
+        // Very simple JSON parsing - only handles flat objects
+        // This is a minimal implementation for config files
+        size_t pos = 0;
+        bool inString = false;
+        char quoteChar = '\0';
+        std::string currentKey;
+        std::string currentValue;
+        int braceLevel = 0;
+        bool inValue = false;
+        
+        while (pos < content.size()) {
+            char c = content[pos];
+            
+            if (!inString) {
+                if (c == '{' || c == '[') {
+                    braceLevel++;
+                } else if (c == '}' || c == ']') {
+                    braceLevel--;
+                } else if (c == '"') {
+                    inString = true;
+                    quoteChar = c;
+                } else if (c == ':') {
+                    inValue = true;
+                } else if (c == ',') {
+                    if (!currentKey.empty() && inValue) {
+                        // Store the current entry
+                        entries[currentKey] = trim(currentValue);
+                        currentKey.clear();
+                        currentValue.clear();
+                        inValue = false;
+                    }
+                }
+            } else if (c == quoteChar && (pos == 0 || content[pos-1] != '\\')) {
+                inString = false;
+                quoteChar = '\0';
+            }
+            
+            if (!inString && !inValue && braceLevel == 1 && c != '{' && c != '}') {
+                // We're in a key (before colon)
+                if (c == '"') {
+                    size_t keyEnd = content.find('"', pos + 1);
+                    if (keyEnd != std::string::npos) {
+                        currentKey = content.substr(pos + 1, keyEnd - pos - 1);
+                        pos = keyEnd;
+                    }
+                }
+            } else if (inValue) {
+                currentValue += c;
+            }
+            
+            pos++;
+        }
+        
+        // Handle the last entry
+        if (!currentKey.empty() && !currentValue.empty()) {
+            entries[currentKey] = trim(currentValue);
+        }
+        
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+// Simple YAML parser (minimal implementation for config files)
+static bool parseYAMLConfig(const std::string& content, std::map<std::string, std::string>& entries) {
+    try {
+        // Very simple YAML parsing - only handles key: value format
+        size_t pos = 0;
+        bool inString = false;
+        char quoteChar = '\0';
+        std::string currentKey;
+        std::string currentValue;
+        bool inKey = true;
+        
+        while (pos < content.size()) {
+            char c = content[pos];
+            
+            if (!inString) {
+                if (c == '"') {
+                    inString = true;
+                    quoteChar = c;
+                } else if (c == ':' && !inKey) {
+                    // Key ends, value starts
+                    inKey = false;
+                } else if ((c == '\n' || c == '\r') && !inString && !inKey && !currentKey.empty()) {
+                    // End of line, store entry
+                    entries[currentKey] = trim(currentValue);
+                    currentKey.clear();
+                    currentValue.clear();
+                    inKey = true;
+                    inString = false;
+                }
+            } else if (c == quoteChar && (pos == 0 || content[pos-1] != '\\')) {
+                inString = false;
+                quoteChar = '\0';
+            }
+            
+            if (inKey) {
+                currentKey += c;
+            } else {
+                currentValue += c;
+            }
+            
+            pos++;
+        }
+        
+        // Handle the last entry
+        if (!currentKey.empty()) {
+            entries[currentKey] = trim(currentValue);
+        }
+        
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+} // namespace nlm
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,37 +159,84 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Read entire file content
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    if (content.empty()) {
+        return true; // Empty file is valid
+    }
+    
+    // Detect file format and parse accordingly
+    bool isJSON = isJSONFile(content);
+    bool isYAML = false;
+    
+    // Simple YAML detection (key: value format on separate lines)
+    if (!isJSON) {
+        size_t pos = 0;
+        bool hasYAMLPattern = false;
+        while (pos < content.size() - 1) {
+            char c1 = content[pos];
+            char c2 = content[pos + 1];
+            if ((std::isalpha(c1) || c1 == '_') && c2 == ':') {
+                hasYAMLPattern = true;
+                break;
+            }
+            pos++;
         }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        isYAML = hasYAMLPattern;
+    }
+    
+    std::map<std::string, std::string> entries;
+    
+    bool success = false;
+    if (isJSON) {
+        success = parseJSONConfig(content, entries);
+    } else if (isYAML) {
+        success = parseYAMLConfig(content, entries);
+    } else {
+        // Fall back to simple key=value format
+        std::string line;
+        std::istringstream stream(content);
+        while (std::getline(stream, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                entries[key] = value;
+            }
         }
+        success = true;
+    }
+    
+    if (!success) {
+        return false;
+    }
+    
+    // Apply parsed entries
+    for (const auto& entry : entries) {
+        set(entry.first, entry.second, ConfigSource::File);
     }
     
     return true;

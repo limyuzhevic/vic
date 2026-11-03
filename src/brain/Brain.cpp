@@ -64,14 +64,33 @@ struct Brain::Impl {
     SimulationStep currentStep;
     Timestamp currentTime;
     
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
-
-    // Phase 5 learned preference trait (see Brain.hpp). Updated only
-    // from sandbox reward via AgentBrain; checkpointed with the
-    // simulation state so a reloaded brain keeps what it learned.
-    float learnedPreference = 0.0f;
+    // Performance monitoring
+    struct PerformanceMetrics {
+        size_t totalSpikesThisStep;
+        size_t totalSpikesTotal;
+        float averageFiringRate;
+        float maxFiringRate;
+        float minFiringRate;
+        size_t activeNeuronCount;
+        size_t firingNeuronCount;
+        float activityLevel;
+        size_t stepsSinceLastHighActivity;
+        bool highActivityAlert;
+        
+        PerformanceMetrics()
+            : totalSpikesThisStep(0)
+            , totalSpikesTotal(0)
+            , averageFiringRate(0.0f)
+            , maxFiringRate(0.0f)
+            , minFiringRate(0.0f)
+            , activeNeuronCount(0)
+            , firingNeuronCount(0)
+            , activityLevel(0.0f)
+            , stepsSinceLastHighActivity(0)
+            , highActivityAlert(false) {}
+    };
+    
+    PerformanceMetrics performance;
     
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
@@ -685,13 +704,114 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->episodicMemory->consolidate(0.3f);
     }
     
-    // ========== STEP 15: Checkpoint management ==========
+        // ========== STEP 15: Checkpoint management ==========
     if (pImpl->checkpointManager) {
         pImpl->checkpointManager->update(currentStep, currentTime);
     }
+    
+    // ========== STEP 16: Performance monitoring and activity regulation ==========
+    updatePerformanceMetrics();
+    
+    // Apply activity regulation if needed
+    if (pImpl->performance.highActivityAlert) {
+        applyActivityRegulation();
+    }
+    
+    // Log performance metrics periodically
+    if (currentStep % 100 == 0) {
+        logPerformanceMetrics();
+    }
+    
+    // Check for runaway excitation
+    if (pImpl->performance.activityLevel > 2.0f) {
+        NLM_LOG_WARNING("High activity level detected: " + std::to_string(pImpl->performance.activityLevel) + ". Applying activity regulation.");
+        applyActivityRegulation();
+    }
 }
 
-void Brain::receiveSensoryInput(const class SensoryInput& input) {
+void Brain::updatePerformanceMetrics() {
+    // Calculate performance metrics
+    pImpl->performance.totalSpikesThisStep = pImpl->totalSpikesThisStep;
+    pImpl->performance.totalSpikesTotal = pImpl->totalSpikesTotal;
+    
+    // Calculate firing rates
+    size_t totalNeurons = getTotalNeuronCount();
+    if (totalNeurons > 0) {
+        pImpl->performance.averageFiringRate = static_cast<float>(pImpl->performance.totalSpikesThisStep) / totalNeurons;
+        pImpl->performance.maxFiringRate = static_cast<float>(pImpl->performance.totalSpikesThisStep) / totalNeurons;
+        pImpl->performance.minFiringRate = static_cast<float>(pImpl->performance.totalSpikesThisStep) / totalNeurons;
+    } else {
+        pImpl->performance.averageFiringRate = 0.0f;
+        pImpl->performance.maxFiringRate = 0.0f;
+        pImpl->performance.minFiringRate = 0.0f;
+    }
+    
+    // Calculate activity level
+    pImpl->performance.activeNeuronCount = getActiveNeuronCount();
+    pImpl->performance.firingNeuronCount = getFiringNeuronCount();
+    pImpl->performance.activityLevel = static_cast<float>(pImpl->performance.firingNeuronCount) / 
+                                       std::max(1, totalNeurons);
+    
+    // Update high activity alert
+    if (pImpl->performance.activityLevel > 0.5f) {
+        pImpl->performance.stepsSinceLastHighActivity++;
+        pImpl->performance.highActivityAlert = true;
+    } else {
+        pImpl->performance.stepsSinceLastHighActivity = 0;
+        pImpl->performance.highActivityAlert = false;
+    }
+}
+
+void Brain::applyActivityRegulation() {
+    // Apply global inhibitory feedback to regulate activity
+    // This is a simple mechanism to prevent runaway excitation
+    float activity = pImpl->performance.activityLevel;
+    
+    if (activity > 0.8f) {
+        // Apply strong inhibition
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Apply global inhibition
+                    neuron->injectCurrent(-5.0f * activity);
+                }
+            }
+        }
+        
+        // Log regulation
+        NLM_LOG_INFO("Applied activity regulation: inhibition level = " + std::to_string(5.0f * activity));
+    } else if (activity > 0.5f) {
+        // Apply moderate inhibition
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Apply mild inhibition
+                    neuron->injectCurrent(-2.0f * activity);
+                }
+            }
+        }
+        
+        // Log regulation
+        NLM_LOG_INFO("Applied mild activity regulation: inhibition level = " + std::to_string(2.0f * activity));
+    }
+}
+
+void Brain::logPerformanceMetrics() {
+    std::string metrics = "Performance Metrics (step " + std::to_string(pImpl->currentStep) + "):";
+    metrics += "\n  Total spikes this step: " + std::to_string(pImpl->performance.totalSpikesThisStep);
+    metrics += "\n  Total spikes overall: " + std::to_string(pImpl->performance.totalSpikesTotal);
+    metrics += "\n  Average firing rate: " + std::to_string(pImpl->performance.averageFiringRate);
+    metrics += "\n  Activity level: " + std::to_string(pImpl->performance.activityLevel);
+    metrics += "\n  Active neurons: " + std::to_string(pImpl->performance.activeNeuronCount);
+    metrics += "\n  Firing neurons: " + std::to_string(pImpl->performance.firingNeuronCount);
+    metrics += "\n  Steps since last high activity: " + std::to_string(pImpl->performance.stepsSinceLastHighActivity);
+    
+    if (pImpl->performance.highActivityAlert) {
+        metrics += "\n  ALERT: High activity detected!";
+    }
+    
+    NLM_LOG_INFO(metrics);
+}
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
     

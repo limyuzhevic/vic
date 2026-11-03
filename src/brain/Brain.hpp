@@ -49,37 +49,101 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+//
+// This is Phase 6 of the NLM project, representing the final integration
+// of all previous neural computation components into a coherent artificial brain.
 
 class Brain {
 public:
-    // Create brain with configuration
+    /**
+     * @brief Creates a brain instance with the specified configuration
+     * 
+     * @param config Configuration settings for the brain including neuron count,
+     *               region count, connection probability, and various system parameters
+     * @throws std::runtime_error if config is null or invalid
+     */
     explicit Brain(std::shared_ptr<Config> config);
     
+    /**
+     * @brief Destructor - cleans up brain resources
+     */
     ~Brain();
     
-    // Disable copying, enable moving
+    /**
+     * @brief Disabled copy constructor - brains cannot be copied
+     */
     Brain(const Brain&) = delete;
+    
+    /**
+     * @brief Disabled copy assignment operator - brains cannot be assigned
+     */
     Brain& operator=(const Brain&) = delete;
+    
+    /**
+     * @brief Move constructor - enables moving brain instances
+     */
     Brain(Brain&&) noexcept;
+    
+    /**
+     * @brief Move assignment operator - enables moving brain instances
+     */
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
+    /**
+     * @brief Initializes the brain with the provided configuration
+     * 
+     * This creates neurons, regions, and initializes all integrated systems
+     * (memory, neuromodulation, cognition, prediction, etc.)
+     * 
+     * @return true if initialization succeeds, false on error
+     * @throws std::runtime_error on configuration errors
+     */
     bool initialize();
     
-    // Main simulation step
-    void step(SimulationStep currentStep);
-    
-    // Simulation time step
+    /**
+     * @brief Main simulation step with timestamp
+     * 
+     * @param currentStep Current simulation step number
+     * @param currentTime Current simulation time in seconds
+     */
     void step(SimulationStep currentStep, Timestamp currentTime);
     
-    // Receive sensory input from environment
-    // Injects current into sensory neurons based on input pattern
+    /**
+     * @brief Convenience simulation step with auto-calculated timestamp
+     * 
+     * @param currentStep Current simulation step number
+     */
+    void step(SimulationStep currentStep);
+    
+    /**
+     * @brief Receives and processes sensory input from the environment
+     * 
+     * This injects current into sensory neurons based on the input pattern,
+     * which propagates through the neural network.
+     * 
+     * @param input Sensory input data containing environmental observations
+     */
     void receiveSensoryInput(const class SensoryInput& input);
     
-    // Inject current directly into a specific neuron
+    /**
+     * @brief Injects current directly into a specific neuron
+     * 
+     * This is useful for external control or stimulation of specific neurons.
+     * 
+     * @param neuron ID of the neuron to inject current into
+     * @param current Amount of current to inject in mV
+     */
     void injectCurrent(NeuronId neuron, MembranePotential current);
     
-    // Inject current into all neurons of a specific type
+    /**
+     * @brief Injects current into all neurons of a specific type
+     * 
+     * This is used for applying global stimulation or inhibition to specific
+     * neural populations (e.g., all sensory neurons).
+     * 
+     * @param type Type of neurons to inject current into
+     * @param current Amount of current to inject in mV
+     */
     void injectCurrentToNeurons(NeuronType type, MembranePotential current);
     
     // Spike system access
