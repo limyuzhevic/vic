@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# nlm-analysis - Main entry point
+
+# Set executable permissions
+chmod +x "$0" 2>/dev/null || true
+
+# Detect script directory and add to PATH
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PATH="$script_dir:$PATH"
+
+# Check for required dependencies
+check_dependencies() {
+    local missing=0
+
+    # Check for core tools
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "ERROR: python3 is required but not found" >&2
+        missing=1
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "ERROR: cmake is required but not found" >&2
+        missing=1
+    fi
+
+    if [ $missing -eq 1 ]; then
+        echo "Please install missing dependencies and try again." >&2
+        exit 1
+    fi
+}
+
+# Show usage information
+show_usage() {
+    cat << EOF
+NLM Analysis Tool
+================
+
+Usage: nlm-analysis [OPTIONS] COMMAND [ARGS...]
+
+Options:
+  --help, -h              Show this help message
+  --version, -v           Show version information
+  --quiet, -q             Suppress non-essential output
+  --verbose, -V           Enable verbose output
+
+Commands:
+  stats                    Display brain statistics
+  connectivity             Analyze brain connectivity
+  export                   Export brain data
+  compare                  Compare brain states
+  visualize                Generate visualizations
+  benchmark                Run performance benchmarks
+  config                   Configuration management
+
+For more information about a specific command, use:
+  nlm-analysis COMMAND --help
+EOF
+}
+
+# Main function
+main() {
+    # Parse global options
+    while [ $# -gt 0 ]; do
+        case $1 in
+            --help|-h)
+                show_usage
+                exit 0
+                ;;
+            --version|-v)
+                echo "NLM Analysis Tool v1.0.0"
+                echo "Phase 6: Integrated Artificial Brain"
+                exit 0
+                ;;
+            --quiet|-q)
+                QUIET=1
+                shift
+                ;;
+            --verbose|-V)
+                VERBOSE=1
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    # Check if we have a command
+    if [ $# -eq 0 ]; then
+        show_usage
+        exit 1
+    fi
+
+    # Dispatch to commands
+    case $1 in
+        stats)
+            shift
+            exec nlm-analysis-stats "$@"
+            ;;
+        connectivity)
+            shift
+            exec nlm-analysis-connectivity "$@"
+            ;;
+        export)
+            shift
+            exec nlm-analysis-export "$@"
+            ;;
+        compare)
+            shift
+            exec nlm-analysis-compare "$@"
+            ;;
+        visualize)
+            shift
+            exec nlm-analysis-visualize "$@"
+            ;;
+        benchmark)
+            shift
+            exec nlm-analysis-benchmark "$@"
+            ;;
+        config)
+            shift
+            exec nlm-analysis-config "$@"
+            ;;
+        *)
+            echo "ERROR: Unknown command '$1'" >&2
+            show_usage >&2
+            exit 1
+            ;;
+    esac
+}
+
+# Execute main function
+main "$@"

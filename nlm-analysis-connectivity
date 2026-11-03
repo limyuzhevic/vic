@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+"""
+NLM Connectivity Analyzer
+
+Analyze brain connectivity patterns, including regional connectivity,
+synaptic strength distributions, and network topology.
+
+Usage: nlm-analysis connectivity [OPTIONS] BRAIN_FILE
+
+Arguments:
+  BRAIN_FILE     Path to checkpoint file (.ncl or .bin)
+
+Options:
+  --regions, -r     Analyze regional connectivity
+  --distribution, -d Analyze synaptic weight distribution
+  --pathway, -p      Analyze specific pathways
+  --topology, -t     Analyze network topology
+  --threshold, -T    Minimum synaptic weight threshold (default: 0.0)
+  --format, -f FORMAT  Output format (text, json, csv) (default: text)
+  --output, -o FILE    Output file (default: stdout)
+  --detailed, -D     Enable detailed analysis
+
+Examples:
+  nlm-analysis connectivity brain.bin
+  nlm-analysis connectivity brain.bin --regions --topology
+  nlm-analysis connectivity brain.bin --threshold 0.1 --format json
+"""

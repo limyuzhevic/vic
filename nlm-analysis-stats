@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+"""
+NLM Brain Statistics Analyzer
+
+Display comprehensive statistics about an NLM brain state.
+
+Usage: nlm-analysis stats [OPTIONS] BRAIN_FILE
+
+Arguments:
+  BRAIN_FILE     Path to checkpoint file (.ncl or .bin)
+
+Options:
+  --detailed, -d     Show detailed statistics
+  --neurons, -n      Show neuron statistics
+  --synapses, -s      Show synapse statistics  
+  --plasticity, -p    Show plasticity statistics
+  --memory, -m        Show memory statistics
+  --performance, -P   Show performance metrics
+  --format, -f FORMAT  Output format (text, json, csv) (default: text)
+  --output, -o FILE    Output file (default: stdout)
+
+Examples:
+  nlm-analysis stats checkpoint.ncl
+  nlm-analysis stats brain.bin --detailed --neurons --synapses
+  nlm-analysis stats brain.bin --format json --output stats.json
+"""
