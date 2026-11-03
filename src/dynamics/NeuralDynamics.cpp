@@ -14,7 +14,7 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
-void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
+void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt, Timestamp currentTime) {
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     // PLACEHOLDER: Simple leaky integrator
     
@@ -37,7 +37,7 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     // Check for firing
     if (shouldFire(neuron)) {
         neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+        neuron->recordSpike(currentTime);  // Fixed: pass actual time
     }
     
     // Refractory mechanism
@@ -49,10 +49,10 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     neuron->clearTotalCurrent();
 }
 
-void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
+void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt, Timestamp currentTime) {
     // TODO PHASE 2: Implement real synaptic dynamics
     // PLACEHOLDER: Synapse decay
-    synapse->step(0.0);
+    synapse->step(currentTime);
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {

@@ -64,7 +64,7 @@ void STDP::update(Synapse* synapse,
     // so weights saturated to their bounds in a few steps and the cost was
     // O(history^2) per synapse per step. Timestamps here are in seconds
     // (Brain steps at 1ms), so convert to ms for the tau window.
-    float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
+    float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) / 1000.0);
     if (dtMs > 0) {
         totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
     } else if (dtMs < 0) {
@@ -102,11 +102,16 @@ void STDP::update(Synapse* synapse,
 
         // Apply weight change
         synapse->addToWeight(totalDelta);
-        // Enforce sign: excitatory stays >= 0.01, inhibitory stays <= -0.01.
-        if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
-            synapse->setWeight(-0.01f);
-        } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
-            synapse->setWeight(0.01f);
+        // Enforce synapse type-specific bounds: excitatory stays >= minWeight,
+        // inhibitory stays <= maxWeight (typically negative for inhibitory).
+        if (synapse->getType() == SynapseType::Inhibitory) {
+            if (synapse->getWeight() > pImpl->maxWeight) {
+                synapse->setWeight(pImpl->maxWeight);
+            }
+        } else if (synapse->getType() == SynapseType::Excitatory) {
+            if (synapse->getWeight() < pImpl->minWeight) {
+                synapse->setWeight(pImpl->minWeight);
+            }
         }
         
         // Update eligibility trace for reward-modulated learning
@@ -156,6 +161,22 @@ void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
     setLTPWeight(ltpWeight);
     setLTDWeight(ltdWeight);
     setTimeConstant(tau);
+}
+
+void STDP::setMinWeight(float weight) {
+    pImpl->minWeight = weight;
+}
+
+float STDP::getMinWeight() const {
+    return pImpl->minWeight;
+}
+
+void STDP::setMaxWeight(float weight) {
+    pImpl->maxWeight = weight;
+}
+
+float STDP::getMaxWeight() const {
+    return pImpl->maxWeight;
 }
 
 } // namespace nlm

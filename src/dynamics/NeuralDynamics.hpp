@@ -15,11 +15,11 @@ public:
     
     // Update neuron state for one step
     // TODO PHASE 2: Implement real dynamics
-    virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
+    virtual void updateNeuron(Neuron* neuron, TimestepDuration dt, Timestamp currentTime) = 0;
     
     // Update synapse state for one step
     // TODO PHASE 2: Implement real synaptic dynamics
-    virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
+    virtual void updateSynapse(Synapse* synapse, TimestepDuration dt, Timestamp currentTime) = 0;
     
     // Apply synaptic input from spike
     virtual void applySpikeInput(Neuron* neuron, const Synapse* synapse) = 0;
@@ -37,8 +37,8 @@ public:
     IntegrateAndFireDynamics();
     ~IntegrateAndFireDynamics() override;
     
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void updateNeuron(Neuron* neuron, TimestepDuration dt, Timestamp currentTime) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt, Timestamp currentTime) override;
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
     bool shouldFire(const Neuron* neuron) const override;
     void reset() override;
@@ -57,8 +57,8 @@ private:
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
     // PLACEHOLDER - Phase 2 will implement HH dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
+    void updateNeuron(Neuron* neuron, TimestepDuration dt, Timestamp currentTime) override {}
+    void updateSynapse(Synapse* synapse, TimestepDuration dt, Timestamp currentTime) override {}
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
     bool shouldFire(const Neuron* neuron) const override { return false; }
     void reset() override {}
@@ -69,8 +69,8 @@ public:
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
     // PLACEHOLDER - Phase 2 will implement FHN dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
+    void updateNeuron(Neuron* neuron, TimestepDuration dt, Timestamp currentTime) override {}
+    void updateSynapse(Synapse* synapse, TimestepDuration dt, Timestamp currentTime) override {}
     void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
     bool shouldFire(const Neuron* neuron) const override { return false; }
     void reset() override {}

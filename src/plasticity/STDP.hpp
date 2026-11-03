@@ -27,6 +27,12 @@ public:
     void setTimeConstant(float tau);    // STDP time constant (ms)
     float getTimeConstant() const;
     
+    // Weight bounds
+    void setMinWeight(float weight);
+    float getMinWeight() const;
+    void setMaxWeight(float weight);
+    float getMaxWeight() const;
+    
     // Update parameters from config
     void configure(float ltpWeight, float ltdWeight, float tau);
     

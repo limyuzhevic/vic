@@ -27,6 +27,19 @@ bool Config::loadFromFile(const std::string& filepath) {
         return false;
     }
     
+    // Determine file type by extension
+    std::string extension = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
+    }
+    
+    // TODO: Implement proper JSON parser for .json files
+    // TODO: Implement proper YAML parser for .yaml/.yml files
+    
+    // For now, use simple key=value format for all files
+    // This will be enhanced in Phase 2 with proper JSON/YAML support
+    
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments

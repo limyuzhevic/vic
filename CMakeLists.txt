@@ -205,9 +205,15 @@ endif()
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+# Python tools
+add_custom_target(nlm_tools ALL
+    COMMENT "Build NLM tools"
+    COMMAND ${CMAKE_COMMAND} -E echo "Building NLM tools..."
 )
+
+# Python tools
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/nlm_debug.py" DESTINATION bin RENAME nlm_debug)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/nlm_config.py" DESTINATION bin RENAME nlm_config)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/advanced_config.json" DESTINATION .)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/easy_usage.md" DESTINATION .)
+
