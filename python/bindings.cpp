@@ -428,6 +428,91 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Add convenience functions for common operations
+    m.def("brain_simulate_step", [](std::shared_ptr<Brain> brain, SimulationStep step) {
+        brain->step(step);
+    }, py::arg("brain"), py::arg("step"),
+         "Perform a single brain simulation step");
+
+    m.def("brain_simulate_steps", [](std::shared_ptr<Brain> brain, SimulationStep startStep, SimulationStep numSteps) {
+        for (SimulationStep step = startStep; step < startStep + numSteps; ++step) {
+            brain->step(step);
+        }
+    }, py::arg("brain"), py::arg("startStep"), py::arg("numSteps"),
+         "Perform multiple brain simulation steps");
+
+    m.def("agent_run_episode", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, 
+                                   SimulationStep numSteps, bool enableLearning = true) {
+        agent->enableRewardModulation(enableLearning);
+        
+        for (SimulationStep step = 0; step < numSteps; ++step) {
+            world->update(0.1);  // Update world
+            auto percept = world->getSensoryPercept();  // Get what the agent sees
+            agent->processSensoryInput(percept);  // Brain sees it
+            agent->updateDevelopment(0.1);  // Update development
+            world->applyMotorCommand(agent->decodeMotorCommand(), world->getSimulationTime());  // Do action
+        }
+        
+        return world->getSimulationTime();
+    }, py::arg("agent"), py::arg("world"), py::arg("numSteps"), py::arg("enableLearning") = true,
+         "Run a complete agent episode in the world");
+
+    m.def("create_simple_agent_config", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.1, ConfigSource::Default);
+        return config;
+    }, "Create a simple, optimized configuration for agent training");
+
+    m.def("validate_config", &Config::validateKey, py::arg("key"),
+         "Validate if a configuration key is valid");
+
+    m.def("get_valid_config_keys", &Config::getValidKeys,
+         "Get all valid configuration keys");
+
+    // Add type conversion and comparison helpers for Python
+    m.def("neuron_id_str", [](NeuronId id) {
+        return std::to_string(id.value);
+    }, py::arg("id"), "Convert neuron ID to string");
+
+    m.def("compare_neuron_ids", [](const NeuronId& a, const NeuronId& b) {
+        return a.value == b.value;
+    }, py::arg("a"), py::arg("b"), "Compare two neuron IDs");
+
+    // Add batch operations for performance
+    m.def("brain_batch_inject", [](std::shared_ptr<Brain> brain, 
+                                   const std::vector<NeuronId>& neuronIds, 
+                                   const std::vector<float>& currents) {
+        if (neuronIds.size() != currents.size()) {
+            throw std::runtime_error("Neuron IDs and currents must have the same size");
+        }
+        for (size_t i = 0; i < neuronIds.size(); ++i) {
+            brain->injectCurrent(neuronIds[i], currents[i]);
+        }
+    }, py::arg("brain"), py::arg("neuronIds"), py::arg("currents"),
+         "Inject current into multiple neurons at once");
+
+    // Add statistical helper functions
+    m.def("compute_firing_stats", [](const std::shared_ptr<Brain>& brain) {
+        std::map<std::string, double> stats;
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["firing_neuron_count"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        return stats;
+    }, py::arg("brain"), "Compute comprehensive brain firing statistics");
+
+    // Add checkpoint management helpers
+    m.def("brain_checkpoint_info", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, std::string> info;
+        info["total_neurons"] = std::to_string(brain->getTotalNeuronCount());
+        info["total_synapses"] = std::to_string(brain->getTotalSynapseCount());
+        info["total_spikes"] = std::to_string(brain->getTotalSpikeCount());
+        info["firing_count"] = std::to_string(brain->getFiringNeuronCount());
+        return info;
+    }, py::arg("brain"), "Get checkpoint information about the brain");
 }
 
 } // namespace nlm

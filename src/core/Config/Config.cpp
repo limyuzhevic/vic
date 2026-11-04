@@ -41,6 +41,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key before setting
+            if (!validateKey(key)) {
+                NLM_LOG_WARNING("Invalid configuration key: " + key);
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -48,7 +54,11 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                set(key, value, ConfigSource::File);
+            } catch (const ConfigValidationError& e) {
+                NLM_LOG_WARNING(std::string("Configuration validation error for key '" + key + "': " + e.what()));
+            }
         }
     }
     
@@ -93,6 +103,22 @@ bool Config::saveToFile(const std::string& filepath) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key before setting
+    if (!validateKey(key)) {
+        throw ConfigValidationError("Invalid configuration key: " + key);
+    }
+    
+    // Validate value if key exists and we have a default value to compare against
+    if (has(key)) {
+        auto defaultVal = getDefaultValue(key);
+        if (defaultVal.has_value()) {
+            if (!validateValue(key, value)) {
+                throw ConfigValidationError("Invalid configuration value for key '" + key + "': " + 
+                    "value type or range not valid for this key");
+            }
+        }
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -175,6 +201,159 @@ std::string Config::summary() const {
         oss << "] (" << static_cast<int>(entry.source) << ")\n";
     }
     return oss.str();
+}
+
+bool Config::validateKey(const std::string& key) {
+    static const std::vector<std::string> validKeys = {
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count",
+        "region_count",
+        "connection_probability",
+        "plasticity_learning_rate",
+        "stdp_ltp_weight",
+        "stdp_ltd_weight",
+        "stdp_time_constant",
+        "development_synaptogenesis_rate",
+        "development_pruning_rate",
+        "dopamine_baseline",
+        "reward_discount_factor",
+        "environment_name",
+        "environment_width",
+        "environment_height",
+        "log_level",
+        "log_to_file",
+        "log_filename",
+        "max_simulation_steps",
+        "simulation_time_limit",
+        "visualization_enabled",
+        "visualization_update_rate"
+    };
+    
+    return std::find(validKeys.begin(), validKeys.end(), key) != validKeys.end();
+}
+
+bool Config::validateValue(const std::string& key, const ConfigValue& value) {
+    // Basic validation based on key
+    if (key == "random_seed") {
+        return std::holds_alternative<int64_t>(value) && std::get<int64_t>(value) >= 0;
+    } else if (key == "simulation_timestep") {
+        return std::holds_alternative<double>(value) && std::get<double>(value) > 0.0;
+    } else if (key == "neuron_count") {
+        return std::holds_alternative<int64_t>(value) && std::get<int64_t>(value) > 0;
+    } else if (key == "region_count") {
+        return std::holds_alternative<int64_t>(value) && std::get<int64_t>(value) > 0;
+    } else if (key == "connection_probability") {
+        return std::holds_alternative<double>(value) && std::get<double>(value) >= 0.0 && std::get<double>(value) <= 1.0;
+    } else if (key == "plasticity_learning_rate") {
+        return std::holds_alternative<double>(value) && std::get<double>(value) >= 0.0;
+    } else if (key == "stdp_ltp_weight" || key == "stdp_ltd_weight") {
+        return std::holds_alternative<double>(value) && std::get<double>(value) >= 0.0;
+    } else if (key == "stdp_time_constant") {
+        return std::holds_alternative<double>(value) && std::get<double>(value) > 0.0;
+    } else if (key == "development_synaptogenesis_rate" || key == "development_pruning_rate") {
+        return std::holds_alternative<double>(value) && std::get<double>(value) >= 0.0;
+    } else if (key == "dopamine_baseline") {
+        return std::holds_alternative<double>(value) && std::get<double>(value) >= 0.0;
+    } else if (key == "reward_discount_factor") {
+        return std::holds_alternative<double>(value) && std::get<double>(value) >= 0.0 && std::get<double>(value) <= 1.0;
+    } else if (key == "environment_width" || key == "environment_height") {
+        return std::holds_alternative<int64_t>(value) && std::get<int64_t>(value) > 0;
+    } else if (key == "log_to_file") {
+        return std::holds_alternative<bool>(value);
+    } else if (key == "max_simulation_steps") {
+        return std::holds_alternative<int64_t>(value) && std::get<int64_t>(value) > 0;
+    } else if (key == "simulation_time_limit") {
+        return std::holds_alternative<double>(value) && std::get<double>(value) >= 0.0;
+    } else if (key == "visualization_enabled") {
+        return std::holds_alternative<bool>(value);
+    } else if (key == "visualization_update_rate") {
+        return std::holds_alternative<double>(value) && std::get<double>(value) > 0.0;
+    }
+    
+    // For other keys, accept any type
+    return true;
+}
+
+std::vector<std::string> Config::getValidKeys() {
+    return {
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count",
+        "region_count",
+        "connection_probability",
+        "plasticity_learning_rate",
+        "stdp_ltp_weight",
+        "stdp_ltd_weight",
+        "stdp_time_constant",
+        "development_synaptogenesis_rate",
+        "development_pruning_rate",
+        "dopamine_baseline",
+        "reward_discount_factor",
+        "environment_name",
+        "environment_width",
+        "environment_height",
+        "log_level",
+        "log_to_file",
+        "log_filename",
+        "max_simulation_steps",
+        "simulation_time_limit",
+        "visualization_enabled",
+        "visualization_update_rate"
+    };
+}
+
+std::optional<ConfigValue> Config::getDefaultValue(const std::string& key) {
+    // Return default values for known keys
+    if (key == "random_seed") {
+        return ConfigValue(int64_t(42));
+    } else if (key == "simulation_timestep") {
+        return ConfigValue(0.001);
+    } else if (key == "neuron_count") {
+        return ConfigValue(int64_t(1000));
+    } else if (key == "region_count") {
+        return ConfigValue(int64_t(2));
+    } else if (key == "connection_probability") {
+        return ConfigValue(0.1f);
+    } else if (key == "plasticity_learning_rate") {
+        return ConfigValue(0.01);
+    } else if (key == "stdp_ltp_weight") {
+        return ConfigValue(0.01f);
+    } else if (key == "stdp_ltd_weight") {
+        return ConfigValue(0.012f);
+    } else if (key == "stdp_time_constant") {
+        return ConfigValue(20.0f);
+    } else if (key == "development_synaptogenesis_rate") {
+        return ConfigValue(0.001f);
+    } else if (key == "development_pruning_rate") {
+        return ConfigValue(0.0001f);
+    } else if (key == "dopamine_baseline") {
+        return ConfigValue(0.1f);
+    } else if (key == "reward_discount_factor") {
+        return ConfigValue(0.99f);
+    } else if (key == "environment_name") {
+        return ConfigValue(std::string("GridWorld"));
+    } else if (key == "environment_width") {
+        return ConfigValue(int64_t(10));
+    } else if (key == "environment_height") {
+        return ConfigValue(int64_t(10));
+    } else if (key == "log_level") {
+        return ConfigValue(std::string("INFO"));
+    } else if (key == "log_to_file") {
+        return ConfigValue(false);
+    } else if (key == "log_filename") {
+        return ConfigValue(std::string("nlm.log"));
+    } else if (key == "max_simulation_steps") {
+        return ConfigValue(int64_t(10000));
+    } else if (key == "simulation_time_limit") {
+        return ConfigValue(0.0f);
+    } else if (key == "visualization_enabled") {
+        return ConfigValue(false);
+    } else if (key == "visualization_update_rate") {
+        return ConfigValue(30.0f);
+    }
+    
+    return std::nullopt;
 }
 
 std::string Config::trim(const std::string& str) {

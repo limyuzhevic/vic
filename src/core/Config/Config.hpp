@@ -44,6 +44,12 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration validation errors
+class ConfigValidationError : public std::runtime_error {
+public:
+    ConfigValidationError(const std::string& message) : std::runtime_error(message) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -66,13 +72,13 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
+    
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -94,6 +100,12 @@ template<typename T>
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation
+    static bool validateKey(const std::string& key);
+    static bool validateValue(const std::string& key, const ConfigValue& value);
+    static std::vector<std::string> getValidKeys();
+    static std::optional<ConfigValue> getDefaultValue(const std::string& key);
     
 private:
     struct Impl;

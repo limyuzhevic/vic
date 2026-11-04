@@ -3,12 +3,36 @@
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
+#include <stdexcept>
 
 namespace nlm {
 
-// Forward declarations
-class Synapse;
-class RandomGenerator;
+// Neuron operation errors
+class NeuronError : public std::runtime_error {
+public:
+    NeuronError(const std::string& message) : std::runtime_error(message) {}
+};
+
+class NeuronInitializationError : public NeuronError {
+public:
+    NeuronInitializationError(const std::string& message) : NeuronError("Neuron initialization failed: " + message) {}
+};
+
+class NeuronStepError : public NeuronError {
+public:
+    NeuronStepError(const std::string& message) : NeuronError("Neuron step failed: " + message) {}
+};
+
+class NeuronInjectionError : public NeuronError {
+public:
+    NeuronInjectionError(const std::string& message) : NeuronError("Neuron current injection failed: " + message) {}
+};
+
+// Neuron state validation
+class NeuronStateError : public std::runtime_error {
+public:
+    NeuronStateError(const std::string& message) : std::runtime_error("Neuron state error: " + message) {}
+};
 
 // Neuron state structure for efficient storage
 struct NeuronState {
