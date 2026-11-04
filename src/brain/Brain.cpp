@@ -87,6 +87,10 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // Prediction system state
+    std::unique_ptr<SensoryInput> currentSensoryState;
+    std::unique_ptr<SensoryInput> lastSensoryState;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -104,6 +108,8 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , currentSensoryState(nullptr)
+        , lastSensoryState(nullptr)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -614,8 +620,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Store current sensory state for prediction
+        // The prediction system predicts next state based on current state
+        pImpl->predictionSystem->train(pImpl->currentSensoryState);
+        
+        // Make prediction for next timestep (would need sensory state)
+        // For now, store sensory state for next prediction cycle
+        pImpl->predictionSystem->updatePredictions(pImpl->lastSensoryState, pImpl->currentSensoryState);
+        
+        // Use prediction error to guide learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Prediction error affects neuromodulation (dopamine)
+        if (pImpl->dopamine) {
+            // Dopamine responds to prediction error (reward prediction error)
+            pImpl->dopamine->signalRewardPredictionError(predictionError);
+        }
+        
+        // Prediction error affects attention and working memory competition
+        if (pImpl->attention && pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // High confidence predictions bias attention
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            if (confidence > 0.5f) {
+                pImpl->attention->processCompetition(competitors);
+            }
+        }
+        
+        // Prediction affects working memory rehearsal
+        if (pImpl->workingMemory && confidence > 0.5f) {
+            // High confidence predictions strengthen memory traces
+            pImpl->workingMemory->strengthenMemory(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -629,10 +665,84 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // ========== STEP 8: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // Store current sensory state for prediction
+        // The prediction system predicts next state based on current state
+        pImpl->predictionSystem->train(pImpl->currentSensoryState);
+        
+        // Make prediction for next timestep (would need sensory state)
+        // For now, store sensory state for next prediction cycle
+        pImpl->predictionSystem->updatePredictions(pImpl->lastSensoryState, pImpl->currentSensoryState);
+        
+        // Use prediction error to guide learning
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float confidence = pImpl->predictionSystem->getConfidence();
+        
+        // Prediction error affects neuromodulation (dopamine)
+        if (pImpl->dopamine) {
+            // Dopamine responds to prediction error (reward prediction error)
+            pImpl->dopamine->signalRewardPredictionError(predictionError);
+        }
+        
+        // Prediction error affects attention and working memory competition
+        if (pImpl->attention && pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // High confidence predictions bias attention
+            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
+            if (confidence > 0.5f) {
+                pImpl->attention->processCompetition(competitors);
+            }
+        }
+        
+        // Prediction affects working memory rehearsal
+        if (pImpl->workingMemory && confidence > 0.5f) {
+            // High confidence predictions strengthen memory traces
+            pImpl->workingMemory->strengthenMemory(predictionError);
+        }
+    }
+    
+    // ========== STEP 9: Update cognition systems ==========
+    
+    // Update neural planner with current state
+    if (pImpl->planner) {
+        // Get current sensory and motor states for planning
+        std::vector<float> currentSensoryPattern;
+        if (pImpl->currentSensoryState) {
+            currentSensoryPattern = pImpl->currentSensoryState->getData();
+        }
+        
+        // Update planner with current state and prediction error
+        pImpl->planner->update(pImpl->timestep, predictionError, confidence);
+        
+        // Get planned action sequence
+        std::vector<ActionType> plannedActions = pImpl->planner->getPlannedActions();
+        
+        // Use planned actions to bias working memory
+        if (!plannedActions.empty() && pImpl->workingMemory) {
+            for (ActionType action : plannedActions) {
+                pImpl->workingMemory->reinforceAction(action, confidence);
+            }
+        }
+    }
+    
+    // Update concept formation with current neural activity
+    if (pImpl->conceptFormation && pImpl->workingMemory) {
+        // Get current working memory content
+        std::vector<NeuronId> memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        std::vector<float> memoryActivations = pImpl->workingMemory->getMemoryActivations();
+        
+        // Process current patterns for concept formation
+        pImpl->conceptFormation->processPatterns(memoryNeurons, memoryActivations, pImpl->timestep);
+        
+        // Get newly formed concepts
+        std::vector<ConceptId> newConcepts = pImpl->conceptFormation->getNewConcepts();
+        
+        // Use concepts to influence attention
+        if (pImpl->attention && !newConcepts.empty()) {
+            for (ConceptId concept : newConcepts) {
+                pImpl->attention->focusOnConcept(concept);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -694,6 +804,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
     // This is a simple mapping - sensory encoding
+    
+    // Store current sensory state for prediction system
+    lastSensoryState = currentSensoryState;
+    currentSensoryState = std::make_unique<SensoryInput>(input);
     
     const auto& values = input.getData();
     if (values.empty()) return;
