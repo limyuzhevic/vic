@@ -65,20 +65,41 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values (defined here so templates instantiate in every TU)
-template<typename T>
-    std::optional<T> get(const std::string& key) const;
-
+    // Get values with improved type safety
     template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
+    T get(const std::string& key, const T& defaultValue = T()) const;
+    
+    template<typename T>
+    bool tryGet(const std::string& key, T& outValue) const;
+    
+    // Configuration presets for common use cases
+    static std::shared_ptr<Config> createStandardBrainConfig(size_t neuronCount = 1000);
+    static std::shared_ptr<Config> createLearningConfig(float learningRate = 0.01f);
+    static std::shared_ptr<Config> createDebugConfig(bool verboseLogging = true);
+    
+    // Get configuration category (for organizing settings)
+    static std::string getCategory(const std::string& key);
+    
+    // Get all keys in a specific category
+    static std::vector<std::string> getKeysInCategory(const std::string& category);
+    
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Enhanced type checking
+    bool isInt(const std::string& key) const;
+    bool isFloat(const std::string& key) const;
+    bool isString(const std::string& key) const;
+    bool isBool(const std::string& key) const;
+    bool isVector(const std::string& key) const;
+    
+    // Configuration validation
+    std::vector<std::string> validate() const;
     
     // Check existence
     bool has(const std::string& key) const;
@@ -95,6 +116,15 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Clone configuration
+    std::shared_ptr<Config> clone() const;
+    
+    // Merge configurations
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
+    
+    // Configuration presets
+    void applyPreset(const std::string& presetName);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +132,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getConfigCategory(const std::string& key);
+    static bool validateValue(const std::string& key, const ConfigValue& value);
 };
 
 } // namespace nlm

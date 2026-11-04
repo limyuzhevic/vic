@@ -408,26 +408,172 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Configuration utilities
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
+    // Brain utilities
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
+    // World utilities
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
+    // Agent utilities
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+    // Invalid IDs (for convenience)
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+
+    // Advanced convenience functions
+    m.def("importBrainState", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw std::runtime_error("Failed to load configuration from: " + filepath);
+        }
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        if (!brain->load(filepath)) {
+            throw std::runtime_error("Failed to load brain state from: " + filepath);
+        }
+        return brain;
+    }, py::arg("filepath"), "Load a complete brain state from a file (shortcut for config + brain.load)");
+
+    m.def("saveBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain->save(filepath)) {
+            throw std::runtime_error("Failed to save brain state to: " + filepath);
+        }
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to a file");
+
+    m.def("runAgentEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                               std::shared_ptr<AgentBrain> agent, size_t maxSteps) {
+        auto agentBody = world->getAgentBody();
+        agent->initialize(world);
+        
+        for (size_t step = 0; step < maxSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("maxSteps"), "Run a complete agent episode");
+
+    // Statistics and analytics helper
+    m.def("computeBrainStats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, std::string> stats;
+        stats["total_neurons"] = std::to_string(brain->getTotalNeuronCount());
+        stats["total_synapses"] = std::to_string(brain->getTotalSynapseCount());
+        stats["active_neurons"] = std::to_string(brain->getActiveNeuronCount());
+        stats["firing_neurons"] = std::to_string(brain->getFiringNeuronCount());
+        stats["total_spikes"] = std::to_string(brain->getTotalSpikeCount());
+        stats["average_firing_rate"] = std::to_string(brain->getAverageFiringRate());
+        stats["e_i_ratio"] = std::to_string(brain->getExcitationInhibitionRatio());
+        stats["developmental_stage"] = std::to_string(static_cast<int>(brain->getDevelopmentalStage()));
+        return stats;
+    }, py::arg("brain"), "Compute comprehensive brain statistics as a dictionary");
+
+    // Neural network utilities
+    m.def("findConnectedComponents", [](std::shared_ptr<Brain> brain) {
+        std::vector<std::vector<NeuronId>> components;
+        std::set<NeuronId> visited;
+        
+        auto* spikeSystem = brain->getSpikeSystem();
+        if (!spikeSystem) return components;
+        
+        for (const auto& neuron : spikeSystem->getAllNeurons()) {
+            if (visited.find(neuron->getId()) == visited.end()) {
+                std::vector<NeuronId> component;
+                std::stack<NeuronId> stack;
+                stack.push(neuron->getId());
+                visited.insert(neuron->getId());
+                
+                while (!stack.empty()) {
+                    NeuronId current = stack.top();
+                    stack.pop();
+                    component.push_back(current);
+                    
+                    auto* region = brain->getRegion(current);
+                    if (region) {
+                        for (const auto& syn : region->getSynapses()) {
+                            NeuronId neighbor = syn->getSourceNeuron() == current ? 
+                                syn->getDestinationNeuron() : syn->getSourceNeuron();
+                            
+                            if (visited.find(neighbor) == visited.end()) {
+                                visited.insert(neighbor);
+                                stack.push(neighbor);
+                            }
+                        }
+                    }
+                }
+                
+                if (!component.empty()) {
+                    components.push_back(component);
+                }
+            }
+        }
+        
+        return components;
+    }, py::arg("brain"), "Find connected components in the neural network");
+
+    // Educational/Research utilities
+    m.def("simulateAndAnalyze", [](std::shared_ptr<Brain> brain, size_t steps, size_t snapshotInterval) {
+        std::vector<std::map<std::string, double>> timeSeries;
+        
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step);
+            
+            if (step % snapshotInterval == 0) {
+                std::map<std::string, double> snapshot;
+                snapshot["step"] = step;
+                snapshot["total_spikes"] = brain->getTotalSpikeCount();
+                snapshot["firing_neurons"] = brain->getFiringNeuronCount();
+                snapshot["active_neurons"] = brain->getActiveNeuronCount();
+                snapshot["average_firing_rate"] = brain->getAverageFiringRate();
+                snapshot["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+                timeSeries.push_back(snapshot);
+            }
+        }
+        
+        return timeSeries;
+    }, py::arg("brain"), py::arg("steps"), py::arg("snapshotInterval"), "Simulate and return time-series data");
+
+    // Configuration utilities
+    m.def("exportConfig", [](std::shared_ptr<Config> config) {
+        return config->summary();
+    }, py::arg("config"), "Export configuration as summary string");
+
+    m.def("mergeConfigs", [](std::shared_ptr<Config> base, std::shared_ptr<Config> override) {
+        auto merged = std::make_shared<Config>(*base);
+        
+        // Get all keys from both configs
+        std::vector<std::string> allKeys = base->getKeys();
+        std::vector<std::string> overrideKeys = override->getKeys();
+        
+        for (const auto& key : overrideKeys) {
+            if (override->has(key)) {
+                merged->set(key, override->getOr<double>(key, 0.0));
+            }
+        }
+        
+        return merged;
+    }, py::arg("base"), py::arg("override"), "Merge two configurations (override takes precedence)");
+
+    // Version and metadata
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__description__") = "NLM (Neural Learning Machine) Python Bindings - A neural simulation framework for research and education";
 
 } // namespace nlm
