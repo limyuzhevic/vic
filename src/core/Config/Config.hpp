@@ -6,6 +6,13 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <map>
+#include <functional>
+#include <regex>
+#include <type_traits>
+#include <sstream>
+#include <cmath>
+#include <limits>
 
 namespace nlm {
 
@@ -29,7 +36,27 @@ enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Runtime,
+    EnvironmentVariable,
+    JSON,
+    YAML
+};
+
+// Validation rule types
+enum class ValidationRule {
+    Range,
+    AllowedValues,
+    Regex,
+    Custom,
+    Positive,
+    NonNegative,
+    LessThan,
+    GreaterThan,
+    InRange,
+    Length,
+    Pattern,
+    Format,
+    Callback
 };
 
 // Configuration entry
@@ -38,70 +65,57 @@ struct ConfigEntry {
     ConfigValue value;
     ConfigSource source;
     std::string description;
+    std::string type;
+    std::string unit;
+    std::vector<std::pair<ValidationRule, std::any>> validationRules;
+    bool isRequired;
     
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description(), 
+                   type(), unit(), validationRules(), isRequired(false) {}
+    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, 
+                const std::string& desc = "", const std::string& t = "", 
+                const std::string& u = "")
+        : key(k), value(v), source(s), description(desc), type(t), unit(u), 
+          validationRules(), isRequired(false) {}
 };
 
-// Main configuration class
-class Config {
-public:
-    Config();
-    ~Config();
+// Environment variable mapping
+struct EnvMapping {
+    std::string configKey;
+    std::string envVarName;
+    std::string defaultValue;
+    bool isRequired;
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
-    
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
-    
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
-    
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
-    
-    // Get values (defined here so templates instantiate in every TU)
-template<typename T>
-    std::optional<T> get(const std::string& key) const;
-
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
-    
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
-    void remove(const std::string& key);
-    
-    // Get all keys
-    std::vector<std::string> getKeys() const;
-    
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    EnvMapping(const std::string& key, const std::string& env, 
+               const std::string& def = "", bool req = false)
+        : configKey(key), envVarName(env), defaultValue(def), isRequired(req) {}
 };
 
-} // namespace nlm
+// Validation rule for configuration values
+struct ValidationRuleConfig {
+    ValidationRule rule;
+    std::any value1;
+    std::any value2;
+    std::string message;
+    std::function<bool(const ConfigValue&)> customValidator;
+    
+    ValidationRuleConfig(ValidationRule r, const std::any& v1 = {}, 
+                         const std::any& v2 = {}, const std::string& msg = "")
+        : rule(r), value1(v1), value2(v2), message(msg), customValidator(nullptr) {}
+};
+
+// Enhanced configuration implementation
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+    std::map<std::string, std::string> descriptions;
+    std::vector<EnvMapping> envMappings;
+    std::map<std::string, std::vector<ValidationRuleConfig>> validationRules;
+    bool validateOnSet;
+    bool allowUnknownKeys;
+    bool isLoaded;
+    std::string lastError;
+    
+    Impl() : descriptions(), envMappings(), validationRules(), 
+             validateOnSet(true), allowUnknownKeys(false), 
+             isLoaded(false), lastError() {}
+};
