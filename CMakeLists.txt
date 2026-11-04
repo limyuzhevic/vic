@@ -26,10 +26,18 @@ add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/AdvancedConfig.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain - Refactored
+    src/brain/BrainMain.cpp
+    src/brain/BrainCore.cpp
+    src/brain/BrainIntegration.cpp
+    src/brain/BrainCheckpoint.cpp
+    src/brain/BrainDevelopment.cpp
+    src/brain/BrainConfig.cpp
+    # Original brain components (for now)
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
@@ -57,6 +65,7 @@ add_library(nlm_core STATIC
     # Memory
     src/memory/Memory.cpp
     src/performance/CheckpointSystem.cpp
+    src/performance/MemoryPool.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition

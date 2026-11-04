@@ -165,10 +165,9 @@ void Logger::error(const std::string& message, const std::string& file, int line
 void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
     log(LogLevel::Critical, message, file, line, function);
 }
-
 bool Logger::isEnabled(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
+    for (const auto& logger : pImpl->loggers) {
         if (logger->getLevel() <= level) {
             return true;
         }
@@ -196,7 +195,13 @@ LogStream::LogStream(LogLevel level, const std::string& file, int line, const st
     : level_(level), file_(file), line_(line), function_(function) {}
 
 LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    try {
+        Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+    } catch (...) {
+        // Ensure no exceptions escape destructor
+        // Write to stderr as a fallback
+        std::cerr << "[LogStream] Error during logging: " << oss_.str() << std::endl;
+    }
 }
 
 } // namespace nlm
