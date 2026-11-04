@@ -1,19 +1,13 @@
 #include "STDP.hpp"
-#include "../brain/Synapse.hpp"
-#include <cmath>
-#include <algorithm>
 
 namespace nlm {
 
 struct STDP::Impl {
-    float ltpWeight;      // A+ for potentiation
-    float ltdWeight;      // A- for depression
-    float timeConstant;   // Tau for exponential window (ms)
-    float minWeight;      // Minimum synaptic weight
-    float maxWeight;      // Maximum synaptic weight
+    float ltpWeight;
+    float ltdWeight;
+    float timeConstant;
     
-    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}
@@ -24,104 +18,16 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
-    
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
-    
-    float totalDelta = 0.0f;
-    float tau = pImpl->timeConstant;
-
-    // Nearest-neighbour STDP: only the most recent pre/post pair is used.
-    // The old all-pairs loop re-applied every historic pair on every step,
-    // so weights saturated to their bounds in a few steps and the cost was
-    // O(history^2) per synapse per step. Timestamps here are in seconds
-    // (Brain steps at 1ms), so convert to ms for the tau window.
-    float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
-    if (dtMs > 0) {
-        totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
-    } else if (dtMs < 0) {
-        totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
-    }
-    
-    // Apply weight change with bounds
-    if (std::abs(totalDelta) > 1e-6f) {
-        // Scale by synaptic efficacy if available
-        float efficacy = synapse->getEfficacy();
-        totalDelta *= efficacy;
-
-        // Inhibitory plasticity must strengthen inhibition, not flip it:
-        // pre-before-post on an inhibitory synapse should make its weight
-        // more negative, not positive. Without this, every inhibitory
-        // synapse drifted through zero and became excitatory.
-        if (synapse->getType() == SynapseType::Inhibitory) {
-            totalDelta = -totalDelta;
-        }
-
-        // Soft (weight-dependent) bounds, Phase 4: the old rule added a
-        // fixed ~0.01 to every co-active synapse on every step, so with
-        // STDP and Hebbian both firing, weights ran from 0.2 to the 1.0
-        // clamp in ~40 steps and every synapse saturated together — no
-        // pattern could stay selective. Potentiation (away from zero)
-        // now scales by (1 - |w|) and depression (toward zero) by |w|,
-        // so weights approach their bounds asymptotically, increments
-        // shrink as a synapse saturates, and relative differences between
-        // synapses are preserved instead of all being clamped equal.
-        {
-            float w = synapse->getWeight();
-            bool awayFromZero = std::abs(w + totalDelta) > std::abs(w);
-            totalDelta *= awayFromZero ? (1.0f - std::abs(w)) : std::abs(w);
-        }
-
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
-        // Enforce sign: excitatory stays >= 0.01, inhibitory stays <= -0.01.
-        if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
-            synapse->setWeight(-0.01f);
-        } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
-            synapse->setWeight(0.01f);
-        }
-        
-        // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
-    }
+    // PLACEHOLDER - Real STDP implementation
+    // This is where spike timing interactions are calculated
+    // For now, just a stub
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
-    
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
+    // PLACEHOLDER - Apply STDP weight change
+    // In real implementation, this would modify synapse weights based on spike timing
+    (void)synapse;
+    (void)delta;
 }
 
 const char* STDP::getName() const {
@@ -129,7 +35,7 @@ const char* STDP::getName() const {
 }
 
 void STDP::setLTPWeight(float weight) {
-    pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->ltpWeight = weight;
 }
 
 float STDP::getLTPWeight() const {
@@ -137,7 +43,7 @@ float STDP::getLTPWeight() const {
 }
 
 void STDP::setLTDWeight(float weight) {
-    pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->ltdWeight = weight;
 }
 
 float STDP::getLTDWeight() const {
@@ -145,7 +51,7 @@ float STDP::getLTDWeight() const {
 }
 
 void STDP::setTimeConstant(float tau) {
-    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    pImpl->timeConstant = tau;
 }
 
 float STDP::getTimeConstant() const {
@@ -156,6 +62,104 @@ void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
     setLTPWeight(ltpWeight);
     setLTDWeight(ltdWeight);
     setTimeConstant(tau);
+}
+
+struct ActivityDependentSTDP::Impl {
+    float ltpWeight;
+    float ltdWeight;
+    float timeConstant;
+    float optimalFiringRate;
+    float highFiringRateThreshold;
+    float learningWindow;
+    
+    Impl() 
+        : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f)
+        , optimalFiringRate(10.0f), highFiringRateThreshold(50.0f), learningWindow(100.0f) {}
+};
+
+ActivityDependentSTDP::ActivityDependentSTDP() : pImpl(new Impl) {}
+
+ActivityDependentSTDP::~ActivityDependentSTDP() = default;
+
+void ActivityDependentSTDP::update(Synapse* synapse,
+                                 const std::vector<Timestamp>& preSpikes,
+                                 const std::vector<Timestamp>& postSpikes,
+                                 TimestepDuration dt) {
+    // PLACEHOLDER - Real activity-dependent STDP implementation
+    // This would calculate learning based on spike timing AND firing rates
+    // For now, just a stub
+    (void)synapse;
+    (void)preSpikes;
+    (void)postSpikes;
+    (void)dt;
+}
+
+void ActivityDependentSTDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+    // PLACEHOLDER - Apply activity-dependent weight change
+    // Only apply if firing rates are within optimal range
+    (void)synapse;
+    (void)delta;
+}
+
+const char* ActivityDependentSTDP::getName() const {
+    return "ActivityDependentSTDP";
+}
+
+void ActivityDependentSTDP::setLTPWeight(float weight) {
+    pImpl->ltpWeight = weight;
+}
+
+float ActivityDependentSTDP::getLTPWeight() const {
+    return pImpl->ltpWeight;
+}
+
+void ActivityDependentSTDP::setLTDWeight(float weight) {
+    pImpl->ltdWeight = weight;
+}
+
+float ActivityDependentSTDP::getLTDWeight() const {
+    return pImpl->ltdWeight;
+}
+
+void ActivityDependentSTDP::setTimeConstant(float tau) {
+    pImpl->timeConstant = tau;
+}
+
+float ActivityDependentSTDP::getTimeConstant() const {
+    return pImpl->timeConstant;
+}
+
+void ActivityDependentSTDP::setOptimalFiringRate(float rate) {
+    pImpl->optimalFiringRate = rate;
+}
+
+void ActivityDependentSTDP::setHighFiringRateThreshold(float threshold) {
+    pImpl->highFiringRateThreshold = threshold;
+}
+
+void ActivityDependentSTDP::setLearningWindow(float window) {
+    pImpl->learningWindow = window;
+}
+
+void ActivityDependentSTDP::configure(float ltpWeight, float ltdWeight, float tau,
+                                       float optimalRate, float highRateThreshold, float learningWindow) {
+    setLTPWeight(ltpWeight);
+    setLTDWeight(ltdWeight);
+    setTimeConstant(tau);
+    setOptimalFiringRate(optimalRate);
+    setHighFiringRateThreshold(highRateThreshold);
+    setLearningWindow(learningWindow);
+}
+
+float ActivityDependentSTDP::getFiringRate(const std::vector<Timestamp>& spikes, TimestepDuration dt) {
+    if (spikes.empty()) return 0.0f;
+    if (dt <= 0.0f) return 0.0f;
+    
+    // Calculate average firing rate
+    float timeWindow = static_cast<float>(spikes.back() - spikes.front());
+    if (timeWindow <= 0.0f) return 0.0f;
+    
+    return static_cast<float>(spikes.size()) / timeWindow * dt;
 }
 
 } // namespace nlm

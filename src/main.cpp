@@ -218,15 +218,17 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         }
     }
     
+    // Create activity regulator to control firing rates
+    ActivityRegulator activityRegulator;
+    
     // Apply repeated input pattern to stimulate learning
+    // BUT with activity regulation to prevent saturation
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("With activity regulation to prevent firing rate saturation");
     
     // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // but with activity regulation to prevent uncontrolled firing
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
@@ -235,18 +237,44 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             }
         }
     }
+    
+    uint64_t brainStepCounter = 0;
+    uint64_t regulatedPatternCount = 0;
+    
     for (SimulationStep step = 0; step < 1000; ++step) {
+        // Apply pattern with activity regulation
         for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+            // Inject current but with activity regulation
+            float baseCurrent = 30.0f;
+            
+            // Get current firing rate for regulation
+            float currentFiringRate = brain->getAverageFiringRate();
+            
+            // Apply activity regulation
+            activityRegulator.update(currentFiringRate, 10.0f, 0.001);
+            
+            // Adjust current based on regulation
+            float regulatedCurrent = baseCurrent * (1.0f - activityRegulator.getInhibitionSignal());
+            regulatedCurrent = std::clamp(regulatedCurrent, 0.0f, 60.0f);  // Keep reasonable bounds
+            
+            brain->injectCurrent(id, regulatedCurrent);
+            regulatedPatternCount++;
         }
         
-        brain->step(step, step * 0.001);
+        brain->step(brainStepCounter++);
         
-        // Log progress every 100 steps
+        // Log progress every 100 steps with regulation info
         if (step % 100 == 0) {
+            float avgFiringRate = brain->getAverageFiringRate();
+            float inhibitionSignal = activityRegulator.getInhibitionSignal();
+            float regulationState = activityRegulator.getRegulationState();
+            
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                        " | Firing: " + std::to_string(avgFiringRate) +
+                        " | Regulation: " + std::to_string(regulationState) +
+                        " | Inhibition: " + std::to_string(inhibitionSignal) +
+                        " | EffectivePattern: " + std::to_string(regulatedPatternCount));
         }
     }
     
@@ -255,6 +283,14 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Compute and display statistics
     experiment.computeStatistics();
+    
+    // Log regulation summary
+    float finalFiringRate = brain->getAverageFiringRate();
+    NLM_LOG_INFO("=== Activity Regulation Summary ===");
+    NLM_LOG_INFO("Final firing rate: " + std::to_string(finalFiringRate) +
+                " (target was ~10.0)");
+    NLM_LOG_INFO("Pattern delivery with regulation: " +
+                std::to_string(regulatedPatternCount) + " effective injections");
 }
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {

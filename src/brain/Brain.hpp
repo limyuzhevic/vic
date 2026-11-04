@@ -8,6 +8,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../neuromodulation/ActivityRegulator.hpp"
 #include <memory>
 #include <string>
 
@@ -90,6 +91,10 @@ public:
     STDP* getSTDP();
     Hebbian* getHebbian();
     StructuralPlasticity* getStructuralPlasticity();
+    
+    // Activity regulation system access
+    ActivityRegulator* getActivityRegulator();
+    const ActivityRegulator* getActivityRegulator() const;
     
     // Statistics
     float getExcitationInhibitionRatio() const;

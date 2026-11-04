@@ -58,10 +58,26 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
-    // Run simulation
+    // Metrics tracking
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
+    size_t successfulActions = 0;
+    size_t totalActions = 0;
+    float episodeRewards = 0.0f;
+    
+    float maxPossibleReward = 0.0f;
+    
+    const float REWARD_PER_RESOURCE = 10.0f;
+    const float REWARD_PER_SUCCESS = 1.0f;
+    const float REWARD_PER_SURVIVAL = 100.0f;
+    
+    const float TARGET_FIRING_RATE = 10.0f;
+    const float MIN_REWARD_SUCCESS_THRESHOLD = 0.1f;
+    
+    // Track actions for episode-based metrics
+    int episodeActions = 0;
+    int episodeSuccesses = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
@@ -80,9 +96,31 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Apply action to world
         ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
         
-        // Compute reward
+        // Track action metrics
+        totalActions++;
+        if (actionResult.reward > 0.0f || actionResult.success) {
+            successfulActions++;
+        }
+        
+        // Compute and accumulate reward (same as before)
         float reward = actionResult.reward;
         totalReward += reward;
+        
+        // Track episode-specific metrics
+        episodeActions++;
+        if (actionResult.reward > 0.0f || actionResult.success) {
+            episodeSuccesses++;
+        }
+        episodeRewards += reward;
+        
+        // Track expected maximum reward (for normalization)
+        if (actionResult.message == "consumed_resource") {
+            maxPossibleReward += REWARD_PER_RESOURCE;
+        } else if (actionResult.message == "success") {
+            maxPossibleReward += REWARD_PER_SUCCESS;
+        } else if (world.getAgentBody().energy > 50.0f) {
+            maxPossibleReward += REWARD_PER_SURVIVAL;
+        }
         
         // Apply reward modulation
         agent.applyRewardModulation(reward, 0.0f);
@@ -106,9 +144,34 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         }
     }
     
-    // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
-    result.avgFiringRate = totalFiringRate / config.maxSteps;
+    // Calculate enhanced reward metrics
+    float rewardPerStep = totalReward / config.maxSteps;
+    float rewardPerEpisode = (totalActions > 0) ? totalReward : 0.0f;
+    
+    // Calculate success rate (normalized measure of performance)
+    float successRate = (totalActions > 0) ? (static_cast<float>(successfulActions) / totalActions) : 0.0f;
+    
+    // Calculate normalized reward success score (reward normalized by potential max, weighted by success rate)
+    float normalizedReward = (maxPossibleReward > 0.0f) ? (totalReward / maxPossibleReward) : 0.0f;
+    float rewardSuccessScore = (normalizedReward * 0.6f) + (successRate * 0.4f);
+    
+    // Calculate reward density (reward per unit time)
+    float rewardDensity = (totalWallClockTime > 0.0) ? (totalReward / totalWallClockTime) : 0.0f;
+    
+    // Collect final metrics (enhanced)
+    result.totalRewardPerStep = rewardPerStep;           // Keep original for backward compatibility
+    result.totalRewardPerEpisode = rewardPerEpisode;
+    result.rewardSuccessRate = rewardSuccessScore;       // New: normalized success score
+    result.rewardDensity = rewardDensity;                 // New: reward per unit time
+    
+    // Log enhanced reward metrics
+    NLM_LOG_INFO("=== Enhanced Reward Analysis ===");
+    NLM_LOG_INFO("Total reward (accumulated): " + std::to_string(totalReward));
+    NLM_LOG_INFO("Reward per step (average): " + std::to_string(rewardPerStep));
+    NLM_LOG_INFO("Reward per episode: " + std::to_string(rewardPerEpisode));
+    NLM_LOG_INFO("Success rate: " + std::to_string(successRate * 100.0f) + "%");
+    NLM_LOG_INFO("Normalized reward score: " + std::to_string(rewardSuccessScore));
+    NLM_LOG_INFO("Reward density: " + std::to_string(rewardDensity) + " per time unit");
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();

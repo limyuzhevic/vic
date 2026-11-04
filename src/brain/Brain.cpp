@@ -10,6 +10,7 @@
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/ActivityRegulator.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -59,6 +60,9 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // Phase 5: Activity regulation for firing rate control
+    std::unique_ptr<ActivityRegulator> activityRegulator;
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -67,7 +71,7 @@ struct Brain::Impl {
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
-
+    
     // Phase 5 learned preference trait (see Brain.hpp). Updated only
     // from sandbox reward via AgentBrain; checkpointed with the
     // simulation state so a reloaded brain keeps what it learned.
@@ -90,6 +94,12 @@ struct Brain::Impl {
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
+    // Checkpoint system
+    std::unique_ptr<CheckpointManager> checkpointManager;
+    
+    // Phase 5: Activity regulation for firing rate control
+    std::unique_ptr<ActivityRegulator> activityRegulator;
+    
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
@@ -105,6 +115,9 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
+        // Initialize activity regulator
+        activityRegulator = std::make_unique<ActivityRegulator>();
+        
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<int64_t>("random_seed")) {
@@ -737,11 +750,24 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+    // Use activity regulation to control firing rates
+    float currentFiringRate = getAverageFiringRate();
+    
+    // Update activity regulator
+    pImpl->activityRegulator->update(currentFiringRate, 10.0f, timestep);
+    
+    // Apply regulation to current injection
+    float regulatedCurrent = current;
+    if (pImpl->activityRegulator->isActive()) {
+        regulatedCurrent = regulatedCurrent * (1.0f - pImpl->activityRegulator->getInhibitionSignal());
+        regulatedCurrent = std::clamp(regulatedCurrent, -60.0f, 60.0f);
+    }
+    
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
-                    neuron->injectCurrent(current);
+                    neuron->injectCurrent(regulatedCurrent);
                 }
             }
         }
@@ -787,6 +813,14 @@ float Brain::getExcitationInhibitionRatio() const {
         return totalExcitatory / totalInhibitory;
     }
     return totalExcitatory > 0.0f ? std::numeric_limits<float>::infinity() : 0.0f;
+}
+
+ActivityRegulator* Brain::getActivityRegulator() {
+    return pImpl->activityRegulator.get();
+}
+
+const ActivityRegulator* Brain::getActivityRegulator() const {
+    return pImpl->activityRegulator.get();
 }
 
 size_t Brain::getTotalSpikeCount() const {

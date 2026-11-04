@@ -36,10 +36,22 @@ struct Phase6IntegrationResult {
     bool predictionIntegrated;
     bool developmentIntegrated;
     bool checkpointingWorks;
+    // System integration status
+    bool memoryWorkingMemoryIntegrated;
+    bool memoryEpisodicMemoryIntegrated;
+    bool neuromodulationIntegrated;
+    bool predictionIntegrated;
+    bool developmentIntegrated;
+    bool checkpointingWorks;
     bool replayWorks;
     
+    // Reward metrics - both per-step and per-episode/trial metrics
+    float totalRewardPerStep;    // Reward averaged over all steps (current behavior)
+    float totalRewardPerEpisode; // Total reward per simulation episode
+    float rewardSuccessRate;     // Normalized success score (0-1)
+    float rewardDensity;         // Reward per unit time
+    
     // Metrics
-    float totalReward;
     float avgFiringRate;
     float avgSynapticWeight;
     float memoryEpisodesStored;
@@ -51,6 +63,28 @@ struct Phase6IntegrationResult {
     time_t startTime;
     time_t endTime;
     double totalWallClockTime;
+    
+    Phase6IntegrationResult()
+        : memoryWorkingMemoryIntegrated(false)
+        , memoryEpisodicMemoryIntegrated(false)
+        , neuromodulationIntegrated(false)
+        , predictionIntegrated(false)
+        , developmentIntegrated(false)
+        , checkpointingWorks(false)
+        , replayWorks(false)
+        , totalRewardPerStep(0.0f)
+        , totalRewardPerEpisode(0.0f)
+        , rewardSuccessRate(0.0f)
+        , rewardDensity(0.0f)
+        , avgFiringRate(0.0f)
+        , avgSynapticWeight(0.0f)
+        , memoryEpisodesStored(0.0f)
+        , noveltyLevel(0.0f)
+        , curiosityLevel(0.0f)
+        , dopamineLevel(0.0f)
+        , startTime(0)
+        , endTime(0)
+        , totalWallClockTime(0.0) {}
     
     Phase6IntegrationResult()
         : memoryWorkingMemoryIntegrated(false)
