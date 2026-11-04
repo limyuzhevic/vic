@@ -19,9 +19,40 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO PHASE 4: Implement proper JSON/YAML parser
+    // Current implementation uses a simple key=value format
+    // For now, just try the existing format and log a warning if parsing fails
     
+    // Try JSON parser first
+    try {
+        auto jsonConfig = std::make_shared<JsonConfig>(filepath);
+        if (jsonConfig->isValid()) {
+            // Convert JSON to Config entries
+            auto entries = jsonConfig->getEntries();
+            for (const auto& entry : entries) {
+                set(entry.key, entry.value, ConfigSource::File);
+            }
+            return true;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_WARNING(std::string("JSON parser failed: ") + e.what() + ", falling back to simple parser");
+    }
+    
+    // Try YAML parser as second option
+    try {
+        auto yamlConfig = std::make_shared<YamlConfig>(filepath);
+        if (yamlConfig->isValid()) {
+            auto entries = yamlConfig->getEntries();
+            for (const auto& entry : entries) {
+                set(entry.key, entry.value, ConfigSource::File);
+            }
+            return true;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_WARNING(std::string("YAML parser failed: ") + e.what() + ", falling back to simple parser");
+    }
+    
+    // Fall back to simple key=value parser (original implementation)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -86,7 +117,37 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Store actual value instead of PLACEHOLDER_VALUE
+        std::visit([&file](auto&& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << val << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << val[i] << "\"";
+                    } else {
+                        file << val[i];
+                    }
+                }
+                file << "]";
+            } else {
+                // Handle numeric and boolean values
+                if constexpr (std::is_same_v<T, bool>) {
+                    file << (val ? "true" : "false");
+                } else {
+                    file << val;
+                }
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -234,5 +295,117 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// JSON configuration parser (Phase 4)
+namespace nlm {
+
+JsonConfig::JsonConfig(const std::string& filepath) : valid(false) {
+    // Try to parse as JSON (nlohmann::json format)
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return;
+    }
+    
+    try {
+        data = nlohmann::json::parse(file);
+        valid = true;
+    } catch (const std::exception&) {
+        // Not valid JSON
+    }
+}
+
+bool JsonConfig::isValid() const {
+    return valid;
+}
+
+std::vector<ConfigEntry> JsonConfig::getEntries() const {
+    std::vector<ConfigEntry> entries;
+    
+    if (!valid) {
+        return entries;
+    }
+    
+    for (const auto& item : data.items()) {
+        std::string key = item.key();
+        ConfigValue value;
+        
+        // Convert JSON value to ConfigValue
+        if (item.value().is_string()) {
+            value = item.value().get<std::string>();
+        } else if (item.value().is_number_integer()) {
+            value = item.value().get<int64_t>();
+        } else if (item.value().is_number_float()) {
+            value = item.value().get<double>();
+        } else if (item.value().is_boolean()) {
+            value = item.value().get<bool>();
+        } else if (item.value().is_array()) {
+            // For arrays, use vector<double> as default
+            std::vector<double> vec = item.value().get<std::vector<double>>();
+            value = vec;
+        }
+        
+        entries.emplace_back(key, value, ConfigSource::File);
+    }
+    
+    return entries;
+}
+
+// YAML configuration parser (Phase 4)
+YamlConfig::YamlConfig(const std::string& filepath) : valid(false) {
+    // Try to parse as YAML (YAML::Node format)
+    try {
+        data = YAML::LoadFile(filepath);
+        valid = true;
+    } catch (const std::exception&) {
+        // Not valid YAML
+    }
+}
+
+bool YamlConfig::isValid() const {
+    return valid;
+}
+
+std::vector<ConfigEntry> YamlConfig::getEntries() const {
+    std::vector<ConfigEntry> entries;
+    
+    if (!valid) {
+        return entries;
+    }
+    
+    for (const auto& item : data) {
+        std::string key = item.first.as<std::string>();
+        ConfigValue value;
+        
+        // Convert YAML value to ConfigValue
+        if (item.second.IsScalar()) {
+            if (item.second.IsString()) {
+                value = item.second.as<std::string>();
+            } else if (item.second.IsInteger()) {
+                value = static_cast<int64_t>(item.second.as<int64_t>());
+            } else if (item.second.IsFloat()) {
+                value = item.second.as<double>();
+            } else if (item.second.IsBoolean()) {
+                value = item.second.as<bool>();
+            }
+        } else if (item.second.IsSequence()) {
+            // For sequences, use vector<double> as default
+            std::vector<double> vec;
+            for (const auto& elem : item.second) {
+                if (elem.IsScalar()) {
+                    if (elem.IsInteger()) {
+                        vec.push_back(static_cast<double>(elem.as<int64_t>()));
+                    } else if (elem.IsFloat()) {
+                        vec.push_back(elem.as<double>());
+                    }
+                }
+            }
+            value = vec;
+        }
+        
+        entries.emplace_back(key, value, ConfigSource::File);
+    }
+    
+    return entries;
+}
 
 } // namespace nlm

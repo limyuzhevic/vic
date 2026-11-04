@@ -125,6 +125,15 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
+        // Connect memory systems to brain for integrated operation
+        workingMemory->initialize(this);
+        episodicMemory->initialize(this);
+        associativeMemory->initialize(this);
+        
+        // Set capacity based on brain size
+        workingMemory->setCapacity(neuronCount / 10);
+        episodicMemory->setMaxEpisodes(1000);
+        
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
         
@@ -132,6 +141,11 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        
+        // Connect cognition systems to brain for integrated operation
+        planner->initialize(this);
+        conceptFormation->initialize(this);
+        attention->initialize(this);
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -163,6 +177,13 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        // Configure checkpoint manager with brain data
+        checkpointManager->configure(
+            config->getOr<std::string>("checkpoint_dir", "./checkpoints"),
+            config->getOr<int64_t>("checkpoint_save_interval", 10000),
+            config->getOr<int64_t>("checkpoint_max_files", 10),
+            config->getOr<bool>("checkpoint_compress", true)
+        );
     }
     
     DevelopmentalStage developmentalStage;
@@ -326,11 +347,7 @@ bool Brain::initialize() {
         }
     });
     }  // spikeHandlersRegistered
-    
-    // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
-    
+
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));

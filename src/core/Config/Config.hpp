@@ -12,6 +12,15 @@ namespace nlm {
 // Forward declarations
 class Config;
 
+// JSON/YAML parsing libraries (include only if available)
+#ifdef HAVE_JSON
+#include <nlohmann/json.hpp>
+#endif
+
+#ifdef HAVE_YAML
+#include <yaml-cpp/yaml.h>
+#endif
+
 // Configuration value types
 using ConfigValue = std::variant<
     int,
@@ -44,6 +53,30 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// JSON configuration parser (Phase 4)
+class JsonConfig {
+public:
+    explicit JsonConfig(const std::string& filepath);
+    bool isValid() const;
+    std::vector<ConfigEntry> getEntries() const;
+    
+private:
+    nlohmann::json data;
+    bool valid;
+};
+
+// YAML configuration parser (Phase 4)
+class YamlConfig {
+public:
+    explicit YamlConfig(const std::string& filepath);
+    bool isValid() const;
+    std::vector<ConfigEntry> getEntries() const;
+    
+private:
+    YAML::Node data;
+    bool valid;
+};
+
 // Main configuration class
 class Config {
 public:
@@ -66,12 +99,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);

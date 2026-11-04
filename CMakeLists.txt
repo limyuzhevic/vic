@@ -82,6 +82,21 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Phase 5 fix: add missing sources needed for Python bindings
+    # (these were present in python/CMakeLists.txt but missing from root)
+    src/agent/SensoryPercept.cpp
+    src/agent/AgentBrain.cpp
+    src/world/SimpleWorld.cpp
+    src/experiments/Phase3Experiment.cpp
+    src/experiments/Phase4Experiment.cpp
+    src/experiments/Phase5Experiment.cpp
+    src/experiments/Phase6IntegratedExperiment.cpp
+    src/experiments/Phase3Demo.cpp
+    src/experiments/Phase4Demo.cpp
+    src/experiments/Phase5Demo.cpp
+    src/experiments/Phase6Demo.cpp
+    src/experiments/Phase6TextDemo.cpp
+    src/benchmark.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
