@@ -56,6 +56,9 @@ public:
     using DelayedSpikeHandler = std::function<void(const DelayedSpikeEvent&)>;
     void registerDelayedHandler(DelayedSpikeHandler handler);
     
+    // Remove all handlers (for cleanup)
+    void unregisterAllHandlers();
+    
     // Get spike history
     const std::vector<DetailedSpikeEvent>& getSpikeHistory() const;
     void clearHistory();

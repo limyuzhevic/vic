@@ -143,7 +143,13 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // TODO PHASE 2: Implement real integrate-and-fire dynamics (LIF with multiple channel dynamics)
+    // This should implement a complete integrate-and-fire model including:
+    // - Subthreshold integration (membrane potential dynamics)
+    // - Threshold crossing detection
+    // - Refractory period management
+    // - Spike timing precision
+    // - Noise and stochastic components
     void step(Timestamp currentTime);
     
     // Reset to initial state

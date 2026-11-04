@@ -134,56 +134,9 @@ size_t SpikeSystem::getPendingSpikeCount() const {
     return pImpl->pendingSpikes.size();
 }
 
-size_t SpikeSystem::getPendingDelayedCount() const {
-    size_t count = 0;
-    for (const auto& pair : pImpl->delayedSpikes) {
-        count += pair.second.size();
-    }
-    return count;
-}
-
-float SpikeSystem::getAverageSpikeRate() const {
-    // Calculate average spike rate based on history
-    if (pImpl->spikeHistory.size() < 2) {
-        return 0.0f;
-    }
-    
-    // Find time range
-    float minTime = std::numeric_limits<float>::max();
-    float maxTime = -std::numeric_limits<float>::max();
-    
-    for (const auto& spike : pImpl->spikeHistory) {
-        minTime = std::min(minTime, static_cast<float>(spike.timestamp));
-        maxTime = std::max(maxTime, static_cast<float>(spike.timestamp));
-    }
-    
-    float duration = maxTime - minTime;
-    if (duration <= 0.0f) {
-        return 0.0f;
-    }
-    
-    return static_cast<float>(pImpl->spikeHistory.size()) / duration;
-}
-
-std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
-    std::vector<std::pair<uint64_t, size_t>> neuronCounts;
-    neuronCounts.reserve(pImpl->spikeCountPerNeuron.size());
-    
-    for (const auto& pair : pImpl->spikeCountPerNeuron) {
-        neuronCounts.emplace_back(pair.first, pair.second);
-    }
-    
-    // Sort by count descending
-    std::sort(neuronCounts.begin(), neuronCounts.end(),
-              [](const auto& a, const auto& b) { return a.second > b.second; });
-    
-    std::vector<NeuronId> result;
-    result.reserve(std::min(count, neuronCounts.size()));
-    for (size_t i = 0; i < std::min(count, neuronCounts.size()); ++i) {
-        result.emplace_back(neuronCounts[i].first);
-    }
-    
-    return result;
+void SpikeSystem::unregisterAllHandlers() {
+    pImpl->handlers.clear();
+    pImpl->delayedHandlers.clear();
 }
 
 void SpikeSystem::reset() {

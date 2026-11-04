@@ -76,7 +76,15 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // TODO PHASE 2: Implement real synaptic dynamics (including short-term plasticity, recovery, and AMPA/NMDA kinetics)
+    // This should implement a complete synaptic model including:
+    // - Real synaptic transmission dynamics (rise/fall times)
+    // - Short-term plasticity (facilitation, depression)
+    // - Recovery processes
+    // - Multiple receptor types (AMPA, NMDA, GABA)
+    // - Use-dependent modulation
+    // - Neurotransmitter release and reuptake
+    // - Real biological synaptic properties
     void step(Timestamp currentTime);
     
     // Reset to initial state

@@ -97,8 +97,13 @@ pybind11_add_module(pynlm bindings.cpp)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
+pybind11_add_module(bindings_tests bindings_tests.cpp)
+target_link_libraries(bindings_tests PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(bindings_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
+    target_compile_options(bindings_tests PRIVATE /permissive-)
 endif()
 
 install(TARGETS pynlm

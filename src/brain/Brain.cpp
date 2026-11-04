@@ -112,12 +112,6 @@ struct Brain::Impl {
         }
         rng = std::make_unique<RandomGenerator>(seed);
         
-        // Initialize plasticity systems
-        spikeSystem = std::make_unique<SpikeSystem>();
-        stdp = std::make_unique<STDP>();
-        hebbian = std::make_unique<Hebbian>();
-        structuralPlasticity = std::make_unique<StructuralPlasticity>();
-        
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
         // Initialize memory systems
@@ -171,7 +165,9 @@ struct Brain::Impl {
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    delete pImpl;
+}
 
 Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -191,6 +187,7 @@ bool Brain::initialize() {
 
     // Re-initialising must rebuild, not append: a previous run left
     // reset()+initialize() reporting 1000 neurons for a 500-neuron brain.
+    // This ensures a clean slate for each brain initialization.
     pImpl->regions.clear();
     pImpl->sensoryNeurons.clear();
     pImpl->motorNeurons.clear();
@@ -857,6 +854,11 @@ void Brain::reset() {
         region->reset();
     }
     
+    // Unregister spike handlers to prevent double-registration on re-initialize
+    if (pImpl->spikeHandlersRegistered) {
+        pImpl->spikeSystem->unregisterAllHandlers();
+        pImpl->spikeHandlersRegistered = false;
+    }
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
