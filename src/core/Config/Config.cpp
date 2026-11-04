@@ -41,14 +41,30 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
+    // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to parse the value
+            ConfigValue parsedValue;
+            if (stringToValue(value, parsedValue)) {
+                // Extract description from line if present (after #)
+                std::string description = "";
+                size_t commentPos = line.find('#');
+                if (commentPos != std::string::npos) {
+                    description = trim(line.substr(commentPos + 1));
+                    // If we have a key=value format, we need to reconstruct the line
+                    // For now, use the line itself as description
+                }
+                
+                set(key, parsedValue, ConfigSource::File, description);
+            } else {
+                // If parsing fails, store as string
+                set(key, value, ConfigSource::File);
+            }
         }
     }
     
@@ -65,14 +81,30 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                // Try to parse the value
+                ConfigValue parsedValue;
+                if (stringToValue(value, parsedValue)) {
+                    set(key, parsedValue, ConfigSource::CommandLine, "Command line argument");
+                } else {
+                    // If parsing fails, store as string
+                    set(key, value, ConfigSource::CommandLine, "Command line argument");
+                }
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            // Try to parse the value
+            ConfigValue parsedValue;
+            if (stringToValue(value, parsedValue)) {
+                set(key, parsedValue, ConfigSource::CommandLine, "Command line argument");
+            } else {
+                // If parsing fails, store as string
+                set(key, value, ConfigSource::CommandLine, "Command line argument");
+            }
         }
     }
     return true;
@@ -85,22 +117,26 @@ bool Config::saveToFile(const std::string& filepath) const {
     }
     
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        file << entry.key << " = " << valueToString(entry.value) << "\n";
+        file << "\n";
     }
     
     return true;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description) {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        it->description = description; // Update description if key exists
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.emplace_back(key, value, source, description);
     }
 }
 
@@ -190,49 +226,172 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+bool Config::loadFromEnv(const std::string& envVar, ConfigSource source) {
+    std::string value = getEnvVar(envVar);
+    if (value.empty()) {
+        return false;
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
-        } else {
-            return std::nullopt;
-        }
-    }, it->value);
+    
+    std::string key = toLower(envVar);
+    // Remove NLM_ prefix if present
+    if (key.size() > 4 && key.substr(0, 4) == "nlm_") {
+        key = key.substr(4);
+    }
+    
+    set(key, value, source);
+    return true;
 }
 
+// Get value with default and validation
 template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
+std::pair<T, bool> Config::getValidated(const std::string& key, const T& defaultValue,
+                                       std::function<bool(const T&)> validator) const {
     auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+    if (!val.has_value()) {
+        return {defaultValue, validator ? validator(defaultValue) : true};
+    }
+    return {*val, validator ? validator(*val) : true};
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// Check if key exists with validation
+template<typename T>
+bool Config::hasValidated(const std::string& key, std::function<bool(const T&)> validator) const {
+    auto val = get<T>(key);
+    if (!val.has_value()) {
+        return false;
+    }
+    return !validator || validator(*val);
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Set with validation
+template<typename T>
+bool Config::setValidated(const std::string& key, const T& value,
+                         std::function<bool(const T&)> validator,
+                         ConfigSource source, const std::string& description) {
+    if (validator && !validator(value)) {
+        return false;
+    }
+    set(key, value, source, description);
+    return true;
+}
 
-} // namespace nlm
+// Implementation of internal helpers
+std::string Config::getEnvVar(const std::string& varName) {
+    const char* val = std::getenv(varName.c_str());
+    return val ? val : "";
+}
+
+bool Config::stringToValue(const std::string& str, ConfigValue& outValue) {
+    if (isBoolean(str)) {
+        bool val;
+        if (stringToBool(str, val)) {
+            outValue = val;
+            return true;
+        }
+    } else if (isNumber(str)) {
+        double val;
+        if (stringToNumber(str, val)) {
+            // Try to determine if it's an int or double based on decimal point
+            if (str.find('.') != std::string::npos || str.find('e') != std::string::npos || str.find('E') != std::string::npos) {
+                outValue = val;
+            } else {
+                // Try to parse as int64_t first, then int
+                try {
+                    size_t pos;
+                    int64_t intVal = std::stoll(str, &pos);
+                    if (pos == str.size()) {
+                        outValue = intVal;
+                        return true;
+                    }
+                } catch (...) {}
+                outValue = static_cast<int>(std::stoi(str));
+            }
+            return true;
+        }
+    } else {
+        // String value (trim quotes)
+        std::string trimmed = trim(str);
+        if ((trimmed.size() >= 2 && 
+             ((trimmed.front() == '"' && trimmed.back() == '"') ||
+              (trimmed.front() == '\'' && trimmed.back() == '\'')))) {
+            trimmed = trimmed.substr(1, trimmed.size() - 2);
+        }
+        outValue = trimmed;
+        return true;
+    }
+    return false;
+}
+
+std::string Config::valueToString(const ConfigValue& value) {
+    std::ostringstream oss;
+    std::visit([&oss](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            oss << "["; for (size_t i = 0; i < arg.size(); ++i) {
+                if (i) oss << ", "; oss << arg[i];
+            } oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << "["; for (size_t i = 0; i < arg.size(); ++i) {
+                if (i) oss << ", "; oss << arg[i];
+            } oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<float>>) {
+            oss << "["; for (size_t i = 0; i < arg.size(); ++i) {
+                if (i) oss << ", "; oss << arg[i];
+            } oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            oss << "["; for (size_t i = 0; i < arg.size(); ++i) {
+                if (i) oss << ", "; oss << arg[i];
+            } oss << "]";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            oss << "["; for (size_t i = 0; i < arg.size(); ++i) {
+                if (i) oss << ", "; oss << "\"" << arg[i] << "\"";
+            } oss << "]";
+        } else {
+            oss << arg;
+        }
+    }, value);
+    return oss.str();
+}
+
+bool Config::isNumber(const std::string& str) {
+    if (str.empty()) return false;
+    size_t start = 0;
+    if (str[0] == '-' || str[0] == '+') {
+        start = 1;
+    }
+    for (size_t i = start; i < str.size(); ++i) {
+        if (!(std::isdigit(str[i]) || str[i] == '.' || str[i] == 'e' || str[i] == 'E' || str[i] == '-' || str[i] == '+')) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Config::isBoolean(const std::string& str) {
+    std::string lower = toLower(str);
+    return lower == "true" || lower == "false" || lower == "yes" || lower == "no" || 
+           lower == "on" || lower == "off" || lower == "1" || lower == "0";
+}
+
+bool Config::stringToBool(const std::string& str, bool& outValue) {
+    std::string lower = toLower(str);
+    if (lower == "true" || lower == "yes" || lower == "on" || lower == "1") {
+        outValue = true;
+        return true;
+    } else if (lower == "false" || lower == "no" || lower == "off" || lower == "0") {
+        outValue = false;
+        return true;
+    }
+    return false;
+}
+
+bool Config::stringToNumber(const std::string& str, double& outValue) {
+    try {
+        outValue = std::stod(str);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}

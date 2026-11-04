@@ -1,10 +1,12 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Updated to use the new Test Framework
 
 #include <iostream>
 #include <cassert>
+#include <string>
 
-// Forward declarations of test functions
+// Original test namespaces
 namespace test_types {
     void runAll();
 }
@@ -34,6 +36,14 @@ namespace test_stdp {
 }
 
 namespace test_brain {
+    void runAll();
+}
+
+// New test framework
+#include "test_framework/TestFramework.hpp"
+
+// Example tests
+namespace test_examples {
     void runAll();
 }
 
@@ -114,6 +124,37 @@ int main() {
     try {
         test_brain::runAll();
         std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << std::endl;
+    
+    // Run new example tests using the Test Framework
+    std::cout << "=== Running Example Tests (Test Framework) ===" << std::endl;
+    try {
+        nlm::TestFramework testFramework;
+        
+        // Add example tests
+        testFramework.addTest("Config Creation", test_examples::testConfigCreation, "Example");
+        testFramework.addTest("Config Set and Get", test_examples::testConfigSetAndGet, "Example");
+        testFramework.addTest("Config GetOr", test_examples::testConfigGetOr, "Example");
+        testFramework.addTest("Config Remove", test_examples::testConfigRemove, "Example");
+        testFramework.addTest("Config Keys", test_examples::testConfigKeys, "Example");
+        testFramework.addTest("Config Validation", test_examples::testConfigValidation, "Example");
+        testFramework.addTest("Config Type Conversion", test_examples::testConfigTypeConversion, "Example");
+        testFramework.addTest("Config Source Tracking", test_examples::testConfigSourceTracking, "Example");
+        testFramework.addTest("Config Summary", test_examples::testConfigSummary, "Example");
+        testFramework.addTest("Config Load from Environment", test_examples::testConfigLoadFromEnv, "Example");
+        
+        // Run all tests
+        testFramework.runAllTests();
+        
+        // Check if all tests passed
+        allPassed = allPassed && (testFramework.getTestCases().empty() || 
+                                 testFramework.getTestCases()[0].result.status == nlm::TestStatus::PASSED);
+        
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
         allPassed = false;

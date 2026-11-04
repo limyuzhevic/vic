@@ -16,10 +16,13 @@ class Config;
 using ConfigValue = std::variant<
     int,
     int64_t,
+    float,
     double,
     bool,
     std::string,
     std::vector<int>,
+    std::vector<int64_t>,
+    std::vector<float>,
     std::vector<double>,
     std::vector<std::string>
 >;
@@ -95,6 +98,28 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Set with source and description
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description = "");
+    
+    // Load from environment variable
+    bool loadFromEnv(const std::string& envVar, ConfigSource source = ConfigSource::CommandLine);
+    
+    // Set with validation
+    template<typename T>
+    bool setValidated(const std::string& key, const T& value, 
+                      std::function<bool(const T&)> validator = nullptr,
+                      ConfigSource source = ConfigSource::Runtime,
+                      const std::string& description = "");
+    
+    // Get value with default and validation
+    template<typename T>
+    std::pair<T, bool> getValidated(const std::string& key, const T& defaultValue,
+                                   std::function<bool(const T&)> validator = nullptr) const;
+    
+    // Check if key exists with validation
+    template<typename T>
+    bool hasValidated(const std::string& key, std::function<bool(const T&)> validator = nullptr) const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +127,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getEnvVar(const std::string& varName);
+    static bool stringToValue(const std::string& str, ConfigValue& outValue);
+    static std::string valueToString(const ConfigValue& value);
+    static bool isNumber(const std::string& str);
+    static bool isBoolean(const std::string& str);
+    static bool stringToBool(const std::string& str, bool& outValue);
+    static bool stringToNumber(const std::string& str, double& outValue);
 };
 
 } // namespace nlm

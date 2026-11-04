@@ -201,6 +201,9 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
+# Test framework library
+add_subdirectory(src/test_framework)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
