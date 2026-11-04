@@ -29,9 +29,9 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
+    # Brain (enhanced with improved validation and error handling)
+    src/brain/Neuron_enhanced.cpp
+    src/brain/Synapse_enhanced.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
