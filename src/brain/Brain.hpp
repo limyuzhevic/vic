@@ -206,8 +206,27 @@ public:
     void logStatus() const;
     
 private:
+    // Helper methods for the integrated brain loop
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateNeuronDynamics(Timestamp currentTime, TimestepDuration dt);
+    void detectAndProcessSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemory();
+    void applyNeuromodulationEffects();
+    void applyPlasticityRules(float plasticityMod);
+    void updateEpisodicMemory(SimulationStep currentStep);
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayImportantMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    void collectStatistics();
+    
+    // Utility methods
+    void setupNeuronLookup();
+    void collectSensoryAndMotorNeurons();
+    void configureCheckpointManager();
+    
     struct Impl;
     Impl* pImpl;
 };
-
-} // namespace nlm

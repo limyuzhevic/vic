@@ -1,6 +1,7 @@
 #include "Random.hpp"
 #include <sstream>
 #include <stdexcept>
+#include <limits>
 
 namespace nlm {
 
@@ -54,64 +55,65 @@ bool RandomGenerator::restoreState(const std::string& state) {
 }
 
 uint32_t RandomGenerator::uniformInt(uint32_t min, uint32_t max) {
-    if (min > max) {
-        throw std::invalid_argument("min must be <= max");
-    }
-    if (min == max) {
-        return min;
-    }
+    validateRange(min, max);
     std::uniform_int_distribution<uint32_t> dist(min, max);
     return dist(pImpl->gen);
 }
 
 uint64_t RandomGenerator::uniformInt(uint64_t min, uint64_t max) {
-    if (min > max) {
-        throw std::invalid_argument("min must be <= max");
-    }
-    if (min == max) {
-        return min;
-    }
+    validateRange(min, max);
     std::uniform_int_distribution<uint64_t> dist(min, max);
     return dist(pImpl->gen);
 }
 
 double RandomGenerator::uniformReal(double min, double max) {
-    if (min >= max) {
-        throw std::invalid_argument("min must be < max");
-    }
+    validateRange(min, max);
     std::uniform_real_distribution<double> dist(min, max);
     return dist(pImpl->gen);
 }
 
 float RandomGenerator::uniformReal(float min, float max) {
-    if (min >= max) {
-        throw std::invalid_argument("min must be < max");
-    }
+    validateRange(min, max);
     std::uniform_real_distribution<float> dist(min, max);
     return dist(pImpl->gen);
 }
 
 double RandomGenerator::normal(double mean, double stddev) {
+    if (stddev < 0.0) {
+        throw std::invalid_argument("standard deviation must be >= 0");
+    }
     std::normal_distribution<double> dist(mean, stddev);
     return dist(pImpl->gen);
 }
 
 float RandomGenerator::normal(float mean, float stddev) {
+    if (stddev < 0.0f) {
+        throw std::invalid_argument("standard deviation must be >= 0");
+    }
     std::normal_distribution<float> dist(mean, stddev);
     return dist(pImpl->gen);
 }
 
 bool RandomGenerator::bernoulli(double p) {
+    if (p < 0.0 || p > 1.0) {
+        throw std::invalid_argument("probability p must be in [0, 1]");
+    }
     std::bernoulli_distribution dist(p);
     return dist(pImpl->gen);
 }
 
 uint32_t RandomGenerator::poisson(double lambda) {
+    if (lambda < 0.0) {
+        throw std::invalid_argument("lambda must be >= 0");
+    }
     std::poisson_distribution<uint32_t> dist(lambda);
     return dist(pImpl->gen);
 }
 
 double RandomGenerator::exponential(double lambda) {
+    if (lambda <= 0.0) {
+        throw std::invalid_argument("lambda must be > 0");
+    }
     std::exponential_distribution<double> dist(lambda);
     return dist(pImpl->gen);
 }

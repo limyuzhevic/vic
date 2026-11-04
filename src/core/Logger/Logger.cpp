@@ -1,9 +1,5 @@
-#include "Logger.hpp"
-#include <iostream>
-#include <fstream>
-#include <iomanip>
-#include <sstream>
-#include <mutex>
+// ... existing includes ...
+#include <system_error>
 
 namespace nlm {
 
@@ -49,8 +45,13 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     // File output if set
     if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut << output << "\n";
-        pImpl->fileOut.flush();
+        try {
+            pImpl->fileOut << output << "\n";
+            pImpl->fileOut.flush();
+        } catch (const std::exception& e) {
+            // Log to stderr if possible (avoid recursion)
+            std::cerr << "Failed to write to log file: " << e.what() << std::endl;
+        }
     }
 }
 
@@ -71,12 +72,28 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    try {
+        pImpl->fileOut.open(filepath, std::ios::app);
+        if (!pImpl->fileOut.is_open()) {
+            // Log to stderr if possible (avoid recursion)
+            std::cerr << "Failed to open log file: " << filepath << std::endl;
+        }
+    } catch (const std::exception& e) {
+        // Log to stderr if possible (avoid recursion)
+        std::cerr << "Exception opening log file " << filepath << ": " << e.what() << std::endl;
+    }
 }
 
 void ConsoleLogger::closeOutputFile() {
-    if (pImpl->fileOut.is_open()) {
-        pImpl->fileOut.close();
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    try {
+        if (pImpl->fileOut.is_open()) {
+            pImpl->fileOut.flush();
+            pImpl->fileOut.close();
+        }
+    } catch (const std::exception& e) {
+        // Log to stderr if possible (avoid recursion)
+        std::cerr << "Exception closing log file: " << e.what() << std::endl;
     }
 }
 

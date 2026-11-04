@@ -37,6 +37,14 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_config_error_handling {
+    void runAll();
+}
+
+namespace test_random_error_handling {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -65,9 +73,27 @@ int main() {
         allPassed = false;
     }
     
+    std::cout << "Running Config Error Handling tests..." << std::endl;
+    try {
+        test_config_error_handling::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
     std::cout << "Running Random tests..." << std::endl;
     try {
         test_random::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Random Error Handling tests..." << std::endl;
+    try {
+        test_random_error_handling::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

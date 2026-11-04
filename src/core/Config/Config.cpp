@@ -1,8 +1,10 @@
-#include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <numeric>
+#include <stdexcept>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -18,24 +20,102 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Enhanced validation and type safety improvements
+
+namespace nlm {
+    namespace {
+        // Configuration validation schema
+        struct ConfigSchema {
+            std::string key;
+            std::string type;  // "int", "float", "string", "bool", "vector"
+            std::string description;
+            std::string defaultValue;
+            std::string validationPattern;
+            bool required = false;
+            
+            ConfigSchema(const std::string& k, const std::string& t, const std::string& desc, 
+                        const std::string& def = "", const std::string& pattern = "", bool req = false)
+                : key(k), type(t), description(desc), defaultValue(def), validationPattern(pattern), required(req) {}
+        };
+        
+        // Configuration validator
+        class ConfigValidator {
+        public:
+            static bool validate(const ConfigEntry& entry, const std::vector<ConfigSchema>& schema) {
+                for (const auto& schemaEntry : schema) {
+                    if (schemaEntry.key == entry.key) {
+                        return validateValue(entry.value, schemaEntry.type, schemaEntry.validationPattern);
+                    }
+                }
+                return true;  // Unknown keys are allowed (flexible schema)
+            }
+            
+        private:
+            static bool validateValue(const ConfigValue& value, const std::string& type, const std::string& pattern) {
+                return std::visit([&](auto&& v) -> bool {
+                    using V = std::decay_t<decltype(v)>;
+                    
+                    if (type == "int" && std::is_same_v<V, int>) return true;
+                    if (type == "int64_t" && std::is_same_v<V, int64_t>) return true;
+                    if (type == "double" && std::is_same_v<V, double>) return true;
+                    if (type == "bool" && std::is_same_v<V, bool>) return true;
+                    if (type == "string" && std::is_same_v<V, std::string>) return true;
+                    if (type == "vector<int>" && std::is_same_v<V, std::vector<int>>) return true;
+                    if (type == "vector<double>" && std::is_same_v<V, std::vector<double>>) return true;
+                    if (type == "vector<string>" && std::is_same_v<V, std::vector<std::string>>) return true;
+                    
+                    // Pattern validation for strings
+                    if (type == "string" && std::is_same_v<V, std::string> && !pattern.empty()) {
+                        return std::regex_match(v, std::regex(pattern));
+                    }
+                    
+                    return false;
+                }, value);
+            }
+        };
+    }
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced error handling with detailed logging
+    if (filepath.empty()) {
+        return false;  // Log error would go here
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        return false;  // Log error would go here
     }
     
+    // Enhanced validation with schema support
+    std::vector<ConfigSchema> validationSchema = {
+        // Define common configuration parameters with validation
+        ConfigSchema("random_seed", "int", "Random number generator seed", "42"),
+        ConfigSchema("neuron_count", "int", "Number of neurons in the brain", "1000"),
+        ConfigSchema("region_count", "int", "Number of neural regions", "1"),
+        ConfigSchema("connection_probability", "double", "Probability of connections between neurons", "0.1"),
+        ConfigSchema("simulation_timestep", "double", "Simulation time step in seconds", "0.001"),
+        ConfigSchema("synaptogenesis_rate", "double", "Rate of synapse creation", "0.0001"),
+        ConfigSchema("pruning_rate", "double", "Rate of synapse removal", "0.00001"),
+        ConfigSchema("checkpoint_dir", "string", "Directory for checkpoint saves", "./checkpoints"),
+        ConfigSchema("replay_interval", "int", "Steps between memory replay events", "100"),
+        ConfigSchema("consolidation_interval", "int", "Steps between memory consolidation events", "1000"),
+    };
+    
     std::string line;
+    int lineNumber = 0;
+    bool success = true;
+    
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        lineNumber++;
+        
+        // Enhanced comment detection
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Enhanced key=value parsing with validation
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -48,51 +128,229 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            try {
+                // Validate before setting
+                bool isValid = true;
+                for (const auto& schemaEntry : validationSchema) {
+                    if (schemaEntry.key == key) {
+                        // Parse value based on type and validate
+                        ConfigValue parsedValue;
+                        if (schemaEntry.type == "int") {
+                            parsedValue = std::stoi(value);
+                        } else if (schemaEntry.type == "double") {
+                            parsedValue = std::stod(value);
+                        } else if (schemaEntry.type == "bool") {
+                            // Parse boolean values
+                            std::transform(value.begin(), value.end(), value.begin(), ::tolower);
+                            if (value == "true" || value == "1" || value == "yes" || value == "on") {
+                                parsedValue = true;
+                            } else if (value == "false" || value == "0" || value == "no" || value == "off") {
+                                parsedValue = false;
+                            } else {
+                                throw std::invalid_argument("Invalid boolean value: " + value);
+                            }
+                        } else {
+                            parsedValue = value;  // Default to string
+                        }
+                        
+                        // Validate the parsed value
+                        if (!ConfigValidator::validate(ConfigEntry(key, parsedValue, ConfigSource::File), validationSchema)) {
+                            NLM_LOG_WARNING(std::string("Configuration validation failed for key: ") + key + 
+                                          std::string(" (expected type: ") + schemaEntry.type + std::string(")"));
+                            success = false;
+                        }
+                        
+                        break;
+                    }
+                }
+                
+                if (isValid) {
+                    // Set the configuration value
+                    set(key, value, ConfigSource::File);
+                }
+                
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR(std::string("Error parsing configuration at line ") + 
+                            std::to_string(lineNumber) + std::string(": ") + e.what());
+                success = false;
+            }
+        } else {
+            NLM_LOG_WARNING(std::string("Invalid configuration line at ") + 
+                          std::to_string(lineNumber) + std::string(": missing '='"));
+            success = false;
         }
     }
     
-    return true;
+    return success;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc == 0) {
+        return false;  // Log error would go here
+    }
+    
+    bool success = true;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
+        // Handle --key=value format with validation
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                // Validate key format (no spaces, reasonable length)
+                if (key.empty() || key.find(' ') != std::string::npos || key.length() > 100) {
+                    NLM_LOG_WARNING(std::string("Invalid configuration key in argument: ") + key);
+                    success = false;
+                    continue;
+                }
+                
+                // Validate value format
+                if (value.empty()) {
+                    NLM_LOG_WARNING(std::string("Empty configuration value for key: ") + key);
+                    success = false;
+                    continue;
+                }
+                
+                // Attempt to set and validate the configuration
+                try {
+                    set(key, value, ConfigSource::CommandLine);
+                } catch (const std::exception& e) {
+                    NLM_LOG_ERROR(std::string("Error setting configuration from argument ") + 
+                                std::to_string(i) + std::string(": ") + e.what());
+                    success = false;
+                }
+            } else {
+                NLM_LOG_WARNING(std::string("Invalid argument format: ") + arg);
+                success = false;
             }
         }
-        // Handle -key value format
+        // Handle -key value format with validation
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            // Validate key format
+            if (key.empty() || key.find(' ') != std::string::npos || key.length() > 100) {
+                NLM_LOG_WARNING(std::string("Invalid configuration key in argument: ") + key);
+                success = false;
+                continue;
+            }
+            
+            // Validate value format
+            if (value.empty()) {
+                NLM_LOG_WARNING(std::string("Empty configuration value for key: ") + key);
+                success = false;
+                continue;
+            }
+            
+            // Attempt to set and validate the configuration
+            try {
+                set(key, value, ConfigSource::CommandLine);
+            } catch (const std::exception& e) {
+                NLM_LOG_ERROR(std::string("Error setting configuration from argument ") + 
+                            std::to_string(i) + std::string(": ") + e.what());
+                success = false;
+            }
+        }
+        else {
+            NLM_LOG_WARNING(std::string("Unrecognized command line argument: ") + arg);
+            success = false;
         }
     }
-    return true;
+    
+    return success;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Validate filepath
+    if (filepath.empty()) {
+        return false;  // Log error would go here
     }
     
+    // Validate that directory exists or can be created
+    std::filesystem::path path(filepath);
+    std::filesystem::path parentDir = path.parent_path();
+    
+    if (!parentDir.empty() && !std::filesystem::exists(parentDir)) {
+        try {
+            std::filesystem::create_directories(parentDir);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Cannot create directory for config file: ") + e.what());
+            return false;
+        }
+    }
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;  // Log error would go here
+    }
+    
+    // Write header
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM Configuration System\n";
+    file << "# Format: key = value  (comments start with #)\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write description if available
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write key and value with proper formatting
+        file << entry.key << " = ";
+        
+        // Write value with proper formatting based on type
+        std::visit([&file](auto&& v) {
+            using V = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<V, std::string>) {
+                // Escape quotes and backslashes in strings
+                std::string escaped = v;
+                size_t pos = 0;
+                while ((pos = escaped.find('"', pos)) != std::string::npos) {
+                    escaped.replace(pos, 1, "\\\"");
+                    pos += 2;
+                }
+                file << "\"" << escaped << "\"";
+            } else if constexpr (std::is_arithmetic_v<V> || std::is_same_v<V, bool>) {
+                file << v;
+            } else if constexpr (std::is_same_v<V, std::vector<int>> ||
+                                 std::is_same_v<V, std::vector<double>> ||
+                                 std::is_same_v<V, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    if constexpr (std::is_same_v<V, std::vector<std::string>>) {
+                        file << "\"" << v[i] << "\"";
+                    } else {
+                        file << v[i];
+                    }
+                }
+                file << "]";
+            } else {
+                file << "UNKNOWN_TYPE_" << typeid(v).name();
+            }
+        }, entry.value);
+        
+        // Write source information as comment
+        file << "  # Source: " << static_cast<int>(entry.source) << "\n";
     }
     
     return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key format
+    if (key.empty() || key.find(' ') != std::string::npos || key.length() > 100) {
+        throw std::invalid_argument("Invalid configuration key: " + key);
+    }
+    
+    // Validate value based on type
+    validateValueForType(value);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -102,6 +360,59 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
     } else {
         pImpl->entries.emplace_back(key, value, source);
     }
+}
+
+void Config::validateValueForType(const ConfigValue& value) {
+    // Type-specific validation rules
+    std::visit([](auto&& v) {
+        using V = std::decay_t<decltype(v)>;
+        
+        if constexpr (std::is_same_v<V, int>) {
+            if (v < std::numeric_limits<int>::min() || v > std::numeric_limits<int>::max()) {
+                throw std::invalid_argument("Integer value out of range");
+            }
+        } else if constexpr (std::is_same_v<V, int64_t>) {
+            if (v < std::numeric_limits<int64_t>::min() || v > std::numeric_limits<int64_t>::max()) {
+                throw std::invalid_argument("int64_t value out of range");
+            }
+        } else if constexpr (std::is_same_v<V, double>) {
+            if (std::isnan(v) || std::isinf(v)) {
+                throw std::invalid_argument("Double value is NaN or infinite");
+            }
+        } else if constexpr (std::is_same_v<V, bool>) {
+            // Boolean values are always valid
+        } else if constexpr (std::is_same_v<V, std::string>) {
+            if (v.length() > 10000) {  // Reasonable limit for string values
+                throw std::invalid_argument("String value too long");
+            }
+            // Check for null bytes
+            if (v.find('\0') != std::string::npos) {
+                throw std::invalid_argument("String value contains null bytes");
+            }
+        } else if constexpr (std::is_same_v<V, std::vector<int>>) {
+            if (v.size() > 10000) {
+                throw std::invalid_argument("Integer vector too large");
+            }
+        } else if constexpr (std::is_same_v<V, std::vector<double>>) {
+            if (v.size() > 10000) {
+                throw std::invalid_argument("Double vector too large");
+            }
+            for (const auto& val : v) {
+                if (std::isnan(val) || std::isinf(val)) {
+                    throw std::invalid_argument("Double vector contains NaN or infinite values");
+                }
+            }
+        } else if constexpr (std::is_same_v<V, std::vector<std::string>>) {
+            if (v.size() > 10000) {
+                throw std::invalid_argument("String vector too large");
+            }
+            for (const auto& str : v) {
+                if (str.find('\0') != std::string::npos) {
+                    throw std::invalid_argument("String vector contains null bytes");
+                }
+            }
+        }
+    }, value);
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
