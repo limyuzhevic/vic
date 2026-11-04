@@ -39,7 +39,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return std::to_string(id.value);
+        })
+        .def_static("from_int", [](uint64_t v) { return NeuronId(v); });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
@@ -51,7 +55,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def("__str__", [](const SynapseId& id) {
+            return std::to_string(id.value);
+        })
+        .def_static("from_int", [](uint64_t v) { return SynapseId(v); });
 
     py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
         .def(py::init<>())
@@ -63,7 +71,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
-        });
+        })
+        .def("__str__", [](const RegionId& id) {
+            return std::to_string(id.value);
+        })
+        .def_static("from_int", [](uint64_t v) { return RegionId(v); });
 
     py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
         .def(py::init<>())
@@ -71,7 +83,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const PopulationId& id) {
+            return std::to_string(id.value);
+        });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -80,7 +98,9 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Sensory", NeuronType::Sensory)
         .value("Motor", NeuronType::Motor)
         .value("Internal", NeuronType::Internal)
-        .export_values();
+        .export_values()
+        .def("is_excitatory", [](NeuronType t) { return t == NeuronType::Excitatory; })
+        .def("is_inhibitory", [](NeuronType t) { return t == NeuronType::Inhibitory; });
 
     py::enum_<SynapseType>(m, "SynapseType", R"pbdoc(Synapse type enumeration)pbdoc")
         .value("Excitatory", SynapseType::Excitatory)
@@ -88,7 +108,9 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Modulatory", SynapseType::Modulatory)
         .value("Electrical", SynapseType::Electrical)
         .value("GapJunction", SynapseType::GapJunction)
-        .export_values();
+        .export_values()
+        .def("is_excitatory", [](SynapseType t) { return t == SynapseType::Excitatory; })
+        .def("is_inhibitory", [](SynapseType t) { return t == SynapseType::Inhibitory; });
 
     py::enum_<DevelopmentalStage>(m, "DevelopmentalStage", R"pbdoc(Developmental stage enumeration)pbdoc")
         .value("Initial", DevelopmentalStage::Initial)
@@ -96,7 +118,13 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Maturation", DevelopmentalStage::Maturation)
         .value("Adult", DevelopmentalStage::Adult)
         .value("Aging", DevelopmentalStage::Aging)
-        .export_values();
+        .export_values()
+        .def("is_developmental", [](DevelopmentalStage s) {
+            return s == DevelopmentalStage::Initial || s == DevelopmentalStage::CriticalPeriod || s == DevelopmentalStage::Maturation;
+        })
+        .def("is_stable", [](DevelopmentalStage s) {
+            return s == DevelopmentalStage::Adult || s == DevelopmentalStage::Aging;
+        });
 
     py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
         .value("Resting", FiringState::Resting)
@@ -144,31 +172,36 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
+        .def("load_from_file", &Config::loadFromFile, py::arg("filepath"),
+             "Load configuration from a file (JSON or key=value format)")
+        .def("load_from_args", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
             argv.reserve(args.size());
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Load configuration from command line arguments as a list of strings")
+        .def("save_to_file", &Config::saveToFile, py::arg("filepath"),
+             "Save configuration to a file in JSON format")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
+        .def("get_keys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+             "Get configuration summary as a string")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        .def("__str__", [](const Config& cfg) {
+            return cfg.summary();
+        })
+        .def_static("create_default", []() {
+            return std::make_shared<Config>();
+        }, "Create a default configuration");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -361,52 +394,52 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
-    py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
-        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+        .def("get_sensory_input_size", &AgentBrain::getSensoryInputSize,
              "Get expected sensory input size")
-        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+        .def("get_motor_output_size", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+        .def("process_sensory_input", &AgentBrain::processSensoryInput,
              py::arg("percept"),
              "Process sensory percept and inject into brain")
-        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+        .def("decode_motor_command", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
+        .def("apply_reward_modulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predicted_reward"),
              "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+        .def("update_development", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
-        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+        .def("get_developmental_stage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
-        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+        .def("get_neuromodulation_level", &AgentBrain::getNeuromodulationLevel,
              "Get current neuromodulation level")
-        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+        .def("get_curiosity_level", &AgentBrain::getCuriosityLevel,
              "Get curiosity level")
-        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+        .def("get_novelty_level", &AgentBrain::getNoveltyLevel,
              "Get novelty level")
-        .def("getPredictionError", &AgentBrain::getPredictionError,
+        .def("get_prediction_error", &AgentBrain::getPredictionError,
              "Get prediction error")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
-        .def("getBrain", &AgentBrain::getBrain,
+        .def("get_brain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+        .def("enable_reward_modulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+        .def("enable_structural_plasticity", &AgentBrain::enableStructuralPlasticity,
              py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+        .def("enable_development", &AgentBrain::enableDevelopment,
              py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+        .def("enable_curiosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("is_reward_modulation_enabled", &AgentBrain::isRewardModulationEnabled)
+        .def("is_structural_plasticity_enabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("is_development_enabled", &AgentBrain::isDevelopmentEnabled)
+        .def("is_curiosity_enabled", &AgentBrain::isCuriosityEnabled);
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

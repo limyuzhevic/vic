@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <optional>
+#include <string_view>
+#include "../Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -19,16 +22,32 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
+        return false;
+    }
+    
+    // Try to parse as JSON first
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Try JSON parsing
+    if (parseJSON(content)) {
+        return true;
+    }
+    
+    // Fall back to simple key=value format
+    file.open(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to reopen config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,6 +68,8 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNumber) + ": " + line);
         }
     }
     
@@ -81,15 +102,177 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open file for writing: " + filepath);
         return false;
     }
     
+    // Write JSON header
+    file << "{\n";
+    
+    bool first = true;
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        if (!first) {
+            file << ",\n";
+        }
+        first = false;
+        
+        file << "  \"" << entry.key << "\": ";
+        
+        // Serialize based on value type
+        std::visit([&file](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << escapeString(val) << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (val ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t> || 
+                                 std::is_same_v<T, double> || 
+                                 std::is_same_v<T, float>) {
+                file << val;
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        file << "\"" << escapeString(val[i]) << "\"";
+                    } else {
+                        file << val[i];
+                    }
+                }
+                file << "]";
+            } else {
+                file << "\"" << escapeString(std::to_string(val)) << "\"";
+            }
+        }, entry.value);
+        
+        file << " // Source: " << static_cast<int>(entry.source);
+        if (!entry.description.empty()) {
+            file << " (" << entry.description << ")";
+        }
     }
     
+    file << "\n}\n";
+    
+    NLM_LOG_INFO("Configuration saved to: " + filepath);
     return true;
+}
+
+bool Config::parseJSON(const std::string& json) {
+    // Simple JSON parser for basic key-value pairs
+    // This is a simplified implementation - for production use, consider a proper JSON library
+    
+    try {
+        size_t pos = 0;
+        while (pos < json.size()) {
+            // Find key
+            pos = json.find('"', pos);
+            if (pos == std::string::npos) break;
+            
+            size_t keyEnd = json.find('"', pos + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = json.substr(pos + 1, keyEnd - pos - 1);
+            pos = keyEnd + 1;
+            
+            // Find value
+            while (pos < json.size() && std::isspace(json[pos])) pos++;
+            if (pos >= json.size() || json[pos] != ':') break;
+            pos++;
+            
+            while (pos < json.size() && std::isspace(json[pos])) pos++;
+            if (pos >= json.size()) break;
+            
+            // Parse value based on type
+            ConfigValue value;
+            bool parsed = false;
+            
+            if (json[pos] == '"') {
+                // String value
+                size_t valueEnd = json.find('"', pos + 1);
+                if (valueEnd == std::string::npos) break;
+                std::string strValue = json.substr(pos + 1, valueEnd - pos - 1);
+                unescapeString(strValue);
+                set(key, strValue, ConfigSource::File);
+                parsed = true;
+                pos = valueEnd + 1;
+            } else if (json.compare(pos, 4, "true") == 0) {
+                // Boolean true
+                set(key, true, ConfigSource::File);
+                pos += 4;
+                parsed = true;
+            } else if (json.compare(pos, 5, "false") == 0) {
+                // Boolean false
+                set(key, false, ConfigSource::File);
+                pos += 5;
+                parsed = true;
+            } else if (std::isdigit(json[pos]) || json[pos] == '-' || json[pos] == '+') {
+                // Numeric value
+                size_t numEnd = pos;
+                while (numEnd < json.size() && (std::isdigit(json[numEnd]) || 
+                                              json[numEnd] == '.' || json[numEnd] == 'e' || 
+                                              json[numEnd] == 'E' || json[numEnd] == '-')) {
+                    numEnd++;
+                }
+                std::string numStr = json.substr(pos, numEnd - pos);
+                try {
+                    // Try to parse as integer first
+                    try {
+                        set(key, std::stoll(numStr), ConfigSource::File);
+                    } catch (...) {
+                        // Fall back to double
+                        set(key, std::stod(numStr), ConfigSource::File);
+                    }
+                    parsed = true;
+                    pos = numEnd;
+                } catch (...) {
+                    // Invalid number, skip
+                }
+            } else if (json[pos] == '[') {
+                // Array value (simplified)
+                // For now, skip array values
+                size_t arrayEnd = json.find(']', pos);
+                if (arrayEnd == std::string::npos) break;
+                pos = arrayEnd + 1;
+                parsed = true;
+            }
+            
+            if (!parsed) {
+                // Skip to next comma or brace
+                while (pos < json.size() && json[pos] != ',' && json[pos] != '}') pos++;
+            }
+            
+            // Skip whitespace
+            while (pos < json.size() && std::isspace(json[pos])) pos++;
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("JSON parsing error: ") + e.what());
+        return false;
+    }
+}
+
+std::string Config::unescapeString(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '\\' && i + 1 < str.size()) {
+            switch (str[i + 1]) {
+                case '\"': result += '"'; i++; break;
+                case '\\': result += '\\'; i++; break;
+                case 'n': result += '\n'; i++; break;
+                case 'r': result += '\r'; i++; break;
+                case 't': result += '\t'; i++; break;
+                default: result += str[i + 1]; i++; break;
+            }
+        } else {
+            result += str[i];
+        }
+    }
+    return result;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
