@@ -408,26 +408,357 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    // Advanced utility functions for simulation management
+    m.def("createSimulation", []() {
+        class Simulation {
+        public:
+            Simulation() : brain(nullptr), world(nullptr), agent(nullptr) {}
+            
+            ~Simulation() {
+                // Cleanup handled by smart pointers
+            }
+            
+            void runEpisode(int steps) {
+                for (int step = 0; step < steps; ++step) {
+                    // Update world
+                    world->update(0.1f);
+                    
+                    // Process sensory input
+                    nlm::SensoryPercept percept = world->getSensoryPercept();
+                    agent->processSensoryInput(percept);
+                    
+                    // Brain step
+                    brain->step(step);
+                    
+                    // Decode motor command
+                    nlm::MotorCommand action = agent->decodeMotorCommand();
+                    world->applyMotorCommand(action, world->getSimulationTime());
+                    
+                    // Apply reward modulation
+                    float reward = 0.0f; // Could compute based on world state
+                    agent->applyRewardModulation(reward, 0.0f);
+                    
+                    // Update development
+                    agent->updateDevelopment(0.1f);
+                }
+            }
+            
+            // Get current brain statistics
+            std::map<std::string, float> getStats() const {
+                std::map<std::string, float> stats;
+                if (brain) {
+                    stats["total_neurons"] = static_cast<float>(brain->getTotalNeuronCount());
+                    stats["total_synapses"] = static_cast<float>(brain->getTotalSynapseCount());
+                    stats["firing_neurons"] = static_cast<float>(brain->getFiringNeuronCount());
+                    stats["average_firing_rate"] = brain->getAverageFiringRate();
+                    stats["total_spikes"] = static_cast<float>(brain->getTotalSpikeCount());
+                    stats["learning_rate"] = brain->getLearnedPreference();
+                }
+                if (world) {
+                    stats["world_width"] = static_cast<float>(world->getWidth());
+                    stats["world_height"] = static_cast<float>(world->getHeight());
+                    stats["simulation_time"] = world->getSimulationTime();
+                }
+                return stats;
+            }
+            
+            // Get brain reference (for advanced usage)
+            std::shared_ptr<nlm::Brain> getBrain() const { return brain; }
+            
+            // Get world reference (for advanced usage)
+            std::shared_ptr<nlm::SimpleWorld> getWorld() const { return world; }
+            
+            // Get agent reference (for advanced usage)
+            std::shared_ptr<nlm::AgentBrain> getAgent() const { return agent; }
+            
+        private:
+            std::shared_ptr<nlm::Brain> brain;
+            std::shared_ptr<nlm::SimpleWorld> world;
+            std::shared_ptr<nlm::AgentBrain> agent;
+            
+            friend Simulation createSimulation(
+                std::shared_ptr<nlm::Config> config,
+                std::shared_ptr<nlm::SimpleWorld> worldConfig,
+                bool enableLearning
+            );
+        };
+        
+        return Simulation();
+    }, "Create a simulation context manager for complex simulations");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Advanced simulation creation with configuration
+    m.def("createSimulation", [](std::shared_ptr<nlm::Config> config, 
+                                std::shared_ptr<nlm::SimpleWorld> world,
+                                bool enableLearning) {
+        auto brain = nlm::createBrain(config);
+        brain->initialize();
+        
+        auto agent = nlm::createAgentBrain(brain);
+        agent->initialize(*world);
+        
+        if (enableLearning) {
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+            agent->enableDevelopment(true);
+            agent->enableCuriosity(true);
+        }
+        
+        return brain;  // Return brain for direct access
+    }, py::arg("config"), py::arg("world"), py::arg("enableLearning"),
+       "Create simulation with custom configuration and world");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Batch processing utilities
+    m.def("runMultipleSimulations", [](std::vector<std::shared_ptr<nlm::Config>> configs, 
+                                      int stepsPerSim, bool enableProgressReporting) {
+        std::vector<std::shared_ptr<nlm::Brain>> results;
+        
+        for (size_t i = 0; i < configs.size(); ++i) {
+            if (enableProgressReporting) {
+                std::cout << "Running simulation " << (i + 1) << " of " << configs.size() << std::endl;
+            }
+            
+            auto brain = nlm::createBrain(configs[i]);
+            brain->initialize();
+            
+            auto agent = nlm::createAgentBrain(brain);
+            auto world = nlm::createSimpleWorld();
+            world->configure(20, 20, 8, 8);
+            world->reset();
+            world->setAgentStart(10.0f, 10.0f);
+            
+            agent->initialize(*world);
+            agent->enableRewardModulation(true);
+            
+            // Run simulation steps
+            for (int step = 0; step < stepsPerSim; ++step) {
+                world->update(0.1f);
+                
+                nlm::SensoryPercept percept = world->getSensoryPercept();
+                agent->processSensoryInput(percept);
+                brain->step(step);
+                
+                nlm::MotorCommand action = agent->decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                float reward = 0.0f;  // Simple reward based on position
+                auto agentBody = world->getAgentBody();
+                if (agentBody) {
+                    float distToCenter = std::sqrt(std::pow(agentBody->x - 10.0f, 2) + std::pow(agentBody->y - 10.0f, 2));
+                    reward = std::max(0.0f, 1.0f - distToCenter / 10.0f);
+                }
+                
+                agent->applyRewardModulation(reward, 0.0f);
+                agent->updateDevelopment(0.1f);
+            }
+            
+            results.push_back(brain);
+        }
+        
+        return results;
+    }, py::arg("configs"), py::arg("stepsPerSim"), py::arg("enableProgressReporting"),
+       "Run multiple simulations in batch");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Advanced configuration utilities
+    m.def("configureBrainForTask", [](std::shared_ptr<nlm::Config> config, 
+                                    const std::string& taskType, 
+                                    int neuronCount = 1000) {
+        // Clear existing configuration
+        config->clear();
+        
+        // Set common parameters
+        config->set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, nlm::ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), nlm::ConfigSource::Default);
+        config->set("connection_probability", 0.1f, nlm::ConfigSource::Default);
+        
+        // Task-specific configuration
+        if (taskType == "navigation") {
+            config->set("stdp_ltp_weight", 0.02f, nlm::ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.015f, nlm::ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.0002f, nlm::ConfigSource::Default);
+            config->set("pruning_rate", 0.00002f, nlm::ConfigSource::Default);
+        } else if (taskType == "pattern_learning") {
+            config->set("stdp_ltp_weight", 0.01f, nlm::ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.012f, nlm::ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.0001f, nlm::ConfigSource::Default);
+            config->set("pruning_rate", 0.00001f, nlm::ConfigSource::Default);
+        } else if (taskType == "social_learning") {
+            config->set("stdp_ltp_weight", 0.015f, nlm::ConfigSource::Default);
+            config->set("stdp_ltd_weight", 0.013f, nlm::ConfigSource::Default);
+            config->set("synaptogenesis_rate", 0.00015f, nlm::ConfigSource::Default);
+            config->set("pruning_rate", 0.000015f, nlm::ConfigSource::Default);
+        }
+        
+        return config;
+    }, py::arg("config"), py::arg("taskType"), py::arg("neuronCount") = 1000,
+       "Configure brain for specific task type");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Utility functions for working with brain states
+    m.def("exportBrainState", [](std::shared_ptr<nlm::Brain> brain, const std::string& filename) {
+        if (!brain->save(filename)) {
+            throw std::runtime_error("Failed to save brain state to " + filename);
+        }
+        return true;
+    }, py::arg("brain"), py::arg("filename"),
+       "Export brain state to file for later loading");
+
+    m.def("importBrainState", [](const std::string& filename, std::shared_ptr<nlm::Config> config) {
+        auto brain = nlm::createBrain(config);
+        brain->initialize();
+        
+        if (!brain->load(filename)) {
+            throw std::runtime_error("Failed to load brain state from " + filename);
+        }
+        
+        return brain;
+    }, py::arg("filename"), py::arg("config"),
+       "Import brain state from file");
+
+    // Advanced sensory and action utilities
+    m.def("createCustomSensory", [](const std::vector<float>& visionData, 
+                                   const std::vector<float>& touchData,
+                                   const std::vector<float>& internalData,
+                                   float timestamp = 0.0f) {
+        auto sensoryInput = std::make_shared<nlm::SensoryInput>();
+        // Note: The actual SensoryInput class may not have these exact setters
+        // This is a placeholder for advanced sensory manipulation
+        return sensoryInput;
+    }, py::arg("visionData"), py::arg("touchData"), py::arg("internalData"), py::arg("timestamp") = 0.0f,
+       "Create custom sensory input for testing");
+
+    m.def("createCustomAction", [](nlm::ActionType actionType, 
+                                  const std::vector<float>& parameters = std::vector<float>()) {
+        return std::make_shared<nlm::Action>(actionType, parameters);
+    }, py::arg("actionType"), py::arg("parameters") = std::vector<float>(),
+       "Create custom action with parameters");
+
+    // Statistics and analysis utilities
+    m.def("computeSimilarityScore", [](const std::vector<float>& pattern1,
+                                      const std::vector<float>& pattern2) {
+        if (pattern1.size() != pattern2.size()) {
+            throw std::invalid_argument("Patterns must have same length");
+        }
+        
+        float dotProduct = 0.0f;
+        float norm1 = 0.0f;
+        float norm2 = 0.0f;
+        
+        for (size_t i = 0; i < pattern1.size(); ++i) {
+            dotProduct += pattern1[i] * pattern2[i];
+            norm1 += pattern1[i] * pattern1[i];
+            norm2 += pattern2[i] * pattern2[i];
+        }
+        
+        float cosineSimilarity = dotProduct / std::sqrt(norm1 * norm2);
+        return std::max(-1.0f, std::min(1.0f, cosineSimilarity)); // Clamp to [-1, 1]
+    }, py::arg("pattern1"), py::arg("pattern2"),
+       "Compute cosine similarity between two patterns");
+
+    // Configuration comparison utilities
+    m.def("compareConfigs", [](std::shared_ptr<nlm::Config> config1,
+                               std::shared_ptr<nlm::Config> config2) {
+        std::map<std::string, std::pair<float, float>> differences;
+        
+        auto keys1 = config1->getKeys();
+        auto keys2 = config2->getKeys();
+        
+        // Check keys present in both
+        for (const auto& key : keys1) {
+            if (config2->has(key)) {
+                // Try to get float values (simplified comparison)
+                auto val1 = config1->getOr<float>(key, 0.0f);
+                auto val2 = config2->getOr<float>(key, 0.0f);
+                differences[key] = std::make_pair(val1, val2);
+            }
+        }
+        
+        return differences;
+    }, py::arg("config1"), py::arg("config2"),
+       "Compare two configurations and return differences");
+
+    // Experiment utilities
+    m.def("runBenchmark", [](std::shared_ptr<nlm::Config> config, 
+                            const std::vector<int>& neuronCounts,
+                            const std::vector<int>& stepCounts) {
+        // Simple benchmark implementation
+        // This could be expanded with more sophisticated benchmarking
+        std::cout << "Running benchmark for NLM with configuration..." << std::endl;
+        
+        std::map<std::string, double> results;
+        
+        for (size_t i = 0; i < neuronCounts.size(); ++i) {
+            auto benchConfig = std::make_shared<nlm::Config>(*config);
+            benchConfig->set("neuron_count", static_cast<int64_t>(neuronCounts[i]), nlm::ConfigSource::Default);
+            
+            auto brain = nlm::createBrain(benchConfig);
+            brain->initialize();
+            
+            // Run benchmark steps
+            auto startTime = std::chrono::high_resolution_clock::now();
+            for (int step = 0; step < stepCounts[i]; ++step) {
+                brain->step(step);
+            }
+            auto endTime = std::chrono::high_resolution_clock::now();
+            
+            double duration = std::chrono::duration<double>(endTime - startTime).count();
+            double stepsPerSecond = stepCounts[i] / duration;
+            
+            results["neurons_" + std::to_string(neuronCounts[i])] = stepsPerSecond;
+            std::cout << "  " << neuronCounts[i] << " neurons: " << stepsPerSecond << " steps/sec" << std::endl;
+        }
+        
+        return results;
+    }, py::arg("config"), py::arg("neuronCounts"), py::arg("stepCounts"),
+       "Run benchmark with different neuron counts");
+
+    // Memory analysis utilities
+    m.def("analyzeWorkingMemory", [](std::shared_ptr<nlm::Brain> brain) {
+        std::map<std::string, double> analysis;
+        
+        auto workingMemory = brain->getWorkingMemory();
+        if (workingMemory) {
+            analysis["active_traces"] = static_cast<double>(workingMemory->getActiveTraces());
+            analysis["memory_capacity"] = static_cast<double>(workingMemory->getCapacity());
+            analysis["memory_activity"] = static_cast<double>(workingMemory->getMemoryActivity());
+            analysis["trace_count"] = static_cast<double>(workingMemory->getMemoryNeuronCount());
+        }
+        
+        auto episodicMemory = brain->getEpisodicMemory();
+        if (episodicMemory) {
+            analysis["episode_count"] = static_cast<double>(episodicMemory->getEpisodeCount());
+            analysis["max_episodes"] = static_cast<double>(episodicMemory->getMaxEpisodes());
+            analysis["replay_enabled"] = episodicMemory->isReplayEnabled() ? 1.0 : 0.0;
+        }
+        
+        return analysis;
+    }, py::arg("brain"),
+       "Analyze brain memory systems for debugging and optimization");
+
+    // Advanced agent configuration
+    m.def("configureAgentForTask", [](std::shared_ptr<nlm::AgentBrain> agent,
+                                   const std::string& taskType,
+                                   bool enableAllSystems = true) {
+        if (enableAllSystems) {
+            agent->enableRewardModulation(true);
+            agent->enableStructuralPlasticity(true);
+            agent->enableDevelopment(true);
+            agent->enableCuriosity(true);
+        }
+        
+        // Task-specific agent configuration
+        if (taskType == "exploration") {
+            agent->enableCuriosity(true);
+            agent->enableStructuralPlasticity(true);
+        } else if (taskType == "exploitation") {
+            agent->enableRewardModulation(true);
+        } else if (taskType == "social") {
+            agent->enableCuriosity(true);
+            agent->enableRewardModulation(true);
+        }
+        
+        return agent;
+    }, py::arg("agent"), py::arg("taskType"), py::arg("enableAllSystems") = true,
+       "Configure agent brain for specific task type");
 
 } // namespace nlm

@@ -1,9 +1,8 @@
-#include "Neuromodulator.hpp"
-#include <algorithm>
+// Neuromodulator implementations
 
 namespace nlm {
 
-struct Dopamine::Impl {
+struct Acetylcholine::Impl {
     float level;
     float baseline;
     float peak;
@@ -13,44 +12,116 @@ struct Dopamine::Impl {
     Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f) {}
 };
 
-Dopamine::Dopamine() : pImpl(new Impl) {}
+Acetylcholine::Acetylcholine() : pImpl(new Impl) {}
 
-Dopamine::~Dopamine() = default;
+Acetylcholine::~Acetylcholine() = default;
 
-const char* Dopamine::getName() const {
-    return "DA";
+const char* Acetylcholine::getName() const {
+    return "ACh";
 }
 
-float Dopamine::getLevel() const {
+float Acetylcholine::getLevel() const {
     return pImpl->level;
 }
 
-void Dopamine::setLevel(float level) {
+void Acetylcholine::setLevel(float level) {
     pImpl->level = std::clamp(level, 0.0f, 1.0f);
 }
 
-float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
+float Acetylcholine::getPlasticityFactor() const {
+    // PLACEHOLDER: ACh modulates plasticity rates and memory consolidation
     return 0.5f + 0.5f * pImpl->level;
 }
 
-void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
+void Acetylcholine::update(TimestepDuration dt) {
     // PLACEHOLDER: Decay towards baseline
     pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
 }
 
-void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+struct Norepinephrine::Impl {
+    float level;
+    float baseline;
+    float peak;
+    float decayRate;
+    float releaseRate;
+    float arousalLevel;
+    
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f), arousalLevel(0.0f) {}
+};
+
+Norepinephrine::Norepinephrine() : pImpl(new Impl) {}
+
+Norepinephrine::~Norepinephrine() = default;
+
+const char* Norepinephrine::getName() const {
+    return "NE";
 }
 
-void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+float Norepinephrine::getLevel() const {
+    return pImpl->level;
+}
+
+void Norepinephrine::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+}
+
+float Norepinephrine::getPlasticityFactor() const {
+    // PLACEHOLDER: NE modulates arousal, attention, and learning
+    return 0.5f + 0.5f * pImpl->level;
+}
+
+void Norepinephrine::update(TimestepDuration dt) {
+    // PLACEHOLDER: Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+}
+
+void Norepinephrine::signalArousal(float arousalLevel) {
+    // PLACEHOLDER: NE burst on arousal
+    pImpl->arousalLevel = arousalLevel;
+    pImpl->level = std::min(pImpl->peak, pImpl->level + arousalLevel * pImpl->releaseRate);
+}
+
+struct Serotonin::Impl {
+    float level;
+    float baseline;
+    float peak;
+    float decayRate;
+    float releaseRate;
+    float socialValue;
+    
+    Impl() : level(0.0f), baseline(0.0f), peak(1.0f), decayRate(0.1f), releaseRate(1.0f), socialValue(0.0f) {}
+};
+
+Serotonin::Serotonin() : pImpl(new Impl) {}
+
+Serotonin::~Serotonin() = default;
+
+const char* Serotonin::getName() const {
+    return "5-HT";
+}
+
+float Serotonin::getLevel() const {
+    return pImpl->level;
+}
+
+void Serotonin::setLevel(float level) {
+    pImpl->level = std::clamp(level, 0.0f, 1.0f);
+}
+
+float Serotonin::getPlasticityFactor() const {
+    // PLACEHOLDER: 5-HT modulates mood, impulsivity, and social behavior
+    return 0.5f + 0.5f * pImpl->level;
+}
+
+void Serotonin::update(TimestepDuration dt) {
+    // PLACEHOLDER: Decay towards baseline
+    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+}
+
+void Serotonin::signalSocial(float socialValue) {
+    // PLACEHOLDER: 5-HT burst on social experience
+    pImpl->socialValue = socialValue;
+    pImpl->level = std::min(pImpl->peak, pImpl->level + socialValue * pImpl->releaseRate);
 }
 
 } // namespace nlm

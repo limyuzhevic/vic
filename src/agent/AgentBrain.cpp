@@ -183,6 +183,112 @@ size_t AgentBrain::getMotorOutputSize() const {
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (!brain_) return;
 
+    // Store sensory percept in working memory for persistent activity
+    if (auto* workingMemory = brain_->getWorkingMemory()) {
+        // Convert vision, touch, internal, and proprioception signals to a single pattern
+        std::vector<float> sensoryPattern;
+        
+        // Add vision data (256 rays)
+        const auto& vision = percept.getVision();
+        sensoryPattern.insert(sensoryPattern.end(), vision.begin(), vision.end());
+        
+        // Add touch data (8 sensors)  
+        const auto& touch = percept.getTouch();
+        sensoryPattern.insert(sensoryPattern.end(), touch.begin(), touch.end());
+        
+        // Add internal signals (4 sensors)
+        const auto& internal = percept.getInternal();
+        sensoryPattern.insert(sensoryPattern.end(), internal.begin(), internal.end());
+        
+        // Add proprioception data (6 sensors)
+        const auto& proprio = percept.getProprioception();
+        sensoryPattern.insert(sensoryPattern.end(), proprio.begin(), proprio.end());
+        
+        // Add text encoding if present
+        const auto& text = percept.getText();
+        if (!text.empty()) {
+            // Add text embedding to pattern
+            auto encodedText = encodeText(text);
+            std::vector<float> textPattern(encodedText.size(), 1.0f);
+            sensoryPattern.insert(sensoryPattern.end(), textPattern.begin(), textPattern.end());
+        }
+        
+        // Store in working memory with strength based on pattern uniqueness
+        if (!sensoryPattern.empty()) {
+            // Simple uniqueness measure - count number of non-zero values
+            int nonZeroCount = 0;
+            for (float val : sensoryPattern) {
+                if (std::abs(val) > 0.01f) nonZeroCount++;
+            }
+            float strength = static_cast<float>(nonZeroCount) / std::max(sensoryPattern.size(), 1);
+            workingMemory->store(sensoryPattern, strength);
+        }
+    }
+
+    // Store sensory experience in episodic memory for long-term learning
+    if (auto* episodicMemory = brain_->getEpisodicMemory()) {
+        EpisodicMemoryItem episode;
+        episode.timestamp = brain_->getTotalSpikeCount();
+        episode.sensoryState = percept.getVision();  // Primary visual state
+        episode.positionX = brain_->getAgentBody() ? brain_->getAgentBody()->x : 0.0f;
+        episode.positionY = brain_->getAgentBody() ? brain_->getAgentBody()->y : 0.0f;
+        episode.orientation = brain_->getAgentBody() ? brain_->getAgentBody()->orientation : 0.0f;
+        
+        // Determine action that will be taken (this is what we're predicting)
+        episode.action = ActionType::Wait; // Default, will be set when agent acts
+        
+        // Set internal state from agent's neuromodulation levels
+        episode.reward = getNeuromodulationLevel();  // Dopamine level as proxy for reward
+        episode.energy = brain_->getEnergy() ? *brain_->getEnergy() : 1.0f;
+        episode.novelty = getNoveltyLevel();
+        
+        episode.resultingSensoryState = percept.getVision();  // Will be updated after action
+        episode.resultingReward = 0.0f;  // Will be updated after action
+        
+        // Record neural activity at this moment
+        episode.activeNeurons.clear();
+        episode.neuronActivations.clear();
+        
+        if (brain_->getWorkingMemory()) {
+            const auto& memNeurons = brain_->getWorkingMemory()->getMemoryNeurons();
+            const auto& memActivations = brain_->getWorkingMemory()->getMemoryActivations();
+            
+            for (size_t i = 0; i < memNeurons.size() && i < memActivations.size(); ++i) {
+                if (memActivations[i] > 0.1f) {  // Only store active traces
+                    episode.activeNeurons.push_back(memNeurons[i]);
+                    episode.neuronActivations.push_back(memActivations[i]);
+                }
+            }
+        }
+        
+        // Store episode immediately for first-pass learning
+        episodicMemory->storeEpisode(episode);
+    }
+
+    // Update prediction system if available
+    if (auto* predictionSystem = brain_->getPredictionSystem()) {
+        // Convert sensory percept to prediction target
+        std::vector<float> currentPattern = percept.getVision();
+        
+        // Generate prediction based on current working memory
+        if (auto* workingMemory = brain_->getWorkingMemory()) {
+            std::vector<float> predictedPattern = workingMemory->retrieve();
+            
+            // Compute prediction error
+            float predictionError = 0.0f;
+            if (!currentPattern.empty() && !predictedPattern.empty()) {
+                size_t minSize = std::min(currentPattern.size(), predictedPattern.size());
+                for (size_t i = 0; i < minSize; ++i) {
+                    predictionError += std::abs(currentPattern[i] - predictedPattern[i]);
+                }
+                predictionError /= static_cast<float>(minSize);
+            }
+            
+            // Update prediction error for neuromodulation
+            predictionError_ = predictionError;
+        }
+    }
+
     // Phase 6 self-model, wired into the loop: the percept arriving
     // now is the consequence of the action decoded last turn, so
     // record (previous vision -> current vision) for that action.
@@ -469,6 +575,82 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     if (hasThoughtPlanned_) {
         ++plannerDecisionCount_;
         if (thoughtPlanned_ == decoded) ++plannerAgreementCount_;
+    }
+
+    // Phase 6: Use brain's self-model system for action bias
+    if (selfModelReady_ && !lastVision_.empty()) {
+        MotorCommand cmds[5] = {MotorCommand::MoveForward, MotorCommand::MoveBackward,
+                                MotorCommand::TurnLeft, MotorCommand::TurnRight,
+                                MotorCommand::Interact};
+        ActionType acts[5] = {ActionType::MoveForward, ActionType::MoveBackward,
+                              ActionType::TurnLeft, ActionType::TurnRight,
+                              ActionType::Interact};
+        float conf[5];
+        for (int i = 0; i < 5; ++i) conf[i] = selfModel_.getSelfModelConfidence(acts[i]);
+        int bestI = 0;
+        float second = 0.0f;
+        for (int i = 0; i < 5; ++i) {
+            if (conf[i] > conf[bestI]) { second = conf[bestI]; bestI = i; }
+            else if (conf[i] > second) { second = conf[i]; }
+        }
+        if (conf[bestI] > 0.8f && conf[bestI] - second > 0.05f) {
+            switch (cmds[bestI]) {
+                case MotorCommand::MoveForward: forwardRate += 3.0f; break;
+                case MotorCommand::MoveBackward: backwardRate += 3.0f; break;
+                case MotorCommand::TurnLeft: turnLeftRate += 3.0f; break;
+                case MotorCommand::TurnRight: turnRightRate += 3.0f; break;
+                case MotorCommand::Interact: interactRate += 3.0f; break;
+                default: break;
+            }
+            ++selfBiasCount_;
+        }
+    }
+
+    // Phase 6: Use brain's social learning system for action bias
+    if (socialReady_ && socialLearning_.getObservationCount() > 0 && !lastVision_.empty()) {
+        auto [imitAct, sim] = socialLearning_.getImitationActionAndSimilarity(lastVision_);
+        if (sim > 0.8f) {
+            switch (imitAct) {
+                case ActionType::MoveForward: forwardRate += 5.0f; ++socialBiasCount_; break;
+                case ActionType::MoveBackward: backwardRate += 5.0f; ++socialBiasCount_; break;
+                case ActionType::TurnLeft: turnLeftRate += 5.0f; ++socialBiasCount_; break;
+                case ActionType::TurnRight: turnRightRate += 5.0f; ++socialBiasCount_; break;
+                case ActionType::Interact: interactRate += 5.0f; ++socialBiasCount_; break;
+                default: break;
+            }
+        }
+    }
+
+    // Phase 6: Update self-model with new experience (wiring it into the loop)
+    if (hasLastDecoded_ && !lastVision_.empty() && !percept.getVision().empty()) {
+        if (!selfModelReady_) { selfModel_.initialize(brain_.get()); selfModelReady_ = true; }
+        ActionType act = ActionType::Wait;
+        switch (lastDecoded_) {
+            case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
+            case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
+            case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
+            case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
+            case MotorCommand::Interact: act = ActionType::Interact; break;
+            default: break;
+        }
+        selfModel_.recordSelfAction(act, lastVision_, percept.getVision());
+    }
+
+    // Phase 6: Update social learning (observeOtherAgent)
+    if (!percept.getText().empty()) {
+        std::string text = percept.getText();
+        auto encodedText = encodeText(text);
+        if (!encodedText.empty()) {
+            // For Phase 6 text-as-a-sense, create a simulated observation
+            // This would normally come from observing another agent
+            // For single-agent world, we simulate what observing another agent would be
+            MotorCommand observedCmd = MotorCommand::Wait;
+            std::vector<float> beforeVision;
+            std::vector<float> afterVision;
+            // In a single-agent world, social learning mostly observes the self-model
+            // or the planned actions being overridden by curiosity
+            observeOtherAgent(thoughtPlanned_, beforeVision, afterVision);
+        }
     }
 
     // Phase 5 diversity counters, from the final action actually taken.

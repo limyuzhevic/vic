@@ -181,117 +181,397 @@ Reads the brain's motor neurons to decide what action to take.
 
 ---
 
-## Mini Projects
+## Advanced Usage: Memory and Learning
 
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
-```
-
-### Project 2: Brain Watching a World
+### Working Memory Examples
 
 ```python
 import pynlm
 
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
-```
-
-### Project 3: Complete Agent
-
-```python
-import pynlm
-
-# Setup
+# Create a brain with working memory
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
+
+# Get working memory (if available)
+working_memory = brain.getWorkingMemory()
+if working_memory:
+    print(f"Working memory capacity: {working_memory.getCapacity()}")
+    print(f"Active memory traces: {working_memory.getActiveTraces()}")
+    
+    # Store sensory input in working memory
+    world = pynlm.createSimpleWorld()
+    world.configure(20, 20, 8, 8)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Process sensory input (automatically stores in working memory)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    
+    # Check what's stored
+    memory_content = working_memory.getMemoryActivations()
+    print(f"Working memory activity levels: {len(memory_content)} traces")
+```
+
+### Episodic Memory and Experience Storage
+
+```python
+import pynlm
+
+# Create brain with episodic memory
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create agent and world
 agent = pynlm.createAgentBrain(brain)
+world = pynlm.createSimpleWorld()
+world.configure(15, 15, 8, 8)
+world.reset()
 agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+# Enable episodic memory
+episodic_memory = brain.getEpisodicMemory()
+if episodic_memory:
+    episodic_memory.setMaxEpisodes(1000)
 
-# Run agent
-for step in range(100):
+# Run simulation and store experiences
+for episode in range(100):
     world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
+    
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(episode)
+    
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    # Simulate reward based on position
+    agentBody = world.getAgentBody()
+    if agentBody:
+        dist_to_center = ((agentBody.x - 7.5)**2 + (agentBody.y - 7.5)**2)**0.5
+        reward = max(0, 1 - dist_to_center / 7.5)
+        agent.applyRewardModulation(reward, 0)
 
-print("Agent simulation complete!")
+# Retrieve stored experiences
+if episodic_memory:
+    recent_episodes = episodic_memory.getRecentEpisodes(5)
+    print(f"Recent episodes: {len(recent_episodes)}")
+    for i, episode in enumerate(recent_episodes):
+        print(f"  Episode {i}: reward={episode.reward:.2f}, steps={episode.age}")
 ```
 
----
+### Neuromodulation Configuration
 
-## Quick Reference
+```python
+import pynlm
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+# Create configuration with enhanced neuromodulation
+config = pynlm.createDefaultConfig()
 
----
+# Configure dopamine (reward and plasticity)
+config.set("neuromod.dopamine_baseline", 0.1)
+config.set("neuromod.dopamine_release_rate", 1.0)
+config.set("neuromod.dopamine_decay_rate", 0.1)
 
-## Troubleshooting
+# Configure acetylcholine (attention and memory)
+config.set("neuromod.acetylcholine_baseline", 0.05)
+config.set("neuromod.acetylcholine_attention_weight", 0.3)
+config.set("neuromod.acetylcholine_memory_consolidation_weight", 0.7)
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+# Configure norepinephrine (arousal and vigilance)
+config.set("neuromod.norepinephrine_baseline", 0.03)
+config.set("neuromod.norepinephrine_arousal_weight", 0.4)
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+# Configure serotonin (mood and social behavior)
+config.set("neuromod.serotonin_baseline", 0.02)
+config.set("neuromod.serotonin_social_weight", 0.5)
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+# Create brain with neuromodulation
+brain = pynlm.createBrain(config)
+brain.initialize()
 
----
+# Create agent with enhanced neuromodulation
+agent = pynlm.createAgentBrain(brain)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+```
 
-## Next Steps
+### Task-Specific Brain Configuration
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+```python
+import pynlm
 
-That's it! You're now ready to use NLM.
+# Configure brain for different tasks
+tasks = {
+    "navigation": {
+        "neuron_count": 1500,
+        "stdp_ltp_weight": 0.02,
+        "stdp_ltd_weight": 0.015,
+        "synaptogenesis_rate": 0.0002,
+        "pruning_rate": 0.00002,
+    },
+    "pattern_learning": {
+        "neuron_count": 1000,
+        "stdp_ltp_weight": 0.01,
+        "stdp_ltd_weight": 0.012,
+        "synaptogenesis_rate": 0.0001,
+        "pruning_rate": 0.00001,
+    },
+    "social_learning": {
+        "neuron_count": 1200,
+        "stdp_ltp_weight": 0.015,
+        "stdp_ltd_weight": 0.013,
+        "synaptogenesis_rate": 0.00015,
+        "pruning_rate": 0.000015,
+    }
+}
+
+# Create task-specific configuration
+def createTaskConfig(task_name):
+    config = pynlm.createDefaultConfig()
+    task_params = tasks.get(task_name, tasks["navigation"])
+    
+    for key, value in task_params.items():
+        if isinstance(value, float):
+            config.set(key, value)
+        elif isinstance(value, int):
+            config.set(key, value)
+    
+    return config
+
+# Use task-specific configuration
+nav_config = createTaskConfig("navigation")
+navigation_brain = pynlm.createBrain(nav_config)
+navigation_brain.initialize()
+```
+
+### Simulation Management and Utilities
+
+```python
+import pynlm
+
+# Create simulation with context manager
+class Simulation:
+    def __init__(self, config=None):
+        if config is None:
+            config = pynlm.createDefaultConfig()
+        self.brain = pynlm.createBrain(config)
+        self.world = pynlm.createSimpleWorld()
+        self.agent = pynlm.createAgentBrain(self.brain)
+        
+    def initialize(self):
+        self.world.configure(20, 20, 8, 8)
+        self.world.reset()
+        self.agent.initialize(self.world)
+        self.brain.initialize()
+        
+    def run_episode(self, steps, task_type="navigation"):
+        for step in range(steps):
+            self.world.update(0.1)
+            
+            percept = self.world.getSensoryPercept()
+            self.agent.processSensoryInput(percept)
+            self.brain.step(step)
+            
+            action = self.agent.decodeMotorCommand()
+            self.world.applyMotorCommand(action, self.world.getSimulationTime())
+            
+            # Task-specific reward
+            if task_type == "navigation":
+                agent_body = self.world.getAgentBody()
+                if agent_body:
+                    dist_to_center = ((agent_body.x - 10)**2 + (agent_body.y - 10)**2)**0.5
+                    reward = max(0, 1 - dist_to_center / 10)
+                    self.agent.applyRewardModulation(reward, 0)
+                    
+    def get_stats(self):
+        stats = {}
+        if self.brain:
+            stats["neurons"] = self.brain.getTotalNeuronCount()
+            stats["synapses"] = self.brain.getTotalSynapseCount()
+            stats["spikes"] = self.brain.getTotalSpikeCount()
+            stats["learning"] = self.brain.getLearnedPreference()
+            
+        if self.world:
+            stats["world_width"] = self.world.getWidth()
+            stats["world_height"] = self.world.getHeight()
+            
+        return stats
+
+# Use the simulation
+sim = Simulation()
+sim.initialize()
+sim.run_episode(100, "navigation")
+stats = sim.get_stats()
+print(f"Simulation completed: {stats}")
+```
+
+### Batch Processing and Benchmarking
+
+```python
+import pynlm
+
+# Create multiple configurations for benchmarking
+configs = []
+for i in range(5):
+    config = pynlm.createDefaultConfig()
+    config.set("random_seed", i * 100)
+    config.set("neuron_count", 500 * (i + 1))
+    configs.append(config)
+
+# Run batch simulation
+print("Running batch simulation...")
+results = []
+
+for i, config in enumerate(configs):
+    print(f"  Simulation {i+1}/5...")
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(10, 10, 6, 6)
+    world.reset()
+    
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    agent.enableRewardModulation(True)
+    
+    # Run simulation
+    for step in range(50):
+        world.update(0.1)
+        
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Simple reward for testing
+        reward = 0.5  # Fixed reward for benchmarking
+        agent.applyRewardModulation(reward, 0)
+    
+    # Collect results
+    result = {
+        "neurons": brain.getTotalNeuronCount(),
+        "synapses": brain.getTotalSynapseCount(),
+        "spikes": brain.getTotalSpikeCount(),
+        "learning": brain.getLearnedPreference(),
+        "firing": brain.getFiringNeuronCount()
+    }
+    results.append(result)
+
+# Print summary
+print("\nBatch Results Summary:")
+print("=====================")
+for i, result in enumerate(results):
+    print(f"Simulation {i+1}: {result['neurons']} neurons, "
+          f"{result['synapses']} synapses, "
+          f"{result['spikes']} spikes, "
+          f"learning={result['learning']:.3f}")
+```
+
+### Memory Analysis and Debugging
+
+```python
+import pynlm
+
+# Create and run simulation
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(15, 15, 8, 8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+agent.enableRewardModulation(True)
+
+# Run simulation to generate memory content
+for step in range(50):
+    world.update(0.1)
+    
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Simple reward
+    agent.applyRewardModulation(0.5, 0)
+
+# Analyze memory systems
+print("Memory System Analysis:")
+print("======================")
+
+# Working memory analysis
+working_memory = brain.getWorkingMemory()
+if working_memory:
+    print("Working Memory:")
+    print(f"  Capacity: {working_memory.getCapacity()} traces")
+    print(f"  Active traces: {working_memory.getActiveTraces()}")
+    print(f"  Memory activity: {working_memory.getMemoryActivity():.3f}")
+    
+    memory_neurons = working_memory.getMemoryNeurons()
+    memory_activations = working_memory.getMemoryActivations()
+    print(f"  Stored neurons: {len(memory_neurons)}")
+    print(f"  Activation range: {min(memory_activations):.3f} - {max(memory_activations):.3f}")
+
+# Episodic memory analysis
+episodic_memory = brain.getEpisodicMemory()
+if episodic_memory:
+    print("\nEpisodic Memory:")
+    print(f"  Episode count: {episodic_memory.getEpisodeCount()}")
+    print(f"  Max episodes: {episodic_memory.getMaxEpisodes()}")
+    print(f"  Replay enabled: {'Yes' if episodic_memory.isReplayEnabled() else 'No'}")
+    
+    recent_episodes = episodic_memory.getRecentEpisodes(3)
+    print(f"  Recent episodes: {len(recent_episodes)}")
+
+# Associative memory analysis
+associative_memory = brain.getAssociativeMemory()
+if associative_memory:
+    print("\nAssociative Memory:")
+    print(f"  Association count: {associative_memory.getAssociationCount()}")
+
+# Prediction system analysis
+prediction_system = brain.getPredictionSystem()
+if prediction_system:
+    print("\nPrediction System:")
+    print("  Prediction system active (analysis not yet implemented)")
+
+# Cognition systems analysis
+neural_planner = brain.getPlanner()
+concept_formation = brain.getConceptFormation()
+self_model = brain.getSelfModel()
+
+if neural_planner:
+    print("\nCognition Systems:")
+    print(f"  Neural planner: active (analysis not yet implemented)")
+    
+if concept_formation:
+    concept_count = concept_formation.getConceptCount()
+    print(f"  Concept formation: {concept_count} concepts")
+    
+if self_model:
+    print(f"  Self model: active (analysis not yet implemented)")
+
+# Neuromodulation analysis
+print("\nNeuromodulation Levels:")
+if hasattr(agent, 'getCuriosityLevel'):
+    print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+if hasattr(agent, 'getNoveltyLevel'):
+    print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+if hasattr(agent, 'getPredictionError'):
+    print(f"  Prediction error: {agent.getPredictionError():.3f}")
+if hasattr(agent, 'getNeuromodulationLevel'):
+    print(f"  Neuromodulation: {agent.getNeuromodulationLevel():.3f}")
+```
