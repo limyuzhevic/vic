@@ -48,10 +48,6 @@ public:
     void setLevel(LogLevel level) override;
     LogLevel getLevel() const override;
     
-    // Enable/disable colors
-    void setUseColors(bool useColors);
-    bool getUseColors() const;
-    
     // Set output file (in addition to console)
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();

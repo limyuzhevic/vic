@@ -1,9 +1,11 @@
+// Complete implementation of ConsoleLogger
 #include "Logger.hpp"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <algorithm>
 
 namespace nlm {
 
@@ -12,6 +14,7 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    std::string filePath;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
@@ -48,7 +51,7 @@ void ConsoleLogger::log(const LogEntry& entry) {
     }
     
     // File output if set
-    if (pImpl->fileOut.is_open()) {
+    if (!pImpl->filePath.empty() && pImpl->fileOut.is_open()) {
         pImpl->fileOut << output << "\n";
         pImpl->fileOut.flush();
     }
@@ -71,132 +74,48 @@ bool ConsoleLogger::getUseColors() const {
 }
 
 void ConsoleLogger::setOutputFile(const std::string& filepath) {
-    pImpl->fileOut.open(filepath, std::ios::app);
+    // Close existing file if open
+    if (pImpl->fileOut.is_open()) {
+        pImpl->fileOut.close();
+    }
+    
+    pImpl->filePath = filepath;
+    pImpl->fileOut.open(filepath, std::ios::out | std::ios::app);
 }
 
 void ConsoleLogger::closeOutputFile() {
     if (pImpl->fileOut.is_open()) {
         pImpl->fileOut.close();
     }
+    pImpl->filePath.clear();
 }
 
+// Level string conversion with all levels
 std::string ConsoleLogger::levelToString(LogLevel level) const {
     switch (level) {
         case LogLevel::Debug: return "DEBUG";
         case LogLevel::Info: return "INFO";
-        case LogLevel::Warning: return "WARN";
+        case LogLevel::Warning: return "WARNING";
         case LogLevel::Error: return "ERROR";
-        case LogLevel::Critical: return "CRIT";
+        case LogLevel::Critical: return "CRITICAL";
         default: return "UNKNOWN";
     }
 }
 
+// Level color conversion with all levels
 std::string ConsoleLogger::levelToColor(LogLevel level) const {
+    if (!pImpl->useColors) {
+        return "";
+    }
+    
     switch (level) {
-        case LogLevel::Debug: return "\033[36m";    // Cyan
-        case LogLevel::Info: return "\033[32m";      // Green
-        case LogLevel::Warning: return "\033[33m";   // Yellow
-        case LogLevel::Error: return "\033[31m";     // Red
-        case LogLevel::Critical: return "\033[35m"; // Magenta
+        case LogLevel::Debug: return "\033[36m"; // Cyan
+        case LogLevel::Info: return "\033[32m";  // Green
+        case LogLevel::Warning: return "\033[33m"; // Yellow
+        case LogLevel::Error: return "\033[31m";  // Red
+        case LogLevel::Critical: return "\033[41m"; // Red background
         default: return "\033[0m";
     }
-}
-
-// Logger class implementation
-struct Logger::Impl {
-    std::vector<std::shared_ptr<ILogger>> loggers;
-    std::mutex mutex;
-};
-
-Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
-
-Logger::~Logger() = default;
-
-void Logger::addLogger(std::shared_ptr<ILogger> logger) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
-}
-
-void Logger::clearLoggers() {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.clear();
-}
-
-void Logger::setLevel(LogLevel level) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        logger->setLevel(level);
-    }
-}
-
-void Logger::log(LogLevel level, const std::string& message,
-                const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    
-    LogEntry entry;
-    entry.level = level;
-    entry.message = message;
-    entry.file = file;
-    entry.line = line;
-    entry.function = function;
-    entry.timestamp = std::chrono::system_clock::now();
-    
-    for (auto& logger : pImpl->loggers) {
-        logger->log(entry);
-    }
-}
-
-void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Debug, message, file, line, function);
-}
-
-void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Info, message, file, line, function);
-}
-
-void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Warning, message, file, line, function);
-}
-
-void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Error, message, file, line, function);
-}
-
-void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Critical, message, file, line, function);
-}
-
-bool Logger::isEnabled(LogLevel level) const {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
-        if (logger->getLevel() <= level) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static std::shared_ptr<Logger>& globalLoggerPtr() {
-    static std::shared_ptr<Logger> ptr = std::make_shared<Logger>();
-    return ptr;
-}
-
-Logger& Logger::getGlobal() {
-    return *globalLoggerPtr();
-}
-
-void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    if (logger) {
-        globalLoggerPtr() = logger;
-    }
-}
-
-// LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
-
-LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
 }
 
 } // namespace nlm
