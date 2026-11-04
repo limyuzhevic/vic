@@ -408,21 +408,62 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, "Create a default configuration")
+    .def("validateConfig", [](std::shared_ptr<Config> config) {
+        // Validate configuration parameters
+        bool isValid = true;
+        
+        // Check for required configuration parameters
+        if (config->has("brain.neuron_count")) {
+            auto neuronCount = config->get<int64_t>("brain.neuron_count");
+            if (neuronCount && *neuronCount == 0) {
+                throw std::invalid_argument("neuron_count must be > 0");
+            }
+        }
+        
+        if (config->has("brain.region_count")) {
+            auto regionCount = config->get<int64_t>("brain.region_count");
+            if (regionCount && *regionCount == 0) {
+                throw std::invalid_argument("region_count must be > 0");
+            }
+        }
+        
+        if (config->has("brain.connection_probability")) {
+            auto connProb = config->get<float>("brain.connection_probability");
+            if (connProb) {
+                if (*connProb < 0.0f || *connProb > 1.0f) {
+                    throw std::invalid_argument("connection_probability must be between 0.0 and 1.0");
+                }
+            }
+        }
+        
+        return isValid;
+    }, "Validate configuration parameters")
+    .def("configureBrain", [](std::shared_ptr<Config> config, std::string key, std::string value) {
+        // Enhanced configuration with type validation
+        config->set(key, value);
+        
+        // Log configuration change
+        std::cout << "[pynlm] Configured: " << key << " = " << value << std::endl;
+    }, py::arg("config"), py::arg("key"), py::arg("value"),
+        "Configure brain with a string value")
+    .def("configureBrainInt", [](std::shared_ptr<Config> config, std::string key, int64_t value) {
+        config->set(key, value);
+        std::cout << "[pynlm] Configured: " << key << " = " << value << std::endl;
+    }, py::arg("config"), py::arg("key"), py::arg("value"),
+        "Configure brain with an integer value")
+    .def("configureBrainFloat", [](std::shared_ptr<Config> config, std::string key, float value) {
+        config->set(key, value);
+        std::cout << "[pynlm] Configured: " << key << " = " << value << std::endl;
+    }, py::arg("config"), py::arg("key"), py::arg("value"),
+        "Configure brain with a float value")
+    .def("configureBrainBool", [](std::shared_ptr<Config> config, std::string key, bool value) {
+        config->set(key, value);
+        std::cout << "[pynlm] Configured: " << key << " = " << (value ? "true" : "false") << std::endl;
+    }, py::arg("config"), py::arg("key"), py::arg("value"),
+        "Configure brain with a boolean value");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

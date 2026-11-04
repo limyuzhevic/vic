@@ -2,6 +2,7 @@
 #include "core/Config/Config.hpp"
 #include <cassert>
 #include <iostream>
+#include <string>
 
 namespace test_config {
 
@@ -78,12 +79,80 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
+void testConfigValidation() {
+    nlm::Config config;
+    
+    // Test setting with empty key (should be rejected)
+    config.set("", 123, nlm::ConfigSource::Runtime);  // Should log error but continue
+    
+    // Test setting with newline in key (should be rejected)
+    config.set("bad\nkey", 456, nlm::ConfigSource::Runtime);  // Should log error but continue
+    
+    // Test valid setting
+    config.set("valid_key", 789, nlm::ConfigSource::Runtime);
+    assert(config.has("valid_key"));
+    
+    auto val = config.get<int>("valid_key");
+    assert(val.has_value());
+    assert(*val == 789);
+    
+    std::cout << "    testConfigValidation passed" << std::endl;
+}
+
+void testConfigErrorHandling() {
+    nlm::Config config;
+    
+    // Test that config operations don't crash on invalid input
+    config.set("test", "valid", nlm::ConfigSource::Runtime);
+    
+    // Test setting with various types
+    config.set("int", 42, nlm::ConfigSource::Runtime);
+    config.set("double", 3.14, nlm::ConfigSource::Runtime);
+    config.set("bool", false, nlm::ConfigSource::Runtime);
+    config.set("string", std::string("test"), nlm::ConfigSource::Runtime);
+    
+    // Verify all settings
+    assert(config.getOr<int>("int", 0) == 42);
+    assert(config.getOr<double>("double", 0.0) > 3.13 && config.getOr<double>("double", 0.0) < 3.15);
+    assert(config.getOr<bool>("bool", true) == false);
+    assert(config.getOr<std::string>("string", "default") == "test");
+    
+    std::cout << "    testConfigErrorHandling passed" << std::endl;
+}
+
+void testConfigSummary() {
+    nlm::Config config;
+    
+    // Add various configuration entries
+    config.set("neuron_count", 1000, nlm::ConfigSource::Default);
+    config.set("region_count", 3, nlm::ConfigSource::Default);
+    config.set("connection_probability", 0.15f, nlm::ConfigSource::Default);
+    config.set("plasticity_rate", 0.001, nlm::ConfigSource::Default);
+    
+    // Generate summary
+    std::string summary = config.summary();
+    
+    // Verify summary contains expected entries
+    assert(summary.find("neuron_count") != std::string::npos);
+    assert(summary.find("region_count") != std::string::npos);
+    assert(summary.find("connection_probability") != std::string::npos);
+    assert(summary.find("plasticity_rate") != std::string::npos);
+    
+    // Verify summary contains entry count
+    assert(summary.find("4 entries") != std::string::npos);
+    
+    std::cout << "    testConfigSummary passed" << std::endl;
+}
+
 void runAll() {
     testConfigCreation();
     testConfigSetAndGet();
     testConfigGetOr();
     testConfigRemove();
     testConfigKeys();
+    testConfigValidation();
+    testConfigErrorHandling();
+    testConfigSummary();
 }
 
 } // namespace test_config

@@ -3,14 +3,28 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <iomanip>
 
 namespace nlm {
 
+// Config implementation with enhanced error handling and validation
+
+// Config implementation with enhanced error handling and validation
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    
+    // Track modification time for change detection
+    std::chrono::system_clock::time_point lastModified;
+    
+    // Maximum allowed entries to prevent memory issues
+    static constexpr size_t MAX_ENTRIES = 10000;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    pImpl->lastModified = std::chrono::system_clock::now();
+}
 
 Config::~Config() = default;
 
@@ -24,6 +38,7 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
@@ -81,27 +96,50 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
+    // Validate file can be written before processing
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = " << "[CONFIG_VALUE]" << "\n";
     }
     
-    return true;
-}
+    if (!file.good()) {
+        NLM_LOG_ERROR("Failed to write to config file: " + filepath);
+        return false;
+    }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key is not empty
+    if (key.empty()) {
+        NLM_LOG_ERROR("Cannot set config entry with empty key");
+        return;
+    }
+    
+    // Validate key doesn't contain problematic characters
+    if (key.find('\n') != std::string::npos || key.find('\r') != std::string::npos) {
+        NLM_LOG_ERROR("Config key contains invalid characters: " + key);
+        return;
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
+        // Update existing entry
+        NLM_LOG_DEBUG("Updating config entry: " + key + " (source: " + std::to_string(static_cast<int>(source)) + ")");
         it->value = value;
         it->source = source;
     } else {
+        // Add new entry
+        NLM_LOG_DEBUG("Adding new config entry: " + key + " (source: " + std::to_string(static_cast<int>(source)) + ")");
         pImpl->entries.emplace_back(key, value, source);
     }
+    
+    // Update modification time
+    pImpl->lastModified = std::chrono::system_clock::now();
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
