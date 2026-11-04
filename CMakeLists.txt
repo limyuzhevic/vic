@@ -201,12 +201,26 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
+# Enhanced Python bindings
+option(NLM_BUILD_PYTHON_BINDINGS_ENHANCED "Build the enhanced pynlm Python module" OFF)
+if(NLM_BUILD_PYTHON_BINDINGS_ENHANCED)
+    find_package(Python REQUIRED COMPONENTS Interpreter Development)
+    find_package(pybind11 CONFIG REQUIRED)
+    # The module is shared, so the static libs it links need PIC.
+    set_target_properties(nlm_core nlm_agent nlm_world nlm_factory nlm_performance PROPERTIES
+        POSITION_INDEPENDENT_CODE ON)
+    pybind11_add_module(pynlm_enhanced python/bindings_enhanced.cpp)
+    target_link_libraries(pynlm_enhanced PRIVATE nlm_core nlm_agent nlm_world nlm_factory nlm_performance)
+    target_include_directories(pynlm_enhanced PRIVATE src)
+    install(TARGETS pynlm_enhanced LIBRARY DESTINATION .)
+endif()
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark nlm_factory nlm_performance
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
