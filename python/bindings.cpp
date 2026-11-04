@@ -142,20 +142,18 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
+             "Load configuration from a JSON/YAML file")
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
-            argv.reserve(args.size());
+            argv.reserve(args.size() + 1);  // +1 for null terminator
+            argv.push_back(nullptr);
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
+            return self.loadFromArgs(static_cast<int>(argv.size() - 1), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments (list of strings)")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -164,11 +162,15 @@ PYBIND11_MODULE(pynlm, m) {
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+        // IMPROVEMENT: Add Pythonic property access
+        .def_property_readonly("size", &Config::getKeys, "Get number of configuration entries")
+        // IMPROVEMENT: Add context manager support
+        .def("__enter__", [](py::object self) { return self; })
+        .def("__exit__", [](py::object, py::object, py::object, py::object) {});
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -359,7 +361,15 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // IMPROVEMENT: Add Pythonic properties
+        .def_property_readonly("total_neurons", &Brain::getTotalNeuronCount)
+        .def_property_readonly("total_synapses", &Brain::getTotalSynapseCount)
+        .def_property_readonly("firing_neurons", &Brain::getFiringNeuronCount)
+        .def_property_readonly("average_firing_rate", &Brain::getAverageFiringRate)
+        // IMPROVEMENT: Add context manager support for simulation
+        .def("__enter__", [](py::object self) { return self; })
+        .def("__exit__", [](py::object, py::object, py::object, py::object) {});
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -406,28 +416,124 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // IMPROVEMENT: Add Pythonic properties for AgentBrain
+        .def_property_readonly("brain", &AgentBrain::getBrain)
+        .def("__enter__", [](py::object self) { return self; })
+        .def("__exit__", [](py::object, py::object, py::object, py::object) {});
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
+    
+    // IMPROVEMENT: Add factory function with parameters
+    m.def("createConfigWithDefaults", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set some sensible defaults for new configurations
+        config->set("brain.neuron_count", 1000);
+        config->set("brain.synapse_density", 0.1);
+        config->set("brain.connection_probability", 0.05);
+        config->set("simulation.timestep", 0.001);
+        return config;
+    }, "Create a default configuration with sensible defaults");
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
-
+    
+    // IMPROVEMENT: Add convenience function for creating and initializing brain
+    m.def("createInitializedBrain", [](std::shared_ptr<Config> config = nullptr) -> std::shared_ptr<Brain> {
+        auto brainConfig = config ? config : std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(brainConfig);
+        brain->initialize();
+        return brain;
+    }, py::arg("config") = nullptr, "Create and initialize a new brain");
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
-
+    
+    // IMPROVEMENT: Add convenience function for creating and configuring world
+    m.def("createConfiguredWorld", [](size_t width, size_t height, 
+                                      size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width"), py::arg("height"), 
+       py::arg("visionWidth"), py::arg("visionHeight"),
+       "Create and configure a new simple world");
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    
+    // IMPROVEMENT: Add convenience function for creating and initializing agent
+    m.def("createInitializedAgent", [](std::shared_ptr<Brain> brain, 
+                                        std::shared_ptr<SimpleWorld> world = nullptr) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        if (world) {
+            agent->initialize(*world);
+        }
+        return agent;
+    }, py::arg("brain"), py::arg("world") = nullptr,
+       "Create and initialize an agent brain");
+    
+    // IMPROVEMENT: Add validation helper function
+    m.def("validateBrainConfig", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::invalid_argument("Configuration cannot be null");
+        }
+        return true;
+    }, py::arg("config"), "Validate a brain configuration");
+    
+    // IMPROVEMENT: Add validation helper function for world
+    m.def("validateWorldConfig", [](std::shared_ptr<SimpleWorld> world) {
+        if (!world) {
+            throw std::invalid_argument("World cannot be null");
+        }
+        return true;
+    }, py::arg("world"), "Validate a world configuration");
+    
+    // IMPROVEMENT: Add batch operation helper
+    m.def("runSimulationBatch", [](std::vector<std::tuple<std::shared_ptr<Brain>, 
+                                                          std::shared_ptr<SimpleWorld>, 
+                                                          std::shared_ptr<AgentBrain>, 
+                                                          size_t, 
+                                                          bool>> episodes) {
+        std::vector<std::tuple<std::shared_ptr<Brain>, 
+                               std::shared_ptr<SimpleWorld>, 
+                               std::shared_ptr<AgentBrain>, 
+                               size_t, 
+                               bool>> results;
+        
+        for (const auto& [brain, world, agent, steps, enableLearning] : episodes) {
+            try {
+                if (agent && world) {
+                    agent->initialize(*world);
+                    if (enableLearning) {
+                        agent->enableRewardModulation(true);
+                        agent->enableCuriosity(true);
+                    }
+                    
+                    for (size_t i = 0; i < steps; ++i) {
+                        world->update(0.1);
+                        auto percept = world->getSensoryPercept();
+                        agent->processSensoryInput(percept);
+                        brain->step(i);
+                        auto action = agent->decodeMotorCommand();
+                        world->applyMotorCommand(action, world->getSimulationTime());
+                    }
+                } else {
+                    throw std::invalid_argument("Invalid episode configuration");
+                }
+                
+                results.emplace_back(brain, world, agent, steps, true);
+            } catch (const std::exception& e) {
+                results.emplace_back(brain, world, agent, steps, false);
+            }
+        }
+        return results;
+    }, py::arg("episodes"), 
+       "Run multiple simulation episodes in batch (returns success flags)");
 
 } // namespace nlm

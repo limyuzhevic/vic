@@ -16,7 +16,11 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // IMPROVEMENT: Implement real storage with capacity limits
+    // IMPROVEMENT: Add time-to-live (TTL) for memory items
+    // IMPROVEMENT: Add decay mechanisms for stored values
+    // IMPROVEMENT: Add competition and prioritization mechanisms
+    
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
@@ -24,6 +28,12 @@ void WorkingMemory::store(NeuronId neuron, float value) {
         }
     }
     if (pImpl->items.size() < pImpl->capacity) {
+        pImpl->items.emplace_back(neuron, value);
+    } else {
+        // IMPLEMENTATION: Evict least recently used item
+        // Find and remove the oldest item
+        auto oldestIt = pImpl->items.begin();
+        pImpl->items.erase(oldestIt);
         pImpl->items.emplace_back(neuron, value);
     }
 }

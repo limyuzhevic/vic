@@ -19,8 +19,10 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
+    // TODO PHASE 2: Implement proper JSON/YAML parser with validation
     // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // IMPROVEMENT: Add JSON/YAML parser support with error handling
+    // IMPROVEMENT: Add configuration validation and schema support
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -56,19 +58,27 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    // IMPROVEMENT: Add better argument parsing with more flexible formats
+    // IMPROVEMENT: Add argument validation and error reporting
+    // IMPROVEMENT: Support boolean flags and complex data types
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
+        // Handle --key=value format (standard)
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                // Handle --key flag (value = true)
+                std::string key = arg.substr(2);
+                set(key, "true", ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
+        // Handle -key value format (short option)
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
@@ -100,11 +110,17 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         it->value = value;
         it->source = source;
     } else {
+        // IMPROVEMENT: Add validation for new keys
         pImpl->entries.emplace_back(key, value, source);
     }
 }
 
+// IMPROVEMENT: Add key validation and normalization
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    // IMPROVEMENT: Add validation for key format and content
+    if (key.empty()) {
+        throw std::invalid_argument("Configuration key cannot be empty");
+    }
     set(key, ConfigValue(value), source);
 }
 
@@ -129,7 +145,13 @@ bool Config::has(const std::string& key) const {
         [&key](const ConfigEntry& e) { return e.key == key; });
 }
 
+// IMPROVEMENT: Add better value validation
 void Config::remove(const std::string& key) {
+    // IMPROVEMENT: Validate key before removal
+    if (key.empty()) {
+        throw std::invalid_argument("Cannot remove configuration with empty key");
+    }
+    
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
             [&key](const ConfigEntry& e) { return e.key == key; }),

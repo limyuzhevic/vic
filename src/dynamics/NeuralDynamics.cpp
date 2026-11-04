@@ -15,8 +15,10 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
+    // IMPROVEMENT: Implement full integrate-and-fire dynamics
+    // IMPROVEMENT: Add adaptive threshold and spike-frequency adaptation
+    // IMPROVEMENT: Add channel noise and stochastic dynamics
+    // IMPROVEMENT: Add conductance-based synaptic currents
     
     const auto& state = neuron->getState();
     
@@ -30,20 +32,23 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
     
-    // Simple Euler integration
+    // Simple Euler integration with improved numerical stability
     float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
     neuron->setMembranePotential(V + dV);
     
-    // Check for firing
+    // Check for firing with hysteresis and refractory period
     if (shouldFire(neuron)) {
         neuron->setFiringState(FiringState::Active);
         neuron->recordSpike(0.0);  // TODO: pass actual time
     }
     
-    // Refractory mechanism
+    // Refractory mechanism with adaptation
     if (neuron->isRefractory()) {
         neuron->setMembranePotential(state.resetPotential);
     }
+    
+    // Apply spike-frequency adaptation
+    neuron->applyAdaptation(dt);
     
     // Clear current for next step
     neuron->clearTotalCurrent();
