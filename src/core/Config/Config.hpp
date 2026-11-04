@@ -62,6 +62,12 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Get configuration source
+    ConfigSource getSource(const std::string& key) const;
+    
+    // Get all keys with a specific source
+    std::vector<std::string> getKeys(ConfigSource source) const;
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
