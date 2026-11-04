@@ -84,6 +84,8 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### Standard C++ Build
+
 ```bash
 mkdir build
 cd build
@@ -91,9 +93,48 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Python Bindings Build (Phase 5 Required)
+
+```bash
+# Option 1: Using pip (recommended for most users)
+pip install .
+# Or install in development mode:
+pip install -e .
+
+# Option 2: Direct scikit-build-core build
+python -m pip install scikit-build-core pybind11
+cd /path/to/nlm
+python -m build
+```
+
+**Important:** The Python bindings require Phase 5 build system fixes. The pyproject.toml file includes `-DNLM_BUILD_PYTHON_BINDINGS=ON` in the CMake arguments, but this setting was previously disabled by default for plain C++ builds.
+
+### Build Troubleshooting
+
+If you encounter issues building Python bindings:
+
+1. **Check CMake version**: Ensure CMake >= 3.16
+2. **Verify Python dependencies**: Install `scikit-build-core>=0.5.0` and `pybind11>=2.11.0`
+3. **Environment setup**: Make sure you're in the correct NLM source directory when running the build commands
+4. **Clean rebuild**: Remove existing build artifacts:
+   ```bash
+   rm -rf build dist
+   python -m pip install --force-reinstall --no-deps .
+   ```
+
+### Verification
+
+After building, verify the Python bindings work:
+
+```python
+import pynlm
+print(f"pynlm version: {pynlm.__version__}")
+print(f"Available modules: {dir(pynlm)}")
+```
+
 ## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+
+Build all targets first (see Building above). The entry points are currently separate demos per phase, not a single unified binary:
 
 ```bash
 ./nlm                 # Phase 2 demo in src/main.cpp
@@ -103,9 +144,7 @@ currently separate demos per phase, not a single unified binary:
 ./nlm_benchmark
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+`nlm_phase6_demo` runs a comprehensive integration test verifying all brain systems are connected. Phase 5 is wired as the `nlm_phase5` library in CMake; it does not yet have a standalone demo executable.
 
 ## Project Structure
 

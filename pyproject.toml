@@ -35,6 +35,21 @@ dev = [
     "numpy>=1.20",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["."]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.pytest]
+minversion = "6.0"
+addopts = "-v --tb=short"
+testpaths = ["."]
+
+[scripts]
+test = "pytest test_pynlm.py"
+test-all = "pytest tests/ test_pynlm.py"
+
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"

@@ -1,0 +1,546 @@
+# .gitignore for NLM (Neural Learning Machine)
+
+# Build artifacts
+build/
+dist/
+*.so
+*.dylib
+*.dll
+
+# Compiled Python extensions
+*.pyd
+*.so
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python virtual environments
+venv/
+.env
+.venv
+env/
+ENV/
+env.bak/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+.coverage.*
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+translate/*.mo
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~/.vscode/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+*.log.*
+
+# Temporary files
+tmp/
+tmp_*
+
+# Configuration files (keep configs but not backup files)
+!configs/*.cfg
+configs/*.bak
+
+# Editor backups
+*backup*
+*~.swp
+*~.swo
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Large binary files (if any)
+*.bin
+*.dat
+*.model
+
+# Documentation build artifacts
+/site/
+_build/
+docs/_build/
+
+# Test artifacts
+test-reports/
+
+# Distribution artifacts
+*.egg-info/
+dist/
+*.egg
+
+# Package manager files
+*.egg-info/
+*.dist-info/
+*.egg-info/
+
+# Package lock files
+requirements.txt
+Pipfile
+Pipfile.lock
+pyproject.toml
+poetry.lock
+
+# Project-specific ignore files
+!.gitignore
+!.github/
+
+# C++ specific
+*.o
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.map
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# Make files
+Makefile
+
+# IDE settings
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/misc.xml
+
+# VS Code specific
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# IntelliJ
+*.iml
+*.iws
+*.ipr
+
+# NetBeans
+nbproject/
+
+# Emacs
+*~
+
+# Core dumps
+*.core
+
+# Memory snapshots
+*.snap
+*.dmp
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Python package files
+*.egg-info/
+dist/
+build/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+coverage.html
+
+# Translations
+*.mo
+
+# Jupyter notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+pyproject.toml
+
+# Environment variables
+.env
+.env.example
+
+# Log files
+*.log
+*.logs
+
+# Runtime data
+pids
+*.pid
+*.seed
+
+# Local configuration
+hostname
+
+# Include git configs in version control
+!/.git/
+
+# Exclude files from version control but allow specific patterns
+
+# Compiled Python extensions
+*.so
+*.pyd
+
+# Installer scripts
+*.exe
+*.msi
+
+# Package manager cache
+*.cache
+
+# Deployment files
+*.zip
+*.tar.gz
+
+# Cloud storage credentials
+*.json
+
+# Database files
+*.sqlite
+*.db
+
+# Backup files
+*.bak
+*.backup
+
+# Session files
+*.session
+
+# Temporary directories
+temp/
+tmp/
+
+# Generated documentation
+*.md
+
+# Development environment files
+.Dockerfile*
+Dockerfile*
+
+# Runtime logs
+*.log
+*.logs
+
+# Testing artifacts
+*.coverage
+*.coverage.*
+
+# Coverage reports
+htmlcov/
+
+# Environment files
+.env
+
+# Virtual environment
+venv/
+
+# Package directories
+*.egg-info/
+*.dist-info/
+
+# Distribution / packaging
+.pytest_cache/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# Environments
+.env
+.venv
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Runtime data
+*.log
+*.pid
+
+# Local config
+*.local
+
+# Project specific
+*.cfg
+!.gitignore
+
+# Documentation build
+_build/
+
+# Testing artifacts
+test-reports/
+
+# Process files
+*.pid
+
+# Temporary files
+tmp_*
+
+# Backups
+*.bak
+
+# Data files
+*.data
+
+# Large files
+*.dat
+*.bin
+
+# Configuration
+*.json
+*.yaml
+*.yml
+
+# Python specific
+*.pyc
+__pycache__/
+
+# Project specific
+configs/*.cfg
+
+# Development artifacts
+development/
+demos/
+docs/
+
+# Testing directories
+tests/
+
+# Temporary files
+/temp/
+
+# Log files
+*.log
+
+# Environment files
+*.env
+
+# IDE
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+
+# Session files
+*.session
+
+# Temporary directories
+temp/
+tmp/
+
+# Process logs
+*.log
+
+# Coverage
+.coverage
+
+# Virtual environments
+venv/
+.env
+
+# Python packages
+*.egg-info/
+
+# Build artifacts
+build/
+
+# Distribution
+*.egg
+
+dist/
+
+# Documentation
+.docs/
+
+# Testing reports
+test-reports/
+
+# Docker
+Dockerfile*
+.dockerignore
+
+# Kubernetes
+*.yaml
+*.yml
+
+# Terraform
+terraform/
+
+# GitHub Actions
+github/
+
+# CI/CD
+ci-cd/
+
+# Secrets
+secrets/
+
+# Private keys
+*.key
+*.pem
+
+# Certificates
+*.crt
+*.cer
+
+# Cache directories
+cache/
+
+# Temporary files
+tmp/
+temp/
+
+# Package managers
+*.lock
+
+# IDE
+.vscode/
+.idea/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Editor
+*~
+*.*~
+
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution
+*.egg-info/
+dist/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Environments
+.env
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+
+# Editor backup
+*~
+
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Package
+*.egg-info/
+dist/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Environments
+.env
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# System
+.DS_Store
+Thumbs.db
+
+# Temp
+/tmp/

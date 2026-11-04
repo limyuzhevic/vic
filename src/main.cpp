@@ -165,11 +165,14 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Failed to get region for plasticity experiment");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_ERROR("No neurons found for plasticity experiment");
         return;
     }
     
@@ -222,11 +225,10 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // Selected pattern input for focused learning: stimulate only the first 20
+    // sensory neurons each step. This avoids network-wide saturation and
+    // allows selective pattern learning (unlike old code that injected 600.0f
+    // into all neurons, causing uniform saturation to 1.0).
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
@@ -262,7 +264,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Failed to get region for STDP verification");
+        return;
+    }
     
     // Use one real synapse and its own pre/post neurons. The old test
     // fired neurons[0]/neurons[1] and measured synapses[0..4], which are
@@ -430,6 +435,20 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
+    
+    // Logging Best Practices
+    // ======================
+    // 1. Use appropriate log levels: INFO for general progress, ERROR for errors
+    // 2. Include context information in error messages for debugging
+    // 3. Avoid excessive logging in production (consider log_level configuration)
+    // 4. Structure log output for easy parsing and analysis
+    // 5. Use consistent formatting for log messages
+    //
+    // Future improvements:
+    // - Add structured logging with timestamps and severity levels
+    // - Implement log rotation for long-running simulations
+    // - Add performance metrics logging
+    // - Consider asynchronous logging for performance-critical paths
     
     return 0;
 }
