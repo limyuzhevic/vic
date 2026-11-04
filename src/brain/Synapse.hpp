@@ -74,16 +74,22 @@ public:
     // Synaptic efficacy (use-dependent modulation)
     float getEfficacy() const;
     void setEfficacy(float efficacy);
-    
+
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Real synaptic dynamics with Tsodyks-Markram short-term plasticity model
     void step(Timestamp currentTime);
-    
+
     // Reset to initial state
     void reset();
-    
+
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
+    
+    // Additional utility methods for advanced usage
+    float getSynapticStrength() const;
+    bool needsStdpUpdate(float currentTime) const;
+    float getAdaptationLevel() const;
+    std::map<std::string, float> getDiagnosticInfo() const;
     
 private:
     struct Impl;
