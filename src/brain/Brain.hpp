@@ -202,12 +202,43 @@ public:
     float getLearnedPreference() const;
     void setLearnedPreference(float preference);
     
-    // Logging
-    void logStatus() const;
+    // Advanced debugging and analysis tools
     
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+    // Debug visualization - export network graph
+    void exportNetworkGraph(const std::string& filepath) const;
+    
+    // Debug analysis - analyze network properties
+    std::string analyzeNetwork() const;
+    
+    // Debug export - export neuron states for external analysis
+    void exportNeuronStates(const std::string& filepath) const;
+    
+    // Debug export - export synapse connectivity
+    void exportSynapseConnectivity(const std::string& filepath) const;
+    
+    // Debug analysis - detect network anomalies
+    std::vector<std::string> detectNetworkAnomalies() const;
+    
+    // Debug profiling - collect performance metrics
+    std::string profilePerformance() const;
+    
+    // Debug analysis - analyze learning progress
+    std::string analyzeLearningProgress() const;
+    
+    // Debug export - export analysis results
+    void exportAnalysisResults(const std::string& prefix) const;
+    
+    // Debug - validate brain state integrity
+    bool validateBrainState() const;
+    
+    // Debug - detailed brain status for debugging
+    std::string debugStatus() const;
+    
+    // Debug - check for memory leaks or corruption
+    bool checkMemoryIntegrity() const;
+    
+    // Debug - trace execution for debugging
+    void enableDebugTrace(bool enable);
+    std::vector<std::string> getDebugTrace() const;
 
 } // namespace nlm
