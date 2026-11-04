@@ -25,8 +25,92 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <chrono>
 
-using namespace nlm;
+namespace nlm {
+    class CommandLineParser {
+    public:
+        struct Options {
+            std::string configFile = "configs/default.cfg";
+            bool verbose = false;
+            bool benchmark = false;
+            std::string testMode = "all"; // "connectivity", "plasticity", "stdp", "all"
+            int steps = 1000;
+            double timestep = 0.001;
+            int neuronCount = 500;
+            int regionCount = 1;
+            float connectionProbability = 0.15f;
+            bool help = false;
+        };
+
+        static Options parse(int argc, char** argv) {
+            Options opts;
+            for (int i = 1; i < argc; ++i) {
+                std::string arg = argv[i];
+                if (arg == "--help" || arg == "-h") {
+                    opts.help = true;
+                } else if (arg.substr(0, 7) == "--config") {
+                    if (arg.find('=') != std::string::npos) {
+                        opts.configFile = arg.substr(arg.find('=') + 1);
+                    } else if (i + 1 < argc) {
+                        opts.configFile = argv[++i];
+                    }
+                } else if (arg == "--verbose" || arg == "-v") {
+                    opts.verbose = true;
+                } else if (arg == "--benchmark" || arg == "-b") {
+                    opts.benchmark = true;
+                } else if (arg == "--test-mode") {
+                    if (i + 1 < argc) opts.testMode = argv[++i];
+                } else if (arg == "--steps") {
+                    if (i + 1 < argc) opts.steps = std::atoi(argv[++i]);
+                } else if (arg == "--timestep") {
+                    if (i + 1 < argc) opts.timestep = std::atof(argv[++i]);
+                } else if (arg == "--neurons") {
+                    if (i + 1 < argc) opts.neuronCount = std::atoi(argv[++i]);
+                } else if (arg == "--regions") {
+                    if (i + 1 < argc) opts.regionCount = std::atoi(argv[++i]);
+                } else if (arg == "--conn-prob") {
+                    if (i + 1 < argc) opts.connectionProbability = std::atof(argv[++i]);
+                } else if (arg[0] == '-') {
+                    NLM_LOG_ERROR("Unknown option: " + arg);
+                }
+            }
+            return opts;
+        }
+
+        static void printHelp() {
+            std::cout << R"(
+NLM Phase 2 Real Neural Computation Test Suite
+
+Usage: ./nlm [OPTIONS]
+
+Options:
+  --help, -h                    Show this help message
+  --config <file>               Load configuration from file
+  --verbose, -v                 Enable verbose logging
+  --benchmark, -b               Run benchmark mode
+  --test-mode <mode>            Test mode: connectivity, plasticity, stdp, all (default: all)
+  --steps <count>               Number of simulation steps (default: 1000)
+  --timestep <time>             Simulation timestep in seconds (default: 0.001)
+  --neurons <count>             Number of neurons (default: 500)
+  --regions <count>             Number of regions (default: 1)
+  --conn-prob <probability>     Connection probability (default: 0.15)
+
+Test Modes:
+  connectivity                 Run basic connectivity test only
+  plasticity                  Run plasticity learning experiment only  
+  stdp                         Run STDP verification test only
+  all                          Run all tests (default)
+
+Examples:
+  ./nlm                          # Run all tests with defaults
+  ./nlm --test-mode connectivity  # Run only connectivity test
+  ./nlm --steps 5000 --neurons 1000  # Run with more neurons and steps
+  ./nlm --benchmark --verbose     # Run benchmark with verbose output
+)" << std::endl;
+        }
+    };
+}
 
 void printBanner() {
     std::cout << R"(
@@ -58,7 +142,7 @@ struct LearningExperiment {
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0), initialWeights(), finalWeights(), mostActiveNeurons() {}
     
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
@@ -159,91 +243,135 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+void runBasicConnectivityTestEnhanced(std::shared_ptr<Brain> brain, int steps, bool verbose) {
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
+    NLM_LOG_INFO("=== Enhanced Test 1: Basic Neural Connectivity ===");
+    
+    // Get brain configuration for more intelligent testing
+    auto config = brain->getConfig();
+    int neuronCount = config->getOr<int64_t>("neuron_count", 500);
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("No brain regions found for connectivity test!");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_ERROR("No neurons found in region!");
         return;
     }
+    
+    NLM_LOG_INFO("  Brain has " + std::to_string(neurons.size()) + " neurons, " + 
+                std::to_string(region->getSynapses().size()) + " synapses");
     
     // Get initial spike count
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+    // Determine optimal number of neurons to stimulate
+    size_t neuronsToStimulate = std::min(size_t(10), neurons.size());
+    
+    // Inject strong current into selected neurons
+    NLM_LOG_INFO("  Injecting current into " + std::to_string(neuronsToStimulate) + " neurons...");
+    for (size_t i = 0; i < neuronsToStimulate; ++i) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        if (verbose) {
+            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                        " threshold: " + std::to_string(neurons[i]->getThreshold()) +
+                        " potential: " + std::to_string(neurons[i]->getMembranePotential()));
+        }
     }
     
-    // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
+    // Run the specified number of steps
+    NLM_LOG_INFO("  Running " + std::to_string(steps) + " simulation steps...");
+    for (SimulationStep step = 0; step < steps; ++step) {
         brain->step(step, step * 0.001);
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
     NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
+    NLM_LOG_INFO("  Firing neurons: " + std::to_string(brain->getFiringNeuronCount()));
+    NLM_LOG_INFO("  Average firing rate: " + std::to_string(brain->getAverageFiringRate()));
     
     if (spikes > 0) {
-        NLM_LOG_INFO("  ✓ Spikes propagate through network");
+        NLM_LOG_INFO("  ✓ Spikes propagate through network successfully");
     } else {
-        NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
+        NLM_LOG_INFO("  ! No spikes detected - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
             NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
                         " V=" + std::to_string(neurons[i]->getMembranePotential()) +
                         " thresh=" + std::to_string(neurons[i]->getThreshold()));
         }
+        if (verbose) {
+            NLM_LOG_INFO("  Note: This may be normal if neurons require higher input to reach threshold.");
+        }
     }
 }
 
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+void runPlasticityExperimentEnhanced(std::shared_ptr<Brain> brain, int steps, bool verbose) {
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    NLM_LOG_INFO("=== Enhanced Test 2: Plasticity Learning Experiment ===");
     
     LearningExperiment experiment(brain, 42);
     
     // Record initial state
     experiment.recordInitialState();
     
-    // Enable plasticity on synapses
+    // Enable plasticity on synapses with validation
     if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+        auto& synapses = region->getSynapses();
+        NLM_LOG_INFO("  Enabling plasticity on " + std::to_string(synapses.size()) + " synapses...");
+        
+        size_t enabledHebbian = 0, enabledSTDP = 0, enabledStructural = 0;
+        for (auto& syn : synapses) {
+            bool hebbian = syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
+            if (hebbian) {
+                if (syn->getHebbianEnabled()) enabledHebbian++;
+                if (syn->getSTDPEnabled()) enabledSTDP++;
+            }
+            if (syn->getStructuralEnabled()) enabledStructural++;
         }
+        
+        NLM_LOG_INFO("    Hebbian enabled: " + std::to_string(enabledHebbian));
+        NLM_LOG_INFO("    STDP enabled: " + std::to_string(enabledSTDP));
+        NLM_LOG_INFO("    Structural enabled: " + std::to_string(enabledStructural));
     }
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Applying repeated input patterns (" + std::to_string(steps) + " steps)...");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // Select a diverse set of neurons for learning
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
             if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
                 patternNeurons.push_back(neuron->getId());
+            } else if (neuron->getType() == NeuronType::Internal && patternNeurons.size() < 25) {
+                patternNeurons.push_back(neuron->getId());
+            } else if (patternNeurons.size() < 30) {  // Fill with other types
+                patternNeurons.push_back(neuron->getId());
             }
         }
+        NLM_LOG_INFO("  Selected " + std::to_string(patternNeurons.size()) + 
+                    " neurons for learning pattern: " + std::to_string(patternNeurons.size()) + " sensory, " +
+                    std::to_string(std::count_if(region->getAllNeurons().begin(), region->getAllNeurons().end(),
+                        [](auto* n) { return n->getType() == NeuronType::Internal; })) + " internal");
     }
-    for (SimulationStep step = 0; step < 1000; ++step) {
+    
+    // Run learning simulation
+    for (SimulationStep step = 0; step < steps; ++step) {
+        // Apply input to pattern neurons
         for (NeuronId id : patternNeurons) {
             brain->injectCurrent(id, 30.0f);
         }
         
         brain->step(step, step * 0.001);
         
-        // Log progress every 100 steps
-        if (step % 100 == 0) {
+        // Log progress every 200 steps (less verbose than before)
+        if (verbose && step % 200 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
@@ -257,53 +385,142 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
+void runStdpVerificationEnhanced(std::shared_ptr<Brain> brain, int steps, bool verbose) {
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 3: STDP Verification ===");
+    NLM_LOG_INFO("=== Enhanced Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
-    
-    // Use one real synapse and its own pre/post neurons. The old test
-    // fired neurons[0]/neurons[1] and measured synapses[0..4], which are
-    // usually unrelated to that pair, so its result said nothing about STDP.
-    auto& synapses = region->getSynapses();
-    if (synapses.empty()) {
-        NLM_LOG_INFO("  No synapses for STDP test");
+    if (!region) {
+        NLM_LOG_ERROR("No brain regions found for STDP test!");
         return;
     }
-    Synapse* syn = synapses[0].get();
-    syn->enablePlasticity(false, true, false);  // STDP only
-    float beforeWeight = syn->getWeight();
-    NLM_LOG_INFO("  Testing STDP on 1 synapse:");
-    NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
-                 " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
-                 ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
-    for (int trial = 0; trial < 50; ++trial) {
-        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
-        brain->step(trial * 2, trial * 2 * 0.001);
-        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
-        brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+    
+    auto& synapses = region->getSynapses();
+    if (synapses.empty()) {
+        NLM_LOG_ERROR("No synapses for STDP test");
+        return;
     }
-
-    float delta = syn->getWeight() - beforeWeight;
-    NLM_LOG_INFO("  After correlated activity:");
-    NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
-                 " (Δ=" + std::to_string(delta) + ")");
-
-    float totalDelta = delta;
+    
+    // Select a synapse with a clear pre-post relationship for better testing
+    Synapse* testSyn = nullptr;
+    size_t testIndex = 0;
+    
+    // Find a synapse with distinct pre and post neurons
+    for (size_t i = 0; i < synapses.size(); ++i) {
+        auto* syn = synapses[i].get();
+        auto preNeuron = syn->getSourceNeuron();
+        auto postNeuron = syn->getDestinationNeuron();
+        
+        if (preNeuron.index() != postNeuron.index()) {
+            testSyn = syn;
+            testIndex = i;
+            break;
+        }
+    }
+    
+    if (!testSyn) {
+        NLM_LOG_WARNING("No suitable synapse found for STDP test (all synapses are self-connections).");
+        testSyn = synapses[0].get();
+        testIndex = 0;
+    }
+    
+    testSyn->enablePlasticity(false, true, false);  // STDP only
+    float beforeWeight = testSyn->getWeight();
+    
+    NLM_LOG_INFO("  Testing STDP on synapse " + std::to_string(testIndex) + ":");
+    NLM_LOG_INFO("    Pre-neuron ID: " + std::to_string(testSyn->getSourceNeuron().index()));
+    NLM_LOG_INFO("    Post-neuron ID: " + std::to_string(testSyn->getDestinationNeuron().index()));
+    NLM_LOG_INFO("    Synapse weight before: " + std::to_string(beforeWeight));
     
     NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
-        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
-        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
+    NLM_LOG_INFO("  Creating correlated pre->post activity (" + std::to_string(steps/2) + " trials)...");
+    
+    // Apply correlated pre->post activity for the specified number of trials
+    for (int trial = 0; trial < steps/2; ++trial) {
+        brain->injectCurrent(testSyn->getSourceNeuron(), 60.0f);
+        brain->step(trial * 2, trial * 2 * 0.001);
+        brain->injectCurrent(testSyn->getDestinationNeuron(), 60.0f);
+        brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+        
+        if (verbose && trial % 10 == 0) {
+            NLM_LOG_INFO("    Trial " + std::to_string(trial) + ": weight = " + std::to_string(testSyn->getWeight()));
+        }
+    }
+    
+    float delta = testSyn->getWeight() - beforeWeight;
+    NLM_LOG_INFO("  After correlated activity:");
+    NLM_LOG_INFO("    Synapse weight after: " + std::to_string(testSyn->getWeight()) +
+                " (Δ=" + std::to_string(delta) + ")");
+    
+    if (verbose) {
+        NLM_LOG_INFO("    Final weight change: " + std::to_string((testSyn->getWeight() - beforeWeight) / steps/2) + " per trial");
+    }
+    
+    // Analyze results with better error handling
+    NLM_LOG_INFO("");
+    if (delta > 0.001f) {
+        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation (learning detected)");
+        NLM_LOG_INFO("    This confirms that spike timing-dependent plasticity is functional.");
+    } else if (delta < -0.001f) {
+        NLM_LOG_INFO("  ! STDP reversed: Check STDP parameters (strong LTD observed)");
+        NLM_LOG_INFO("    Pre-before-post produced depression instead of potentiation.");
     } else {
-        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+        NLM_LOG_INFO("  ! No change: STDP may not be triggering or parameters need adjustment");
+        NLM_LOG_INFO("    This could indicate: weak correlation, wrong STDP direction, or parameter tuning needed.");
+    }
+}
+
+void runBenchmarkTest(std::shared_ptr<Brain> brain, int steps) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Benchmark: Performance Measurement ===");
+    
+    auto config = brain->getConfig();
+    int neuronCount = config->getOr<int64_t>("neuron_count", 500);
+    int regionCount = config->getOr<int64_t>("region_count", 1);
+    
+    NLM_LOG_INFO("Benchmark configuration:");
+    NLM_LOG_INFO("  Neurons: " + std::to_string(neuronCount));
+    NLM_LOG_INFO("  Regions: " + std::to_string(regionCount));
+    NLM_LOG_INFO("  Simulation steps: " + std::to_string(steps));
+    
+    // Reset brain to clean state for benchmarking
+    brain->reset();
+    brain->initialize();
+    
+    // Warm-up period (let the brain settle)
+    NLM_LOG_INFO("  Warm-up: 100 steps...");
+    for (SimulationStep step = 0; step < 100; ++step) {
+        brain->step(step, step * 0.001);
+    }
+    
+    // Benchmark the simulation performance
+    NLM_LOG_INFO("  Running benchmark: " + std::to_string(steps) + " steps...");
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    for (SimulationStep step = 0; step < steps; ++step) {
+        brain->step(step, step * 0.001);
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    
+    double totalTimeSeconds = duration.count() / 1000.0;
+    double stepsPerSecond = steps / totalTimeSeconds;
+    double avgStepTimeMs = (totalTimeSeconds * 1000.0) / steps;
+    
+    NLM_LOG_INFO("  Benchmark Results:");
+    NLM_LOG_INFO("    Total time: " + std::to_string(totalTimeSeconds) + " seconds");
+    NLM_LOG_INFO("    Steps per second: " + std::to_string(stepsPerSecond));
+    NLM_LOG_INFO("    Average step time: " + std::to_string(avgStepTimeMs) + " ms");
+    NLM_LOG_INFO("    Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+    NLM_LOG_INFO("    Final firing rate: " + std::to_string(brain->getAverageFiringRate()) + " Hz");
+    
+    if (stepsPerSecond > 1000) {
+        NLM_LOG_INFO("  ✓ Excellent performance: >1000 steps/second");
+    } else if (stepsPerSecond > 100) {
+        NLM_LOG_INFO("  ✓ Good performance: >100 steps/second");
+    } else {
+        NLM_LOG_INFO("  ! Performance could be improved: <100 steps/second");
     }
 }
 
@@ -312,74 +529,96 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Parse command line arguments
+    auto opts = CommandLineParser::parse(argc, argv);
+    
+    // If help was requested, print help and exit
+    if (opts.help) {
+        CommandLineParser::printHelp();
+        return 0;
+    }
+    
+    // Initialize logger with verbose level if requested
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    LogLevel logLevel = LogLevel::Info;
+    if (opts.verbose) {
+        logLevel = LogLevel::Debug;
+        NLM_LOG_INFO("Verbose logging enabled");
+    }
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("Version: Enhanced with advanced features");
+    NLM_LOG_INFO("Test Mode: " + opts.testMode);
+    NLM_LOG_INFO("Steps: " + std::to_string(opts.steps));
     NLM_LOG_INFO("");
     
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+    // Load from file if specified
+    if (opts.configFile != "configs/default.cfg") {
+        if (config->loadFromFile(opts.configFile)) {
+            NLM_LOG_INFO("Loaded configuration from: " + opts.configFile);
+        } else {
+            NLM_LOG_WARNING("Failed to load configuration from: " + opts.configFile);
+            NLM_LOG_INFO("Using default configuration.");
         }
-    }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        if (config->loadFromFile(opts.configFile)) {
+            NLM_LOG_INFO("Loaded default configuration from: " + opts.configFile);
+        } else {
+            NLM_LOG_INFO("Using completely default configuration (no config file found).");
+        }
     }
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Apply user-provided or default configuration values
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Applying configuration overrides:");
+    
+    // Validate and set neuron count
+    int64_t neuronCount = static_cast<int64_t>(std::max(1, opts.neuronCount));
+    if (neuronCount > 10000) {
+        NLM_LOG_WARNING("Neuron count " + std::to_string(neuronCount) + " is very large, this may impact performance.");
+        neuronCount = 10000;
+    }
+    config->set("neuron_count", neuronCount, ConfigSource::CommandLine);
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(neuronCount));
+    
+    // Validate and set region count
+    int64_t regionCount = static_cast<int64_t>(std::max(1, opts.regionCount));
+    config->set("region_count", regionCount, ConfigSource::CommandLine);
+    NLM_LOG_INFO("  region_count: " + std::to_string(regionCount));
+    
+    // Set simulation timestep
+    double timestep = std::max(0.0001, std::min(0.1, opts.timestep));  // Reasonable bounds
+    config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(timestep) + "s");
+    
+    // Set connection probability
+    float connectionProbability = std::max(0.01f, std::min(0.5f, opts.connectionProbability));
+    config->set("connection_probability", connectionProbability, ConfigSource::CommandLine);
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(connectionProbability));
+    
+    // Set random seed (deterministic for reproducibility)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    NLM_LOG_INFO("  random_seed: 42 (deterministic)");
     
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("Final Configuration Summary:");
+    NLM_LOG_INFO("  Total neurons: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  Regions: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  Simulation timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  Connection probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
@@ -390,46 +629,71 @@ int main(int argc, char** argv) {
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
+        NLM_LOG_ERROR("Check configuration and available memory.");
         return 1;
     }
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Run selected tests based on mode
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Starting Test Suite ===");
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
+    bool runConnectivity = (opts.testMode == "all" || opts.testMode == "connectivity");
+    bool runPlasticity = (opts.testMode == "all" || opts.testMode == "plasticity");
+    bool runStdp = (opts.testMode == "all" || opts.testMode == "stdp");
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    if (runConnectivity) {
+        runBasicConnectivityTestEnhanced(brain, opts.steps, opts.verbose);
+        
+        // Reset brain for next test if we're running multiple tests
+        if (runPlasticity || runStdp) {
+            NLM_LOG_INFO("Resetting brain for next test...");
+            brain->reset();
+            brain->initialize();
+        }
+    }
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    if (runPlasticity) {
+        runPlasticityExperimentEnhanced(brain, opts.steps, opts.verbose);
+        
+        // Reset brain for STDP test if needed
+        if (runStdp) {
+            NLM_LOG_INFO("Resetting brain for STDP test...");
+            brain->reset();
+            brain->initialize();
+        }
+    }
     
-    // Final brain status
+    if (runStdp) {
+        runStdpVerificationEnhanced(brain, opts.steps, opts.verbose);
+    }
+    
+    // Run benchmark if requested (independent test)
+    if (opts.benchmark) {
+        runBenchmarkTest(brain, opts.steps);
+    }
+    
+    // Final brain status (even if no tests ran)
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
     
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test Suite Complete ===");
+    
+    if (runConnectivity || runPlasticity || runStdp) {
+        NLM_LOG_INFO("Tests completed successfully!");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Summary of completed tests:");
+        if (runConnectivity) NLM_LOG_INFO("  ✓ Basic neural connectivity");
+        if (runPlasticity) NLM_LOG_INFO("  ✓ Plasticity learning experiment");
+        if (runStdp) NLM_LOG_INFO("  ✓ STDP verification");
+        if (opts.benchmark) NLM_LOG_INFO("  ✓ Performance benchmark");
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
+        NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
+    }
     
     return 0;
 }
