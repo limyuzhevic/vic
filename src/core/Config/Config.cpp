@@ -8,15 +8,80 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    bool strictMode = false;
+    bool validateOnSet = false;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with default configuration values
+    setDefaults();
+}
 
 Config::~Config() = default;
 
 Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
+
+void Config::setDefaults() {
+    // Set sensible default configuration values for NLM
+    set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    set("simulation_timestep", 0.001, ConfigSource::Default);
+    set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+    set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    set("connection_probability", 0.1f, ConfigSource::Default);
+    
+    // STDP parameters
+    set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Hebbian learning parameters
+    set("hebbian_learning_rate", 0.001f, ConfigSource::Default);
+    set("hebbian_decay_time", 50.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Neuromodulation parameters
+    set("dopamine_scale", 1.0f, ConfigSource::Default);
+    set("curiosity_threshold", 0.5f, ConfigSource::Default);
+    set("novelty_decay", 0.99f, ConfigSource::Default);
+    
+    // Development parameters
+    set("critical_period_end", 300.0, ConfigSource::Default);
+    set("maturation_rate", 0.8f, ConfigSource::Default);
+    
+    // Memory system parameters
+    set("working_memory_capacity", 0.1f, ConfigSource::Default);
+    set("episodic_memory_capacity", 1000, ConfigSource::Default);
+    set("replay_interval", 100, ConfigSource::Default);
+    
+    // Checkpointing parameters
+    set("checkpoint_dir", "./checkpoints", ConfigSource::Default);
+    set("max_checkpoints", 10, ConfigSource::Default);
+    set("checkpoint_compression", 1, ConfigSource::Default); // 1=balanced, 2=fast, 3=best
+    
+    // Logging parameters
+    set("log_level", "INFO", ConfigSource::Default);
+    set("enable_file_logging", true, ConfigSource::Default);
+    set("log_file", "./nlm.log", ConfigSource::Default);
+    
+    // Cognitive parameters
+    set("planning_depth", 5, ConfigSource::Default);
+    set("attention_inhibition_strength", 0.5f, ConfigSource::Default);
+    set("attention_excitation_strength", 1.5f, ConfigSource::Default);
+    
+    // Sensory processing parameters
+    set("vision_sensitivity", 1.0f, ConfigSource::Default);
+    set("touch_sensitivity", 1.0f, ConfigSource::Default);
+    set("internal_signal_sensitivity", 1.0f, ConfigSource::Default);
+    
+    // Motor output parameters
+    set("motor_neuron_threshold", 5.0f, ConfigSource::Default);
+    set("action_execution_time", 0.001, ConfigSource::Default);
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
@@ -146,11 +211,129 @@ std::vector<std::string> Config::getKeys() const {
     return keys;
 }
 
-void Config::clear() {
-    pImpl->entries.clear();
+void Config::setDefaults() {
+    // Set sensible default configuration values for NLM
+    set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    set("simulation_timestep", 0.001, ConfigSource::Default);
+    set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+    set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    set("connection_probability", 0.1f, ConfigSource::Default);
+    
+    // STDP parameters
+    set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    set("stdp_tau", 20.0f, ConfigSource::Default);
+    
+    // Hebbian learning parameters
+    set("hebbian_learning_rate", 0.001f, ConfigSource::Default);
+    set("hebbian_decay_time", 50.0f, ConfigSource::Default);
+    
+    // Structural plasticity parameters
+    set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Neuromodulation parameters
+    set("dopamine_scale", 1.0f, ConfigSource::Default);
+    set("curiosity_threshold", 0.5f, ConfigSource::Default);
+    set("novelty_decay", 0.99f, ConfigSource::Default);
+    
+    // Development parameters
+    set("critical_period_end", 300.0, ConfigSource::Default);
+    set("maturation_rate", 0.8f, ConfigSource::Default);
+    
+    // Memory system parameters
+    set("working_memory_capacity", 0.1f, ConfigSource::Default);
+    set("episodic_memory_capacity", 1000, ConfigSource::Default);
+    set("replay_interval", 100, ConfigSource::Default);
+    
+    // Checkpointing parameters
+    set("checkpoint_dir", "./checkpoints", ConfigSource::Default);
+    set("max_checkpoints", 10, ConfigSource::Default);
+    set("checkpoint_compression", 1, ConfigSource::Default); // 1=balanced, 2=fast, 3=best
+    
+    // Logging parameters
+    set("log_level", "INFO", ConfigSource::Default);
+    set("enable_file_logging", true, ConfigSource::Default);
+    set("log_file", "./nlm.log", ConfigSource::Default);
+    
+    // Cognitive parameters
+    set("planning_depth", 5, ConfigSource::Default);
+    set("attention_inhibition_strength", 0.5f, ConfigSource::Default);
+    set("attention_excitation_strength", 1.5f, ConfigSource::Default);
+    
+    // Sensory processing parameters
+    set("vision_sensitivity", 1.0f, ConfigSource::Default);
+    set("touch_sensitivity", 1.0f, ConfigSource::Default);
+    set("internal_signal_sensitivity", 1.0f, ConfigSource::Default);
+    
+    // Motor output parameters
+    set("motor_neuron_threshold", 5.0f, ConfigSource::Default);
+    set("action_execution_time", 0.001, ConfigSource::Default);
 }
 
-std::string Config::summary() const {
+// Check if configuration is valid
+bool Config::validate() const {
+    std::vector<std::string> errors = getValidationErrors();
+    return errors.empty();
+}
+
+// Get validation errors
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    // Check required fields
+    std::vector<std::string> requiredFields = {
+        "neuron_count", "region_count", "connection_probability"
+    };
+    
+    for (const auto& field : requiredFields) {
+        if (!has(field)) {
+            errors.push_back("Missing required configuration field: " + field);
+        }
+    }
+    
+    // Validate numeric ranges
+    if (has("neuron_count")) {
+        auto neuronCount = get<int64_t>("neuron_count");
+        if (neuronCount && (*neuronCount <= 0 || *neuronCount > 1000000)) {
+            errors.push_back("neuron_count must be between 1 and 1000000");
+        }
+    }
+    
+    if (has("region_count")) {
+        auto regionCount = get<int64_t>("region_count");
+        if (regionCount && (*regionCount <= 0 || *regionCount > 100)) {
+            errors.push_back("region_count must be between 1 and 100");
+        }
+    }
+    
+    if (has("connection_probability")) {
+        auto connProb = get<double>("connection_probability");
+        if (connProb && (*connProb < 0.0 || *connProb > 1.0)) {
+            errors.push_back("connection_probability must be between 0.0 and 1.0");
+        }
+    }
+    
+    return errors;
+}
+
+// Enable/disable strict mode
+void Config::setStrictMode(bool strict) {
+    pImpl->strictMode = strict;
+}
+
+bool Config::getStrictMode() const {
+    return pImpl->strictMode;
+}
+
+// Enable/disable validation on set
+void Config::setValidateOnSet(bool validate) {
+    pImpl->validateOnSet = validate;
+}
+
+bool Config::getValidateOnSet() const {
+    return pImpl->validateOnSet;
+}
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
     for (const auto& entry : pImpl->entries) {

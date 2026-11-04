@@ -244,12 +244,20 @@ bool CheckpointReader::readNeurons(NeuronCheckpointData& data) {
 bool CheckpointReader::readDelayedSpikes(std::vector<DelayedSpikeEvent>& events) {
     events.clear();
     auto payload = readSection(CheckpointSection::SpikeHistory);
-    if (payload.empty()) return true;  // Absent section: legacy checkpoint, no pending spikes.
-    if (!parseDelayedSpikes(payload, events)) {
-        error_ = "failed to parse delayed spike section";
-        return false;
+    
+    // If there's a spike history section and it's not empty, we should have events
+    if (!payload.empty()) {
+        if (!parseDelayedSpikes(payload, events)) {
+            error_ = "failed to parse delayed spike section";
+            return false;
+        }
     }
+    
     return true;
+}
+
+bool CheckpointReader::readDelayedSpikes(std::vector<DelayedSpikeEvent>& events) {
+    return readDelayedSpikes(events);
 }
 
 bool CheckpointReader::readSynapses(SynapseCheckpointData& data) {

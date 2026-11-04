@@ -56,8 +56,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from YAML file
+    bool loadFromYAMLFile(const std::string& filepath);
+    
+    // Load from JSON file
+    bool loadFromJSONFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -65,14 +71,34 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
+    // Save configuration in JSON format
+    std::string saveToJSON() const;
+    
+    // Save configuration in YAML format
+    std::string saveToYAML() const;
+    
+    // Validate configuration
+    bool validate() const;
+    
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Enable/disable strict mode
+    void setStrictMode(bool strict);
+    bool getStrictMode() const;
+    
+    // Enable/disable validation on set
+    void setValidateOnSet(bool validate);
+    bool getValidateOnSet() const;
+    
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
+    
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -102,6 +128,21 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Set default configuration values
+    void setDefaults();
+    
+    // Load from YAML file implementation
+    bool loadFromYAMLFileImpl(const std::string& filepath);
+    
+    // Load from JSON file implementation
+    bool loadFromJSONFileImpl(const std::string& filepath);
+    
+    // Save to JSON implementation
+    std::string saveToJSONImpl() const;
+    
+    // Save to YAML implementation
+    std::string saveToYAMLImpl() const;
 };
 
 } // namespace nlm
