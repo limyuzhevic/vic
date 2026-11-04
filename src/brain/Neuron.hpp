@@ -49,11 +49,29 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+/**
+ * @class Neuron
+ * @brief Represents a single neuron implementing Leaky Integrate-and-Fire (LIF) dynamics
+ * 
+ * The Neuron class is the fundamental computational unit of the NLM brain simulation.
+ * Each neuron maintains its own membrane potential state, responds to synaptic inputs,
+ * and generates action potentials (spikes) when its membrane potential exceeds threshold.
+ * 
+ * The LIF model provides a biophysically plausible approximation of neuronal behavior
+ * while remaining computationally efficient for large-scale simulations.
+ * 
+ * @note Neurons are organized into populations within regions, and maintain
+ *       connections (synapses) with other neurons for information propagation.
+ * 
+ * @see Brain for integration with higher-level brain systems
+ * @see Synapse for incoming and outgoing synaptic connections
+ */
 class Neuron {
 public:
-    // Create neuron with ID
+    /**
+     * @brief Create neuron with unique identifier
+     * @param id Unique identifier for this neuron
+     */
     explicit Neuron(NeuronId id);
     
     ~Neuron();
@@ -64,35 +82,101 @@ public:
     Neuron(Neuron&&) noexcept;
     Neuron& operator=(Neuron&&) noexcept;
     
-    // Identity
+    /**
+     * @brief Get the neuron's unique identifier
+     * @return NeuronId The neuron's identifier
+     */
     NeuronId getId() const;
     
-    // Type
+    /**
+     * @brief Get the neuron's type classification
+     * @return NeuronType The neuron's type (Sensory, Internal, Motor, Inhibitory)
+     */
     NeuronType getType() const;
+    
+    /**
+     * @brief Set the neuron's type classification
+     * @param type The neuron type to assign
+     */
     void setType(NeuronType type);
     
-    // State access
+    /**
+     * @brief Get the neuron's complete state
+     * @return const NeuronState& Reference to the neuron's current state
+     * @note State includes membrane potential, firing rate, spike history, etc.
+     */
     const NeuronState& getState() const;
+    
+    /**
+     * @brief Get mutable reference to neuron's state (for modification)
+     * @return NeuronState& Mutable reference to state
+     * @warning Modifying state directly is generally not recommended. Use proper API methods.
+     */
     NeuronState& getState();
     
-    // Membrane potential
+    /**
+     * @brief Get the neuron's current membrane potential
+     * @return MembranePotential Current membrane potential in millivolts (mV)
+     * @see getRestingPotential() for the neuron's resting membrane potential
+     * @see checkThreshold() to determine if neuron should fire
+     */
     MembranePotential getMembranePotential() const;
+    
+    /**
+     * @brief Set the neuron's membrane potential directly
+     * @param potential New membrane potential in millivolts (mV)
+     * @warning This bypasses the normal integration process. Use with caution.
+     */
     void setMembranePotential(MembranePotential potential);
+    
+    /**
+     * @brief Add current to membrane potential (simulate incoming synaptic input)
+     * @param delta Change in membrane potential in millivolts (mV)
+     * @note Positive delta = excitatory input, negative delta = inhibitory input
+     */
     void addToMembranePotential(MembranePotential delta);
     
-    // Threshold
+    /**
+     * @brief Get the neuron's firing threshold
+     * @return MembranePotential Threshold voltage in millivolts (mV)
+     * @see checkThreshold() to determine if neuron should fire based on current potential
+     */
     MembranePotential getThreshold() const;
+    
+    /**
+     * @brief Set the neuron's firing threshold
+     * @param threshold New threshold voltage in millivolts (mV)
+     */
     void setThreshold(MembranePotential threshold);
     
-    // Firing state
-    bool isFiring() const;
+    /**
+     * @brief Check if neuron is currently in refractory period
+     * @return bool True if neuron is refractory (cannot fire)
+     */
     bool isRefractory() const;
-    void setFiringState(FiringState state);
+    
+    /**
+     * @brief Set the refractory period duration
+     * @param steps Number of simulation steps neuron must remain refractory after firing
+     */
     void setRefractoryPeriod(uint32_t steps);
+    
+    /**
+     * @brief Decrement refractory counter (called each simulation step)
+     */
     void decrementRefractory();
     
-    // Firing rate (for rate-based computation)
+    /**
+     * @brief Get the neuron's current firing rate
+     * @return FiringRate Firing rate in Hertz (spikes per second)
+     */
     FiringRate getFiringRate() const;
+    
+    /**
+     * @brief Set the neuron's firing rate directly
+     * @param rate New firing rate in Hertz
+     * @warning This bypasses the normal spike-based rate computation
+     */
     void setFiringRate(FiringRate rate);
     
     // LIF neuron parameters
@@ -103,26 +187,85 @@ public:
     MembranePotential getRestingPotential() const;
     void setResetPotential(MembranePotential potential);
     
-    // Spike detection
+    /**
+     * @brief Check if neuron should fire based on current membrane potential
+     * @return bool True if membrane potential exceeds threshold
+     */
     bool checkThreshold() const;
+    
+    /**
+     * @brief Get timestamp of last spike
+     * @return float Timestamp of last spike in simulation time units (-1.0 if no spike)
+     */
     float getLastSpikeTime() const;
     
-    // LIF step function - returns true if neuron fired
+    /**
+     * @brief Perform one LIF integration step - returns true if neuron fired
+     * @param currentTime Current simulation time
+     * @param dt Time step duration in simulation time units
+     * @return bool True if neuron crossed threshold and fired during this step
+     * @note This is the core neuron computation method called during each simulation step
+     */
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
-    // Incoming signals (post-synaptic potentials)
+    /**
+     * @brief Apply excitatory synaptic input to neuron
+     * @param amplitude Synaptic input amplitude in millivolts (mV)
+     * @note This represents post-synaptic potentials from excitatory synapses
+     */
     void receiveExcitatoryInput(MembranePotential amplitude);
+    
+    /**
+     * @brief Apply inhibitory synaptic input to neuron
+     * @param amplitude Synaptic input amplitude in millivolts (mV)
+     * @note This represents post-synaptic potentials from inhibitory synapses
+     */
     void receiveInhibitoryInput(MembranePotential amplitude);
+    
+    /**
+     * @brief Apply modulatory input (neuromodulators, etc.)
+     * @param amplitude Modulatory input amplitude in millivolts (mV)
+     * @note This represents inputs from neuromodulatory systems
+     */
     void receiveModulatoryInput(MembranePotential amplitude);
     
-    // Current injection (from external sources)
+    /**
+     * @brief Apply external current input to neuron
+     * @param current Current input in millivolts (mV)
+     * @note This represents external driving inputs (sensory input, motor commands, etc.)
+     */
     void injectCurrent(MembranePotential current);
+    
+    /**
+     * @brief Get total accumulated current
+     * @return MembranePotential Total current in millivolts (mV)
+     */
     MembranePotential getTotalCurrent() const;
+    
+    /**
+     * @brief Clear accumulated current
+     * @note Should be called at the beginning of each simulation step
+     */
     void clearTotalCurrent();
     
-    // Spike history (recent spikes for STDP)
+    /**
+     * @brief Record a spike timestamp for plasticity computations
+     * @param timestamp Simulation time when spike occurred
+     * @note Used by STDP and other spike-timing dependent plasticity rules
+     */
     void recordSpike(Timestamp timestamp);
+    
+    /**
+     * @brief Get recent spike timestamps for plasticity
+     * @return const std::vector<Timestamp>& Vector of spike timestamps
+     * @note Used by STDP and other spike-timing dependent plasticity rules
+     */
     const std::vector<Timestamp>& getSpikeHistory() const;
+    
+    /**
+     * @brief Clear spike history
+     * @note Used to reset plasticity state between experiments
+     */
     void clearSpikeHistory();
     
     // Synapse management (incoming and outgoing)

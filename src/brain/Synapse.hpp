@@ -8,11 +8,43 @@ namespace nlm {
 // Forward declaration
 class Neuron;
 
-// Synapse representing a connection between neurons
-// Implements real synaptic transmission with delays and short-term plasticity
-
+/**
+ * @class Synapse
+ * @brief Represents a synaptic connection between neurons
+ * 
+ * The Synapse class implements a real biological synapse with key properties:
+ * - Synaptic weight (strength of connection)
+ * - Transmission delay (temporal propagation)
+ * - Connection type (excitatory or inhibitory)
+ * - Spike timing history (for STDP plasticity)
+ * - Eligibility traces (for reward-modulated learning)
+ * - Synaptic efficacy (use-dependent modulation)
+ * 
+ * Synapses are the fundamental communication channels in the NLM brain,
+ * transmitting signals from presynaptic to postsynaptic neurons with
+ * realistic biophysical properties including delays and activity-dependent
+ * plasticity mechanisms.
+ * 
+ * @note Synapses are organized into regions and can be subject to multiple
+ *       plasticity rules simultaneously (STDP, Hebbian, reward-modulated).
+ * 
+ * @see Brain for integration with higher-level brain systems
+ * @see Neuron for pre- and post-synaptic neurons
+ */
 class Synapse {
 public:
+    /**
+     * @brief Create synapse with unique identifier and neuron connections
+     * 
+     * @param id Unique identifier for this synapse
+     * @param source Neuron ID of presynaptic neuron
+     * @param destination Neuron ID of postsynaptic neuron
+     * 
+     * @note The synapse does not automatically connect to actual neurons.
+     *       Connection establishment happens during brain initialization
+     *       through the brain's connectivity setup.
+     */
+    Synapse(SynapseId id, NeuronId source, NeuronId destination);
     // Create synapse with IDs
     Synapse(SynapseId id, NeuronId source, NeuronId destination);
     

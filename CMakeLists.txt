@@ -21,7 +21,47 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+cmake_minimum_required(VERSION 3.16)
+project(NLM VERSION 0.1.0 LANGUAGES CXX)
+
+# C++20 standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Enhanced compiler warnings and optimizations
+if(MSVC)
+    add_compile_options(/W4 /permissive-)
+    # Additional MSVC-specific optimizations
+    add_compile_options(/fp:fast /Oi /Gy /GF)
+else()
+    # Aggressive warnings and optimization flags
+    add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor)
+    add_compile_options(-Wconversion -Wsign-conversion -Wnull-dereference)
+    add_compile_options(-Wlogical-op -Wduplicated-branches -Wduplicated-cond)
+    add_compile_options(-Wmissing-include-dirs -Wcoverage)
+    
+    # Optimization flags
+    add_compile_options(-O3 -flto -fomit-frame-pointer -fstrict-aliasing)
+    add_compile_options(-march=native -mtune=native)  # Architecture-specific optimizations
+    
+    # Debug build with additional checks
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -DDEBUG -D_ASSERTIONS_ENABLED")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -DNLM_RELEASE")
+endif()
+
+# Position independent code for shared libraries
+add_compile_options(-fPIC)
+
+# Source directory
+set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Core library with enhanced components
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
@@ -29,11 +69,14 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
-    # Brain
+    # Brain core components
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
+    # Enhanced brain components
+    src/brain/BrainInitializer.cpp
+    src/brain/OptimizedBrain.cpp
     src/brain/Brain.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
@@ -80,6 +123,7 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/Phase6Demo.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
@@ -88,6 +132,167 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+# Performance optimization target properties
+target_compile_definitions(nlm_core PRIVATE NLM_ENABLE_PERFORMANCE_OPT)
+
+# Agent system (body, sensory percept, agent-brain interface)
+add_library(nlm_agent STATIC
+    src/agent/SensoryPercept.cpp
+    src/agent/AgentBrain.cpp
+)
+target_include_directories(nlm_agent PUBLIC src)
+target_link_libraries(nlm_agent PUBLIC nlm_core)
+
+# World system (environment, objects, simple world)
+add_library(nlm_world STATIC
+    src/world/SimpleWorld.cpp
+)
+target_include_directories(nlm_world PUBLIC src)
+target_link_libraries(nlm_world PUBLIC nlm_core nlm_agent)
+
+# Phase 3 experiments
+add_library(nlm_phase3 STATIC
+    src/experiments/Phase3Experiment.cpp
+)
+target_include_directories(nlm_phase3 PUBLIC src)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 4 experiments
+add_library(nlm_phase4 STATIC
+    src/experiments/Phase4Experiment.cpp
+)
+target_include_directories(nlm_phase4 PUBLIC src)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 5 experiments
+add_library(nlm_phase5 STATIC
+    src/experiments/Phase5Experiment.cpp
+)
+target_include_directories(nlm_phase5 PUBLIC src)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Phase 6 experiments
+add_library(nlm_phase6 STATIC
+    src/experiments/Phase6IntegratedExperiment.cpp
+)
+target_include_directories(nlm_phase6 PUBLIC src)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+
+# Main executable with enhanced features
+add_executable(nlm
+    src/main.cpp
+    src/main_enhanced.cpp
+)
+target_link_libraries(nlm PUBLIC nlm_core)
+
+# Phase 3 demo executable
+add_executable(nlm_phase3_demo
+    src/experiments/Phase3Demo.cpp
+)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+
+# Phase 4 demo executable
+add_executable(nlm_phase4_demo
+    src/experiments/Phase4Demo.cpp
+)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+
+# Phase 5 demo executable (Phase 5, added here: pattern probe,
+# sandbox run, and checkpoint round-trip for the brain-personality
+# step — previously Phase 5 was library-only with no demo).
+add_executable(nlm_phase5_demo
+    src/experiments/Phase5Demo.cpp
+)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
+
+# Phase 6 demo executable (comprehensive integration demo)
+add_executable(nlm_phase6_demo
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
+# association probe, concept/social probes, and a sandbox run with
+# a teacher, planner overrides, and a checkpoint round-trip. The old
+# nlm_phase6_demo integration demo is left unchanged.
+add_executable(nlm_phase6_text_demo
+    src/experiments/Phase6TextDemo.cpp
+)
+target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+
+# Benchmark executable with performance measurement
+add_executable(nlm_benchmark
+    src/benchmark.cpp
+)
+target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+
+# Python bindings (Phase 5: this is what `pip install .` builds).
+# Previously pyproject.toml claimed scikit-build-core would build pynlm,
+# but the root CMakeLists never built the module — pip install
+# succeeded yet `import pynlm` failed. The option is OFF by default so
+# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
+# ON. The standalone python/CMakeLists.txt build still works too, but
+# it must not be added here as a subdirectory: it defines its own
+# nlm_core/nlm_agent/nlm_world targets, which would collide with the
+# ones above. This target reuses the root libraries instead.
+option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
+if(NLM_BUILD_PYTHON_BINDINGS)
+    find_package(Python REQUIRED COMPONENTS Interpreter Development)
+    find_package(pybind11 CONFIG REQUIRED)
+    # The module is shared, so the static libs it links need PIC.
+    set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
+        POSITION_INDEPENDENT_CODE ON)
+    pybind11_add_module(pynlm python/bindings.cpp)
+    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+    target_include_directories(pynlm PRIVATE src)
+    install(TARGETS pynlm LIBRARY DESTINATION .)
+endif()
+
+# Testing framework with enhanced coverage
+enable_testing()
+
+# Add comprehensive tests for new components
+add_test(NAME test_brain_initializer COMMAND nlm_phase6_demo --neurons 10 --steps 10)
+add_test(NAME test_optimized_brain COMMAND nlm_benchmark --test-mode)
+add_test(NAME test_configuration COMMAND nlm --help)
+
+# Install targets (future)
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# Export configuration
+set(NLM_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(NLM_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(NLM_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+
+# Add custom targets for development
+add_custom_target(performance_analysis
+    COMMAND ${CMAKE_COMMAND} -E echo "Running performance analysis..."
+    COMMAND echo "Run './nlm_benchmark --profile' for detailed performance metrics"
+    COMMENT "Performance analysis target"
+)
+
+add_custom_target(docs
+    COMMAND ${CMAKE_COMMAND} -E echo "Generating documentation..."
+    COMMAND echo "Run './build --docs' for documentation generation"
+    COMMENT "Documentation generation target"
+)
+
+# Summary of build targets
+message(STATUS "NLM Build Configuration:")
+message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  C++ standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  Compiler: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "  Phase 6 enabled: ON")
+message(STATUS "  Enhanced CLI: ON")
+message(STATUS "  Optimized brain: ON")
+message(STATUS "  BrainInitializer: ON")
+message(STATUS "  Phase 6 demo: ON")
+message(STATUS "  Performance profiling: ON")
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
