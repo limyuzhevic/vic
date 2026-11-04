@@ -117,6 +117,11 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
+    // Checkpoint system integration
+    void setCheckpointProviders();
+    bool collectNeuronData(NeuronCheckpointData& data) const;
+    bool collectSynapseData(SynapseCheckpointData& data) const;
+    
     // Region management
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);
