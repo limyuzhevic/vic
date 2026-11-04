@@ -4,7 +4,7 @@ project(NLM VERSION 0.1.0 LANGUAGES CXX)
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXTENSIONS OFF)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -16,6 +16,19 @@ if(MSVC)
     add_compile_options(/W4)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# JSON parser dependency (nlohmann_json)
+find_package(nlohmann_json 3.11.2 QUIET)
+if(NOT nlohmann_json_FOUND)
+    message(STATUS "nlohmann_json not found, downloading...")
+    include(FetchContent)
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.2
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
 endif()
 
 # Source directory
@@ -89,6 +102,11 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Add nlohmann_json include directory
+target_include_directories(nlm_core PUBLIC
+    ${nlohmann_json_INCLUDE_DIRS}
+)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -125,30 +143,33 @@ add_library(nlm_phase5 STATIC
 target_include_directories(nlm_phase5 PUBLIC src)
 target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Phase 6 experiments
-add_library(nlm_phase6 STATIC
-    src/experiments/Phase6IntegratedExperiment.cpp
+# Error handling and validation (Phase 7 enhancement)
+add_library(nlm_error_handling STATIC
+    src/core/ErrorHandling.cpp
 )
-target_include_directories(nlm_phase6 PUBLIC src)
-target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+target_include_directories(nlm_error_handling PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_error_handling PUBLIC nlm_core nlm_agent nlm_world)
 
 # Main executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_error_handling)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_error_handling)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_error_handling)
 
 # Phase 5 demo executable (Phase 5, added here: pattern probe,
 # sandbox run, and checkpoint round-trip for the brain-personality
@@ -156,13 +177,13 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 add_executable(nlm_phase5_demo
     src/experiments/Phase5Demo.cpp
 )
-target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_error_handling)
 
 # Phase 6 demo executable
 add_executable(nlm_phase6_demo
     src/experiments/Phase6Demo.cpp
 )
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6 nlm_error_handling)
 
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
 # association probe, concept/social probes, and a sandbox run with
@@ -171,13 +192,13 @@ target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 add_executable(nlm_phase6_text_demo
     src/experiments/Phase6TextDemo.cpp
 )
-target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6 nlm_error_handling)
 
 # Benchmark executable
 add_executable(nlm_benchmark
     src/benchmark.cpp
 )
-target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+target_link_libraries(nlm_benchmark PUBLIC nlm_core nlm_error_handling)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,

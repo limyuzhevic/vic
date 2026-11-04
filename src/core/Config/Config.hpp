@@ -56,14 +56,20 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON or YAML format)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from file (JSON or YAML format) with format parameter
+    bool loadFromFile(const std::string& filepath, const std::string& format);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format by default)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Save to file with specific format
+    bool saveToFile(const std::string& filepath, const std::string& format) const;
     
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>
