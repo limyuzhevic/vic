@@ -40,6 +40,7 @@
 #include <iostream>
 #include <set>
 #include <string>
+#include <unistd.h> // for getpid()
 #include <utility>
 
 namespace nlm {
@@ -218,7 +219,8 @@ int main() {
     };
     size_t histBefore = synHistoryTotal(brain);
 
-    const std::string ckpt = "/tmp/nlm_phase5_demo.ckpt";
+    std::string tempDir = "/tmp";
+    std::string ckpt = tempDir + "/nlm_phase5_demo_" + std::to_string(getpid()) + ".ckpt";
     bool saved = brain->save(ckpt);
     auto brain2 = std::make_shared<Brain>(makeConfig());
     brain2->initialize();
@@ -245,6 +247,10 @@ int main() {
         agent2.processSensoryInput(percept);
         for (int i = 0; i < 10; ++i) brain2->step(brainStep++);
         std::cout << " continuedCmd=" << cmdName(agent2.decodeMotorCommand());
+        
+        // Clean up the checkpoint file
+        std::remove(ckpt.c_str());
+        std::cout << " cleanup=done";
     }
     std::cout << "\n\nPhase 5 demonstration complete.\n";
     return 0;

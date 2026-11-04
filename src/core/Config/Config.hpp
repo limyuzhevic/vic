@@ -80,6 +80,13 @@ template<typename T>
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
+    // Configuration validation
+    void validate(const std::string& key, const ConfigValue& value, ConfigSource source) const;
+    bool validateAll() const;
+    
+    // Default descriptions
+    static std::string getDefaultDescription(const std::string& key);
+    
     // Check existence
     bool has(const std::string& key) const;
     

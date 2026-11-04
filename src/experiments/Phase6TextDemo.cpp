@@ -48,6 +48,7 @@
 #include <iostream>
 #include <set>
 #include <string>
+#include <unistd.h> // for getpid()
 #include <utility>
 #include <vector>
 
@@ -391,7 +392,8 @@ int main() {
                   << " preference=" << a2.getLearnedPreference() << "\n";
         // Checkpoint: preference and state survive a reload, and
         // the reloaded brain still acts on the same pattern.
-        const std::string ckpt = "/tmp/nlm_phase6_text_demo.ckpt";
+        std::string tempDir = "/tmp";
+        std::string ckpt = tempDir + "/nlm_phase6_text_demo_" + std::to_string(getpid()) + ".ckpt";
         bool saved = b2->save(ckpt);
         auto b3 = std::make_shared<Brain>(makeConfig());
         b3->initialize();
@@ -412,6 +414,10 @@ int main() {
                 for (int j = 0; j < 10; ++j) b3->step(bs++);
             }
             std::cout << " continuedCmd=" << cmdName(a3.decodeMotorCommand());
+            
+            // Clean up the checkpoint file
+            std::remove(ckpt.c_str());
+            std::cout << " cleanup=done";
         }
         std::cout << "\n";
     }

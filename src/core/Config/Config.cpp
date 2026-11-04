@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <stdexcept>
+#include <cmath>
 
 namespace nlm {
 
@@ -92,7 +95,196 @@ bool Config::saveToFile(const std::string& filepath) const {
     return true;
 }
 
+namespace nlm {
+
+struct ConfigValidationRules {
+    struct ValidationRule {
+        std::string key;
+        std::string validationType;
+        std::string description;
+        std::function<bool(const ConfigValue&)> validator;
+        std::string errorMessage;
+    };
+    
+    static std::vector<ValidationRule> getDefaultRules() {
+        return {
+            // Numeric range validation
+            {"neuron_count", "range", "Number of neurons must be positive", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<int64_t>(&v)) return (*val > 0);
+                 if (const auto* val = std::get_if<int>(&v)) return (*val > 0);
+                 return false;
+             }, "neuron_count must be a positive integer"},
+            
+            {"region_count", "range", "Number of regions must be positive", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<int64_t>(&v)) return (*val > 0);
+                 if (const auto* val = std::get_if<int>(&v)) return (*val > 0);
+                 return false;
+             }, "region_count must be a positive integer"},
+            
+            {"connection_probability", "range", "Connection probability must be between 0 and 1", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<double>(&v)) return (*val >= 0.0 && *val <= 1.0);
+                 if (const auto* val = std::get_if<float>(&v)) return (*val >= 0.0f && *val <= 1.0f);
+                 return false;
+             }, "connection_probability must be between 0 and 1"},
+            
+            {"random_seed", "range", "Random seed must be non-negative", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<int64_t>(&v)) return (*val >= 0);
+                 if (const auto* val = std::get_if<int>(&v)) return (*val >= 0);
+                 return false;
+             }, "random_seed must be a non-negative integer"},
+            
+            // Positive values for rates
+            {"plasticity_learning_rate", "positive", "Learning rate must be positive", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<double>(&v)) return (*val > 0.0);
+                 if (const auto* val = std::get_if<float>(&v)) return (*val > 0.0f);
+                 return false;
+             }, "plasticity_learning_rate must be positive"},
+            
+            {"synaptogenesis_rate", "positive", "Synaptogenesis rate must be positive", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<double>(&v)) return (*val >= 0.0);
+                 if (const auto* val = std::get_if<float>(&v)) return (*val >= 0.0f);
+                 return false;
+             }, "synaptogenesis_rate must be non-negative"},
+            
+            {"pruning_rate", "positive", "Pruning rate must be positive", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<double>(&v)) return (*val >= 0.0);
+                 if (const auto* val = std::get_if<float>(&v)) return (*val >= 0.0f);
+                 return false;
+             }, "pruning_rate must be non-negative"},
+            
+            // STDP parameters
+            {"stdp_ltp_weight", "range", "LTP weight must be between 0 and 1", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<double>(&v)) return (*val >= 0.0 && *val <= 1.0);
+                 if (const auto* val = std::get_if<float>(&v)) return (*val >= 0.0f && *val <= 1.0f);
+                 return false;
+             }, "stdp_ltp_weight must be between 0 and 1"},
+            
+            {"stdp_ltd_weight", "range", "LTD weight must be between 0 and 1", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<double>(&v)) return (*val >= 0.0 && *val <= 1.0);
+                 if (const auto* val = std::get_if<float>(&v)) return (*val >= 0.0f && *val <= 1.0f);
+                 return false;
+             }, "stdp_ltd_weight must be between 0 and 1"},
+            
+            {"stdp_time_constant", "range", "STDP time constant must be positive", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<double>(&v)) return (*val > 0.0);
+                 if (const auto* val = std::get_if<float>(&v)) return (*val > 0.0f);
+                 return false;
+             }, "stdp_time_constant must be positive"},
+            
+            // Environment dimensions
+            {"environment_width", "range", "Environment width must be positive", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<int64_t>(&v)) return (*val > 0);
+                 if (const auto* val = std::get_if<int>(&v)) return (*val > 0);
+                 return false;
+             }, "environment_width must be positive"},
+            
+            {"environment_height", "range", "Environment height must be positive", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<int64_t>(&v)) return (*val > 0);
+                 if (const auto* val = std::get_if<int>(&v)) return (*val > 0);
+                 return false;
+             }, "environment_height must be positive"},
+            
+            // Simulation parameters
+            {"simulation_timestep", "range", "Simulation timestep must be positive", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<double>(&v)) return (*val > 0.0);
+                 if (const auto* val = std::get_if<float>(&v)) return (*val > 0.0f);
+                 return false;
+             }, "simulation_timestep must be positive"},
+            
+            {"max_simulation_steps", "range", "Max steps must be positive", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<int64_t>(&v)) return (*val > 0);
+                 if (const auto* val = std::get_if<int>(&v)) return (*val > 0);
+                 return false;
+             }, "max_simulation_steps must be positive"},
+            
+            // Log level validation
+            {"log_level", "enum", "Log level must be valid", 
+             [](const ConfigValue& v) {
+                 if (const auto* val = std::get_if<std::string>(&v)) {
+                     static const std::vector<std::string> validLevels = {"off", "error", "warning", "info", "debug"};
+                     return std::find(validLevels.begin(), validLevels.end(), *val) != validLevels.end();
+                 }
+                 return false;
+             }, "log_level must be one of: off, error, warning, info, debug"},
+        };
+    }
+}
+;
+
+std::string Config::getDefaultDescription(const std::string& key) {
+    static const std::unordered_map<std::string, std::string> descriptions = {
+        {"neuron_count", "Number of neurons in the brain"},
+        {"region_count", "Number of brain regions"},
+        {"connection_probability", "Probability of connection between neurons"},
+        {"random_seed", "Random seed for reproducible experiments"},
+        {"plasticity_learning_rate", "Learning rate for plasticity rules"},
+        {"stdp_ltp_weight", "STDP long-term potentiation weight"},
+        {"stdp_ltd_weight", "STDP long-term depression weight"},
+        {"stdp_time_constant", "STDP time constant (ms)"},
+        {"synaptogenesis_rate", "Rate of new synapse formation"},
+        {"pruning_rate", "Rate of synapse elimination"},
+        {"environment_width", "Width of the simulated environment"},
+        {"environment_height", "Height of the simulated environment"},
+        {"simulation_timestep", "Time step for simulation (seconds)"},
+        {"max_simulation_steps", "Maximum number of simulation steps"},
+        {"log_level", "Logging level (off, error, warning, info, debug)"},
+        {"log_to_file", "Whether to log to file"},
+        {"log_filename", "Name of log file"},
+        {"visualization_enabled", "Whether visualization is enabled"},
+        {"visualization_update_rate", "Visualization update rate (Hz)"},
+        {"reward_discount_factor", "Discount factor for rewards"},
+        {"environment_name", "Name of the environment"},
+    };
+    
+    auto it = descriptions.find(key);
+    return it != descriptions.end() ? it->second : "Configuration parameter";
+}
+
+void Config::validate(const std::string& key, const ConfigValue& value, ConfigSource source) const {
+    const auto& rules = ConfigValidationRules::getDefaultRules();
+    
+    for (const auto& rule : rules) {
+        if (rule.key == key) {
+            if (!rule.validator(value)) {
+                throw std::invalid_argument("Configuration validation failed for key '" + key + "': " + rule.errorMessage);
+            }
+        }
+    }
+}
+
+bool Config::validateAll() const {
+    const auto& rules = ConfigValidationRules::getDefaultRules();
+    
+    for (const auto& entry : pImpl->entries) {
+        for (const auto& rule : rules) {
+            if (rule.key == entry.key) {
+                if (!rule.validator(entry.value)) {
+                    NLM_LOG_ERROR("Configuration validation failed for key '" + entry.key + "': " + rule.errorMessage);
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    validate(key, value, source);
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -100,7 +292,7 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         it->value = value;
         it->source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        pImpl->entries.emplace_back(key, value, source, getDefaultDescription(key));
     }
 }
 

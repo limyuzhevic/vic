@@ -8,6 +8,7 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#include <unistd.h> // for getpid()
 
 namespace test_brain {
 
@@ -145,8 +146,13 @@ void testBrainCheckpointRoundTrip() {
         brain1.step(step);
     }
 
-    const std::string path = "/tmp/nlm_test_checkpoint.bin";
-    if (!brain1.save(path)) throw std::runtime_error("checkpoint save failed");
+    // Use a temporary directory that can be cleaned up
+    const std::string tempDir = "/tmp";
+    const std::string path = tempDir + "/nlm_test_checkpoint_" + std::to_string(getpid()) + ".bin";
+    
+    if (!brain1.save(path)) {
+        throw std::runtime_error("checkpoint save failed");
+    }
 
     auto meanWeight = [](nlm::Brain& b) {
         double sum = 0.0;
@@ -200,6 +206,9 @@ void testBrainCheckpointRoundTrip() {
     nlm::Brain smallBrain(smallConfig);
     smallBrain.initialize();
     if (smallBrain.load(path)) throw std::runtime_error("mismatched-structure load should fail");
+
+    // Clean up the temporary file
+    std::remove(path.c_str());
 
     std::cout << "    testBrainCheckpointRoundTrip passed (meanWeight="
               << savedMeanWeight << ", pending=" << savedPending

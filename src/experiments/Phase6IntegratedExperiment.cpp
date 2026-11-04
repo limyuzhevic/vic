@@ -8,6 +8,7 @@
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include <chrono>
 #include <cmath>
+#include <unistd.h> // for getpid()
 
 namespace nlm {
 
@@ -342,18 +343,22 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
     
     // Save checkpoint
-    std::string path = "/tmp/nlm_checkpoint_test.bin";
+    std::string tempDir = "/tmp";
+    std::string path = tempDir + "/nlm_checkpoint_test_" + std::to_string(getpid()) + ".bin";
     if (!brain1->save(path)) {
         NLM_LOG_ERROR("Failed to save checkpoint");
         return false;
     }
     
+    NLM_LOG_INFO("Checkpoint saved to: " + path);
+
     // Create new brain and load
     auto brain2 = std::make_shared<Brain>(cfg);
     brain2->initialize();
     
     if (!brain2->load(path)) {
         NLM_LOG_ERROR("Failed to load checkpoint");
+        std::remove(path.c_str()); // Clean up
         return false;
     }
     
@@ -364,6 +369,11 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     // is complex. The load should restore the structure at minimum.
     
     NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
+    
+    // Clean up the temporary file
+    std::remove(path.c_str());
+    NLM_LOG_INFO("Cleaned up temporary checkpoint file");
+    
     return true;
 }
 
