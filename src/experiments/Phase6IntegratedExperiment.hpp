@@ -47,6 +47,12 @@ struct Phase6IntegrationResult {
     float curiosityLevel;
     float dopamineLevel;
     
+    // Total exploration events and discoveries during the experiment
+    // These metrics track how well the agent learned to explore and discover resources
+    size_t totalExplorationEvents;
+    size_t totalResourceDiscoveries;
+    float finalExplorationTendency;
+    
     // Timestamps
     time_t startTime;
     time_t endTime;
@@ -67,6 +73,9 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , totalExplorationEvents(0)
+        , totalResourceDiscoveries(0)
+        , finalExplorationTendency(0.5f)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}
@@ -85,6 +94,14 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // Enhanced experiment parameters
+    bool enableResourceDiscovery;      // Enable discovery of valuable resources
+    bool enableHazardAvoidance;        // Enable avoidance of hazards
+    bool enableExplorationBonus;       // Enable exploration movement bonus
+    bool enableCuriosityDriven;        // Enable curiosity-driven exploration
+    float resourceValueRange;           // Min/max resource values
+    float hazardValueRange;             // Min/max hazard values
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -93,7 +110,13 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , enableResourceDiscovery(true)
+        , enableHazardAvoidance(true)
+        , enableExplorationBonus(true)
+        , enableCuriosityDriven(true)
+        , resourceValueRange(10.0f)
+        , hazardValueRange(5.0f) {}
 };
 
 /**

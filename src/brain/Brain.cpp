@@ -83,6 +83,7 @@ struct Brain::Impl {
     
     // Integration state
     bool isResting;  // For sleep/rest cycle
+    bool replayEnabled;  // Enable/disable memory replay
     size_t stepsSinceLastEpisode;
     size_t replayInterval;
     size_t consolidationInterval;
@@ -101,6 +102,7 @@ struct Brain::Impl {
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
         , isResting(false)
+        , replayEnabled(true)  // Enable memory replay by default
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
@@ -649,40 +651,71 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 13: Apply development effects ==========
-    if (currentStep % 1000 == 0) {  // Update development every 1000 steps
-        pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+    // ========== STEP 13.5: Sleep/rest cycle and memory consolidation ==========
+    // Implement sleep/rest cycle with memory consolidation during offline periods
+    if (pImpl->isResting) {
+        // During sleep, focus on memory consolidation
+        pImpl->isResting = false;  // Sleep only lasts one step for now
         
-        // Development affects plasticity rates
-        auto* sp = pImpl->structuralPlasticity.get();
-        if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
+        // Enhanced memory consolidation during rest
+        if (pImpl->episodicMemory) {
+            // Consolidate strong memories (those with high activation)
+            pImpl->episodicMemory->consolidate(0.5f);  // Higher threshold during rest
             
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
+            // Replay important memories during sleep for consolidation
+            if (pImpl->replayEnabled) {
+                auto episodesToReplay = pImpl->episodicMemory->getEpisodesForReplay(5);  // More replays during rest
+                for (const auto* episode : episodesToReplay) {
+                    pImpl->episodicMemory->replayEpisode(episode);
+                }
             }
             
-            sp->setSynaptogenesisRate(0.0001f * plasticityMod);
-            sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+            // Strengthen working memory traces
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->strengthenMemory(1.1f);  // Boost memory strength
+            }
+        }
+        
+        // Development updates during rest periods
+        if (currentStep % 3000 == 0) {  // Less frequent development during rest
+            pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
+        }
+        
+        NLM_LOG_INFO("Brain resting - memory consolidation active");
+    } else {
+        // Check if it's time to enter rest/sleep based on development stage
+        bool shouldRest = false;
+        
+        switch (pImpl->developmentalStage) {
+            case DevelopmentalStage::Maturation:
+                // Rest periods during maturation to consolidate learning
+                if (currentStep > 0 && currentStep % 5000 == 0) {
+                    shouldRest = true;
+                }
+                break;
+            case DevelopmentalStage::Adult:
+                // Regular rest cycles in adulthood for maintenance
+                if (currentStep > 0 && currentStep % 10000 == 0) {
+                    shouldRest = true;
+                }
+                break;
+            default:
+                // No rest during initial and critical periods
+                shouldRest = false;
+                break;
+        }
+        
+        if (shouldRest) {
+            pImpl->isResting = true;
+            pImpl->stepsSinceLastEpisode = 0;
         }
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
     if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
         // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+        float consolidationThreshold = pImpl->developmentalStage == DevelopmentalStage::Adult ? 0.4f : 0.3f;
+        pImpl->episodicMemory->consolidate(consolidationThreshold);
     }
     
     // ========== STEP 15: Checkpoint management ==========
@@ -697,6 +730,144 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     
     const auto& values = input.getData();
     if (values.empty()) return;
+    
+    size_t numSensory = pImpl->sensoryNeurons.size();
+    if (numSensory == 0) return;
+    
+    // Store current sensory pattern in working memory for episodic memory
+    // Convert to vector of floats (normalized to [0, 1])
+    std::vector<float> sensoryPattern;
+    sensoryPattern.reserve(values.size());
+    for (const auto& val : values) {
+        // Normalize from whatever range to [0, 1]
+        sensoryPattern.push_back(std::max(0.0f, std::min(1.0f, static_cast<float>(val) / 255.0f)));
+    }
+    
+    // Store pattern in working memory (storeToNeuron handles individual neurons,
+    // but we also need to store the complete pattern for episodic memory)
+    if (pImpl->workingMemory && !sensoryPattern.empty()) {
+        // For each sensory neuron, store its activation based on input
+        for (size_t i = 0; i < std::min(numSensory, sensoryPattern.size()); ++i) {
+            float normalizedValue = sensoryPattern[i];
+            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue);
+        }
+        
+        // Also store the complete pattern for episodic memory
+        pImpl->workingMemory->store(sensoryPattern, 1.0f);
+    }
+    
+    // ========== NEW: Enhanced sensory encoding and memory integration ==========
+    
+    // 1. Create a complete episodic memory item from this sensory input
+    if (pImpl->episodicMemory) {
+        EpisodicMemoryItem episode;
+        episode.timestamp = pImpl->currentStep;
+        episode.sensoryState = sensoryPattern;
+        episode.positionX = 0.0f; // TODO: Get from environment if available
+        episode.positionY = 0.0f;
+        episode.orientation = 0.0f;
+        episode.action = ActionType::Wait; // Default, will be updated by motor system
+        episode.reward = 0.0f; // Will be updated when reward is received
+        episode.energy = 1.0f; // Default energy
+        episode.novelty = 0.0f; // Will be updated by novelty detector
+        episode.resultingReward = 0.0f;
+        
+        // Record currently active neurons as part of this episode
+        for (size_t i = 0; i < numSensory; ++i) {
+            if (pImpl->sensoryNeurons[i]->isFiring() || 
+                std::abs(pImpl->sensoryNeurons[i]->getState().membranePotential - pImpl->sensoryNeurons[i]->getState().restingPotential) > 5.0f) {
+                episode.activeNeurons.push_back(pImpl->sensoryNeurons[i]->getId());
+                // Get normalized activation level
+                float activation = std::abs(pImpl->sensoryNeurons[i]->getState().membranePotential - pImpl->sensoryNeurons[i]->getState().restingPotential) / 20.0f;
+                episode.neuronActivations.push_back(activation);
+            }
+        }
+        
+        // Store this episode in episodic memory
+        pImpl->episodicMemory->storeEpisode(episode);
+    }
+    
+    // 2. Update prediction system with current sensory state
+    if (pImpl->predictionSystem) {
+        // Get current state as SensoryInput for prediction
+        auto currentState = std::make_unique<SensoryInput>(sensoryPattern);
+        
+        // Generate prediction for next state
+        auto predictedState = pImpl->predictionSystem->predictNextState(*currentState);
+        
+        // Update prediction based on actual observation
+        pImpl->predictionSystem->updatePredictions(*predictedState, *currentState);
+        
+        // Train prediction system
+        pImpl->predictionSystem->train(*currentState);
+    }
+    
+    // 3. Update concept formation with current sensory pattern
+    if (pImpl->conceptFormation) {
+        // In a real implementation, this would extract features from the sensory pattern
+        // to form abstract concepts about the environment
+        std::vector<float> conceptFeatures;
+        
+        // Simple feature extraction: compute mean, variance, max/min
+        if (!sensoryPattern.empty()) {
+            float sum = 0.0f, sumSq = 0.0f, max = sensoryPattern[0], min = sensoryPattern[0];
+            for (float val : sensoryPattern) {
+                sum += val;
+                sumSq += val * val;
+                if (val > max) max = val;
+                if (val < min) min = val;
+            }
+            float mean = sum / sensoryPattern.size();
+            float variance = sumSq / sensoryPattern.size() - mean * mean;
+            
+            conceptFeatures = {mean, variance, max, min}; // Basic features
+        }
+        
+        // Present to concept formation system
+        pImpl->conceptFormation->presentExperience(sensoryPattern, conceptFeatures, 
+                                                 0.0f, // Initial reward, will be updated later
+                                                 static_cast<SimulationStep>(pImpl->currentStep));
+    }
+    
+    // 4. Update attention based on sensory saliency
+    if (pImpl->attention) {
+        // Calculate saliency based on change in input
+        static std::vector<float> previousSensory;
+        if (previousSensory.empty()) {
+            previousSensory = sensoryPattern;
+        } else {
+            // Compute change from previous sensory input
+            float change = 0.0f;
+            for (size_t i = 0; i < std::min(previousSensory.size(), sensoryPattern.size()); ++i) {
+                change += std::abs(sensoryPattern[i] - previousSensory[i]);
+            }
+            
+            // Apply bottom-up salience based on change
+            if (change > 0.1f) {  // Threshold for salient change
+                for (size_t i = 0; i < std::min(numSensory, sensoryPattern.size()); ++i) {
+                    pImpl->attention->applyBottomUpSalience(pImpl->sensoryNeurons[i]->getId(), 
+                                                           change * sensoryPattern[i]);
+                }
+            }
+        }
+        
+        previousSensory = sensoryPattern;
+    }
+    
+    // 5. Update neuromodulation systems
+    if (pImpl->curiosity) {
+        // Update curiosity based on prediction error
+        float predictionError = pImpl->predictionSystem ? pImpl->predictionSystem->getPredictionError() : 0.0f;
+        float noveltyLevel = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+        pImpl->curiosity->update(noveltyLevel, predictionError, pImpl->timestep);
+    }
+    
+    if (pImpl->dopamine) {
+        // Update dopamine with reward prediction (initially zero)
+        pImpl->dopamine->update(pImpl->timestep);
+    }
+    
+    // Continue with original current code...
     
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;

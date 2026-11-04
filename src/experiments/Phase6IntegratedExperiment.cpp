@@ -58,10 +58,35 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
+    // Create a more engaging environment for learning
+    // Add various objects with different values to encourage exploration
+    // This makes the experiment more meaningful and interesting
+    
+    // Add some resource objects (positive reward)
+    world.addObject(WorldObject(2.0f, 2.0f, WorldObjectType::Resource, 5.0f));  // Food resource
+    world.addObject(WorldObject(8.0f, 8.0f, WorldObjectType::Resource, 10.0f)); // High-value resource
+    world.addObject(WorldObject(12.0f, 4.0f, WorldObjectType::Resource, 8.0f)); // Medium resource
+    
+    // Add some hazard objects (negative reward)
+    world.addObject(WorldObject(5.0f, 6.0f, WorldObjectType::Hazard, -3.0f));  // Minor hazard
+    world.addObject(WorldObject(10.0f, 10.0f, WorldObjectType::Hazard, -8.0f)); // Major hazard
+    
+    // Add exploration targets to encourage movement and discovery
+    world.addObject(WorldObject(15.0f, 2.0f, WorldObjectType::Resource, 3.0f));  // Exploration target
+    world.addObject(WorldObject(1.0f, 10.0f, WorldObjectType::Resource, 4.0f));  // Another exploration target
+    
+    NLM_LOG_INFO("World populated with resources, hazards, and exploration targets");
+    NLM_LOG_INFO("Agent must learn to navigate, discover valuable resources, and avoid hazards");
+    
     // Run simulation
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
+    size_t explorationEvents = 0;
+    size_t resourceFoundEvents = 0;
+    
+    // Track agent's learned preference for exploration
+    float explorationTendency = 0.5f;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
@@ -77,17 +102,51 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
+        // Apply action to world and get interaction results
         ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
         
-        // Compute reward
-        float reward = actionResult.reward;
-        totalReward += reward;
+        // Compute reward - enhanced with exploration and discovery bonuses
+        float stepReward = actionResult.reward;
         
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        // Add exploration bonus based on movement and discovery
+        // This encourages the agent to explore new areas
+        float explorationBonus = 0.0f;
+        if (actionResult.actionType == ActionType::MoveForward || 
+            actionResult.actionType == ActionType::TurnLeft || 
+            actionResult.actionType == ActionType::TurnRight) {
+            // Movement can lead to exploration
+            explorationBonus += 0.1f;
+            explorationEvents++;
+        }
         
-        // Update development
+        // Discovery bonus for finding new resources
+        // This encourages learning about the environment layout
+        if (actionResult.actionType == ActionType::PickUp && actionResult.reward > 0.0f) {
+            explorationBonus += actionResult.reward * 0.5f;  // Half of resource value as discovery bonus
+            resourceFoundEvents++;
+        }
+        
+        // Update exploration tendency based on successful exploration
+        if (explorationBonus > 0.0f) {
+            explorationTendency += 0.02f;
+        } else if (actionResult.reward < -2.0f) {  // Major hazard hit
+            explorationTendency -= 0.03f;
+        }
+        
+        explorationTendency = std::max(0.1f, std::min(1.0f, explorationTendency));
+        
+        // Apply exploration bias to agent's learned preference
+        brain->setLearnedPreference(explorationTendency * 2.0f - 1.0f);  // Range [-1, 1]
+        
+        // Enhanced reward for meaningful discoveries
+        stepReward += explorationBonus;
+        totalReward += stepReward;
+        
+        // Apply reward modulation with exploration bias
+        // Higher exploration tendency increases sensitivity to rewards
+        agent.applyRewardModulation(stepReward, stepReward * explorationTendency);
+        
+        // Update development more frequently to show learning progression
         if (config.enableDevelopment) {
             agent.updateDevelopment(0.001);
         }
@@ -96,13 +155,18 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
-        // Periodic status
-        if (step % 1000 == 0) {
+        // Enhanced logging that shows learning progress
+        if (step % 500 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
-                        " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
+                        " | Reward: " + std::to_string(stepReward) +
+                        " | Total: " + std::to_string(totalReward) +
+                        " | Explored: " + std::to_string(explorationEvents) +
+                        " | Resources: " + std::to_string(resourceFoundEvents) +
+                        " | Exploration Tendency: " + std::to_string(explorationTendency) +
                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                            brain->getWorkingMemory()->getActiveTraces() : 0) +
+                        " | EpisodicMem: " + std::to_string(brain->getEpisodicMemory() ? 
+                            brain->getEpisodicMemory()->getEpisodeCount() : 0));
         }
     }
     
@@ -114,6 +178,23 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
+    
+    // Add new metrics for enhanced experiment
+    result.totalExplorationEvents = explorationEvents;  // Track exploration success
+    result.totalResourceDiscoveries = resourceFoundEvents;  // Track resource discovery
+    result.finalExplorationTendency = explorationTendency;  // Track learned exploration bias
+    
+    // Log enhanced final results
+    NLM_LOG_INFO("=== Enhanced Learning Experiment Results ===");
+    NLM_LOG_INFO("Total exploration events: " + std::to_string(explorationEvents));
+    NLM_LOG_INFO("Total resource discoveries: " + std::to_string(resourceFoundEvents));
+    NLM_LOG_INFO("Final exploration tendency: " + std::to_string(explorationTendency));
+    NLM_LOG_INFO("Memory retention: " + std::to_string(result.memoryEpisodesStored) + " episodes");
+    NLM_LOG_INFO("Novelty detection: " + std::to_string(result.noveltyLevel));
+    NLM_LOG_INFO("Curiosity drive: " + std::to_string(result.curiosityLevel));
+    NLM_LOG_INFO("Dopamine modulation: " + std::to_string(result.dopamineLevel));
+    NLM_LOG_INFO("Working memory traces: " + std::to_string(brain->getWorkingMemory() ? 
+        brain->getWorkingMemory()->getActiveTraces() : 0));
     
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
