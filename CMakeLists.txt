@@ -132,11 +132,11 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
+# Advanced configuration executable
+add_executable(nlm_config
+    src/advanced_config.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm_config PUBLIC nlm_core)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -173,21 +173,23 @@ add_executable(nlm_phase6_text_demo
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
 
-# Benchmark executable
-add_executable(nlm_benchmark
-    src/benchmark.cpp
+# Test suite executable
+add_executable(nlm_test_suite
+    src/test_suite.cpp
 )
-target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+target_link_libraries(nlm_test_suite PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
 
-# Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
+# Advanced configuration executable
+add_executable(nlm_config
+    src/advanced_config.cpp
+)
+target_link_libraries(nlm_config PUBLIC nlm_core)
+
+# Power user features executable
+add_executable(nlm_power_user
+    src/power_user_features.cpp
+)
+target_link_libraries(nlm_power_user PUBLIC nlm_core nlm_agent nlm_world)
 option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
@@ -206,7 +208,9 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 
+        nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_phase6_text_demo 
+        nlm_benchmark nlm_unified
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

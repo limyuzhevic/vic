@@ -19,9 +19,12 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON/YAML parser first (Phase 2 improved)
+    if (loadFromJSON(filepath)) {
+        return true;
+    }
     
+    // Fall back to simple key=value format (Phase 1)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -55,6 +58,24 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
+// TODO: Implement proper JSON/YAML parser
+bool Config::loadFromJSON(const std::string& content) {
+    // For now, just treat as a special key=value format
+    // TODO: Use a real JSON library like nlohmann::json
+    return false;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Read entire file
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    return loadFromJSON(content);
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -86,7 +107,35 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Helper to convert ConfigValue to string
+        auto valueToString = [](const ConfigValue& value) -> std::string {
+            std::stringstream ss;
+            std::visit([&ss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    ss << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                     std::is_same_v<T, std::vector<double>> ||
+                                     std::is_same_v<T, std::vector<std::string>>) {
+                    ss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i) ss << ", ";
+                        if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                            ss << "\"" << arg[i] << "\"";
+                        } else {
+                            ss << arg[i];
+                        }
+                    }
+                    ss << "]";
+                } else {
+                    ss << arg;
+                }
+            }, value);
+            return ss.str();
+        };
+        
+        file << entry.key << " = " << valueToString(entry.value) << "\n\n";
     }
     
     return true;
@@ -234,5 +283,62 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// JSON parsing implementation (simplified)
+bool Config::loadFromJSON(const std::string& content) {
+    // Simple JSON parser for key=value pairs
+    // This is a basic implementation - for production, use nlohmann::json
+    size_t pos = 0;
+    while (pos < content.length()) {
+        // Find next key (simplified - looks for "key": value format)
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find value after colon
+        size_t colonPos = content.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        size_t valueStart = content.find_first_not_of(' ', colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        // Find end of value (next comma or })
+        size_t valueEnd = content.find_first_of(',}', valueStart);
+        if (valueEnd == std::string::npos) valueEnd = content.length();
+        
+        std::string valueStr = content.substr(valueStart, valueEnd - valueStart);
+        
+        // Trim whitespace
+        valueStr = trim(valueStr);
+        
+        // Remove surrounding quotes from value if present
+        if (valueStr.size() >= 2 && 
+            ((valueStr.front() == '"' && valueStr.back() == '"') ||
+             (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+            valueStr = valueStr.substr(1, valueStr.size() - 2);
+        }
+        
+        set(key, valueStr, ConfigSource::File);
+        
+        pos = valueEnd;
+    }
+    
+    return true;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Read entire file
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    return loadFromJSON(content);
+}
 
 } // namespace nlm
