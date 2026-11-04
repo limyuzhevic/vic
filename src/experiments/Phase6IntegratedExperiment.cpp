@@ -62,6 +62,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
     size_t firingCount = 0;
+    size_t positiveRewardSteps = 0;
+    size_t negativeRewardSteps = 0;
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
@@ -80,9 +82,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Apply action to world
         ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
         
-        // Compute reward
+        // Compute reward - track both positive and negative
         float reward = actionResult.reward;
         totalReward += reward;
+        if (reward > 0.0f) positiveRewardSteps++;
+        else if (reward < 0.0f) negativeRewardSteps++;
         
         // Apply reward modulation
         agent.applyRewardModulation(reward, 0.0f);
@@ -107,13 +111,20 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
+    result.totalReward = totalReward;  // Track total reward, not average
     result.avgFiringRate = totalFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
+    
+    // Log detailed reward statistics
+    NLM_LOG_INFO("Reward statistics:");
+    NLM_LOG_INFO("  Total reward: " + std::to_string(result.totalReward));
+    NLM_LOG_INFO("  Average reward per step: " + std::to_string(result.totalReward / config.maxSteps));
+    NLM_LOG_INFO("  Positive reward steps: " + std::to_string(positiveRewardSteps));
+    NLM_LOG_INFO("  Negative reward steps: " + std::to_string(negativeRewardSteps));
     
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);

@@ -185,6 +185,30 @@ bool CheckpointReader::open(const std::string& filepath) {
         if (!stream_) break;
     }
     stream_.clear();
+    
+    // Report progress
+    NLM_LOG_INFO("Checkpoint: " + filepath + " opened successfully");
+    NLM_LOG_INFO("  Checkpoint size: " + std::to_string(header_.totalSize) + " bytes");
+    NLM_LOG_INFO("  Sections: " + std::to_string(sections_.size()));
+    for (size_t i = 0; i < sections_.size(); ++i) {
+        if (sections_[i].type == static_cast<uint32_t>(CheckpointSection::End)) continue;
+        const char* sectionName = "unknown";
+        switch (sections_[i].type) {
+            case static_cast<uint32_t>(CheckpointSection::Neurons): sectionName = "Neurons"; break;
+            case static_cast<uint32_t>(CheckpointSection::Synapses): sectionName = "Synapses"; break;
+            case static_cast<uint32_t>(CheckpointSection::SpikeHistory): sectionName = "SpikeHistory"; break;
+            case static_cast<uint32_t>(CheckpointSection::RandomState): sectionName = "RandomState"; break;
+            case static_cast<uint32_t>(CheckpointSection::Plasticity): sectionName = "Plasticity"; break;
+            case static_cast<uint32_t>(CheckpointSection::Memory): sectionName = "Memory"; break;
+            case static_cast<uint32_t>(CheckpointSection::SimulationState): sectionName = "SimulationState"; break;
+            case static_cast<uint32_t>(CheckpointSection::Development): sectionName = "Development"; break;
+            case static_cast<uint32_t>(CheckpointSection::Neuromodulation): sectionName = "Neuromodulation"; break;
+            case static_cast<uint32_t>(CheckpointSection::Prediction): sectionName = "Prediction"; break;
+            case static_cast<uint32_t>(CheckpointSection::Environment): sectionName = "Environment"; break;
+        }
+        NLM_LOG_INFO("    " + std::to_string(i) + ": " + sectionName + " (" + std::to_string(sections_[i].size) + " bytes)");
+    }
+    
     return true;
 }
 
@@ -378,13 +402,26 @@ bool CheckpointWriter::finalize() {
     }
     SectionHeader endHeader;
     endHeader.type = static_cast<uint32_t>(CheckpointSection::End);
-    endHeader.offset = static_cast<uint64_t>(stream_.tellp()) + sizeof(SectionHeader);
+    endHeader.offset = static_cast<uint64_t>(stream_.tellp());  // Current position is the start of the End section
+    endHeader.size = 0;
+    endHeader.checksum = 0;
+    endHeader.compressedSize = 0;
     stream_.write(reinterpret_cast<const char*>(&endHeader), sizeof(endHeader));
     if (!stream_) return false;
     bytesWritten_ += sizeof(endHeader);
     // Patch the real header in place.
     header_.totalSize = bytesWritten_;
-    header_.checksum = ChecksumCalculator::crc32(neuronPayload_.data(), neuronPayload_.size());
+    // Calculate checksum on all payload data, not just neurons
+    uint32_t totalChecksum = ChecksumCalculator::crc32(neuronPayload_.data(), neuronPayload_.size());
+    totalChecksum = ChecksumCalculator::combine(totalChecksum, 
+        ChecksumCalculator::crc32(synapsePayload_.data(), synapsePayload_.size()));
+    totalChecksum = ChecksumCalculator::combine(totalChecksum,
+        ChecksumCalculator::crc32(delayedSpikePayload_.data(), delayedSpikePayload_.size()));
+    for (const auto& entry : extraPayloads_) {
+        totalChecksum = ChecksumCalculator::combine(totalChecksum,
+            ChecksumCalculator::crc32(entry.second.data(), entry.second.size()));
+    }
+    header_.checksum = totalChecksum;
     stream_.seekp(0, std::ios::beg);
     stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
     stream_.flush();
@@ -450,16 +487,46 @@ bool CheckpointManager::saveImmediately(const std::string& name) {
 bool CheckpointManager::update(uint64_t currentStep, double currentTime) {
     (void)currentTime;
     if (!shouldSave(currentStep)) return false;
-    if (!neuronProvider_ || !synapseProvider_) return false;
     lastSaveStep_ = currentStep;
-    return saveImmediately("checkpoint-" + std::to_string(currentStep) + ".bin");
+    return saveImmediately("checkpoint-" + std::to_string(currentStep) + ".bin",
+                           [this]() -> NeuronCheckpointData { NeuronCheckpointData data; return data; },
+                           [this]() -> SynapseCheckpointData { SynapseCheckpointData data; return data; },
+                           []() -> std::vector<uint8_t> { return std::vector<uint8_t>(); });
 }
 
-bool CheckpointManager::load(const std::string& name) {
+bool CheckpointManager::load(const std::string& name, 
+                               std::function<void(const std::vector<uint8_t>&)> neuronRestorer,
+                               std::function<void(const std::vector<uint8_t>&)> synapseRestorer,
+                               std::function<void(const std::vector<uint8_t>&)> spikeRestorer) {
     std::string path = (std::filesystem::path(checkpointDir_) / name).string();
     CheckpointReader reader;
     if (!reader.open(path)) return false;
-    return reader.validate();
+    if (!reader.validate()) {
+        NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
+        return false;
+    }
+    
+    // Restore checkpoints to components
+    auto neuronPayload = reader.readSection(CheckpointSection::Neurons);
+    auto synapsePayload = reader.readSection(CheckpointSection::Synapses);
+    auto spikePayload = reader.readSection(CheckpointSection::SpikeHistory);
+    
+    // Report progress
+    NLM_LOG_INFO("Checkpoint loading progress:");
+    NLM_LOG_INFO("  Reading neurons...");
+    if (neuronRestorer && !neuronPayload.empty()) neuronRestorer(neuronPayload);
+    NLM_LOG_INFO("  Neurons loaded: " + std::to_string(neuronPayload.size()) + " bytes");
+    
+    NLM_LOG_INFO("  Reading synapses...");
+    if (synapseRestorer && !synapsePayload.empty()) synapseRestorer(synapsePayload);
+    NLM_LOG_INFO("  Synapses loaded: " + std::to_string(synapsePayload.size()) + " bytes");
+    
+    NLM_LOG_INFO("  Reading spikes...");
+    if (spikeRestorer && !spikePayload.empty()) spikeRestorer(spikePayload);
+    NLM_LOG_INFO("  Spikes loaded: " + std::to_string(spikePayload.size()) + " bytes");
+    
+    NLM_LOG_INFO("Checkpoint loaded and restored successfully");
+    return true;
 }
 
 std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoints() const {
