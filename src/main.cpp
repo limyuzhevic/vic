@@ -7,26 +7,7 @@
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
 
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-#include "sensory/SensoryInput.hpp"
-#include "motor/Action.hpp"
-#include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
-
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
-
-using namespace nlm;
+#include "core/Config/Constants.hpp"
 
 void printBanner() {
     std::cout << R"(
@@ -179,7 +160,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        neurons[i]->injectCurrent(Constants::Defaults::TEST_CURRENT_INJECTION);  // Strong excitatory input
     }
     
     // Run a few steps
@@ -230,14 +211,14 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < Constants::Defaults::MAX_PATTERN_NEURONS) {
                 patternNeurons.push_back(neuron->getId());
             }
         }
     }
-    for (SimulationStep step = 0; step < 1000; ++step) {
+    for (SimulationStep step = 0; step < Constants::Defaults::PLASTICITY_EXPERIMENT_STEPS; ++step) {
         for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+            brain->injectCurrent(id, Constants::Defaults::PATTERN_CURRENT_INJECTION);
         }
         
         brain->step(step, step * 0.001);
@@ -283,10 +264,10 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
 
-    for (int trial = 0; trial < 50; ++trial) {
-        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
+    for (int trial = 0; trial < Constants::Defaults::STDP_TRIAL_COUNT; ++trial) {
+        brain->injectCurrent(syn->getSourceNeuron(), Constants::Defaults::STDP_CURRENT_INJECTION);
         brain->step(trial * 2, trial * 2 * 0.001);
-        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
+        brain->injectCurrent(syn->getDestinationNeuron(), Constants::Defaults::STDP_CURRENT_INJECTION);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
 
@@ -298,9 +279,9 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
+    if (totalDelta > Constants::Defaults::EPSILON) {
         NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
+    } else if (totalDelta < -Constants::Defaults::EPSILON) {
         NLM_LOG_INFO("  ! STDP reversed: Check parameters");
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");

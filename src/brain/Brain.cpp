@@ -106,7 +106,7 @@ struct Brain::Impl {
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
+        uint64_t seed = Defaults::RANDOM_SEED;  // Use constant instead of magic number 42
         if (auto seedOpt = config->get<int64_t>("random_seed")) {
             seed = *seedOpt;
         }
@@ -142,10 +142,10 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        // Configure STDP parameters using constants
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", Constants::Defaults::STDP_LTP_WEIGHT);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", Constants::Defaults::STDP_LTD_WEIGHT);
+        float tau = config->getOr<float>("stdp_tau", Constants::Defaults::STDP_TIME_CONSTANT);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
@@ -202,9 +202,9 @@ bool Brain::initialize() {
     pImpl->currentTime = 0.0;
     
     // Get configuration values
-    size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000));
-    size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", 1));
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", Constants::Defaults::MAX_NEURON_COUNT));
+    size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", Constants::Defaults::REGION_COUNT));
+    float connectionProbability = pImpl->config->getOr<float>("connection_probability", Constants::Defaults::CONNECTION_PROBABILITY);
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
