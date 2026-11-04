@@ -20,7 +20,7 @@ struct Neuron::Impl {
     
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
+    static constexpr float TIME_CONSTANT = 75.0f;  // ms - increased for slower integration
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
@@ -205,68 +205,87 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+// LIF dynamics: Enhanced Leaky Integrate-and-Fire with better spike rate control
+    // dV/dt = (V_rest - V)/tau + I/C + adaptation
+    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C) + adaptation
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
+    float tau = Impl::TIME_CONSTANT;  // ms - increased for realistic time constant
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
+    // Leak contribution with conductance-based scaling (biologically realistic)
+    float leakConductance = pImpl->state.leakConductance;
+    float leakContribution = (V_rest - V) * leakConductance / tau;
+    
+    // Strong spike-frequency adaptation (biologically realistic)
+    // Post-spike adaptation hyperpolarizes the neuron, increasing threshold for next spike
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        // Adaptation creates a potassium current that hyperpolarizes the neuron
+        float adaptationCurrent = pImpl->state.adaptationVariable * 0.03f;
+        float adaptationVoltage = adaptationCurrent * (tau / C);  // Convert current to voltage
+        V -= std::min(adaptationVoltage, 8.0f);  // Clamp adaptation effect
+        
+        // Adaptation variable decays over time (synaptic resources depletion)
+        pImpl->state.adaptationVariable *= 0.92f;  // Slower decay
+    }
     
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
-    }
+    // Clamp membrane potential to prevent instability with tighter bounds
+    V = std::clamp(V, -90.0f, 45.0f);  // Narrower range reduces runaway excitation
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
-    
-    // Update the firing-rate metric from counted spikes, in Hz.
-    // Previously setFiringRate() was never called anywhere, so
-    // getAverageFiringRate() summed zeros even with thousands of spikes.
-    // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
-    // dt is in seconds (0.001 in the demos), so a neuron firing every
-    // step would approach 1000 Hz, and refractory periods cap it well
-    // below that in practice.
+    // Firing rate calculation (exponential moving average)
     if (dt > 0.0) {
-        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+        pImpl->state.firingRate = 0.95f * pImpl->state.firingRate;  // Slower decay
     }
-
-    // Check for spike
-    if (V >= threshold) {
+    
+    // Enhanced spike detection with refractory and adaptation consideration
+    bool spikeThresholdMet = V >= threshold;
+    
+    if (spikeThresholdMet && !pImpl->state.isRefractory()) {
         fired = true;
-        if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
-        }
-        pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
         
-        // Record spike
+        // Record spike in history for STDP and adaptation
         recordSpike(currentTime);
         
-        // Reset membrane potential
-        V = V_reset;
+        // Strong spike-frequency adaptation response (biologically realistic)
+        // Each spike increases adaptation variable, making subsequent spikes harder
+        pImpl->state.adaptationVariable += 2.0f;  // Stronger adaptation per spike
         
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        // Reset membrane potential with adaptation contribution
+        float adaptationInfluence = std::min(pImpl->state.adaptationVariable * 0.08f, 6.0f);
+        V = std::max(V_reset - adaptationInfluence, V_rest - 15.0f);  // Don't hyperpolarize too much
+        
+        // Extended refractory period with adaptation component
+        // Longer refractory period for high adaptation levels
+        uint32_t baseRefractory = pImpl->state.refractoryPeriod;
+        uint32_t adaptationRefractory = static_cast<uint32_t>(pImpl->state.adaptationVariable * 0.5f);
+        pImpl->state.refractoryRemaining = baseRefractory + adaptationRefractory;
+        
+        // Set firing state
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Track spike count for statistics
+        pImpl->state.firingRate += 0.06f * static_cast<float>(1.0 / dt);  // Lower contribution
     } else {
+        // Neuron is active (processing) but not in refractory or not spiked
+        pImpl->state.firingState = FiringState::Active;
+    }
+    
+    // Clear synaptic input for next step
+    pImpl->synapticInput = 0.0f;
+    
+    return fired;
+    } else {
+        // Neuron is active (processing) but not refractory
         pImpl->state.firingState = FiringState::Active;
     }
     
@@ -293,11 +312,32 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Threshold is typically -52mV with small variation (higher threshold reduces firing)
+    pImpl->state.threshold = -52.0f + rng.uniformReal(-2.0f, 2.0f);
     
     // Resting potential typically -70mV
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    
+    // Reset potential slightly above resting (-65mV typical for LIF)
+    pImpl->state.resetPotential = -65.0f + rng.uniformReal(-1.0f, 1.0f);
+    
+    // Leak conductance for biological realism (nS)
+    pImpl->state.leakConductance = 15.0f + rng.uniformReal(-3.0f, 3.0f);
+    
+    // Refractory period controls maximum firing rate (steps)
+    pImpl->state.refractoryPeriod = 15 + rng.uniformInt(0, 10);  // 15-25 steps
+    
+    // Plasticity flags for STDP, Hebbian, reward-modulated learning
+    pImpl->plasticityFlags.enableSTDP = true;
+    pImpl->plasticityFlags.enableHebbian = true;
+    pImpl->plasticityFlags.enableRewardModulated = true;
+    
+    // Set neuron type based on initialization
+    if (pImpl->state.restingPotential < -75.0f) {
+        pImpl->type = NeuronType::Inhibitory;  // More hyperpolarized = inhibitory
+    } else {
+        pImpl->type = NeuronType::Excitatory;  // Less hyperpolarized = excitatory
+    }
     
     // Reset potential is usually close to resting
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);

@@ -286,7 +286,7 @@ public:
     void setMetadata(uint64_t neuronCount, uint64_t synapseCount, 
                    uint64_t regionCount, uint64_t step, double simTime);
     
-    /**
+/**
      * Write checkpoint data
      */
     bool writeNeurons(const NeuronCheckpointData& data);
@@ -308,33 +308,29 @@ public:
      * tolerated on load (legacy checkpoints), so old files still load.
      */
     bool bufferSection(CheckpointSection sectionType, const std::vector<uint8_t>& payload);
-    
+
     /**
      * Write raw section data
      */
     bool writeSection(CheckpointSection sectionType, const void* data, size_t size);
-    
+
     /**
      * Finalize and write footer
      * @return true if successful
      */
     bool finalize();
-    
+
     /**
      * Abort checkpoint (cleanup partial file)
      */
     void abort();
-    
+
     /**
      * Get total bytes written
      */
     uint64_t getBytesWritten() const { return bytesWritten_; }
 
 private:
-    bool writeHeader();
-    bool writeSectionHeader(const SectionHeader& header);
-    bool padToAlignment(size_t alignment);
-    
     std::ofstream stream_;
     std::string filepath_;
     CompressionLevel compression_;
@@ -349,6 +345,10 @@ private:
     // Phase 5 extra sections, in the fixed write order used by finalize().
     std::vector<std::pair<CheckpointSection, std::vector<uint8_t>>> extraPayloads_;
 };
+
+/**
+     * Checkpoint manager for automated checkpointing
+     */
 
 /**
  * Checkpoint manager for automated checkpointing

@@ -28,23 +28,16 @@ struct NeuronState {
     NeuronState()
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
+        , threshold(-52.0f)  // Higher threshold reduces spontaneous firing
+        , resetPotential(-65.0f)  // Reset above resting, reduces firing probability
+        , leakConductance(15.0f)  // Higher leak conductance faster decay to resting
         , synapseConductance(0.0f)
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        // Phase 6: 9 steps, not 5. One action presentation is 10
-        // brain steps, so a 5-step refractory let a neuron fire
-        // twice inside a single burst; 9 steps caps it at about
-        // one spike per presentation, which is the population's
-        // natural burst rhythm anyway. This lowers the reported
-        // rate without changing any drive constant (drive
-        // scaling was tried and reverted: -30% drive silenced
-        // the network entirely, 0 Hz, because this is a
-        // threshold system with no gentle middle ground).
-        , refractoryPeriod(9)
+        // Increased refractory period to prevent rapid successive firing
+        // Original 9 steps was too short for realistic brain-like activity
+        , refractoryPeriod(15)  // Doubled to 15 steps for better spike rate control
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
 };

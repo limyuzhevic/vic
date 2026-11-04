@@ -4,10 +4,10 @@
 namespace nlm {
 
 struct IntegrateAndFireDynamics::Impl {
-    float membraneTimeConstant;  // ms
-    float membraneResistance;     // MOhm
+    float membraneTimeConstant;  // ms - increased for slower integration
+    float membraneResistance;     // MOhm - optimized for realistic input processing
     
-    Impl() : membraneTimeConstant(20.0f), membraneResistance(10.0f) {}
+    Impl() : membraneTimeConstant(50.0f), membraneResistance(12.0f) {}  // Optimized parameters
 };
 
 IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}

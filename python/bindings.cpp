@@ -15,6 +15,13 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/neuromodulation/Reward.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -408,6 +415,162 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             "Initialize with world")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+             py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    // Reward class for reinforcement learning
+    py::class_<Reward, std::shared_ptr<Reward>>(m, "Reward", R"pbdoc(Reward signal for reinforcement learning)pbdoc")
+        .def(py::init<>())
+        .def("getValue", &Reward::getValue, "Get current reward value")
+        .def("setValue", &Reward::setValue, py::arg("value"), "Set current reward value")
+        .def("add", &Reward::add, py::arg("delta"), "Accumulate reward")
+        .def("reset", &Reward::reset, "Reset accumulated reward")
+        .def("computeReward", &Reward::computeReward, py::arg("observation"),
+             "Compute reward from environment observation")
+        .def("computeEnvironmentalReward", &Reward::computeEnvironmentalReward, py::arg("observation"),
+             "Compute environmental reward from observation")
+        .def("computeIntegratedReward", &Reward::computeIntegratedReward,
+             py::arg("observation"), py::arg("neuromodulationLevel"),
+             "Compute integrated reward with neuromodulation")
+        .def("getHistory", &Reward::getHistory, "Get reward history")
+        .def("clearHistory", &Reward::clearHistory, "Clear reward history")
+        .def("__repr__", [](const Reward& r) {
+            return "<Reward: value=" + std::to_string(r.getValue()) + ", history_size=" + 
+                   std::to_string(r.getHistory().size()) + ">";
+        });
+
+    // Plasticity rules
+    py::class_<STDP, std::shared_ptr<STDP>>(m, "STDP", R"pbdoc(Spike-Timing-Dependent Plasticity)pbdoc")
+        .def(py::init<>())
+        .def("update", &STDP::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"),
+             "Update synaptic weights based on spike timing")
+        .def("applyWeightChange", &STDP::applyWeightChange, py::arg("synapse"), py::arg("delta"),
+             "Apply weight change to synapse")
+        .def("getName", &STDP::getName)
+        .def("setLTPWeight", &STDP::setLTPWeight, py::arg("weight"), "Set LTP weight")
+        .def("getLTPWeight", &STDP::getLTPWeight)
+        .def("setLTDWeight", &STDP::setLTDWeight, py::arg("weight"), "Set LTD weight")
+        .def("getLTDWeight", &STDP::getLTDWeight)
+        .def("setTimeConstant", &STDP::setTimeConstant, py::arg("tau"), "Set STDP time constant")
+        .def("getTimeConstant", &STDP::getTimeConstant)
+        .def("configure", &STDP::configure, py::arg("ltpWeight"), py::arg("ltdWeight"), py::arg("tau"),
+             "Configure STDP parameters");
+
+    py::class_<Hebbian, std::shared_ptr<Hebbian>>(m, "Hebbian", R"pbdoc(Hebbian plasticity rule)pbdoc")
+        .def(py::init<>())
+        .def("update", &Hebbian::update, py::arg("synapse"), py::arg("preSpikes"), py::arg("postSpikes"), py::arg("dt"),
+             "Update synaptic weights based on co-activity")
+        .def("applyWeightChange", &Hebbian::applyWeightChange, py::arg("synapse"), py::arg("delta"),
+             "Apply weight change to synapse")
+        .def("getName", &Hebbian::getName)
+        .def("setLearningRate", &Hebbian::setLearningRate, py::arg("rate"), "Set learning rate")
+        .def("getLearningRate", &Hebbian::getLearningRate)
+        .def("setMaxWeight", &Hebbian::setMaxWeight, py::arg("maxWeight"), "Set maximum weight")
+        .def("getMaxWeight", &Hebbian::getMaxWeight);
+
+    // Neuromodulation system
+    py::class_<Neuromodulator, std::shared_ptr<Neuromodulator>>(m, "Neuromodulator", R"pbdoc(Base class for neuromodulators)pbdoc")
+        .def(py::init<>())
+        .def("getLevel", &Neuromodulator::getLevel)
+        .def("setLevel", &Neuromodulator::setLevel, py::arg("level"))
+        .def("signalReward", &Neuromodulator::signalReward, py::arg("reward"),
+             "Signal reward to neuromodulator")
+        .def("signalRewardPredictionError", &Neuromodulator::signalRewardPredictionError, py::arg("error"),
+             "Signal reward prediction error");
+
+    py::class_<Dopamine, Neuromodulator>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator)pbdoc")
+        .def(py::init<>());
+
+    py::class_<Curiosity, Neuromodulator>(m, "Curiosity", R"pbdoc(Curiosity neuromodulator)pbdoc")
+        .def(py::init<>());
+
+    py::class_<Novelty, Neuromodulator>(m, "Novelty", R"pbdoc(Novelty detection neuromodulator)pbdoc")
+        .def(py::init<>());
+
+    // Memory systems
+    py::class_<NeuralWorkingMemory, std::shared_ptr<NeuralWorkingMemory>>(m, "NeuralWorkingMemory", R"pbdoc(Working memory system)pbdoc")
+        .def(py::init<>())
+        .def("addItem", &NeuralWorkingMemory::addItem, py::arg("item"), py::arg("priority"),
+             "Add item to working memory")
+        .def("getItem", &NeuralWorkingMemory::getItem, py::arg("index"), "Get item by index")
+        .def("getSize", &NeuralWorkingMemory::getSize)
+        .def("clear", &NeuralWorkingMemory::clear);
+
+    py::class_<NeuralEpisodicMemory, std::shared_ptr<NeuralEpisodicMemory>>(m, "NeuralEpisodicMemory", R"pbdoc(Episodic memory system)pbdoc")
+        .def(py::init<>())
+        .def("storeEpisode", &NeuralEpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store episodic memory")
+        .def("recallEpisode", &NeuralEpisodicMemory::recallEpisode, py::arg("index"),
+             "Recall episode by index")
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount)
+        .def("replayEpisodes", &NeuralEpisodicMemory::replayEpisodes, py::arg("startIndex"), py::arg("count"),
+             "Replay episodes for consolidation")
+        .def("getLastReplayIndex", &NeuralEpisodicMemory::getLastReplayIndex);
+
+    // Prediction system
+    py::class_<PredictionSystem, std::shared_ptr<PredictionSystem>>(m, "PredictionSystem", R"pbdoc(Neural prediction system)pbdoc")
+        .def(py::init<>())
+        .def("predict", &PredictionSystem::predict, py::arg("input"), "Make prediction")
+        .def("updatePredictionError", &PredictionSystem::updatePredictionError, py::arg("error"),
+             "Update prediction error")
+        .def("getPrediction", &PredictionSystem::getPrediction)
+        .def("getPredictionError", &PredictionSystem::getPredictionError)
+        .def("getConfidence", &PredictionSystem::getConfidence);
+
+    // Development system
+    py::class_<DevelopmentSystem, std::shared_ptr<DevelopmentSystem>>(m, "DevelopmentSystem", R"pbdoc(Neural development system)pbdoc")
+        .def(py::init<>())
+        .def("updateStage", &DevelopmentSystem::updateStage, py::arg("timestep"),
+             "Update developmental stage")
+        .def("getCurrentStage", &DevelopmentSystem::getCurrentStage)
+        .def("setStage", &DevelopmentSystem::setStage, py::arg("stage"), "Set developmental stage")
+        .def("isCriticalPeriod", &DevelopmentSystem::isCriticalPeriod)
+        .def("getPlasticityMultiplier", &DevelopmentSystem::getPlasticityMultiplier);
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -423,6 +586,18 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createReward", []() -> std::shared_ptr<Reward> {
+        return std::make_shared<Reward>();
+    }, "Create a new reward system");
+
+    m.def("createSTDP", []() -> std::shared_ptr<STDP> {
+        return std::make_shared<STDP>();
+    }, "Create a new STDP plasticity rule");
+
+    m.def("createHebbian", []() -> std::shared_ptr<Hebbian> {
+        return std::make_shared<Hebbian>();
+    }, "Create a new Hebbian plasticity rule");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

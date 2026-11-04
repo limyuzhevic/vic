@@ -287,11 +287,225 @@ print("Agent simulation complete!")
 
 ---
 
+### Project 5: Enhanced Reward System
+
+```python
+import pynlm
+
+# Create enhanced reward system
+reward = pynlm.createReward()
+
+# Get observation from world
+observation = world.getSensoryPercept()
+
+# Compute environmental reward (requires implementation in SimpleWorld)
+env_reward = reward.computeEnvironmentalReward(observation)
+print(f"Environmental reward: {env_reward}")
+
+# Compute integrated reward with neuromodulation
+neuromodulation_level = agent.getNeuromodulationLevel()
+integrated_reward = reward.computeIntegratedReward(observation, neuromodulation_level)
+print(f"Integrated reward: {integrated_reward}")
+
+# Use reward in learning
+agent.applyRewardModulation(integrated_reward, 0.0)
+```
+
+### Project 6: Advanced Learning with Plasticity Rules
+
+```python
+import pynlm
+
+# Create brain and plasticity rules
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Create and configure plasticity rules
+stdp = pynlm.createSTDP()
+stdp.configure(ltpWeight=0.015, ltdWeight=0.018, tau=35.0)
+
+hebbian = pynlm.createHebbian()
+hebbian.setLearningRate(0.015)
+
+# Run simulation with enhanced plasticity
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+### Project 7: Neuromodulation Integration
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access neuromodulation system
+neuromodulator = brain.getNeuromodulator()
+
+# Get neuromodulators
+dopamine = neuromodulator.getDopamine()
+curiosity = neuromodulator.getCuriosity()
+novelty = neuromodulator.getNovelty()
+
+# Modify neuromodulation levels
+dopamine.setLevel(0.5)
+curiosity.setLevel(0.3)
+novelty.setLevel(0.2)
+
+# Signal rewards
+neuromodulator.signalReward(0.8)
+neuromodulator.signalRewardPredictionError(0.1)
+```
+
+### Project 8: Memory Systems
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access memory systems
+working_memory = brain.getWorkingMemory()
+episodic_memory = brain.getEpisodicMemory()
+
+# Store and recall memories
+working_memory.addItem("observation", 0.8)
+working_memory.addItem("action", 0.9, priority=1)
+
+episode = {"sensory": "vision_data", "action": "move_forward", "reward": 0.5}
+episodic_memory.storeEpisode(episode)
+
+# Use memory for learning
+recall = episodic_memory.recallEpisode(0)
+```
+
+### Project 9: Development System
+
+```python
+import pynlm
+
+# Create brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Access development system
+development = brain.getDevelopmentSystem()
+
+# Update developmental stage
+for step in range(200):
+    development.updateStage(0.1)  # Update per timestep
+    current_stage = development.getCurrentStage()
+    
+    # Set developmental stage based on simulation time
+    if step == 50:
+        development.setStage(pynlm.DevelopmentalStage.Maturation)
+    elif step == 100:
+        development.setStage(pynlm.DevelopmentalStage.Adult)
+    elif step == 150:
+        development.setStage(pynlm.DevelopmentalStage.Aging)
+```
+
+---
+
+## Advanced Features Overview
+
+### Enhanced Neural Dynamics
+
+The NLM neural dynamics have been significantly improved:
+
+1. **Optimized Spike Rate Control**: 
+   - Higher neuron threshold (-52mV vs -55mV)
+   - Extended refractory period (15-25 steps vs 9 steps)
+   - Slower membrane time constant (50-75ms vs 20ms)
+   - Stronger leak conductance (15nS vs 10nS)
+
+2. **Spike-Frequency Adaptation**:
+   - Post-spike hyperpolarization
+   - Adaptation variable tracking
+   - Dynamic refractory period extension
+
+### Enhanced Learning Mechanisms
+
+1. **Improved STDP**: 
+   - Pattern selectivity analysis
+   - Temporal consistency bonuses
+   - Longer integration window (35ms vs 20ms)
+   - Weight-dependent soft bounds
+
+2. **Enhanced Hebbian Learning**:
+   - Exploration-exploitation balance
+   - Pattern consistency rewards
+   - Underrepresented synapse bonuses
+
+3. **Comprehensive Neuromodulation**:
+   - Reward-modulated plasticity
+   - Curiosity-driven exploration
+   - Novelty detection
+   - Prediction error signaling
+
+### Improved Reward System
+
+1. **Environmental Reward Computation**:
+   - Vision-based feature analysis
+   - Internal signal stability rewards
+   - Audio-based activity monitoring
+   - Active perception incentives
+
+2. **Integrated Neuromodulatory Rewards**:
+   - Dopamine-modulated reward sensitivity
+   - Baseline reward persistence
+   - History-based reward trends
+
+### Complete Memory Systems
+
+1. **Working Memory**:
+   - Persistent activity competition
+   - Priority-based item management
+   - Decay and consolidation mechanisms
+
+2. **Episodic Memory**:
+   - Experience encoding
+   - Replay and consolidation
+   - Sleep/rest cycle integration
+
+### Python Bindings Enhancement
+
+The Python bindings now include:
+
+- **Reward system** for reinforcement learning
+- **STDP and Hebbian plasticity rules**
+- **Neuromodulation system** (Dopamine, Curiosity, Novelty)
+- **Memory systems** (Working Memory, Episodic Memory)
+- **Prediction system** for forward models
+- **Development system** for lifespan learning
+- **Enhanced agent interface** with advanced learning features
+
+### CLI Improvements (Coming Soon)
+
+Phase 6 demo executables now include:
+- `nlm_demo_simple` - Basic simulation with enhanced reward
+- `nlm_demo_advanced` - Full integration with all systems
+- `nlm_demo_neuromodulation` - Neuromodulation-focused learning
+- `nlm_demo_development` - Developmental stage learning
+- `nlm_demo_memory` - Memory system integration
+
+---
+
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
+1. Read `HOW_TO_USE.md` for more detailed C++ usage
+2. Read `docs/ARCHITECTURE.md` to understand the system design
 3. Experiment with different configurations!
+4. Explore the new Python bindings for enhanced learning features
+5. Try the CLI demo executables for advanced usage
 
 That's it! You're now ready to use NLM.

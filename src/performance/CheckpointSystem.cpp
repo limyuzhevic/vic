@@ -401,10 +401,6 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
-
 // ---------------- CheckpointManager ----------------
 
 CheckpointManager::CheckpointManager()
