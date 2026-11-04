@@ -3,13 +3,30 @@
 #include "../core/Types/Types.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../sensory/Vision.hpp"
+#include "../sensory/Audio.hpp"
+#include "../sensory/InternalSignals.hpp"
+#include "../motor/MotorSystem.hpp"
+#include "../environment/Environment.hpp"
+#include "../environment/Observation.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../performance/CheckpointSystem.hpp"
 #include <memory>
 #include <string>
+#include <vector>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -18,18 +35,7 @@ class Config;
 class RandomGenerator;
 class SimulationClock;
 class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+class Brain;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -74,7 +80,7 @@ public:
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
+    void receiveSensoryInput(const SensoryInput& input);
     
     // Inject current directly into a specific neuron
     void injectCurrent(NeuronId neuron, MembranePotential current);
@@ -96,11 +102,11 @@ public:
     size_t getTotalSpikeCount() const;
     size_t getPendingSpikeEventCount() const;
     
-    // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    // Produce motor/action output based on neural activity
+    std::unique_ptr<Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const Neuromodulator& signal);
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
@@ -191,7 +197,7 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
-
+    
     // Learned preference trait (Phase 5): a single scalar, -1..1,
     // updated only by sandbox reward through AgentBrain, saved in the
     // checkpoint (SimulationState section) and used as a small bias in
@@ -207,7 +213,7 @@ public:
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm
