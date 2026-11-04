@@ -2,11 +2,11 @@ cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
 # C++20 standard
-set(CMAKE_CXX_STANDARD 20)
+**set(CMAKE_CXX_STANDARD 20)**
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
+# Build type configuration
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -15,11 +15,25 @@ endif()
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wformat=2 -Wconversion)
 endif()
 
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Project options
+**option(NLM_BUILD_TESTS "Build tests" ON)**
+option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
+option(NLM_BUILD_DEMOS "Build demo executables" ON)
+option(NLM_BUILD_BENCHMARKS "Build benchmarks" ON)
+option(NLM_ENABLE_LOGGING "Enable logging" ON)
+option(NLM_ENABLE_VALIDATION "Enable configuration validation" ON)
+
+# If NLM_BUILD_PYTHON_BINDINGS is ON, also turn on logging
+if(NLM_BUILD_PYTHON_BINDINGS)
+    set(NLM_ENABLE_LOGGING ON CACHE BOOL "" FORCE)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 
 # Core library
 add_library(nlm_core STATIC
@@ -88,6 +102,14 @@ target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
+
+if(NLM_ENABLE_LOGGING)
+    target_compile_definitions(nlm_core PUBLIC NLM_ENABLE_LOGGING)
+endif()
+
+if(NLM_ENABLE_VALIDATION)
+    target_compile_definitions(nlm_core PUBLIC NLM_ENABLE_VALIDATION)
+endif()
 
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
@@ -174,10 +196,12 @@ add_executable(nlm_phase6_text_demo
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
 
 # Benchmark executable
-add_executable(nlm_benchmark
-    src/benchmark.cpp
-)
-target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+if(NLM_BUILD_BENCHMARKS)
+    add_executable(nlm_benchmark
+        src/benchmark.cpp
+    )
+    target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+endif()
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
@@ -188,7 +212,6 @@ target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 # it must not be added here as a subdirectory: it defines its own
 # nlm_core/nlm_agent/nlm_world targets, which would collide with the
 # ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 CONFIG REQUIRED)
@@ -202,12 +225,33 @@ if(NLM_BUILD_PYTHON_BINDINGS)
 endif()
 
 # Testing
-enable_testing()
-add_subdirectory(tests)
+if(NLM_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+if(NLM_BUILD_DEMOS)
+    install(TARGETS nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+        ARCHIVE DESTINATION bin
+        LIBRARY DESTINATION bin
+        RUNTIME DESTINATION bin
+    )
+endif()
+
+# Build information output
+message(STATUS "NLM Build Configuration:")
+message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Python bindings: ${NLM_BUILD_PYTHON_BINDINGS}")
+message(STATUS "  Tests: ${NLM_BUILD_TESTS}")
+message(STATUS "  Demos: ${NLM_BUILD_DEMOS}")
+message(STATUS "  Benchmarks: ${NLM_BUILD_BENCHMARKS}")
+message(STATUS "  Logging: ${NLM_ENABLE_LOGGING}")
+message(STATUS "  Validation: ${NLM_ENABLE_VALIDATION}")
+message(STATUS "  C++ standard: ${CMAKE_CXX_STANDARD}")

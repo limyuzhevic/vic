@@ -6,43 +6,84 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <cstdint>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
 
-// Configuration value types
+// Type aliases for configuration values for better readability and maintainability
+using ConfigInt = int;
+using ConfigInt64 = int64_t;
+using ConfigDouble = double;
+using ConfigFloat = float;
+using ConfigBool = bool;
+using ConfigString = std::string;
+using ConfigStringVector = std::vector<std::string>;
+using ConfigIntVector = std::vector<int>;
+using ConfigDoubleVector = std::vector<double>;
+
+// Configuration value types - centralized for maintainability
 using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
+    ConfigInt,
+    ConfigInt64,
+    ConfigDouble,
+    ConfigFloat,
+    ConfigBool,
+    ConfigString,
+    ConfigIntVector,
+    ConfigDoubleVector,
+    ConfigStringVector
 >;
 
-// Configuration source
+// Configuration source enum for tracking value origins
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+    Default,    // Set as default value
+    File,       // Loaded from configuration file
+    CommandLine, // Loaded from command line arguments
+    Runtime     // Set at runtime via API
 };
 
-// Configuration entry
+// Configuration entry structure - contains value and metadata
 struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
+    std::string key;           // Configuration key/name
+    ConfigValue value;         // The actual configuration value
+    ConfigSource source;       // How this value was obtained
+    std::string description;   // Human-readable description of the config option
     
+    // Default constructor
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    
+    // Full constructor with all fields
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// Helper functions for configuration management
+namespace config_helpers {
+    // Check if a key exists in configuration entries
+    inline bool keyExists(const std::string& key, const std::vector<ConfigEntry>& entries) {
+        return std::any_of(entries.begin(), entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+    }
+    
+    // Convert ConfigSource to string for debugging/logging
+    inline const char* sourceToString(ConfigSource source) {
+        switch (source) {
+            case ConfigSource::Default: return "Default";
+            case ConfigSource::File: return "File";
+            case ConfigSource::CommandLine: return "CommandLine";
+            case ConfigSource::Runtime: return "Runtime";
+            default: return "Unknown";
+        }
+    }
+    
+    // Check if configuration entry is valid
+    inline bool isValidEntry(const ConfigEntry& entry) {
+        return !entry.key.empty();
+    }
+}
 
 // Main configuration class
 class Config {
