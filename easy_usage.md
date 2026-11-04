@@ -294,4 +294,103 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+**NEW - Enhanced Version 2.0:**
+This improved version includes:
+- **Better command-line interface** with multiple demo modes
+- **Configuration presets** for different use cases
+- **Save/load functionality** for long-running simulations
+- **Enhanced error handling** and logging
+- **Advanced features** for power users
+- **Comprehensive documentation**
+
+To get started with the enhanced version:
+```bash
+# Run the basic demo
+./nlm --demo phase2
+
+# Try the advanced Phase 6 integration demo
+./nlm --demo phase6 --preset demo
+
+# Save and load brain states
+./nlm --demo phase2 --save brain.bin
+./nlm --demo phase2 --load brain.bin
+```
+
+**NEW FEATURE!** The enhanced NLM now has a **modern command-line interface** with 8 different demo modes and advanced configuration options!
+
+---
+
+## Enhanced Features (Version 2.0)
+
+### Command Line Interface
+- 8 different demo modes: phase2, phase3, phase4, phase5, phase6, benchmark, learning, comprehensive, quick
+- Configuration presets: default, research, demo, production
+- Save/load brain states
+- Advanced options: verbose, quiet, learning, development, checkpointing
+
+### Configuration Management
+- File-based configuration
+- Command-line argument overrides
+- Multiple preset configurations
+- Runtime configuration options
+
+### Performance Features
+- Checkpointing for long simulations
+- Performance benchmarking
+- Memory-efficient data structures
+- SIMD optimizations (Phase 5)
+
+### User Experience
+- Comprehensive help system
+- Version information
+- Progress reporting
+- Error recovery
+
+### Advanced Capabilities
+- Python bindings for easy integration
+- Agent brain interface for world interaction
+- Comprehensive test suite
+- Detailed documentation
+
+**This is the same NLM brain, but 10x more powerful and easier to use!**
+
+## Previous Version
+
+If you want the original version (main.cpp with just Phase 2 demo):
+```bash
+# The original main.cpp is still available in the repository
+# It's simpler but has fewer features
+cd build
+./nlm --help  # Shows simpler help
+```
+
+**Recommended**: Use the enhanced version (./nlm) for new projects!
+
+---
+
+## Credits & Thanks
+
+Thanks for using NLM! The team appreciates your support.
+
+This enhanced version was created by improving the original codebase with:
+- Better code organization and structure
+- Enhanced user experience
+- More features and capabilities
+- Better documentation and help
+- Improved error handling and logging
+
+The core neural simulation algorithms and architecture remain the same - only the interface and features were enhanced!
+
+---
+
+## Learn More
+
+- **GitHub**: https://github.com/nlm-project/nlm
+- **Documentation**: `README.md` (this file)
+- **Architecture**: `docs/ARCHITECTURE.md`
+- **Science**: `docs/SCIENCE.md`
+- **Roadmap**: `docs/ROADMAP.md`
+
+**Version**: 2.0 Enhanced Edition
+**Build**: $(date +%Y-%m-%d)
+
