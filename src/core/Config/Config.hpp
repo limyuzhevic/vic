@@ -56,14 +56,21 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON, YAML, or simple key=value format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (JSON format)
     bool saveToFile(const std::string& filepath) const;
+    
+    // Internal parsing helpers (JSON/YAML)
+private:
+    bool parseFromJson(const nlohmann::json& json);
+    bool parseFromYaml(const YAML::Node& yaml);
+    bool loadFromFileSimple(const std::string& filepath);
+    static std::string getFileExtension(const std::string& filename);
     
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>

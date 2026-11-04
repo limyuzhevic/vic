@@ -1,0 +1,118 @@
+# NLM Configuration File (YAML format)
+# Enhanced configuration for Phase 6: Integrated Artificial Brain
+
+version: "0.1.0"
+description: "Neural Learning Machine Phase 6 Configuration"
+
+# Random seed for reproducible experiments
+random_seed: 42
+
+# Simulation settings
+simulation:
+  timestep: 0.001
+  max_steps: 10000
+  time_limit: 0.0
+
+# Brain settings
+brain:
+  neuron_count: 1000
+  region_count: 1
+  connection_probability: 0.15
+  
+  populations:
+    sensory: 125
+    internal: 500
+    inhibitory: 100
+    motor: 125
+
+# Plasticity settings
+plasticity:
+  stdp:
+    ltp_weight: 0.01
+    ltd_weight: 0.012
+    time_constant: 20.0
+    enable: true
+  hebbian:
+    weight_increase: 0.02
+    weight_decrease: 0.01
+    enable: true
+  structural:
+    synaptogenesis_rate: 0.0001
+    pruning_rate: 0.00001
+    enable: true
+
+# Development settings
+development:
+  initial_stage: "Initial"
+  critical_period_steps: 1000
+  maturation_steps: 3000
+  plasticity_decay_rate: 0.01
+
+# Neuromodulation settings
+neuromodulation:
+  dopamine:
+    baseline: 0.0
+    burst_level: 1.0
+    enable: true
+  curiosity:
+    baseline: 0.0
+    enable: true
+  novelty:
+    threshold: 0.5
+    enable: true
+  prediction_error:
+    baseline: 0.0
+    enable: true
+
+# Memory settings
+memory:
+  working_memory:
+    capacity: 100
+    decay_rate: 0.9
+  episodic_memory:
+    max_episodes: 1000
+    replay_interval: 100
+    consolidation_interval: 1000
+    enable: true
+
+# Cognition settings
+cognition:
+  planning:
+    depth: 5
+    enable: true
+  concept_formation:
+    enable: true
+  attention:
+    inhibition_strength: 0.5
+    excitation_strength: 1.5
+    enable: true
+
+# Environment settings
+environment:
+  name: "StandardGridWorld"
+  width: 10
+  height: 10
+  enable: true
+
+# Logging settings
+logging:
+  level: "INFO"
+  to_file: false
+  filename: "nlm.log"
+  max_size_mb: 100
+  rotate_count: 5
+
+# Checkpointing settings
+checkpointing:
+  directory: "./checkpoints"
+  interval: 1000
+  max_files: 10000
+  compress: true
+
+# Visualization settings
+visualization:
+  enabled: false
+  update_rate: 30.0
+
+# Advanced settings
+enable_debug_mode: false

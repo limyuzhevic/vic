@@ -1,0 +1,131 @@
+// Enhanced configuration file with JSON support
+# NLM Configuration File (JSON format)
+# This is the default configuration for Phase 6: Integrated Artificial Brain
+
+{
+    "version": "0.1.0",
+    "description": "Neural Learning Machine Phase 6 Configuration",
+    
+    "simulation": {
+        "timestep": 0.001,
+        "max_steps": 10000,
+        "time_limit": 0.0
+    },
+    
+    "brain": {
+        "neuron_count": 1000,
+        "region_count": 1,
+        "connection_probability": 0.15,
+        
+        "populations": {
+            "sensory": 125,
+            "internal": 500,
+            "inhibitory": 100,
+            "motor": 125
+        }
+    },
+    
+    "plasticity": {
+        "stdp": {
+            "ltp_weight": 0.01,
+            "ltd_weight": 0.012,
+            "time_constant": 20.0,
+            "enable": true
+        },
+        "hebbian": {
+            "weight_increase": 0.02,
+            "weight_decrease": 0.01,
+            "enable": true
+        },
+        "structural": {
+            "synaptogenesis_rate": 0.0001,
+            "pruning_rate": 0.00001,
+            "enable": true
+        }
+    },
+    
+    "development": {
+        "initial_stage": "Initial",
+        "critical_period_steps": 1000,
+        "maturation_steps": 3000,
+        "plasticity_decay_rate": 0.01
+    },
+    
+    "neuromodulation": {
+        "dopamine": {
+            "baseline": 0.0,
+            "burst_level": 1.0,
+            "enable": true
+        },
+        "curiosity": {
+            "baseline": 0.0,
+            "enable": true
+        },
+        "novelty": {
+            "threshold": 0.5,
+            "enable": true
+        },
+        "prediction_error": {
+            "baseline": 0.0,
+            "enable": true
+        }
+    },
+    
+    "memory": {
+        "working_memory": {
+            "capacity": 100,
+            "decay_rate": 0.9
+        },
+        "episodic_memory": {
+            "max_episodes": 1000,
+            "replay_interval": 100,
+            "consolidation_interval": 1000,
+            "enable": true
+        }
+    },
+    
+    "cognition": {
+        "planning": {
+            "depth": 5,
+            "enable": true
+        },
+        "concept_formation": {
+            "enable": true
+        },
+        "attention": {
+            "inhibition_strength": 0.5,
+            "excitation_strength": 1.5,
+            "enable": true
+        }
+    },
+    
+    "environment": {
+        "name": "StandardGridWorld",
+        "width": 10,
+        "height": 10,
+        "enable": true
+    },
+    
+    "logging": {
+        "level": "INFO",
+        "to_file": false,
+        "filename": "nlm.log",
+        "max_size_mb": 100,
+        "rotate_count": 5
+    },
+    
+    "checkpointing": {
+        "directory": "./checkpoints",
+        "interval": 1000,
+        "max_files": 10000,
+        "compress": true
+    },
+    
+    "visualization": {
+        "enabled": false,
+        "update_rate": 30.0
+    },
+    
+    "random_seed": 42,
+    "enable_debug_mode": false
+}
