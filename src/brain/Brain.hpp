@@ -1,18 +1,3 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
 // Forward declarations
 class Config;
 class RandomGenerator;
@@ -30,6 +15,9 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Serotonin;
+class Noradrenaline;
+class Acetylcholine;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -177,6 +165,15 @@ public:
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
     
+    // Serotonin - behavioral flexibility
+    Serotonin* getSerotonin();
+    
+    // Noradrenaline - attention and arousal
+    Noradrenaline* getNoradrenaline();
+    
+    // Acetylcholine - learning and memory
+    Acetylcholine* getAcetylcholine();
+    
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
     
@@ -191,7 +188,7 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
-
+    
     // Learned preference trait (Phase 5): a single scalar, -1..1,
     // updated only by sandbox reward through AgentBrain, saved in the
     // checkpoint (SimulationState section) and used as a small bias in

@@ -10,6 +10,9 @@
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../neuromodulation/Noradrenaline.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
@@ -22,6 +25,7 @@
 #include <cmath>
 #include <cstring>
 #include <sstream>
+#include <numeric>
 
 namespace nlm {
 
@@ -481,7 +485,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
+        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, 
+                               pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, 
+                               pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -503,6 +509,68 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                 }
             }
+        }
+        
+        // Apply to prediction error system
+        if (pImpl->predictionError) {
+            // Prediction error influences dopamine
+            float predictionError = pImpl->predictionError->getError();
+            float predictionModulation = 1.0f + dopamineLevel * 0.5f;  // Scale factor
+            pImpl->predictionError->setError(predictionError * predictionModulation);
+        }
+    }
+    
+    // Update serotonin (behavioral flexibility)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Serotonin influences exploration and behavioral flexibility
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Modulate neuron's response to novel stimuli
+                    // Higher serotonin increases response to new inputs
+                    float flexibilityMod = serotoninLevel * 0.3f;
+                    if (flexibilityMod > 0.0f) {
+                        // Enhance neuron's sensitivity to new inputs
+                        neuron->setFlexibility(neuron->getFlexibility() + flexibilityMod);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update norepinephrine (attention and arousal)
+    if (pImpl->noradrenaline) {
+        pImpl->noradrenaline->update(pImpl->timestep);
+        
+        // Norepinephrine enhances signal-to-noise ratio
+        float noradrenalineLevel = pImpl->noradrenaline->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Enhance excitatory/inhibitory balance
+                    float arousalMod = noradrenalineLevel * 0.4f;
+                    if (arousalMod > 0.0f) {
+                        neuron->injectCurrent(arousalMod * 0.5f);  // Half goes to excitation
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update acetylcholine (learning and memory)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+        
+        // Acetylcholine enhances synaptic plasticity
+        float acetylcholineLevel = pImpl->acetylcholine->getLevel();
+        if (pImpl->stdp) {
+            // Enhance STDP learning rates
+            float plasticityBoost = 1.0f + acetylcholineLevel * 0.5f;
+            pImpl->stdp->setLTPWeight(pImpl->stdp->getLTPWeight() * plasticityBoost);
+            pImpl->stdp->setLTDWeight(pImpl->stdp->getLTDWeight() * plasticityBoost);
         }
     }
     
@@ -631,8 +699,44 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Update concept formation with current neural activity
+        // Create concept patterns from working memory and active neurons
+        std::vector<float> conceptPattern;
+        
+        // Include working memory content for concept formation
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            conceptPattern.reserve(memoryNeurons.size());
+            for (const auto& neuronId : memoryNeurons) {
+                // Get neuron activation from working memory
+                float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                conceptPattern.push_back(activation);
+            }
+        } else {
+            // Create pattern from currently active neurons
+            conceptPattern.reserve(pImpl->regions.size() * 10); // Rough estimate
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring()) {
+                            conceptPattern.push_back(neuron->getFiringRate());
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!conceptPattern.empty()) {
+            // Normalize pattern
+            float patternSum = 0.0f;
+            for (float val : conceptPattern) patternSum += val;
+            if (patternSum > 0.0f) {
+                for (float& val : conceptPattern) val /= patternSum;
+            }
+            
+            // Present to concept formation system
+            pImpl->conceptFormation->presentExperience(conceptPattern, {}, 0.0f, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -798,14 +902,48 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Improved action selection that integrates cognition systems
+    // Step 1: Use NeuralPlanner to generate planned actions when available
+    ActionType plannedAction = ActionType::Wait;
     
-    if (pImpl->motorNeurons.empty()) {
-        return std::make_unique<Action>(ActionType::Wait);
+    if (pImpl->planner) {
+        // Create sensory state from current neural activity
+        std::vector<float> currentState;
+        
+        // Include working memory content for planning
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            currentState.reserve(memoryNeurons.size());
+            for (const auto& neuronId : memoryNeurons) {
+                float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                currentState.push_back(activation);
+            }
+        } else {
+            // Create simple state from currently active neurons
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    if (pop->getNeuronType() == NeuronType::Internal) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            currentState.push_back(neuron->getFiringRate());
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Plan action if we have a state
+        if (!currentState.empty()) {
+            float targetReward = 0.5f;  // Default target reward
+            // Could use neuromodulation level for better reward prediction
+            if (pImpl->dopamine) {
+                targetReward = std::clamp(pImpl->dopamine->getLevel(), 0.0f, 1.0f);
+            }
+            
+            plannedAction = pImpl->planner->planAction(currentState, targetReward);
+        }
     }
     
-    // Calculate activity of motor neuron groups
+    // Step 2: Get motor neuron activity as fallback/primary
     size_t firingMotor = 0;
     for (auto* neuron : pImpl->motorNeurons) {
         if (neuron->isFiring()) {
@@ -813,13 +951,35 @@ std::unique_ptr<class Action> Brain::produceAction() {
         }
     }
     
-    // Return a simple action
+    // Step 3: Combine planned action with motor activity
     ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
+    
+    // If planner suggested an action, use it (unless it's Wait)
+    if (plannedAction != ActionType::Wait) {
+        type = plannedAction;
+    }
+    // Otherwise, use motor activity
+    else if (firingMotor > 0) {
+        // Simple heuristic: if multiple motor groups firing, use the one with highest average rate
+        std::vector<float> groupRates;
+        // This would need motor group separation - for now keep simple MoveForward
         type = ActionType::MoveForward;
     }
     
+    // Step 4: Apply neuromodulation influences
+    if (pImpl->dopamine) {
+        // Dopamine can bias toward more exploratory actions
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        if (dopamineLevel > 0.1f) {
+            // High dopamine encourages exploration - increase variety of actions
+            // This is handled in AgentBrain via curiosity
+        }
+    }
+    
     auto action = std::make_unique<Action>(type);
+    
+    // Apply curiosity influences (handled by AgentBrain)
+    // Apply attention influences (handled by AgentBrain)
     
     return action;
 }
