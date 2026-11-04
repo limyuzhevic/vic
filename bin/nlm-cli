@@ -1,0 +1,299 @@
+#!/usr/bin/env python3
+
+"""
+NLM (Neural Learning Machine) - Command Line Interface
+
+Advanced interface for controlling and interacting with the NLM neural simulation.
+
+Usage:
+    nlm-cli [OPTIONS] COMMAND [ARGS...]
+
+Options:
+    --help                      Show this help message and exit
+    --version                   Show version information and exit
+    --verbose                   Enable verbose logging
+    --quiet                     Suppress non-essential output
+
+Commands:
+    demo                        Run a demonstration of NLM capabilities
+    test                        Run unit tests
+    checkpoint [file]           Save or load brain state
+    config                      Manage configuration
+    explore                     Explore brain state and statistics
+    train                       Start interactive training session
+    experiment                   Run a specific experiment
+    profile                      Profile brain performance
+
+For detailed help on a specific command:
+    nlm-cli help <command>
+
+Advanced Features:
+    - Multi-agent simulations
+    - Custom environments
+    - Reward shaping
+    - Memory management
+    - Learning curve analysis
+    - Performance benchmarking
+"""
+
+import sys
+import os
+from pathlib import Path
+from typing import Optional, List, Dict, Any
+
+# Add the src directory to the path so we can import nlm modules
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+class CLIConfig:
+    def __init__(self):
+        self.verbose = False
+        self.quiet = False
+        self.config_file = None
+        self.log_level = "info"
+        
+    def parse_args(self, args: List[str]) -> Dict[str, Any]:
+        """Parse command line arguments"""
+        config = {}
+        
+        # Simple argument parsing for demonstration
+        i = 0
+        while i < len(args):
+            arg = args[i]
+            
+            if arg == "--verbose":
+                config["verbose"] = True
+            elif arg == "--quiet":
+                config["quiet"] = True
+            elif arg == "--help":
+                config["help"] = True
+            elif arg == "--version":
+                config["version"] = True
+            elif arg == "demo":
+                config["command"] = "demo"
+            elif arg == "test":
+                config["command"] = "test"
+            elif arg == "checkpoint":
+                config["command"] = "checkpoint"
+                if i + 1 < len(args) and not args[i + 1].startswith("-"):
+                    config["checkpoint_file"] = args[i + 1]
+                    i += 1
+            elif arg == "config":
+                config["command"] = "config"
+            elif arg == "explore":
+                config["command"] = "explore"
+            elif arg == "train":
+                config["command"] = "train"
+            elif arg == "experiment":
+                config["command"] = "experiment"
+                if i + 1 < len(args) and not args[i + 1].startswith("-"):
+                    config["experiment_name"] = args[i + 1]
+                    i += 1
+            elif arg == "profile":
+                config["command"] = "profile"
+            elif arg.startswith("-"):
+                config[arg] = True
+            else:
+                if "command" not in config:
+                    config["command"] = arg
+                else:
+                    config["extra_args"] = config.get("extra_args", []) + [arg]
+            
+            i += 1
+            
+        return config
+
+    def print_help(self):
+        """Print help information"""
+        help_text = """NLM Command Line Interface - Advanced Neural Network Control
+
+USAGE:
+    nlm-cli [OPTIONS] COMMAND [ARGS...]
+
+OPTIONS:
+    --help                      Show this help message and exit
+    --version                   Show version information and exit
+    --verbose                   Enable verbose logging
+    --quiet                     Suppress non-essential output
+    --config FILE               Specify configuration file
+    --log-level LEVEL           Set logging level (debug, info, warning, error)
+
+COMMANDS:
+    demo                        Run a demonstration of NLM capabilities
+    test                        Run unit tests and benchmarks
+    checkpoint [FILE]           Save or load brain state (default: brain.ckpt)
+    config                      Manage configuration
+    explore                     Explore brain state and statistics
+    train                       Start interactive training session
+    experiment <NAME>            Run a specific experiment by name
+    profile                      Profile brain performance
+
+ADVANCED FEATURES:
+    Multi-agent simulations
+    Custom environments
+    Reward shaping
+    Memory management
+    Learning curve analysis
+    Performance benchmarking
+
+For more information about a specific command, use:
+    nlm-cli help <command>
+
+EXAMPLES:
+    # Run a demo
+    nlm-cli demo
+
+    # Save brain state
+    nlm-cli checkpoint my_brain.ckpt
+
+    # Load and continue
+    nlm-cli checkpoint saved_brain.ckpt
+
+    # Run a specific experiment
+    nlm-cli experiment phase6_integration
+
+    # Interactive training
+    nlm-cli train
+
+    # Profile performance
+    nlm-cli profile --duration 60
+"""
+        print(help_text)
+
+    def print_version(self):
+        """Print version information"""
+        print("NLM Command Line Interface v2.0.0")
+        print("Neural Learning Machine - Advanced Neural Simulation")
+        print("Build: $(date +%Y-%m-%d)")
+        print("Python API: NLM-Python Bridge")
+        print("Web Dashboard: Available via --web flag")
+
+def main():
+    """Main CLI entry point"""
+    try:
+        # Initialize configuration
+        cli = CLIConfig()
+        
+        # Parse command line arguments
+        config = cli.parse_args(sys.argv[1:])
+        
+        # Handle global options
+        if config.get("help"):
+            cli.print_help()
+            return 0
+            
+        if config.get("version"):
+            cli.print_version()
+            return 0
+            
+        if config.get("quiet"):
+            import logging
+            logging.getLogger().setLevel(logging.ERROR)
+        elif config.get("verbose"):
+            import logging
+            logging.getLogger().setLevel(logging.DEBUG)
+            
+        # Route to command handlers
+        command = config.get("command", "demo")
+        
+        if command == "demo":
+            print("=== NLM Demo Mode ===")
+            print("Running demonstration of NLM capabilities...")
+            print("This would normally run the integrated Phase 6 demo.")
+            print("Features:")
+            print("  - Real neural network simulation")
+            print("  - Multi-step learning experiments")
+            print("  - Interactive agent control")
+            print("  - Memory management and replay")
+            print("  - Reward-based learning")
+            print("  - Concept formation")
+            print("  - Social learning")
+            print("  - Self-model development")
+            return 0
+            
+        elif command == "test":
+            print("=== NLM Test Mode ===")
+            print("Running unit tests and benchmarks...")
+            print("This would normally run the full test suite.")
+            print("Tests available:")
+            print("  - Unit tests (neuron, synapse, plasticity)")
+            print("  - Integration tests (memory, neuromodulation)")
+            print("  - Performance benchmarks")
+            print("  - Stress tests")
+            return 0
+            
+        elif command == "checkpoint":
+            checkpoint_file = config.get("checkpoint_file", "brain.ckpt")
+            print(f"=== Checkpoint: {checkpoint_file} ===")
+            print(f"Saving/Loadding brain state to: {checkpoint_file}")
+            print("This would normally:")
+            print("  - Save neural weights and state")
+            print("  - Save working memory contents")
+            print("  - Save episodic memory episodes")
+            print("  - Save learned preferences and traits")
+            print("  - Support incremental checkpointing")
+            return 0
+            
+        elif command == "config":
+            print("=== NLM Configuration ===")
+            print("Configuration management interface")
+            print("Options:")
+            print("  - List current settings")
+            print("  - Modify configuration")
+            print("  - Validate configuration")
+            print("  - Export to file")
+            return 0
+            
+        elif command == "explore":
+            print("=== NLM Exploration Mode ===")
+            print("Exploring brain state and statistics...")
+            print("Analysis options:")
+            print("  - Neural statistics (spike rates, connectivity)")
+            print("  - Memory statistics (working, episodic)")
+            print("  - Learning statistics (concepts, preferences)")
+            print("  - Performance metrics")
+            print("  - Visualization data")
+            return 0
+            
+        elif command == "train":
+            print("=== NLM Training Mode ===")
+            print("Starting interactive training session...")
+            print("Training controls:")
+            print("  - Manual control via keyboard/mouse")
+            print("  - Automated learning with goals")
+            print("  - Reward feedback and shaping")
+            print("  - Curriculum learning")
+            print("  - Multi-objective optimization")
+            return 0
+            
+        elif command == "experiment":
+            experiment_name = config.get("experiment_name", "default")
+            print(f"=== NLM Experiment: {experiment_name} ===")
+            print(f"Running experiment: {experiment_name}")
+            print("Experiment phases:")
+            print("  1. Initialization and setup")
+            print("  2. Data collection")
+            print("  3. Analysis and results")
+            print("  4. Visualization and reporting")
+            return 0
+            
+        elif command == "profile":
+            print("=== NLM Profiling Mode ===")
+            print("Profiling brain performance...")
+            print("Profiling options:")
+            print("  - Performance metrics (speed, memory)")
+            print("  - Learning curve analysis")
+            print("  - Resource utilization")
+            print("  - Bottleneck identification")
+            return 0
+            
+        else:
+            print(f"Unknown command: {command}")
+            print("Use 'nlm-cli --help' for available commands")
+            return 1
+            
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())
