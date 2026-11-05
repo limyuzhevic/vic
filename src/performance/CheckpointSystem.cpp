@@ -401,9 +401,47 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+        // Write the header to the stream position where it should be
+        stream_.seekp(0, std::ios::beg);
+        stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+        if (!stream_) return false;
+        bytesWritten_ = sizeof(header_);
+        return true;
+    }
+    
+    bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+        // Write section header followed by padding for alignment
+        uint64_t currentPos = static_cast<uint64_t>(stream_.tellp());
+        
+        // Pad to 8-byte alignment
+        size_t padding = (8 - (currentPos % 8)) % 8;
+        if (padding > 0) {
+            std::vector<uint8_t> pad(padding, 0);
+            stream_.write(reinterpret_cast<const char*>(pad.data()), static_cast<std::streamsize>(padding));
+            if (!stream_) return false;
+            bytesWritten_ += padding;
+        }
+        
+        // Write the section header
+        stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+        if (!stream_) return false;
+        bytesWritten_ += sizeof(header);
+        
+        return true;
+    }
+    
+    bool CheckpointWriter::padToAlignment(size_t alignment) {
+        uint64_t currentPos = static_cast<uint64_t>(stream_.tellp());
+        size_t padding = (alignment - (currentPos % alignment)) % alignment;
+        if (padding > 0) {
+            std::vector<uint8_t> pad(padding, 0);
+            stream_.write(reinterpret_cast<const char*>(pad.data()), static_cast<std::streamsize>(padding));
+            if (!stream_) return false;
+            bytesWritten_ += padding;
+        }
+        return true;
+    }
 
 // ---------------- CheckpointManager ----------------
 
@@ -436,7 +474,16 @@ bool CheckpointManager::saveImmediately(const std::string& name) {
     std::string path = (std::filesystem::path(checkpointDir_) / filename).string();
     CheckpointWriter writer;
     if (!writer.create(path, compress_ ? CompressionLevel::Balanced : CompressionLevel::None)) return false;
-    writer.setMetadata(neurons.membranePotential.size(), synapses.weight.size(), 0, lastSaveStep_, 0.0);
+    
+    // Get region count from neurons data (if available) or default to 0
+    uint64_t regionCount = 0;
+    if (!neurons.regionId.empty()) {
+        // Count unique regions
+        std::unordered_set<uint64_t> uniqueRegions(neurons.regionId.begin(), neurons.regionId.end());
+        regionCount = uniqueRegions.size();
+    }
+    
+    writer.setMetadata(neurons.membranePotential.size(), synapses.weight.size(), regionCount, lastSaveStep_, 0.0);
     if (!writer.writeNeurons(neurons) || !writer.writeSynapses(synapses)) {
         writer.abort();
         return false;
