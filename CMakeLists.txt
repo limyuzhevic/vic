@@ -165,13 +165,20 @@ add_executable(nlm_phase6_demo
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
-# association probe, concept/social probes, and a sandbox run with
-# a teacher, planner overrides, and a checkpoint round-trip. The old
-# nlm_phase6_demo integration demo is left unchanged.
+# # association probe, concept/social probes, and a sandbox run with
+# # a teacher, planner overrides, and a checkpoint round-trip. The old
+# # nlm_phase6_demo integration demo is left unchanged.
 add_executable(nlm_phase6_text_demo
     src/experiments/Phase6TextDemo.cpp
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+
+# Interactive CLI demo (new Phase 7): user-friendly interface for
+# exploring and configuring NLM simulations interactively.
+add_executable(nlm_interactive_cli
+    src/experiments/InteractiveCLI.cpp
+)
+target_link_libraries(nlm_interactive_cli PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
 
 # Benchmark executable
 add_executable(nlm_benchmark
