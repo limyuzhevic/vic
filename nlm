@@ -1,0 +1,14 @@
+#!/bin/bash
+# NLM Advanced Command Line Interface
+# Make the Python script executable and provide easy access
+
+PYTHON_SCRIPT="/workspace/app/nlm_cli.py"
+
+if [ ! -f "$PYTHON_SCRIPT" ]; then
+    echo "Error: NLM CLI script not found at $PYTHON_SCRIPT"
+    echo "Please ensure the script is installed correctly."
+    exit 1
+fi
+
+# Execute the NLM CLI
+python3 "$PYTHON_SCRIPT" "$@"

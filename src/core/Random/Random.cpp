@@ -17,15 +17,11 @@ RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
 
 RandomGenerator::~RandomGenerator() = default;
 
-RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }
@@ -138,12 +134,75 @@ void RandomGenerator::fillBytes(void* data, size_t size) {
     }
 }
 
-std::mt19937_64& RandomGenerator::engine() {
-    return pImpl->gen;
+std::vector<uint32_t> RandomGenerator::uniformIntBatch(size_t count, uint32_t min, uint32_t max) {
+    std::vector<uint32_t> results;
+    results.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        results.push_back(uniformInt(min, max));
+    }
+    return results;
 }
 
-const std::mt19937_64& RandomGenerator::engine() const {
-    return pImpl->gen;
+std::vector<double> RandomGenerator::uniformRealBatch(size_t count, double min, double max) {
+    std::vector<double> results;
+    results.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        results.push_back(uniformReal(min, max));
+    }
+    return results;
+}
+
+std::vector<float> RandomGenerator::uniformFloatBatch(size_t count, float min, float max) {
+    std::vector<float> results;
+    results.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        results.push_back(uniformReal(min, max));
+    }
+    return results;
+}
+
+std::vector<bool> RandomGenerator::bernoulliBatch(size_t count, double p) {
+    std::vector<bool> results;
+    results.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        results.push_back(bernoulli(p));
+    }
+    return results;
+}
+
+void RandomGenerator::resetWithSeed(uint64_t seed) {
+    seed(seed);
+}
+
+double RandomGenerator::calculateMean(const std::vector<double>& values) const {
+    if (values.empty()) return 0.0;
+    double sum = 0.0;
+    for (double v : values) sum += v;
+    return sum / values.size();
+}
+
+double RandomGenerator::calculateStdDev(const std::vector<double>& values) const {
+    if (values.size() <= 1) return 0.0;
+    double mean = calculateMean(values);
+    double sumSq = 0.0;
+    for (double v : values) {
+        double diff = v - mean;
+        sumSq += diff * diff;
+    }
+    return std::sqrt(sumSq / (values.size() - 1));
+}
+
+bool RandomGenerator::isDeterministic() const {
+    return pImpl && pImpl->currentSeed != std::random_device{}();
+}
+
+std::vector<double> RandomGenerator::normalBatch(size_t count, double mean, double stddev) {
+    std::vector<double> results;
+    results.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        results.push_back(normal(mean, stddev));
+    }
+    return results;
 }
 
 } // namespace nlm

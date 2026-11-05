@@ -136,6 +136,41 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Convenience methods for batch configuration
+    void configureLearning(bool enableReward, bool enableDevelopment, bool enableCuriosity) {
+        enableRewardModulation(enableReward);
+        enableDevelopment(enableDevelopment);
+        enableCuriosity(enableCuriosity);
+    }
+    
+    // Utility methods for diagnostics
+    std::string getAgentStatus() const {
+        std::string status = "Agent Status:\n";
+        status += "  Motor neuron groups:\n";
+        auto groups = getMotorGroupActivities();
+        for (const auto& group : groups) {
+            status += "    " + group.name + ": " + std::to_string(group.firingRate) + " Hz\n";
+        }
+        status += "  Novelty: " + std::to_string(getNoveltyLevel()) + "\n";
+        status += "  Curiosity: " + std::to_string(getCuriosityLevel()) + "\n";
+        status += "  Prediction error: " + std::to_string(getPredictionError()) + "\n";
+        status += "  Learned preference: " + std::to_string(getLearnedPreference()) + "\n";
+        status += "  Developmental stage: " + std::to_string(static_cast<int>(getDevelopmentalStage())) + "\n";
+        status += "  Concept count: " + std::to_string(getConceptCount()) + "\n";
+        status += "  Social observations: " + std::to_string(getSocialObservationCount()) + "\n";
+        return status;
+    }
+    
+    // High-level action selection with confidence filtering
+    MotorCommand getActionWithConfidence(float minConfidence = 0.5f) {
+        MotorCommand cmd = decodeMotorCommand();
+        float confidence = getCuriosityLevel() * 0.5f + (getPredictionError() > 0 ? 0.3f : 0.0f);
+        if (confidence >= minConfidence) {
+            return cmd;
+        }
+        return MotorCommand::Wait;
+    }
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();

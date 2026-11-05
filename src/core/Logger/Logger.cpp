@@ -176,27 +176,50 @@ bool Logger::isEnabled(LogLevel level) const {
     return false;
 }
 
-static std::shared_ptr<Logger>& globalLoggerPtr() {
-    static std::shared_ptr<Logger> ptr = std::make_shared<Logger>();
-    return ptr;
+// Enhanced configuration and management
+void Logger::addAutoCleanupLogger(std::shared_ptr<ILogger> logger) {
+    addLogger(logger);
+    // Note: Actual cleanup logic would be implemented based on specific needs
 }
 
-Logger& Logger::getGlobal() {
-    return *globalLoggerPtr();
+size_t Logger::getLoggerCount() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    return pImpl->loggers.size();
 }
 
-void Logger::setGlobal(std::shared_ptr<Logger> logger) {
-    if (logger) {
-        globalLoggerPtr() = logger;
+template<typename LoggerType>
+bool Logger::hasLoggerType() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    for (const auto& logger : pImpl->loggers) {
+        if (dynamic_cast<const LoggerType*>(logger.get()) != nullptr) {
+            return true;
+        }
     }
+    return false;
 }
 
-// LogStream implementation
-LogStream::LogStream(LogLevel level, const std::string& file, int line, const std::string& function)
-    : level_(level), file_(file), line_(line), function_(function) {}
-
-LogStream::~LogStream() {
-    Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+std::map<LogLevel, size_t> Logger::getLogLevelSummary() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    std::map<LogLevel, size_t> summary;
+    
+    for (LogLevel level : {LogLevel::Debug, LogLevel::Info, LogLevel::Warning, 
+                           LogLevel::Error, LogLevel::Critical}) {
+        size_t count = 0;
+        for (const auto& logger : pImpl->loggers) {
+            if (logger->getLevel() <= level) {
+                count++;
+            }
+        }
+        summary[level] = count;
+    }
+    return summary;
 }
 
-} // namespace nlm
+Logger::PerformanceStats Logger::getPerformanceStats() const {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    PerformanceStats stats;
+    stats.logCount = pImpl->loggers.size();
+    // Note: Actual timing stats would require more sophisticated tracking
+    stats.lastLogTime = std::chrono::system_clock::now();
+    return stats;
+}

@@ -85,6 +85,28 @@ public:
     // Fill range with random bytes
     void fillBytes(void* data, size_t size);
     
+    // Convenience methods for batch operations
+    std::vector<uint32_t> uniformIntBatch(size_t count, uint32_t min = 0, uint32_t max = 1000000);
+    
+    std::vector<double> uniformRealBatch(size_t count, double min = 0.0, double max = 1.0);
+    
+    std::vector<float> uniformFloatBatch(size_t count, float min = 0.0f, float max = 1.0f);
+    
+    std::vector<bool> bernoulliBatch(size_t count, double p = 0.5);
+    
+    // State management convenience methods
+    void resetWithSeed(uint64_t seed);
+    
+    // Statistical operations
+    double calculateMean(const std::vector<double>& values) const;
+    double calculateStdDev(const std::vector<double>& values) const;
+    
+    // Utility methods
+    bool isDeterministic() const;
+    
+    // Advanced distribution methods
+    std::vector<double> normalBatch(size_t count, double mean = 0.0, double stddev = 1.0);
+    
     // Get underlying engine for advanced use
     std::mt19937_64& engine();
     const std::mt19937_64& engine() const;
