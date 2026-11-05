@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 
@@ -19,9 +21,26 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Detect file format by extension
+    std::string format = detectFileFormat(filepath);
     
+    // Try JSON first if extension is .json
+    if (format == "json") {
+        if (parseJSONFile(filepath, pImpl->entries)) {
+            return true;
+        }
+        // Fall through to simple parser if JSON fails
+    }
+    
+    // Try YAML if extension is .yaml or .yml
+    if (format == "yaml" || format == "yml") {
+        if (parseYAMLFile(filepath, pImpl->entries)) {
+            return true;
+        }
+        // Fall through to simple parser if YAML fails
+    }
+    
+    // Try simple key=value format as fallback
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -34,6 +53,27 @@ bool Config::loadFromFile(const std::string& filepath) {
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            // Try to convert value to appropriate type
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return true;
+}
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
