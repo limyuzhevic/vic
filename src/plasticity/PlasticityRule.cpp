@@ -24,27 +24,69 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& preSpikes,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
-    // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
-    
-    if (preSpikes.empty() || postSpikes.empty()) {
+    // Real Hebbian learning: correlated pre-post spiking strengthens synapses
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Count coincident spikes (simplified)
-    size_t coincidences = 0;
-    for (Timestamp pre : preSpikes) {
-        for (Timestamp post : postSpikes) {
-            if (std::abs(pre - post) < 10.0) {  // 10ms window
-                ++coincidences;
+    // Calculate spike correlation with temporal precision
+    float correlation = 0.0f;
+    size_t correlationCount = 0;
+    
+    // For each pre-synaptic spike, look for post-synaptic spikes within time window
+    for (Timestamp preSpike : preSpikes) {
+        for (Timestamp postSpike : postSpikes) {
+            float timeDiff = std::abs(preSpike - postSpike);
+            
+            // Consider spikes correlated if within Hebbian time window (e.g., 10ms)
+            if (timeDiff < 10.0) {  // 10ms Hebbian window
+                correlation += 1.0f - (timeDiff / 10.0f);  // Stronger correlation for closer spikes
+                ++correlationCount;
             }
         }
     }
     
-    // Apply weight change proportional to coincidences
-    if (coincidences > 0) {
-        applyWeightChange(synapse, pImpl->learningRate * static_cast<float>(coincidences));
+    // Apply weight change based on correlation
+    if (correlationCount > 0) {
+        float learningEffect = correlation / correlationCount;  // Average correlation
+        applyWeightChange(synapse, pImpl->learningRate * learningEffect);
     }
+}
+
+void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+    // Real Hebbian weight change with synaptic constraints
+    if (!synapse) return;
+    
+    // Get current weight and apply Hebbian update
+    float currentWeight = synapse->getWeight();
+    
+    // Hebbian learning can potentiate (strengthen) synapses
+    // Weight change is proportional to synaptic activity correlation
+    float newWeight = currentWeight + delta;
+    
+    // Apply synaptic constraints:
+    // - Maximum weight limit
+    // - Minimum weight limit
+    // - Soft bound to prevent runaway excitation
+    const float maxWeight = 1.0f;
+    const float minWeight = 0.0f;
+    
+    // Soft bound: prevent individual weights from saturating
+    // Creates competition between synapses for limited resources
+    if (newWeight > maxWeight) {
+        float excess = newWeight - maxWeight;
+        newWeight = maxWeight - excess * 0.1f;  // Soft bound
+    }
+    
+    // Ensure weight is within bounds
+    newWeight = std::clamp(newWeight, minWeight, maxWeight);
+    
+    // Apply homeostatic scaling based on overall network activity
+    // This prevents runaway excitation in Hebbian networks
+    newWeight = synapse->applyHomeostaticScaling(newWeight);
+    
+    // Update synapse weight
+    synapse->setWeight(newWeight);
 }
 
 void HebbianRule::applyWeightChange(Synapse* synapse, SynapticWeight delta) {

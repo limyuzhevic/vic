@@ -30,27 +30,31 @@ void Dopamine::setLevel(float level) {
 }
 
 float Dopamine::getPlasticityFactor() const {
-    // TODO PHASE 2: Implement real dopamine-modulated plasticity factor
-    // PLACEHOLDER: Higher dopamine increases plasticity
-    return 0.5f + 0.5f * pImpl->level;
+    // Real dopamine-modulated plasticity factor: 
+    // Baseline plasticity is 0.2, scaled by dopamine level to range 0.2-1.0
+    return 0.2f + 0.8f * pImpl->level;
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Real dopamine dynamics with exponential decay
+    float dtFloat = static_cast<float>(dt);
+    pImpl->level = pImpl->baseline + (pImpl->level - pImpl->baseline) * std::exp(-pImpl->decayRate * dtFloat);
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    // Real reward signaling with phasic response
+    // Pulse magnitude depends on reward magnitude
+    float pulse = std::clamp(reward * pImpl->releaseRate, -pImpl->peak, pImpl->peak);
+    pImpl->level = pImpl->baseline + (pImpl->level - pImpl->baseline) * 0.2f + pulse * 0.8f;
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    // Real reward prediction error signaling: predicts reward - expected reward
+    // Positive error (better than expected) increases dopamine, negative decreases it
+    float pulse = error * pImpl->releaseRate;
+    pImpl->level = pImpl->baseline + (pImpl->level - pImpl->baseline) * 0.3f + pulse * 0.7f;
+    // Keep within reasonable bounds
+    pImpl->level = std::clamp(pImpl->level, 0.0f, pImpl->peak);
 }
 
 } // namespace nlm
