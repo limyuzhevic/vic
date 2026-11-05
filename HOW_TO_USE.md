@@ -522,7 +522,7 @@ cmake .. -DPython_EXECUTABLE=$(which python)
 - Check CMake version >= 3.16
 - Verify all source files are present
 
-### Runtime Issues
+### Advanced Learning with Neuromodulation
 
 **ImportError: No module named 'pynlm':**
 ```bash
@@ -532,11 +532,44 @@ pip install --force-reinstall .
 **Segmentation faults:**
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
+- Verify all Python dependencies are installed: `pip install pybind11 scikit-build-core pytest numpy`
+
+**Learning not occurring:**
+- Check that learning subsystems are enabled: `agent.enableRewardModulation(True)`
+- Verify configuration parameters are set for learning: `config.set("plasticity.stdp.enable", True)`
+- Apply sensory input to stimulate neural activity: `brain.injectCurrentToNeurons(pynlm.NeuronType.Sensory, 30.0f)`
+
+**Agent not exploring:**
+- Enable curiosity-driven exploration: `agent.enableCuriosity(True)`
+- Check novelty detection: `agent.getNoveltyLevel()` should change over time
+- Verify developmental stages: `brain.getDevelopmentalStage()` for age-dependent learning
 
 ---
 
 ## Further Reading
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+When you're ready for deeper understanding:
+
+1. **ARCHITECTURE.md** - Complete system architecture overview with Phase 6 integration details
+2. **SCIENCE.md** - Scientific background and biological inspiration
+3. **EXPERIMENTS.md** - Experiment descriptions, benchmark results, and performance analysis
+4. **README.md** - Comprehensive project overview with phase summaries and build instructions
+5. **easy_usage.md** - Beginner-friendly usage guide with practical examples
+
+## Advanced Features Not Covered Here
+
+Beyond this documentation, NLM provides:
+
+- **Custom neural architectures** with multiple brain regions and specialized populations
+- **Complex world environments** with dynamic terrain, hazards, resources, and social agents
+- **Advanced learning algorithms** with different neuromodulation strategies (dopamine, acetylcholine, etc.)
+- **Performance optimization** using SIMD vectorization and parallel processing
+- **Checkpoint persistence** for long-running learning sessions and distributed learning
+- **Ablation studies** to understand component contributions and optimize architectures
+- **Scaling benchmarks** for networks from hundreds to millions of neurons
+- **Visualization tools** for exploring neural dynamics and learning patterns
+- **Python API extensions** for custom world models and agent behaviors
+
+This documentation covers the essential capabilities. For the most advanced use cases, explore the source code in the `src/` directory and examine the Phase 6 experiment implementations in `src/experiments/` for complete system integration examples.
+
+That's it! You're now equipped with comprehensive knowledge to use NLM's **full Phase 6 integrated artificial brain** with advanced learning capabilities, persistence, and real-world deployment potential.

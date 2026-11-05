@@ -3,6 +3,18 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <system_error>
+#include <numeric>
+
+// JSON support
+#ifdef NLM_ENABLE_JSON
+#include <nlohmann/json.hpp>
+#endif
+
+// YAML support
+#ifdef NLM_ENABLE_YAML
+#include <yaml-cpp/yaml.h>
+#endif
 
 namespace nlm {
 
@@ -18,10 +30,280 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Helper function to convert ConfigValue to nlohmann::json
+#ifdef NLM_ENABLE_JSON
+static nlohmann::json toJson(const ConfigValue& value) {
+    nlohmann::json result;
+    std::visit([&result](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            result = arg;
+        } else if constexpr (std::is_arithmetic_v<T>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = arg;
+        }
+    }, value);
+    return result;
+}
+
+// Helper function to convert nlohmann::json to ConfigValue
+static ConfigValue fromJson(const nlohmann::json& json) {
+    ConfigValue result;
     
+    if (json.is_string()) {
+        result = json.get<std::string>();
+    } else if (json.is_number_integer()) {
+        if (json.is_signed_integer()) {
+            // Try to preserve int64_t for large numbers
+            int64_t val = json.get<int64_t>();
+            if (val >= std::numeric_limits<int>::min() && val <= std::numeric_limits<int>::max()) {
+                result = static_cast<int>(val);
+            } else {
+                result = val;
+            }
+        } else {
+            result = json.get<uint64_t>();
+        }
+    } else if (json.is_number_float()) {
+        result = json.get<double>();
+    } else if (json.is_boolean()) {
+        result = json.get<bool>();
+    } else if (json.is_array()) {
+        // Determine array type
+        if (json.empty()) {
+            result = std::vector<std::string>{};
+        } else {
+            // Try to infer element type
+            if (json.front().is_string()) {
+                std::vector<std::string> vec;
+                vec.reserve(json.size());
+                for (const auto& item : json) {
+                    vec.push_back(item.get<std::string>());
+                }
+                result = vec;
+            } else if (json.front().is_number_integer()) {
+                std::vector<int> vec;
+                vec.reserve(json.size());
+                for (const auto& item : json) {
+                    vec.push_back(item.get<int>());
+                }
+                result = vec;
+            } else if (json.front().is_number_float()) {
+                std::vector<double> vec;
+                vec.reserve(json.size());
+                for (const auto& item : json) {
+                    vec.push_back(item.get<double>());
+                }
+                result = vec;
+            } else {
+                // Default to string vector
+                std::vector<std::string> vec;
+                vec.reserve(json.size());
+                for (const auto& item : json) {
+                    vec.push_back(item.dump());
+                }
+                result = vec;
+            }
+        }
+    } else {
+        // Default to string
+        result = json.get<std::string>();
+    }
+    
+    return result;
+}
+#endif
+
+#ifdef NLM_ENABLE_YAML
+// Helper function to convert YAML::Node to ConfigValue
+static ConfigValue fromYaml(const YAML::Node& node) {
+    ConfigValue result;
+    
+    if (node.IsScalar()) {
+        const std::string& value = node.Scalar();
+        
+        // Try to parse as boolean
+        if (value == "true" || value == "false") {
+            result = value == "true";
+        }
+        // Try to parse as integer
+        else if (std::all_of(value.begin(), value.end(), ::isdigit) ||
+                 (value.front() == '-' && std::all_of(value.begin() + 1, value.end(), ::isdigit))) {
+            if (value.find('.') == std::string::npos) {
+                // Integer
+                if (value.find('+') != std::string::npos || value.find('-') != std::string::npos) {
+                    result = std::stoll(value);
+                } else {
+                    result = std::stoul(value);
+                }
+            } else {
+                // Double
+                result = std::stod(value);
+            }
+        }
+        // Try to parse as double (including scientific notation)
+        else {
+            try {
+                size_t pos;
+                double d = std::stod(value, &pos);
+                if (pos == value.size()) {
+                    result = d;
+                } else {
+                    result = value;
+                }
+            } catch (...) {
+                result = value;
+            }
+        }
+    } else if (node.IsSequence()) {
+        // Determine array type
+        if (node.size() == 0) {
+            result = std::vector<std::string>{};
+        } else {
+            // Check if all elements are strings
+            bool allStrings = std::all_of(node.begin(), node.end(),
+                [](const YAML::Node& n) { return n.IsScalar() && !n.Scalar().empty(); });
+            
+            if (allStrings) {
+                std::vector<std::string> vec;
+                vec.reserve(node.size());
+                for (const auto& item : node) {
+                    vec.push_back(item.Scalar());
+                }
+                result = vec;
+            } else {
+                // Default to string vector
+                std::vector<std::string> vec;
+                vec.reserve(node.size());
+                for (const auto& item : node) {
+                    vec.push_back(item.Scalar());
+                }
+                result = vec;
+            }
+        }
+    } else {
+        // Default to string representation
+        result = node.as<std::string>();
+    }
+    
+    return result;
+}
+
+// Helper function to convert ConfigValue to YAML
+static YAML::Node toYaml(const ConfigValue& value) {
+    YAML::Node result;
+    
+    std::visit([&result](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            for (const auto& item : arg) {
+                result.push_back(item);
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            for (const auto& item : arg) {
+                result.push_back(item);
+            }
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            for (const auto& item : arg) {
+                result.push_back(item);
+            }
+        } else if constexpr (std::is_arithmetic_v<T>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = arg;
+        }
+    }, value);
+    
+    return result;
+}
+#endif
+
+// Helper function to detect file format
+Config::ConfigFormat Config::detectFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return ConfigFormat::KEY_VALUE;
+    }
+    
+    // Read first few lines
+    std::string line;
+    std::getline(file, line);
+    
+    // Check for JSON format (starts with { or [)
+    if (!line.empty()) {
+        char first = line.front();
+        if (first == '{' || first == '[') {
+            return ConfigFormat::JSON;
+        }
+        
+        // Check for YAML format (contains colon)
+        if (line.find(':') != std::string::npos) {
+            return ConfigFormat::YAML;
+        }
+    }
+    
+    // Default to key=value format
+    return ConfigFormat::KEY_VALUE;
+}
+
+bool Config::loadFromJsonFile(const std::string& filepath) {
+#ifdef NLM_ENABLE_JSON
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        return loadFromJsonString(jsonData.dump());
+    } catch (const std::exception& e) {
+        return false;
+    }
+#else
+    return false;
+#endif
+}
+
+bool Config::loadFromYamlFile(const std::string& filepath) {
+#ifdef NLM_ENABLE_YAML
+    try {
+        YAML::Node yamlData = YAML::LoadFile(filepath);
+        return loadFromYamlString(yamlData);
+    } catch (const std::exception& e) {
+        return false;
+    }
+#else
+    return false;
+#endif
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // Detect file format and load accordingly
+    ConfigFormat format = detectFormat(filepath);
+    
+    switch (format) {
+        case ConfigFormat::JSON:
+            return loadFromJsonFile(filepath);
+        case ConfigFormat::YAML:
+            return loadFromYamlFile(filepath);
+        case ConfigFormat::KEY_VALUE:
+            return loadFromKeyValueFile(filepath);
+        default:
+            return loadFromKeyValueFile(filepath);
+    }
+}
+
+bool Config::loadFromKeyValueFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -78,18 +360,181 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
+bool Config::saveToFile(const std::string& filepath, bool useJson, bool useYaml) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    if (useJson) {
+        nlohmann::json jsonData;
+        for (const auto& entry : pImpl->entries) {
+            if (!entry.description.empty()) {
+                jsonData[entry.key] = {{ "value", toJson(entry.value) }, { "description", entry.description }};
+            } else {
+                jsonData[entry.key] = toJson(entry.value);
+            }
+        }
+        file << jsonData.dump(2);
+    } else if (useYaml) {
+#ifdef NLM_ENABLE_YAML
+        YAML::Emitter yamlData;
+        yamlData << YAML::BeginMap;
+        for (const auto& entry : pImpl->entries) {
+            yamlData << YAML::Key << entry.key;
+            if (!entry.description.empty()) {
+                yamlData << YAML::Value << YAML::BeginMap;
+                yamlData << YAML::Key << "value" << toJson(entry.value);
+                yamlData << YAML::Key << "description" << entry.description;
+                yamlData << YAML::EndMap;
+            } else {
+                yamlData << YAML::Value << toJson(entry.value);
+            }
+        }
+        yamlData << YAML::EndMap;
+        file << yamlData.c_str();
+#else
+        // YAML not enabled, fall back to key=value
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        }
+#endif
+    } else {
+        // Default to key=value format
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        }
     }
     
     return true;
+}
+
+bool Config::saveToJsonFile(const std::string& filepath) const {
+    return saveToFile(filepath, true, false);
+}
+
+bool Config::saveToYamlFile(const std::string& filepath) const {
+    return saveToFile(filepath, false, true);
+}
+
+bool Config::loadFromJsonString(const std::string& jsonString) {
+#ifdef NLM_ENABLE_JSON
+    try {
+        nlohmann::json jsonData = nlohmann::json::parse(jsonString);
+        
+        clear();
+        
+        for (const auto& [key, value] : jsonData.items()) {
+            ConfigValue configValue = fromJson(value);
+            set(key, configValue, ConfigSource::File);
+            
+            // Extract description if present
+            if (value.is_object() && value.contains("description")) {
+                std::string description = value["description"].get<std::string>();
+                // Update the entry with description
+                auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+                    [&key](const ConfigEntry& e) { return e.key == key; });
+                if (it != pImpl->entries.end()) {
+                    it->description = description;
+                }
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        return false;
+    }
+#else
+    return false;
+#endif
+}
+
+bool Config::loadFromYamlString(const std::string& yamlString) {
+#ifdef NLM_ENABLE_YAML
+    try {
+        YAML::Node yamlData = YAML::Load(yamlString);
+        return loadFromYamlString(yamlData);
+    } catch (const std::exception& e) {
+        return false;
+    }
+#else
+    return false;
+#endif
+}
+
+bool Config::loadFromYamlString(const YAML::Node& yamlData) {
+#ifdef NLM_ENABLE_YAML
+    clear();
+    
+    if (yamlData.IsMap()) {
+        for (const auto& pair : yamlData) {
+            std::string key = pair.first.as<std::string>();
+            YAML::Node value = pair.second;
+            
+            ConfigValue configValue = fromYaml(value);
+            set(key, configValue, ConfigSource::File);
+            
+            // Extract description if present
+            if (value.IsMap() && value["description"]) {
+                std::string description = value["description"].as<std::string>();
+                // Update the entry with description
+                auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+                    [&key](const ConfigEntry& e) { return e.key == key; });
+                if (it != pImpl->entries.end()) {
+                    it->description = description;
+                }
+            }
+        }
+    }
+    
+    return true;
+#else
+    return false;
+#endif
+}
+
+std::string Config::toJson() const {
+#ifdef NLM_ENABLE_JSON
+    nlohmann::json jsonData;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (!entry.description.empty()) {
+            jsonData[entry.key] = {{ "value", toJson(entry.value) }, { "description", entry.description }};
+        } else {
+            jsonData[entry.key] = toJson(entry.value);
+        }
+    }
+    
+    return jsonData.dump(2);
+#else
+    return "{\"error\": \"JSON support not enabled\"}";
+#endif
+}
+
+std::string Config::toYaml() const {
+#ifdef NLM_ENABLE_YAML
+    YAML::Emitter yamlData;
+    yamlData << YAML::BeginMap;
+    
+    for (const auto& entry : pImpl->entries) {
+        yamlData << YAML::Key << entry.key;
+        if (!entry.description.empty()) {
+            yamlData << YAML::Value << YAML::BeginMap;
+            yamlData << YAML::Key << "value" << toJson(entry.value);
+            yamlData << YAML::Key << "description" << entry.description;
+            yamlData << YAML::EndMap;
+        } else {
+            yamlData << YAML::Value << toJson(entry.value);
+        }
+    }
+    
+    yamlData << YAML::EndMap;
+    return yamlData.c_str();
+#else
+    return "error: YAML support not enabled";
+#endif
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

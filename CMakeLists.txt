@@ -18,8 +18,25 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# JSON/YAML configuration support
+option(NLM_ENABLE_JSON "Enable JSON configuration support" ON)
+option(NLM_ENABLE_YAML "Enable YAML configuration support" OFF)
+
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Find JSON library (nlohmann::json)
+if(NLM_ENABLE_JSON)
+    # Try to find nlohmann::json package
+    find_package(nlohmann_json 3.2.0 REQUIRED)
+else()
+    message(WARNING "JSON configuration support is disabled. Key=value format will be used.")
+endif()
+
+# Find YAML library (yaml-cpp) - optional
+if(NLM_ENABLE_YAML)
+    find_package(yaml-cpp 0.7.0 REQUIRED)
+endif()
 
 # Core library
 add_library(nlm_core STATIC

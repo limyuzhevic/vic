@@ -40,6 +40,14 @@ Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
 
+[project.scripts]
+nlm = "nlm_cli.__main__:main"
+nlm-brain = "nlm_cli.brain.__main__:main"
+nlm-experiment = "nlm_cli.experiment.__main__:main"
+nlm-performance = "nlm_cli.performance.__main__:main"
+nlm-config = "nlm_cli.config.__main__:main"
+nlm-visualize = "nlm_cli.visualization.__main__:main"
+
 [tool.scikit-build]
 # scikit-build-core >= 0.8 renamed minimum-version to version.
 cmake.version = ">=3.16"
@@ -55,6 +63,8 @@ cmake.args = [
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_ENABLE_JSON = true
+NLM_ENABLE_YAML = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
