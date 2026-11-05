@@ -198,6 +198,15 @@ public:
                               << ", energy=" << world.getAgentBody().energy
                               << "\n";
                 }
+                
+                // Enhanced logging for debugging reward calculation
+                if (step % 100 == 0) {
+                    std::cout << "    DEBUG: step=" << step 
+                              << ", reward=" << result.reward
+                              << ", action=" << motorCommandToString(cmd)
+                              << ", message=" << result.message
+                              << " (DEBUG LOGGING ADDED)\n";
+                }
             }
             
             // Record final metrics

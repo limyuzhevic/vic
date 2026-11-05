@@ -57,6 +57,7 @@ add_library(nlm_core STATIC
     # Memory
     src/memory/Memory.cpp
     src/performance/CheckpointSystem.cpp
+    src/performance/PerformanceMonitor.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
     # Cognition
@@ -178,6 +179,12 @@ add_executable(nlm_benchmark
     src/benchmark.cpp
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+
+# Advanced CLI executable
+add_executable(nlm_advanced
+    src/advanced_cli/AdvancedCLI.cpp
+)
+target_link_libraries(nlm_advanced PUBLIC nlm_core)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
