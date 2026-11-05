@@ -85,6 +85,14 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // Advanced configuration options
+    bool enableNeuromodulation;
+    bool enablePrediction;
+    bool enableCognition;
+    float neuromodulationStrength;
+    float predictionConfidence;
+    float curiosityLevel;
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -93,7 +101,30 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , enableNeuromodulation(true)
+        , enablePrediction(true)
+        , enableCognition(true)
+        , neuromodulationStrength(1.0f)
+        , predictionConfidence(0.8f)
+        , curiosityLevel(0.5f) {}
+        
+    // Configuration validation
+    bool isValid() const {
+        return neuronCount > 0 && 
+               maxSteps > 0 &&
+               connectionProbability >= 0.0f && connectionProbability <= 1.0f &&
+               neuromodulationStrength >= 0.0f && neuromodulationStrength <= 2.0f &&
+               predictionConfidence >= 0.0f && predictionConfidence <= 1.0f &&
+               curiosityLevel >= 0.0f && curiosityLevel <= 1.0f;
+    }
+    
+    std::string getValidationError() const {
+        if (!isValid()) {
+            return "Invalid configuration parameters";
+        }
+        return "";
+    }
 };
 
 /**
