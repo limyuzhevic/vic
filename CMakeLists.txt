@@ -30,11 +30,7 @@ add_library(nlm_core STATIC
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
     # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
+    src/brain/StatsCollector.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -92,6 +88,8 @@ target_include_directories(nlm_core PUBLIC
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
+    src/agent/MotorCommandSelector.cpp
+    src/agent/CognitiveModules.cpp
     src/agent/AgentBrain.cpp
 )
 target_include_directories(nlm_agent PUBLIC src)

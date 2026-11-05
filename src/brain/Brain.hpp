@@ -1,6 +1,4 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
+#include "StatsCollector.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "NeuralRegion.hpp"
@@ -186,11 +184,20 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Get comprehensive brain statistics using StatsCollector
+    StatsCollector::BrainStats getStats() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Get formatted statistics string
+    std::string getFormattedStats() const;
+    
+    // Get statistics as JSON
+    std::string getStatsJSON() const;
+    
+    // Get statistics as CSV
+    std::string getStatsCSV() const;
+    
+    // Get statistics as Markdown
+    std::string getStatsMarkdown() const;
 
     // Learned preference trait (Phase 5): a single scalar, -1..1,
     // updated only by sandbox reward through AgentBrain, saved in the
