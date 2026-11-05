@@ -142,20 +142,10 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
-            std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
-        }, py::arg("args"),
-           "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -166,6 +156,54 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+             "Set a configuration key (string)")
+        .def("set", [](Config& self, const std::string& key, int64_t value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+             "Set a configuration key (int64_t)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+             "Set a configuration key (double)")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+             "Set a configuration key (float)")
+        .def("get", [](Config& self, const std::string& key) -> std::string {
+            return self.getOr<std::string>(key, "");
+        }, py::arg("key"),
+             "Get a configuration key as string (returns empty string if not found)")
+        .def("get", [](Config& self, const std::string& key, const std::string& default_value) -> std::string {
+            return self.getOr<std::string>(key, default_value);
+        }, py::arg("key"), py::arg("default_value"),
+             "Get a configuration key as string with default")
+        .def("get", [](Config& self, const std::string& key) -> int64_t {
+            return self.getOr<int64_t>(key, 0);
+        }, py::arg("key"),
+             "Get a configuration key as int64_t (returns 0 if not found)")
+        .def("get", [](Config& self, const std::string& key, int64_t default_value) -> int64_t {
+            return self.getOr<int64_t>(key, default_value);
+        }, py::arg("key"), py::arg("default_value"),
+             "Get a configuration key as int64_t with default")
+        .def("get", [](Config& self, const std::string& key) -> double {
+            return self.getOr<double>(key, 0.0);
+        }, py::arg("key"),
+             "Get a configuration key as double (returns 0.0 if not found)")
+        .def("get", [](Config& self, const std::string& key, double default_value) -> double {
+            return self.getOr<double>(key, default_value);
+        }, py::arg("key"), py::arg("default_value"),
+             "Get a configuration key as double with default")
+        .def("get", [](Config& self, const std::string& key) -> float {
+            return self.getOr<float>(key, 0.0f);
+        }, py::arg("key"),
+             "Get a configuration key as float (returns 0.0f if not found)")
+        .def("get", [](Config& self, const std::string& key, float default_value) -> float {
+            return self.getOr<float>(key, default_value);
+        }, py::arg("key"), py::arg("default_value"),
+             "Get a configuration key as float with default")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -410,24 +448,95 @@ PYBIND11_MODULE(pynlm, m) {
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, "Create a default configuration")
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Convenience function to load a preset configuration
+    m.def("loadPresetConfig", [](const std::string& name) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        if (name == "phase2") {
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+            config->set("connection_probability", 0.15f, ConfigSource::Default);
+        } else if (name == "phase3") {
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+            config->set("connection_probability", 0.1f, ConfigSource::Default);
+            config->set("reward_modulation_enabled", true, ConfigSource::Default);
+            config->set("structural_plasticity_enabled", true, ConfigSource::Default);
+            config->set("development_enabled", true, ConfigSource::Default);
+            config->set("curiosity_enabled", true, ConfigSource::Default);
+        } else if (name == "phase6") {
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+            config->set("connection_probability", 0.12f, ConfigSource::Default);
+            config->set("reward_modulation_enabled", true, ConfigSource::Default);
+            config->set("structural_plasticity_enabled", true, ConfigSource::Default);
+            config->set("development_enabled", true, ConfigSource::Default);
+            config->set("curiosity_enabled", true, ConfigSource::Default);
+            config->set("plasticity_enabled", true, ConfigSource::Default);
+        }
+        
+        return config;
+    }, py::arg("name"),
+        "Load a preset configuration (phase2, phase3, or phase6)");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Convenience function for running a quick demo
+    m.def("runQuickDemo", [](int phase, int episodes, int steps_per_episode) {
+        auto config = std::make_shared<Config>();
+        
+        if (phase == 2) {
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        } else if (phase == 3) {
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        } else if (phase == 6) {
+            config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+            config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+        }
+        
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        
+        // Run basic steps
+        for (int step = 0; step < steps_per_episode; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        return brain;
+    }, py::arg("phase"), py::arg("episodes") = 1, py::arg("steps_per_episode") = 100,
+        "Run a quick demo with the specified phase and return the brain");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Utility function for getting brain statistics as a dictionary
+    m.def("getBrainStats", [](const std::shared_ptr<Brain>& brain) {
+        py::dict stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        if (auto agentBrain = std::dynamic_pointer_cast<AgentBrain>(brain)) {
+            stats["neuromodulation_level"] = agentBrain->getNeuromodulationLevel();
+            stats["curiosity_level"] = agentBrain->getCuriosityLevel();
+            stats["novelty_level"] = agentBrain->getNoveltyLevel();
+            stats["prediction_error"] = agentBrain->getPredictionError();
+            stats["developmental_stage"] = static_cast<int>(agentBrain->getDevelopmentalStage());
+        }
+        
+        return stats;
+    }, py::arg("brain"),
+        "Get brain statistics as a dictionary");
 
 } // namespace nlm

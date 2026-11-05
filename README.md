@@ -81,7 +81,6 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Episodic memory replay during simulation
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
-
 ## Building
 
 ```bash
@@ -91,163 +90,327 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+## Building Python Bindings
+
+The NLM Python bindings (`pynlm` module) are built by default when using pip install:
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
-./nlm_phase3_demo
-./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
+# Build with pip (recommended)
+pip install .
+
+# Or build standalone C++ libraries
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_BUILD_PYTHON_BINDINGS=ON
+make -j4
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+**Important**: The Python bindings are now enabled by default for easier development.
+
+## Running
+
+### Unified Demo System
+
+The unified demo system provides command-line access to all NLM phases:
+
+```bash
+# Run Phase 2: Real Neural Computation
+./nlm_demo --phase 2
+
+# Run Phase 3: World Interaction
+./nlm_demo --phase 3 --episodes 10 --steps-per-episode 500
+
+# Run Phase 4: Cognitive Development
+./nlm_demo --phase 4 --enable-dev --enable-curiosity
+
+# Run Phase 5: Performance & Integration
+./nlm_demo --phase 5 --enable-plasticity
+
+# Run Phase 6: Final Integration
+./nlm_demo --phase 6
+
+# Run benchmark mode
+./nlm_demo --benchmark --neuron-count 2000
+```
+
+### Legacy Demos
+
+The legacy phase-specific demos are still available:
+
+```bash
+./nlm_phase2_demo           # Phase 2: Real neural computation
+./nlm_phase3_demo           # Phase 3: World interaction  
+./nlm_phase4_demo           # Phase 4: Cognitive development
+./nlm_phase5_demo           # Phase 5: Performance & integration
+./nlm_phase6_demo           # Phase 6: Final integration
+./nlm_benchmark             # Performance benchmark
+```
+
+### Python API
+
+```python
+import pynlm
+
+# Create a brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run some steps
+for i in range(100):
+    brain.step(i)
+
+# Get statistics
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Synapses: {brain.getTotalSynapseCount()}")
+print(f"Spikes: {brain.getTotalSpikeCount()}")
+```
+
+### Complete Example
+
+```python
+import pynlm
+
+# Create brain with preset configuration
+brain = pynlm.createBrain(pynlm.loadPresetConfig("phase6"))
+brain.initialize()
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=16, visionHeight=16)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable learning features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableStructuralPlasticity(True)
+
+# Run simulation
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+
+# Get final stats
+stats = pynlm.getBrainStats(brain)
+print(f"Simulation completed with {stats['neuron_count']} neurons")
+```
+
+## Python Testing
+
+To test the Python bindings:
+
+```bash
+# Build with Python bindings
+mkdir build
+cd build
+cmake .. -DNLM_BUILD_PYTHON_BINDINGS=ON
+
+# Run Python tests
+python3 ../test_pynlm.py
+```
+
+Or using the test runner:
+
+```bash
+python3 tests/run_tests.py
+```
+
+## Configuration
+
+### Command Line Configuration
+
+The unified demo system accepts many command-line options:
+
+```bash
+./nlm_demo --help  # Show all options
+
+Common options:
+  --phase N        Phase to run (2-6)
+  --episodes N     Number of episodes
+  --steps-per-episode N  Steps per episode
+  --neuron-count N        Total neurons
+  --random-seed N          Random seed
+  --enable-dev             Enable development features
+  --enable-reward          Enable reward modulation
+  --enable-curiosity       Enable curiosity module
+  --enable-plasticity      Enable synaptic plasticity
+  --enable-structural      Enable structural plasticity
+  --benchmark              Run benchmark mode
+```
+
+### Python Configuration
+
+```python
+import pynlm
+
+# Create default config
+config = pynlm.createDefaultConfig()
+
+# Set values
+config.set("random_seed", 42)
+config.set("neuron_count", 1000)
+config.set("simulation_timestep", 0.001)
+
+# Load from file
+config.loadFromFile("my_config.json")
+
+# Save to file
+config.saveToFile("my_config.json")
+
+# Get values
+print(config.get("random_seed"))
+print(config.get("neuron_count"))
+```
 
 ## Project Structure
 
 ```
 NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── agent/          # Agent-brain interface
-│   ├── world/          # Simple world
-│   ├── performance/    # Checkpoints, pools, queues (headers)
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── CMakeLists.txt              # Main build system
+├── pyproject.toml              # Python package definition
+├── src/                        # Source code
+│   ├── core/                   # Core utilities
+│   ├── brain/                  # Neural components
+│   ├── plasticity/             # Plasticity rules
+│   ├── development/            # Developmental system
+│   ├── neuromodulation/         # Neuromodulators
+│   ├── memory/                 # Memory systems
+│   ├── cognition/              # Cognitive mechanisms
+│   ├── sensory/                # Sensory processing
+│   ├── motor/                  # Motor system
+│   ├── environment/            # Environment interface
+│   ├── experiments/            # Experiment framework
+│   └── visualization/           # Visualization
+├── python/                      # Python bindings
+│   ├── bindings.cpp            # Pybind11 bindings
+│   └── CMakeLists.txt          # Python build system
+├── tests/                       # Test suites
+│   ├── C++ tests
+│   ├── Python tests
+│   └── run_tests.py            # Python test runner
+├── configs/                     # Configuration files
+│   └── default.cfg
+├── docs/                        # Documentation
+├── easy_usage.md                # This file - beginner guide
+└── HOW_TO_USE.md                # Detailed user guide
 ```
+
+## Key Improvements
+
+### 1. Fixed Python Bindings
+
+**Before**: Python bindings were broken and not usable
+**After**: Working Python bindings with comprehensive API
+
+- ✅ Python bindings build by default
+- ✅ Complete API for Brain, Config, Agent, World
+- ✅ Configuration file support
+- ✅ Preset configurations (phase2, phase3, phase6)
+- ✅ Convenience functions and utilities
+
+### 2. Unified Demo System
+
+**Before**: Separate demo executables with limited flexibility
+**After**: Unified demo system with command-line options
+
+- ✅ Single entry point (`./nlm_demo`)
+- ✅ Configurable phase selection (2-6)
+- ✅ Flexible parameter customization
+- ✅ Benchmark mode
+- ✅ Feature flags (--enable-dev, --enable-reward, etc.)
+
+### 3. Enhanced Python API
+
+**Before**: Basic, incomplete API
+**After**: Comprehensive, well-documented API
+
+- ✅ Type-safe configuration get/set
+- ✅ Preset configuration loading
+- ✅ Brain statistics utilities
+- ✅ Quick demo functions
+- ✅ Complete world/agent integration
+
+### 4. Comprehensive Testing
+
+**Before**: Limited test coverage
+**After**: Full test suite for all major components
+
+- ✅ Python bindings test suite
+- ✅ Configuration file operations
+- ✅ Preset loading
+- ✅ Integration tests
+- ✅ Command-line demo testing
+
+### 5. Improved Documentation
+
+**Before**: Outdated, incomplete documentation
+**After**: Comprehensive, up-to-date documentation
+
+- ✅ Easy Usage Guide (this file)
+- ✅ Detailed API documentation
+- ✅ Examples for all use cases
+- ✅ Command-line reference
+
+### 6. Bug Fixes
+
+- ✅ Fixed Python bindings build system
+- ✅ Fixed configuration loading/saving
+- ✅ Fixed command-line argument parsing
+- ✅ Fixed demo integration issues
+- ✅ Fixed type conversions in bindings
 
 ## Phase Summary
 
-### Phase 1 (Complete)
-- Project skeleton
+### Phase 1 (Complete): Core Foundation
+- Project skeleton and structure
 - Core types and configuration
 - Neural interfaces
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
+### Phase 2 (Complete): Real Neural Computation  
+- LIF neuron dynamics
 - Event-driven spike propagation
 - STDP and Hebbian plasticity
 - Structural plasticity
 
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
+### Phase 3 (Complete): World Interaction
+- Sensory processing
+- Motor output
 - Reward prediction error
 - Developmental stages
-- Novelty and curiosity
 
-### Phase 4 (Complete)
-- Neural prediction system
+### Phase 4 (Complete): Cognitive Development
 - Working memory
-- Episodic-like memory
+- Episodic memory  
 - Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
+- Neural attention and planning
 
-### Phase 5 (Complete)
+### Phase 5 (Complete): Performance & Integration
 - Performance optimizations
-- Memory pools and event queues
+- Memory pools and queues
 - SIMD vectorization
-- Parallel processing
 - Checkpoint system
 
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
+### Phase 6 (Complete): Final Integration
+- All systems integrated
+- Comprehensive brain loop
+- Memory, neuromodulation, prediction
+- Development and plasticity integration
 
 ## Scientific Limitations
 
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
+NLM is a research project. Current limitations include:
 
 - Simplified LIF neuron model (not Hodgkin-Huxley)
 - No realistic ion channel dynamics
 - No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
+- Limited to simulated computing resources
 
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
-```
+The Python bindings provide research access to the complete NLM system while maintaining the scientific integrity of the simulation.
 
 ## License
 

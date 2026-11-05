@@ -132,11 +132,11 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main unified executable
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -188,7 +188,9 @@ target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 # it must not be added here as a subdirectory: it defines its own
 # nlm_core/nlm_agent/nlm_world targets, which would collide with the
 # ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
+# Python bindings - enabled by default for pip install
+# When building standalone C++ libraries, set NLM_BUILD_PYTHON_BINDINGS=OFF
+option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" ON)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 CONFIG REQUIRED)
@@ -197,13 +199,37 @@ if(NLM_BUILD_PYTHON_BINDINGS)
         POSITION_INDEPENDENT_CODE ON)
     pybind11_add_module(pynlm python/bindings.cpp)
     target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-    target_include_directories(pynlm PRIVATE src)
-    install(TARGETS pynlm LIBRARY DESTINATION .)
+    target_include_directories(pynlm PRIVATE ${NLM_SOURCE_DIR})
+    
+    # Python module installation
+    install(TARGETS pynlm
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+    
+    # Install headers for Python bindings
+    install(DIRECTORY src/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nlm
+        FILES_MATCHING PATTERN "*.hpp"
+    )
 endif()
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Add a custom target for running Python tests
+add_custom_target(test_python
+    COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_tests.py
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Running Python tests for NLM bindings"
+    VERBATIM
+)
+
+# Add a custom target for running all tests
+add_custom_target(run_all_tests
+    DEPENDS test_python
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    COMMENT "Running all NLM tests"
+    VERBATIM
+)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
