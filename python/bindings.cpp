@@ -39,6 +39,9 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
         .def("__repr__", [](const NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
+        })
+        .def("__str__", [](const NeuronId& id) {
+            return std::to_string(id.value);
         });
 
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
@@ -145,7 +148,7 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON/YAML file")
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
@@ -155,9 +158,9 @@ PYBIND11_MODULE(pynlm, m) {
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a JSON/YAML file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -181,13 +184,40 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
-             py::arg("channels") = 3)
+              py::arg("channels") = 3)
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("setDataFromArray", [](Vision& self, py::array_t<float> data) {
+            // Convert numpy array to std::vector
+            auto buf = data.request();
+            if (buf.ndim != 3) throw std::runtime_error("Vision data must be 3D array (height, width, channels)");
+            size_t height = buf.shape[0];
+            size_t width = buf.shape[1];
+            size_t channels = buf.shape[2];
+            std::vector<float> vec(height * width * channels);
+            std::copy(static_cast<float*>(buf.ptr), static_cast<float*>(buf.ptr) + buf.size, vec.begin());
+            self.setData(vec);
+        }, py::arg("data"), "Set vision data from numpy array")
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getShape", [](Vision& self) {
+            return std::make_tuple(self.getHeight(), self.getWidth(), self.getChannels());
+        }, "Get vision dimensions as (height, width, channels)")
+        .def("getDataAsNumpy", [](Vision& self) {
+            size_t height = self.getHeight();
+            size_t width = self.getWidth();
+            size_t channels = self.getChannels();
+            py::array_t<float> numpy_array({height, width, channels});
+            auto buf = numpy_array.request();
+            float* ptr = static_cast<float*>(buf.ptr);
+            
+            const std::vector<float>& visionData = self.getData();
+            std::copy(visionData.begin(), visionData.end(), ptr);
+            
+            return numpy_array;
+        }, "Get vision data as numpy array");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -195,9 +225,28 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Audio& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("setDataFromArray", [](Audio& self, py::array_t<float> data) {
+            // Convert numpy array to std::vector
+            auto buf = data.request();
+            if (buf.ndim != 1) throw std::runtime_error("Audio data must be 1D array");
+            std::vector<float> vec(buf.size);
+            std::copy(static_cast<float*>(buf.ptr), static_cast<float*>(buf.ptr) + buf.size, vec.begin());
+            self.setData(vec);
+        }, py::arg("data"), "Set audio data from numpy array")
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("getDataAsNumpy", [](Audio& self) {
+            size_t numSamples = self.getNumSamples();
+            py::array_t<float> numpy_array({numSamples});
+            auto buf = numpy_array.request();
+            float* ptr = static_cast<float*>(buf.ptr);
+            
+            const std::vector<float>& audioData = self.getData();
+            std::copy(audioData.begin(), audioData.end(), ptr);
+            
+            return numpy_array;
+        }, "Get audio data as numpy array");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
@@ -257,17 +306,103 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
         .def("getVisionWidth", &SensoryPercept::getVisionWidth)
         .def("getVisionHeight", &SensoryPercept::getVisionHeight)
+        .def("getVisionDataAsNumpy", [](SensoryPercept& self) {
+            size_t width = self.getVisionWidth();
+            size_t height = self.getVisionHeight();
+            py::array_t<float> numpy_array({height, width});
+            auto buf = numpy_array.request();
+            float* ptr = static_cast<float*>(buf.ptr);
+            
+            const std::vector<float>& visionData = self.getVision();
+            std::copy(visionData.begin(), visionData.end(), ptr);
+            
+            return numpy_array;
+        }, "Get vision data as numpy array (height x width)")
+        .def("setVisionFromNumpy", [](SensoryPercept& self, py::array_t<float> data) {
+            auto buf = data.request();
+            if (buf.ndim != 2) throw std::runtime_error("Vision data must be 2D array (height x width)");
+            size_t height = buf.shape[0];
+            size_t width = buf.shape[1];
+            std::vector<float> vec(height * width);
+            std::copy(static_cast<float*>(buf.ptr), static_cast<float*>(buf.ptr) + buf.size, vec.begin());
+            self.setVision(vec);
+        }, py::arg("data"), "Set vision data from numpy array")
         .def("getTouch", &SensoryPercept::getTouch)
         .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
+        .def("getTouchAsNumpy", [](SensoryPercept& self) {
+            const std::vector<float>& touchData = self.getTouch();
+            py::array_t<float> numpy_array({static_cast<size_t>(touchData.size())});
+            auto buf = numpy_array.request();
+            float* ptr = static_cast<float*>(buf.ptr);
+            std::copy(touchData.begin(), touchData.end(), ptr);
+            return numpy_array;
+        }, "Get touch data as numpy array")
+        .def("setTouchFromNumpy", [](SensoryPercept& self, py::array_t<float> data) {
+            auto buf = data.request();
+            if (buf.ndim != 1) throw std::runtime_error("Touch data must be 1D array");
+            std::vector<float> vec(buf.size);
+            std::copy(static_cast<float*>(buf.ptr), static_cast<float*>(buf.ptr) + buf.size, vec.begin());
+            self.setTouch(vec);
+        }, py::arg("data"), "Set touch data from numpy array")
         .def("getInternal", &SensoryPercept::getInternal)
         .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
+        .def("getInternalAsNumpy", [](SensoryPercept& self) {
+            const std::vector<float>& internalData = self.getInternal();
+            py::array_t<float> numpy_array({static_cast<size_t>(internalData.size())});
+            auto buf = numpy_array.request();
+            float* ptr = static_cast<float*>(buf.ptr);
+            std::copy(internalData.begin(), internalData.end(), ptr);
+            return numpy_array;
+        }, "Get internal data as numpy array")
+        .def("setInternalFromNumpy", [](SensoryPercept& self, py::array_t<float> data) {
+            auto buf = data.request();
+            if (buf.ndim != 1) throw std::runtime_error("Internal data must be 1D array");
+            std::vector<float> vec(buf.size);
+            std::copy(static_cast<float*>(buf.ptr), static_cast<float*>(buf.ptr) + buf.size, vec.begin());
+            self.setInternal(vec);
+        }, py::arg("data"), "Set internal data from numpy array")
         .def("getProprioception", &SensoryPercept::getProprioception)
         .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
         .def("getAudio", &SensoryPercept::getAudio)
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
+        .def("getAudioAsNumpy", [](SensoryPercept& self) {
+            const std::vector<float>& audioData = self.getAudio();
+            py::array_t<float> numpy_array({static_cast<size_t>(audioData.size())});
+            auto buf = numpy_array.request();
+            float* ptr = static_cast<float*>(buf.ptr);
+            std::copy(audioData.begin(), audioData.end(), ptr);
+            return numpy_array;
+        }, "Get audio data as numpy array")
+        .def("setAudioFromNumpy", [](SensoryPercept& self, py::array_t<float> data) {
+            auto buf = data.request();
+            if (buf.ndim != 1) throw std::runtime_error("Audio data must be 1D array");
+            std::vector<float> vec(buf.size);
+            std::copy(static_cast<float*>(buf.ptr), static_cast<float*>(buf.ptr) + buf.size, vec.begin());
+            self.setAudio(vec);
+        }, py::arg("data"), "Set audio data from numpy array")
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        // Convenience methods for common operations
+        .def("getPixelValue", [](SensoryPercept& self, size_t x, size_t y) {
+            size_t width = self.getVisionWidth();
+            if (x >= width) throw std::out_of_range("X coordinate out of bounds");
+            if (y >= self.getVisionHeight()) throw std::out_of_range("Y coordinate out of bounds");
+            size_t index = y * width + x;
+            const std::vector<float>& visionData = self.getVision();
+            return index < visionData.size() ? visionData[index] : 0.0f;
+        }, py::arg("x"), py::arg("y"), "Get pixel value at (x, y) position")
+        .def("setPixelValue", [](SensoryPercept& self, size_t x, size_t y, float value) {
+            size_t width = self.getVisionWidth();
+            if (x >= width) throw std::out_of_range("X coordinate out of bounds");
+            if (y >= self.getVisionHeight()) throw std::out_of_range("Y coordinate out of bounds");
+            size_t index = y * width + x;
+            std::vector<float>& visionData = self.getVision();
+            if (index < visionData.size()) visionData[index] = value;
+        }, py::arg("x"), py::arg("y"), py::arg("value"), "Set pixel value at (x, y) position")
+        .def("isDarkPixel", [](SensoryPercept& self, size_t x, size_t y, float threshold = 0.5f) {
+            return self.getPixelValue(x, y) < threshold;
+        }, py::arg("x"), py::arg("y"), py::arg("threshold") = 0.5f, "Check if pixel is dark");
 
     py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
