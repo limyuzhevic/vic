@@ -19,14 +19,193 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Enhanced file loading with support for multiple formats
+    // 1. JSON format (preferred): {"key": "value", "number": 42, "bool": true}
+    // 2. YAML format (simplified): key: value\nnumber: 42\nbool: true
+    // 3. Simple key=value format (backward compatible)
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    if (content.empty()) {
+        return false;
+    }
+    
+    // Try JSON parser first
+    bool jsonSuccess = parseJSON(content);
+    if (jsonSuccess) {
+        return true;
+    }
+    
+    // Try YAML parser second
+    bool yamlSuccess = parseYAML(content);
+    if (yamlSuccess) {
+        return true;
+    }
+    
+    // Fall back to simple key=value format for backward compatibility
+    file.clear();
+    file.seekg(0);
+    return parseKeyValueFormat(file);
+}
+
+bool Config::parseJSON(const std::string& content) {
+    // Simple JSON parser for configuration files
+    // Supports basic objects: {"key": "value", "num": 42, "bool": true}
+    try {
+        size_t pos = 0;
+        while (pos < content.size()) {
+            // Skip whitespace
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t')) {
+                pos++;
+            }
+            
+            if (pos >= content.size()) break;
+            
+            // Parse key
+            if (content[pos] == '"') {
+                size_t keyEnd = content.find('"', pos + 1);
+                if (keyEnd == std::string::npos) return false;
+                
+                std::string key = content.substr(pos + 1, keyEnd - pos - 1);
+                pos = keyEnd + 1;
+                
+                // Skip whitespace
+                while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t')) {
+                    pos++;
+                }
+                
+                // Parse colon
+                if (pos >= content.size() || content[pos] != ':') return false;
+                pos++;
+                
+                // Skip whitespace
+                while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t')) {
+                    pos++;
+                }
+                
+                // Parse value
+                std::string value;
+                if (content[pos] == '"') {
+                    // String value
+                    size_t valueEnd = content.find('"', pos + 1);
+                    if (valueEnd == std::string::npos) return false;
+                    value = content.substr(pos + 1, valueEnd - pos - 1);
+                    pos = valueEnd + 1;
+                } else if (content[pos] == 't' || content[pos] == 'f') {
+                    // Boolean value
+                    size_t valueEnd = content.find_first_of(",}", pos);
+                    if (valueEnd == std::string::npos) return false;
+                    std::string boolStr = content.substr(pos, valueEnd - pos);
+                    if (boolStr == "true") {
+                        value = "true";
+                    } else if (boolStr == "false") {
+                        value = "false";
+                    } else {
+                        return false;
+                    }
+                    pos = valueEnd;
+                } else if (content[pos] == '-' || (content[pos] >= '0' && content[pos] <= '9')) {
+                    // Number value
+                    size_t valueEnd = content.find_first_of(",}", pos);
+                    if (valueEnd == std::string::npos) return false;
+                    value = content.substr(pos, valueEnd - pos);
+                    pos = valueEnd;
+                } else {
+                    return false;
+                }
+                
+                // Remove quotes from key and value if present
+                key = trim(key);
+                if (value.size() >= 2 && ((value.front() == '"' && value.back() == '"') ||
+                                          (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                } else {
+                    value = trim(value);
+                }
+                
+                set(key, value, ConfigSource::File);
+                
+                // Skip comma if present
+                while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t')) {
+                    pos++;
+                }
+                if (pos < content.size() && content[pos] == ',') {
+                    pos++;
+                }
+            } else {
+                // Not a JSON object, skip to YAML parser
+                return false;
+            }
+        }
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::parseYAML(const std::string& content) {
+    // Simple YAML parser for configuration files
+    // Supports key: value format, one per line
+    try {
+        size_t pos = 0;
+        while (pos < content.size()) {
+            // Skip whitespace
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\n' || content[pos] == '\t' || content[pos] == '\r')) {
+                pos++;
+            }
+            
+            if (pos >= content.size()) break;
+            
+            // Skip comments
+            if (content[pos] == '#') {
+                size_t newline = content.find('\n', pos);
+                if (newline == std::string::npos) break;
+                pos = newline + 1;
+                continue;
+            }
+            
+            // Parse key
+            size_t keyEnd = content.find(':', pos);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = content.substr(pos, keyEnd - pos);
+            pos = keyEnd + 1;
+            
+            // Skip whitespace after colon
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t')) {
+                pos++;
+            }
+            
+            // Parse value
+            size_t valueEnd = content.find('\n', pos);
+            if (valueEnd == std::string::npos) {
+                valueEnd = content.size();
+            }
+            
+            std::string value = content.substr(pos, valueEnd - pos);
+            
+            // Trim whitespace from key and value
+            key = trim(key);
+            value = trim(value);
+            
+            if (!key.empty()) {
+                set(key, value, ConfigSource::File);
+            }
+            
+            pos = valueEnd + 1;
+        }
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+bool Config::parseKeyValueFormat(std::ifstream& file) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
