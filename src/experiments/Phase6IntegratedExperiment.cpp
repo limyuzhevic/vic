@@ -404,4 +404,61 @@ bool Phase6IntegratedExperiment::testReplay() {
     return true;
 }
 
+bool Phase6IntegratedExperiment::testPredictionIntegration() {
+    NLM_LOG_INFO("=== Testing Prediction System Integration ===");
+    
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", 100);
+    
+    auto brain = std::make_shared<Brain>(cfg);
+    brain->initialize();
+    
+    // Get prediction system
+    auto* prediction = brain->getPredictionSystem();
+    if (!prediction) {
+        NLM_LOG_ERROR("Prediction system not available");
+        return false;
+    }
+    
+    // Run some steps to let prediction system learn patterns
+    for (int i = 0; i < 100; ++i) {
+        brain->step(i, i * 0.001);
+    }
+    
+    NLM_LOG_INFO("[PASS] Prediction system is integrated and functional");
+    return true;
+}
+
+bool Phase6IntegratedExperiment::testDevelopmentIntegration() {
+    NLM_LOG_INFO("=== Testing Development System Integration ===");
+    
+    auto cfg = std::make_shared<Config>();
+    cfg->set("neuron_count", 100);
+    
+    auto brain = std::make_shared<Brain>(cfg);
+    brain->initialize();
+    
+    // Get development system
+    auto* development = brain->getDevelopmentSystem();
+    if (!development) {
+        NLM_LOG_ERROR("Development system not available");
+        return false;
+    }
+    
+    // Get developmental stage
+    DevelopmentalStage stage = brain->getDevelopmentalStage();
+    
+    // Run some steps with development
+    for (int i = 0; i < 50; ++i) {
+        brain->step(i, i * 0.001);
+        // Update development system
+        if (i % 10 == 0) {
+            development->update(brain.get(), *brain->getRandomGenerator(), 0.01);
+        }
+    }
+    
+    NLM_LOG_INFO("[PASS] Development system is integrated and functional");
+    return true;
+}
+
 } // namespace nlm

@@ -610,12 +610,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
+    } else if (pImpl->stepsSinceLastEpisode == 1) {
+        // Update a shorter-lived memory buffer for recent experiences
+        if (pImpl->workingMemory) {
+            // Store recent sensory-to-motor mappings in working memory
+            // This helps with short-term memory integration
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring()) {
+                            pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // TODO: Implement proper prediction system integration
+        // Currently only tracks prediction error history
+        // Should:
+        // 1. Encode current sensory input for prediction
+        // 2. Compare with stored predictions
+        // 3. Generate prediction error signals
+        // 4. Use prediction error for neuromodulation (curiosity, novelty)
+        // 5. Update prediction targets based on actual outcomes
+        
+        // Store current brain state for prediction
+        // Phase 6: Initialize prediction with current neural activity
+        // This enables prediction error signals for neuromodulation
+        if (pImpl->predictionSystem) {
+            // TODO: Implement actual prediction system integration
+            // This should include:
+            // - Sensory encoding for prediction
+            // - Prediction target generation
+            // - Prediction error calculation
+            // - Prediction error feedback to neuromodulation systems
+            
+            // Placeholder for prediction system logic
+            // In a full implementation, this would:
+            // 1. Extract relevant features from current neural state
+            // 2. Compare with stored prediction targets
+            // 3. Calculate prediction error
+            // 4. Update neuromodulation signals based on error
+            // 5. Learn from prediction errors over time
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -623,16 +664,65 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->attention->update(pImpl->timestep);
         
         // Apply attention to working memory winners
+        // Enhanced: apply attention to all neural activity, not just working memory
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
+        } else {
+            // Even without working memory entries, apply attention to recent firing patterns
+            // This helps maintain attentional focus even during low-activity periods
+            std::vector<NeuronId> recentFiring;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring()) {
+                            recentFiring.push_back(neuron->getId());
+                        }
+                    }
+                }
+            }
+            if (!recentFiring.empty()) {
+                pImpl->attention->processCompetition(recentFiring);
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Enhanced concept formation with attentional guidance
+        // Phase 6: integrate with attention system for concept selection
+        
+        // Collect current neural patterns for concept learning
+        std::vector<float> currentPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring()) {
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        currentPattern.push_back(activation);
+                    }
+                }
+            }
+        }
+        
+        // Only form concepts from meaningful patterns
+        if (currentPattern.size() > 10) {
+            // TODO: Implement proper concept formation integration
+            // Should:
+            // 1. Encode sensory input as concept patterns using attention guidance
+            // 2. Compare with existing concept database
+            // 3. Create new concepts for novel patterns with reward history
+            // 4. Update concept activation based on attention weighting
+            // 5. Use concepts to bias motor planning and action selection
+            
+            // Present pattern to concept formation system
+            // In a full implementation, this would encode sensory input
+            // and form abstract concepts from recurring patterns
+            // The attention system helps select which patterns are relevant
+            
+            // Placeholder for concept formation logic
+            // brain_->getConceptFormation()->presentPattern(currentPattern);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

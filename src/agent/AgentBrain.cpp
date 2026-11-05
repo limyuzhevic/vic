@@ -245,16 +245,51 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // Selectivity is therefore pursued through plasticity and
     // homeostatic scaling (STDP.cpp, Brain.cpp), not by silencing the
     // sensory input. The original intensity encoding is kept.
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
+        for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
+            if (sensoryVision_[i]) {
+                // Inject current proportional to vision intensity
+                float current = vision[i] * 5.0f;  // Scale factor
+                sensoryVision_[i]->injectCurrent(current);
+                
+            // Also store sensory experience in episodic memory for learning and development
+            if (brain_ && brain_->getEpisodicMemory() && current > 0.5f) {
+                // Create an episodic memory item from sensory input
+                // This allows the brain to learn from its sensory experiences
+                // and maintain a continuous record of interactions with the environment
+                
+                // TODO: Enhance episodic memory integration with:
+                // 1. Action-Outcome associations (link sensory input to actions taken)
+                // 2. Reward Prediction errors (compare expected vs actual reward)
+                // 3. Contextual memory (store environmental context)
+                // 4. Memory consolidation (replay and strengthen important episodes)
+                // 5. Integration with working memory for seamless continuity
+                
+                EpisodicMemoryItem episode;
+                episode.timestamp = brain_->getCurrentStep();
+                episode.reward = 0.0f; // Will be updated later in applyRewardModulation
+                episode.positionX = i < sensoryTouch_.size() ? i : 0;
+                episode.positionY = i < sensoryTouch_.size() ? (i % 10) : 0;
+                episode.orientation = 0.0f;
+                episode.action = ActionType::Wait; // Will be updated when action is selected
+                episode.energy = 1.0f;
+                episode.novelty = noveltyLevel_;
+                episode.resultingReward = expectedReward_;
+                episode.age = 0;
+                
+                // Encode sensory state as the pattern
+                episode.sensoryState = vision;
+                episode.resultingSensoryState = vision;
+                
+                // Store which neurons were active
+                episode.activeNeurons.push_back(sensoryVision_[i]->getId());
+                episode.neuronActivations.push_back(current / 10.0f);
+                
+                brain_->getEpisodicMemory()->storeEpisode(episode);
+            }
+            }
         }
-    }
 
-    // Phase 6 text-as-a-sense: inject the teacher word's sparse
+// Phase 6 text-as-a-sense: inject the teacher word's sparse
     // pattern on the dedicated text neurons, in the same presentation
     // as the visual scene, so STDP can associate the two. The brain
     // sees only which text neurons fire — never the string — and no
@@ -264,6 +299,13 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
             size_t neuronIdx = 16 + idx;
             if (neuronIdx < sensoryVision_.size() && sensoryVision_[neuronIdx]) {
                 sensoryVision_[neuronIdx]->injectCurrent(8.0f);
+                
+                // TODO: Add working memory integration for text input
+                // Should store text patterns in working memory for:
+                // 1. Pattern completion and reconstruction
+                // 2. Text-scene association learning
+                // 3. Working memory consolidation for text concepts
+                // 4. Integration with episodic memory for text experiences
             }
         }
     }

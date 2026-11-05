@@ -125,14 +125,14 @@ public:
     bool testNeuromodulationIntegration();
     
     /**
-     * Test checkpoint save/load
+     * Test prediction system integration
      */
-    bool testCheckpointing();
+    bool testPredictionIntegration();
     
     /**
-     * Test replay system
+     * Test development system integration
      */
-    bool testReplay();
+    bool testDevelopmentIntegration();
 };
 
 } // namespace nlm
