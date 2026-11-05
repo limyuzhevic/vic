@@ -333,6 +333,7 @@ PYBIND11_MODULE(pynlm, m) {
              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
              "Get all region IDs")
+        // Get all regions
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
@@ -359,7 +360,249 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Additional Python-friendly methods
+        .def("getAllNeurons", &Brain::getAllNeurons,
+             py::return_value_policy::reference_internal,
+             "Get all neurons in the brain")
+        .def("getAllSynapses", &Brain::getAllSynapses,
+             py::return_value_policy::reference_internal,
+             "Get all synapses in the brain")
+        .def("getRegionByName", [](Brain& brain, const std::string& name) {
+            for (auto& region : brain.getRegions()) {
+                if (region->getName() == name) {
+                    return region.get();
+                }
+            }
+            return (NeuralRegion*)nullptr;
+        }, py::arg("name"),
+             py::return_value_policy::reference_internal,
+             "Get region by name")
+        .def("findNeuronById", &Brain::getRegion, py::arg("id"),
+             py::return_value_policy::reference_internal,
+             "Get region by ID (alias for getRegion)")
+        .def("clear", [](Brain& brain) {
+            brain.reset();
+            brain.initialize();
+        }, "Reset and re-initialize brain")
+        .def("runLearningEpisode", [](Brain& brain, const std::vector<float>& inputs, int steps) {
+            // Inject inputs into sensory neurons
+            for (size_t i = 0; i < std::min(inputs.size(), size_t(20)); ++i) {
+                brain.injectCurrentToNeurons(NeuronType::Sensory, inputs[i] * 50.0f);
+            }
+            
+            // Run episode
+            for (int step = 0; step < steps; ++step) {
+                brain.step(step, step * 0.001);
+            }
+            
+            // Return some summary statistics
+            std::map<std::string, double> stats;
+            stats["total_spikes"] = brain.getTotalSpikeCount();
+            stats["firing_neurons"] = brain.getFiringNeuronCount();
+            stats["avg_firing_rate"] = brain.getAverageFiringRate();
+            return stats;
+        }, py::arg("inputs"), py::arg("steps"),
+             "Run a learning episode with given inputs")
+        .def("getConnectivityMatrix", [](Brain& brain) {
+            auto regions = brain.getRegions();
+            if (regions.empty()) {
+                return std::vector<std::vector<float>>();
+            }
+            
+            auto& region = *regions[0];
+            auto neurons = region.getAllNeurons();
+            auto synapses = region.getSynapses();
+            
+            std::vector<std::vector<float>> matrix;
+            matrix.resize(neurons.size(), std::vector<float>(neurons.size(), 0.0f));
+            
+            for (size_t i = 0; i < neurons.size(); ++i) {
+                for (size_t j = 0; j < neurons.size(); ++j) {
+                    // Check if there's a synapse from neuron i to neuron j
+                    for (const auto& syn : synapses) {
+                        if (syn->getSourceNeuron().index() == i && 
+                            syn->getDestinationNeuron().index() == j) {
+                            matrix[i][j] = syn->getWeight();
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            return matrix;
+        }, "Get connectivity matrix of first region")
+        .def("exportForAnalysis", [](Brain& brain, const std::string& filename) {
+            // Simple export format - could be enhanced
+            std::ofstream file(filename);
+            if (!file.is_open()) {
+                throw std::runtime_error("Cannot open file for export: " + filename);
+            }
+            
+            auto regions = brain.getRegions();
+            file << "NLM Brain Export" << std::endl;
+            file << "Regions: " << regions.size() << std::endl;
+            file << "Total Neurons: " << brain.getTotalNeuronCount() << std::endl;
+            file << "Total Synapses: " << brain.getTotalSynapseCount() << std::endl;
+            file << "Total Spikes: " << brain.getTotalSpikeCount() << std::endl;
+            file << "Developmental Stage: " << static_cast<int>(brain.getDevelopmentalStage()) << std::endl;
+            file << std::endl;
+            
+            for (size_t r = 0; r < regions.size(); ++r) {
+                file << "Region " << r << ": " << regions[r]->getName() << std::endl;
+                file << "  Neurons: " << regions[r]->getAllNeurons().size() << std::endl;
+                file << "  Synapses: " << regions[r]->getSynapses().size() << std::endl;
+                
+                auto neurons = regions[r]->getAllNeurons();
+                for (size_t n = 0; n < neurons.size(); ++n) {
+                    file << "    Neuron " << n << ": " 
+                         << "Type=" << static_cast<int>(neurons[n]->getType()) << " "
+                         << "V=" << neurons[n]->getMembranePotential() << " "
+                         << "Refractory=" << neurons[n]->getRefractoryCount() << std::endl;
+                }
+            }
+            
+            file.close();
+            return true;
+        }, py::arg("filename"),
+             "Export brain state to file for analysis")
+        .def("importFromAnalysis", [](Brain& brain, const std::string& filename) {
+            std::ifstream file(filename);
+            if (!file.is_open()) {
+                throw std::runtime_error("Cannot open file for import: " + filename);
+            }
+            
+            std::string line;
+            while (std::getline(file, line)) {
+                if (line.find("Developmental Stage:") != std::string::npos) {
+                    size_t pos = line.find(":");
+                    if (pos != std::string::npos) {
+                        int stage = std::stoi(line.substr(pos + 1));
+                        brain.setDevelopmentalStage(static_cast<DevelopmentalStage>(stage));
+                    }
+                }
+            }
+            
+            file.close();
+            return true;
+        }, py::arg("filename"),
+             "Import brain state from file (basic implementation)")
+        .def("getNeuralStats", [](Brain& brain) {
+            std::map<std::string, double> stats;
+            
+            auto regions = brain.getRegions();
+            size_t totalNeurons = brain.getTotalNeuronCount();
+            size_t totalSynapses = brain.getTotalSynapseCount();
+            size_t totalSpikes = brain.getTotalSpikeCount();
+            
+            stats["total_neurons"] = totalNeurons;
+            stats["total_synapses"] = totalSynapses;
+            stats["total_spikes"] = totalSpikes;
+            stats["spikes_per_neuron"] = totalNeurons > 0 ? (double)totalSpikes / totalNeurons : 0.0;
+            stats["synapses_per_neuron"] = totalNeurons > 0 ? (double)totalSynapses / totalNeurons : 0.0;
+            stats["avg_firing_rate"] = brain.getAverageFiringRate();
+            stats["excitation_inhibition_ratio"] = brain.getExcitationInhibitionRatio();
+            stats["developmental_stage"] = static_cast<double>(brain.getDevelopmentalStage());
+            
+            // Calculate network density
+            if (totalNeurons > 1 && totalSynapses > 0) {
+                double max_possible = totalNeurons * totalNeurons;
+                stats["network_density"] = (double)totalSynapses / max_possible;
+            } else {
+                stats["network_density"] = 0.0;
+            }
+            
+            return stats;
+        }, "Get comprehensive neural network statistics")
+        .def("enableAllPlasticity", [](Brain& brain) {
+            // Enable all plasticity mechanisms
+            if (auto* stdp = brain.getSTDP()) {
+                stdp->enablePlasticity(true);
+            }
+            if (auto* hebbian = brain.getHebbian()) {
+                hebbian->enablePlasticity(true);
+            }
+            if (auto* structural = brain.getStructuralPlasticity()) {
+                structural->enablePlasticity(true);
+            }
+            return true;
+        }, "Enable all plasticity mechanisms")
+        .def("disableAllPlasticity", [](Brain& brain) {
+            // Disable all plasticity mechanisms
+            if (auto* stdp = brain.getSTDP()) {
+                stdp->enablePlasticity(false);
+            }
+            if (auto* hebbian = brain.getHebbian()) {
+                hebbian->enablePlasticity(false);
+            }
+            if (auto* structural = brain.getStructuralPlasticity()) {
+                structural->enablePlasticity(false);
+            }
+            return true;
+        }, "Disable all plasticity mechanisms")
+        .def("getActiveConnectivity", [](Brain& brain) {
+            // Get list of active/in-use synapses
+            std::vector<std::pair<size_t, size_t>> connections;
+            
+            auto regions = brain.getRegions();
+            for (auto& region : regions) {
+                auto synapses = region->getSynapses();
+                for (const auto& syn : synapses) {
+                    if (syn->getWeight() > 0.1f) {  // Consider weakly active synapses as active
+                        size_t src = syn->getSourceNeuron().index();
+                        size_t dst = syn->getDestinationNeuron().index();
+                        connections.push_back({src, dst});
+                    }
+                }
+            }
+            
+            return connections;
+        }, "Get list of active synaptic connections")
+        .def("simulateEnvironment", [](Brain& brain, double duration, double timestep = 0.001) {
+            // Simulate in a simple environment for a given duration
+            int steps = static_cast<int>(duration / timestep);
+            
+            for (int step = 0; step < steps; ++step) {
+                brain.step(step, step * timestep);
+                
+                // Inject some environmental input (could be enhanced)
+                if (step % 100 == 0) {
+                    brain.injectCurrentToNeurons(NeuronType::Sensory, 10.0f);
+                }
+            }
+            
+            return steps;
+        }, py::arg("duration"), py::arg("timestep") = 0.001,
+             "Simulate brain in environment for given duration")
+        .def("getLearningSummary", [](Brain& brain) {
+            std::map<std::string, double> summary;
+            
+            // Calculate various learning metrics
+            size_t totalSpikes = brain.getTotalSpikeCount();
+            size_t firingNeurons = brain.getFiringNeuronCount();
+            double avgFiringRate = brain.getAverageFiringRate();
+            double eiRatio = brain.getExcitationInhibitionRatio();
+            
+            summary["total_experience"] = static_cast<double>(totalSpikes);
+            summary["active_neurons_count"] = static_cast<double>(firingNeurons);
+            summary["experience_per_neuron"] = totalSpikes > 0 ? (double)firingNeurons / totalSpikes : 0.0;
+            summary["learning_intensity"] = avgFiringRate;
+            summary["network_balance"] = eiRatio;
+            
+            // Determine learning phase based on developmental stage
+            auto stage = brain.getDevelopmentalStage();
+            std::string stageStr;
+            switch (stage) {
+                case DevelopmentalStage::Initial: stageStr = "initial"; break;
+                case DevelopmentalStage::CriticalPeriod: stageStr = "critical_period"; break;
+                case DevelopmentalStage::Maturation: stageStr = "maturation"; break;
+                case DevelopmentalStage::Adult: stageStr = "adult"; break;
+                case DevelopmentalStage::Aging: stageStr = "aging"; break;
+            }
+            summary["developmental_phase"] = stageStr;
+            
+            return summary;
+        }, "Get learning summary and statistics");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
