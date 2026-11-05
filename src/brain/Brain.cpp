@@ -613,9 +613,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->currentStep > 0) {
+        // Make prediction based on current neural state and sensory input
+        // Predict the next sensory state based on current activity patterns
+        
+        // Get current sensory activity from sensory neurons
+        std::vector<float> currentSensoryState;
+        currentSensoryState.reserve(pImpl->sensoryNeurons.size());
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            currentSensoryState.push_back(std::abs(neuron->getState().membranePotential - 
+                                                   neuron->getState().restingPotential) / 20.0f);
+        }
+        
+        // Create a Vision object for prediction (simplified approach)
+        // In a real implementation, this would use the actual sensory input
+        // We're using neural activity as a proxy for prediction
+        Vision currentVision;
+        currentVision.setData(currentSensoryState);
+        
+        // Make prediction for next state
+        auto predictedState = pImpl->predictionSystem->predictNextState(currentVision);
+        
+        // Update predictions based on actual neural activity (which represents sensory input)
+        // This is where prediction error is computed and stored
+        pImpl->predictionSystem->train(currentVision);
+        
+        // Get prediction error for neuromodulation
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        
+        // Use prediction error to modulate dopamine (reward prediction error)
+        if (predictionError > 0.0f) {
+            // Positive prediction error (surprise) -> increase dopamine
+            if (pImpl->dopamine) {
+                float currentDopamine = pImpl->dopamine->getLevel();
+                pImpl->dopamine->setLevel(std::min(1.0f, currentDopamine + predictionError * 0.5f));
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
