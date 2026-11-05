@@ -82,6 +82,8 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Phase 6: Advanced monitoring and control systems
+    src/agent/NeuralActivityMonitor.cpp
 )
 
 target_include_directories(nlm_core PUBLIC
