@@ -41,11 +41,195 @@ void printBanner() {
     ║     This phase implements:                                    ║
     ║     - Real LIF neuron dynamics                                ║
     ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
+    ║     - STDP and Hebbian plasticity rules                       ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     )" << std::endl;
+}
+
+// Command-line argument parser for Phase 2 demo
+struct DemoArgs {
+    size_t neuronCount = 500;
+    size_t plasticitySteps = 1000;
+    size_t stdpTrials = 50;
+    float connectivity = 0.15f;
+    float stdpLtpWeight = 0.02f;
+    float stdpLtdWeight = 0.015f;
+    float synaptogenesisRate = 0.0001f;
+    float pruningRate = 0.00001f;
+    bool enableDetailedLogging = true;
+    bool enablePerformanceMetrics = true;
+    std::string configFile = "configs/default.cfg";
+};
+
+DemoArgs parseDemoArgs(int argc, char** argv) {
+    DemoArgs args;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "Phase 2 Demo Arguments:\n"
+                     << "  --neurons N            Set neuron count (default: 500)\n"
+                     << "  --plasticity-steps N   Set plasticity experiment steps (default: 1000)\n"
+                     << "  --stdp-trials N        Set STDP trials (default: 50)\n"
+                     << "  --connectivity F        Set connection probability (default: 0.15)\n"
+                     << "  --stdp-ltp W           Set STDP LTP weight (default: 0.02)\n"
+                     << "  --stdp-ltd W            Set STDP LTD weight (default: 0.015)\n"
+                     << "  --no-logging            Disable detailed logging\n"
+                     << "  --no-metrics            Disable performance metrics\n"
+                     << "  --config FILE           Load configuration from file (default: configs/default.cfg)\n"
+                     << "  --benchmark-only        Run only benchmark test\n"
+                     << "  --quick                 Run all tests with minimal configuration\n";
+            exit(0);
+        }
+        
+        if (arg == "--benchmark-only") {
+            args.neuronCount = 100;
+            args.plasticitySteps = 100;
+            args.stdpTrials = 10;
+        } else if (arg == "--quick") {
+            args.neuronCount = 100;
+            args.plasticitySteps = 200;
+            args.stdpTrials = 20;
+            args.enableDetailedLogging = false;
+            args.enablePerformanceMetrics = false;
+        }
+        
+        if (arg.find("--neurons=") == 0) {
+            args.neuronCount = std::stoull(arg.substr(10));
+        } else if (arg.find("--plasticity-steps=") == 0) {
+            args.plasticitySteps = std::stoull(arg.substr(19));
+        } else if (arg.find("--stdp-trials=") == 0) {
+            args.stdpTrials = std::stoi(arg.substr(14));
+        } else if (arg.find("--connectivity=") == 0) {
+            args.connectivity = std::stof(arg.substr(15));
+        } else if (arg.find("--stdp-ltp=") == 0) {
+            args.stdpLtpWeight = std::stof(arg.substr(11));
+        } else if (arg.find("--stdp-ltd=") == 0) {
+            args.stdpLtdWeight = std::stof(arg.substr(11));
+        } else if (arg == "--no-logging") {
+            args.enableDetailedLogging = false;
+        } else if (arg == "--no-metrics") {
+            args.enablePerformanceMetrics = false;
+        } else if (arg.find("--config=") == 0) {
+            args.configFile = arg.substr(9);
+        }
+    }
+    
+    return args;
+}
+
+void runBenchmarkTest(std::shared_ptr<Brain> brain, bool detailed) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 0: Benchmark Performance ===");
+    
+    // Get baseline performance
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) {
+        NLM_LOG_ERROR("No region found for benchmarking");
+        return;
+    }
+    
+    size_t neuronCount = brain->getTotalNeuronCount();
+    size_t synapseCount = brain->getTotalSynapseCount();
+    
+    NLM_LOG_INFO("Benchmark Configuration:");
+    NLM_LOG_INFO("  Neurons: " + std::to_string(neuronCount));
+    NLM_LOG_INFO("  Synapses: " + std::to_string(synapseCount));
+    NLM_LOG_INFO("  Synapses/Neuron: " + std::to_string(static_cast<float>(synapseCount) / neuronCount));
+    
+    // Test step efficiency
+    size_t stepsToTest = 100;
+    size_t initialSpikes = brain->getTotalSpikeCount();
+    
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    for (size_t step = 0; step < stepsToTest; ++step) {
+        // Minimal input for benchmarking
+        if (step < 10) {
+            brain->injectCurrentToNeurons(NeuronType::Sensory, 10.0f);
+        }
+        brain->step(step, step * 0.001);
+    }
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    double totalTime = std::chrono::duration<double>(endTime - startTime).count();
+    
+    size_t spikesGenerated = brain->getTotalSpikeCount() - initialSpikes;
+    
+    NLM_LOG_INFO("Performance Results:");
+    NLM_LOG_INFO("  Time for " + std::to_string(stepsToTest) + " steps: " + 
+                std::to_string(totalTime) + "s");
+    NLM_LOG_INFO("  Steps/second: " + std::to_string(stepsToTest / totalTime));
+    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikesGenerated));
+    NLM_LOG_INFO("  Spikes/step: " + std::to_string(static_cast<float>(spikesGenerated) / stepsToTest));
+    
+    if (detailed) {
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Network Statistics:");
+        NLM_LOG_INFO("  Firing neuron count: " + std::to_string(brain->getFiringNeuronCount()));
+        NLM_LOG_INFO("  Excitation/Inhibition ratio: " + std::to_string(brain->getExcitationInhibitionRatio()));
+    }
+}
+
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain, bool detailed) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
+    
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) {
+        NLM_LOG_ERROR("No region found for connectivity test");
+        return;
+    }
+    
+    auto neurons = region->getAllNeurons();
+    if (neurons.empty()) {
+        NLM_LOG_ERROR("  No neurons found!");
+        return;
+    }
+    
+    // Get initial spike count
+    size_t initialSpikes = brain->getTotalSpikeCount();
+    
+    // Inject moderate current into a subset of neurons for realistic testing
+    size_t neuronsToStimulate = std::min(size_t(5), neurons.size() / 20); // Only 5% of neurons
+    NLM_LOG_INFO("  Injecting current into " + std::to_string(neuronsToStimulate) + 
+                " neurons (" + std::to_string(neuronsToStimulate * 100.0f / neurons.size()) + "% of network)...");
+    
+    for (size_t i = 0; i < neuronsToStimulate; ++i) {
+        neurons[i]->injectCurrent(25.0f); // Moderate current
+    }
+    
+    // Run a few steps
+    for (SimulationStep step = 0; step < 50; ++step) {
+        brain->step(step, step * 0.001);
+    }
+    
+    size_t spikesGenerated = brain->getTotalSpikeCount() - initialSpikes;
+    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikesGenerated));
+    
+    if (spikesGenerated > 0) {
+        NLM_LOG_INFO("  ✓ Spikes propagate through network");
+        
+        if (detailed) {
+            NLM_LOG_INFO("  Sample neuron states:");
+            for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                            " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                            " thresh=" + std::to_string(neurons[i]->getThreshold()) +
+                            " refrac=" + std::to_string(neurons[i]->getRefractoryTime()));
+            }
+        }
+    } else {
+        NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
+        for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
+            NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                        " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+        }
+    }
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -159,27 +343,32 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain, bool detailed) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
-    // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("No region found for connectivity test");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_ERROR("  No neurons found!");
         return;
     }
     
     // Get initial spike count
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+    // Inject moderate current into a subset of neurons for realistic testing
+    size_t neuronsToStimulate = std::min(size_t(5), neurons.size() / 20); // Only 5% of neurons
+    NLM_LOG_INFO("  Injecting current into " + std::to_string(neuronsToStimulate) + 
+                " neurons (" + std::to_string(neuronsToStimulate * 100.0f / neurons.size()) + "% of network)...");
+    
+    for (size_t i = 0; i < neuronsToStimulate; ++i) {
+        neurons[i]->injectCurrent(25.0f); // Moderate current
     }
     
     // Run a few steps
@@ -187,11 +376,21 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
         brain->step(step, step * 0.001);
     }
     
-    size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
-    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
+    size_t spikesGenerated = brain->getTotalSpikeCount() - initialSpikes;
+    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikesGenerated));
     
-    if (spikes > 0) {
+    if (spikesGenerated > 0) {
         NLM_LOG_INFO("  ✓ Spikes propagate through network");
+        
+        if (detailed) {
+            NLM_LOG_INFO("  Sample neuron states:");
+            for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
+                NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
+                            " V=" + std::to_string(neurons[i]->getMembranePotential()) +
+                            " thresh=" + std::to_string(neurons[i]->getThreshold()) +
+                            " refrac=" + std::to_string(neurons[i]->getRefractoryTime()));
+            }
+        }
     } else {
         NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
@@ -202,7 +401,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+void runPlasticityExperiment(std::shared_ptr<Brain> brain, bool detailed) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
@@ -235,6 +434,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             }
         }
     }
+    
     for (SimulationStep step = 0; step < 1000; ++step) {
         for (NeuronId id : patternNeurons) {
             brain->injectCurrent(id, 30.0f);
@@ -243,7 +443,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         brain->step(step, step * 0.001);
         
         // Log progress every 100 steps
-        if (step % 100 == 0) {
+        if (step % 100 == 0 && detailed) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
@@ -257,7 +457,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
+void runStdpVerification(std::shared_ptr<Brain> brain, bool detailed) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
@@ -277,24 +477,24 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     float beforeWeight = syn->getWeight();
     NLM_LOG_INFO("  Testing STDP on 1 synapse:");
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
-                 " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
-                 ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
+                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
-                 " (Δ=" + std::to_string(delta) + ")");
-
+                  " (Δ=" + std::to_string(delta) + ")");
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -383,6 +583,28 @@ int main(int argc, char** argv) {
     SimulationClock clock(timestep);
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
+    // Parse command-line arguments for demo customization
+    DemoArgs args = parseDemoArgs(argc, argv);
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== NLM Phase 2 Demo Configuration ===");
+    if (args.enableDetailedLogging) {
+        NLM_LOG_INFO("Neuron count: " + std::to_string(args.neuronCount));
+        NLM_LOG_INFO("Plasticity steps: " + std::to_string(args.plasticitySteps));
+        NLM_LOG_INFO("STDP trials: " + std::to_string(args.stdpTrials));
+        NLM_LOG_INFO("Connection probability: " + std::to_string(args.connectivity));
+    }
+    NLM_LOG_INFO("");
+    
+    // Override configuration with parsed arguments
+    config->set("neuron_count", static_cast<int64_t>(args.neuronCount), ConfigSource::CommandLine);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::CommandLine);
+    config->set("connection_probability", args.connectivity, ConfigSource::CommandLine);
+    config->set("stdp_ltp_weight", args.stdpLtpWeight, ConfigSource::CommandLine);
+    config->set("stdp_ltd_weight", args.stdpLtdWeight, ConfigSource::CommandLine);
+    config->set("synaptogenesis_rate", args.synaptogenesisRate, ConfigSource::CommandLine);
+    config->set("pruning_rate", args.pruningRate, ConfigSource::CommandLine);
+    
     // Initialize brain
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
@@ -395,20 +617,23 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
+    // Run benchmark test first
+    runBenchmarkTest(brain, args.enableDetailedLogging);
+    
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    runBasicConnectivityTest(brain, args.enableDetailedLogging);
     
     // Reset brain for plasticity experiment
     brain->reset();
     brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    runPlasticityExperiment(brain, args.enableDetailedLogging);
     
     // Reset and run Test 3: STDP verification
     brain->reset();
     brain->initialize();
-    runStdpVerification(brain);
+    runStdpVerification(brain, args.enableDetailedLogging);
     
     // Final brain status
     NLM_LOG_INFO("");
