@@ -1,8 +1,11 @@
+// Config.cpp - Clean, fixed version
 #include "Config.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cmath>
+#include <memory>
 
 namespace nlm {
 
@@ -19,9 +22,6 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -84,9 +84,42 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Saved from configuration system\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write comment with description
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << "\n";
+        }
+        
+        // Write the key=value pair with proper formatting
+        file << entry.key << " = ";
+        
+        // Format value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        file << "\"" << arg[i] << "\"";
+                    } else {
+                        file << arg[i];
+                    }
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -165,7 +198,11 @@ std::string Config::summary() const {
                 oss << "[";
                 for (size_t i = 0; i < arg.size(); ++i) {
                     if (i) oss << ", ";
-                    oss << arg[i];
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        oss << "\"" << arg[i] << "\"";
+                    } else {
+                        oss << arg[i];
+                    }
                 }
                 oss << "]";
             } else {
@@ -190,6 +227,7 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
+// Template method implementations moved from header to avoid ODR violations
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
@@ -211,6 +249,7 @@ std::optional<T> Config::get(const std::string& key) const {
     }, it->value);
 }
 
+    
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);

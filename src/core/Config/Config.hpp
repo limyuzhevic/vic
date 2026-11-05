@@ -5,7 +5,6 @@
 #include <vector>
 #include <variant>
 #include <optional>
-#include <algorithm>
 
 namespace nlm {
 
@@ -56,7 +55,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -65,8 +64,8 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    // Get values
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>

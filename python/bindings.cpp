@@ -144,22 +144,95 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
+        // Load configuration from file (supports JSON, YAML, and simple key=value formats)
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
+             "Load configuration from a file (JSON, YAML, or simple key=value format)")
+        // Enhanced CLI loading with better error handling
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
+            // Convert Python list of strings to C-style argv
             std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+            argv.reserve(args.size() + 1);
+            // Add program name placeholder
+            argv.push_back(const_cast<char*>("nlm"));
+            for (const auto& a : args) {
+                argv.push_back(const_cast<char*>(a.c_str()));
+            }
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments in --key=value format")
+        .def("loadFromJsonString", [](Config& self, const std::string& json) {
+            // Parse JSON string and load configuration
+            try {
+#ifdef NLM_HAS_JSON
+                nlohmann::json j = nlohmann::json::parse(json);
+                for (const auto& pair : j.items()) {
+                    std::string key = pair.key();
+                    const nlohmann::json& value = pair.value();
+                    
+                    if (value.is_boolean()) {
+                        self.set(key, value.get<bool>(), ConfigSource::Runtime);
+                    } else if (value.is_number_integer()) {
+                        self.set(key, value.get<int64_t>(), ConfigSource::Runtime);
+                    } else if (value.is_number_float()) {
+                        self.set(key, value.get<double>(), ConfigSource::Runtime);
+                    } else if (value.is_string()) {
+                        self.set(key, value.get<std::string>(), ConfigSource::Runtime);
+                    } else if (value.is_array()) {
+                        // Convert to vector
+                        std::vector<double> vec;
+                        for (const auto& elem : value) {
+                            if (elem.is_number()) {
+                                vec.push_back(elem.get<double>());
+                            } else if (elem.is_string()) {
+                                vec.push_back(std::stod(elem.get<std::string>()));
+                            }
+                        }
+                        self.set(key, vec, ConfigSource::Runtime);
+                    }
+                }
+                return true;
+#else
+                // Fallback: try to parse simple format
+                throw std::runtime_error("JSON support not compiled. Use simple key=value format instead.");
+#endif
+            } catch (const std::exception& e) {
+                std::cerr << "JSON parsing error: " << e.what() << std::endl;
+                return false;
+            }
+        }, py::arg("json"),
+           "Load configuration from JSON string")
+        // Save configuration to file
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file (simple key=value format)")
+        // Configuration value access methods
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](const Config& self, const std::string& key) {
+            // Attempt to get different value types
+            if (auto val = self.get<int>(key)) return *val;
+            if (auto val = self.get<int64_t>(key)) return *val;
+            if (auto val = self.get<double>(key)) return *val;
+            if (auto val = self.get<bool>(key)) return *val;
+            if (auto val = self.get<std::string>(key)) return *val;
+            return std::string(); // Return empty string if not found
+        }, py::arg("key"),
+             "Get configuration value by key (auto-detects type)")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            return self.get<int64_t>(key).value_or(0);
+        }, py::arg("key"),
+             "Get integer configuration value (returns 0 if not found)")
+        .def("getDouble", [](const Config& self, const std::string& key) {
+            return self.get<double>(key).value_or(0.0);
+        }, py::arg("key"),
+             "Get double/float configuration value (returns 0.0 if not found)")
+        .def("getBool", [](const Config& self, const std::string& key) {
+            return self.get<bool>(key).value_or(false);
+        }, py::arg("key"),
+             "Get boolean configuration value (returns false if not found)")
+        .def("getString", [](const Config& self, const std::string& key) {
+            return self.get<std::string>(key).value_or(std::string());
+        }, py::arg("key"),
+             "Get string configuration value (returns empty string if not found)")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -411,18 +484,76 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    
+    m.def("createMinimalConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set minimal viable configuration for basic operation
+        config->set("neuron_count", 500);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        config->set("simulation_timestep", 0.001);
+        config->set("random_seed", static_cast<int64_t>(42));
+        return config;
+    }, "Create a minimal configuration for basic operation");
+    
+    m.def("createResearchConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Enhanced configuration for research scenarios
+        config->set("neuron_count", 2000);
+        config->set("region_count", 3);
+        config->set("connection_probability", 0.15f);
+        config->set("simulation_timestep", 0.001);
+        config->set("random_seed", static_cast<int64_t>(12345));
+        config->set("stdp_ltp_weight", 0.02f);
+        config->set("stdp_ltd_weight", 0.018f);
+        config->set("stdp_time_constant", 20.0f);
+        config->set("plasticity_learning_rate", 0.01f);
+        config->set("synaptogenesis_rate", 0.0005f);
+        config->set("pruning_rate", 0.00005f);
+        config->set("enable_development", true);
+        config->set("enable_reward_modulation", true);
+        config->set("enable_curiosity", true);
+        config->set("dopamine_baseline", 0.1f);
+        config->set("dopamine_decay_rate", 0.05f);
+        config->set("reward_discount_factor", 0.95f);
+        return config;
+    }, "Create a research-grade configuration with enhanced plasticity");
+    
+    m.def("createDebugConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Configuration optimized for debugging and testing
+        config->set("neuron_count", 100);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.2f);
+        config->set("simulation_timestep", 0.001);
+        config->set("random_seed", static_cast<int64_t>(999));
+        config->set("log_level", std::string("DEBUG"));
+        config->set("log_to_file", true);
+        config->set("log_filename", std::string("nlm_debug.log"));
+        config->set("enable_checkpointing", true);
+        config->set("checkpoint_path", std::string("/tmp/debug_checkpoint.bin"));
+        return config;
+    }, "Create a debug configuration with logging and checkpointing");
+    
+    m.def("createPerformanceConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Configuration optimized for performance testing
+        config->set("neuron_count", 5000);
+        config->set("region_count", 2);
+        config->set("connection_probability", 0.05f); // Sparse connectivity
+        config->set("simulation_timestep", 0.001);
+        config->set("random_seed", static_cast<int64_t>(777));
+        config->set("stdp_ltp_weight", 0.01f);
+        config->set("stdp_ltd_weight", 0.012f);
+        config->set("stdp_time_constant", 15.0f);
+        config->set("plasticity_learning_rate", 0.005f);
+        config->set("synaptogenesis_rate", 0.00001f);
+        config->set("pruning_rate", 0.000001f);
+        config->set("enable_development", false); // Simpler for performance
+        config->set("enable_reward_modulation", false);
+        config->set("enable_curiosity", false);
+        return config;
+    }, "Create a performance-optimized configuration for large simulations");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

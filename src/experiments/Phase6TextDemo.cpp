@@ -67,18 +67,44 @@ const char* cmdName(MotorCommand cmd) {
     }
 }
 
-std::shared_ptr<Config> makeConfig() {
+// Standard configuration template for NLM experiments
+// Provides consistent baseline settings across all experiments
+std::shared_ptr<Config> createStandardConfig(uint64_t neuronCount = 500, uint64_t randomSeed = 42) {
     auto config = std::make_shared<Config>();
-    config->set("neuron_count", 500);
+    
+    // Core simulation parameters
+    config->set("neuron_count", neuronCount);
     config->set("region_count", 2);
     config->set("connection_probability", 0.1f);
-    config->set("random_seed", static_cast<int64_t>(42));
+    config->set("random_seed", static_cast<int64_t>(randomSeed));
     config->set("simulation_timestep", 0.001);
+    
+    // STDP plasticity parameters
     config->set("stdp_ltp_weight", 0.01f);
     config->set("stdp_ltd_weight", 0.012f);
     config->set("stdp_tau", 20.0f);
+    
+    // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f);
     config->set("pruning_rate", 0.00001f);
+    
+    // Basic neuromodulation
+    config->set("dopamine_baseline", 0.0f);
+    config->set("dopamine_decay_rate", 0.1f);
+    
+    // Reward processing
+    config->set("reward_discount_factor", 0.99f);
+    
+    // Environment settings
+    config->set("environment_name", std::string("GridWorld"));
+    config->set("environment_width", 20);
+    config->set("environment_height", 20);
+    
+    // Logging
+    config->set("log_level", std::string("INFO"));
+    config->set("log_to_file", false);
+    config->set("log_filename", std::string("nlm.log"));
+    
     return config;
 }
 
@@ -146,15 +172,47 @@ int main() {
 
     // --- 1. Text association probe ---
     std::cout << "--- 1. Text association: \"apple\" taught with a resource scene ---\n";
-    auto brain = std::make_shared<Brain>(makeConfig());
+    auto config = createStandardConfig();
+    auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     SimpleWorld world;
     world.configure(20.0f, 20.0f, 16, 16);
     AgentBrain agent(brain);
     agent.initialize(world);
     agent.enableCuriosity(false);
-    agent.enableRewardModulation(false);  // Pure STDP association, no reward teacher.
     uint64_t step = 0;
+
+    // Probe design, corrected after a first failed attempt: text
+    // alone must NOT be presented with empty vision (all rays
+    // 1.0). Empty vision is itself strong drive, and 10 of its
+    // 16 neurons are also active in the paired scene, so after
+    // teaching ANY word presented over empty vision recalled
+    // the scene through the shared vision neurons — the control
+    // word rose as much as the taught word (0.88 vs 0.86), and
+    // the probe measured vision, not the word. Text is therefore
+    // presented "in the dark" (vision 0, no visual drive), so
+    // only the word's own neurons can evoke anything, and the
+    // baseline subtracted is dark silence, not empty vision.
+    std::vector<float> darkVision(16, 0.0f);
+    auto emptyPat = presentAndRead(agent, brain, makePercept(emptyVision, noTouch), 50, step);
+    auto darkPat = presentAndRead(agent, brain, makePercept(darkVision, noTouch), 50, step);
+    auto visualBefore = presentAndRead(agent, brain, makePercept(brightVision, fwdTouch), 50, step);
+    auto textBefore = presentAndRead(agent, brain, makePercept(darkVision, noTouch, "apple"), 50, step);
+    auto controlBefore = presentAndRead(agent, brain, makePercept(darkVision, noTouch, "zebra"), 50, step);
+    float simTextBefore = cosine(subtract(textBefore, darkPat), subtract(visualBefore, emptyPat));
+    float simControlBefore = cosine(subtract(controlBefore, darkPat), subtract(visualBefore, emptyPat));
+    std::cout << "  before teaching: text~visual=" << simTextBefore
+              << " control~visual=" << simControlBefore << "\n";
+    std::cout << "  encoder: apple ->";
+    for (size_t idx : AgentBrain::encodeText("apple")) std::cout << " " << idx;
+    std::cout << " ; zebra ->";
+    for (size_t idx : AgentBrain::encodeText("zebra")) std::cout << " " << idx;
+    std::cout << " (same word always gives the same pattern; different words differ)\n";
+
+    // Paired teaching: the word and the scene, together, repeatedly.
+    // No reward, no label, no string matching — only co-presentation.
+    for (int a = 0; a < 300; ++a) {
+        agent.processSensoryInput(makePercept(brightVision, fwdTouch, "apple"));
 
     // Probe design, corrected after a first failed attempt: text
     // alone must NOT be presented with empty vision (all rays
@@ -208,7 +266,7 @@ int main() {
     // when the single-word probe above shows a large gain.
     std::cout << "  --- differential probe (apple->resource, zebra->hazard, fresh brain) ---\n";
     {
-        auto bDiff = std::make_shared<Brain>(makeConfig());
+        auto bDiff = std::make_shared<Brain>(createStandardConfig());
         bDiff->initialize();
         AgentBrain aDiff(bDiff);
         aDiff.initialize(world);
@@ -330,7 +388,7 @@ int main() {
     // --- 4. Sandbox run: teacher labels what is touched, planner in loop ---
     std::cout << "--- 4. Sandbox run (100 steps, teacher labels touched things \"apple\") ---\n";
     {
-        auto config = makeConfig();
+        auto config = createStandardConfig();
         auto b2 = std::make_shared<Brain>(config);
         b2->initialize();
         SimpleWorld w2;
@@ -393,7 +451,7 @@ int main() {
         // the reloaded brain still acts on the same pattern.
         const std::string ckpt = "/tmp/nlm_phase6_text_demo.ckpt";
         bool saved = b2->save(ckpt);
-        auto b3 = std::make_shared<Brain>(makeConfig());
+        auto b3 = std::make_shared<Brain>(createStandardConfig());
         b3->initialize();
         bool loaded = saved && b3->load(ckpt);
         std::cout << "  checkpoint: saved=" << (saved ? "yes" : "NO")

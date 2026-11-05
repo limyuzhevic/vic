@@ -59,18 +59,44 @@ const char* cmdName(MotorCommand cmd) {
     }
 }
 
-std::shared_ptr<Config> makeConfig() {
+// Standard configuration template for NLM experiments
+// Provides consistent baseline settings across all experiments
+std::shared_ptr<Config> createStandardConfig(uint64_t neuronCount = 500, uint64_t randomSeed = 42) {
     auto config = std::make_shared<Config>();
-    config->set("neuron_count", 500);
+    
+    // Core simulation parameters
+    config->set("neuron_count", neuronCount);
     config->set("region_count", 2);
     config->set("connection_probability", 0.1f);
-    config->set("random_seed", static_cast<int64_t>(42));
+    config->set("random_seed", static_cast<int64_t>(randomSeed));
     config->set("simulation_timestep", 0.001);
+    
+    // STDP plasticity parameters
     config->set("stdp_ltp_weight", 0.01f);
     config->set("stdp_ltd_weight", 0.012f);
     config->set("stdp_tau", 20.0f);
+    
+    // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f);
     config->set("pruning_rate", 0.00001f);
+    
+    // Basic neuromodulation
+    config->set("dopamine_baseline", 0.0f);
+    config->set("dopamine_decay_rate", 0.1f);
+    
+    // Reward processing
+    config->set("reward_discount_factor", 0.99f);
+    
+    // Environment settings
+    config->set("environment_name", std::string("GridWorld"));
+    config->set("environment_width", 20);
+    config->set("environment_height", 20);
+    
+    // Logging
+    config->set("log_level", std::string("INFO"));
+    config->set("log_to_file", false);
+    config->set("log_filename", std::string("nlm.log"));
+    
     return config;
 }
 
@@ -87,7 +113,8 @@ SensoryPercept makePercept(const std::vector<float>& vision,
 
 // Run one pattern through a fresh brain and report the decode.
 void probePattern(const char* label, const SensoryPercept& percept) {
-    auto brain = std::make_shared<Brain>(makeConfig());
+    auto config = createStandardConfig();
+    auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     SimpleWorld world;
     world.configure(20.0f, 20.0f, 16, 16);
@@ -157,7 +184,7 @@ int main() {
 
     // --- 2. Sandbox run + checkpoint round-trip ---
     std::cout << "--- 2. Sandbox run (100 steps) + checkpoint round-trip ---\n";
-    auto config = makeConfig();
+    auto config = createStandardConfig();
     auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     SimpleWorld world;
@@ -220,7 +247,7 @@ int main() {
 
     const std::string ckpt = "/tmp/nlm_phase5_demo.ckpt";
     bool saved = brain->save(ckpt);
-    auto brain2 = std::make_shared<Brain>(makeConfig());
+    auto brain2 = std::make_shared<Brain>(createStandardConfig());
     brain2->initialize();
     bool loaded = saved && brain2->load(ckpt);
     std::cout << "  checkpoint: saved=" << (saved ? "yes" : "NO")
