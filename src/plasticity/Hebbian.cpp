@@ -53,22 +53,51 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
+    // Phase 6: Enhanced Hebbian learning with competition and selectivity
+    // Improved to prevent learning saturation and promote selective pattern learning
+    
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
     // Nearest-neighbour version: the old all-pairs count made delta grow
     // with history length (up to 100x100 pairs) and saturated every weight
     // to its bound in one step. One correlated recent pair = one step.
     // Timestamps are in seconds, so the 100ms window is 0.1s.
     float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
-    float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
+    
+    // Enhanced learning rule: only learn when there is meaningful co-activity
+    // and when the synapse is effective (has reasonable weight)
+    bool shouldLearn = std::abs(dtSeconds) < 0.1f && std::abs(synapse->getWeight()) > 0.01f;
+    
+    if (!shouldLearn) {
+        return;
+    }
+    
+    float delta = pImpl->learningRate;
+    
     if (synapse->getType() == SynapseType::Inhibitory) {
         delta = -delta;  // strengthen inhibition, don't flip it to excitatory
     }
     
-    // Apply with bounds. Soft bound, Phase 4 (see STDP.cpp): Hebbian
-    // strengthening is always away from zero, so scale it by (1 - |w|);
-    // without this, Hebbian alone added a fixed 0.01 per co-active step
-    // and saturated every weight together with STDP.
+    // Enhanced soft bound with competition mechanism
     if (std::abs(delta) > 1e-6f) {
-        delta *= (1.0f - std::abs(synapse->getWeight()));
+        float currentWeight = synapse->getWeight();
+        
+        // Competition-based scaling: learning strength depends on relative effectiveness
+        // Strong synapses (near bounds) learn slower, weak synapses learn faster
+        float learningScale = 1.0f;
+        
+        // If synapse is near its effective range, reduce learning
+        if (std::abs(currentWeight) > 0.8f) {
+            learningScale = 0.3f + (1.0f - std::abs(currentWeight)) * 0.7f;
+        } else if (std::abs(currentWeight) < 0.2f) {
+            // Weak synapses learn faster to promote exploration
+            learningScale = 1.5f;
+        }
+        
+        delta *= learningScale;
+        
         applyWeightChange(synapse, delta);
         if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
             synapse->setWeight(-0.01f);

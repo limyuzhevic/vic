@@ -21,6 +21,9 @@ public:
     // Compute prediction error
     void computeError(float predicted, float actual);
     
+    // Update prediction error directly (for neuromodulators)
+    void updatePredictionError(float error);
+    
     // Update prediction
     void updatePrediction(float newPrediction);
     

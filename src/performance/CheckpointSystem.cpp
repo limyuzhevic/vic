@@ -459,7 +459,13 @@ bool CheckpointManager::load(const std::string& name) {
     std::string path = (std::filesystem::path(checkpointDir_) / name).string();
     CheckpointReader reader;
     if (!reader.open(path)) return false;
-    return reader.validate();
+    if (!reader.validate()) return false;
+    
+    // CheckpointManager::load is now a stub - actual loading is handled by Brain::load()
+    // The CheckpointReader has already validated the file, and Brain::load() will read
+    // the actual data from the file when called. This method provides the integration
+    // point for the external checkpoint loading interface.
+    return true;
 }
 
 std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoints() const {

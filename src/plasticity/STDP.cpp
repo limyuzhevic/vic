@@ -59,19 +59,44 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
 
+    // Phase 6: Enhanced STDP learning with competition and activity-dependent rules
+    // Improved to prevent learning saturation and promote selective pattern learning
+    
+    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+        return;
+    }
+    
+    float totalDelta = 0.0f;
+    float tau = pImpl->timeConstant;
+
     // Nearest-neighbour STDP: only the most recent pre/post pair is used.
     // The old all-pairs loop re-applied every historic pair on every step,
     // so weights saturated to their bounds in a few steps and the cost was
     // O(history^2) per synapse per step. Timestamps here are in seconds
     // (Brain steps at 1ms), so convert to ms for the tau window.
     float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
+    
+    // Enhanced STDP: only learn when timing is appropriate and synapse is effective
+    bool shouldLearn = false;
     if (dtMs > 0) {
-        totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
+        // Pre-before-post potentiation: stronger when timing is optimal
+        if (dtMs > 1.0f && dtMs < 50.0f) {  // Optimal STDP window
+            shouldLearn = true;
+            totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
+        }
     } else if (dtMs < 0) {
-        totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+        // Post-before-pre depression: stronger when timing is optimal
+        if (dtMs > -50.0f && dtMs < -1.0f) {  // Optimal LTD window
+            shouldLearn = true;
+            totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+        }
     }
     
-    // Apply weight change with bounds
+    if (!shouldLearn) {
+        return;
+    }
+    
+    // Apply weight change with enhanced competition mechanism
     if (std::abs(totalDelta) > 1e-6f) {
         // Scale by synaptic efficacy if available
         float efficacy = synapse->getEfficacy();
@@ -85,20 +110,33 @@ void STDP::update(Synapse* synapse,
             totalDelta = -totalDelta;
         }
 
-        // Soft (weight-dependent) bounds, Phase 4: the old rule added a
-        // fixed ~0.01 to every co-active synapse on every step, so with
-        // STDP and Hebbian both firing, weights ran from 0.2 to the 1.0
-        // clamp in ~40 steps and every synapse saturated together — no
-        // pattern could stay selective. Potentiation (away from zero)
-        // now scales by (1 - |w|) and depression (toward zero) by |w|,
-        // so weights approach their bounds asymptotically, increments
-        // shrink as a synapse saturates, and relative differences between
-        // synapses are preserved instead of all being clamped equal.
-        {
-            float w = synapse->getWeight();
-            bool awayFromZero = std::abs(w + totalDelta) > std::abs(w);
-            totalDelta *= awayFromZero ? (1.0f - std::abs(w)) : std::abs(w);
+        // Enhanced soft (weight-dependent) bounds with competition
+        float w = synapse->getWeight();
+        bool awayFromZero = std::abs(w + totalDelta) > std::abs(w);
+        
+        // Competition-based scaling: learning strength depends on relative effectiveness
+        // Strong synapses (near bounds) learn slower, weak synapses learn faster
+        float learningScale = 1.0f;
+        
+        if (awayFromZero) {
+            // Potentiation (away from zero): scale by (1 - |w|) as before
+            learningScale = (1.0f - std::abs(w));
+            
+            // Additional competition: if synapse is strong, reduce learning
+            if (std::abs(w) > 0.7f) {
+                learningScale *= 0.5f + 0.5f * (1.0f - std::abs(w));
+            }
+        } else {
+            // Depression (toward zero): scale by |w| as before
+            learningScale = std::abs(w);
+            
+            // Additional competition: if synapse is weak, reduce learning to prevent too much depression
+            if (std::abs(w) < 0.3f) {
+                learningScale *= 0.5f + std::abs(w);
+            }
         }
+        
+        totalDelta *= learningScale;
 
         // Apply weight change
         synapse->addToWeight(totalDelta);

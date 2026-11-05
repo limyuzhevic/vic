@@ -34,6 +34,12 @@ void PredictionError::computeError(float predicted, float actual) {
     pImpl->history.push_back(pImpl->error);
 }
 
+// Update prediction error directly (for neuromodulators)
+void PredictionError::updatePredictionError(float error) {
+    pImpl->error = error;
+    pImpl->history.push_back(pImpl->error);
+}
+
 void PredictionError::updatePrediction(float newPrediction) {
     pImpl->predictedValue = newPrediction;
 }

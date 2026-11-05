@@ -936,53 +936,97 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
+    // Send reward to neuromodulators for proper processing
+    if (brain_->getDopamine()) {
+        brain_->getDopamine()->signalReward(reward);
+    }
     
-    // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    if (brain_->getPredictionErrorSignal()) {
+        // Compute prediction error for the prediction error system
+        predictionError_ = reward - predictedReward;
+        brain_->getPredictionErrorSignal()->computeError(expectedReward_, reward);
+    }
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Get current neuromodulator levels for brain processing
+    float dopamineLevel = 0.0f;
+    if (brain_->getDopamine()) {
+        dopamineLevel = brain_->getDopamine()->getLevel();
+    }
     
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    // Get curiosity level
+    float curiosityLevel = 0.0f;
+    if (brain_->getCuriosity()) {
+        curiosityLevel = brain_->getCuriosity()->getLevel();
+    }
     
-    // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (const auto& syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
+    // Get novelty level  
+    float noveltyLevel = 0.0f;
+    if (brain_->getNovelty()) {
+        noveltyLevel = brain_->getNovelty()->getLevel();
+    }
+    
+    // Update agent state with neuromodulator levels
+    this->dopamineLevel_ = dopamineLevel;
+    this->curiosityLevel_ = curiosityLevel;
+    this->noveltyLevel_ = noveltyLevel;
+    this->predictionError_ = predictionError_;
+    this->expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    
+    // Apply neuromodulation to synapses using real neuromodulator levels
+    if (dopamineLevel != 0.0f) {
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& syn : region->getSynapses()) {
+                float eligibility = syn->getEligibilityTrace();
 
-            if (std::abs(eligibility) > 0.001f) {
-                // Reward-modulated weight change. Phase 4: the old
-                // rule used delta = eligibility * dopamine with no
-                // learning rate, and eligibility traces accumulate
-                // STDP deltas to ~4, so a single +10 reward (dopamine
-                // clamped to 1) drove every eligible synapse straight
-                // to its clamp — one event saturated the network. A
-                // 0.05 learning rate and a +-0.1 per-event cap keep a
-                // reward event meaningful without erasing all prior
-                // selectivity in one step (standard R-STDP scaling).
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
-                delta = std::clamp(delta, -0.1f, 0.1f);
-                syn->addToWeight(delta);
-                
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                if (std::abs(eligibility) > 0.001f) {
+                    // Real reward-modulated weight change based on actual dopamine
+                    float delta = eligibility * dopamineLevel * plasticityModifier_ * 0.05f;
+                    delta = std::clamp(delta, -0.1f, 0.1f);
+                    syn->addToWeight(delta);
+                    
+                    // Decay eligibility trace
+                    syn->decayEligibilityTrace(0.1f);
+                }
             }
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    // Update brain systems with neuromodulator levels
+    // Dopamine affects neural excitability
+    if (dopamineLevel != 0.0f && brain_->getDopamine()) {
+        float plasticityFactor = brain_->getDopamine()->getPlasticityFactor();
+        
+        // Apply to STDP with real neuromodulator plasticity factor
+        auto* stdp = brain_->getSTDP();
+        if (stdp) {
+            stdp->setLTPWeight(0.01f * plasticityFactor);
+            stdp->setLTDWeight(0.012f * plasticityFactor);
+        }
+        
+        // Dopamine affects neural excitability by injecting current
+        for (auto& region : *brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by adjusting effective current injection
+                    // Positive dopamine increases excitability (lower effective threshold)
+                    float excitabilityMod = dopamineLevel * 0.5f;
+                    if (excitabilityMod > 0.0f) {
+                        neuron->injectCurrent(excitabilityMod);
+                    }
+                }
+            }
+        }
+    }
     
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+    // Update curiosity system
+    if (brain_->getCuriosity()) {
+        brain_->getCuriosity()->update(noveltyLevel, predictionError_, 0.001f);
+    }
+    
+    // Apply curiosity-based exploration
+    if (curiosityEnabled_ && curiosityLevel > 0.1f) {
+        // Curious behavior: increased exploration and exploration-driven actions
+        // This is handled in the motor command selection (see AgentBrain::decodeMotorCommand)
     }
 }
 
