@@ -35,6 +35,14 @@ add_library(nlm_core STATIC
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
+    # Phase 5: NEW ARCHITECTURE COMPONENTS
+    src/brain/BrainMemory.cpp
+    src/brain/BrainPlasticity.cpp
+    src/brain/BrainNeuromodulation.cpp
+    src/brain/BrainCognition.cpp
+    src/brain/BrainDevelopment.cpp
+    src/brain/BrainPrediction.cpp
+    src/brain/BrainCheckpoint.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -62,6 +70,7 @@ add_library(nlm_core STATIC
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    src/cognition/AttentionalSelection.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp
