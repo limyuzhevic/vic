@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>  // JSON library for configuration
 
 namespace nlm {
 
@@ -86,13 +87,128 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert ConfigValue to string based on type
+        std::visit([&](const auto& value) {
+            using ValueType = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<ValueType, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<ValueType, bool>) {
+                file << entry.key << " = " << (value ? "true" : "false") << "\n";
+            } else {
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
 }
 
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+bool Config::loadFromJson(const std::string& filepath) {
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Cannot open JSON configuration file: " + filepath);
+            return false;
+        }
+        
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Load from JSON
+        for (auto& [key, value] : jsonData.items()) {
+            // Convert JSON value to ConfigValue based on type
+            ConfigEntry entry;
+            entry.key = key;
+            entry.source = ConfigSource::File;
+            
+            if (value.is_string()) {
+                entry.value = ConfigValue(value.get<std::string>());
+                entry.description = "JSON string configuration: " + key;
+            } else if (value.is_number_integer()) {
+                // Try to determine if it's int64 or int
+                int64_t intValue = value.get<int64_t>();
+                if (intValue >= INT_MIN && intValue <= INT_MAX) {
+                    entry.value = ConfigValue(static_cast<int>(intValue));
+                } else {
+                    entry.value = ConfigValue(intValue);
+                }
+                entry.description = "JSON integer configuration: " + key;
+            } else if (value.is_number_unsigned()) {
+                entry.value = ConfigValue(value.get<uint64_t>());
+                entry.description = "JSON unsigned configuration: " + key;
+            } else if (value.is_number_float()) {
+                entry.value = ConfigValue(value.get<double>());
+                entry.description = "JSON floating-point configuration: " + key;
+            } else if (value.is_boolean()) {
+                entry.value = ConfigValue(value.get<bool>());
+                entry.description = "JSON boolean configuration: " + key;
+            } else if (value.is_object() || value.is_array()) {
+                // For complex types, store as string representation
+                entry.value = ConfigValue(value.dump());
+                entry.description = "JSON complex configuration: " + key;
+            }
+            
+            pImpl->entries.push_back(entry);
+        }
+        
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath + " (" + std::to_string(pImpl->entries.size()) + " entries)");
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception loading JSON configuration: ") + e.what());
+        return false;
+    }
+}
+
+bool Config::saveToJson(const std::string& filepath) const {
+    try {
+        nlohmann::json jsonData;
+        
+        // Convert entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            // Convert ConfigValue to JSON based on type
+            std::visit([&](const auto& value) {
+                using ValueType = std::decay_t<decltype(value)>;
+                
+                if constexpr (std::is_same_v<ValueType, std::string>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<ValueType, bool>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<ValueType, int>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<ValueType, int64_t>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<ValueType, uint64_t>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<ValueType, double>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<ValueType, float>) {
+                    jsonData[entry.key] = value;
+                }
+            }, entry.value);
+        }
+        
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Cannot write JSON configuration file: " + filepath);
+            return false;
+        }
+        
+        // Write pretty-printed JSON
+        file << jsonData.dump(2);
+        
+        NLM_LOG_INFO("Saved configuration to JSON file: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR(std::string("Exception saving JSON configuration: ") + e.what());
+        return false;
+    }
+}
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     

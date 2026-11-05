@@ -23,7 +23,10 @@ RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {
+            delete pImpl;
+            pImpl = nullptr;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }

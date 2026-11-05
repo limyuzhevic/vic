@@ -122,7 +122,7 @@ public:
     
     // Spike history (recent spikes for STDP)
     void recordSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getSpikeHistory() const;
+    const std::deque<Timestamp>& getSpikeHistory() const;
     void clearSpikeHistory();
     
     // Synapse management (incoming and outgoing)

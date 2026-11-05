@@ -25,7 +25,10 @@ NeuralPopulation::NeuralPopulation(NeuralPopulation&& other) noexcept : pImpl(ot
 
 NeuralPopulation& NeuralPopulation::operator=(NeuralPopulation&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {
+            delete pImpl;
+            pImpl = nullptr;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }

@@ -28,7 +28,10 @@ SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(other.pImpl) {
 
 SpikeSystem& SpikeSystem::operator=(SpikeSystem&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {
+            delete pImpl;
+            pImpl = nullptr;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }

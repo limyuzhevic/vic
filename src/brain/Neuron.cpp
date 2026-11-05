@@ -13,15 +13,15 @@ struct Neuron::Impl {
     PopulationId populationId;
     MembranePotential totalCurrent;  // Total synaptic current input this step
     MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
+    std::deque<Timestamp> spikeHistory;
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    // LIF parameters from common constants
+    static constexpr float MEMBRANE_CAPACITANCE = Constants::MEMBRANE_CAPACITANCE;  // nF
+    static constexpr float TIME_CONSTANT = Constants::TIME_CONSTANT;  // ms
+    static constexpr size_t MAX_SPIKE_HISTORY = Constants::DEFAULT_MAX_SPIKE_HISTORY;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
              totalCurrent(0.0f), synapticInput(0.0f) {}
@@ -43,7 +43,10 @@ Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
 
 Neuron& Neuron::operator=(Neuron&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {
+            delete pImpl;
+            pImpl = nullptr;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -55,15 +58,19 @@ void Neuron::setType(NeuronType type) {
 }
 
 void Neuron::setMembranePotential(MembranePotential potential) {
-    pImpl->state.membranePotential = potential;
+    // Clamp to reasonable bounds to prevent instability
+    pImpl->state.membranePotential = std::clamp(potential, Constants::MIN_MEMBRANE_POTENTIAL, Constants::MAX_MEMBRANE_POTENTIAL);
 }
 
 void Neuron::addToMembranePotential(MembranePotential delta) {
+    // Clamp to reasonable bounds to prevent instability
     pImpl->state.membranePotential += delta;
+    pImpl->state.membranePotential = std::clamp(pImpl->state.membranePotential, Constants::MIN_MEMBRANE_POTENTIAL, Constants::MAX_MEMBRANE_POTENTIAL);
 }
 
 void Neuron::setThreshold(MembranePotential threshold) {
-    pImpl->state.threshold = threshold;
+    // Threshold should be above resting potential but not excessively high
+    pImpl->state.threshold = std::clamp(threshold, Constants::MIN_THRESHOLD, Constants::MAX_THRESHOLD);
 }
 
 void Neuron::setFiringState(FiringState state) {
@@ -80,11 +87,13 @@ void Neuron::decrementRefractory() {
 }
 
 void Neuron::setFiringRate(FiringRate rate) {
-    pImpl->state.firingRate = rate;
+    // Firing rate should be non-negative
+    pImpl->state.firingRate = std::max(0.0f, rate);
 }
 
 void Neuron::setLeakConductance(MembranePotential conductance) {
-    pImpl->state.leakConductance = conductance;
+    // Leak conductance should be positive
+    pImpl->state.leakConductance = std::clamp(conductance, Constants::MIN_LEAK_CONDUCTANCE, Constants::MAX_LEAK_CONDUCTANCE);
 }
 
 MembranePotential Neuron::getLeakConductance() const {
@@ -100,7 +109,8 @@ uint32_t Neuron::getRefractoryPeriod() const {
 }
 
 void Neuron::setRestingPotential(MembranePotential potential) {
-    pImpl->state.restingPotential = potential;
+    // Resting potential should be in typical biological range
+    pImpl->state.restingPotential = std::clamp(potential, Constants::MIN_RESTING_POTENTIAL, Constants::MAX_RESTING_POTENTIAL);
 }
 
 MembranePotential Neuron::getRestingPotential() const {
@@ -108,7 +118,8 @@ MembranePotential Neuron::getRestingPotential() const {
 }
 
 void Neuron::setResetPotential(MembranePotential potential) {
-    pImpl->state.resetPotential = potential;
+    // Reset potential should be in typical biological range
+    pImpl->state.resetPotential = std::clamp(potential, Constants::MIN_RESET_POTENTIAL, Constants::MAX_RESET_POTENTIAL);
 }
 
 bool Neuron::checkThreshold() const {
@@ -139,8 +150,8 @@ void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
 
 void Neuron::injectCurrent(MembranePotential current) {
     // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
+    // Add to synaptic input for LIF integration, with bounds checking
+    pImpl->synapticInput += std::clamp(current, Constants::MIN_CURRENT, Constants::MAX_CURRENT);
 }
 
 void Neuron::clearTotalCurrent() {
@@ -150,7 +161,7 @@ void Neuron::clearTotalCurrent() {
 void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+        pImpl->spikeHistory.pop_front();
     }
 }
 
@@ -325,7 +336,7 @@ bool Neuron::isFiring() const { return pImpl->state.firingState == FiringState::
 bool Neuron::isRefractory() const { return pImpl->state.refractoryRemaining > 0; }
 FiringRate Neuron::getFiringRate() const { return pImpl->state.firingRate; }
 MembranePotential Neuron::getTotalCurrent() const { return pImpl->totalCurrent; }
-const std::vector<Timestamp>& Neuron::getSpikeHistory() const { return pImpl->spikeHistory; }
+const std::deque<Timestamp>& Neuron::getSpikeHistory() const { return pImpl->spikeHistory; }
 const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const { return pImpl->incomingSynapses; }
 const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const { return pImpl->outgoingSynapses; }
 const PlasticityFlags& Neuron::getPlasticityFlags() const { return pImpl->plasticityFlags; }

@@ -179,7 +179,10 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {
+            delete pImpl;
+            pImpl = nullptr;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -1093,7 +1096,7 @@ bool Brain::save(const std::string& filepath) const {
         return true;
         
     } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        NLM_LOG_ERROR(std::string("Exception saving brain to ") + filepath + ": " + e.what());
         return false;
     }
 }
@@ -1369,7 +1372,7 @@ bool Brain::load(const std::string& filepath) {
         return true;
         
     } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+        NLM_LOG_ERROR(std::string("Exception loading brain from ") + filepath + ": " + e.what());
         return false;
     }
 }

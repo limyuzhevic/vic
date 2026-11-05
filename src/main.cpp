@@ -11,6 +11,7 @@
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
+#include "core/Constants.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -179,12 +180,12 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Inject strong current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        neurons[i]->injectCurrent(Constants::MAX_CURRENT);  // Strong excitatory input
     }
     
     // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
+    for (SimulationStep step = 0; step < Constants::BASIC_CONNECTIVITY_TEST_STEPS; ++step) {
+        brain->step(step, step * Constants::SIMULATION_TIMESTEP);
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;

@@ -33,7 +33,10 @@ NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
 
 NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {
+            delete pImpl;
+            pImpl = nullptr;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -239,7 +242,7 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
                                                float connectionProbability,
                                                float meanWeight,
                                                float weightVariance) {
-    // Efficient random connectivity initialization
+    // Optimized random connectivity initialization
     // Creates synapses based on neuron types:
     // - Excitatory neurons -> all neurons (excitatory synapses)
     // - Inhibitory neurons -> all neurons (inhibitory synapses)

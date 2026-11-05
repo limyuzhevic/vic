@@ -7,6 +7,9 @@
 #include <optional>
 #include <algorithm>
 
+// Include nlohmann/json for JSON configuration support
+#include <nlohmann/json.hpp>
+
 namespace nlm {
 
 // Forward declarations
@@ -59,19 +62,25 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON file
+    bool loadFromJson(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (simple format)
     bool saveToFile(const std::string& filepath) const;
     
+    // Save to JSON file
+    bool saveToJson(const std::string& filepath) const;
+    
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);

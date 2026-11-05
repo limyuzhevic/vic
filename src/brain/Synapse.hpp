@@ -51,8 +51,8 @@ public:
     // Activity history for plasticity
     void recordPreSpike(Timestamp timestamp);
     void recordPostSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getPreSpikeHistory() const;
-    const std::vector<Timestamp>& getPostSpikeHistory() const;
+    const std::deque<Timestamp>& getPreSpikeHistory() const;
+    const std::deque<Timestamp>& getPostSpikeHistory() const;
     void clearHistory();
     // Phase 5 checkpoint support: restore histories recorded by
     // recordPre/PostSpike (capped at the same MAX_SPIKE_HISTORY).

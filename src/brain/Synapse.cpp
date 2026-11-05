@@ -16,8 +16,8 @@ struct Synapse::Impl {
     SynapseType type;
     
     // Spike history for STDP
-    std::vector<Timestamp> preSpikeHistory;
-    std::vector<Timestamp> postSpikeHistory;
+    std::deque<Timestamp> preSpikeHistory;
+    std::deque<Timestamp> postSpikeHistory;
     
     // Plasticity state
     PlasticityFlags plasticityFlags;
@@ -34,16 +34,16 @@ struct Synapse::Impl {
     // Synaptic efficacy (use-dependent modulation)
     float efficacy;
     
-    // Weight bounds
-    static constexpr float MIN_WEIGHT = -1.0f;
-    static constexpr float MAX_WEIGHT = 1.0f;
+    // Weight bounds from common constants
+    static constexpr float MIN_WEIGHT = Constants::MIN_SYNAPTIC_WEIGHT;
+    static constexpr float MAX_WEIGHT = Constants::MAX_SYNAPTIC_WEIGHT;
     
-    // Short-term plasticity parameters
-    static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
-    static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
-    static constexpr float STP_U_MAX = 1.0f;  // Max utilization
+    // Short-term plasticity parameters from common constants
+    static constexpr float STP_FACILITATION_TAU = Constants::STP_FACILITATION_TAU;  // ms
+    static constexpr float STP_DEPRESSION_TAU = Constants::STP_DEPRESSION_TAU;  // ms
+    static constexpr float STP_U_MAX = Constants::STP_U_MAX;  // Max utilization
     
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr size_t MAX_SPIKE_HISTORY = Constants::DEFAULT_MAX_SPIKE_HISTORY;
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
@@ -70,7 +70,10 @@ Synapse::Synapse(Synapse&& other) noexcept : pImpl(other.pImpl) {
 
 Synapse& Synapse::operator=(Synapse&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) {
+            delete pImpl;
+            pImpl = nullptr;
+        }
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -94,7 +97,12 @@ SynapticWeight Synapse::getWeight() const {
 }
 
 void Synapse::setWeight(SynapticWeight weight) {
-    pImpl->weight = weight;
+    if (weight < Impl::MIN_WEIGHT || weight > Impl::MAX_WEIGHT) {
+        // Clamp to reasonable bounds to prevent instability
+        pImpl->weight = std::clamp(weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    } else {
+        pImpl->weight = weight;
+    }
 }
 
 void Synapse::addToWeight(SynapticWeight delta) {
@@ -130,22 +138,22 @@ bool Synapse::isInhibitory() const {
 void Synapse::recordPreSpike(Timestamp timestamp) {
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
+        pImpl->preSpikeHistory.pop_front();
     }
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
+        pImpl->postSpikeHistory.pop_front();
     }
 }
 
-const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
+const std::deque<Timestamp>& Synapse::getPreSpikeHistory() const {
     return pImpl->preSpikeHistory;
 }
 
-const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
+const std::deque<Timestamp>& Synapse::getPostSpikeHistory() const {
     return pImpl->postSpikeHistory;
 }
 
