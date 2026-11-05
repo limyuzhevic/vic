@@ -7,6 +7,10 @@
 #include "../world/SimpleWorld.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "NeuronGroup.hpp"
+#include "NeuronGroupManager.hpp"
+#include "NeuronDistribution.hpp"
+#include "../core/Config/Config.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -17,7 +21,7 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
-    AgentBrain(std::shared_ptr<Brain> brain);
+    AgentBrain(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config = nullptr);
     ~AgentBrain();
     
     // Initialize with world
@@ -34,11 +38,11 @@ public:
     
     // Decode brain motor activity into motor command
     MotorCommand decodeMotorCommand();
-
+    
     // Diagnostic: per motor group, in decode order. `activity` is mean
     // |membrane - resting| (the old decode metric); `firingRate` is mean
     // firing rate in Hz (now derived from counted spikes). Decode uses
-    // firingRate, because a neuron that just spiked resets its membrane
+   职能 firingRate, because a neuron that just spiked resets its membrane
     // to rest, so membrane deviation at sampling time is 0 for exactly
     // the neurons that fired — the old metric erased its own signal.
     struct MotorGroupActivity {
@@ -70,7 +74,7 @@ public:
     
     // Get prediction error
     float getPredictionError() const;
-
+    
     // Thought trace (Phase 5): a one-line, human-readable record of the
     // most recent loop — what was perceived, what the planner suggested
     // from learned action quality, what the brain actually decoded, and
@@ -78,17 +82,17 @@ public:
     // brain's motor decode still decides the action, so a trace where
     // planned != acted is a real, reportable disagreement, not a script.
     std::string getThoughtTrace() const;
-
+    
     // Learned preference trait, stored on the Brain so it survives a
     // checkpoint reload (see Brain::getLearnedPreference).
     float getLearnedPreference() const;
-
+    
     // Phase 5 diagnostic counters (see private section): how often the
     // vision-gated reflex bonus / hazard suppression / WTA pulse fired.
     int getReflexBonusCount() const { return reflexBonusCount_; }
     int getReflexSuppressCount() const { return reflexSuppressCount_; }
     int getWtaPulseCount() const { return wtaPulseCount_; }
-
+    
     // Phase 6: text-as-a-sense. Encode a teacher word into the sparse
     // pattern of text-neuron indices it drives (see .cpp). The string
     // itself is never passed to the brain; only this pattern is
@@ -136,6 +140,13 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Neuron group management API
+    NeuronGroupManager* getGroupManager() { return groupManager_.get(); }
+    const NeuronGroupManager* getGroupManager() const { return groupManager_.get(); }
+    
+    // Get distribution statistics
+    std::string getDistributionStats() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
@@ -144,24 +155,11 @@ private:
     MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
     
     std::shared_ptr<Brain> brain_;
+    std::shared_ptr<Config> config_;
     
-    // Motor neuron groups
-    std::vector<Neuron*> motorForward_;
-    std::vector<Neuron*> motorBackward_;
-    std::vector<Neuron*> motorTurnLeft_;
-    std::vector<Neuron*> motorTurnRight_;
-    std::vector<Neuron*> motorInteract_;
-    std::vector<Neuron*> motorWait_;
-    
-    // Sensory neuron groups
-    std::vector<Neuron*> sensoryVision_;
-    std::vector<Neuron*> sensoryTouch_;
-    std::vector<Neuron*> sensoryInternal_;
-    std::vector<Neuron*> sensoryProprioception_;
-    // Internal (hidden) neurons, for the recall probe. Sensory neurons
-    // are the input layer; the association between a word and a scene
-    // lives in which internal neurons the two inputs jointly recruit.
-    std::vector<Neuron*> internalNeurons_;
+    // Neuron distribution system
+    std::unique_ptr<NeuronGroupManager> groupManager_;
+    std::unique_ptr<NeuronDistribution> distribution_;
     
     // Neuromodulation state
     float dopamineLevel_;
@@ -262,6 +260,25 @@ private:
     bool hasThoughtPlanned_ = false;
     float thoughtReward_ = 0.0f;
     bool hasThoughtOutcome_ = false;
+    
+    // Legacy support (for backward compatibility)
+    // Motor neuron groups
+    std::vector<Neuron*> motorForward_;
+    std::vector<Neuron*> motorBackward_;
+    std::vector<Neuron*> motorTurnLeft_;
+    std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorInteract_;
+    std::vector<Neuron*> motorWait_;
+    
+    // Sensory neuron groups
+    std::vector<Neuron*> sensoryVision_;
+    std::vector<Neuron*> sensoryTouch_;
+    std::vector<Neuron*> sensoryInternal_;
+    std::vector<Neuron*> sensoryProprioception_;
+    // Internal (hidden) neurons, for the recall probe. Sensory neurons
+    // are the input layer; the association between a word and a scene
+    // lives in which internal neurons the two inputs jointly recruit.
+    std::vector<Neuron*> internalNeurons_;
 };
 
 } // namespace nlm

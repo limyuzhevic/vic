@@ -1,54 +1,48 @@
+// Brain.hpp - Updated Brain class as coordinator
 #pragma once
 
+#include "../core/Config/Config.hpp"
+#include "../core/Random/Random.hpp"
 #include "../core/Types/Types.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
+#include "../development/DevelopmentSystem.hpp"
+#include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Curiosity.hpp"
+#include "../neuromodulation/Novelty.hpp"
+#include "../neuromodulation/PredictionError.hpp"
+#include "../memory/NeuralWorkingMemory.hpp"
+#include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
+#include "../prediction/PredictionSystem.hpp"
+#include "../cognition/NeuralPlanner.hpp"
+#include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
+#include "../performance/CheckpointSystem.hpp"
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+class NeuralRegion;
+class NeuralPopulation;
+class Neuron;
+class Synapse;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
 
-// Inter-regional connection (long-range connectivity)
-struct InterRegionConnection {
-    RegionId sourceRegion;
-    RegionId targetRegion;
-    float weight;
-    Delay delay;
-    PlasticityFlags plasticityFlags;
-    
-    InterRegionConnection()
-        : sourceRegion(), targetRegion(), weight(0.0f), delay(1), plasticityFlags() {}
-    
-    InterRegionConnection(RegionId src, RegionId tgt, float w = 0.0f, Delay d = 1)
-        : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
-};
-
-// Brain: The central coordinator of the neural system
-// Implements real spiking neural computation with event-driven dynamics
-// and integrated memory, prediction, cognition, and neuromodulation systems
+// Forward declarations for all component classes
+class BrainInitializer;
+class BrainSimulator;
+class BrainIOHandler;
+class BrainMemoryManager;
+class BrainNeuromodulation;
+class BrainDevelopment;
+class BrainStatistics;
+class BrainCheckpoint;
 
 class Brain {
 public:
@@ -160,7 +154,7 @@ public:
     // Neural planner for action planning
     NeuralPlanner* getPlanner();
     
-    // Concept formation for pattern discovery
+    // Hack concept for pattern discovery
     ConceptFormation* getConceptFormation();
     
     // Attentional selection for focus
@@ -191,7 +185,7 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
-
+    
     // Learned preference trait (Phase 5): a single scalar, -1..1,
     // updated only by sandbox reward through AgentBrain, saved in the
     // checkpoint (SimulationState section) and used as a small bias in
@@ -208,6 +202,16 @@ public:
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Component instances
+    static BrainInitializer brainInitializer;
+    static BrainSimulator brainSimulator;
+    static BrainIOHandler brainIOHandler;
+    static BrainMemoryManager brainMemoryManager;
+    static BrainNeuromodulation brainNeuromodulation;
+    static BrainDevelopment brainDevelopment;
+    static BrainStatistics brainStatistics;
+    static BrainCheckpoint brainCheckpoint;
 };
 
 } // namespace nlm

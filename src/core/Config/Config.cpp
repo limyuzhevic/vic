@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <chrono>
+#include <cmath>
 
 namespace nlm {
 
@@ -84,9 +86,18 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Add header with timestamp and version
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream header;
+    header << "# NLM Configuration File\\n";
+    header << "# Generated on " << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "\\n";
+    header << "# Version: 1.0\\n\\n";
+    file << header.str();
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# " << entry.description << "\\n";
+        file << entry.key << " = " << getValueAsString(entry.value) << "\\n\\n";
     }
     
     return true;
@@ -150,44 +161,147 @@ void Config::clear() {
     pImpl->entries.clear();
 }
 
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
+bool Config::validate() const {
+    std::vector<std::string> errors = getValidationErrors();
+    return errors.empty();
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
     for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
-                                 std::is_same_v<T, std::vector<double>> ||
-                                 std::is_same_v<T, std::vector<std::string>>) {
-                oss << "[";
-                for (size_t i = 0; i < arg.size(); ++i) {
-                    if (i) oss << ", ";
-                    oss << arg[i];
-                }
-                oss << "]";
-            } else {
-                oss << arg;
+        if (entry.key.empty()) {
+            errors.push_back("Empty key found");
+            continue;
+        }
+        
+        // Type-specific validation
+        if (entry.key == "neuron_count") {
+            auto val = get<int>(entry.key);
+            if (val && (*val <= 0)) {
+                errors.push_back("neuron_count must be positive");
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        }
+        else if (entry.key == "region_count") {
+            auto val = get<int>(entry.key);
+            if (val && (*val <= 0)) {
+                errors.push_back("region_count must be positive");
+            }
+        }
+        else if (entry.key == "connection_probability") {
+            auto val = get<float>(entry.key);
+            if (val && (*val < 0.0f || *val > 1.0f)) {
+                errors.push_back("connection_probability must be between 0.0 and 1.0");
+            }
+        }
+        else if (entry.key == "plasticity_learning_rate") {
+            auto val = get<float>(entry.key);
+            if (val && (*val < 0.0f || *val > 1.0f)) {
+                errors.push_back("plasticity_learning_rate must be between 0.0 and 1.0");
+            }
+        }
+        else if (entry.key == "stdp_ltp_weight" || entry.key == "stdp_ltd_weight" || 
+                 entry.key == "stdp_time_constant") {
+            auto val = get<float>(entry.key);
+            if (val && (*val < 0.0f)) {
+                errors.push_back(entry.key + " must be non-negative");
+            }
+        }
+        else if (entry.key == "environment_width" || entry.key == "environment_height") {
+            auto val = get<int>(entry.key);
+            if (val && (*val <= 0)) {
+                errors.push_back(entry.key + " must be positive");
+            }
+        }
+        else if (entry.key == "simulation_timestep") {
+            auto val = get<double>(entry.key);
+            if (val && (*val <= 0.0)) {
+                errors.push_back("simulation_timestep must be positive");
+            }
+        }
     }
-    return oss.str();
+    
+    return errors;
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+// Helper function to convert ConfigValue to string
+std::string Config::getValueAsString(const ConfigValue& value) const {
+    std::stringstream ss;
+    std::visit([&ss](auto&& arg) {
+        if constexpr (std::is_same_v<decltype(arg), std::string>) {
+            ss << "\"" << arg << "\"";
+        } else if constexpr (std::is_same_v<decltype(arg), std::vector<int>>) {
+            ss << "["; for (size_t i = 0; i < arg.size(); ++i) {
+                if (i) ss << ", "; ss << arg[i];
+            } ss << "]";
+        } else if constexpr (std::is_same_v<decltype(arg), std::vector<double>>) {
+            ss << "["; for (size_t i = 0; i < arg.size(); ++i) {
+                if (i) ss << ", "; ss << arg[i];
+            } ss << "]";
+        } else if constexpr (std::is_same_v<decltype(arg), std::vector<std::string>>) {
+            ss << "["; for (size_t i = 0; i < arg.size(); ++i) {
+                if (i) ss << ", "; ss << "\"" << arg[i] << "\"";
+            } ss << "]";
+        } else {
+            ss << arg;  // Handles int, int64_t, double, bool
+        }
+    }, value);
+    return ss.str();
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+// Helper function to get current timestamp
+std::string Config::getCurrentTimestamp() const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+
+// Helper function to validate values
+bool Config::validateValue(const std::string& key, const std::string& value) const {
+    // Key validation
+    if (key.empty() || key.find_first_of(" \t\r\n") != std::string::npos) {
+        return false;
+    }
+    
+    // Value validation based on key
+    if (key == "neuron_count" || key == "region_count") {
+        try {
+            int val = std::stoi(value);
+            return val > 0;
+        } catch (...) { return false; }
+    }
+    
+    if (key == "plasticity_learning_rate" || key == "connection_probability") {
+        try {
+            double val = std::stod(value);
+            return val >= 0.0 && val <= 1.0;
+        } catch (...) { return false; }
+    }
+    
+    if (key == "stdp_ltp_weight" || key == "stdp_ltd_weight" || key == "stdp_time_constant") {
+        try {
+            double val = std::stod(value);
+            return val >= 0.0;
+        } catch (...) { return false; }
+    }
+    
+    if (key == "environment_width" || key == "environment_height") {
+        try {
+            int val = std::stoi(value);
+            return val > 0;
+        } catch (...) { return false; }
+    }
+    
+    if (key == "simulation_timestep") {
+        try {
+            double val = std::stod(value);
+            return val > 0.0;
+        } catch (...) { return false; }
+    }
+    
+    return true; // Default: accept any value
 }
 
 template<typename T>

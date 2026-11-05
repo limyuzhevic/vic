@@ -21,6 +21,31 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# CLI framework
+add_library(nlm_cli STATIC
+    src/cli/Command.cpp
+    src/cli/CommandRegistry.cpp
+    src/cli/CLI.cpp
+    src/cli/Main.cpp
+    # Configuration commands
+    src/cli/config/ConfigListCommand.cpp
+    src/cli/config/ConfigGetCommand.cpp
+    src/cli/config/ConfigSetCommand.cpp
+    src/cli/config/ConfigValidateCommand.cpp
+    src/cli/config/ConfigExportCommand.cpp
+    # Brain commands
+    src/cli/brain/BrainInfoCommand.cpp
+    src/cli/brain/BrainResetCommand.cpp
+    src/cli/brain/BrainSaveCommand.cpp
+    src/cli/brain/BrainLoadCommand.cpp
+)
+
+target_include_directories(nlm_cli PUBLIC
+    src/cli
+    src/cli/include
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
@@ -32,7 +57,7 @@ add_library(nlm_core STATIC
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
+   र्पॉलulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
     # Dynamics

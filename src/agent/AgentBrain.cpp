@@ -7,8 +7,9 @@
 
 namespace nlm {
 
-AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
+AgentBrain::AgentBrain(std::shared_ptr<Brain> brain, std::shared_ptr<Config> config)
     : brain_(brain)
+    , config_(config)
     , dopamineLevel_(0.0f)
     , noveltyLevel_(0.0f)
     , curiosityLevel_(0.0f)
@@ -22,45 +23,29 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
-    // Initialize motor and sensory neuron groups
+    // Initialize group manager
+    groupManager_ = std::make_unique<NeuronGroupManager>(config_);
+    groupManager_->initialize();
+    
+    // Initialize distribution system
+    distribution_ = std::make_unique<NeuronDistribution>(brain_->getRandomGenerator());
+    
+    // Initialize motor and sensory neuron groups (legacy support)
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
             for (auto& pop : region->getPopulations()) {
                 NeuronType type = pop->getNeuronType();
                 
                 if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
+                    std::vector<Neuron*> neurons = pop->getNeurons();
+                    groupManager_->addNeuronToGroup(neurons[0], type);
                 } else if (type == NeuronType::Internal) {
                     for (Neuron* n : pop->getNeurons()) {
                         internalNeurons_.push_back(n);
                     }
                 } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
+                    std::vector<Neuron*> neurons = pop->getNeurons();
+                    groupManager_->addNeuronToGroup(neurons[0], type);
                 }
             }
         }
@@ -1105,6 +1090,23 @@ void AgentBrain::reset() {
     hasLastDecoded_ = false;
     hasThoughtPlanned_ = false;
     hasThoughtOutcome_ = false;
+}
+
+std::string AgentBrain::getDistributionStats() const {
+    std::stringstream ss;
+    ss << "AgentBrain Distribution Stats:" << std::endl;
+    
+    if (groupManager_) {
+        ss << "  Neuron Group Manager:" << std::endl;
+        ss << groupManager_->getDistributionStats();
+    }
+    
+    if (distribution_) {
+        ss << "  Neuron Distribution:" << std::endl;
+        ss << distribution_->getStats();
+    }
+    
+    return ss.str();
 }
 
 } // namespace nlm
