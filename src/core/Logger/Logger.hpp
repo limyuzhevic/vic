@@ -15,18 +15,58 @@ enum class LogLevel {
     Info = 1,
     Warning = 2,
     Error = 3,
-    Critical = 4
+    Critical = 4,
+    Trace = -1,  // Ultra-detailed tracing (below debug level)
+    Performance = 6  // Special level for performance metrics
 };
 
-// Log entry structure
-struct LogEntry {
-    LogLevel level;
+// Structured log entry for JSON logging
+struct StructuredLogEntry {
+    std::chrono::system_clock::time_point timestamp;
+    std::string level;
     std::string message;
     std::string file;
-    int line;
+    int line = 0;
     std::string function;
-    std::chrono::system_clock::time_point timestamp;
+    std::string threadId;
+    std::map<std::string, std::string> fields;
+    
+    // Convert to JSON string
+    std::string toJSON() const;
 };
+
+// Log formatting options
+enum class LogFormat {
+    Simple,      // Plain text format
+    Structured,  // Structured format with key=value pairs
+    JSON         // JSON format
+};
+
+// Performance timing for logging
+struct PerformanceTimer {
+    std::string name;
+    std::chrono::system_clock::time_point start;
+    std::chrono::system_clock::time_point end;
+    bool stopped = false;
+    
+    PerformanceTimer(const std::string& timerName);
+    ~PerformanceTimer();
+    
+    void start();
+    void stop();
+    double getElapsedSeconds() const;
+    std::string getFormattedElapsed() const;
+};
+
+// Global log format setting
+void setLogFormat(LogFormat format);
+LogFormat getLogFormat();
+
+// Performance logging convenience functions
+void logPerformance(const std::string& timerName, double elapsedSeconds);
+
+// Structured logging convenience functions
+void logStructured(const std::string& message, const std::map<std::string, std::string>& fields);
 
 // Logger interface
 class ILogger {

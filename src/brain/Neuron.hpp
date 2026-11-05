@@ -142,6 +142,9 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
+    // Update firing rate based on recent spike activity
+    void updateFiringRateAdaptation();
+    
     // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);

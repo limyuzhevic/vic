@@ -264,46 +264,105 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     auto* region = brain->getRegion(RegionId(1));
     if (!region) return;
     
-    // Use one real synapse and its own pre/post neurons. The old test
-    // fired neurons[0]/neurons[1] and measured synapses[0..4], which are
-    // usually unrelated to that pair, so its result said nothing about STDP.
+    // Find a synapse and its pre/post neurons for testing
     auto& synapses = region->getSynapses();
     if (synapses.empty()) {
         NLM_LOG_INFO("  No synapses for STDP test");
         return;
     }
-    Synapse* syn = synapses[0].get();
-    syn->enablePlasticity(false, true, false);  // STDP only
-    float beforeWeight = syn->getWeight();
-    NLM_LOG_INFO("  Testing STDP on 1 synapse:");
-    NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
-                 " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
-                 ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
+    // Select a synapse that we can directly control
+    Synapse* testSyn = nullptr;
+    NeuronId testPre = INVALID_NEURON_ID;
+    NeuronId testPost = INVALID_NEURON_ID;
+    
+    // Find the first non-empty synapse and get its neurons
+    for (size_t i = 0; i < synapses.size(); ++i) {
+        auto& synPtr = synapses[i];
+        if (synPtr && synPtr->getSourceNeuron() != INVALID_NEURON_ID && 
+            synPtr->getDestinationNeuron() != INVALID_NEURON_ID) {
+            testSyn = synPtr.get();
+            testPre = synPtr->getSourceNeuron();
+            testPost = synPtr->getDestinationNeuron();
+            break;
+        }
+    }
+    
+    if (!testSyn) {
+        NLM_LOG_INFO("  No valid synapses found for STDP test");
+        return;
+    }
+    
+    testSyn->enablePlasticity(false, true, false);  // STDP only
+    float beforeWeight = testSyn->getWeight();
+    
+    NLM_LOG_INFO("  Testing STDP on synapse " + std::to_string(testPre.index()) + 
+                 " -> " + std::to_string(testPost.index()) + ":");
+    NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) + 
+                 " (pre=" + std::to_string(testPre.index()) + 
+                 ", post=" + std::to_string(testPost.index()) + ")");
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
+    // Proper STDP test: fire pre neuron first, then post neuron (causal order)
+    // This should produce LTP (long-term potentiation)
     for (int trial = 0; trial < 50; ++trial) {
-        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
+        // Fire pre neuron
+        brain->injectCurrent(testPre, 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
-        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
+        
+        // Fire post neuron shortly after
+        brain->injectCurrent(testPost, 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
-    float delta = syn->getWeight() - beforeWeight;
-    NLM_LOG_INFO("  After correlated activity:");
-    NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
+    
+    float delta = testSyn->getWeight() - beforeWeight;
+    
+    NLM_LOG_INFO("  After correlated activity (pre->post):");
+    NLM_LOG_INFO("    Synapse after: " + std::to_string(testSyn->getWeight()) + 
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
     if (totalDelta > 0.001f) {
-        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
+        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation (LTP)");
     } else if (totalDelta < -0.001f) {
-        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
+        NLM_LOG_INFO("  ! STDP reversed: Post-before-pre produced depression (LTD)");
     } else {
-        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+        NLM_LOG_INFO("  ! No change: STDP may not be triggering correctly");
+    }
+    
+    // Additional test: reverse timing (post->pre) should produce depression
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("  Testing reverse timing (post->pre) for LTD...");
+    
+    float resetWeight = testSyn->getWeight();
+    testSyn->enablePlasticity(false, true, false);  // Re-enable STDP
+    
+    for (int trial = 0; trial < 30; ++trial) {
+        // Fire post neuron first, then pre neuron (anti-causal order)
+        brain->injectCurrent(testPost, 60.0f);
+        brain->step(trial * 2, trial * 2 * 0.001);
+        
+        // Fire pre neuron shortly after
+        brain->injectCurrent(testPre, 60.0f);
+        brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+    }
+    
+    float reverseDelta = testSyn->getWeight() - resetWeight;
+    
+    NLM_LOG_INFO("  After reverse activity (post->pre):");
+    NLM_LOG_INFO("    Synapse after: " + std::to_string(testSyn->getWeight()) + 
+                 " (Δ=" + std::to_string(reverseDelta) + ")");
+    
+    if (reverseDelta < -0.001f) {
+        NLM_LOG_INFO("  ✓ STDP LTD WORKING: Post-before-pre produced depression");
+    } else if (reverseDelta > 0.001f) {
+        NLM_LOG_INFO("  ! STDP unexpected: Reverse timing produced potentiation");
+    } else {
+        NLM_LOG_INFO("  ? STDP: No significant change with reverse timing");
     }
 }
 
