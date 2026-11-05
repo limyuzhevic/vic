@@ -179,6 +179,12 @@ add_executable(nlm_benchmark
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
+# NLM Command Line Interface (Phase 7: standalone CLI tool)
+option(NLM_BUILD_COMMAND_LINE_INTERFACE "Build the NLM command line interface tool" ON)
+if(NLM_BUILD_COMMAND_LINE_INTERFACE)
+    add_subdirectory(src/command_line)
+endif()
+
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
 # but the root CMakeLists never built the module — pip install

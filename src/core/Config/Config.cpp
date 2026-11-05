@@ -3,8 +3,119 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <unordered_map>
+#include <variant>
 
 namespace nlm {
+
+// Simple JSON value parser for configuration
+class SimpleJsonParser {
+public:
+    struct JsonValue {
+        std::variant<int, int64_t, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>> value;
+    };
+    
+    static bool parseJsonFile(const std::string& filepath, std::unordered_map<std::string, JsonValue>& outData) {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        // Read entire file
+        std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+        file.close();
+        
+        // Try to parse as JSON
+        return parseJson(content, outData);
+    }
+    
+private:
+    static bool parseJson(const std::string& jsonStr, std::unordered_map<std::string, JsonValue>& outData) {
+        // Simple JSON parsing for key=value pairs
+        // Supports: {"key": "value", "number": 42, "bool": true}
+        // This is a simplified implementation for configuration files
+        
+        // Remove whitespace
+        std::string cleanJson;
+        for (char c : jsonStr) {
+            if (!std::isspace(c)) {
+                cleanJson += c;
+            }
+        }
+        
+        if (cleanJson.empty() || cleanJson[0] != '{' || cleanJson.back() != '}') {
+            return false; // Not a JSON object
+        }
+        
+        // Parse key:value pairs
+        size_t pos = 1; // Skip opening {
+        while (pos < cleanJson.length() - 1) {
+            // Find next key (starts with ")
+            size_t keyStart = cleanJson.find('"', pos);
+            if (keyStart == std::string::npos) break;
+            
+            size_t keyEnd = cleanJson.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = cleanJson.substr(keyStart + 1, keyEnd - keyStart - 1);
+            
+            // Find colon after key
+            size_t colonPos = cleanJson.find(':', keyEnd);
+            if (colonPos == std::string::npos) break;
+            
+            // Find value
+            size_t valueStart = cleanJson.find_first_not_of(": \t,\n", colonPos);
+            if (valueStart == std::string::npos) break;
+            
+            // Parse value based on first character
+            JsonValue jsonVal;
+            
+            if (cleanJson[valueStart] == '"') {
+                // String value
+                size_t valueEnd = cleanJson.find('"', valueStart + 1);
+                if (valueEnd == std::string::npos) break;
+                jsonVal.value = cleanJson.substr(valueStart + 1, valueEnd - valueStart - 1);
+            } else if (cleanJson[valueStart] == 't' || cleanJson[valueStart] == 'f') {
+                // Boolean value
+                size_t trueEnd = cleanJson.find(',', colonPos);
+                if (trueEnd == std::string::npos) {
+                    trueEnd = cleanJson.find('}', colonPos);
+                }
+                bool isTrue = (cleanJson.substr(colonPos, trueEnd - colonPos).find('t') != std::string::npos && 
+                              cleanJson.substr(colonPos, trueEnd - colonPos).find('r') != std::string::npos && 
+                              cleanJson.substr(colonPos, trueEnd - colonPos).find('u') != std::string::npos && 
+                              cleanJson.substr(colonPos, trueEnd - colonPos).find('e') != std::string::npos);
+                jsonVal.value = isTrue;
+            else if (std::isdigit(static_cast<unsigned char>(cleanJson[valueStart])) || cleanJson[valueStart] == '-') {
+                // Numeric value (simplified parsing)
+                size_t numEnd = cleanJson.find_first_of(",}", valueStart);
+                if (numEnd == std::string::npos) numEnd = cleanJson.length();
+                
+                std::string numStr = cleanJson.substr(valueStart, numEnd - valueStart);
+                if (numStr.find('.') != std::string::npos) {
+                    jsonVal.value = std::stod(numStr);
+                } else {
+                    jsonVal.value = std::stoll(numStr);
+                }
+            }
+            
+            outData[key] = jsonVal;
+            
+            // Skip to next key or closing }
+            pos = cleanJson.find('"', valueStart) + 1;
+            if (pos < valueStart) break;
+            
+            // Skip to next key or }
+            size_t nextKey = cleanJson.find('"', pos);
+            if (nextKey == std::string::npos) break;
+            
+            pos = nextKey;
+        }
+        
+        return true;
+    }
+};
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,9 +130,39 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to parse as JSON first
+    std::unordered_map<std::string, SimpleJsonParser::JsonValue> jsonData;
+    if (SimpleJsonParser::parseJsonFile(filepath, jsonData)) {
+        // Successfully parsed as JSON
+        for (const auto& pair : jsonData) {
+            // Convert JSON value to ConfigValue
+            const auto& jsonVal = pair.second.value;
+            ConfigValue configVal;
+            
+            if (std::holds_alternative<int>(jsonVal)) {
+                configVal = std::get<int>(jsonVal);
+            } else if (std::holds_alternative<int64_t>(jsonVal)) {
+                configVal = std::get<int64_t>(jsonVal);
+            } else if (std::holds_alternative<double>(jsonVal)) {
+                configVal = std::get<double>(jsonVal);
+            } else if (std::holds_alternative<bool>(jsonVal)) {
+                configVal = std::get<bool>(jsonVal);
+            } else if (std::holds_alternative<std::string>(jsonVal)) {
+                configVal = std::get<std::string>(jsonVal);
+            } else if (std::holds_alternative<std::vector<int>>(jsonVal)) {
+                configVal = std::get<std::vector<int>>(jsonVal);
+            } else if (std::holds_alternative<std::vector<double>>(jsonVal)) {
+                configVal = std::get<std::vector<double>>(jsonVal);
+            } else if (std::holds_alternative<std::vector<std::string>>(jsonVal)) {
+                configVal = std::get<std::vector<std::string>>(jsonVal);
+            }
+            
+            set(pair.first, configVal, ConfigSource::File);
+        }
+        return true;
+    }
     
+    // Fallback to original key=value format for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -38,22 +179,7 @@ bool Config::loadFromFile(const std::string& filepath) {
         // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
-}
+            std::string key = trim(line.substr( δεπι(
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
@@ -84,9 +210,53 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write a simple header comment
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM Configuration System\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write a comment with the source
+        file << "# " << entry.key << " (";
+        switch (entry.source) {
+            case ConfigSource::Default:
+                file << "default";
+                break;
+            case ConfigSource::File:
+                file << "file";
+                break;
+            case ConfigSource::CommandLine:
+                file << "command-line";
+                break;
+            case ConfigSource::Runtime:
+                file << "runtime";
+                break;
+        }
+        file << ")\n";
+        
+        // Write the key=value pair
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        file << "\"" << arg[i] << "\"";
+                    } else {
+                        file << arg[i];
+                    }
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;
