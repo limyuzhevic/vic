@@ -6,6 +6,16 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <stdexcept>
+#include <unordered_map>
+#include <functional>
+#include <chrono>
+#include <ctime>
+
+// Forward declarations for JSON/YAML support
+#ifdef HAVE_JSON
+#include <nlohmann/json.hpp>
+#endif
 
 namespace nlm {
 
@@ -16,20 +26,64 @@ class Config;
 using ConfigValue = std::variant<
     int,
     int64_t,
+    uint64_t,
+    float,
     double,
     bool,
     std::string,
     std::vector<int>,
+    std::vector<int64_t>,
+    std::vector<uint64_t>,
+    std::vector<float>,
     std::vector<double>,
+    std::vector<bool>,
     std::vector<std::string>
 >;
+
+// Configuration validation result
+struct ValidationResult {
+    bool valid;
+    std::string errorMessage;
+    std::string path;
+    
+    ValidationResult() : valid(false), errorMessage("Validation failed") {}
+    ValidationResult(bool v, const std::string& err, const std::string& path = "")
+        : valid(v), errorMessage(err), path(path) {}
+    
+    static ValidationResult success() { return ValidationResult(true, ""); }
+    static ValidationResult error(const std::string& msg, const std::string& path = "") { 
+        return ValidationResult(false, msg, path); }
+};
 
 // Configuration source
 enum class ConfigSource {
     Default,
     File,
     CommandLine,
-    Runtime
+    Runtime,
+    Environment
+};
+
+// Configuration error types
+enum class ConfigErrorType {
+    FileNotFound,
+    ParseError,
+    ValidationError,
+    KeyNotFound,
+    TypeError,
+    IoError,
+    UnsupportedFormat
+};
+
+class ConfigError : public std::runtime_error {
+public:
+    ConfigError(const std::string& message, ConfigErrorType type = ConfigErrorType::ParseError)
+        : std::runtime_error(message), errorType(type) {}
+    
+    ConfigErrorType getErrorType() const { return errorType; }
+    
+private:
+    ConfigErrorType errorType;
 };
 
 // Configuration entry

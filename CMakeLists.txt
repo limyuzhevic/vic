@@ -6,9 +6,13 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
+# Build type validation
+if(NOT CMAKE_BUILD_TYPE MATCHES "Debug|Release|RelWithDebInfo|MinSizeRel")
+    message(FATAL_ERROR "Invalid CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}. Use Debug, Release, RelWithDebInfo, or MinSizeRel.")
 endif()
 
 # Enable warnings
@@ -179,35 +183,93 @@ add_executable(nlm_benchmark
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
-# Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
+# Python bindings with enhanced configuration and better defaults
+option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" ON)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 CONFIG REQUIRED)
-    # The module is shared, so the static libs it links need PIC.
+    
+    # Configure Python bindings build with modern CMake practices
     set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
-        POSITION_INDEPENDENT_CODE ON)
+        POSITION_INDEPENDENT_CODE ON
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_PRIVATE_HEADERS_INSIDE_NAMESPACE ON
+    )
+    
+    # Add Python-specific compile options
+    target_compile_definitions(nlm_core PRIVATE -D_NLM_PYTHON_BINDINGS)
+    target_compile_definitions(nlm_agent PRIVATE -D_NLM_PYTHON_BINDINGS)
+    target_compile_definitions(nlm_world PRIVATE -D_NLM_PYTHON_BINDINGS)
+    
     pybind11_add_module(pynlm python/bindings.cpp)
     target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-    target_include_directories(pynlm PRIVATE src)
-    install(TARGETS pynlm LIBRARY DESTINATION .)
+    target_include_directories(pynlm PRIVATE
+        src
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    )
+    
+    # Installation for Python package with proper structure
+    install(TARGETS pynlm
+        LIBRARY DESTINATION python/pynlm
+        ARCHIVE DESTINATION python/pynlm
+        RUNTIME DESTINATION python/pynlm
+        NAMELINK_SKIP
+        NAMELINK_ONLY
+    )
+    
+    # Install Python metadata
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml
+        DESTINATION python/pynlm
+        RENAME pyproject.toml
+    )
 endif()
 
-# Testing
+# Enable testing with modern CMake practices
 enable_testing()
+
+# Configure test directory with better isolation
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+# Enhanced test target with better organization
+add_custom_target(run_all_tests
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    COMMENT "Run all tests with verbose output"
+    VERBATIM
 )
+
+add_custom_target(run_unit_tests
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -L "unit"
+    COMMENT "Run unit tests only"
+    VERBATIM
+)
+
+add_custom_target(run_integration_tests
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -L "integration"
+    COMMENT "Run integration tests only"
+    VERBATIM
+)
+
+# Additional configuration options for advanced build scenarios
+
+# Option to build shared libraries instead of static
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
+
+# Installation directory customization
+set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Installation prefix")
+
+# Option to enable position independent code for all targets
+set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "Position independent code")
+
+# Option to build examples
+set(BUILD_EXAMPLES ON CACHE BOOL "Build example applications")
+
+# Option to build documentation
+set(BUILD_DOCS ON CACHE BOOL "Build documentation")
+
+# Option to enable coverage reporting
+set(CMAKE_COVERAGE OFF CACHE BOOL "Enable code coverage reporting")
+
+if(CMAKE_COVERAGE)
+    target_compile_options(nlm_core PRIVATE --coverage)
+    target_link_options(nlm_core PRIVATE --coverage)
+endif()
