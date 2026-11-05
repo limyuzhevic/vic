@@ -25,7 +25,6 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
                  std::to_string(config.maxSteps) + " steps");
     
-    // Create configuration
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount));
     cfg->set("region_count", static_cast<int64_t>(config.regionCount));
@@ -34,6 +33,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("stdp_ltd_weight", 0.012f);
     cfg->set("synaptogenesis_rate", 0.0001f);
     cfg->set("pruning_rate", 0.00001f);
+    
+    // Enable episodic memory by default for Phase 6 integration test
+    cfg->set("enable_episodic_memory", true, ConfigSource::Default);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -107,7 +109,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
+    // Use total accumulated reward instead of average per step
+    // for better representation of overall learning
+    result.totalReward = totalReward;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;

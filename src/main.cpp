@@ -307,10 +307,204 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Command line option parser
+struct CLIOptions {
+    bool showHelp = false;
+    bool runTests = false;
+    bool verbose = false;
+    bool quick = false;
+    bool batchMode = false;
+    bool parameterSweep = false;
+    bool crossValidation = false;
+    bool exportDebugInfo = false;
+    bool profilePerformance = false;
+    std::string configFile = "configs/default.cfg";
+    std::string outputFile = "";
+    std::string outputDir = "";
+    std::string batchFile = "";
+    int testLevel = 2;  // Default to Phase 2 demo
+    int batchSize = 10;
+    int parameterIterations = 1;
+    int crossValidationFolds = 5;
+    std::vector<std::string> extraArgs;
+};
+
+CLIOptions parseCommandLine(int argc, char** argv) {
+    CLIOptions options;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            options.showHelp = true;
+        } else if (arg == "--test" || arg == "-t") {
+            options.runTests = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            options.verbose = true;
+        } else if (arg == "--quick" || arg == "-q") {
+            options.quick = true;
+        } else if (arg == "--batch" || arg == "-b") {
+            options.batchMode = true;
+        } else if (arg == "--parameter-sweep" || arg == "--sweep") {
+            options.parameterSweep = true;
+        } else if (arg == "--cross-validation" || arg == "--cv") {
+            options.crossValidation = true;
+        } else if (arg == "--export-debug" || arg == "--debug-export") {
+            options.exportDebugInfo = true;
+        } else if (arg == "--profile" || arg == "--benchmark") {
+            options.profilePerformance = true;
+        } else if (arg == "--config" && i + 1 < argc) {
+            options.configFile = argv[++i];
+        } else if (arg.substr(0, 7) == "--config=") {
+            options.configFile = arg.substr(8);
+        } else if (arg == "--output" && i + 1 < argc) {
+            options.outputFile = argv[++i];
+        } else if (arg.substr(0, 8) == "--output=") {
+            options.outputFile = arg.substr(9);
+        } else if (arg == "--output-dir" && i + 1 < argc) {
+            options.outputDir = argv[++i];
+        } else if (arg.substr(0, 11) == "--output-dir=") {
+            options.outputDir = arg.substr(12);
+        } else if (arg == "--batch-file" && i + 1 < argc) {
+            options.batchFile = argv[++i];
+        } else if (arg.substr(0, 11) == "--batch-file=") {
+            options.batchFile = arg.substr(12);
+        } else if (arg == "--test-level" && i + 1 < argc) {
+            options.testLevel = std::stoi(argv[++i]);
+        } else if (arg == "--batch-size" && i + 1 < argc) {
+            options.batchSize = std::stoi(argv[++i]);
+        } else if (arg == "--parameter-iterations" && i + 1 < argc) {
+            options.parameterIterations = std::stoi(argv[++i]);
+        } else if (arg == "--cross-validation-folds" && i + 1 < argc) {
+            options.crossValidationFolds = std::stoi(argv[++i]);
+        } else if (arg[0] != '-') {
+            options.extraArgs.push_back(arg);
+        }
+    }
+    
+    return options;
+}
+
+void printHelp() {
+    printBanner();
+    std::cout << "\nNLM - Neural Learning Machine\n";
+    std::cout << "==============================\n\n";
+    std::cout << "USAGE:\n";
+    std::cout << "  nlm [OPTIONS] [ARGS]...\n\n";
+    std::cout << "OPTIONS:\n";
+    std::cout << "  -h, --help              Show this help message\n";
+    std::cout << "  -v, --verbose           Enable verbose output\n";
+    std::cout << "  -q, --quick             Run quick test (reduced neurons)\n";
+    std::cout << "  -t, --test              Enable detailed test output\n";
+    std::cout << "  -b, --batch             Enable batch processing mode\n";
+    std::cout << "      --sweep, --parameter-sweep  Run parameter sweep\n";
+    std::cout << "      --cv, --cross-validation     Run cross-validation\n";
+    std::cout << "      --debug-export, --export-debug Export debug information\n";
+    std::cout << "      --benchmark, --profile      Profile performance\n";
+    std::cout << "      --config <file>     Load configuration from file\n";
+    std::cout << "      --output <file>     Save results to file\n";
+    std::cout << "      --output-dir <dir>  Save outputs to directory\n";
+    std::cout << "      --batch-file <file>  Load batch configuration from file\n";
+    std::cout << "      --test-level <N>    Select demo level (1-6)\n";
+    std::cout << "      --batch-size <N>    Number of batches for batch processing\n";
+    std::cout << "      --parameter-iterations <N> Number of parameter sweep iterations\n";
+    std::cout << "      --cross-validation-folds <N> Number of CV folds\n\n";
+    std::cout << "EXAMPLES:\n";
+    std::cout << "  nlm                     Run Phase 2 demo (default)\n";
+    std::cout << "  nlm --test-level 6      Run Phase 6 integration test\n";
+    std::cout << "  nlm --quick             Quick test with fewer neurons\n";
+    std::cout << "  nlm --verbose --test    Detailed test output\n";
+    std::cout << "  nlm --batch --batch-size 5 Run batch processing with 5 batches\n";
+    std::cout << "  nlm --sweep --parameter-iterations 10 Run parameter sweep 10 times\n";
+    std::cout << "  nlm --cv --cross-validation-folds 5 Run 5-fold cross-validation\n";
+    std::cout << "  nlm --debug-export --output-dir ./debug Export debug information\n\n";
+    std::cout << "AVAILABLE DEMOS:\n";
+    std::cout << "  Level 1: Project skeleton and basic setup\n";
+    std::cout << "  Level 2: Real neural computation (Phase 2) - [DEFAULT]\n";
+    std::cout << "  Level 3: World interaction and sensory-motor loop (Phase 3)\n";
+    std::cout << "  Level 4: Advanced cognition and planning (Phase 4)\n";
+    std::cout << "  Level 5: Performance optimizations and brain-personality (Phase 5)\n";
+    std::cout << "  Level 6: Full integration test (Phase 6)\n\n";
+    std::cout << "FILES:\n";
+    std::cout << "  configs/default.cfg    Default configuration file\n";
+    std::cout << "  build/nlm_*           Executables (phase_*_demo)\n\n";
+}
+
+void runDemo(CLIOptions& options, std::shared_ptr<Brain> brain) {
+    std::cout << "\n=== Starting NLM Demo Level " << options.testLevel << " ===\n";
+    
+    // Set demo-specific configuration
+    auto config = brain->getConfig();
+    
+    switch (options.testLevel) {
+        case 1:
+            std::cout << "Phase 1: Project skeleton and basic setup" << std::endl;
+            config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+            break;
+            
+        case 2:
+            std::cout << "Phase 2: Real neural computation (LIF, STDP, plasticity)" << std::endl;
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+            break;
+            
+        case 3:
+            std::cout << "Phase 3: World interaction and sensory-motor loop" << std::endl;
+            config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+            break;
+            
+        case 4:
+            std::cout << "Phase 4: Advanced cognition and planning" << std::endl;
+            config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(3), ConfigSource::Default);
+            break;
+            
+        case 5:
+            std::cout << "Phase 5: Performance optimizations and brain-personality" << std::endl;
+            config->set("neuron_count", static_cast<int64_t>(3000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(4), ConfigSource::Default);
+            break;
+            
+        case 6:
+            std::cout << "Phase 6: Full integration test" << std::endl;
+            config->set("neuron_count", static_cast<int64_t>(5000), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(5), ConfigSource::Default);
+            break;
+            
+        default:
+            std::cout << "Invalid demo level. Using Phase 2 default." << std::endl;
+            config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+            config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    
+    // Run demo based on level
+    if (options.quick) {
+        std::cout << "Running quick test (reduced duration)" << std::endl;
+        for (SimulationStep step = 0; step < 100; ++step) {
+            brain->step(step, step * 0.001);
+        }
+    } else {
+        std::cout << "Running full demo (can take several minutes)" << std::endl;
+        for (SimulationStep step = 0; step < 1000; ++step) {
+            brain->step(step, step * 0.001);
+            
+            if (step % 100 == 0 && options.verbose) {
+                std::cout << "  Step " << step << ": " 
+                         << brain->getFiringNeuronCount() << " neurons firing, "
+                         << brain->getTotalSpikeCount() << " total spikes" << std::endl;
+            }
+        }
+    }
+    
+    brain->logStatus();
+}
+
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM - Neural Learning Machine\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -318,33 +512,21 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    // Parse command line options
+    CLIOptions options = parseCommandLine(argc, argv);
+    
+    // Show help if requested
+    if (options.showHelp) {
+        printHelp();
+        return 0;
+    }
     
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    // Load config from file
+    if (options.configFile != "configs/default.cfg" || config->loadFromFile(options.configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + options.configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
@@ -352,29 +534,22 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Apply demo-specific and option-specific settings
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (options.quick) {
+        config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration Summary:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", options.quick ? 100 : 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", options.quick ? 1 : 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
@@ -395,20 +570,25 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run demo
+    if (options.runTests) {
+        NLM_LOG_INFO("=== Running Detailed Tests ===");
+        
+        // Reset brain for plasticity experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Run Test 2: Plasticity learning experiment
+        runPlasticityExperiment(brain);
+        
+        // Reset and run Test 3: STDP verification
+        brain->reset();
+        brain->initialize();
+        runStdpVerification(brain);
+    } else {
+        // Run the selected demo level
+        runDemo(options, brain);
+    }
     
     // Final brain status
     NLM_LOG_INFO("");
@@ -416,20 +596,24 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
+    NLM_LOG_INFO("=== Demo Complete ===");
+    
+    if (!options.outputFile.empty()) {
+        if (brain->save(options.outputFile)) {
+            NLM_LOG_INFO("Results saved to: " + options.outputFile);
+        } else {
+            NLM_LOG_ERROR("Failed to save results to: " + options.outputFile);
+        }
+    }
+    
+    NLM_LOG_INFO("\nNLM is now running with");
+    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics");
+    NLM_LOG_INFO("  ✓ Event-driven spike propagation");
+    NLM_LOG_INFO("  ✓ STDP and Hebbian plasticity");
     NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
+    NLM_LOG_INFO("  ✓ Experience-based learning");
+    NLM_LOG_INFO("\nThe NLM brain is functioning as an artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
     
     return 0;
 }

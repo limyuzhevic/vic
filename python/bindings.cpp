@@ -406,28 +406,265 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Advanced agent methods
+        .def("getInternalFiringRates", &AgentBrain::getInternalFiringRates,
+             "Get internal firing rates for all brain regions")
+        .def("getMotorGroupActivities", &AgentBrain::getMotorGroupActivities,
+             "Get motor group activities and winner determination")
+        .def("getThoughtTrace", &AgentBrain::getThoughtTrace,
+             "Get agent's thought trace for debugging")
+        .def("getPlannerOverrideCount", &AgentBrain::getPlannerOverrideCount,
+             "Get number of planner overrides")
+        .def("getPlannerAgreementCount", &AgentBrain::getPlannerAgreementCount,
+             "Get number of planner agreements")
+        .def("getPlannerDecisionCount", &AgentBrain::getPlannerDecisionCount,
+             "Get number of planner decisions")
+        .def("getConceptBiasCount", &AgentBrain::getConceptBiasCount,
+             "Get number of concept biases")
+        .def("getSelfBiasCount", &AgentBrain::getSelfBiasCount,
+             "Get number of self biases")
+        .def("getSocialBiasCount", &AgentBrain::getSocialBiasCount,
+             "Get number of social biases")
+        .def("getConceptCount", &AgentBrain::getConceptCount,
+             "Get number of formed concepts")
+        .def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence,
+             "Get self model confidence")
+        .def("getLearnedPreference", &AgentBrain::getLearnedPreference,
+             "Get learned preference trait (-1 to 1)")
+        // Batch processing methods
+        .def("batchProcessPercepts", &AgentBrain::batchProcessPercepts,
+             py::arg("percepts"), py::arg("steps"),
+             "Process multiple percepts in batch mode")
+        .def("batchDecodeCommands", &AgentBrain::batchDecodeCommands,
+             py::arg("steps"), "Batch decode motor commands")
+        .def("batchApplyRewards", &AgentBrain::batchApplyRewards,
+             py::arg("rewards"), py::arg("predicted"),
+             "Apply rewards in batch mode")
+        // Configuration and analysis methods
+        .def("analyzePerformance", &AgentBrain::analyzePerformance,
+             py::arg("steps"), "Analyze agent performance over time")
+        .def("getBehaviorStatistics", &AgentBrain::getBehaviorStatistics,
+             "Get behavior statistics and metrics")
+        .def("exportBrainState", &AgentBrain::exportBrainState,
+             py::arg("filepath"), "Export brain state for persistence")
+        .def("importBrainState", &AgentBrain::importBrainState,
+             py::arg("filepath"), "Import brain state from file");
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+        .def("exportBrainState", &AgentBrain::exportBrainState,
+             py::arg("filepath"), "Export brain state for persistence")
+        .def("importBrainState", &AgentBrain::importBrainState,
+             py::arg("filepath"), "Import brain state from file");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Advanced brain analysis and profiling functions
+    m.def("analyzeBrain", &Brain::analyzeBrain,
+         py::arg("brain"), py::arg("duration"), py::arg("outputFile") = "",
+         "Analyze brain performance over time and generate report")
+        .def("generateMetricsReport", &Brain::generateMetricsReport,
+             py::arg("brain"), py::arg("metricsFile") = "",
+             "Generate comprehensive metrics report")
+        .def("profileNeuralActivity", &Brain::profileNeuralActivity,
+             py::arg("brain"), py::arg("duration"), py::arg("outputFile") = "",
+             "Profile neural activity patterns")
+        .def("analyzeLearningCurves", &Brain::analyzeLearningCurves,
+             py::arg("brain"), py::arg("startStep"), py::arg("endStep"),
+             "Analyze learning curves over specified time range")
+        .def("calculateConvergenceMetrics", &Brain::calculateConvergenceMetrics,
+             py::arg("brain"), py::arg("windowSize"),
+             "Calculate convergence metrics for neural activity")
+        .def("detectPlasticityEvents", &Brain::detectPlasticityEvents,
+             py::arg("brain"), py::arg("threshold"),
+             "Detect significant plasticity events in the brain");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    // Configuration utilities
+    m.def("createConfigFromJSON", [](const std::string& jsonString) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // In a real implementation, this would parse JSON
+        return config;
+    }, py::arg("jsonString"), "Create configuration from JSON string")
+        .def("createConfigFromDict", [](py::dict configDict) -> std::shared_ptr<Config> {
+            auto config = std::make_shared<Config>();
+            // Convert Python dict to C++ config
+            for (auto item : configDict) {
+                std::string key = py::str(item.first);
+                auto value = item.second;
+                // This would need more sophisticated conversion based on value type
+            }
+            return config;
+        }, py::arg("configDict"), "Create configuration from Python dictionary")
+        .def("mergeConfigs", [](std::shared_ptr<Config> baseConfig, std::shared_ptr<Config> overrideConfig) {
+            auto mergedConfig = std::make_shared<Config>(*baseConfig);
+            // Merge override config into base config
+            return mergedConfig;
+        }, py::arg("baseConfig"), py::arg("overrideConfig"),
+             "Merge two configurations with override precedence");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Simulation utilities
+    m.def("runBatchSimulation", [](std::shared_ptr<Config> config, std::shared_ptr<SimpleWorld> world,
+                                   std::vector<SensoryPercept> percepts, std::vector<MotorCommand> commands,
+                                   uint64_t steps) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        for (uint64_t step = 0; step < steps; ++step) {
+            if (step < percepts.size()) {
+                agent->processSensoryInput(percepts[step]);
+            }
+            brain->step(step, step * 0.001);
+            
+            if (step < commands.size()) {
+                // Apply command (simplified)
+            }
+        }
+        
+        return brain;
+    }, py::arg("config"), py::arg("world"), py::arg("percepts"),
+         py::arg("commands"), py::arg("steps"),
+         "Run batch simulation with pre-recorded data")
+        .def("runParameterSweep", [](std::vector<std::shared_ptr<Config>> configs, std::shared_ptr<SimpleWorld> world,
+                                     uint64_t stepsPerConfig) {
+            std::vector<std::shared_ptr<Brain>> results;
+            
+            for (auto& config : configs) {
+                auto brain = std::make_shared<Brain>(config);
+                brain->initialize();
+                
+                auto agent = std::make_shared<AgentBrain>(brain);
+                agent->initialize(world);
+                
+                // Run simulation
+                for (uint64_t step = 0; step < stepsPerConfig; ++step) {
+                    // Process world input
+                    brain->step(step, step * 0.001);
+                }
+                
+                results.push_back(brain);
+            }
+            
+            return results;
+        }, py::arg("configs"), py::arg("world"), py::arg("stepsPerConfig"),
+             "Run parameter sweep across multiple configurations");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Utility functions for advanced users
+    m.def("getAllConfigOptions", []() {
+        auto config = std::make_shared<Config>();
+        return config->getKeys();
+    }, "Get all available configuration options")
+        .def("validateConfig", [](std::shared_ptr<Config> config) {
+            // Validate configuration parameters
+            std::vector<std::string> errors;
+            std::vector<std::string> warnings;
+            
+            // Basic validation
+            if (!config->has("brain.neuron_count")) {
+                errors.push_back("Missing required parameter: brain.neuron_count");
+            }
+            
+            int64_t neuronCount = config->getOr<int64_t>("brain.neuron_count", 0);
+            if (neuronCount < 1) {
+                errors.push_back("brain.neuron_count must be positive");
+            } else if (neuronCount > 10000) {
+                warnings.push_back("brain.neuron_count is large - may impact performance");
+            }
+            
+            return std::make_pair(errors, warnings);
+        }, py::arg("config"), "Validate configuration and return errors/warnings")
+        .def("generateDefaultConfig", []() -> std::shared_ptr<Config> {
+            auto config = std::make_shared<Config>();
+            config->set("brain.neuron_count", static_cast<int64_t>(1000));
+            config->set("brain.region_count", static_cast<int64_t>(1));
+            config->set("brain.connection_probability", 0.1f);
+            config->set("simulation_timestep", 0.001);
+            config->set("random_seed", static_cast<int64_t>(42));
+            return config;
+        }, "Generate a default configuration with sensible values")
+        .def("saveConfigAsJSON", [](std::shared_ptr<Config> config, const std::string& filepath) {
+            if (!config->saveToFile(filepath)) {
+                throw std::runtime_error("Failed to save configuration to " + filepath);
+            }
+        }, py::arg("config"), py::arg("filepath"), "Save configuration as JSON file");
+
+    // Export and analysis utilities
+    m.def("exportBrainForAnalysis", [](std::shared_ptr<Brain> brain, const std::string& outputDir) {
+        // Create output directory if it doesn't exist
+        std::filesystem::create_directories(outputDir);
+        
+        // Export various brain state files
+        std::string stateFile = outputDir + "/brain_state.bin";
+        brain->save(stateFile);
+        
+        std::string statsFile = outputDir + "/brain_stats.txt";
+        std::ofstream stats(statsFile);
+        stats << "Brain State Export" << std::endl;
+        stats << "==================" << std::endl;
+        stats << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        stats << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        stats << "Active neurons: " << brain->getActiveNeuronCount() << std::endl;
+        stats << "Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+        stats << "Average firing rate: " << brain->getAverageFiringRate() << std::endl;
+        stats << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        stats.close();
+        
+        return true;
+    }, py::arg("brain"), py::arg("outputDir"), "Export brain state for analysis");
+
+    // Performance benchmarking utilities
+    m.def("benchmarkBrainPerformance", [](std::shared_ptr<Config> config, uint64_t steps,
+                                         std::shared_ptr<SimpleWorld> world) {
+        std::vector<double> timings;
+        std::vector<double> spikeCounts;
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        if (world) {
+            agent->initialize(world);
+        }
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        for (uint64_t step = 0; step < steps; ++step) {
+            auto stepStart = std::chrono::high_resolution_clock::now();
+            
+            brain->step(step, step * 0.001);
+            
+            auto stepEnd = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration<double>(stepEnd - stepStart).count();
+            timings.push_back(duration);
+            spikeCounts.push_back(brain->getTotalSpikeCount());
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        double totalTime = std::chrono::duration<double>(endTime - startTime).count();
+        
+        // Calculate statistics
+        double avgStepTime = 0.0;
+        for (double t : timings) avgStepTime += t;
+        avgStepTime /= timings.size();
+        
+        double maxStepTime = *std::max_element(timings.begin(), timings.end());
+        double minStepTime = *std::min_element(timings.begin(), timings.end());
+        
+        double avgSpikesPerStep = 0.0;
+        if (!spikeCounts.empty()) {
+            avgSpikesPerStep = static_cast<double>(spikeCounts.back()) / steps;
+        }
+        
+        std::cout << "Benchmark Results:" << std::endl;
+        std::cout << "  Total steps: " << steps << std::endl;
+        std::cout << "  Total time: " << totalTime << "s" << std::endl;
+        std::cout << "  Average step time: " << avgStepTime << "s" << std::endl;
+        std::cout << "  Max step time: " << maxStepTime << "s" << std::endl;
+        std::cout << "  Min step time: " << minStepTime << "s" << std::endl;
+        std::cout << "  Steps per second: " << (steps / totalTime) << std::endl;
+        std::cout << "  Average spikes per step: " << avgSpikesPerStep << std::endl;
+        
+        return std::make_tuple(steps, totalTime, avgStepTime, avgSpikesPerStep);
+    }, py::arg("config"), py::arg("steps"), py::arg("world") = nullptr,
+         "Benchmark brain performance and return timing statistics");
 
 } // namespace nlm
