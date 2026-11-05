@@ -178,7 +178,6 @@ add_executable(nlm_benchmark
     src/benchmark.cpp
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
-
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
 # but the root CMakeLists never built the module — pip install
@@ -188,6 +187,7 @@ target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 # it must not be added here as a subdirectory: it defines its own
 # nlm_core/nlm_agent/nlm_world targets, which would collide with the
 # ones above. This target reuses the root libraries instead.
+
 option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
@@ -195,10 +195,79 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     # The module is shared, so the static libs it links need PIC.
     set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
         POSITION_INDEPENDENT_CODE ON)
+    
+    # Check for Python development headers
+    include(CheckPythonHeaders)
+    if(PYTHON_HEADERS_MISSING)
+        message(WARNING "Python development headers not found. Python bindings will not be available.")
+        set(NLM_BUILD_PYTHON_BINDINGS OFF)
+    endif()
+    
+    # Configure pybind11 include directories
+    target_include_directories(pynlm PRIVATE
+        ${Python_INCLUDE_DIRS}
+        ${pybind11_INCLUDE_DIRS}
+    )
+    
+    # Configure compile options for Python bindings
+    target_compile_features(pynlm PRIVATE cxx_std_17)
+    
+    # Add installation support for Python module
+    install(TARGETS pynlm
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+    
+    # Set output name for Python module
+    set_target_properties(pynlm PROPERTIES
+        OUTPUT_NAME "pynlm"
+        PREFIX ""
+    )
+    
+    # Add Python module dependency
+    target_link_libraries(pynlm PRIVATE
+        nlm_core nlm_agent nlm_world
+        ${Python_LIBRARIES}
+    )
+    
+    # Configure Python extension module
     pybind11_add_module(pynlm python/bindings.cpp)
-    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-    target_include_directories(pynlm PRIVATE src)
-    install(TARGETS pynlm LIBRARY DESTINATION .)
+    
+    # Add platform-specific configurations
+    if(WIN32)
+        # Windows-specific configurations
+        target_compile_definitions(pynlm PRIVATE "_GLIBCXX_USE_CXX11_ABI=0")
+    else()
+        # Linux/Unix configurations
+        target_compile_options(pynlm PRIVATE -fvisibility=hidden)
+    endif()
+    
+    # Add comprehensive error checking and validation
+    add_custom_target(check_python_bindings
+        COMMAND ${CMAKE_COMMAND} -E echo "Python bindings validation"
+        COMMAND ${Python_EXECUTABLE} -c "import sys; print('Python version:', sys.version)"
+        COMMAND ${Python_EXECUTABLE} -c "import pynlm; print('pynlm available:', pynlm.__version__)" 2> ${CMAKE_BINARY_DIR}/pynlm_test_output.txt
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Validating Python bindings installation"
+    )
+    
+    # Add Python module testing
+    add_custom_target(test_pynlm
+        COMMAND ${Python_EXECUTABLE} -m pytest ${CMAKE_SOURCE_DIR}/tests/test_pynlm.py
+        DEPENDS check_python_bindings
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Testing Python bindings"
+    )
+    
+    # Install Python module
+    install(TARGETS pynlm DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    
+    # Create a Python package structure
+    file(MAKE_DIRECTORY ${CMAKE_SOURCE_DIR}/python/pynlm)
+    install(FILES ${CMAKE_SOURCE_DIR}/examples/PYTHON_API.md
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/pynlm
+    )
 endif()
 
 # Testing

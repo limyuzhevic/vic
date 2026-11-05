@@ -3,11 +3,23 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <stdexcept>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, size_t> keyIndexMap;
+    
+    // Error tracking
+    std::vector<std::string> lastErrors;
+    bool errorRecoveryEnabled = true;
+    
+    Impl() : errorRecoveryEnabled(true) {
+        lastErrors.reserve(100);  // Pre-allocate for performance
+    }
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,16 +31,55 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Check file extension to determine format
+    if (filepath.size() >= 5 && filepath.substr(filepath.size() - 5) == ".json") {
+        return loadFromJSON(filepath);
+    } else {
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open JSON configuration file: " + filepath);
+        return false;
+    }
+    
+    try {
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        pImpl->keyIndexMap.clear();
+        
+        // Parse JSON recursively
+        parseJSON(jsonData, "");
+        
+        NLM_LOG_INFO("Successfully loaded JSON configuration from: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse JSON configuration file " + filepath + ": " + std::string(e.what()));
+        // Fall back to simple format if JSON parsing fails
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNum = 0;
+    bool hasErrors = false;
+    
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,10 +100,56 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Skipping malformed line in config file " + filepath + ": " + line + " (line " + std::to_string(lineNum) + ")");
+            hasErrors = true;
         }
     }
     
-    return true;
+    if (hasErrors) {
+        NLM_LOG_ERROR("Configuration file " + filepath + " has parsing errors");
+    }
+    
+    NLM_LOG_INFO("Loaded configuration from: " + filepath);
+    return !hasErrors;
+}
+
+void Config::parseJSON(const nlohmann::json& json, const std::string& prefix) {
+    if (json.is_object()) {
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = prefix.empty() ? it.key() : prefix + "." + it.key();
+            
+            if (it->is_object()) {
+                parseJSON(*it, key);
+            } else if (it->is_array()) {
+                // Convert array to string representation
+                std::string arrayStr = "[";
+                for (size_t i = 0; i < it->size(); ++i) {
+                    if (i > 0) arrayStr += ", ";
+                    arrayStr += it->at(i).dump();
+                }
+                arrayStr += "]";
+                set(key, arrayStr, ConfigSource::File);
+            } else {
+                // Convert JSON value to string representation
+                std::string valueStr;
+                if (it->is_string()) {
+                    valueStr = it->get<std::string>();
+                } else if (it->is_number_integer()) {
+                    valueStr = std::to_string(it->get<int64_t>());
+                } else if (it->is_number_float()) {
+                    valueStr = std::to_string(it->get<double>());
+                } else if (it->is_boolean()) {
+                    valueStr = it->get<bool>() ? "true" : "false";
+                } else if (it->is_null()) {
+                    valueStr = "null";
+                } else {
+                    valueStr = it->dump();
+                }
+                set(key, valueStr, ConfigSource::File);
+            }
+        }
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -86,21 +183,68 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Convert ConfigValue to string representation
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            
+            if constexpr (std::is_same_v<T, int>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << value;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (value ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << "UNKNOWN_TYPE";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Update key index map for faster lookups
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        // Update index map
+        pImpl->keyIndexMap[key] = std::distance(pImpl->entries.begin(), it);
     } else {
+        size_t index = pImpl->entries.size();
         pImpl->entries.emplace_back(key, value, source);
+        pImpl->keyIndexMap[key] = index;
     }
 }
 

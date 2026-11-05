@@ -150,9 +150,14 @@ PYBIND11_MODULE(pynlm, m) {
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
+            // Create non-const copies of strings to safely pass to C-style API
+            std::vector<std::string> mutableArgs = args;
             std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+            argv.reserve(mutableArgs.size());
+            for (auto& a : mutableArgs) {
+                // Store pointer to non-const copy
+                argv.push_back(const_cast<char*>(a.c_str()));
+            }
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
            "Load configuration from command line arguments")
@@ -295,7 +300,23 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
-    py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
+    py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class
+
+A complete, fully integrated artificial brain simulation system that implements:
+- Leaky Integrate-and-Fire (LIF) neuron dynamics
+- Event-driven spike propagation with synaptic delays
+- Multiple plasticity mechanisms (STDP, Hebbian, structural)
+- Working memory, episodic memory, and associative memory
+- Neuromodulation (dopamine, curiosity, novelty, prediction error)
+- Prediction systems for sensory prediction and error computation
+- Cognitive mechanisms (neural planner, concept formation, attention)
+- Developmental stages and plasticity modulation
+- Checkpoint save/load functionality
+
+The Brain class serves as the core simulation engine, coordinating all
+neural systems and providing the interface for simulation control and
+analysis. It implements the complete brain loop described in the NLM
+architecture philosophy.
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
@@ -361,7 +382,20 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
-    py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+    py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world
+
+The AgentBrain class provides a Python-friendly interface for integrating
+neural simulation with environmental interaction. It bridges the gap between
+the low-level brain simulation and high-level agent behavior by providing:
+- Sensory input processing from the world
+- Motor command generation from neural activity
+- Neuromodulation application based on environmental feedback
+- Development system updates for learning and adaptation
+- Curiosity and novelty-driven exploration behavior
+
+This class implements the agent loop: perceive → process → act → learn,
+enabling autonomous agents to interact with their environment using
+neural computation rather than explicit programming.
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
