@@ -333,9 +333,18 @@ PYBIND11_MODULE(pynlm, m) {
              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
              "Get all region IDs")
-        .def("getRegions", &Brain::getRegions,
-             py::return_value_policy::reference_internal,
-             "Get all regions")
+        .def("getRegions", [](const Brain& self) {
+            py::list result;
+            const auto& regions = self.getRegions();
+            for (const auto& region_ptr : regions) {
+                if (region_ptr) {
+                    result.append(py::cast(region_ptr.get()));
+                } else {
+                    result.append(py::none());
+                }
+            }
+            return result;
+        }, "Get all regions")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,

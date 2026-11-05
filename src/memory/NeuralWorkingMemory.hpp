@@ -62,10 +62,15 @@ public:
     size_t getMemoryNeuronCount() const { return memoryNeurons_.size(); }
     const std::vector<float>& getMemoryActivations() const { return memoryActivations_; }
     const std::vector<SimulationStep>& getMemoryTimestamps() const { return memoryTimestamps_; }
-    void restoreSnapshot(const std::vector<NeuronId>& neurons,
-                         const std::vector<float>& activations,
-                         const std::vector<SimulationStep>& timestamps) {
-        size_t n = std::min({neurons.size(), activations.size(), timestamps.size()});
+void restoreSnapshot(const std::vector<NeuronId>& neurons,
+                          const std::vector<float>& activations,
+                          const std::vector<SimulationStep>& timestamps) {
+        size_t n1 = neurons.size();
+        size_t n2 = activations.size();
+        size_t n3 = timestamps.size();
+        size_t n = n1;
+        if (n2 < n) n = n2;
+        if (n3 < n) n = n3;
         memoryNeurons_.assign(neurons.begin(), neurons.begin() + static_cast<std::ptrdiff_t>(n));
         memoryActivations_.assign(activations.begin(), activations.begin() + static_cast<std::ptrdiff_t>(n));
         memoryTimestamps_.assign(timestamps.begin(), timestamps.begin() + static_cast<std::ptrdiff_t>(n));
