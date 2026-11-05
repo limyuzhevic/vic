@@ -329,16 +329,24 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
+    // Parse command line arguments with enhanced CLI
+    if (!config->parseCommandLine(argc, argv)) {
+        NLM_LOG_ERROR("Failed to parse command line arguments.");
+        return 1;
+    }
+    
+    // Show help if requested
+    if (config->has("help") || config->has("--help") || config->has("-h")) {
+        std::cout << config->getUsage() << std::endl;
+        return 0;
+    }
+    
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
+        if ((arg == "--config" || arg == "-c") && i + 1 < argc) {
+            configFile = argv[++i];
         }
     }
     
@@ -349,8 +357,11 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Validate configuration
+    if (!config->validateConfig()) {
+        NLM_LOG_ERROR("Configuration validation failed.");
+        return 1;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

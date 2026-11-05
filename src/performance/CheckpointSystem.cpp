@@ -459,7 +459,28 @@ bool CheckpointManager::load(const std::string& name) {
     std::string path = (std::filesystem::path(checkpointDir_) / name).string();
     CheckpointReader reader;
     if (!reader.open(path)) return false;
-    return reader.validate();
+    if (!reader.validate()) return false;
+    
+    // Read neurons and synapses from checkpoint
+    NeuronCheckpointData neurons;
+    SynapseCheckpointData synapses;
+    
+    if (!reader.readNeurons(neurons)) return false;
+    if (!reader.readSynapses(synapses)) return false;
+    
+    // Apply neurons to the provider (called by Brain::load)
+    if (neuronProvider_) {
+        // The provider should accept the neuron data
+        // This is a simplification - in the real Brain::load,
+        // the neuron data would be applied directly to the brain
+        neuronProvider_(const_cast<NeuronCheckpointData&>(neurons));
+    }
+    
+    if (synapseProvider_) {
+        synapseProvider_(const_cast<SynapseCheckpointData&>(synapses));
+    }
+    
+    return true;
 }
 
 std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoints() const {

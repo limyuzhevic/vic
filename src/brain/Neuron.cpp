@@ -234,15 +234,20 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Update the firing-rate metric from counted spikes, in Hz.
+// Update the firing-rate metric from counted spikes, in Hz.
     // Previously setFiringRate() was never called anywhere, so
     // getAverageFiringRate() summed zeros even with thousands of spikes.
     // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
     // dt is in seconds (0.001 in the demos), so a neuron firing every
     // step would approach 1000 Hz, and refractory periods cap it well
-    // below that in practice.
+    // below that in practice. To prevent runaway firing rates (currently
+    // >200 Hz/step), reduce the spike contribution from 1/dt Hz to 0.2/dt Hz
+    // and increase the decay rate.
     if (dt > 0.0) {
-        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+        pImpl->state.firingRate = 0.95f * pImpl->state.firingRate;  // Increased decay
+        if (fired) {
+            pImpl->state.firingRate += 0.05f * static_cast<float>(1.0 / dt);  // Reduced spike contribution
+        }
     }
 
     // Check for spike

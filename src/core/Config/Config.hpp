@@ -6,6 +6,7 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -44,6 +45,15 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration help info for CLI
+struct ConfigHelp {
+    std::string key;
+    std::string description;
+    std::string type;
+    std::string defaultValue;
+    std::vector<std::string> options;
+};
+
 // Main configuration class
 class Config {
 public:
@@ -66,12 +76,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +105,16 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Enhanced command-line interface
+    bool parseCommandLine(int argc, char** argv);
+    std::string getUsage() const;
+    bool validateConfig() const;
+    std::string getConfigValue(const std::string& key) const;
+    
+    // Configuration help system
+    static std::vector<ConfigHelp> getHelpInfo();
+    static std::string getConfigSchema();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +122,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isNumeric(const std::string& str);
+    static ConfigValue stringToConfigValue(const std::string& str);
+    static std::string configValueToString(const ConfigValue& value);
 };
 
 } // namespace nlm

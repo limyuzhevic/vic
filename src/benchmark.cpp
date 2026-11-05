@@ -1,144 +1,122 @@
-// NLM Performance Benchmark
-// Measures simulation performance for different network sizes
-
-#include "core/Config/Config.hpp"
-#include "core/Random/Random.hpp"
-#include "core/Logger/Logger.hpp"
-#include "core/SimulationClock/SimulationClock.hpp"
-#include "brain/Brain.hpp"
-#include "brain/Neuron.hpp"
-#include "brain/Synapse.hpp"
-
 #include <iostream>
-#include <chrono>
-#include <vector>
-#include <iomanip>
 #include <string>
+#include <memory>
+#include <vector>
 
 using namespace nlm;
 
-// Simple performance measurement
-struct BenchmarkResult {
-    size_t neurons;
-    size_t synapses;
-    size_t steps;
-    double totalTime;      // seconds
-    double stepsPerSecond;
-    double spikesPerStep;
-    double synapsesPerNeuron;
-};
-
-BenchmarkResult runBenchmark(size_t neuronCount, size_t steps) {
-    std::cout << "  Running benchmark: " << neuronCount << " neurons, " 
-              << steps << " steps..." << std::flush;
+// Example: Performance monitoring with timers
+void demonstratePerformanceMonitoring() {
+    std::cout << "=== Performance Monitoring Demo ===" << std::endl;
     
-    // Create configuration
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.1f, ConfigSource::Default);
-    config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    // Time a specific operation
+    auto result = Logger::getGlobal().timeOperation("Neural processing", LogLevel::Info, []() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        return 42;
+    });
     
-    // Create brain
-    auto brain = std::make_shared<Brain>(config);
-    brain->initialize();
-    
-    // Run simulation
-    auto startTime = std::chrono::high_resolution_clock::now();
-    
-    for (size_t step = 0; step < steps; ++step) {
-        // Inject some random input
-        for (size_t i = 0; i < std::min(size_t(10), neuronCount / 10); ++i) {
-            brain->injectCurrentToNeurons(NeuronType::Sensory, 30.0f);
-        }
-        
-        brain->step(step, step * 0.001);
-    }
-    
-    auto endTime = std::chrono::high_resolution_clock::now();
-    double totalTime = std::chrono::duration<double>(endTime - startTime).count();
-    
-    // Collect results
-    BenchmarkResult result;
-    result.neurons = brain->getTotalNeuronCount();
-    result.synapses = brain->getTotalSynapseCount();
-    result.steps = steps;
-    result.totalTime = totalTime;
-    result.stepsPerSecond = steps / totalTime;
-    result.spikesPerStep = static_cast<double>(brain->getTotalSpikeCount()) / steps;
-    result.synapsesPerNeuron = static_cast<double>(result.synapses) / result.neurons;
-    
-    std::cout << " Done!" << std::endl;
-    std::cout << "    Time: " << std::fixed << std::setprecision(2) << totalTime << "s" << std::endl;
-    std::cout << "    Steps/sec: " << std::fixed << std::setprecision(0) << result.stepsPerSecond << std::endl;
-    std::cout << "    Spikes/step: " << std::fixed << std::setprecision(2) << result.spikesPerStep << std::endl;
-    
-    return result;
+    std::cout << "Operation result: " << result << std::endl;
+    std::cout << "See log output for timing details" << std::endl;
 }
 
-void printBenchmarkResults(const std::vector<BenchmarkResult>& results) {
-    std::cout << std::endl;
-    std::cout << "╔═══════════════════════════════════════════════════════════════════════════════════╗" << std::endl;
-    std::cout << "║                     NLM Performance Benchmark Results                           ║" << std::endl;
-    std::cout << "╠═══════════════╦═══════════════╦═══════════╦═════════════╦══════════════════════╣" << std::endl;
-    std::cout << "║   Neurons     ║   Synapses    ║ Steps/sec ║ Spikes/step ║ Synapses/Neuron      ║" << std::endl;
-    std::cout << "╠═══════════════╬═══════════════╬═══════════╬═════════════╬══════════════════════╣" << std::endl;
+// Example: Event tracing for complex workflows
+void demonstrateEventTracing() {
+    std::cout << "\n=== Event Tracing Demo ===" << std::endl;
     
-    for (const auto& r : results) {
-        std::cout << "║ " << std::setw(13) << r.neurons 
-                  << " ║ " << std::setw(13) << r.synapses
-                  << " ║ " << std::setw(9) << std::fixed << std::setprecision(0) << r.stepsPerSecond
-                  << " ║ " << std::setw(11) << std::fixed << std::setprecision(2) << r.spikesPerStep
-                  << " ║ " << std::setw(20) << std::fixed << std::setprecision(2) << r.synapsesPerNeuron
-                  << " ║" << std::endl;
-    }
+    // Create an event tracer
+    auto tracer = Logger::getGlobal().traceEvent("Data processing workflow", "workflow-123");
     
-    std::cout << "╚═══════════════╩═══════════════╩═══════════╩═════════════╩══════════════════════╝" << std::endl;
-    std::cout << std::endl;
+    // Add events to the trace
+    tracer.addEvent("Input received", "500MB of data");
+    tracer.addCheckpoint("Parsing started");
+    tracer.addEvent("Parsing completed", "200 files processed");
+    tracer.addCheckpoint("Analysis started");
+    tracer.addEvent("Analysis completed", "95% confidence");
+    tracer.addCheckpoint("Output generated");
+    
+    // Set context for the entire trace
+    tracer.setContext("user_id", "user456");
+    tracer.setContext("priority", "high");
+    
+    std::cout << "Event trace completed. See log output for details." << std::endl;
+}
+
+// Example: Memory profiling
+void demonstrateMemoryProfiling() {
+    std::cout << "\n=== Memory Profiling Demo ===" << std::endl;
+    
+    // Create a memory profiler
+    auto profiler = Logger::getGlobal().profileMemory("Neural network training", "mem-prof-789");
+    
+    // Track memory allocations (simulated)
+    profiler.trackAllocation(1024, "neuron initialization");
+    profiler.trackAllocation(2048, "synapse creation");
+    profiler.trackObjectCreation("Neuron", 1000);
+    profiler.trackObjectCreation("Synapse", 5000);
+    
+    // Simulate deallocation
+    profiler.trackDeallocation(1024);
+    profiler.trackObjectDestruction("Neuron", 100);
+    
+    std::cout << "Memory profile completed. See log output for details." << std::endl;
+}
+
+// Example: Combined advanced logging
+void demonstrateCombinedLogging() {
+    std::cout << "\n=== Combined Advanced Logging Demo ===" << std::endl;
+    
+    // Use timer to measure overall operation
+    auto timer = Logger::getGlobal().timeOperation("Full pipeline processing", LogLevel::Info, "pipeline-999");
+    
+    // Add event trace to the same correlation
+    auto tracer = Logger::getGlobal().traceEvent("Full pipeline", "pipeline-999");
+    tracer.setContext("input_type", "sensor_data");
+    tracer.setContext("output_type", "behavioral_commands");
+    
+    // Add memory profiling to the same correlation
+    auto profiler = Logger::getGlobal().profileMemory("Pipeline processing", "pipeline-999");
+    
+    // Simulate some operations within the pipeline
+    profiler.trackAllocation(4096, "pipeline buffer");
+    tracer.addEvent("Sensor data received");
+    
+    // Simulate processing
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    
+    profiler.trackAllocation(2048, "neural activation");
+    tracer.addEvent("Neural processing completed");
+    
+    // Simulate output
+    profiler.trackDeallocation(4096);
+    tracer.addCheckpoint("Output generated");
+    
+    // Log performance summary
+    Logger::getGlobal().logPerformance("Full pipeline processing", timer.getDurationMs(), "pipeline-999");
+    
+    std::cout << "Combined logging demonstration completed." << std::endl;
 }
 
 int main() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Performance Benchmark                                     ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+    std::cout << "NLM Advanced Logging and Debugging Demonstrations" << std::endl;
+    std::cout << "=================================================" << std::endl;
     
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Warning);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
+    // Initialize global logger with appropriate level
+    Logger::getGlobal().setLevel(LogLevel::Info);
     
-    std::cout << "Running NLM Performance Benchmarks..." << std::endl;
-    std::cout << std::endl;
+    // Add console logger for demonstration
+    auto consoleLogger = std::make_shared<ConsoleLogger>();
+    consoleLogger->setLevel(LogLevel::Info);
+    consoleLogger->setUseColors(true);
+    Logger::getGlobal().addLogger(consoleLogger);
     
-    std::vector<BenchmarkResult> results;
+    // Run demonstrations
+    demonstratePerformanceMonitoring();
+    demonstrateEventTracing();
+    demonstrateMemoryProfiling();
+    demonstrateCombinedLogging();
     
-    // Benchmark configurations: (neuron_count, steps)
-    std::vector<std::pair<size_t, size_t>> benchmarks = {
-        {100, 1000},      // 100 neurons, 1000 steps
-        {500, 1000},      // 500 neurons, 1000 steps
-        {1000, 500},      // 1000 neurons, 500 steps
-        {2000, 200},      // 2000 neurons, 200 steps
-    };
-    
-    for (const auto& [neurons, steps] : benchmarks) {
-        auto result = runBenchmark(neurons, steps);
-        results.push_back(result);
-        std::cout << std::endl;
-    }
-    
-    // Print summary
-    printBenchmarkResults(results);
-    
-    std::cout << "Benchmark complete." << std::endl;
+    std::cout << "\nAll demonstrations completed successfully!" << std::endl;
+    std::cout << "Check the log output above for detailed timing and event information." << std::endl;
     
     return 0;
 }
