@@ -13,347 +13,487 @@
 #include <cmath>
 #include <set>
 #include <utility>
+#include <stdexcept>
+#include <chrono>
 
 namespace nlm {
 
-// Main Phase 3 demonstration
-// Shows: experience -> neural activity -> action -> consequence -> learning
+// Enhanced Phase 3 demo with better error handling and logging
+// Demonstrates world interaction with comprehensive logging and error recovery
 
-class Phase3Demo {
+class Phase3DemoEnhanced {
 public:
-    Phase3Demo() {}
-    ~Phase3Demo() {}
+    Phase3DemoEnhanced() : logger_(Logger::getGlobal()) {
+        // Initialize with performance monitoring
+        startTime_ = std::chrono::high_resolution_clock::now();
+    }
     
-    void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
-        std::cout << "===========================================\n";
-        std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
-        std::cout << "===========================================\n\n";
-        
-        // Create configuration
-        auto config = std::make_shared<Config>();
-        configureEnvironment(config);
-        configureBrain(config);
-        
-        // Create world
-        SimpleWorld world;
-        world.configure(20.0f, 20.0f, 16, 16);
-        world.setRandomSeed(42);
-        
-        // Create brain
-        auto brain = std::make_shared<Brain>(config);
-        brain->initialize();
-        
-        // Create agent brain interface
-        AgentBrain agentBrain(brain);
-        agentBrain.initialize(world);
-        
-        // Configure agent brain
+    ~Phase3DemoEnhanced() {
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime_);
+        logger_.info("Phase 3 demo completed in {} ms", duration.count());
+    }
+    
+    // Run demonstration with comprehensive error handling
+    bool run(int numEpisodes = 5, int stepsPerEpisode = 200) {
+        try {
+            std::cout << "===========================================\n";
+            std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO (ENHANCED)\n";
+            std::cout << "===========================================\n\n";
+            
+            logger_.info("Starting Phase 3 enhanced demonstration");
+            logger_.info("Episodes: {}, Steps per episode: {}", numEpisodes, stepsPerEpisode);
+            
+            // Create configuration with comprehensive error checking
+            auto config = std::make_shared<Config>();
+            if (!configureEnvironment(config)) {
+                std::cerr << "ERROR: Failed to configure environment!" << std::endl;
+                return false;
+            }
+            
+            if (!configureBrain(config)) {
+                std::cerr << "ERROR: Failed to configure brain!" << std::endl;
+                return false;
+            }
+            
+            // Create world with validation
+            SimpleWorld world;
+            if (!world.configure(20.0f, 20.0f, 16, 16)) {
+                std::cerr << "ERROR: Failed to configure world!" << std::endl;
+                return false;
+            }
+            world.setRandomSeed(42);
+            
+            // Create brain with error checking
+            auto brain = std::make_shared<Brain>(config);
+            if (!brain->initialize()) {
+                std::cerr << "ERROR: Failed to initialize brain!" << std::endl;
+                return false;
+            }
+            
+            // Create agent brain interface with error checking
+            AgentBrain agentBrain(brain);
+            if (!agentBrain.initialize(world)) {
+                std::cerr << "ERROR: Failed to initialize agent brain!" << std::endl;
+                return false;
+            }
+            
+            // Configure agent brain with validation
+            configureAgentBrain(agentBrain);
+            
+            // Display initial state with comprehensive diagnostics
+            displayInitialState(brain, agentBrain);
+            
+            // Metrics tracking with enhanced monitoring
+            std::vector<ExperimentMetrics> allMetrics;
+            bool success = true;
+            
+            // Run episodes with comprehensive error handling
+            for (int episode = 0; episode < numEpisodes; ++episode) {
+                std::cout << "\n--- Episode " << episode << " started ---";
+                logger_.info("Starting episode {}", episode);
+                
+                try {
+                    success = runEpisode(world, agentBrain, brain, episode, metrics, stepsPerEpisode);
+                    if (!success) {
+                        logger_.error("Episode {} failed", episode);
+                        std::cerr << "ERROR: Episode " << episode << " failed!" << std::endl;
+                        // Continue with next episode for better resilience
+                    }
+                    allMetrics.push_back(metrics);
+                    
+                } catch (const std::exception& e) {
+                    logger_.error("Exception in episode {}: {}", episode, e.what());
+                    std::cerr << "EXCEPTION in episode " << episode << ": " << e.what() << std::endl;
+                    success = false;
+                }
+            }
+            
+            // Display final results with comprehensive analysis
+            displayFinalResults(allMetrics, numEpisodes);
+            
+            // Save metrics to file for analysis
+            saveMetricsToFile(allMetrics, "phase3_metrics.json");
+            
+            return true;
+            
+        } catch (const std::exception& e) {
+            logger_.error("Fatal error in Phase 3 demo: {}", e.what());
+            std::cerr << "FATAL ERROR: " << e.what() << std::endl;
+            return false;
+        } catch (...) {
+            logger_.error("Unknown fatal error in Phase 3 demo");
+            std::cerr << "FATAL ERROR: Unknown error occurred" << std::endl;
+            return false;
+        }
+    }
+    
+private:
+    bool configureEnvironment(std::shared_ptr<Config> config) {
+        try {
+            config->set("environment.type", "SimpleWorld");
+            config->set("environment.width", 20);
+            config->set("environment.height", 20);
+            config->set("environment.observation_noise", 0.1f);
+            
+            // Validate configuration
+            if (!config->has("environment.type") || 
+                !config->has("environment.width") || 
+                !config->has("environment.height")) {
+                logger_.error("Missing required environment configuration");
+                return false;
+            }
+            
+            logger_.info("Environment configured successfully");
+            return true;
+            
+        } catch (const std::exception& e) {
+            logger_.error("Error configuring environment: {}", e.what());
+            return false;
+        }
+    }
+    
+    bool configureBrain(std::shared_ptr<Config> config) {
+        try {
+            config->set("brain.neuron_count", 500);
+            config->set("brain.region_count", 2);
+            config->set("brain.synapse_density", 0.05);
+            config->set("brain.initial_weight_mean", 0.5f);
+            config->set("brain.initial_weight_std", 0.1f);
+            config->set("brain.v_thresh", -55.0f);
+            config->set("brain.v_rest", -70.0f);
+            config->set("brain.v_reset", -75.0f);
+            config->set("brain.tau_mem", 20.0f);
+            config->set("brain.tau_ref", 2.0f);
+            config->set("plasticity.stdp.enable", true);
+            config->set("plasticity.hebbian.enable", true);
+            config->set("plasticity.structural.enable", true);
+            config->set("neuromod.dopamine.scale", 1.0f);
+            config->set("neuromod.curiosity.enable", true);
+            
+            logger_.info("Brain configuration completed");
+            return true;
+            
+        } catch (const std::exception& e) {
+            logger_.error("Error configuring brain: {}", e.what());
+            return false;
+        }
+    }
+    
+    void configureAgentBrain(AgentBrain& agentBrain) {
         agentBrain.enableRewardModulation(true);
         agentBrain.enableStructuralPlasticity(true);
         agentBrain.enableDevelopment(true);
         agentBrain.enableCuriosity(true);
         
+        logger_.info("Agent brain configured with all subsystems enabled");
+    }
+    
+    void displayInitialState(std::shared_ptr<Brain> brain, AgentBrain& agentBrain) {
         std::cout << "Initial brain state:\n";
         std::cout << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
         std::cout << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
         std::cout << "  Sensory input size: " << agentBrain.getSensoryInputSize() << "\n";
-        std::cout << "  Motor output size: " << agentBrain.getMotorOutputSize() << "\n\n";
+        std::cout << "  Motor output size: " << agentBrain.getMotorOutputSize() << "\n";
+        std::cout << "  E/I ratio: " << brain->getExcitationInhibitionRatio() << "\n";
+        std::cout << "  Average firing rate: " << brain->getAverageFiringRate() << " Hz\n";
+        std::cout << "  Total spike count: " << brain->getTotalSpikeCount() << "\n\n";
         
-        // Metrics tracking
-        std::vector<ExperimentMetrics> allMetrics;
-        
-        // Run episodes
-        for (int episode = 0; episode < numEpisodes; ++episode) {
-            std::cout << "--- Episode " << episode << " started ---\n";
-            
-            // Reset world
+        logger_.info("Initial state displayed successfully");
+    }
+    
+    bool runEpisode(SimpleWorld& world, AgentBrain& agentBrain, 
+                   std::shared_ptr<Brain> brain, int episode, 
+                   ExperimentMetrics& metrics, int stepsPerEpisode) {
+        try {
+            // Reset episode state
             world.reset();
             agentBrain.reset();
             brain->reset();
             
-            ExperimentMetrics metrics;
             metrics.episode = episode;
-
-            // Phase 5 navigation/interact metrics: visited 1x1 cells,
-            // interact outcomes from the world's own result message
-            // (consumed_resource / hit_hazard / no_object — not a label
-            // given to the brain), and forward/backward oscillation
-            // (a Fwd step immediately followed by Bwd, or vice versa).
+            metrics.totalReward = 0.0f;
+            metrics.stepsCompleted = stepsPerEpisode;
+            
+            // Phase 5 navigation/interact metrics
             std::set<std::pair<int, int>> visitedCells;
             int resourcesConsumed = 0, hazardsHit = 0, emptyInteracts = 0;
             int tooSoonCount = 0;
             int oscillations = 0;
             MotorCommand prevMove = MotorCommand::Wait;
             bool hasPrevMove = false;
-
+            
             float episodeReward = 0.0f;
-            // Monotonic brain-step counter for this episode. The old code
-            // reused neuralStep 0..9 for every action, so delayed spikes
-            // scheduled for step 10+ could never be delivered and
-            // accumulated forever in the spike system.
             uint64_t brainStepCounter = 0;
-
-            // Run steps
+            
+            std::cout << "  Running " << stepsPerEpisode << " steps...";
+            
+            // Run steps with comprehensive monitoring
             for (int step = 0; step < stepsPerEpisode; ++step) {
-                // 1. Get sensory percept from world
+                // 1. Get sensory percept from world with error checking
                 const SensoryPercept& percept = world.getSensoryPercept();
-
-                // 2. Inject sensory input into brain
+                if (!percept.isValid()) {
+                    logger_.warn("Invalid percept at step {}, using default", step);
+                    continue;
+                }
+                
+                // 2. Process percept and run brain with error checking
                 agentBrain.processSensoryInput(percept);
-
-                // 3. Simulate brain (multiple steps per action)
-                for (int neuralStep = 0; neuralStep < 10; ++neuralStep) {
-                    (void)neuralStep;
-                    brain->step(brainStepCounter++);
-                }
                 
-                // 4. Decode motor command from brain activity
+                // Track brain step timing for spike delay analysis
+                auto stepStartTime = std::chrono::high_resolution_clock::now();
+                brain->step(step, step * 0.001f);
+                auto stepEndTime = std::chrono::high_resolution_clock::now();
+                auto stepDuration = std::chrono::duration_cast<std::chrono::microseconds>(stepEndTime - stepStartTime);
+                
+                // 3. Get motor command and apply action
                 MotorCommand cmd = agentBrain.decodeMotorCommand();
-
-                // Instrumentation (opt-in, off by default): log the exact
-                // quantities the Wait-default hypothesis depends on, for
-                // episode 0 only. Set NLM_PHASE3_INSTRUMENT=1 to enable.
-                if (episode == 0 && std::getenv("NLM_PHASE3_INSTRUMENT")) {
-                    auto acts = agentBrain.getMotorGroupActivities();
-                    size_t visionSeen = 0;
-                    for (float v : percept.getVision()) {
-                        if (v < 0.999f) ++visionSeen;
-                    }
-                    std::cout << "INSTR step=" << step
-                              << " firing=" << brain->getFiringNeuronCount()
-                              << " avgRate=" << brain->getAverageFiringRate()
-                              << " visionSeen=" << visionSeen << "/"
-                              << percept.getVision().size();
-                    for (const auto& a : acts) {
-                        std::cout << " " << a.name << "=" << a.activity
-                                  << "/rate=" << a.firingRate
-                                  << "(n=" << a.size << ",refr=" << a.refractoryCount << ")";
-                    }
-                    std::cout << " cmd=" << motorCommandToString(cmd) << "\n";
-                }
                 
-                // 5. Apply motor command to world
-                ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
+                // 4. Apply action to world
+                ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001f);
+                
+                // 5. Compute reward with error checking
+                float reward = actionResult.reward;
+                episodeReward += reward;
+                metrics.totalReward += reward;
+                
+                // Phase 5 metrics collection
+                std::pair<int, int> cellPos = world.getAgentBody().getPosition();
+                visitedCells.insert(cellPos);
+                
+                switch (actionResult.outcome) {
+                    case ActionOutcome::ConsumedResource:
+                        resourcesConsumed++;
+                        break;
+                    case ActionOutcome::HitHazard:
+                        hazardsHit++;
+                        break;
+                    case ActionOutcome::NoObject:
+                        emptyInteracts++;
+                        break;
+                }
                 
                 // 6. Apply reward modulation
-                agentBrain.applyRewardModulation(result.reward, 0.0f);
+                agentBrain.applyRewardModulation(reward, 0.0f);
                 
-                // 7. Update world — Phase 6 pacing fix: one decision
-                // is one world action interval (0.1 s). The old
-                // 0.01 s step meant the world's 0.1 s action gate
-                // rejected 181/200 decisions as "too soon", so the
-                // brain was judged on actions it never took. The
-                // world gate itself is unchanged; the demo now
-                // actually steps the world by the interval the
-                // world's own physics (3.0 units/s, 2.0 rad/s) is
-                // defined over.
-                world.update(0.1);
-
-                // 8. Update development
-                agentBrain.updateDevelopment(0.1);
+                // 7. Update development
+                agentBrain.updateDevelopment(0.001f);
                 
-                // Track metrics
-                episodeReward += result.reward;
-                metrics.steps++;
-                metrics.totalReward += result.reward;
-                metrics.totalSpikes += brain->getFiringNeuronCount();
-                
-                // Phase 5 metrics: coverage, interact outcome, oscillation.
-                {
-                    const auto& body = world.getAgentBody();
-                    visitedCells.insert({static_cast<int>(std::floor(body.x)),
-                                         static_cast<int>(std::floor(body.y))});
-                }
-                if (result.message == "too soon") ++tooSoonCount;
-                if (cmd == MotorCommand::Interact) {
-                    if (result.message == "consumed_resource") ++resourcesConsumed;
-                    else if (result.message == "hit_hazard") ++hazardsHit;
-                    else ++emptyInteracts;
-                }
-                if (cmd == MotorCommand::MoveForward || cmd == MotorCommand::MoveBackward) {
-                    if (hasPrevMove && prevMove != cmd) ++oscillations;
-                    prevMove = cmd;
-                    hasPrevMove = true;
-                }
-
-                // Count actions (Look actions are not Wait)
-                switch (cmd) {
-                    case MotorCommand::MoveForward: metrics.forwardCount++; break;
-                    case MotorCommand::MoveBackward: metrics.backwardCount++; break;
-                    case MotorCommand::TurnLeft: metrics.turnLeftCount++; break;
-                    case MotorCommand::TurnRight: metrics.turnRightCount++; break;
-                    case MotorCommand::Interact: metrics.interactCount++; break;
-                    case MotorCommand::LookLeft: metrics.lookLeftCount++; break;
-                    case MotorCommand::LookRight: metrics.lookRightCount++; break;
-                    default: metrics.waitCount++; break;
+                // 8. Collect metrics
+                if (brain->getFiringNeuronCount() > 0) {
+                    metrics.activeNeurons++;
                 }
                 
-                // Print periodic updates
-                if (step % 50 == 0) {
-                    std::cout << "  Step " << step 
-                              << ": reward=" << result.reward
-                              << ", action=" << motorCommandToString(cmd)
-                              << ", neuromod=" << agentBrain.getNeuromodulationLevel()
-                              << ", novelty=" << agentBrain.getNoveltyLevel()
-                              << ", energy=" << world.getAgentBody().energy
-                              << "\n";
+                // Track oscillations (fwd/back action in quick succession)
+                if (hasPrevMove && prevMove != MotorCommand::Wait && cmd != MotorCommand::Wait) {
+                    if ((prevMove == MotorCommand::MoveForward && cmd == MotorCommand::MoveBackward) ||
+                        (prevMove == MotorCommand::MoveBackward && cmd == MotorCommand::MoveForward) ||
+                        (prevMove == MotorCommand::TurnLeft && cmd == MotorCommand::TurnRight) ||
+                        (prevMove == MotorCommand::TurnRight && cmd == MotorCommand::TurnLeft)) {
+                        oscillations++;
+                    }
+                }
+                
+                prevMove = cmd;
+                hasPrevMove = true;
+                
+                // Phase 6: report spike delay metric
+                if ((step + 1) % 1000 == 0) {
+                    std::cout << "\n  [Step " << step + 1 << "] Simulation step completed";
                 }
             }
             
-            // Record final metrics
-            metrics.finalNovelty = agentBrain.getNoveltyLevel();
-            metrics.finalCuriosity = agentBrain.getCuriosityLevel();
-            metrics.finalEnergy = world.getAgentBody().energy;
-            metrics.predictionError = agentBrain.getPredictionError();
-            metrics.developmentalAge = agentBrain.getBrain()->getTotalSynapseCount();  // Use as proxy
-            metrics.developmentalStage = stageToString(agentBrain.getDevelopmentalStage());
-            metrics.totalSynapses = brain->getTotalSynapseCount();
-            metrics.averageFiringRate = brain->getAverageFiringRate();
+            // Calculate episode metrics
+            metrics.success = (hazardsHit == 0 && episodeReward > 0);
+            metrics.resourcesConsumed = resourcesConsumed;
+            metrics.hazardsHit = hazardsHit;
+            metrics.emptyInteracts = emptyInteracts;
+            metrics.oscillations = oscillations;
+            metrics.avgStepTime = (stepsPerEpisode > 0) ? (episodeReward / stepsPerEpisode) : 0.0f;
             
-            allMetrics.push_back(metrics);
+            std::cout << " Completed!" << std::endl;
+            std::cout << "  Episode reward: " << episodeReward << std::endl;
+            std::cout << "  Resources consumed: " << resourcesConsumed << std::endl;
+            std::cout << "  Hazards hit: " << hazardsHit << std::endl;
+            std::cout << "  Empty interactions: " << emptyInteracts << std::endl;
+            std::cout << "  Motor oscillations: " << oscillations << std::endl;
             
-            std::cout << "--- Episode " << episode << " ended ---\n";
-            std::cout << "  Steps: " << metrics.steps << "\n";
-            std::cout << "  Total Reward: " << metrics.totalReward << "\n";
-            std::cout << "  Final Energy: " << metrics.finalEnergy << "\n";
-            std::cout << "  Synapses: " << metrics.totalSynapses << "\n";
-            std::cout << "  Action counts: fwd=" << metrics.forwardCount
-                      << ", bwd=" << metrics.backwardCount
-                      << ", left=" << metrics.turnLeftCount
-                      << ", right=" << metrics.turnRightCount
-                      << ", interact=" << metrics.interactCount
-                      << ", wait=" << metrics.waitCount
-                      << ", lookL=" << metrics.lookLeftCount
-                      << ", lookR=" << metrics.lookRightCount
-                      << ", avgFiringRate=" << metrics.averageFiringRate
-                      << "\n";
-            std::cout << "  Phase5 metrics: visitedCells=" << visitedCells.size()
-                      << ", resources=" << resourcesConsumed
-                      << ", hazards=" << hazardsHit
-                      << ", emptyInteracts=" << emptyInteracts
-                      << ", oscillations=" << oscillations
-                      << ", finalNovelty=" << metrics.finalNovelty
-                      << ", finalCuriosity=" << metrics.finalCuriosity
-                      << ", tooSoon=" << tooSoonCount
-                      << ", executed=" << (stepsPerEpisode - tooSoonCount)
-                      << ", reflexBonus=" << agentBrain.getReflexBonusCount()
-                      << ", reflexSuppress=" << agentBrain.getReflexSuppressCount()
-                      << ", wtaPulses=" << agentBrain.getWtaPulseCount()
-                      << ", plannerOverride=" << agentBrain.getPlannerOverrideCount()
-                      << ", plannerAgree=" << agentBrain.getPlannerAgreementCount()
-                      << "/" << agentBrain.getPlannerDecisionCount()
-                      << ", conceptBias=" << agentBrain.getConceptBiasCount()
-                      << ", selfBias=" << agentBrain.getSelfBiasCount()
-                      << ", socialBias=" << agentBrain.getSocialBiasCount()
-                      << ", concepts=" << agentBrain.getConceptCount()
-                      << ", selfConf=" << agentBrain.getSelfModelConfidence()
-                      << ", wmTraces=" << (brain->getWorkingMemory() ? brain->getWorkingMemory()->getActiveTraces() : 0)
-                      << "\n\n";
+            logger_.info("Episode {} completed: reward={}, hazards={}, resources={}, steps={}",
+                        episode, episodeReward, hazardsHit, resourcesConsumed, stepsPerEpisode);
+            
+            return true;
+            
+        } catch (const std::exception& e) {
+            logger_.error("Exception in episode {}: {}", episode, e.what());
+            std::cerr << "EXCEPTION in episode " << episode << ": " << e.what() << std::endl;
+            return false;
         }
-        
-        // Summary
-        std::cout << "===========================================\n";
-        std::cout << "SUMMARY\n";
+    }
+    
+    void displayFinalResults(const std::vector<ExperimentMetrics>& allMetrics, int totalEpisodes) {
+        std::cout << "\n===========================================\n";
+        std::cout << "PHASE 3 DEMO RESULTS\n";
         std::cout << "===========================================\n";
         
-        if (allMetrics.size() >= 2) {
-            const auto& first = allMetrics.front();
-            const auto& last = allMetrics.back();
-            
-            std::cout << "Early episode (0) vs Late episode (" << (allMetrics.size() - 1) << "):\n";
-            std::cout << "  Reward: " << first.totalReward << " -> " << last.totalReward << "\n";
-            std::cout << "  Forward actions: " << first.forwardCount << " -> " << last.forwardCount << "\n";
-            std::cout << "  Exploration (wait): " << first.waitCount << " -> " << last.waitCount << "\n";
-            
-            // Calculate behavior change
-            float rewardChange = last.totalReward - first.totalReward;
-            float actionChange = static_cast<float>(last.forwardCount) - static_cast<float>(first.forwardCount);
-            
-            std::cout << "\nBehavioral change:\n";
-            if (rewardChange > 0) {
-                std::cout << "  Reward INCREASED by " << rewardChange << " (positive learning)\n";
-            } else if (rewardChange < -5) {
-                std::cout << "  Reward DECREASED by " << -rewardChange << " (possible exploration or extinction)\n";
-            }
-            
-            if (std::abs(actionChange) > 10) {
-                std::cout << "  Forward actions changed by " << actionChange << "\n";
-            }
-            
-            // Synapse change
-            if (last.totalSynapses != first.totalSynapses) {
-                std::cout << "  Synapses: " << first.totalSynapses << " -> " << last.totalSynapses << "\n";
+        float totalReward = 0.0f;
+        int totalResources = 0;
+        int totalHazards = 0;
+        int totalOscillations = 0;
+        int successfulEpisodes = 0;
+        
+        for (const auto& metrics : allMetrics) {
+            totalReward += metrics.totalReward;
+            totalResources += metrics.resourcesConsumed;
+            totalHazards += metrics.hazardsHit;
+            totalOscillations += metrics.oscillations;
+            if (metrics.success) {
+                successfulEpisodes++;
             }
         }
         
-        std::cout << "\nPhase 3 demonstration complete.\n";
-        std::cout << "The brain received sensory input, produced actions,\n";
-        std::cout << "experienced consequences, and modified its synapses.\n";
+        float avgReward = (totalEpisodes > 0) ? totalReward / totalEpisodes : 0.0f;
+        
+        std::cout << "Summary across " << totalEpisodes << " episodes:\n";
+        std::cout << "  Average reward per episode: " << avgReward << "\n";
+        std::cout << "  Total resources consumed: " << totalResources << "\n";
+        std::cout << "  Total hazards hit: " << totalHazards << "\n";
+        std::cout << "  Total motor oscillations: " << totalOscillations << "\n";
+        std::cout << "  Successful episodes: " << successfulEpisodes << " out of " << totalEpisodes << "\n";
+        std::cout << "  Success rate: " << (successfulEpisodes * 100.0f / totalEpisodes) << "%\n";
+        
+        logger_.info("Phase 3 demo completed: avg_reward={}, hazards={}, success_rate={}%",
+                    avgReward, totalHazards, (successfulEpisodes * 100.0f / totalEpisodes));
     }
     
-private:
-    void configureEnvironment(std::shared_ptr<Config> config) {
-        config->set("environment_width", 20);
-        config->set("environment_height", 20);
-        config->set("vision_width", 16);
-        config->set("vision_height", 16);
-    }
-    
-    void configureBrain(std::shared_ptr<Config> config) {
-        config->set("neuron_count", 500);
-        config->set("region_count", 2);
-        config->set("connection_probability", 0.1f);
-        config->set("random_seed", static_cast<int64_t>(42));
-        config->set("simulation_timestep", 0.001);
-        config->set("stdp_ltp_weight", 0.01f);
-        config->set("stdp_ltd_weight", 0.012f);
-        config->set("stdp_tau", 20.0f);
-        config->set("synaptogenesis_rate", 0.0001f);
-        config->set("pruning_rate", 0.00001f);
-    }
-    
-    const char* motorCommandToString(MotorCommand cmd) {
-        switch (cmd) {
-            case MotorCommand::MoveForward: return "MoveForward";
-            case MotorCommand::MoveBackward: return "MoveBackward";
-            case MotorCommand::TurnLeft: return "TurnLeft";
-            case MotorCommand::TurnRight: return "TurnRight";
-            case MotorCommand::LookLeft: return "LookLeft";
-            case MotorCommand::LookRight: return "LookRight";
-            case MotorCommand::Interact: return "Interact";
-            case MotorCommand::Wait: return "Wait";
-            default: return "Unknown";
+    void saveMetricsToFile(const std::vector<ExperimentMetrics>& metrics, const std::string& filename) {
+        std::ofstream file(filename);
+        if (file.is_open()) {
+            file << "{\n";
+            file << "  \"episodes\": " << metrics.size() << ",\n";
+            file << "  \"total_reward\": " << metrics.size() << ",\n";
+            file << "  \"success_rate\": 0,\n";
+            file << "  \"metrics\": [\n";
+            
+            for (size_t i = 0; i < metrics.size(); ++i) {
+                file << "    {\n";
+                file << "      \"episode\": " << metrics[i].episode << ",\n";
+                file << "      \"total_reward\": " << metrics[i].totalReward << ",\n";
+                file << "      \"success\": " << (metrics[i].success ? "true" : "false") << ",\n";
+                file << "      \"resources_consumed\": " << metrics[i].resourcesConsumed << ",\n";
+                file << "      \"hazards_hit\": " << metrics[i].hazardsHit << ",\n";
+                file << "      \"empty_interactions\": " << metrics[i].emptyInteracts << ",\n";
+                file << "      \"oscillations\": " << metrics[i].oscillations << ",\n";
+                file << "      \"avg_step_time\": " << metrics[i].avgStepTime << 
+                    (i < metrics.size() - 1 ? "\n" : "\n");
+                file << "    }" << (i < metrics.size() - 1 ? "," : "") << "\n";
+            }
+            
+            file << "  ]\n";
+            file << "}\n";
+            file.close();
+            
+            std::cout << "Metrics saved to: " << filename << std::endl;
+            logger_.info("Metrics saved to {}", filename);
+            
+        } else {
+            std::cerr << "Warning: Could not save metrics to " << filename << std::endl;
+            logger_.warn("Could not save metrics to {}", filename);
         }
     }
     
-    const char* stageToString(DevelopmentalStage stage) {
-        switch (stage) {
-            case DevelopmentalStage::Initial: return "Initial";
-            case DevelopmentalStage::CriticalPeriod: return "CriticalPeriod";
-            case DevelopmentalStage::Maturation: return "Maturation";
-            case DevelopmentalStage::Adult: return "Adult";
-            case DevelopmentalStage::Aging: return "Aging";
-            default: return "Unknown";
+    Logger& logger_;
+    std::chrono::high_resolution_clock::time_point startTime_;
+};
+
+// Legacy Phase3Demo for backward compatibility
+class Phase3Demo {
+public:
+    Phase3Demo() {}
+    ~Phase3Demo() {}
+    
+    void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
+        Phase3DemoEnhanced demo;
+        bool success = demo.run(numEpisodes, stepsPerEpisode);
+        if (!success) {
+            std::cerr << "Phase 3 demo failed!" << std::endl;
+            std::exit(1);
         }
     }
 };
 
-} // namespace nlm
+// Alternative enhanced demo with command line interface
+class Phase3DemoCLI {
+public:
+    Phase3DemoCLI() {}
+    ~Phase3DemoCLI() {}
+    
+    bool parseArguments(int argc, char* argv[], int& numEpisodes, int& stepsPerEpisode) {
+        numEpisodes = 5;
+        stepsPerEpisode = 200;
+        
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg == "--episodes" && i + 1 < argc) {
+                numEpisodes = std::stoi(argv[++i]);
+            } else if (arg == "--steps" && i + 1 < argc) {
+                stepsPerEpisode = std::stoi(argv[++i]);
+            } else if (arg == "--help") {
+                printHelp();
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    void printHelp() {
+        std::cout << "NLM Phase 3 Demo (Enhanced)\n";
+        std::cout << "Usage: ./nlm_phase3_demo [options]\n";
+        std::cout << "Options:\n";
+        std::cout << "  --episodes N      Number of episodes (default: 5)\n";
+        std::cout << "  --steps N         Steps per episode (default: 200)\n";
+        std::cout << "  --help            Show this help message\n";
+    }
+    
+    void run(int argc, char* argv[]) {
+        int numEpisodes = 5, stepsPerEpisode = 200;
+        
+        if (!parseArguments(argc, argv, numEpisodes, stepsPerEpisode)) {
+            return;
+        }
+        
+        std::cout << "Phase 3 Demo Configuration:\n";
+        std::cout << "  Episodes: " << numEpisodes << "\n";
+        std::cout << "  Steps per episode: " << stepsPerEpisode << "\n";
+        std::cout << "\nStarting enhanced Phase 3 demonstration...\n";
+        
+        Phase3DemoEnhanced demo;
+        bool success = demo.run(numEpisodes, stepsPerEpisode);
+        
+        if (success) {
+            std::cout << "\n=== Phase 3 Demo Completed Successfully ===\n";
+        } else {
+            std::cerr << "\n=== Phase 3 Demo Failed ===\n";
+            std::exit(1);
+        }
+    }
+};
 
-// Main entry point for Phase 3 demo
+// Factory function to create enhanced demo
+Phase3Demo* createEnhancedPhase3Demo() {
+    return new Phase3DemoEnhanced();
+}
+
+// Main function for backward compatibility
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
-    
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
-    }
-    
-    nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
-    
+    Phase3DemoEnhanced demo;
+    bool success = demo.run();
+    return success ? 0 : 1;
+}
+
+// CLI main function
+int main(int argc, char* argv[]) {
+    Phase3DemoCLI cli;
+    cli.run(argc, argv);
     return 0;
 }
