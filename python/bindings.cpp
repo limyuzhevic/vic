@@ -144,31 +144,40 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
-            std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
-        }, py::arg("args"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+    .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+              "Load configuration from a JSON/YAML file (auto-detects format)")
+         .def("loadFromJSON", &Config::loadFromJSON, py::arg("filepath"),
+              "Load configuration from a JSON file")
+         .def("loadFromYAML", &Config::loadFromYAML, py::arg("filepath"),
+              "Load configuration from a YAML file")
+         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+              "Save configuration to a JSON/YAML file (auto-detects format)")
+         .def("saveToJSON", &Config::saveToJSON, py::arg("filepath"),
+              "Save configuration to a JSON file")
+         .def("saveToYAML", &Config::saveToYAML, py::arg("filepath"),
+              "Save configuration to a YAML file")
+         .def("toJSON", &Config::toJSON,
+              "Convert configuration to JSON string")
+         .def("fromJSON", &Config::fromJSON, py::arg("jsonString"),
+              "Load configuration from JSON string")
+         .def("toYAML", &Config::toYAML,
+              "Convert configuration to YAML string")
+         .def("fromYAML", &Config::fromYAML, py::arg("yamlString"),
+              "Load configuration from YAML string")
+         .def("validate", &Config::validate,
+              "Validate configuration and return list of errors")
+         .def("isValid", &Config::isValid,
+              "Check if configuration is valid")
+         .def("getMissingKeys", &Config::getMissingKeys, py::arg("requiredKeys"),
+              "Get required keys that are missing from configuration")
+         .def("getStats", &Config::getStats,
+              "Get configuration statistics")
+         .def("getHelp", &Config::getHelp,
+              "Get configuration help documentation")
+         .def("getAllKeys", &Config::getAllKeys,
+              "Get all available configuration keys")
+         .def("getExample", &Config::getExample,
+              "Get example configuration string")
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

@@ -6,23 +6,9 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <filesystem>
 
 namespace nlm {
-
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
 
 // Configuration source
 enum class ConfigSource {
@@ -68,10 +54,10 @@ public:
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +81,56 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // ==================== NEW: JSON/YAML SUPPORT ====================
+    
+    // Load from JSON file
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML file  
+    bool loadFromYAML(const std::string& filepath);
+    
+    // Save to JSON file
+    bool saveToJSON(const std::string& filepath) const;
+    
+    // Save to YAML file
+    bool saveToYAML(const std::string& filepath) const;
+    
+    // Get configuration as JSON string
+    std::string toJSON() const;
+    
+    // Set configuration from JSON string
+    bool fromJSON(const std::string& jsonString);
+    
+    // Get configuration as YAML string
+    std::string toYAML() const;
+    
+    // Set configuration from YAML string
+    bool fromYAML(const std::string& yamlString);
+    
+    // ==================== VALIDATION AND DEBUGGING ====================
+    
+    // Validate configuration
+    std::vector<std::string> validate() const;
+    
+    // Check if configuration is valid
+    bool isValid() const;
+    
+    // Get required keys that are missing
+    std::vector<std::string> getMissingKeys(const std::vector<std::string>& requiredKeys) const;
+    
+    // Get configuration statistics
+    std::string getStats() const;
+    
+    // ==================== HELP AND UTILITIES ====================
+    
+    // Print configuration help
+    static std::string getHelp();
+    
+    // Get all available configuration keys
+    static std::vector<std::string> getAllKeys();
+    
+    // Get example configuration
+    static std::string getExample();
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -103,5 +139,3 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
-
-} // namespace nlm

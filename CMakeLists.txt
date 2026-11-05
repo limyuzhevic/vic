@@ -21,6 +21,10 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Find JSON and YAML dependencies
+find_package(nlohmann_json 3.2.0 REQUIRED)
+find_package(yaml-cpp 0.7.0 REQUIRED)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
