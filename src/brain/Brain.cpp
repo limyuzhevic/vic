@@ -605,8 +605,24 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                 }
             }
             
+            // Store working memory content in episode (experience encoding)
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                std::vector<float> wmPattern = pImpl->workingMemory->retrieve();
+                std::copy(wmPattern.begin(), std::min(wmPattern.end(), std::vector<float>(episode.sensoryState).begin() + 10), 
+                         episode.sensoryState.begin());
+                episode.sensoryState.resize(std::min(wmPattern.size(), episode.sensoryState.size()));
+            }
+            
             // Store reward in episode
             episode.reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Store attention winners in episode (important processing)
+            if (pImpl->attention && !pImpl->attention->getWinners().empty()) {
+                for (NeuronId winner : pImpl->attention->getWinners()) {
+                    episode.activeNeurons.push_back(winner);
+                    episode.neuronActivations.push_back(1.0f);  // High activation for attended neurons
+                }
+            }
             
             pImpl->episodicMemory->storeEpisode(episode);
         }
@@ -616,9 +632,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        if (pImpl->predictionSystem) {
+            // Initialize prediction with current sensory state
+            // The prediction system learns patterns from sensory input
+            if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                std::vector<float> currentPattern = pImpl->workingMemory->retrieve();
+                // The prediction system could update its internal model
+                // with the current sensory pattern for better prediction accuracy
+                // This is a placeholder implementation - full prediction system
+                // integration would involve more sophisticated pattern matching
+                // and temporal sequence prediction
+                float predictionError = pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f;
+                // Store prediction error in working memory for attention
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons.empty() ? NeuronId() : pImpl->sensoryNeurons[0]->getId(), predictionError);
+                }
+            }
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // Update attention system
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -627,12 +660,81 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
+        
+        // Also incorporate concept formation into attention
+        if (pImpl->conceptFormation && pImpl->conceptFormation->getConceptCount() > 0) {
+            std::vector<float> conceptPattern;
+            // Get the best concept pattern for attention biasing
+            float bestAvgReward = -1.0f;
+            
+            for (size_t i = 1; i <= pImpl->conceptFormation->getConceptCount(); ++i) {
+                const auto* concept = pImpl->conceptFormation->getConcept(i);
+                if (concept && !concept->instances.empty()) {
+                    float avgReward = 0.0f;
+                    for (const auto& inst : concept->instances) avgReward += inst.avgReward;
+                    avgReward /= static_cast<float>(concept->instances.size());
+                    
+                    if (avgReward > bestAvgReward) {
+                        bestAvgReward = avgReward;
+                        conceptPattern = concept->pattern;
+                    }
+                }
+            }
+            
+            if (!conceptPattern.empty() && pImpl->workingMemory) {
+                // Apply top-down bias from concepts to attention
+                for (size_t i = 0; i < std::min(conceptPattern.size(), pImpl->workingMemory->getMemoryNeurons().size()); ++i) {
+                    if (conceptPattern[i] > 0.7f) {  // Strong concept matches
+                        NeuronId neuron = pImpl->workingMemory->getMemoryNeurons()[i];
+                        pImpl->attention->applyTopDownBias(neuron, conceptPattern[i] * bestAvgReward);
+                    }
+                }
+            }
+        }
     }
     
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    // Update neural planner based on formed concepts
+    if (pImpl->planner && pImpl->conceptFormation && pImpl->conceptFormation->getConceptCount() > 0) {
+        // Get concept patterns for planning
+        // The planner evaluates action quality based on learned preferences from concepts
+        // This allows planning to leverage the pattern associations formed during experience
+        
+        // Get the best concept for planning (highest average reward)
+        std::vector<float> bestPattern;
+        float bestAvgReward = -1.0f;
+        
+        for (size_t i = 1; i <= pImpl->conceptFormation->getConceptCount(); ++i) {
+            const auto* concept = pImpl->conceptFormation->getConcept(i);
+            if (concept && !concept->instances.empty()) {
+                float avgReward = 0.0f;
+                for (const auto& inst : concept->instances) avgReward += inst.avgReward;
+                avgReward /= static_cast<float>(concept->instances.size());
+                
+                if (avgReward > bestAvgReward) {
+                    bestAvgReward = avgReward;
+                    bestPattern = concept->pattern;
+                }
+            }
+        }
+        
+        if (!bestPattern.empty()) {
+            // Plan actions based on the highest-reward concept
+            pImpl->planner->planActions(bestPattern);
+            
+            // Store planned action quality for agent integration
+            // The agent's planner overlay will use this planned action quality
+            // to bias the motor decoding, allowing for intelligent action selection
+            if (!bestPattern.empty()) {
+                for (ActionType action : {ActionType::MoveForward, ActionType::MoveBackward,
+                                        ActionType::TurnLeft, ActionType::TurnRight,
+                                        ActionType::Interact, ActionType::Wait}) {
+                    // Initialize action quality if not set
+                    if (pImpl->planner->getActionQuality(action) == 0.0f) {
+                        pImpl->planner->setActionQuality(action, bestAvgReward * (action == ActionType::Interact ? 1.2f : 1.0f));
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
