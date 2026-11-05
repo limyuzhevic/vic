@@ -1,16 +1,24 @@
 #include "Config.hpp"
+#include "constants.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <unordered_map>
+#include <vector>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, std::string> typeHints;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with basic type validation
+    initializeTypeHints();
+}
 
 Config::~Config() = default;
 
@@ -18,46 +26,122 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+void Config::initializeTypeHints() {
+    // Register common configuration keys with their types for validation
+    pImpl->typeHints = {
+        {"neuron_count", "int64"},
+        {"region_count", "int64"},
+        {"connection_probability", "float"},
+        {"random_seed", "int64"},
+        {"simulation_timestep", "double"},
+        {"stdp_ltp_weight", "float"},
+        {"stdp_ltd_weight", "float"},
+        {"stdp_tau", "float"},
+        {"synaptogenesis_rate", "float"},
+        {"pruning_rate", "float"},
+        {"environment_width", "float"},
+        {"environment_height", "float"},
+        {"vision_width", "int"},
+        {"vision_height", "int"},
+        {"turn_speed", "float"},
+        {"move_speed", "float"},
+        {"agent_energy_max", "float"},
+        {"agent_energy_decay_rate", "float"},
+        {"working_memory_size", "int"},
+        {"episodic_memory_capacity", "int"},
+        {"planning_horizon", "int"},
+        {"attention_selectivity", "float"},
+        {"enable_plasticity", "bool"},
+        {"enable_curiosity", "bool"},
+        {"enable_reward_modulation", "bool"},
+        {"enable_development", "bool"},
+    };
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
+    size_t lineNum = 0;
     std::string line;
+    size_t fileSize = std::filesystem::file_size(filepath);
+    
+    if (fileSize > constants::MAX_FILE_SIZE) {
+        NLM_LOG_ERROR("Config file too large: " + std::to_string(fileSize) + " bytes (max " + 
+                     std::to_string(constants::MAX_FILE_SIZE) + " bytes)");
+        return false;
+    }
+    
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        ++lineNum;
         line = trim(line);
+        
+        // Skip empty lines and comments
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Check for syntax errors
+        if (line.find('=') == std::string::npos) {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": expected 'key = value' format, got: " + line);
+            continue;
+        }
+        
+        // Parse key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        if (key.empty() || value.empty()) {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": empty key or value");
+            continue;
+        }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Validate value format before setting
+        if (!validateValue(key, value)) {
+            NLM_LOG_WARNING("Invalid config value for key '" + key + "' on line " + std::to_string(lineNum));
+            continue;
+        }
+        
+        try {
             set(key, value, ConfigSource::File);
+            NLM_LOG_DEBUG("Loaded config: " + key + " = " + value);
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Error setting config key '" + key + "': " + e.what());
         }
     }
     
+    size_t validEntries = 0;
+    for (const auto& entry : pImpl->entries) {
+        if (!entry.key.empty()) validEntries++;
+    }
+    
+    if (validEntries == 0) {
+        NLM_LOG_WARNING("No valid configuration entries found in file: " + filepath);
+        return false;
+    }
+    
+    NLM_LOG_INFO("Loaded " + std::to_string(validEntries) + " configuration entries from: " + filepath);
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    size_t validArgs = 0;
+    size_t totalArgs = 0;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        totalArgs++;
         
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
@@ -65,30 +149,98 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key format
+                if (!validateKeyFormat(key)) {
+                    NLM_LOG_WARNING("Invalid command line key format: " + key);
+                    continue;
+                }
+                
+                if (!validateValue(key, value)) {
+                    NLM_LOG_WARNING("Invalid command line value for key '" + key + "': " + value);
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+                validArgs++;
+                NLM_LOG_DEBUG("Command line arg: " + key + " = " + value);
+            } else {
+                NLM_LOG_WARNING("Missing '=' in command line argument: " + arg);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key format
+            if (!validateKeyFormat(key)) {
+                NLM_LOG_WARNING("Invalid command line key format: " + key);
+                continue;
+            }
+            
+            if (!validateValue(key, value)) {
+                NLM_LOG_WARNING("Invalid command line value for key '" + key + "': " + value);
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+            validArgs++;
+            NLM_LOG_DEBUG("Command line arg: " + key + " = " + value);
+        } else {
+            NLM_LOG_WARNING("Unknown command line argument: " + arg);
         }
     }
+    
+    if (validArgs < totalArgs) {
+        NLM_LOG_INFO(std::to_string(totalArgs - validArgs) + " invalid command line arguments ignored");
+    }
+    
     return true;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to save config file: " + filepath);
         return false;
     }
     
+    // Write header comment
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM on " + getCurrentTimestamp() + "\n";
+    file << "# This is a simple key=value format for Phase 1 compatibility.\n\n";
+    
+    // Write configuration entries
+    size_t entryCount = 0;
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format the value appropriately
+        std::string formattedValue;
+        if (std::holds_alternative<std::string>(entry.value)) {
+            formattedValue = "\"" + std::get<std::string>(entry.value) + "\"";
+        } else if (std::holds_alternative<int>(entry.value)) {
+            formattedValue = std::to_string(std::get<int>(entry.value));
+        } else if (std::holds_alternative<int64_t>(entry.value)) {
+            formattedValue = std::to_string(std::get<int64_t>(entry.value));
+        } else if (std::holds_alternative<float>(entry.value)) {
+            formattedValue = std::to_string(std::get<float>(entry.value));
+        } else if (std::holds_alternative<double>(entry.value)) {
+            formattedValue = std::to_string(std::get<double>(entry.value));
+        } else if (std::holds_alternative<bool>(entry.value)) {
+            formattedValue = std::get<bool>(entry.value) ? "true" : "false";
+        } else {
+            formattedValue = "UNKNOWN";
+        }
+        
+        file << entry.key << " = " << formattedValue << "\n\n";
+        entryCount++;
     }
     
+    file << "# End of configuration file\n";
+    
+    NLM_LOG_INFO("Saved " + std::to_string(entryCount) + " configuration entries to: " + filepath);
     return true;
 }
 
@@ -236,3 +388,100 @@ template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
+
+// Helper function implementations
+
+bool validateKeyFormat(const std::string& key) {
+    // Keys should match pattern: [a-z][a-z_]*
+    if (key.empty()) return false;
+    if (!std::isalpha(key[0]) && key[0] != '_') return false;
+    
+    for (char c : key) {
+        if (!std::isalnum(c) && c != '_') {
+            return false;
+        }
+    }
+    
+    if (key.size() > 100) {
+        return false;  // Prevent excessively long keys
+    }
+    
+    return true;
+}
+
+bool validateValue(const std::string& key, const std::string& value) {
+    // Basic format validation
+    if (value.empty()) return false;
+    if (value.size() > 1000) return false;  // Prevent excessively long values
+    
+    // Type-specific validation based on key hints
+    auto it = pImpl->typeHints.find(key);
+    if (it != pImpl->typeHints.end()) {
+        const std::string& typeHint = it->second;
+        
+        if (typeHint == "int" || typeHint == "int64") {
+            // Check if value can be converted to int
+            try {
+                if (typeHint == "int64") {
+                    size_t pos;
+                    int64_t val = std::stoll(value, &pos);
+                    if (pos != value.size()) return false;
+                    // Check range for typical neuron counts
+                    if (key == "neuron_count" && (val < constants::MIN_NEURON_COUNT || val > constants::MAX_NEURON_COUNT)) {
+                        NLM_LOG_WARNING("neuron_count out of range: " + value + " (valid: " + 
+                                     std::to_string(constants::MIN_NEURON_COUNT) + "-" + 
+                                     std::to_string(constants::MAX_NEURON_COUNT) + ")");
+                    }
+                } else {
+                    size_t pos;
+                    int val = std::stoi(value, &pos);
+                    if (pos != value.size()) return false;
+                }
+            } catch (...) {
+                return false;
+            }
+        } else if (typeHint == "float") {
+            try {
+                size_t pos;
+                float val = std::stof(value, &pos);
+                if (pos != value.size()) return false;
+                
+                // Range validation based on key
+                if (key == "connection_probability" && (val < constants::MIN_CONNECTION_PROBABILITY || val > constants::MAX_CONNECTION_PROBABILITY)) {
+                    NLM_LOG_WARNING("connection_probability out of range: " + value + 
+                                 " (valid: " + std::to_string(constants::MIN_CONNECTION_PROBABILITY) + "-" + 
+                                 std::to_string(constants::MAX_CONNECTION_PROBABILITY) + ")");
+                } else if (key == "input_injection" && (val < constants::MIN_INPUT_INJECTION || val > constants::MAX_INPUT_INJECTION)) {
+                    NLM_LOG_WARNING("input_injection out of range: " + value + 
+                                 " (valid: " + std::to_string(constants::MIN_INPUT_INJECTION) + "-" + 
+                                 std::to_string(constants::MAX_INPUT_INJECTION) + ")");
+                }
+            } catch (...) {
+                return false;
+            }
+        } else if (typeHint == "double") {
+            try {
+                size_t pos;
+                double val = std::stod(value, &pos);
+                if (pos != value.size()) return false;
+            } catch (...) {
+                return false;
+            }
+        } else if (typeHint == "bool") {
+            std::string lowerValue = toLower(value);
+            if (lowerValue != "true" && lowerValue != "false" && lowerValue != "1" && lowerValue != "0") {
+                return false;
+            }
+        }
+    }
+    
+    return true;
+}
+
+std::string getCurrentTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
