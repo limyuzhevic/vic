@@ -199,6 +199,9 @@ constexpr SynapseId INVALID_SYNAPSE_ID = SynapseId(UINT64_MAX);
 constexpr RegionId INVALID_REGION_ID = RegionId(UINT64_MAX);
 constexpr PopulationId INVALID_POPULATION_ID = PopulationId(UINT64_MAX);
 
+// Version
+constexpr const char* NLM_VERSION = "0.1.0";
+
 } // namespace nlm
 
 namespace std {

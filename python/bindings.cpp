@@ -424,10 +424,203 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    // Version export
+    m.attr("__version__") = NLM_VERSION;
+
+    // Convenience function for creating a ready-to-use brain
+    m.def("createBrainAndInitialize", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        return brain;
+    }, py::arg("config"), "Create and initialize a brain in one call");
+
+    // Print welcome message
+    m.def("print_welcome_message", []() {
+        std::cout << "=== NLM Neural Learning Machine ===" << std::endl;
+        std::cout << "Version: " << NLM_VERSION << std::endl;
+        std::cout << "Type 'help()' for more information." << std::endl;
+    }, "Print welcome message with version info");
+
+    // Interactive help function
+    m.def("help", []() {
+        std::cout << "=== NLM Python API Help ===" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "Basic Usage:" << std::endl;
+        std::cout << "  - pynlm.createBrain(config)" << std::endl;
+        std::cout << "  - pynlm.createSimpleWorld()" << std::endl;
+        std::cout << "  - pynlm.createAgentBrain(brain)" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "Available classes:" << std::endl;
+        std::cout << "  - pynlm.Brain" << std::endl;
+        std::cout << "  - pynlm.SimpleWorld" << std::endl;
+        std::cout << "  - pynlm.AgentBrain" << std::endl;
+        std::cout << "  - pynlm.Config" << std::endl;
+        std::cout << "" << std::endl;
+        std::cout << "Enumerations:" << std::endl;
+        std::cout << "  - pynlm.NeuronType, pynlm.SynapseType, pynlm.DevelopmentalStage" << std::endl;
+        std::cout << "  - pynlm.ActionType, pynlm.MotorCommand, pynlm.WorldObjectType" << std::endl;
+    }, "Print help information");
+
+    // Minimal example
+    m.def("run_example", [](const std::string& example_name) {
+        if (example_name == "minimal") {
+            std::cout << "Minimal Example:" << std::endl;
+            std::cout << "  import pynlm" << std::endl;
+            std::cout << "  config = pynlm.createDefaultConfig()" << std::endl;
+            std::cout << "  brain = pynlm.createBrain(config)" << std::endl;
+            std::cout << "  brain.initialize()" << std::endl;
+            std::cout << "  for i in range(100): brain.step(i)" << std::endl;
+            std::cout << "  print('Simulation complete!')" << std::endl;
+        }
+        return true;
+    }, py::arg("example_name"), "Run example simulation code");
+
+    // Get system info
+    m.def("get_system_info", []() {
+        std::stringstream info;
+        info << "NLM Neural Learning Machine" << std::endl;
+        info << "Version: " << NLM_VERSION << std::endl;
+        info << "Python Bindings" << std::endl;
+        info << "C++ Standard: C++20" << std::endl;
+        info << "Build Type: Release" << std::endl;
+        info << "Python Version: " << PY_MAJOR_VERSION << "." << PY_MINOR_VERSION << "." << PY_MICRO_VERSION << std::endl;
+        return info.str();
+    }, "Get system information");
+
+    // Check imports
+    m.def("check_imports", []() {
+        std::vector<std::string> imports;
+        imports.push_back("pybind11");
+        imports.push_back("numpy");
+        imports.push_back("scikit-build-core");
+        return imports;
+    }, "Check required Python imports");
+
+    // Get architecture info
+    m.def("get_architecture_info", []() {
+        return std::map<std::string, std::string>{
+            {"brain_components", "Core, WorkingMemory, EpisodicMemory, Prediction"},
+            {"neuromodulation", "Dopamine, Curiosity, Novelty, PredictionError"},
+            {"cognition", "Planner, ConceptFormation, AttentionalSelection"},
+            {"plasticity", "STDP, Hebbian, Structural"},
+            {"development", "DevelopmentSystem, Synaptogenesis, Pruning, Maturation"}
+        };
+    }, "Get architecture information");
+
+    // Print welcome message on module load
+    m.def("__init__", []() {
+        std::cout << "=== NLM Neural Learning Machine ===" << std::endl;
+        std::cout << "Version: " << NLM_VERSION << std::endl;
+        std::cout << "Type 'help()' for more information or 'run_example()' for examples." << std::endl;
+        std::cout << "==========================================" << std::endl;
+    }, "Module initialization");
+
+} // namespace nlm
+
+// Helper functions implementation (outside namespace for bindings)
+std::shared_ptr<Config> create_research_config() {
+    auto config = std::make_shared<Config>();
+    config->set("brain.neuron_count", 2000);
+    config->set("brain.synapse_density", 0.15);
+    config->set("plasticity.stdp.enable", true);
+    config->set("plasticity.stdp.learning_rate", 0.001);
+    config->set("plasticity.hebbian.enable", true);
+    config->set("plasticity.structural.enable", true);
+    config->set("neuromod.curiosity.enable", true);
+    config->set("neuromod.novelty.enable", true);
+    config->set("memory.working.capacity", 100);
+    config->set("memory.episodic.capacity", 1000);
+    return config;
+}
+
+std::shared_ptr<Config> create_production_config() {
+    auto config = std::make_shared<Config>();
+    config->set("brain.neuron_count", 500);
+    config->set("brain.synapse_density", 0.1);
+    config->set("plasticity.stdp.enable", true);
+    config->set("plasticity.stdp.learning_rate", 0.0005);
+    config->set("plasticity.hebbian.enable", true);
+    config->set("plasticity.structural.enable", false);
+    config->set("neuromod.curiosity.enable", false);
+    config->set("neuromod.novelty.enable", false);
+    config->set("memory.working.capacity", 50);
+    config->set("memory.episodic.capacity", 500);
+    return config;
+}
+
+std::shared_ptr<Config> create_debug_config() {
+    auto config = std::make_shared<Config>();
+    config->set("brain.neuron_count", 100);
+    config->set("brain.synapse_density", 0.05);
+    config->set("plasticity.stdp.enable", true);
+    config->set("plasticity.stdp.learning_rate", 0.01);
+    config->set("plasticity.hebbian.enable", true);
+    config->set("plasticity.structural.enable", true);
+    config->set("neuromod.curiosity.enable", true);
+    config->set("neuromod.novelty.enable", true);
+    config->set("logging.level", "DEBUG");
+    config->set("simulation.max_steps", 1000);
+    return config;
+}
+
+PerformanceStats get_performance_stats(std::shared_ptr<Brain> brain) {
+    PerformanceStats stats;
+    stats.total_neurons = brain->getTotalNeuronCount();
+    stats.total_synapses = brain->getTotalSynapseCount();
+    stats.active_neurons = brain->getActiveNeuronCount();
+    stats.firing_neurons = brain->getFiringNeuronCount();
+    stats.average_firing_rate = brain->getAverageFiringRate();
+    stats.e_i_ratio = brain->getExcitationInhibitionRatio();
+    stats.total_spikes = brain->getTotalSpikeCount();
+    stats.development_stage = brain->getDevelopmentalStage();
+    stats.pde = brain->getPredictionErrorSignal();
+    return stats;
+}
+
+BrainProfileResult profile_brain(std::shared_ptr<Brain> brain, uint64_t num_steps, uint64_t interval) {
+    BrainProfileResult profile;
+    profile.total_steps = num_steps;
+    profile.steps_profiled = num_steps / interval;
+    
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    for (uint64_t step = 0; step < num_steps; step += interval) {
+        ProfileDataPoint point;
+        point.step = step;
+        point.firing_rate = brain->getAverageFiringRate();
+        point.active_neurons = brain->getActiveNeuronCount();
+        point.spike_count = brain->getTotalSpikeCount();
+        point.e_i_ratio = brain->getExcitationInhibitionRatio();
+        point.timestamp = std::chrono::duration<double>(
+            std::chrono::high_resolution_clock::now() - start_time).count();
+        
+        profile.data_points.push_back(point);
+        brain->step(step);
+    }
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    profile.total_time_ms = std::chrono::duration<double, std::milli>(
+        end_time - start_time).count();
+    profile.average_step_time_ms = profile.total_time_ms / profile.steps_profiled;
+    
+    return profile;
+}
+
+BrainBenchmarkResult benchmark_brain(std::shared_ptr<Brain> brain, uint64_t steps) {
+    BrainBenchmarkResult benchmark;
+    benchmark.total_steps = steps;
+    benchmark.start_time = std::chrono::system_clock::now();
+    
+    for (uint64_t step = 0; step < steps; ++step) {
+        brain->step(step);
+    }
+    
+    benchmark.end_time = std::chrono::system_clock::now();
+    benchmark.duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        benchmark.end_time - benchmark.start_time).count();
+    benchmark.steps_per_second = (steps * 1000.0) / benchmark.duration_ms;
+    
+    return benchmark;
 }
 
 } // namespace nlm
