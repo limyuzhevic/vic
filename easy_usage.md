@@ -221,77 +221,214 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+#### Advanced Usage
+
+### Advanced Configuration
+
+#### Creating Advanced Brain Configuration
 
 ```python
 import pynlm
 
-# Setup
+# Create advanced brain configuration
+config = pynlm.createBrainConfig(
+    neuronCount=2000,
+    connectionProbability=0.15,
+    enablePlasticity=True,
+    enableNeuromodulation=True
+)
+
+# Initialize the brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable all advanced systems
+agent.enableAllSystems()
+
+# Run advanced simulation with monitoring
+def monitor_simulation(brain, world, agent, step):
+    firing_rate = brain.getAverageFiringRate()
+    e_i_ratio = brain.getExcitationInhibitionRatio()
+    print(f"Step {step}: FR={firing_rate:.2f}, E/I={e_i_ratio:.2f}")
+
+pynlm.runAdvancedSimulation(brain, world, agent, 5000, monitor_simulation)
+```
+
+### Performance Monitoring and Benchmarking
+
+```python
+import pynlm
+
+# Create and initialize brain
 config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+
+# Benchmark brain performance
+results = pynlm.benchmarkBrain(brain, 2000)
+print(f"Benchmark Results:")
+print(f"  Steps/second: {results['steps_per_second']:.1f}")
+print(f"  Total spikes: {results['total_spikes']}")
+print(f"  Average firing rate: {results['avg_firing_rate']:.3f}")
+```
+
+### Advanced World Configuration
+
+```python
+import pynlm
+
+# Create advanced world with custom settings
+world = pynlm.createAdvancedWorld(
+    width=30,
+    height=30,
+    visionWidth=16,
+    visionHeight=16,
+    maxEnergy=200.0,
+    energyDecayRate=0.005
+)
 world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+# Set agent start position
+world.setAgentStart(15.0, 15.0)
+```
 
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
+### Brain Statistics and Monitoring
+
+```python
+import pynlm
+
+# Get comprehensive brain statistics
+stats = pynlm.getBrainStats(brain)
+print("Brain Statistics:")
+for key, value in stats.items():
+    print(f"  {key}: {value}")
+
+# Example output:
+#   total_neurons: 1000
+#   total_synapses: 50000
+#   active_neurons: 120
+#   firing_neurons: 85
+#   avg_firing_rate: 0.085
+#   total_spikes: 42000
+#   e_i_ratio: 1.23
+```
+
+### Checkpoint Management
+
+```python
+import pynlm
+
+# Save brain with metadata
+brain.save("checkpoints/episode_1.bin", "Episode 1: Random exploration")
+
+# Load brain with metadata
+loaded_metadata = pynlm.loadBrainWithMetadata(brain, "checkpoints/episode_1.bin")
+print(f"Loaded from: {loaded_metadata}")
+```
+
+### Complete Advanced Agent Example
+
+```python
+import pynlm
+
+def runAdvancedAgentSimulation(config, world_config, steps=3000):
+    """Run complete advanced agent simulation with monitoring."""
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    # Create configuration
+    config = pynlm.createAdvancedBrainConfig(
+        neuronCount=config.get("neuron_count", 1000),
+        connectionProbability=config.get("connection_probability", 0.1),
+        enablePlasticity=True,
+        enableNeuromodulation=True
+    )
+    
+    # Create brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Create world
+    world = pynlm.createAdvancedWorld(**world_config)
+    world.reset()
+    
+    # Create agent
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Enable all systems
+    agent.enableAllSystems()
+    
+    # Run simulation with monitoring
+    def monitor_callback(brain, world, agent, step):
+        if step % 100 == 0:
+            stats = pynlm.getBrainStats(brain)
+            print(f"Step {step}: FR={stats['avg_firing_rate']:.3f}, "
+                  f"E/I={stats['e_i_ratio']:.2f}, "
+                  f"Spikes={stats['total_spikes']}")
+    
+    pynlm.runAdvancedSimulation(brain, world, agent, steps, monitor_callback)
+    
+    return brain, world, agent
 
-print("Agent simulation complete!")
+# Example usage
+if __name__ == "__main__":
+    config = {
+        "neuron_count": 2000,
+        "connection_probability": 0.12
+    }
+    
+    world_config = {
+        "width": 20,
+        "height": 20,
+        "visionWidth": 8,
+        "visionHeight": 8,
+        "maxEnergy": 150.0,
+        "energyDecayRate": 0.02
+    }
+    
+    brain, world, agent = runAdvancedAgentSimulation(config, world_config, 2000)
+    print("Advanced simulation complete!")
 ```
 
 ---
 
-## Quick Reference
+## Advanced Features Summary
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
-
----
-
-## Troubleshooting
-
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
-
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
-
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+| Feature | Python Function | Description |
+|---------|----------------|-------------|
+| Advanced Brain Config | `createAdvancedBrainConfig()` | Create brain with advanced settings |
+| Advanced World | `createAdvancedWorld()` | Create world with custom parameters |
+| All Systems Enable | `enableAllSystems()` | Enable reward, plasticity, development, curiosity |
+| Advanced Simulation | `runAdvancedSimulation()` | Run simulation with monitoring callback |
+| Benchmarking | `benchmarkBrain()` | Measure performance metrics |
+| Brain Stats | `getBrainStats()` | Get comprehensive statistics |
+| Checkpoint Save/Load | `saveBrainWithMetadata()` / `loadBrainWithMetadata()` | Save/load with metadata |
+| World Monitoring | `monitorSimulation()` | Monitor simulation progress |
 
 ---
 
-## Next Steps
+## Best Practices
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+### For Advanced Users
 
-That's it! You're now ready to use NLM.
+1. **Use Callbacks for Monitoring**: Always use callbacks in advanced simulations to track metrics without affecting performance.
+
+2. **Benchmark Before Production**: Use `benchmarkBrain()` to ensure your configuration performs well.
+
+3. **Monitor E/I Balance**: Keep an eye on `e_i_ratio` to ensure proper neural balance.
+
+4. **Use Checkpoints Wisely**: Save checkpoints at key intervals, not every step.
+
+5. **Profile Memory Usage**: Large simulations benefit from monitoring memory usage.
+
+### Common Issues and Solutions
+
+**Problem**: Brain doesn't learn enough.
+**Solution**: Ensure `enableAllSystems()` is called and check curiosity/novelty levels.
+
+**Problem**: Simulation too slow.
+**Solution**: Benchmark first, then optimize configuration or reduce steps.
+
+**Problem**: Memory usage high.
+**Solution**: Use smaller brain configurations or save/load checkpoints.
+
+That's it! You're now ready for advanced NLM usage with all the new powerful features.

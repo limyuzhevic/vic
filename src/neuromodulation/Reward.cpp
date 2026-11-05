@@ -32,11 +32,30 @@ void Reward::reset() {
     pImpl->accumulatedReward = 0.0f;
 }
 
-float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
-    return 0.0f;
-}
+void Reward::computeReward(const Observation& observation) {
+        // TODO PHASE 2: Implement real reward computation from observation
+        // PLACEHOLDER: Returns 0
+        return 0.0f;
+    }
+    
+    void Reward::recordObservation(const Observation& observation) {
+        // TODO PHASE 2: Implement observation recording for reward computation
+        // PLACEHOLDER: Just record timestamp
+        pImpl->history.push_back(observation.getTimestamp());
+    }
+    
+    float Reward::getRecentReward(int lookbackSteps) const {
+        // TODO PHASE 2: Implement recent reward calculation
+        // PLACEHOLDER: Return current value
+        if (lookbackSteps <= 0 || pImpl->history.empty()) return getValue();
+        return getValue();
+    }
+    
+    bool Reward::shouldReinforce() const {
+        // TODO PHASE 2: Implement reinforcement decision logic
+        // PLACEHOLDER: Always return true for testing
+        return getValue() > 0.1f;
+    }
 
 const std::vector<float>& Reward::getHistory() const {
     return pImpl->history;

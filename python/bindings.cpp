@@ -428,6 +428,129 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+    
+    // Advanced simulation control functions
+    m.def("runAdvancedSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                         std::shared_ptr<AgentBrain> agent, int maxSteps,
+                                         std::function<void(std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>, int)> callback) {
+        for (int step = 0; step < maxSteps; ++step) {
+            world->update(0.001);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            if (callback) {
+                callback(brain, world, agent, step);
+            }
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("maxSteps"),
+       py::arg("callback") = nullptr,
+       "Run advanced simulation with callback for monitoring");
+    
+    m.def("enableAllSystems", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        agent->enableCuriosity(true);
+    }, py::arg("agent"), "Enable all advanced brain systems");
+    
+    m.def("disableAllSystems", [](std::shared_ptr<AgentBrain> agent) {
+        agent->enableRewardModulation(false);
+        agent->enableStructuralPlasticity(false);
+        agent->enableDevelopment(false);
+        agent->enableCuriosity(false);
+    }, py::arg("agent"), "Disable all advanced brain systems");
+    
+    m.def("configureAdvancedBrain", [](std::shared_ptr<Config> config, int neuronCount, float connectionProb,
+                                        bool enablePlasticity, bool enableNeuromodulation) {
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("brain.connection_probability", connectionProb);
+        if (enablePlasticity) {
+            config->set("plasticity.structural.enable", true);
+        }
+        if (enableNeuromodulation) {
+            config->set("neuromod.dopamine.scale", 1.0f);
+            config->set("neuromod.curiosity.enable", true);
+            config->set("neuromod.novelty.enable", true);
+        }
+    }, py::arg("config"), py::arg("neuronCount"), py::arg("connectionProb"), py::arg("enablePlasticity"),
+       py::arg("enableNeuromodulation"), "Configure brain with advanced settings");
+    
+    m.def("saveBrainWithMetadata", [](std::shared_ptr<Brain> brain, const std::string& filepath,
+                                      const std::string& metadata) {
+        brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), py::arg("metadata") = "",
+       "Save brain state with metadata comment");
+    
+    m.def("loadBrainWithMetadata", [](std::shared_ptr<Brain> brain, const std::string& filepath,
+                                      std::string& loadedMetadata) {
+        bool success = brain->load(filepath);
+        loadedMetadata = metadata;
+        return success;
+    }, py::arg("brain"), py::arg("filepath"), py::arg("loadedMetadata"),
+       "Load brain state and return metadata");
+    
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics");
+    
+    m.def("createAdvancedWorld", [](int width, int height, float visionWidth, float visionHeight,
+                                    float maxEnergy, float energyDecayRate) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->setMaxEnergy(maxEnergy);
+        world->setEnergyDecayRate(energyDecayRate);
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth") = 8.0f,
+       py::arg("visionHeight") = 8.0f, py::arg("maxEnergy") = 100.0f,
+       py::arg("energyDecayRate") = 0.01f, "Create advanced world with custom settings");
+    
+    m.def("monitorSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                   int monitorInterval, std::function<void(double, double, double)> callback) {
+        for (int step = 0; step < 10000; ++step) {
+            world->update(0.001);
+            auto percept = world->getSensoryPercept();
+            
+            static int count = 0;
+            if (++count % monitorInterval == 0) {
+                double firingRate = brain->getAverageFiringRate();
+                double eiratio = brain->getExcitationInhibitionRatio();
+                double spikeCount = brain->getTotalSpikeCount();
+                if (callback) callback(firingRate, eiratio, spikeCount);
+            }
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("monitorInterval"), py::arg("callback") = nullptr,
+       "Monitor simulation progress with callback");
+    
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, int steps) {
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        std::map<std::string, double> results;
+        results["steps_per_second"] = steps / (duration.count() / 1000.0);
+        results["total_spikes"] = brain->getTotalSpikeCount();
+        results["avg_firing_rate"] = brain->getAverageFiringRate();
+        return results;
+    }, py::arg("brain"), py::arg("steps"), "Benchmark brain performance");
+    
+    m.def("resetBrainCompletely", [](std::shared_ptr<Brain> brain, std::shared_ptr<Config> config) {
+        brain->reset();
+        brain->initialize();
+    }, py::arg("brain"), py::arg("config"), "Completely reset brain with new config");
 }
 
 } // namespace nlm

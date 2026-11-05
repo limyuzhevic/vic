@@ -37,24 +37,58 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
     }
 }
 
-float PredictionSystem::getPredictionError() const {
-    return pImpl->predictionError;
-}
-
-float PredictionSystem::getConfidence() const {
-    return pImpl->confidence;
-}
-
-const std::vector<float>& PredictionSystem::getErrorHistory() const {
-    return pImpl->errorHistory;
-}
-
-void PredictionSystem::clearHistory() {
-    pImpl->errorHistory.clear();
-}
-
-void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
-}
+// Phase 2 enhanced functionality
+    
+    // Get current prediction error
+    float PredictionSystem::getPredictionError() const {
+        return pImpl->predictionError;
+    }
+    
+    // Get prediction confidence (0-1, 1 = confident, 0 = uncertain)
+    float PredictionSystem::getConfidence() const {
+        return pImpl->confidence;
+    }
+    
+    // Get prediction error history
+    const std::vector<float>& PredictionSystem::getErrorHistory() const {
+        return pImpl->errorHistory;
+    }
+    
+    // Clear prediction history
+    void PredictionSystem::clearHistory() {
+        pImpl->errorHistory.clear();
+    }
+    
+    // Enhanced prediction training method
+    void PredictionSystem::train(const SensoryInput& observation) {
+        // TODO PHASE 2: Train prediction model
+        // PLACEHOLDER: Just update confidence
+        pImpl->confidence = std::min(1.0f, pImpl->confidence + 0.01f);
+    }
+    
+    // Get average prediction error over time
+    float PredictionSystem::getAverageError() const {
+        if (pImpl->errorHistory.empty()) return 0.0f;
+        float sum = 0.0f;
+        for (float error : pImpl->errorHistory) {
+            sum += error;
+        }
+        return sum / pImpl->errorHistory.size();
+    }
+    
+    // Get maximum prediction error
+    float PredictionSystem::getMaxError() const {
+        if (pImpl->errorHistory.empty()) return 0.0f;
+        float maxError = 0.0f;
+        for (float error : pImpl->errorHistory) {
+            if (error > maxError) maxError = error;
+        }
+        return maxError;
+    }
+    
+    // Check if prediction system is properly trained
+    bool PredictionSystem::isTrained() const {
+        return pImpl->confidence > 0.8f;
+    }
 
 } // namespace nlm

@@ -26,6 +26,18 @@ public:
     // TODO PHASE 2: Implement real reward computation
     float computeReward(const class Observation& observation) const;
     
+    // Phase 2 enhanced reward computation
+    void computeReward(const class Observation& observation);
+    
+    // Record observation for future reward calculation
+    void recordObservation(const class Observation& observation);
+    
+    // Get recent reward value
+    float getRecentReward(int lookbackSteps) const;
+    
+    // Determine if reinforcement should occur
+    bool shouldReinforce() const;
+    
     // Reward history
     const std::vector<float>& getHistory() const;
     void clearHistory();

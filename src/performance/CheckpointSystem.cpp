@@ -401,9 +401,50 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+        if (!stream_.is_open()) return false;
+        
+        // Write header to stream
+        stream_.seekp(0, std::ios::beg);
+        stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+        if (!stream_) return false;
+        
+        bytesWritten_ += sizeof(header_);
+        return true;
+    }
+    
+    bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+        if (!stream_.is_open()) return false;
+        
+        // Write section header
+        stream_.seekp(0, std::ios::end);
+        uint64_t currentPos = static_cast<uint64_t>(stream_.tellp());
+        
+        SectionHeader headerToWrite = header;
+        headerToWrite.offset = currentPos;
+        
+        stream_.write(reinterpret_cast<const char*>(&headerToWrite), sizeof(headerToWrite));
+        if (!stream_) return false;
+        
+        bytesWritten_ += sizeof(headerToWrite);
+        return true;
+    }
+    
+    bool CheckpointWriter::padToAlignment(size_t alignment) {
+        if (!stream_.is_open()) return false;
+        
+        size_t currentPos = static_cast<size_t>(stream_.tellp());
+        size_t padding = (alignment - (currentPos % alignment)) % alignment;
+        
+        if (padding > 0) {
+            std::vector<uint8_t> padBytes(padding, 0);
+            stream_.write(reinterpret_cast<const char*>(padBytes.data()), padding);
+            if (!stream_) return false;
+            bytesWritten_ += padding;
+        }
+        
+        return true;
+    }
 
 // ---------------- CheckpointManager ----------------
 

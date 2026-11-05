@@ -18,6 +18,12 @@ public:
     // TODO PHASE 2: Implement real action selection
     std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
     
+    // Enhanced action selection methods for Phase 2
+    std::unique_ptr<Action> selectActionBasedOnActivation(const class NeuralRegion& motorRegion);
+    std::unique_ptr<Action> selectActionWithPreferences(const std::vector<float>& preferences);
+    std::unique_ptr<Action> selectActionBasedOnPopulation(const class NeuralRegion& motorRegion);
+    std::unique_ptr<Action> selectActionBasedOnRecency(const class NeuralRegion& motorRegion);
+    
     // Get available actions
     const std::vector<ActionType>& getAvailableActions() const;
     

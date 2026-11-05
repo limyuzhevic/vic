@@ -507,6 +507,126 @@ for _ in range(500):
 
 ---
 
+## Advanced Usage
+
+### Advanced Simulation Control
+
+```python
+import pynlm
+
+def runAdvancedSimulationWithMonitoring(brain, world, agent, maxSteps, monitorInterval=100):
+    """Run advanced simulation with monitoring callbacks."""
+    
+    for step in range(maxSteps):
+        # Update world
+        world.update(0.1)
+        
+        # Get sensory input
+        percept = world.getSensoryPercept()
+        
+        # Process input
+        agent.processSensoryInput(percept)
+        
+        # Brain step
+        brain.step(step)
+        
+        # Get action
+        action = agent.decodeMotorCommand()
+        
+        # Apply action
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Monitor progress
+        if step % monitorInterval == 0:
+            print(f"Step {step}: FR={brain.getAverageFiringRate():.3f}, "
+                  f"E/I={brain.getExcitationInhibitionRatio():.2f}, "
+                  f"Active={brain.getActiveNeuronCount()}, "
+                  f"Firing={brain.getFiringNeuronCount()}")
+
+# Usage example
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all advanced systems
+agent.enableAllSystems()
+
+# Run with monitoring
+runAdvancedSimulationWithMonitoring(brain, world, agent, 1000)
+```
+
+### Performance Benchmarking
+
+```python
+import pynlm
+
+# Benchmark brain performance
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+benchmark_results = pynlm.benchmarkBrain(brain, 2000)
+print("Benchmark Results:")
+print(f"  Steps per second: {benchmark_results['steps_per_second']:.1f}")
+print(f"  Total spikes: {benchmark_results['total_spikes']}")
+print(f"  Average firing rate: {benchmark_results['avg_firing_rate']:.3f}")
+```
+
+### Advanced World Configuration
+
+```python
+import pynlm
+
+# Create world with advanced settings
+world = pynlm.createAdvancedWorld(
+    width=30,           # World size
+    height=30,
+    visionWidth=16,     # Vision field of view
+    visionHeight=16,
+    maxEnergy=200.0,    # Maximum agent energy
+    energyDecayRate=0.005  # Energy decay per step
+)
+
+# Configure world
+world.configure(width=30, height=30, visionWidth=16, visionHeight=16)
+world.reset()
+world.setMaxEnergy(200.0)
+world.setEnergyDecayRate(0.005)
+```
+
+### Comprehensive Brain Statistics
+
+```python
+import pynlm
+
+# Get detailed brain statistics
+brain_stats = pynlm.getBrainStats(brain)
+print("Detailed Brain Statistics:")
+for key, value in brain_stats.items():
+    print(f"  {key}: {value}")
+```
+
+### Checkpoint Management with Metadata
+
+```python
+import pynlm
+
+# Save brain with metadata
+pynlm.saveBrainWithMetadata(brain, "checkpoints/episode_1.bin", "Episode 1: Random exploration")
+
+# Load brain with metadata
+loaded_metadata = ""
+if pynlm.loadBrainWithMetadata(brain, "checkpoints/episode_1.bin", loaded_metadata):
+    print(f"Successfully loaded checkpoint: {loaded_metadata}")
+```
+
+---
+
 ## Troubleshooting
 
 ### Build Issues

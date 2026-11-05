@@ -326,31 +326,231 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
+    // Parse command line arguments with better structure
+    struct CommandLineArgs {
+        std::string configFile = "configs/default.cfg";
+        bool helpRequested = false;
+        bool verbose = false;
+        bool benchmark = false;
+        std::string outputFile;
+        int timestep = -1;
+        int neuronCount = -1;
+        float connectionProb = -1.0f;
+        bool showDefaults = false;
+        bool validateOnly = false;
+    };
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
+    CommandLineArgs parseCommandLine(int argc, char** argv) {
+        CommandLineArgs args;
+        
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            
+            if (arg == "--help" || arg == "-h") {
+                args.helpRequested = true;
+            } else if (arg == "--verbose" || arg == "-v") {
+                args.verbose = true;
+            } else if (arg == "--benchmark" || arg == "-b") {
+                args.benchmark = true;
+            } else if (arg == "--validate-only") {
+                args.validateOnly = true;
+            } else if (arg == "--show-defaults") {
+                args.showDefaults = true;
+            } else if (arg == "--output" || arg == "-o") {
+                if (i + 1 < argc) {
+                    args.outputFile = argv[++i];
+                } else {
+                    std::cerr << "Error: --output requires a filename" << std::endl;
+                    args.helpRequested = true;
+                }
+            } else if (arg == "--timestep" || arg == "-t") {
+                if (i + 1 < argc) {
+                    args.timestep = std::stoi(argv[++i]);
+                }
+            } else if (arg == "--neurons" || arg == "-n") {
+                if (i + 1 < argc) {
+                    args.neuronCount = std::stoi(argv[++i]);
+                }
+            } else if (arg == "--connection-prob" || arg == "--conn-prob") {
+                if (i + 1 < argc) {
+                    args.connectionProb = std::stof(argv[++i]);
+                }
+            } else if (arg.substr(0, 7) == "--config") {
+                if (arg.find('=') != std::string::npos) {
+                    args.configFile = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    args.configFile = argv[++i];
+                }
+            } else if (arg == "--info") {
+                args.showDefaults = true;
+                std::cout << "=== NLM Configuration Info ===" << std::endl;
+                // Log configuration summary
+                std::cout << "Available configuration options:" << std::endl;
+                std::cout << "  --config <file>         Load configuration from file" << std::endl;
+                std::cout << "  --neurons <n>           Set neuron count" << std::endl;
+                std::cout << "  --connection-prob <p>   Set connection probability" << std::endl;
+                std::cout << "  --timestep <t>          Set simulation timestep (ms)" << std::endl;
+                std::cout << "  --output <file>         Save checkpoint to file" << std::endl;
+                std::cout << "  --verbose, -v           Enable verbose logging" << std::endl;
+                std::cout << "  --benchmark, -b         Run in benchmark mode" << std::endl;
+                std::cout << "  --help, -h              Show this help message" << std::endl;
+                std::cout << "  --validate-only         Only validate configuration, no simulation" << std::endl;
+                std::cout << "  --show-defaults         Show current default configuration" << std::endl;
+                return args;
+            } else {
+                std::cerr << "Unknown option: " << arg << std::endl;
+                args.helpRequested = true;
             }
+        }
+        
+        return args;
+    }
+    
+    // Print help information
+    void printHelp() {
+        printBanner();
+        std::cout << "\n=== NLM Command Line Options ===" << std::endl;
+        std::cout << "\nBasic Options:" << std::endl;
+        std::cout << "  --help, -h              Show this help message" << std::endl;
+        std::cout << "  --verbose, -v           Enable verbose logging" << std::endl;
+        std::cout << "  --benchmark, -b         Run in benchmark mode" << std::endl;
+        std::cout << "  --validate-only         Only validate configuration, no simulation" << std::endl;
+        std::cout << "\nConfiguration Options:" << std::endl;
+        std::cout << "  --config <file>         Load configuration from file (default: configs/default.cfg)" << std::endl;
+        std::cout << "  --neurons <n>           Set neuron count (overrides config)" << std::endl;
+        std::cout << "  --connection-prob <p>   Set connection probability (0.0-1.0, overrides config)" << std::endl;
+        std::cout << "  --timestep <t>          Set simulation timestep in milliseconds (overrides config)" << std::endl;
+        std::cout << "  --show-defaults         Show current default configuration" << std::endl;
+        std::cout << "\nOutput Options:" << std::endl;
+        std::cout << "  --output <file>         Save checkpoint to specified file" << std::endl;
+        std::cout << "\nPhase 2 Demo Specific Options:" << std::endl;
+        std::cout << "  --info                  Show configuration information and exit" << std::endl;
+        std::cout << "\nExample Usage:" << std::endl;
+        std::cout << "  ./nlm --verbose --neurons 1000 --connection-prob 0.12" << std::endl;
+        std::cout << "  ./nlm --config myconfig.cfg --output brain_checkpoint.bin" << std::endl;
+        std::cout << "  ./nlm --benchmark --timestep 5000" << std::endl;
+        std::cout << "\nFor more information, visit: https://github.com/nlm-project/nlm" << std::endl;
+    }
+    
+    // Print configuration information
+    void printConfigInfo(const std::shared_ptr<Config>& config) {
+        std::cout << "\n=== NLM Configuration ===" << std::endl;
+        std::cout << "Configuration summary:" << std::endl;
+        
+        if (config->has("random_seed")) {
+            std::cout << "  Random seed: " << config->getOr<int64_t>("random_seed", 0) << std::endl;
+        }
+        if (config->has("simulation_timestep")) {
+            std::cout << "  Simulation timestep: " << config->getOr<double>("simulation_timestep", 0.001) << "s" << std::endl;
+        }
+        if (config->has("neuron_count")) {
+            std::cout << "  Neuron count: " << config->getOr<int64_t>("neuron_count", 0) << std::endl;
+        }
+        if (config->has("region_count")) {
+            std::cout << "  Region count: " << config->getOr<int64_t>("region_count", 0) << std::endl;
+        }
+        if (config->has("connection_probability")) {
+            std::cout << "  Connection probability: " << config->getOr<float>("connection_probability", 0.0f) << std::endl;
+        }
+        if (config->has("stdp_ltp_weight")) {
+            std::cout << "  STDP LTP weight: " << config->getOr<float>("stdp_ltp_weight", 0.0f) << std::endl;
+        }
+        if (config->has("stdp_ltd_weight")) {
+            std::cout << "  STDP LTD weight: " << config->getOr<float>("stdp_ltd_weight", 0.0f) << std::endl;
+        }
+        if (config->has("stdp_tau")) {
+            std::cout << "  STDP tau: " << config->getOr<float>("stdp_tau", 0.0f) << "ms" << std::endl;
+        }
+        
+        std::cout << "\nCommand line overrides applied (if any):" << std::endl;
+        if (args.timestep >= 0) {
+            std::cout << "  Timestep: " << args.timestep << "ms (command line)" << std::endl;
+        }
+        if (args.neuronCount >= 0) {
+            std::cout << "  Neuron count: " << args.neuronCount << " (command line)" << std::endl;
+        }
+        if (args.connectionProb >= 0.0f) {
+            std::cout << "  Connection probability: " << args.connectionProb << " (command line)" << std::endl;
+        }
+        if (!args.outputFile.empty()) {
+            std::cout << "  Output file: " << args.outputFile << std::endl;
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Apply command line overrides
+    void applyCommandLineOverrides(std::shared_ptr<Config>& config, const CommandLineArgs& args) {
+        if (args.timestep >= 0) {
+            config->set("simulation_timestep", static_cast<double>(args.timestep) / 1000.0, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Command line override: simulation_timestep = " + std::to_string(args.timestep) + "ms");
+        }
+        if (args.neuronCount >= 0) {
+            config->set("neuron_count", static_cast<int64_t>(args.neuronCount), ConfigSource::CommandLine);
+            NLM_LOG_INFO("Command line override: neuron_count = " + std::to_string(args.neuronCount));
+        }
+        if (args.connectionProb >= 0.0f) {
+            config->set("connection_probability", args.connectionProb, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Command line override: connection_probability = " + std::to_string(args.connectionProb));
+        }
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Validate configuration
+    bool validateConfiguration(const std::shared_ptr<Config>& config) {
+        bool isValid = true;
+        
+        if (config->has("neuron_count")) {
+            int64_t neuronCount = config->getOr<int64_t>("neuron_count", 0);
+            if (neuronCount <= 0) {
+                NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(neuronCount));
+                isValid = false;
+            }
+        }
+        
+        if (config->has("simulation_timestep")) {
+            double timestep = config->getOr<double>("simulation_timestep", 0.0);
+            if (timestep <= 0.0) {
+                NLM_LOG_ERROR("Invalid simulation timestep: " + std::to_string(timestep));
+                isValid = false;
+            }
+        }
+        
+        if (config->has("connection_probability")) {
+            float connProb = config->getOr<float>("connection_probability", 0.0f);
+            if (connProb < 0.0f || connProb > 1.0f) {
+                NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(connProb));
+                isValid = false;
+            }
+        }
+        
+        return isValid;
+    }
+    
+// Command line parsing is complete. Now we need to integrate it with the rest of the main function.
+    
+    // Print help and exit if requested
+    if (args.helpRequested) {
+        printHelp();
+        return 0;
+    }
+    
+    // Print configuration info and exit if requested
+    if (args.showDefaults) {
+        printConfigInfo(config);
+        return 0;
+    }
+    
+    // Apply command line overrides
+    applyCommandLineOverrides(config, args);
+    
+    // Validate configuration
+    if (!validateConfiguration(config)) {
+        std::cerr << "Configuration validation failed!" << std::endl;
+        return 1;
+    }
+    
+    if (args.validateOnly) {
+        NLM_LOG_INFO("Configuration validation successful!")
+        return 0;
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
