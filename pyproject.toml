@@ -27,18 +27,29 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+    "typing-extensions>=4.0",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "numpy>=1.20",
+    "pytest-cov>=4.0",
+    "matplotlib>=3.5",
+    "jupyter>=1.0",
+    "black>=23.0",
+    "ruff>=0.1.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+
+[project.scripts]
+nlm = "examples.cli:main"
+nlm-demo = "examples.demo:main"
 
 [tool.scikit-build]
 # scikit-build-core >= 0.8 renamed minimum-version to version.
@@ -59,3 +70,8 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+packages = ["pynlm"]
+
