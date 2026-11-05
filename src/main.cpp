@@ -165,11 +165,14 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Inject current into a few neurons and see if spikes propagate
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("Test failed: No region found (RegionId 1)");
+        return;
+    }
     
     auto neurons = region->getAllNeurons();
     if (neurons.empty()) {
-        NLM_LOG_INFO("  No neurons found!");
+        NLM_LOG_ERROR("Test failed: No neurons found in region");
         return;
     }
     
@@ -182,23 +185,33 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
-    // Run a few steps
+    // Run a few steps with detailed logging
+    NLM_LOG_INFO("  Running simulation steps...");
     for (SimulationStep step = 0; step < 50; ++step) {
         brain->step(step, step * 0.001);
+        
+        // Log progress every 10 steps
+        if (step % 10 == 0) {
+            NLM_LOG_INFO("    Step " + std::to_string(step) + 
+                        " | Active neurons: " + std::to_string(brain->getActiveNeuronCount()) +
+                        " | Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+        }
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
-    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikes));
+    NLM_LOG_INFO("  Total spikes generated: " + std::to_string(spikes));
     
     if (spikes > 0) {
-        NLM_LOG_INFO("  ✓ Spikes propagate through network");
+        NLM_LOG_INFO("  ✓ SUCCESS: Spikes propagate through network");
     } else {
-        NLM_LOG_INFO("  ! No spikes - checking neuron parameters...");
+        NLM_LOG_INFO("  ! WARNING: No spikes detected - checking neuron parameters...");
         for (size_t i = 0; i < std::min(size_t(3), neurons.size()); ++i) {
             NLM_LOG_INFO("    Neuron " + std::to_string(i) + 
                         " V=" + std::to_string(neurons[i]->getMembranePotential()) +
-                        " thresh=" + std::to_string(neurons[i]->getThreshold()));
+                        " thresh=" + std::to_string(neurons[i]->getThreshold()) +
+                        " type=" + std::to_string(static_cast<int>(neurons[i]->getType())));
         }
+        NLM_LOG_WARNING("  Possible issues: neuron thresholds too high, insufficient current injection");
     }
 }
 
