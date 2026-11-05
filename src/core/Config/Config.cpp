@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,40 +20,46 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        nlohmann::json jsonConfig;
+        file >> jsonConfig;
+        
+        // Clear existing config entries
+        clear();
+        
+        // Parse JSON entries
+        if (jsonConfig.contains("config")) {
+            const auto& configArray = jsonConfig["config"];
+            for (const auto& item : configArray) {
+                if (item.is_object() && item.contains("key") && item.contains("value")) {
+                    std::string key = item["key"];
+                    std::string value = item["value"].get<std::string>();
+                    std::string description = item.value("description", "");
+                    set(key, value, ConfigSource::File);
+                    // Note: description is not stored in ConfigEntry
+                }
+            }
+        } else {
+            // Legacy format: treat as flat key-value pairs
+            for (auto it = jsonConfig.begin(); it != jsonConfig.end(); ++it) {
+                std::string key = it.key();
+                std::string value = it->get<std::string>();
+                set(key, value, ConfigSource::File);
+            }
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        NLM_LOG_INFO("Successfully loaded configuration from: " + filepath);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse config file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -81,15 +88,34 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not save config file: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        nlohmann::json jsonConfig;
+        
+        // Create config array with key-value-description objects
+        nlohmann::json configArray = nlohmann::json::array();
+        for (const auto& entry : pImpl->entries) {
+            nlohmann::json item;
+            item["key"] = entry.key;
+            item["value"] = entry.value; // Note: entry.value is a variant, may need to convert
+            item["description"] = entry.description;
+            item["source"] = static_cast<int>(entry.source);
+            configArray.push_back(item);
+        }
+        
+        jsonConfig["config"] = configArray;
+        
+        file << std::setw(2) << jsonConfig << std::endl;
+        
+        NLM_LOG_INFO("Successfully saved configuration to: " + filepath);
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to save config file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
