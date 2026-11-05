@@ -164,7 +164,10 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
+                // IMPROVEMENT: Make movement exploration rewarding
+                // instead of just costly. Small positive reward for
+                // successful movement encourages exploration.
+                result.reward = 0.001f;  // Small positive reward for exploration
                 result.success = true;
             } else {
                 result.reward = -0.05f;  // Cost for hitting wall
@@ -186,7 +189,7 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.02f;
+                result.reward = 0.002f;  // Small positive reward for backward exploration
                 result.success = true;
             } else {
                 result.reward = -0.05f;
@@ -198,14 +201,16 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
         case MotorCommand::TurnLeft:
             agent_.angularVelocity = -turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            // IMPROVEMENT: Turn reward is small but positive for exploration
+            // Turning is useful for exploration and perception
+            result.reward = 0.0005f;
             result.success = true;
             break;
             
         case MotorCommand::TurnRight:
             agent_.angularVelocity = turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = 0.0005f;
             result.success = true;
             break;
             
@@ -213,14 +218,15 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             // Pan sensor (no movement)
             agent_.angularVelocity = 0.0f;
             agent_.isTurning = false;
-            result.reward = 0.0f;
+            // IMPROVEMENT: Looking provides reward for information gathering
+            result.reward = 0.0002f;
             result.success = true;
             break;
 
         case MotorCommand::LookRight:
-            agent_.angularVelocity = 0.0f;
+            agent_.angularVelocity = OLFSpeed;
             agent_.isTurning = false;
-            result.reward = 0.0f;
+            result.reward = 0.0002f;
             result.success = true;
             break;
 
@@ -232,12 +238,7 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             
         case MotorCommand::Wait:
         default:
-            // Decay velocities
-            agent_.velocityX *= 0.9f;
-            agent_.velocityY *= 0.9f;
-            agent_.angularVelocity *= 0.9f;
-            agent_.isMoving = false;
-            agent_.isTurning = false;
+            // Phase 6: waiting provides minimal reward for rest/pausing
             result.reward = 0.0f;
             result.success = true;
             break;

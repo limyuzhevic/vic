@@ -393,43 +393,149 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    brain->logStatus();
+    // Add Phase 6 experiment command line options
+    if (config->getOr<bool>("enable_experiment", false)) {
+        std::cout << "" << std::endl;
+        std::cout << "=== Phase 6 Integration Experiment ===" << std::endl;
+        
+        // Include Phase 6 experiment headers
+        #include "experiments/Phase6IntegratedExperiment.hpp"
+        #include "experiments/Phase6Demo.hpp"
+        
+        Phase6IntegratedExperiment experiment;
+        Phase6Config expConfig;
+        
+        // Configure experiment based on command line options
+        expConfig.neuronCount = config->getOr<size_t>("experiment_neuron_count", 500);
+        expConfig.maxSteps = config->getOr<uint64_t>("experiment_max_steps", 2000);
+        expConfig.enableCheckpointing = config->getOr<bool>("experiment_checkpoint", true);
+        expConfig.enableReplay = config->getOr<bool>("experiment_replay", true);
+        expConfig.enableDevelopment = config->getOr<bool>("experiment_development", true);
+        expConfig.checkpointPath = "./checkpoints/experiment_checkpoint.bin";
+        
+        auto result = experiment.run(expConfig);
+        
+        std::cout << "" << std::endl;
+        std::cout << "=== Experiment Results ===" << std::endl;
+        std::cout << "Total Reward: " << result.totalReward << std::endl;
+        std::cout << "Average Firing Rate: " << result.avgFiringRate << std::endl;
+        std::cout << "Synaptic Weight Change: " << result.avgSynapticWeight << std::endl;
+        std::cout << "Episodes Stored: " << result.memoryEpisodesStored << std::endl;
+        std::cout << "Novelty Level: " << result.noveltyLevel << std::endl;
+        std::cout << "Curiosity Level: " << result.curiosityLevel << std::endl;
+        std::cout << "Dopamine Level: " << result.dopamineLevel << std::endl;
+        std::cout << std::endl;
+        
+        std::cout << "=== System Integration Status ===" << std::endl;
+        std::cout << "Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+        std::cout << "Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+        std::cout << "Neuromodulation: " << (result.neuromodulationIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+        std::cout << "Prediction: " << (result.predictionIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+        std::cout << "Development: " << (result.developmentIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
+        std::cout << "Checkpointing: " << (result.checkpointingWorks ? "WORKING" : "NOT WORKING") << std::endl;
+        std::cout << "Replay: " << (result.replayWorks ? "WORKING" : "NOT WORKING") << std::endl;
+        std::cout << std::endl;
+        
+        std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+        
+        if (!result.totalReward || result.avgSynapticWeight < 0.01f) {
+            std::cout << "\nWARNING: Low learning detected. Try enabling more exploration features." << std::endl;
+        }
+    }
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    // Add performance profiling option
+    if (config->getOr<bool>("enable_profiling", false)) {
+        std::cout << "" << std::endl;
+        std::cout << "=== Performance Profiling ===" << std::endl;
+        
+        // Basic profiling using high_resolution_clock
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        // Run a simplified learning experiment
+        brain->reset();
+        brain->initialize();
+        
+        // Record initial state
+        size_t initialSpikes = brain->getTotalSpikeCount();
+        auto initialTime = std::chrono::high_resolution_clock::now();
+        
+        // Run learning experiment
+        for (SimulationStep step = 0; step < 1000; ++step) {
+            // Inject varied sensory input to stimulate learning
+            if (step % 10 == 0) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 20.0f + (step % 100));
+            }
+            brain->step(step, step * 0.001);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        size_t finalSpikes = brain->getTotalSpikeCount();
+        
+        // Calculate performance metrics
+        auto totalTime = std::chrono::duration<double>(endTime - startTime).count();
+        double spikesPerSecond = (finalSpikes - initialSpikes) / totalTime;
+        double stepsPerSecond = 1000.0 / totalTime;
+        
+        std::cout << "Profiling Results (1000 steps):" << std::endl;
+        std::cout << "  Total time: " << totalTime << "s" << std::endl;
+        std::cout << "  Steps per second: " << stepsPerSecond << std::endl;
+        std::cout << "  Spikes per second: " << spikesPerSecond << std::endl;
+        std::cout << "  Average firing rate: " << (spikesPerSecond / config->getOr<int64_t>("neuron_count", 500)) << " Hz per neuron" << std::endl;
+        
+        // Memory efficiency check
+        size_t neuronCount = brain->getTotalNeuronCount();
+        size_t synapseCount = brain->getTotalSynapseCount();
+        std::cout << "Memory efficiency:" << std::endl;
+        std::cout << "  Neurons: " << neuronCount << std::endl;
+        std::cout << "  Synapses: " << synapseCount << std::endl;
+        std::cout << "  Synapse/Neuron ratio: " << (synapseCount / (neuronCount > 0 ? neuronCount : 1)) << ":1" << std::endl;
+    }
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
-    
-    // Final brain status
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Final Brain Status ===");
-    brain->logStatus();
-    
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
-    
-    return 0;
+    // Add learning analysis mode
+    if (config->getOr<bool>("enable_learning_analysis", false)) {
+        std::cout << "" << std::endl;
+        std::cout << "=== Learning Analysis Mode ===" << std::endl;
+        
+        // Initialize brain for analysis
+        brain->reset();
+        brain->initialize();
+        
+        // Run structured learning experiment
+        LearningExperiment analysis(brain, config->getOr<uint64_t>("analysis_seed", 12345));
+        
+        // Record initial state
+        analysis.recordInitialState();
+        
+        // Apply controlled learning stimulus
+        NLM_LOG_INFO("Applying controlled learning stimulus...");
+        
+        // Stimulus pattern: varied sensory input with some rewards
+        for (SimulationStep step = 0; step < 500; ++step) {
+            // Vary sensory input strength
+            float sensoryInput = 20.0f + 30.0f * std::sin(step * 0.02f);
+            brain->injectCurrentToNeurons(NeuronType::Sensory, sensoryInput);
+            
+            // Occasional positive reward to stimulate reward-modulated learning
+            if (step % 50 == 0) {
+                brain->applyRewardModulation(brain->getSTDP(), 0.5f);
+            }
+            
+            brain->step(step, step * 0.001);
+            
+            if (step % 100 == 0) {
+                std::cout << "Step " << step << ": Firing=" << brain->getFiringNeuronCount() 
+                          << ", Spikes=" << brain->getTotalSpikeCount() 
+                          << ", Learning indicator=" << analysis.getLearningIndicator() << std::endl;
+            }
+        }
+        
+        // Record final state
+        analysis.recordFinalState();
+        
+        // Compute and display detailed statistics
+        analysis.computeStatistics();
+        
+        std::cout << "" << std::endl;
+        std::cout << "=== Learning Analysis Complete ===" << std::endl;
+    }
 }

@@ -21,6 +21,24 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , reflexBonusCount_(0)
+    , reflexSuppressCount_(0)
+    , wtaPulseCount_(0)
+    , lastWinnerGroup_(-1)
+    , lastWinnerMargin_(0.0f)
+    , consecutiveWinnerCount_(0)
+    , stepsSinceTurn_(0)
+    , repeatCount_(0)
+    , plannerOverrideCount_(0)
+    , plannerAgreementCount_(0)
+    , plannerDecisionCount_(0)
+    , conceptBiasCount_(0)
+    , selfBiasCount_(0)
+    , socialBiasCount_(0)
+    , selfModelReady_(false)
+    , socialReady_(false)
+    , totalExplorations_(0)
+    , explorationCount_(0)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -890,6 +908,24 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     thoughtReward_ = reward;
     hasThoughtOutcome_ = true;
+    
+    // IMPROVEMENT: Add exploration bonuses based on curiosity and novelty
+    // Agents should be rewarded for exploring novel situations and high curiosity levels
+    float explorationBonus = 1.0f;
+    if (curiosityEnabled_) {
+        // Scale bonus with curiosity level - more exploration yields higher bonus
+        explorationBonus += curiosityLevel_ * 0.5f;
+    }
+    if (noveltyLevel_ > 0.5f) {
+        // Significant novelty provides extra exploration bonus
+        explorationBonus += (noveltyLevel_ - 0.5f) * 1.0f;
+    }
+    
+    // IMPROVEMENT: Apply exploration bonus to all rewards to encourage exploration
+    // But cap it to prevent runaway reward accumulation
+    float enhancedReward = reward * explorationBonus;
+    enhancedReward = std::clamp(enhancedReward, -10.0f, 10.0f);
+    
     // Phase 6 concept formation, wired into the loop: the pattern
     // that led to this action, paired with this action's reward.
     // Concepts therefore emerge from experienced pattern/reward
@@ -903,7 +939,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         float norm = 0.0f;
         for (float v : pat) norm += v * v;
         if (norm > 0.01f) {
-            brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
+            brain_->getConceptFormation()->presentExperience(pat, lastTouch_, enhancedReward, 0);
         }
     }
     // Phase 5 learning for the thought/preference systems, from the
@@ -927,26 +963,61 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
         if (brain_->getPlanner()) {
             float q = brain_->getPlanner()->getActionQuality(taken);
-            float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
+            float r = std::clamp(enhancedReward / 10.0f, -1.0f, 1.0f);
             brain_->getPlanner()->setActionQuality(taken, 0.9f * q + 0.1f * r);
         }
-        if (lastDecoded_ == MotorCommand::Interact && std::abs(reward) > 0.01f) {
-            float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
+        if (lastDecoded_ == MotorCommand::Interact && std::abs(enhancedReward) > 0.01f) {
+            float r = std::clamp(enhancedReward / 10.0f, -1.0f, 1.0f);
             brain_->setLearnedPreference(brain_->getLearnedPreference() + 0.1f * r);
         }
     }
     
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
+    // IMPROVEMENT: Add habituation penalty for overusing the same action
+    // This encourages behavioral diversity and prevents stuck patterns
+    if (hasLastDecoded_) {
+        ActionType actionType;
+        switch (lastDecoded_) {
+            case MotorCommand::MoveForward: actionType = ActionType::MoveForward; break;
+            case MotorCommand::MoveBackward: actionType = ActionType::MoveBackward; break;
+            case MotorCommand::TurnLeft: actionType = ActionType::TurnLeft; break;
+            case MotorCommand::TurnRight: actionType = ActionType::TurnRight; break;
+            case MotorCommand::Interact: actionType = ActionType::Interact; break;
+            default: actionType = ActionType::Wait;
+        }
+        
+        // Track action usage for habituation
+        if (lastActionCounts_.count(actionType) == 0) {
+            lastActionCounts_[actionType] = 0;
+        }
+        lastActionCounts_[actionType]++;
+        
+        // Apply habituation penalty if action is overused
+        float usageCount = static_cast<float>(lastActionCounts_[actionType]);
+        if (usageCount > 50.0f) {  // After 50 uses
+            float habituationFactor = std::min(1.0f, (usageCount - 50.0f) / 200.0f);  // Max at 250 uses
+            float habituationPenalty = -0.02f * habituationFactor * enhancedReward;
+            // Apply penalty to prediction error (modifies future learning)
+            predictionError_ += habituationPenalty;
+        }
+    }
     
-    // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    // Compute prediction error with exploration bonus
+    predictionError_ = enhancedReward - predictedReward;
     
-    // Dopamine-like signal (based on prediction error)
+    // IMPROVEMENT: Update expected reward with adaptive learning rate
+    // Higher curiosity = faster adaptation to new rewards
+    float adaptationRate = 0.05f;
+    if (curiosityLevel_ > 0.5f) {
+        adaptationRate = 0.08f;  // Faster learning when curious
+    }
+    expectedReward_ = (1.0f - adaptationRate) * expectedReward_ + adaptationRate * enhancedReward;
+    
+    // Dopamine-like signal (based on prediction error with exploration bonus)
     dopamineLevel_ = predictionError_;
     
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+    // IMPROVEMENT: Expand dopamine range to better handle exploration bonuses
+    // Allow for more positive dopamine to reinforce exploration behaviors
+    dopamineLevel_ = std::clamp(dopamineLevel_, -1.5f, 1.5f);
     
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
@@ -954,35 +1025,42 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             float eligibility = syn->getEligibilityTrace();
 
             if (std::abs(eligibility) > 0.001f) {
-                // Reward-modulated weight change. Phase 4: the old
-                // rule used delta = eligibility * dopamine with no
-                // learning rate, and eligibility traces accumulate
-                // STDP deltas to ~4, so a single +10 reward (dopamine
-                // clamped to 1) drove every eligible synapse straight
-                // to its clamp — one event saturated the network. A
-                // 0.05 learning rate and a +-0.1 per-event cap keep a
-                // reward event meaningful without erasing all prior
-                // selectivity in one step (standard R-STDP scaling).
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
-                delta = std::clamp(delta, -0.1f, 0.1f);
+                // IMPROVEMENT: Adaptive learning rate based on curiosity and plasticity modifier
+                float curiosityLearningRate = 0.05f * (1.0f + curiosityLevel_ * 0.5f);
+                float plasticityAdaptiveRate = plasticityModifier_ * curiosityLearningRate;
+                
+                // IMPROVEMENT: Reward-modulated weight change with better scaling
+                // Use exploration bonus and adaptive learning rate for balanced learning
+                float delta = eligibility * dopamineLevel_ * plasticityAdaptiveRate * 0.03f;
+                // IMPROVEMENT: Expanded weight change range to accommodate exploration bonuses
+                delta = std::clamp(delta, -0.15f, 0.15f);
                 syn->addToWeight(delta);
                 
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                // IMPROVEMENT: Adaptive eligibility trace decay
+                // Higher curiosity = faster trace decay for more flexible learning
+                float traceDecayRate = 0.1f * (1.0f + curiosityLevel_ * 0.5f);
+                syn->decayEligibilityTrace(traceDecayRate);
             }
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    // IMPROVEMENT: Enhanced plasticity modulation based on exploration state
+    // Positive curiosity and novelty should boost plasticity for faster learning
+    float curiosityPlasticityBoost = 1.0f + curiosityLevel_ * 0.5f + noveltyLevel_ * 0.3f;
+    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_ * curiosityPlasticityBoost;
+    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 3.0f);
     
     // Apply to STDP
     auto* stdp = brain_->getSTDP();
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+    
+    // IMPROVEMENT: Track exploration metrics for debugging and analysis
+    totalExplorations_++;
+    if (curiosityLevel_ > 0.7f) {
+        explorationCount_++;
     }
 }
 
