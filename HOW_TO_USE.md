@@ -50,9 +50,37 @@ After successful compilation, you will have:
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
-| `nlm_phase3_demo` | Executable | Phase 3 demonstration |
-| `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase3_demo` | Executable | **Enhanced** Phase 3 demonstration (improved CLI) |
+| `nlm_phase4_demo` | Executable | **Enhanced** Phase 4 demonstration (improved CLI) |
+| `nlm_phase5_demo` | Executable | **Enhanced** Phase 5 demonstration (improved CLI) |
+| `nlm_phase6_demo` | Executable | **Enhanced** Phase 6 integration test (improved CLI) |
+| `nlm_phase6_text_demo` | Executable | **Enhanced** Phase 6 text/thought demo (improved CLI) |
+| `nlm_benchmark` | Executable | Performance benchmark |
 | `nlm_test` | Executable | Unit test suite |
+
+### Enhanced CLI Features
+
+All demo executables now feature a comprehensive command-line interface:
+
+- **Unified Options**: Common options across all demos (`--help`, `--version`, `--verbose`, `--quiet`)
+- **Enhanced Configuration**: Detailed configuration options for each experiment
+- **Better Help System**: Comprehensive help documentation with examples
+- **Advanced Parameters**: Fine-grained control over experiment parameters
+- **Output Options**: Support for result file export
+- **Logging Control**: Configurable logging levels and output destinations
+
+### New CLI Example
+
+```bash
+# Run enhanced Phase 3 demo with custom parameters
+./nlm_phase3_demo --episodes 10 --steps 500 --neuron-count 800 --timestep 0.002 --enable-curiosity --enable-reward
+
+# Run enhanced Phase 6 integration demo with output
+./nlm_phase6_demo --neuron-count 1000 --max-steps 5000 --enable-checkpoint --enable-replay --output results.json
+
+# View help for any demo
+./nlm_phase3_demo --help
+```
 
 ### Build Options
 

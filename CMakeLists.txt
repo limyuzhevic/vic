@@ -29,6 +29,7 @@ add_library(nlm_core STATIC
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
+    src/core/CLI.cpp
     # Brain
     src/brain/Neuron.cpp
     src/brain/Synapse.cpp
@@ -138,29 +139,29 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
+# Phase 3 demo executable (enhanced version)
 add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
+    src/experiments/Phase3DemoEnhanced.cpp
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
+# Phase 4 demo executable (enhanced version)
 add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+    src/experiments/Phase4DemoEnhanced.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
 # Phase 5 demo executable (Phase 5, added here: pattern probe,
 # sandbox run, and checkpoint round-trip for the brain-personality
-# step — previously Phase 5 was library-only with no demo).
+# step — previously Phase 5 was library-only with no demo). This file is that demo.
 add_executable(nlm_phase5_demo
-    src/experiments/Phase5Demo.cpp
+    src/experiments/Phase5DemoEnhanced.cpp
 )
 target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
 
 # Phase 6 demo executable
 add_executable(nlm_phase6_demo
-    src/experiments/Phase6Demo.cpp
+    src/experiments/Phase6IntegrationDemoEnhanced.cpp
 )
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
@@ -169,7 +170,7 @@ target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # a teacher, planner overrides, and a checkpoint round-trip. The old
 # nlm_phase6_demo integration demo is left unchanged.
 add_executable(nlm_phase6_text_demo
-    src/experiments/Phase6TextDemo.cpp
+    src/experiments/Phase6TextDemoEnhanced.cpp
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
 

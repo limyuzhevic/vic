@@ -71,12 +71,27 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Using Enhanced C++ Demos
+
+Now you can run the enhanced NLM demos with better command-line options:
+
+```bash
+# Run enhanced Phase 3 demo with custom parameters
+./nlm_phase3_demo --episodes 10 --steps 500 --neuron-count 800 --enable-curiosity --enable-reward
+
+# Run enhanced Phase 6 integration demo
+./nlm_phase6_demo --neuron-count 1000 --max-steps 5000 --enable-checkpoint --enable-replay --output results.json
+
+# View help for any demo
+./nlm_phase3_demo --help
+```
+
 ---
 
 ## Simple Analogy
 
 | Real World | NLM Code |
-|------------|----------|
+|------------|------|
 | You see something | `percept = world.getSensoryPercept()` |
 | Your brain processes it | `agent.processSensoryInput(percept)` |
 | You decide to act | `action = agent.decodeMotorCommand()` |
@@ -143,15 +158,154 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Enable Brain Features (Enhanced)
 
 ```python
-# These are all optional:
+# These are all optional with enhanced options:
 agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+agent.enablePrediction(True)            # Learn temporal relationships
+agent.enableSelfModel(True)             # Learn about your own body
+agent.enableSocialLearning(True)        # Observe and imitate others
 ```
+
+---
+
+## What Each Part Does
+
+### `pynlm.createBrain(config)`
+Creates a virtual brain with neurons and synapses.
+- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+
+### `brain.initialize()`
+Starts up the brain. Always call this before using the brain!
+
+### `brain.step(step_number)`
+Makes the brain process one moment in time. The brain:
+- Checks each neuron
+- Sends signals between connected neurons
+- Updates connections based on learning rules
+
+### `world.update(time)`
+Updates the virtual world by `time` seconds.
+
+### `agent.processSensoryInput(percept)`
+Gives sensory information (vision, touch, etc.) to the brain.
+
+### `agent.decodeMotorCommand()`
+Reads the brain's motor neurons to decide what action to take.
+
+---
+
+## Mini Projects
+
+### Project 1: Silent Brain (Just Neurons)
+
+```python
+import pynlm
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+for i in range(10):
+    brain.step(i)
+
+print("Silent brain test done!")
+```
+
+### Project 2: Brain Watching a World
+
+```python
+import pynlm
+
+# Setup
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Watch the world for 30 steps
+for i in range(30):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(i)
+    
+print("Watched world for 30 steps")
+print("Firing rate:", brain.getAverageFiringRate())
+```
+
+### Project 3: Complete Agent with Enhanced Features
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable ALL learning features (enhanced options)
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enablePrediction(True)
+agent.enableSelfModel(True)
+agent.enableSocialLearning(True)
+
+# Run agent
+for step in range(100):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 20 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+print("Agent simulation complete!")
+```
+
+---
+
+## Enhanced Command Line Options
+
+The enhanced C++ demos now provide:
+
+### Phase 3 Enhanced CLI
+- `--episodes N`: Number of episodes (default: 5)
+- `--steps N`: Steps per episode (default: 200)
+- `--neuron-count N`: Number of neurons (default: 500)
+- `--enable-curiosity`: Enable curiosity-driven exploration
+- `--enable-reward`: Enable reward modulation
+- `--enable-plasticity`: Enable synaptic plasticity
+- `--enable-development`: Enable developmental processes
+
+### Phase 6 Enhanced CLI
+- `--neuron-count N`: Number of neurons (default: 500)
+- `--max-steps N`: Maximum simulation steps (default: 2000)
+- `--enable-checkpoint`: Enable checkpoint saving
+- `--enable-replay`: Enable memory replay
+- `--enable-development`: Enable development
+- `--output FILE`: Export results to file
+- `--custom-key VALUE`: Custom parameters
+
+### Common Enhanced Options
+- `--verbose, -v`: Enable verbose output
+- `--quiet, -q`: Quiet mode
+- `--help`: Show help
+- `--version`: Show version
 
 ---
 
@@ -294,4 +448,6 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with all its enhanced capabilities.
+
+The enhanced CLI provides better help, more configuration options, and improved user experience for all NLM demos.

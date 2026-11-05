@@ -11,6 +11,7 @@
 #include "core/Random/Random.hpp"
 #include "core/Logger/Logger.hpp"
 #include "core/SimulationClock/SimulationClock.hpp"
+#include "core/CLI.hpp"
 #include "brain/Brain.hpp"
 #include "brain/Neuron.hpp"
 #include "brain/Synapse.hpp"
@@ -308,6 +309,33 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Use new unified CLI system
+    auto options = nlm::parseCommonOptions(argc, argv, "nlm");
+    
+    if (options.help) {
+        nlm::printCommonOptionsHelp("nlm");
+        return 0;
+    }
+    
+    if (options.version) {
+        nlm::CLIParser parser("nlm");
+        parser.printVersion();
+        return 0;
+    }
+    
+    // Setup logging based on options
+    nlm::setupCommonLogging(options.logLevel, options.verbose, options.quiet);
+    
+    // Load configuration file if specified
+    std::map<std::string, std::string> configValues;
+    if (!options.configFile.empty() && options.configFile != "configs/default.cfg") {
+        if (nlm::loadCommonConfig(options.configFile, configValues)) {
+            NLM_LOG_INFO("Loaded configuration from: " + options.configFile);
+        } else {
+            NLM_LOG_WARN("Could not load configuration file: " + options.configFile);
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -326,25 +354,9 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    // Load configuration from file (ignore if not found)
+    if (config->loadFromFile(options.configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + options.configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
@@ -354,7 +366,7 @@ int main(int argc, char** argv) {
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("simulation_timestep", options.timestep, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
