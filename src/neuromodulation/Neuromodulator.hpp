@@ -38,15 +38,9 @@ public:
     Dopamine();
     ~Dopamine() override;
     
-    const char* getName() const override;
-    float getLevel() const override;
-    void setLevel(float level) override;
-    float getPlasticityFactor() const override;
-    void update(TimestepDuration dt) override;
-    
-    // Reward signaling
-    void signalReward(float reward);
-    void signalRewardPredictionError(float error);
+    const char* getName() const override {
+        return "DA";
+    }
     
 private:
     struct Impl;
