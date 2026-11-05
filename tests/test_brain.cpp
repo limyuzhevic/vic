@@ -70,8 +70,11 @@ void testBrainReset() {
     brain.step(0);
     brain.reset();
     
-    // Verify reset worked
+    // Verify reset worked - check that brain can still step
+    // (reset doesn't change neuron count, only simulation state)
+    brain.step(1);
     assert(brain.getTotalNeuronCount() == 50);
+    assert(brain.getRegionCount() == 1);
     
     std::cout << "    testBrainReset passed" << std::endl;
 }
@@ -172,7 +175,7 @@ void testBrainCheckpointRoundTrip() {
     float savedMembrane = firstMembrane(brain1);
     size_t savedPending = brain1.getPendingSpikeEventCount();
 
-    nlm::Brain brain2(config);
+nlm::Brain brain2(config);
     brain2.initialize();
     if (!brain2.load(path)) throw std::runtime_error("checkpoint load failed");
     if (std::abs(meanWeight(brain2) - savedMeanWeight) >= 1e-6) throw std::runtime_error("mean weight not restored");

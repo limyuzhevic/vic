@@ -1,52 +1,43 @@
+// NLM Visualization Interface
+// Phase 6: Visualization and debugging tools for brain simulation
+
 #pragma once
 
 #include <string>
 #include <vector>
-#include <memory>
 
 namespace nlm {
 
-// Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+class Brain;
+
 class VisualizationInterface {
 public:
     VisualizationInterface();
     ~VisualizationInterface();
     
-    // Initialize visualization
-    bool initialize();
+    // Show comprehensive brain state visualization
+    void showBrainState(const Brain& brain, const std::string& title) const;
     
-    // Update visualization data
-    void update();
+    // Show simulation step progress
+    void showSimulationStep(const Brain& brain, size_t step) const;
     
-    // Render current state
-    void render();
+    // Show synapse activity visualization
+    void showSynapseActivity(const Brain& brain, size_t topN = 10) const;
     
-    // Close visualization
-    void close();
+    // Show neuromodulation activity
+    void showNeuromodulationActivity(const Brain& brain) const;
     
-    // Check if visualization is active
-    bool isActive() const;
+    // Show memory system statistics
+    void showMemoryStats(const Brain& brain) const;
     
-    // Set update rate
-    void setUpdateRate(double hz);
-    double getUpdateRate() const;
+    // Show performance metrics
+    void showPerformanceMetrics(const Brain& brain, double wallClockTime) const;
     
-    // Network visualization
-    void visualizeNetwork(const class Brain& brain);
+    // Show development system status
+    void showDevelopmentStatus(const Brain& brain) const;
     
-    // Activity visualization
-    void visualizeActivity(const class Brain& brain);
-    
-    // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
-    
-    // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Show checkpoint status
+    void showCheckpointStatus(const Brain& brain) const;
 };
 
 } // namespace nlm

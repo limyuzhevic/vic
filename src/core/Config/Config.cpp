@@ -1,238 +1,400 @@
-#include "Config.hpp"
+// Enhanced NLM Configuration Implementation
+// Phase 6: Improved Configuration Management with Validation
+
+#include "core/Config/Config.hpp"
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <vector>
+#include <iostream>
 #include <algorithm>
-#include <filesystem>
+#include <ctime>
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
+Config::Config() : data_() {
+    initializeDefaults();
+}
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+void Config::initializeDefaults() {
+    // Set all default values
+    set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    set("simulation_timestep", 0.001, ConfigSource::Default);
+    set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+    set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    set("connection_probability", 0.1f, ConfigSource::Default);
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
+    // STDP parameters
+    set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    set("stdp_tau", 20.0f, ConfigSource::Default);
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Structural plasticity
+    set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Memory parameters
+    set("working_memory_capacity", static_cast<int64_t>(100), ConfigSource::Default);
+    set("max_episodes", static_cast<int64_t>(1000), ConfigSource::Default);
+    
+    // Development
+    set("development_enabled", true, ConfigSource::Default);
+    set("plasticity_modifier", 1.0f, ConfigSource::Default);
+    
+    // Simulation
+    set("max_steps", static_cast<int64_t>(10000), ConfigSource::Default);
+    set("checkpoint_interval", static_cast<int64_t>(100), ConfigSource::Default);
+    
+    // Logging
+    set("log_level", static_cast<int64_t>(1), ConfigSource::Default); // 0=Error, 1=Info, 2=Debug
+}
+
+bool Config::loadFromFile(const std::string& filename) {
+    try {
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            NLM_LOG_WARNING("Config file not found: " + filename + ", using defaults");
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
-}
-
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+        std::string line;
+        int lineNumber = 0;
+        int successfulLines = 0;
+        int malformedLines = 0;
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+        while (std::getline(file, line)) {
+            lineNumber++;
+            
+            // Skip comments and empty lines
+            if (line.empty() || line[0] == '#' || line[0] == ';') {
+                continue;
             }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
-}
-
-void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
-}
-
-void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, int64_t value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
-}
-
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-}
-
-void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
-}
-
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
-    }
-    return keys;
-}
-
-void Config::clear() {
-    pImpl->entries.clear();
-}
-
-std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
-                                 std::is_same_v<T, std::vector<double>> ||
-                                 std::is_same_v<T, std::vector<std::string>>) {
-                oss << "[";
-                for (size_t i = 0; i < arg.size(); ++i) {
-                    if (i) oss << ", ";
-                    oss << arg[i];
-                }
-                oss << "]";
+            
+            // Parse key-value pairs
+            size_t delimiterPos = line.find('=');
+            if (delimiterPos == std::string::npos) {
+                malformedLines++;
+                continue;
+            }
+            
+            std::string key = line.substr(0, delimiterPos);
+            std::string value = line.substr(delimiterPos + 1);
+            
+            // Trim whitespace
+            key = trim(key);
+            value = trim(value);
+            
+            if (key.empty() || value.empty()) {
+                malformedLines++;
+                continue;
+            }
+            
+            if (parseLine(key, value)) {
+                successfulLines++;
             } else {
-                oss << arg;
+                malformedLines++;
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        }
+        
+        file.close();
+        
+        if (successfulLines > 0) {
+            NLM_LOG_INFO("Loaded " + std::to_string(successfulLines) + " configuration parameters from: " + filename);
+            if (malformedLines > 0) {
+                NLM_LOG_WARNING("Skipped " + std::to_string(malformedLines) + " malformed lines in config file");
+            }
+            return true;
+        } else if (malformedLines > 0) {
+            NLM_LOG_ERROR("No valid configuration parameters found in: " + filename);
+            return false;
+        } else {
+            NLM_LOG_WARNING("Empty config file: " + filename + ", using defaults");
+            return false;
+        }
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Exception while loading config file " + filename + ": " + std::string(e.what()));
+        return false;
     }
-    return oss.str();
+}
+
+bool Config::loadFromArgs(int argc, char* argv[]) {
+    bool anyArgs = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--config" && i + 1 < argc) {
+            // Already handled by loadFromFile
+            continue;
+        } else if (arg.find("--") == 0) {
+            // Parse --key=value format
+            std::string key = arg.substr(2);
+            size_t equalPos = key.find('=');
+            if (equalPos != std::string::npos) {
+                std::string keyName = key.substr(0, equalPos);
+                std::string keyValue = key.substr(equalPos + 1);
+                
+                if (parseLine(keyName, keyValue)) {
+                    anyArgs = true;
+                }
+            }
+        } else if (arg == "--help" || arg == "-h") {
+            // Help handled elsewhere
+            continue;
+        } else if (arg == "save" || arg == "load" || arg == "run" || arg == "build" || arg == "test") {
+            // Command handled elsewhere
+            continue;
+        } else {
+            // Unknown argument, could be a value
+            std::cerr << "Unknown argument: " << arg << std::endl;
+        }
+    }
+    
+    return anyArgs;
+}
+
+bool Config::parseLine(const std::string& key, const std::string& value) {
+    try {
+        // Check if key exists (try all types)
+        ConfigSource source = ConfigSource::CommandLine;
+        
+        // Try to parse based on value content
+        if (value.find('.') != std::string::npos) {
+            // Try float
+            try {
+                float floatVal = std::stof(value);
+                set(key, floatVal, source);
+                return true;
+            } catch (...) {}
+            
+            // Try double
+            try {
+                double doubleVal = std::stod(value);
+                set(key, doubleVal, source);
+                return true;
+            } catch (...) {}
+        } else if (value == "true" || value == "false") {
+            // Boolean
+            bool boolVal = (value == "true");
+            set(key, boolVal, source);
+            return true;
+        } else {
+            // Try integer
+            try {
+                int64_t intVal = std::stoll(value);
+                set(key, intVal, source);
+                return true;
+            } catch (...) {}
+            
+            // Fall back to string
+            set(key, value, source);
+            return true;
+        }
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing config line '" + key + " = " + value + "': " + std::string(e.what()));
+    }
+    
+    return false;
 }
 
 std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
+    size_t start = str.find_first_not_of(" \t\n\r");
+    size_t end = str.find_last_not_of(" \t\n\r");
+    return (start == std::string::npos) ? "" : str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+ConfigSource Config::detectConfigSource(const std::string& key) const {
+    auto it = sourceMap_.find(key);
+    if (it != sourceMap_.end()) {
+        return it->second;
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
-        } else {
-            return std::nullopt;
+    return ConfigSource::Default;
+}
+
+bool Config::validate() const {
+    bool isValid = true;
+    std::vector<std::string> errors;
+    
+    // Validate neuron count
+    auto neuronCountOpt = get<int64_t>("neuron_count");
+    if (neuronCountOpt) {
+        int64_t count = *neuronCountOpt;
+        if (count < 10 || count > 1000000) {
+            errors.push_back("neuron_count must be between 10 and 1,000,000");
+            isValid = false;
         }
-    }, it->value);
+    }
+    
+    // Validate region count
+    auto regionCountOpt = get<int64_t>("region_count");
+    if (regionCountOpt) {
+        int64_t count = *regionCountOpt;
+        if (count < 1 || count > 1000) {
+            errors.push_back("region_count must be between 1 and 1000");
+            isValid = false;
+        }
+    }
+    
+    // Validate connection probability
+    auto connProbOpt = get<float>("connection_probability");
+    if (connProbOpt) {
+        float prob = *connProbOpt;
+        if (prob < 0.0f || prob > 1.0f) {
+            errors.push_back("connection_probability must be between 0.0 and 1.0");
+            isValid = false;
+        }
+    }
+    
+    // Validate simulation timestep
+    auto timestepOpt = get<double>("simulation_timestep");
+    if (timestepOpt) {
+        double timestep = *timestepOpt;
+        if (timestep <= 0.0 || timestep > 1.0) {
+            errors.push_back("simulation_timestep must be between 0.0 and 1.0");
+            isValid = false;
+        }
+    }
+    
+    // Validate STDP parameters
+    auto ltpOpt = get<float>("stdp_ltp_weight");
+    if (ltpOpt) {
+        float ltp = *ltpOpt;
+        if (ltp < 0.0f) {
+            errors.push_back("stdp_ltp_weight must be positive");
+            isValid = false;
+        }
+    }
+    
+    auto ltdOpt = get<float>("stdp_ltd_weight");
+    if (ltdOpt) {
+        float ltd = *ltdOpt;
+        if (ltd < 0.0f) {
+            errors.push_back("stdp_ltd_weight must be positive");
+            isValid = false;
+        }
+    }
+    
+    // Validate structural plasticity
+    auto synRateOpt = get<float>("synaptogenesis_rate");
+    if (synRateOpt) {
+        float rate = *synRateOpt;
+        if (rate < 0.0f || rate > 0.01f) {
+            errors.push_back("synaptogenesis_rate should be between 0.0 and 0.01");
+        }
+    }
+    
+    // Report validation errors
+    if (!isValid) {
+        NLM_LOG_ERROR("Configuration validation failed:");
+        for (const auto& error : errors) {
+            NLM_LOG_ERROR("  - " + error);
+        }
+    }
+    
+    return isValid;
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+void Config::logConfiguration() const {
+    NLM_LOG_INFO("=== NLM Configuration ===");
+    
+    auto logValue = [this](const std::string& key) {
+        auto neuronCountOpt = get<int64_t>("neuron_count");
+        if (neuronCountOpt) {
+            NLM_LOG_INFO("  " + key + ": " + std::to_string(*neuronCountOpt));
+        }
+    };
+    
+    logValue("neuron_count");
+    logValue("region_count");
+    
+    auto logFloatValue = [this](const std::string& key) {
+        auto connProbOpt = get<float>("connection_probability");
+        if (connProbOpt) {
+            NLM_LOG_INFO(std::fixed, std::setprecision(4));
+            NLM_LOG_INFO("  " + key + ": " + std::to_string(*connProbOpt));
+        }
+    };
+    
+    logFloatValue("connection_probability");
+    
+    NLM_LOG_INFO("========================");
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+bool Config::saveToFile(const std::string& filename) const {
+    try {
+        std::ofstream file(filename);
+        if (!file.is_open()) {
+            NLM_LOG_ERROR("Failed to create config file: " + filename);
+            return false;
+        }
+        
+        file << "# NLM Configuration File" << std::endl;
+        file << "# Generated by NLM Configuration System" << std::endl;
+        file << "# Generated at: " << getCurrentTimestamp() << std::endl;
+        file << std::endl;
+        
+        // Write all parameters
+        saveToStream(file);
+        
+        file.close();
+        NLM_LOG_INFO("Configuration saved to: " + filename);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error saving configuration to file: " + std::string(e.what()));
+        return false;
+    }
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+void Config::saveToStream(std::ostream& stream) const {
+    stream << "# Basic simulation parameters" << std::endl;
+    auto neuronCountOpt = get<int64_t>("neuron_count");
+    if (neuronCountOpt) {
+        stream << "neuron_count = " << *neuronCountOpt << std::endl;
+    }
+    
+    auto regionCountOpt = get<int64_t>("region_count");
+    if (regionCountOpt) {
+        stream << "region_count = " << *regionCountOpt << std::endl;
+    }
+    
+    auto connProbOpt = get<float>("connection_probability");
+    if (connProbOpt) {
+        stream << "connection_probability = " << *connProbOpt << std::endl;
+    }
+    
+    stream << std::endl;
+    stream << "# Synaptic plasticity parameters" << std::endl;
+    auto ltpOpt = get<float>("stdp_ltp_weight");
+    if (ltpOpt) {
+        stream << "stdp_ltp_weight = " << *ltpOpt << std::endl;
+    }
+    
+    auto ltdOpt = get<float>("stdp_ltd_weight");
+    if (ltdOpt) {
+        stream << "stdp_ltd_weight = " << *ltdOpt << std::endl;
+    }
+    
+    stream << std::endl;
+    stream << "# Structural plasticity" << std::endl;
+    auto synRateOpt = get<float>("synaptogenesis_rate");
+    if (synRateOpt) {
+        stream << "synaptogenesis_rate = " << *synRateOpt << std::endl;
+    }
+    
+    auto pruneRateOpt = get<float>("pruning_rate");
+    if (pruneRateOpt) {
+        stream << "pruning_rate = " << *pruneRateOpt << std::endl;
+    }
+}
+
+std::string Config::getCurrentTimestamp() const {
+    std::time_t now = std::time(nullptr);
+    char buf[80];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+    return std::string(buf);
+}
 
 } // namespace nlm
