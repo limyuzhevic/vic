@@ -59,6 +59,7 @@ int main(int argc, char* argv[]) {
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
+    config.checkpointPath = "./nlm_checkpoint_test.bin";  // Fixed checkpoint path
     
     auto result = experiment.run(config);
     
