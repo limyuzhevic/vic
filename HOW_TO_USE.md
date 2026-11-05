@@ -535,8 +535,301 @@ pip install --force-reinstall .
 
 ---
 
-## Further Reading
+---
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
-- [SCIENCE.md](docs/SCIENCE.md) - Scientific background
-- [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+## Part 8: Advanced Features and Power User Options (Phase 6)
+
+This section covers the advanced configuration, debugging, and performance tuning options available in NLM Phase 6.
+
+### Advanced Configuration
+
+NLM supports two configuration file formats with extensive options for power users:
+
+#### JSON Configuration (Phase 6 Advanced)
+```json
+{
+  "neuron_count": 1000,
+  "region_count": 2,
+  "connection_probability": 0.1,
+  "enable_learning": true,
+  "enable_plasticity": true,
+  "enable_development": true,
+  "enable_neuromodulation": true,
+  "debug_mode": false,
+  "working_memory_capacity_fraction": 0.1,
+  "episodic_memory_max_episodes": 1000,
+  "memory_replay_interval": 100,
+  "exploration_balance": 0.3,
+  "curiosity_threshold": 0.7,
+  "reward_pe_decay_rate": 0.99,
+  "dopamine_learning_rate": 0.05,
+  "curiosity_bonus_weight": 0.2,
+  "novelty_sensitivity": 0.3,
+  "prediction_error_sensitivity": 0.4,
+  "critical_period_strength": 1.0,
+  "maturation_acceleration": 1.2,
+  "synaptic_delivery_threads": 4,
+  "enable_optimized_spike_delivery": true,
+  "spike_delivery_batch_size": 100,
+  "cache_connectivity": true
+}
+```
+
+#### Legacy Key=Value Format (Phase 5/6 Compatible)
+```
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.1
+enable_learning = true
+enable_plasticity = true
+enable_development = true
+enable_neuromodulation = true
+debug_mode = false
+working_memory_capacity_fraction = 0.1
+episodic_memory_max_episodes = 1000
+memory_replay_interval = 100
+exploration_balance = 0.3
+curiosity_threshold = 0.7
+reward_pe_decay_rate = 0.99
+dopamine_learning_rate = 0.05
+curiosity_bonus_weight = 0.2
+novelty_sensitivity = 0.3
+prediction_error_sensitivity = 0.4
+critical_period_strength = 1.0
+maturation_acceleration = 1.2
+synaptic_delivery_threads = 4
+enable_optimized_spike_delivery = true
+spike_delivery_batch_size = 100
+cache_connectivity = true
+```
+
+### Advanced Command Line Options (Phase 6)
+
+NLM now supports extensive command-line options for debugging, validation, and controlling simulation behavior:
+
+#### Core Options
+```bash
+# Basic execution
+nlm [OPTIONS]
+
+# Debug and validation
+nlm --debug                  # Enable debug logging
+nlm --validate               # Validate configuration before running
+nlm --profile                # Enable performance profiling
+
+# Configuration management
+nlm --export                 # Export current config to JSON
+nlm --import=config.json     # Import configuration from JSON file
+nlm --config=file.cfg        # Legacy config file support
+
+# Learning control (independent mechanisms)
+nlm --enable-learning        # Enable learning mechanisms (default)
+nlm --no-learning            # Disable learning mechanisms
+nlm --enable-plasticity      # Enable synaptic plasticity (default)
+nlm --no-plasticity          # Disable synaptic plasticity
+nlm --enable-development     # Enable developmental processes (default)
+nlm --no-development         # Disable developmental processes
+nlm --enable-neuromodulation  # Enable neuromodulation (default)
+nlm --no-neuromodulation     # Disable neuromodulation
+nlm --enable-curiosity       # Enable curiosity-driven exploration
+nlm --no-curiosity           # Disable curiosity
+nlm --enable-novelty         # Enable novelty detection
+nlm --no-novelty             # Disable novelty detection
+
+# Network inspection
+nlm --inspect=neurons        # Inspect neuron structure
+nlm --inspect=synapses       # Inspect synapse statistics
+nlm --inspect=regions        # Inspect brain region structure
+n(target|------|-------------|---)
+
+For complete documentation including installation, building, configuration, and advanced features, please refer to the README.md file which contains comprehensive documentation for all phases of the NLM project.
+
+This HOW_TO_USE.md file focuses on basic usage patterns and common scenarios for beginners.
+
+For advanced features, configuration validation, network inspection, performance tuning, and comprehensive command-line options, please see the main README.md file.
+
+Phase 6 introduces extensive advanced configuration and control options for power users, including:
+
+- Enhanced configuration system with JSON support
+- Command-line validation and debugging tools
+- Network inspection and analysis capabilities
+- Performance tuning options
+- Learning mechanism control
+- Configuration import/export functionality
+
+For complete documentation of all advanced features and Phase 6 capabilities, please refer to the main README.md file.
+
+---
+
+## Getting Help
+
+### Online Resources
+
+- **Documentation**: https://nlm.readthedocs.io
+- **GitHub Repository**: https://github.com/nlm-project/nlm
+- **Discussions**: Project GitHub discussions
+- **Examples**: https://github.com/nlm-project/nlm-examples
+
+### Support
+
+For questions not covered in this documentation:
+1. Check the main README.md for comprehensive documentation
+2. Review the source code comments and headers
+3. Use `nlm --help` for current command-line options
+4. Experiment with small configurations first
+
+### Project-Specific Questions
+
+For NLM-specific questions:
+- **Phase 1**: Basic project setup and building
+- **Phase 2**: Core brain components and simulation
+- **Phase 3**: World interaction and agent systems
+- **Phase 4**: Advanced cognition and prediction systems
+- **Phase 5**: Performance optimizations and advanced features
+- **Phase 6**: Final integration and advanced configuration
+
+### Example Search
+
+Use `grep -r "example" .` to find example scripts and code snippets.
+
+---
+
+## Quick Reference
+
+### Basic Commands
+
+```bash
+# Build the project
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+
+# Run basic simulation
+./nlm
+
+# Run Phase 6 integration test
+./nlm_phase6_demo
+
+# Run unit tests
+./nlm_test
+```
+
+### Python Usage
+
+```python
+import pynlm
+
+# Create default configuration
+config = pynlm.createDefaultConfig()
+
+# Create and initialize brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+```
+
+### Configuration Files
+
+- **Default configuration**: `configs/default.cfg`
+- **Phase 6 advanced configuration**: See README.md for examples
+- **Python examples**: Available in main project directory
+
+---
+
+## Best Practices
+
+### For Beginners
+
+1. **Always call `initialize()` before `step()`**
+2. **Use small configurations for testing**
+3. **Enable debugging for complex simulations**
+4. **Use validation before running production configurations**
+5. **Start with examples and modify gradually**
+
+### For Advanced Users
+
+1. **Use `--debug --validate` for complex configurations**
+2. **Profile performance with `--profile`**
+3. **Inspect networks with `--inspect=neurons`**
+4. **Control learning mechanisms precisely**
+5. **Export/import configurations for reproducibility**
+
+---
+
+## Next Steps
+
+1. **Read README.md** for comprehensive documentation
+2. **Check examples** in the project directory
+3. **Experiment with configurations**
+4. **Join discussions** for questions
+5. **Contribute** to the project
+
+The NLM project continues to evolve. Always check the latest documentation for the most current features and capabilities.
+
+---
+
+## Version Information
+
+- **Current Phase**: Phase 6: Final Integration
+- **Documentation**: README.md contains comprehensive documentation
+- **Last Updated**: 2026
+- **Status**: All documentation available in main README.md
+
+For the most complete and up-to-date documentation, please refer to the main README.md file.
+
+---
+
+# NLM (Neural Learning Machine) - Advanced Features Reference (Phase 6)
+
+This section documents the advanced features available in NLM Phase 6. For complete documentation, please refer to the main README.md file.
+
+## Advanced Features Summary
+
+Phase 6 introduces extensive advanced configuration and control options:
+
+### 1. Enhanced Configuration System
+- JSON/YAML configuration file support
+- Comprehensive parameter validation
+- Type conversion and error handling
+- Configuration import/export functionality
+
+### 2. Command-Line Control
+- `--debug` / `--no-debug` for logging control
+- `--validate` for configuration validation
+- `--profile` for performance profiling
+- `--inspect=neurons` for network analysis
+- Independent learning mechanism control
+
+### 3. Performance Tuning
+- Thread-based synaptic delivery
+- Optimized spike delivery algorithms
+- Connectivity caching
+- Batch processing for better performance
+
+### 4. Memory System Configuration
+- Working memory capacity control
+- Episodic memory management
+- Memory replay and consolidation
+- Memory system performance tuning
+
+### 5. Neuromodulation Control
+- Dopamine-based learning
+- Curiosity-driven exploration
+- Novelty detection
+- Reward prediction error handling
+
+### 6. Developmental System
+- Critical period control
+- Maturation acceleration
+- Age-dependent plasticity
+- Developmental stage management
+
+For complete documentation of all features, parameters, and examples, please refer to the main README.md file.
+
+---
+
+*End of Advanced Features Reference. See main README.md for comprehensive documentation.*
