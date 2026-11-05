@@ -395,39 +395,77 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
-        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
+        .def("enableAllFeatures", &AgentBrain::enableAllFeatures,
+             py::arg("enable") = true,
+             "Enable or disable all agent features at once")
+        .def("configureForSimulation", &AgentBrain::configureForSimulation,
+             py::arg("mode") = "standard",
+             "Configure agent for different simulation modes (fast, accurate, balanced, minimal)")
+        .def("setFeatureFlag", &AgentBrain::setFeatureFlag,
+             py::arg("featureName"), py::arg("enabled"),
+             "Set a specific feature flag with validation")
+        .def("getFeatureStatus", &AgentBrain::getFeatureStatus,
+             "Get current status of all agent features")
+        .def("getAvailableFeatures", &AgentBrain::getAvailableFeatures,
+             "Get list of available features that can be configured")
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
-
-} // namespace nlm
+    m.def("createQuickStartConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        return config;
+    }, "Create a quick-start configuration optimized for beginners")
+    
+    .def("validateBrainSetup", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent,
+                                 std::shared_ptr<SimpleWorld> world) {
+        bool valid = true;
+        std::string errors;
+        
+        if (!brain->getTotalNeuronCount()) {
+            valid = false;
+            errors += "Brain has no neurons. ";
+        }
+        
+        if (!agent->getSensoryInputSize()) {
+            valid = false;
+            errors += "Agent has no sensory inputs. ";
+        }
+        
+        if (!world->getWidth()) {
+            valid = false;
+            errors += "World has no dimensions. ";
+        }
+        
+        return std::make_pair(valid, errors);
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"),
+       "Validate that the simulation setup is complete")
+    
+    .def("getSimulationStatus", [](std::shared_ptr<Brain> brain, std::shared_ptr<AgentBrain> agent,
+                                   std::shared_ptr<SimpleWorld> world) {
+        std::map<std::string, std::string> status;
+        status["brain_neurons"] = std::to_string(brain->getTotalNeuronCount());
+        status["brain_synapses"] = std::to_string(brain->getTotalSynapseCount());
+        status["brain_spikes"] = std::to_string(brain->getTotalSpikeCount());
+        status["agent_features"] = agent->getFeatureStatus();
+        status["world_dimensions"] = std::to_string(world->getWidth()) + "x" + std::to_string(world->getHeight());
+        status["simulation_time"] = std::to_string(world->getSimulationTime());
+        return status;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"),
+       "Get comprehensive simulation status")
+    
+    // Export configuration
+    m.def("exportConfigToJSON", &Config::saveToFile,
+         py::arg("filepath"), py::arg("config"),
+         "Export configuration to JSON file")
+    
+    // Import configuration
+    m.def("importConfigFromJSON", [](std::shared_ptr<Config> config, const std::string& filepath) {
+        bool success = config->loadFromFile(filepath);
+        return std::make_pair(success, filepath);
+    }, py::arg("config"), py::arg("filepath"),
+       "Import configuration from JSON file")

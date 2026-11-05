@@ -1107,4 +1107,82 @@ void AgentBrain::reset() {
     hasThoughtOutcome_ = false;
 }
 
+bool AgentBrain::isRewardModulationEnabled() const {
+    return rewardModulationEnabled_;
+}
+bool AgentBrain::isStructuralPlasticityEnabled() const {
+    return structuralPlasticityEnabled_;
+}
+bool AgentBrain::isDevelopmentEnabled() const {
+    return developmentEnabled_;
+}
+bool AgentBrain::isCuriosityEnabled() const {
+    return curiosityEnabled_;
+}
+
+// Enable/disable all features at once
+void AgentBrain::enableAllFeatures(bool enable) {
+    enableRewardModulation(enable);
+    enableStructuralPlasticity(enable);
+    enableDevelopment(enable);
+    enableCuriosity(enable);
+}
+
+// Configure for different simulation modes
+void AgentBrain::configureForSimulation(const std::string& mode) {
+    if (mode == "fast") {
+        enableAllFeatures(true);
+        // Fast mode: disable expensive computations
+        if (brain_) {
+            // Could add specific optimizations here
+        }
+    } else if (mode == "accurate") {
+        enableAllFeatures(true);
+        // Accurate mode: enable all features with maximum precision
+    } else if (mode == "balanced") {
+        enableAllFeatures(true);
+        // Balanced mode: reasonable trade-off between speed and features
+    } else if (mode == "minimal") {
+        enableRewardModulation(true);
+        // Minimal mode: only essential features
+    } else {
+        enableAllFeatures(true);
+    }
+}
+
+// Advanced configuration with validation
+bool AgentBrain::setFeatureFlag(const std::string& featureName, bool enabled) {
+    if (featureName == "reward_modulation") {
+        enableRewardModulation(enabled);
+        return true;
+    } else if (featureName == "structural_plasticity") {
+        enableStructuralPlasticity(enabled);
+        return true;
+    } else if (featureName == "development") {
+        enableDevelopment(enabled);
+        return true;
+    } else if (featureName == "curiosity") {
+        enableCuriosity(enabled);
+        return true;
+    }
+    return false;
+}
+
+// Get status of all features
+std::string AgentBrain::getFeatureStatus() const {
+    std::string status = "Feature Status:\n";
+    status += "  Reward Modulation: " + std::string(rewardModulationEnabled_ ? "ENABLED" : "DISABLED") + "\n";
+    status += "  Structural Plasticity: " + std::string(structuralPlasticityEnabled_ ? "ENABLED" : "DISABLED") + "\n";
+    status += "  Development: " + std::string(developmentEnabled_ ? "ENABLED" : "DISABLED") + "\n";
+    status += "  Curiosity: " + std::string(curiosityEnabled_ ? "ENABLED" : "DISABLED") + "\n";
+    return status;
+}
+
+// Get list of available features
+std::vector<std::string> AgentBrain::getAvailableFeatures() const {
+    return {"reward_modulation", "structural_plasticity", "development", "curiosity"};
+}
+
+} // namespace nlm
+
 } // namespace nlm

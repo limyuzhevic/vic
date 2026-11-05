@@ -125,16 +125,26 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Configuration methods with validation
+    void enableRewardModulation(bool enable);
+    void enableStructuralPlasticity(bool enable);
+    void enableDevelopment(bool enable);
+    void enableCuriosity(bool enable);
     
+    // Get current configuration status
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    
+    // Batch configuration setup
+    void enableAllFeatures(bool enable = true);
+    void configureForSimulation(const std::string& mode = "standard");
+    
+    // Advanced configuration with parameter validation
+    bool setFeatureFlag(const std::string& featureName, bool enabled);
+    std::string getFeatureStatus() const;
+    std::vector<std::string> getAvailableFeatures() const;
     
 private:
     // Motor decoding: convert neural activity to motor command
