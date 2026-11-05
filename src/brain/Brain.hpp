@@ -205,6 +205,9 @@ public:
     // Logging
     void logStatus() const;
     
+    // Configuration validation
+    bool validateConfiguration() const;
+    
 private:
     struct Impl;
     Impl* pImpl;

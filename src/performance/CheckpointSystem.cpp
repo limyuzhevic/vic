@@ -450,7 +450,11 @@ bool CheckpointManager::saveImmediately(const std::string& name) {
 bool CheckpointManager::update(uint64_t currentStep, double currentTime) {
     (void)currentTime;
     if (!shouldSave(currentStep)) return false;
-    if (!neuronProvider_ || !synapseProvider_) return false;
+    if (!neuronProvider_ || !synapseProvider_) {
+        NLM_LOG_ERROR("Checkpoint providers not configured");
+        return false;
+    }
+    
     lastSaveStep_ = currentStep;
     return saveImmediately("checkpoint-" + std::to_string(currentStep) + ".bin");
 }
@@ -458,18 +462,54 @@ bool CheckpointManager::update(uint64_t currentStep, double currentTime) {
 bool CheckpointManager::load(const std::string& name) {
     std::string path = (std::filesystem::path(checkpointDir_) / name).string();
     CheckpointReader reader;
-    if (!reader.open(path)) return false;
-    return reader.validate();
+    if (!reader.open(path)) {
+        NLM_LOG_ERROR("Failed to open checkpoint file: " + path);
+        NLM_LOG_ERROR("Error: " + reader.getError());
+        return false;
+    }
+    
+    if (!reader.validate()) {
+        NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
+        return false;
+    }
+    
+    // Additional validation
+    const auto& header = reader.getHeader();
+    if (header.neuronCount == 0) {
+        NLM_LOG_ERROR("Invalid checkpoint: neuron count is zero");
+        return false;
+    }
+    
+    NLM_LOG_INFO("Successfully loaded checkpoint: " + name + " (" + 
+                 std::to_string(header.neuronCount) + " neurons, " +
+                 std::to_string(header.synapseCount) + " synapses)");
+    
+    return true;
 }
 
 std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoints() const {
     std::vector<CheckpointInfo> infos;
     std::error_code ec;
-    if (checkpointDir_.empty() || !std::filesystem::exists(checkpointDir_, ec)) return infos;
+    if (checkpointDir_.empty() || !std::filesystem::exists(checkpointDir_, ec)) {
+        NLM_LOG_DEBUG("Checkpoint directory does not exist or is empty: " + checkpointDir_);
+        return infos;
+    }
+    
+    int count = 0;
     for (const auto& entry : std::filesystem::directory_iterator(checkpointDir_, ec)) {
         if (entry.path().extension() != ".bin") continue;
         CheckpointReader reader;
-        if (!reader.open(entry.path().string())) continue;
+        if (!reader.open(entry.path().string())) {
+            NLM_LOG_DEBUG("Failed to open checkpoint file for listing: " + entry.path().string());
+            continue;
+        }
+        
+        if (!reader.validate()) {
+            NLM_LOG_WARNING("Invalid checkpoint file (corrupt or incompatible): " + entry.path().string() + 
+                           " (error: " + reader.getError() + ")");
+            continue;
+        }
+        
         CheckpointInfo info;
         info.name = entry.path().filename().string();
         info.step = reader.getHeader().step;
@@ -483,7 +523,11 @@ std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoint
             ftime - decltype(ftime)::clock::now() + std::chrono::system_clock::now());
         info.timestamp = std::chrono::system_clock::to_time_t(sysTime);
         infos.push_back(info);
+        count++;
     }
+    
+    NLM_LOG_DEBUG("Found " + std::to_string(count) + " valid checkpoints in directory: " + checkpointDir_);
+    
     std::sort(infos.begin(), infos.end(),
               [](const CheckpointInfo& a, const CheckpointInfo& b) { return a.step < b.step; });
     return infos;
@@ -491,11 +535,25 @@ std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoint
 
 void CheckpointManager::pruneOldCheckpoints(size_t keepCount) {
     auto infos = listCheckpoints();
-    if (infos.size() <= keepCount) return;
+    if (infos.size() <= keepCount) {
+        NLM_LOG_DEBUG("No checkpoints to prune (have " + std::to_string(infos.size()) + 
+                     " checkpoints, keeping " + std::to_string(keepCount) + ")");
+        return;
+    }
+    
     size_t toRemove = infos.size() - keepCount;
+    NLM_LOG_INFO("Pruning " + std::to_string(toRemove) + " old checkpoints (keeping most recent " + 
+                 std::to_string(keepCount) + ")");
+    
     for (size_t i = 0; i < toRemove; ++i) {
         std::error_code ec;
+        std::string removedPath = (std::filesystem::path(checkpointDir_) / infos[i].name).string();
         std::filesystem::remove(std::filesystem::path(checkpointDir_) / infos[i].name, ec);
+        if (ec) {
+            NLM_LOG_WARNING("Failed to remove old checkpoint " + infos[i].name + ": " + ec.message());
+        } else {
+            NLM_LOG_DEBUG("Removed old checkpoint: " + removedPath);
+        }
     }
 }
 

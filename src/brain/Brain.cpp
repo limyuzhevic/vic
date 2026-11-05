@@ -201,6 +201,12 @@ bool Brain::initialize() {
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     
+    // Validate configuration before initialization
+    if (!validateConfiguration()) {
+        NLM_LOG_ERROR("Configuration validation failed during brain initialization");
+        return false;
+    }
+    
     // Get configuration values
     size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000));
     size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", 1));
@@ -1551,41 +1557,136 @@ RandomGenerator* Brain::getRandomGenerator() {
     return pImpl->rng.get();
 }
 
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
-    
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
-    }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+bool Brain::validateConfiguration() const {
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Configuration is null");
+        return false;
     }
     
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    // Validate required configuration values with bounds checking
+    auto neuronCount = pImpl->config->getOr<int64_t>("neuron_count", 1000);
+    if (neuronCount <= 0 || neuronCount > 100000) {
+        NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be 1-100000");
+        return false;
     }
     
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
-    
-    for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    auto regionCount = pImpl->config->getOr<int64_t>("region_count", 1);
+    if (regionCount <= 0 || regionCount > 100) {
+        NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be 1-100");
+        return false;
     }
+    
+    auto connectionProb = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    if (connectionProb < 0.0f || connectionProb > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connectionProb) + ". Must be 0.0-1.0");
+        return false;
+    }
+    
+    auto timestep = pImpl->config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0 || timestep > 1.0) {
+        NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep) + ". Must be 0.001-1.0");
+        return false;
+    }
+    
+    // Validate plasticity parameters
+    auto ltpWeight = pImpl->config->getOr<float>("stdp_ltp_weight", 0.01f);
+    if (ltpWeight < 0.0f || ltpWeight > 1.0f) {
+        NLM_LOG_ERROR("Invalid stdp_ltp_weight: " + std::to_string(ltpWeight) + ". Must be 0.0-1.0");
+        return false;
+    }
+    
+    auto ltdWeight = pImpl->config->getOr<float>("stdp_ltd_weight", 0.012f);
+    if (ltdWeight < 0.0f || ltdWeight > 1.0f) {
+        NLM_LOG_ERROR("Invalid stdp_ltd_weight: " + std::to_string(ltdWeight) + ". Must be 0.0-1.0");
+        return false;
+    }
+    
+    auto stdpTau = pImpl->config->getOr<float>("stdp_tau", 20.0f);
+    if (stdpTau <= 0.0f || stdpTau > 1000.0f) {
+        NLM_LOG_ERROR("Invalid stdp_tau: " + std::to_string(stdpTau) + ". Must be 0.01-1000.0");
+        return false;
+    }
+    
+    // Validate structural plasticity parameters
+    auto synaptogenesisRate = pImpl->config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    if (synaptogenesisRate < 0.0f || synaptogenesisRate > 0.01f) {
+        NLM_LOG_ERROR("Invalid synaptogenesis_rate: " + std::to_string(synaptogenesisRate) + ". Must be 0.0-0.01");
+        return false;
+    }
+    
+    auto pruningRate = pImpl->config->getOr<float>("pruning_rate", 0.00001f);
+    if (pruningRate < 0.0f || pruningRate > 0.001f) {
+        NLM_LOG_ERROR("Invalid pruning_rate: " + std::to_string(pruningRate) + ". Must be 0.0-0.001");
+        return false;
+    }
+    
+    NLM_LOG_INFO("Configuration validation passed");
+    return true;
 }
 
-} // namespace nlm
+bool Brain::validateConfiguration() const {
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Configuration is null");
+        return false;
+    }
+    
+    // Validate required configuration values with bounds checking
+    auto neuronCount = pImpl->config->getOr<int64_t>("neuron_count", 1000);
+    if (neuronCount <= 0 || neuronCount > 100000) {
+        NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount) + ". Must be 1-100000");
+        return false;
+    }
+    
+    auto regionCount = pImpl->config->getOr<int64_t>("region_count", 1);
+    if (regionCount <= 0 || regionCount > 100) {
+        NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount) + ". Must be 1-100");
+        return false;
+    }
+    
+    auto connectionProb = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    if (connectionProb < 0.0f || connectionProb > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connectionProb) + ". Must be 0.0-1.0");
+        return false;
+    }
+    
+    auto timestep = pImpl->config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0 || timestep > 1.0) {
+        NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep) + ". Must be 0.001-1.0");
+        return false;
+    }
+    
+    // Validate plasticity parameters
+    auto ltpWeight = pImpl->config->getOr<float>("stdp_ltp_weight", 0.01f);
+    if (ltpWeight < 0.0f || ltpWeight > 1.0f) {
+        NLM_LOG_ERROR("Invalid stdp_ltp_weight: " + std::to_string(ltpWeight) + ". Must be 0.0-1.0");
+        return false;
+    }
+    
+    auto ltdWeight = pImpl->config->getOr<float>("stdp_ltd_weight", 0.012f);
+    if (ltdWeight < 0.0f || ltdWeight > 1.0f) {
+        NLM_LOG_ERROR("Invalid stdp_ltd_weight: " + std::to_string(ltdWeight) + ". Must be 0.0-1.0");
+        return false;
+    }
+    
+    auto stdpTau = pImpl->config->getOr<float>("stdp_tau", 20.0f);
+    if (stdpTau <= 0.0f || stdpTau > 1000.0f) {
+        NLM_LOG_ERROR("Invalid stdp_tau: " + std::to_string(stdpTau) + ". Must be 0.01-1000.0");
+        return false;
+    }
+    
+    // Validate structural plasticity parameters
+    auto synaptogenesisRate = pImpl->config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    if (synaptogenesisRate < 0.0f || synaptogenesisRate > 0.01f) {
+        NLM_LOG_ERROR("Invalid synaptogenesis_rate: " + std::to_string(synaptogenesisRate) + ". Must be 0.0-0.01");
+        return false;
+    }
+    
+    auto pruningRate = pImpl->config->getOr<float>("pruning_rate", 0.00001f);
+    if (pruningRate < 0.0f || pruningRate > 0.001f) {
+        NLM_LOG_ERROR("Invalid pruning_rate: " + std::to_string(pruningRate) + ". Must be 0.0-0.001");
+        return false;
+    }
+    
+    NLM_LOG_INFO("Configuration validation passed");
+    return true;
+}

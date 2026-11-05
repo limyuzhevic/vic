@@ -1,36 +1,16 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-#include <algorithm>
-
-namespace nlm {
-
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
+// Configuration validation schema
+struct ConfigValidation {
+    bool required;
+    std::function<bool(const std::string&)> validate;
+    std::string description;
+    
+    ConfigValidation(bool req = false, 
+                    std::function<bool(const std::string&)> val = nullptr,
+                    const std::string& desc = "")
+        : required(req), validate(val), description(desc) {}
 };
+
+using ConfigSchema = std::unordered_map<std::string, ConfigValidation>;
 
 // Configuration entry
 struct ConfigEntry {
@@ -66,12 +46,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +75,13 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration validation
+    bool validate(const ConfigSchema& schema) const;
+    bool validateKey(const std::string& key, const std::string& value) const;
+    
+    // Get configuration schema for validation
+    static ConfigSchema getSchema();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +89,70 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string getCurrentTimeString();
 };
+
+// Configuration value types
+using ConfigValue = std::variant<
+    int,
+    int64_t,
+    double,
+    bool,
+    std::string,
+    std::vector<int>,
+    std::vector<double>,
+    std::vector<std::string>
+>;
+
+// Configuration source
+enum class ConfigSource {
+    Default,
+    File,
+    CommandLine,
+    Runtime
+};
+
+// Configuration validation schema
+struct ConfigValidation {
+    bool required;
+    std::function<bool(const std::string&)> validate;
+    std::string description;
+    
+    ConfigValidation(bool req = false, 
+                    std::function<bool(const std::string&)> val = nullptr,
+                    const std::string& desc = "")
+        : required(req), validate(val), description(desc) {}
+};
+
+using ConfigSchema = std::unordered_map<std::string, ConfigValidation>;
+
+// Convenience macro for file/line/function info
+#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
+#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+
+// Stream-style logging helper
+class LogStream {
+public:
+    LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
+    ~LogStream();
+    
+    template<typename T>
+    LogStream& operator<<(const T& value) {
+        oss_ << value;
+        return *this;
+    }
+    
+private:
+    LogLevel level_;
+    std::ostringstream oss_;
+    std::string file_;
+    int line_;
+    std::string function_;
+};
+
+#define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
 
 } // namespace nlm
