@@ -60,6 +60,20 @@ public:
                           const std::vector<ActionType>& actualActions,
                           float actualReward);
 
+    // Record that a planned action was successful
+    // Used by Brain::produceAction to improve future planning
+    void recordPlanningSuccess(ActionType action, bool success) {
+        size_t actionIdx = static_cast<size_t>(action);
+        if (actionIdx < actionQuality_.size()) {
+            actionQuality_[actionIdx] = std::clamp(actionQuality_[actionIdx] + (success ? 0.1f : -0.05f), -1.0f, 1.0f);
+        }
+        
+        recentPlanSuccess_.push_back(success);
+        if (recentPlanSuccess_.size() > 10) {
+            recentPlanSuccess_.pop_front();
+        }
+    }
+
     // Clear planning cache
     void clearCache();
 

@@ -54,7 +54,27 @@ void PredictionSystem::clearHistory() {
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    // Train prediction model using the observed sensory input
+    // In a full implementation, this would update a learned forward model
+    // For now, we can record the observation for later use in prediction
+    
+    // Store recent observations for pattern matching
+    if (pImpl->errorHistory.size() > 100) {
+        pImpl->errorHistory.erase(pImpl->errorHistory.begin());
+    }
+    
+    // Use observation to build prediction capabilities
+    // This is a simple placeholder - Phase 2 would implement real predictive coding
+    const auto& obsData = observation.getData();
+    if (!obsData.empty()) {
+        // Record the observation magnitude as confidence
+        float magnitude = 0.0f;
+        for (float val : obsData) {
+            magnitude += val * val;
+        }
+        magnitude = std::sqrt(magnitude) / obsData.size();
+        pImpl->confidence = std::min(1.0f, pImpl->confidence * 0.9f + magnitude * 0.1f);
+    }
 }
 
 } // namespace nlm

@@ -4,6 +4,9 @@
 #include <cmath>
 #include <numeric>
 
+// Forward declaration for helper function
+std::vector<float> extractFeaturesFromEpisode(const EpisodicMemoryItem& episode);
+
 namespace nlm {
 
 struct ConceptFormation::Impl {
@@ -558,4 +561,101 @@ void TemporalRelation::clear() {
     sequences_.clear();
 }
 
-} // namespace nlm
+void ConceptFormation::updateConceptFormation(
+    const std::vector<float>& currentPatterns,
+    const std::vector<const EpisodicMemoryItem*>& recentEpisodes) {
+    
+    // Present working memory patterns for concept formation
+    if (!currentPatterns.empty()) {
+        std::vector<float> emptyFeatures(currentPatterns.size(), 0.0f);
+        presentExperience(currentPatterns, emptyFeatures, 0.0f, 0);  // Use step 0 as current time
+    }
+    
+    // Present episodic memory patterns for concept learning
+    for (const auto* episode : recentEpisodes) {
+        if (episode) {
+            // Extract features from the episode for learning
+            std::vector<float> features = extractFeaturesFromEpisode(*episode);
+            
+            // Present episode data to concept formation system
+            // Use episode reward as learning signal
+            presentExperience(episode->sensoryState, features, episode->reward, episode->timestamp);
+            
+            // Also use resulting state for prediction learning
+            if (!episode->resultingSensoryState.empty()) {
+                presentExperience(episode->resultingSensoryState, features, episode->resultingReward, episode->timestamp + 10);
+            }
+        }
+    }
+}
+
+// Helper function to extract features from episodic memory items
+// This creates feature vectors for concept formation from episodic data
+std::vector<float> extractFeaturesFromEpisode(const EpisodicMemoryItem& episode) {
+    std::vector<float> features;
+    
+    // Create a comprehensive feature vector from episode data
+    features.reserve(
+        episode.activeNeurons.size() + 
+        episode.neuronActivations.size() + 
+        episode.sensoryState.size() + 
+        episode.resultingSensoryState.size() + 5);  // +5 for additional metrics
+    
+    // Feature 1: Episode age (normalized)
+    features.push_back(episode.age / 100.0f);
+    
+    // Feature 2: Reward level
+    features.push_back(episode.reward);
+    
+    // Feature 3: Novelty
+    features.push_back(episode.novelty);
+    
+    // Feature 4: Energy level
+    features.push_back(episode.energy);
+    
+    // Feature 5: Action encoding
+    features.push_back(static_cast<float>(episode.action) / 10.0f);
+    
+    // Feature 6: Average neuron activation
+    if (!episode.neuronActivations.empty()) {
+        float sum = std::accumulate(episode.neuronActivations.begin(), episode.neuronActivations.end(), 0.0f);
+        features.push_back(sum / episode.neuronActivations.size());
+    } else {
+        features.push_back(0.0f);
+    }
+    
+    // Feature 7: Episode length (number of active neurons)
+    features.push_back(static_cast<float>(episode.activeNeurons.size()) / 100.0f);
+    
+    // Feature 8: Position x
+    features.push_back(episode.positionX / 10.0f);
+    
+    // Feature 9: Position y
+    features.push_back(episode.positionY / 10.0f);
+    
+    // Feature 10: Orientation
+    features.push_back(episode.orientation / 360.0f);
+    
+    // Feature 11: Sensory state summary (mean of first 10 elements or all)
+    if (!episode.sensoryState.empty()) {
+        size_t limit = std::min(static_cast<size_t>(10), episode.sensoryState.size());
+        float sum = std::accumulate(episode.sensoryState.begin(), episode.sensoryState.begin() + limit, 0.0f);
+        features.push_back(sum / limit);
+    } else {
+        features.push_back(0.0f);
+    }
+    
+    // Feature 12: Resulting sensory state difference (change)
+    if (!episode.sensoryState.empty() && !episode.resultingSensoryState.empty()) {
+        size_t limit = std::min(episode.sensoryState.size(), episode.resultingSensoryState.size());
+        float totalDiff = 0.0f;
+        for (size_t i = 0; i < limit; ++i) {
+            totalDiff += std::abs(episode.sensoryState[i] - episode.resultingSensoryState[i]);
+        }
+        features.push_back(totalDiff / limit);
+    } else {
+        features.push_back(0.0f);
+    }
+    
+    return features;
+}

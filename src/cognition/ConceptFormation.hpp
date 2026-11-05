@@ -132,18 +132,23 @@ public:
     // Clear all concepts
     void clear();
 
-    // Get generalization ability (can concept handle variations?)
+// Get generalization ability (can concept handle variations?)
     float getGeneralizationAbility(size_t conceptId) const;
 
     // Set parameters
     void setFormationThreshold(float t) { formationThreshold_ = t; }
     void setStabilityWindow(size_t w) { stabilityWindow_ = w; }
+    
+    // Update concept formation with integrated memory data
+    // This method processes working memory and episodic memory to form concepts
+    void updateConceptFormation(const std::vector<float>& currentPatterns,
+                                const std::vector<const EpisodicMemoryItem*>& recentEpisodes);
 
 private:
     // Create new concept from pattern
     size_t createConcept(const std::vector<float>& pattern,
-                        const std::vector<float>& features,
-                        float reward);
+                         const std::vector<float>& features,
+                         float reward);
 
     // Update concept prototype using Hebbian averaging
     void updatePrototype(size_t conceptId, const std::vector<float>& newInstance);
@@ -248,6 +253,12 @@ public:
     // Get confidence in prediction
     float getPredictionConfidence(const std::vector<float>& event) const;
 
+    // Get temporal relationship
+    std::vector<float> predictPrevious(const std::vector<float>& eventB) const;
+
+    // Get confidence in prediction
+    float getPredictionConfidence(const std::vector<float>& event) const;
+
     // Get sequence length
     size_t getSequenceLength() const { return sequences_.size(); }
 
@@ -268,5 +279,9 @@ private:
     Brain* brain_;
     std::vector<SequenceLink> sequences_;
 };
+
+// Helper function for concept formation
+// Extracts features from episodic memory items for concept learning
+std::vector<float> extractFeaturesFromEpisode(const EpisodicMemoryItem& episode);
 
 } // namespace nlm
