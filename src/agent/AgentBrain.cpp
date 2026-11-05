@@ -2,8 +2,10 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/ErrorHandling/MemoryTracker.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cassert>
 
 namespace nlm {
 
@@ -21,53 +23,156 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , lastWinnerGroup_(-1)
+    , lastWinnerMargin_(0.0f)
+    , consecutiveWinnerCount_(0)
+    , stepsSinceTurn_(0)
+    , repeatCount_(0)
+    , reflexBonusCount_(0)
+    , reflexSuppressCount_(0)
+    , wtaPulseCount_(0)
+    , lastDecoded_(MotorCommand::Wait)
+    , hasLastDecoded_(false)
+    , selfModelReady_(false)
+    , socialReady_(false)
+    , thoughtReward_(0.0f)
+    , hasThoughtOutcome_(false)
 {
-    // Initialize motor and sensory neuron groups
-    if (brain_) {
-        for (const auto& region : brain_->getRegions()) {
-            for (auto& pop : region->getPopulations()) {
-                NeuronType type = pop->getNeuronType();
-                
-                if (type == NeuronType::Motor) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute motor neurons to different action groups
-                        size_t idx = motorForward_.size() + motorBackward_.size() + 
-                                    motorTurnLeft_.size() + motorTurnRight_.size() +
-                                    motorInteract_.size() + motorWait_.size();
-                        
-                        switch (idx % 6) {
-                            case 0: motorForward_.push_back(n); break;
-                            case 1: motorBackward_.push_back(n); break;
-                            case 2: motorTurnLeft_.push_back(n); break;
-                            case 3: motorTurnRight_.push_back(n); break;
-                            case 4: motorInteract_.push_back(n); break;
-                            case 5: motorWait_.push_back(n); break;
-                        }
-                    }
-                } else if (type == NeuronType::Internal) {
-                    for (Neuron* n : pop->getNeurons()) {
+    // Validate brain pointer
+    if (!brain_) {
+        NLM_LOG_ERROR("Brain pointer is null in AgentBrain constructor", "AgentBrain::Constructor");
+        throw std::invalid_argument("Brain pointer cannot be null");
+    }
+
+    // Initialize motor and sensory neuron groups with bounds checking
+    initializeNeuronGroups();
+
+    NLM_LOG_INFO("AgentBrain initialized successfully", "AgentBrain::Constructor");
+}
+
+AgentBrain::~AgentBrain() = default;
+
+void AgentBrain::initializeNeuronGroups() {
+    // Clear existing vectors to ensure clean state
+    clearNeuronVectors();
+
+    // Validate brain exists before accessing
+    if (!brain_) {
+        NLM_LOG_ERROR("Brain is null during neuron group initialization", "AgentBrain::initializeNeuronGroups");
+        return;
+    }
+
+    // Process regions with error handling
+    for (const auto& region : brain_->getRegions()) {
+        if (!region) {
+            NLM_LOG_WARN("Null region encountered during initialization", "AgentBrain::initializeNeuronGroups");
+            continue;
+        }
+
+        for (auto& pop : region->getPopulations()) {
+            if (!pop) {
+                NLM_LOG_WARN("Null population encountered during initialization", "AgentBrain::initializeNeuronGroups");
+                continue;
+            }
+
+            NeuronType type = pop->getNeuronType();
+
+            // Get neurons with bounds checking
+            const auto& neurons = pop->getNeurons();
+            if (neurons.empty()) {
+                continue;  // Skip empty populations
+            }
+
+            // Validate neuron pointers
+            for (Neuron* n : neurons) {
+                if (!n) {
+                    NLM_LOG_WARN("Null neuron pointer encountered during initialization", "AgentBrain::initializeNeuronGroups");
+                    continue;
+                }
+
+                switch (type) {
+                    case NeuronType::Motor:
+                        distributeMotorNeuron(n);
+                        break;
+                    case NeuronType::Internal:
                         internalNeurons_.push_back(n);
-                    }
-                } else if (type == NeuronType::Sensory) {
-                    for (Neuron* n : pop->getNeurons()) {
-                        // Distribute sensory neurons
-                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
-                                    sensoryInternal_.size() + sensoryProprioception_.size();
-                        
-                        switch (idx % 4) {
-                            case 0: sensoryVision_.push_back(n); break;
-                            case 1: sensoryTouch_.push_back(n); break;
-                            case 2: sensoryInternal_.push_back(n); break;
-                            case 3: sensoryProprioception_.push_back(n); break;
-                        }
-                    }
+                        break;
+                    case NeuronType::Sensory:
+                        distributeSensoryNeuron(n);
+                        break;
                 }
             }
         }
     }
+
+    // Log initialization statistics
+    NLM_LOG_INFO(std::string("Neuron group initialization complete: ") +
+                std::to_string(motorForward_.size()) + " forward, " +
+                std::to_string(motorBackward_.size()) + " backward, " +
+                std::to_string(motorTurnLeft_.size()) + " left, " +
+                std::to_string(motorTurnRight_.size()) + " right, " +
+                std::to_string(motorInteract_.size()) + " interact, " +
+                std::to_string(motorWait_.size()) + " wait, " +
+                std::to_string(sensoryVision_.size()) + " vision, " +
+                std::to_string(sensoryTouch_.size()) + " touch, " +
+                std::to_string(sensoryInternal_.size()) + " internal, " +
+                std::to_string(sensoryProprioception_.size()) + " proprioception, " +
+                std::to_string(internalNeurons_.size()) + " internal neurons",
+                "AgentBrain::initializeNeuronGroups");
 }
 
-AgentBrain::~AgentBrain() = default;
+void AgentBrain::clearNeuronVectors() {
+    // Clear all neuron group vectors
+    motorForward_.clear();
+    motorBackward_.clear();
+    motorTurnLeft_.clear();
+    motorTurnRight_.clear();
+    motorInteract_.clear();
+    motorWait_.clear();
+    sensoryVision_.clear();
+    sensoryTouch_.clear();
+    sensoryInternal_.clear();
+    sensoryProprioception_.clear();
+    internalNeurons_.clear();
+}
+
+void AgentBrain::distributeMotorNeuron(Neuron* n) {
+    assert(n != nullptr && "Neuron pointer cannot be null");
+
+    // Calculate index with bounds checking
+    size_t total = motorForward_.size() + motorBackward_.size() + 
+                   motorTurnLeft_.size() + motorTurnRight_.size() +
+                   motorInteract_.size() + motorWait_.size();
+
+    // Ensure we don't exceed expected capacity
+    if (total >= UINT32_MAX) {
+        NLM_LOG_WARN("Motor neuron group exceeds maximum expected capacity", "AgentBrain::distributeMotorNeuron");
+        return;
+    }
+
+    switch (total % 6) {
+        case 0: motorForward_.push_back(n); break;
+        case 1: motorBackward_.push_back(n); break;
+        case 2: motorTurnLeft_.push_back(n); break;
+        case 3: motorTurnRight_.push_back(n); break;
+        case 4: motorInteract_.push_back(n); break;
+        case 5: motorWait_.push_back(n); break;
+    }
+}
+
+void AgentBrain::distributeSensoryNeuron(Neuron* n) {
+    assert(n != nullptr && "Neuron pointer cannot be null");
+
+    size_t total = sensoryVision_.size() + sensoryTouch_.size() +
+                   sensoryInternal_.size() + sensoryProprioception_.size();
+
+    switch (total % 4) {
+        case 0: sensoryVision_.push_back(n); break;
+        case 1: sensoryTouch_.push_back(n); break;
+        case 2: sensoryInternal_.push_back(n); break;
+        case 3: sensoryProprioception_.push_back(n); break;
+    }
+}
 
 // Phase 6 text encoder: a teacher word becomes a sparse sensory
 // pattern, never a string the brain can match on. Lower-case, trim,
@@ -80,54 +185,102 @@ AgentBrain::~AgentBrain() = default;
 // rays, the vision group has 31 neurons), so text has its own
 // channel and cannot masquerade as a visual scene.
 std::vector<size_t> AgentBrain::encodeText(const std::string& text) {
-    std::string norm;
-    for (char c : text) {
-        if (c == ' ' || c == '\t' || c == '\n') continue;
-        norm += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    MemoryTracker::getInstance().trackAllocation(__LINE__, "encodeText");
+    
+    try {
+        std::string norm;
+        for (char c : text) {
+            if (c == ' ' || c == '\t' || c == '\n') continue;
+            norm += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (norm.empty()) return {};
+
+        uint64_t h = 1469598103934665603ULL;
+        for (char c : norm) {
+            h ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
+            h *= 1099511628211ULL;
+        }
+
+        std::vector<size_t> out;
+        uint64_t state = h;
+        while (out.size() < 4) {
+            // splitmix64
+            state += 0x9e3779b97f4a7c15ULL;
+            uint64_t z = state;
+            z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+            z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+            z = z ^ (z >> 31);
+            size_t idx = static_cast<size_t>(z % 15);
+            
+            // Validate bounds
+            if (idx >= 15) {
+                NLM_LOG_WARN(std::string("Invalid text encoding index: ") + std::to_string(idx), "AgentBrain::encodeText");
+                continue;
+            }
+            
+            if (std::find(out.begin(), out.end(), idx) == out.end()) {
+                out.push_back(idx);
+            }
+        }
+        
+        MemoryTracker::getInstance().trackDeallocation("encodeText");
+        return out;
+        
+    } catch (const std::exception& e) {
+        MemoryTracker::getInstance().trackDeallocation("encodeText");
+        NLM_LOG_ERROR(std::string("Exception in encodeText: ") + e.what(), "AgentBrain::encodeText");
+        return {};
     }
-    if (norm.empty()) return {};
-    uint64_t h = 1469598103934665603ULL;
-    for (char c : norm) {
-        h ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
-        h *= 1099511628211ULL;
-    }
-    std::vector<size_t> out;
-    uint64_t state = h;
-    while (out.size() < 4) {
-        // splitmix64
-        state += 0x9e3779b97f4a7c15ULL;
-        uint64_t z = state;
-        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
-        z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
-        z = z ^ (z >> 31);
-        size_t idx = static_cast<size_t>(z % 15);
-        if (std::find(out.begin(), out.end(), idx) == out.end()) out.push_back(idx);
-    }
-    return out;
 }
 
 std::vector<float> AgentBrain::getInternalFiringRates() const {
     std::vector<float> rates;
     rates.reserve(internalNeurons_.size());
+
     for (const Neuron* n : internalNeurons_) {
-        rates.push_back(n ? n->getFiringRate() : 0.0f);
+        if (!n) {
+            NLM_LOG_WARN("Null internal neuron pointer encountered", "AgentBrain::getInternalFiringRates");
+            rates.push_back(0.0f);
+            continue;
+        }
+
+        // Validate neuron state before accessing
+        try {
+            rates.push_back(n->getFiringRate());
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR(std::string("Exception accessing neuron firing rate: ") + e.what(), 
+                         "AgentBrain::getInternalFiringRates");
+            rates.push_back(0.0f);
+        }
     }
+
     return rates;
 }
 
 std::vector<float> AgentBrain::conceptPattern() const {
     std::vector<float> pat;
-    for (float v : lastVision_) pat.push_back(1.0f - v);
-    for (float t : lastTouch_) pat.push_back(t);
+    pat.reserve(lastVision_.size() + lastTouch_.size());
+
+    for (float v : lastVision_) {
+        pat.push_back(1.0f - v);
+    }
+    for (float t : lastTouch_) {
+        pat.push_back(t);
+    }
+
     return pat;
 }
 
 size_t AgentBrain::getConceptCount() const {
-    return brain_ && brain_->getConceptFormation() ? brain_->getConceptFormation()->getConceptCount() : 0;
+    if (!brain_ || !brain_->getConceptFormation()) {
+        return 0;
+    }
+    return brain_->getConceptFormation()->getConceptCount();
 }
 
 float AgentBrain::getSelfModelConfidence() const {
     if (!selfModelReady_) return 0.0f;
+
     float sum = 0.0f;
     int n = 0;
     for (int a = 0; a < 6; ++a) {
@@ -143,17 +296,38 @@ size_t AgentBrain::getSocialObservationCount() const {
 
 void AgentBrain::observeOtherAgent(MotorCommand observed, const std::vector<float>& beforeVision,
                                    const std::vector<float>& afterVision) {
-    if (!socialReady_ && brain_) { socialLearning_.initialize(brain_.get()); socialReady_ = true; }
-    ActionType act = ActionType::Wait;
-    switch (observed) {
-        case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
-        case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
-        case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
-        case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
-        case MotorCommand::Interact: act = ActionType::Interact; break;
-        default: break;
+    MemoryTracker::getInstance().trackAllocation(__LINE__, "observeOtherAgent");
+    
+    try {
+        if (!socialReady_ && brain_) {
+            socialLearning_.initialize(brain_.get());
+            socialReady_ = true;
+        }
+
+        ActionType act = ActionType::Wait;
+        switch (observed) {
+            case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
+            case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
+            case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
+            case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
+            case MotorCommand::Interact: act = ActionType::Interact; break;
+            default: break;
+        }
+
+        // Validate input vectors
+        if (beforeVision.empty() || afterVision.empty()) {
+            NLM_LOG_WARN("Invalid vision vectors provided for social learning", "AgentBrain::observeOtherAgent");
+            return;
+        }
+
+        socialLearning_.observeAgentAction(act, beforeVision, afterVision);
+        
+    } catch (const std::exception& e) {
+        MemoryTracker::getInstance().trackDeallocation("observeOtherAgent");
+        NLM_LOG_ERROR(std::string("Exception in observeOtherAgent: ") + e.what(), "AgentBrain::observeOtherAgent");
     }
-    socialLearning_.observeAgentAction(act, beforeVision, afterVision);
+
+    MemoryTracker::getInstance().trackDeallocation("observeOtherAgent");
 }
 
 void AgentBrain::initialize(const SimpleWorld& world) {
@@ -164,252 +338,279 @@ void AgentBrain::initialize(const SimpleWorld& world) {
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     
-    NLM_LOG_INFO("AgentBrain initialized with " + 
+
+    NLM_LOG_INFO(std::string("AgentBrain initialized with ") + 
                  std::to_string(sensoryVision_.size()) + " vision sensory neurons, " +
                  std::to_string(sensoryTouch_.size()) + " touch sensory neurons, " +
-                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons");
-}
-
-size_t AgentBrain::getSensoryInputSize() const {
-    // Vision (16x16) + touch (8) + internal (4) + proprioception (6)
-    return 256 + 8 + 4 + 6;
-}
-
-size_t AgentBrain::getMotorOutputSize() const {
-    // One motor neuron per action
-    return 6;
+                 std::to_string(sensoryInternal_.size()) + " internal sensory neurons",
+                 "AgentBrain::initialize");
 }
 
 void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
-    if (!brain_) return;
-
-    // Phase 6 self-model, wired into the loop: the percept arriving
-    // now is the consequence of the action decoded last turn, so
-    // record (previous vision -> current vision) for that action.
-    // This is what lets the agent later predict what its own actions
-    // do, instead of the SelfModel class sitting unused in the
-    // library. It records from the loop's own percepts only.
-    if (hasLastDecoded_ && !lastVision_.empty() && !percept.getVision().empty()) {
-        if (!selfModelReady_) { selfModel_.initialize(brain_.get()); selfModelReady_ = true; }
-        ActionType act = ActionType::Wait;
-        switch (lastDecoded_) {
-            case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
-            case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
-            case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
-            case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
-            case MotorCommand::Interact: act = ActionType::Interact; break;
-            default: break;
+    MemoryTracker::getInstance().trackAllocation(__LINE__, "processSensoryInput");
+    
+    try {
+        if (!brain_) {
+            NLM_LOG_ERROR("Brain pointer is null in processSensoryInput", "AgentBrain::processSensoryInput");
+            MemoryTracker::getInstance().trackDeallocation("processSensoryInput");
+            return;
         }
-        selfModel_.recordSelfAction(act, lastVision_, percept.getVision());
-    }
-    lastText_ = percept.getText();
 
-    // Phase 5 winner-take-all lateral inhibition: if the last decode
-    // had a decisive winner (margin > 5 Hz) and the scene is stable
-    // (low novelty), suppress the losing motor groups with an
-    // inhibitory pulse on this presentation. The pulse is applied
-    // before sensory injection so it shapes the coming 10 brain steps;
-    // membrane leak (tau ~20 ms) means it decays across those steps
-    // rather than silencing the losers outright. A close call (margin
-    // <= 5 Hz) or a novel scene gets no inhibition, so competition
-    // stays open when the brain is genuinely undecided or the world
-    // has changed. Two lock-in guards, learned the hard way: the pulse
-    // never applies to an Interact winner (interacting does not move
-    // the agent, so the percept never changes and a pulse would freeze
-    // the agent on Interact — the Phase 4 reflex-trap failure mode in
-    // a new form), and it stops after the same group has won 3 times
-    // in a row, so a movement winner cannot persist indefinitely.
-    if (lastWinnerGroup_ >= 0 && lastWinnerGroup_ != 4 &&
-        consecutiveWinnerCount_ < 3 &&
-        lastWinnerMargin_ > 5.0f && noveltyLevel_ < 0.3f) {
-        const std::vector<Neuron*>* groups[5] = {
-            &motorForward_, &motorBackward_, &motorTurnLeft_,
-            &motorTurnRight_, &motorInteract_};
-        for (int g = 0; g < 5; ++g) {
-            if (g == lastWinnerGroup_) continue;
-            for (Neuron* n : *groups[g]) {
-                if (n) n->injectCurrent(-4.0f);
+        // Phase 6 self-model, wired into the loop: the percept arriving
+        // now is the consequence of the action decoded last turn, so
+        // record (previous vision -> current vision) for that action.
+        // This is what lets the agent later predict what its own actions
+        // do, instead of the SelfModel class sitting unused in the
+        // library. It records from the loop's own percepts only.
+        if (hasLastDecoded_ && !lastVision_.empty() && !percept.getVision().empty()) {
+            if (!selfModelReady_) {
+                selfModel_.initialize(brain_.get());
+                selfModelReady_ = true;
             }
-        }
-        ++wtaPulseCount_;
-    }
-
-    // Vision input (16 rays in SimpleWorld -> sensoryVision_ neurons).
-    // NOTE (Phase 4, tried and reverted): encoding closeness
-    // (1 - vision) * 5 was tested first — it makes an empty scene
-    // quiet and patterns sparse, but with random connectivity p=0.1 a
-    // sparse pattern drives only ~4-8 sensory neurons, and that is not
-    // enough coincident input to recruit internal/motor populations
-    // (each needs ~6 coincident inputs to cross threshold), so the
-    // whole network went silent and Phase 3 collapsed to ~200 Wait.
-    // Selectivity is therefore pursued through plasticity and
-    // homeostatic scaling (STDP.cpp, Brain.cpp), not by silencing the
-    // sensory input. The original intensity encoding is kept.
-    const auto& vision = percept.getVision();
-    for (size_t i = 0; i < sensoryVision_.size() && i < vision.size(); ++i) {
-        if (sensoryVision_[i]) {
-            // Inject current proportional to vision intensity
-            float current = vision[i] * 5.0f;  // Scale factor
-            sensoryVision_[i]->injectCurrent(current);
-        }
-    }
-
-    // Phase 6 text-as-a-sense: inject the teacher word's sparse
-    // pattern on the dedicated text neurons, in the same presentation
-    // as the visual scene, so STDP can associate the two. The brain
-    // sees only which text neurons fire — never the string — and no
-    // decision below branches on text content.
-    if (!percept.getText().empty()) {
-        for (size_t idx : encodeText(percept.getText())) {
-            size_t neuronIdx = 16 + idx;
-            if (neuronIdx < sensoryVision_.size() && sensoryVision_[neuronIdx]) {
-                sensoryVision_[neuronIdx]->injectCurrent(8.0f);
+            ActionType act = ActionType::Wait;
+            switch (lastDecoded_) {
+                case MotorCommand::MoveForward: act = ActionType::MoveForward; break;
+                case MotorCommand::MoveBackward: act = ActionType::MoveBackward; break;
+                case MotorCommand::TurnLeft: act = ActionType::TurnLeft; break;
+                case MotorCommand::TurnRight: act = ActionType::TurnRight; break;
+                case MotorCommand::Interact: act = ActionType::Interact; break;
+                default: break;
             }
+            selfModel_.recordSelfAction(act, lastVision_, percept.getVision());
         }
-    }
+        lastText_ = percept.getText();
 
-    // Touch input (8 values -> sensoryTouch_ neurons)
-    const auto& touch = percept.getTouch();
-    maxTouch_ = 0.0f;
-    for (float t : touch) maxTouch_ = std::max(maxTouch_, t);
-    {
-        float visionMean = 0.0f;
-        for (float v : vision) visionMean += v;
-        if (!vision.empty()) visionMean /= static_cast<float>(vision.size());
-        lastVision_ = vision;
-        // Forward touch: touch sensors 0, 1, 7 are the forward cone
-        // (-45..+45 degrees); the other sensors point sideways/back.
-        forwardTouch_ = 0.0f;
-        if (touch.size() >= 8) {
-            forwardTouch_ = std::max({touch[0], touch[1], touch[7]});
-        } else {
-            forwardTouch_ = maxTouch_;
-        }
-        // Closest object in the direction of the strongest forward
-        // touch. Phase 5 fix: the first version used centre rays
-        // 5..10 only, and in a full Phase 3 run the reflex bonus and
-        // suppression fired 0 times in 1000 steps — an object touched
-        // at +-30-45 degrees is outside the centre cone, so the cue
-        // never saw it. Touch sensors 0/1/7 point at 0/+45/-45 degrees
-        // and vision rays span -45..+45 degrees (ray i at
-        // -45 + 90*i/15), so the ray(s) nearest the touch direction
-        // are: 0 degrees -> rays 7,8; +45 degrees -> ray 15;
-        // -45 degrees -> ray 0. The smallest value below empty (1.0)
-        // among those rays is the forward object, if any. See
-        // AgentBrain.hpp for why >0.5 means resource-like and <0.35
-        // hazard/wall-like at touch range.
-        forwardObjectVision_ = 1.0f;
-        if (touch.size() >= 8 && !vision.empty() && forwardTouch_ > 0.05f) {
-            size_t touchDir = 0;
-            float touchBest = touch[0];
-            if (touch[1] > touchBest) { touchBest = touch[1]; touchDir = 1; }
-            if (touch[7] > touchBest) { touchBest = touch[7]; touchDir = 7; }
-            std::vector<size_t> rays;
-            if (touchDir == 0) rays = {7, 8};
-            else if (touchDir == 1) rays = {15};
-            else rays = {0};
-            for (size_t r : rays) {
-                if (r < vision.size() && vision[r] < 0.99f) {
-                    forwardObjectVision_ = std::min(forwardObjectVision_, vision[r]);
+        // Phase 5 winner-take-all lateral inhibition: if the last decode
+        // had a decisive winner (margin > 5 Hz) and the scene is stable
+        // (low novelty), suppress the losing motor groups with an
+        // inhibitory pulse on this presentation. The pulse is applied
+        // before sensory injection so it shapes the coming 10 brain steps;
+        // membrane leak (tau ~20 ms) means it decays across those steps
+        // rather than silencing the losers outright. A close call (margin
+        // <= 5 Hz) or a novel scene gets no inhibition, so competition
+        // stays open when the brain is genuinely undecided or the world
+        // has changed. Two lock-in guards, learned the hard way: the pulse
+        // never applies to an Interact winner (interacting does not move
+        // the agent, so the percept never changes and a pulse would freeze
+        // the agent on Interact — the Phase 4 reflex-trap failure mode in
+        // a new form), and it stops after the same group has won 3 times
+        // in a row, so a movement winner cannot persist indefinitely.
+        if (lastWinnerGroup_ >= 0 && lastWinnerGroup_ != 4 &&
+            consecutiveWinnerCount_ < 3 &&
+            lastWinnerMargin_ > 5.0f && noveltyLevel_ < 0.3f) {
+
+            const std::vector<Neuron*>* groups[5] = {
+                &motorForward_, &motorBackward_, &motorTurnLeft_,
+                &motorTurnRight_, &motorInteract_};
+
+            for (int g = 0; g < 5; ++g) {
+                if (g == lastWinnerGroup_) continue;
+                for (Neuron* n : *groups[g]) {
+                    if (!n) continue; // Bounds checking
+                    n->injectCurrent(-4.0f);
                 }
             }
-        } else if (!vision.empty()) {
-            // Phase 6: without touch, the forward object is the
-            // closest centre-ray object. The Phase 5 code left
-            // forwardObjectVision_ at its previous value (or 1.0)
-            // whenever nothing was touched, so bright-approach
-            // phototaxis — which is explicitly a vision-only, no-
-            // touch cue — could almost never fire from a fresh
-            // percept. Vision alone now drives it.
-            for (size_t r = 5; r <= 10 && r < vision.size(); ++r) {
-                if (vision[r] < 0.99f) {
-                    forwardObjectVision_ = std::min(forwardObjectVision_, vision[r]);
+            ++wtaPulseCount_;
+        }
+
+        // Vision input (16 rays in SimpleWorld -> sensoryVision_ neurons).
+        // NOTE (Phase 4, tried and reverted): encoding closeness
+        // (1 - vision) * 5 was tested first — it makes an empty scene
+        // quiet and patterns sparse, but with random connectivity p=0.1 a
+        // sparse pattern drives only ~4-8 sensory neurons, and that is not
+        // enough coincident input to recruit internal/motor populations
+        // (each needs ~6 coincident inputs to cross threshold), so the
+        // whole network went silent and Phase 3 collapsed to ~200 Wait.
+        // Selectivity is therefore pursued through plasticity and
+        // homeostatic scaling (STDP.cpp, Brain.cpp), not by silencing the
+        // sensory input. The original intensity encoding is kept.
+        const auto& vision = percept.getVision();
+
+        // Validate vision size against sensoryVision_ size
+        size_t minSize = std::min(sensoryVision_.size(), vision.size());
+        for (size_t i = 0; i < minSize; ++i) {
+            if (sensoryVision_[i]) {
+                // Inject current proportional to vision intensity
+                float current = vision[i] * 5.0f;  // Scale factor
+                sensoryVision_[i]->injectCurrent(current);
+            }
+        }
+
+        // Phase 6 text-as-a-sense: inject the teacher word's sparse
+        // pattern on the dedicated text neurons, in the same presentation
+        // as the visual scene, so STDP can associate the two. The brain
+        // sees only which text neurons fire — never the string — and no
+        // decision below branches on text content.
+        if (!percept.getText().empty()) {
+            std::vector<size_t> indices = encodeText(percept.getText());
+            for (size_t idx : indices) {
+                size_t neuronIdx = 16 + idx;
+                // Validate bounds before accessing
+                if (neuronIdx < sensoryVision_.size() && sensoryVision_[neuronIdx]) {
+                    sensoryVision_[neuronIdx]->injectCurrent(8.0f);
                 }
             }
         }
-        lastTouch_ = touch;
-        thoughtPercept_ = "visionMean=" + std::to_string(visionMean) +
-                          " fwdObjVision=" + std::to_string(forwardObjectVision_) +
-                          " fwdTouch=" + std::to_string(forwardTouch_) +
-                          " maxTouch=" + std::to_string(maxTouch_);
-        hasThoughtOutcome_ = false;
-    }
-    for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
-        if (sensoryTouch_[i]) {
-            float current = touch[i] * 8.0f;  // Collision signal
-            sensoryTouch_[i]->injectCurrent(current);
+
+        // Touch input (8 values -> sensoryTouch_ neurons)
+        const auto& touch = percept.getTouch();
+        maxTouch_ = 0.0f;
+        for (float t : touch) maxTouch_ = std::max(maxTouch_, t);
+
+        {
+            float visionMean = 0.0f;
+            for (float v : vision) visionMean += v;
+            if (!vision.empty()) visionMean /= static_cast<float>(vision.size());
+            lastVision_ = vision;
+
+            // Forward touch: touch sensors 0, 1, 7 are the forward cone
+            // (-45..+45 degrees); the other sensors point sideways/back.
+            forwardTouch_ = 0.0f;
+            if (touch.size() >= 8) {
+                forwardTouch_ = std::max({touch[0], touch[1], touch[7]});
+            } else {
+                forwardTouch_ = maxTouch_;
+            }
+
+            // Closest object in the direction of the strongest forward
+            // touch. Phase 5 fix: the first version used centre rays
+            // 5..10 only, and in a full Phase 3 run the reflex bonus and
+            // suppression fired 0 times in 1000 steps — an object touched
+            // at +-30-45 degrees is outside the centre cone, so the cue
+            // never saw it. Touch sensors 0/1/7 point at 0/+45/-45 degrees
+            // and vision rays span -45..+45 degrees (ray i at
+            // -45 + 90*i/15), so the ray(s) nearest the touch direction
+            // are: 0 degrees -> rays 7,8; +45 degrees -> ray 15;
+            // -45 degrees -> ray 0. The smallest value below empty (1.0)
+            // among those rays is the forward object, if any. See
+            // AgentBrain.hpp for why >0.5 means resource-like and <0.35
+            // hazard/wall-like at touch range.
+            forwardObjectVision_ = 1.0f;
+            if (touch.size() >= 8 && !vision.empty() && forwardTouch_ > 0.05f) {
+                size_t touchDir = 0;
+                float touchBest = touch[0];
+                if (touch[1] > touchBest) { touchBest = touch[1]; touchDir = 1; }
+                if (touch[7] > touchBest) { touchBest = touch[7]; touchDir = 7; }
+                std::vector<size_t> rays;
+                if (touchDir == 0) rays = {7, 8};
+                else if (touchDir == 1) rays = {15};
+                else rays = {0};
+                for (size_t r : rays) {
+                    if (r < vision.size() && vision[r] < 0.99f) {
+                        forwardObjectVision_ = std::min(forwardObjectVision_, vision[r]);
+                    }
+                }
+            } else if (!vision.empty()) {
+                // Phase 6: without touch, the forward object is the
+                // closest centre-ray object. The Phase 5 code left
+                // forwardObjectVision_ at its previous value (or 1.0)
+                // whenever nothing was touched, so bright-approach
+                // phototaxis — which is explicitly a vision-only, no-
+                // touch cue — could almost never fire from a fresh
+                // percept. Vision alone now drives it.
+                for (size_t r = 5; r <= 10 && r < vision.size(); ++r) {
+                    if (vision[r] < 0.99f) {
+                        forwardObjectVision_ = std::min(forwardObjectVision_, vision[r]);
+                    }
+                }
+            }
+            lastTouch_ = touch;
+            thoughtPercept_ = "visionMean=" + std::to_string(visionMean) +
+                              " fwdObjVision=" + std::to_string(forwardObjectVision_) +
+                              " fwdTouch=" + std::to_string(forwardTouch_) +
+                              " maxTouch=" + std::to_string(maxTouch_);
+            hasThoughtOutcome_ = false;
+        }
+
+        for (size_t i = 0; i < sensoryTouch_.size() && i < touch.size(); ++i) {
+            if (sensoryTouch_[i]) {
+                float current = touch[i] * 8.0f;  // Collision signal
+                sensoryTouch_[i]->injectCurrent(current);
+            }
+        }
+
+        // Internal signals (4 values -> sensoryInternal_ neurons)
+        const auto& intern = percept.getInternal();
+        for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
+            if (sensoryInternal_[i]) {
+                float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
+                sensoryInternal_[i]->injectCurrent(current);
+            }
+        }
+
+        // Proprioception (6 values -> sensoryProprioception_ neurons)
+        const auto& proprio = percept.getProprioception();
+        for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
+            if (sensoryProprioception_[i]) {
+                float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
+                sensoryProprioception_[i]->injectCurrent(current);
+            }
+        }
+
+        // Compute novelty as prediction error against a slowly adapting
+        // expectation of the scene (habituation). Phase 4: the old code
+        // differenced consecutive frames, which had two fatal problems.
+        // (1) It divided by previousVision_.size() = 16*16 = 256 while the
+        // world's vision is only 16 rays, dividing every real change by
+        // 16. (2) Even correctly normalised, per-step vision change while
+        // moving is only ~0-0.004 (the agent moves <=0.3 units per
+        // executed action and most actions are throttled), so novelty was
+        // ~0 on every step after step 0 and curiosity never fired. A slow
+        // prediction (alpha 0.05, ~20-step lag) accumulates sustained
+        // change: steady movement keeps prediction error elevated, while
+        // a stationary agent's prediction catches up and novelty decays
+        // to 0 — exactly the habituation behaviour curiosity needs.
+        if (!vision.empty()) {
+            if (predictedVision_.size() != vision.size()) {
+                predictedVision_.assign(vision.size(), 0.0f);
+            }
+            float totalDiff = 0.0f;
+            for (size_t i = 0; i < vision.size(); ++i) {
+                totalDiff += std::abs(vision[i] - predictedVision_[i]);
+            }
+            noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+            noveltyLevel_ *= sensoryNoveltyDecay_;
+
+            // Adapt the prediction toward the current scene.
+            constexpr float kPredictionAlpha = 0.05f;
+            for (size_t i = 0; i < vision.size(); ++i) {
+                predictedVision_[i] += kPredictionAlpha * (vision[i] - predictedVision_[i]);
+            }
+        }
+
+        // Update curiosity based on novelty. Phase 4: curiosity is a short
+        // trace, not an instantaneous value — a single novel step used to
+        // vanish immediately, and a small but sustained novelty (the normal
+        // case while moving) never accumulated. Phase 5: the trace term
+        // rises 0.3 -> 0.6, because with 0.3 a steady novelty of 0.05
+        // settled curiosity at ~0.14 and late-episode exploration died
+        // (late novelty 0.005-0.13 in Phase 4). With 0.6 the same steady
+        // novelty settles near 0.25 — enough to keep exploration alive
+        // across an episode — while the clamp at 1.0 and the proportional
+        // (not gated) exploration rule keep it from swamping learned
+        // behaviour. The trace still decays, so a fully familiar scene
+        // still settles low; it just takes longer to get there.
+        if (curiosityEnabled_) {
+            curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f
+                            + 0.6f * curiosityLevel_;
+            curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
         }
     }
-    
-    // Internal signals (4 values -> sensoryInternal_ neurons)
-    const auto& intern = percept.getInternal();
-    for (size_t i = 0; i < sensoryInternal_.size() && i < intern.size(); ++i) {
-        if (sensoryInternal_[i]) {
-            float current = (intern[i] * 2.0f - 1.0f) * 5.0f;  // Center and scale
-            sensoryInternal_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Proprioception (6 values -> sensoryProprioception_ neurons)
-    const auto& proprio = percept.getProprioception();
-    for (size_t i = 0; i < sensoryProprioception_.size() && i < proprio.size(); ++i) {
-        if (sensoryProprioception_[i]) {
-            float current = (proprio[i] * 2.0f - 1.0f) * 3.0f;  // Center and scale
-            sensoryProprioception_[i]->injectCurrent(current);
-        }
-    }
-    
-    // Compute novelty as prediction error against a slowly adapting
-    // expectation of the scene (habituation). Phase 4: the old code
-    // differenced consecutive frames, which had two fatal problems.
-    // (1) It divided by previousVision_.size() = 16*16 = 256 while the
-    // world's vision is only 16 rays, dividing every real change by
-    // 16. (2) Even correctly normalised, per-step vision change while
-    // moving is only ~0-0.004 (the agent moves <=0.3 units per
-    // executed action and most actions are throttled), so novelty was
-    // ~0 on every step after step 0 and curiosity never fired. A slow
-    // prediction (alpha 0.05, ~20-step lag) accumulates sustained
-    // change: steady movement keeps prediction error elevated, while
-    // a stationary agent's prediction catches up and novelty decays
-    // to 0 — exactly the habituation behaviour curiosity needs.
-    if (!vision.empty()) {
-        if (predictedVision_.size() != vision.size()) {
-            predictedVision_.assign(vision.size(), 0.0f);
-        }
-        float totalDiff = 0.0f;
-        for (size_t i = 0; i < vision.size(); ++i) {
-            totalDiff += std::abs(vision[i] - predictedVision_[i]);
-        }
-        noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
-        noveltyLevel_ *= sensoryNoveltyDecay_;
-        // Adapt the prediction toward the current scene.
-        constexpr float kPredictionAlpha = 0.05f;
-        for (size_t i = 0; i < vision.size(); ++i) {
-            predictedVision_[i] += kPredictionAlpha * (vision[i] - predictedVision_[i]);
-        }
+    catch (const std::exception& e) {
+        MemoryTracker::getInstance().trackDeallocation("processSensoryInput");
+        NLM_LOG_ERROR(std::string("Exception in processSensoryInput: ") + e.what(), 
+                     "AgentBrain::processSensoryInput");
+        throw; // Re-throw after logging
     }
 
-    // Update curiosity based on novelty. Phase 4: curiosity is a short
-    // trace, not an instantaneous value — a single novel step used to
-    // vanish immediately, and a small but sustained novelty (the normal
-    // case while moving) never accumulated. Phase 5: the trace term
-    // rises 0.3 -> 0.6, because with 0.3 a steady novelty of 0.05
-    // settled curiosity at ~0.14 and late-episode exploration died
-    // (late novelty 0.005-0.13 in Phase 4). With 0.6 the same steady
-    // novelty settles near 0.25 — enough to keep exploration alive
-    // across an episode — while the clamp at 1.0 and the proportional
-    // (not gated) exploration rule keep it from swamping learned
-    // behaviour. The trace still decays, so a fully familiar scene
-    // still settles low; it just takes longer to get there.
-    if (curiosityEnabled_) {
-        curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f
-                        + 0.6f * curiosityLevel_;
-        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
-    }
+    MemoryTracker::getInstance().trackDeallocation("processSensoryInput");
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
-    if (!brain_) return MotorCommand::Wait;
+    if (!brain_) {
+        NLM_LOG_ERROR("Brain pointer is null in decodeMotorCommand", "AgentBrain::decodeMotorCommand");
+        return MotorCommand::Wait;
+    }
 
     // Phase 5 thought: ask the brain's planner what it would do, from
     // learned action quality, before the motor decode decides. The
@@ -464,8 +665,15 @@ MotorCommand AgentBrain::decodeMotorCommand() {
         decoded = selectWithCuriosity(decoded);
     }
 
-    // Phase 6 planner agreement: planned vs finally acted, after
-    // curiosity exploration (which can still override both).
+    // Phase 6 planner IN the loop (was advisory only). The planner
+    // suggests from learned action quality; that suggestion now
+    // biases the motor decode, but only once the planner has actually
+    // learned something (some action quality beyond +-0.05 from
+    // experienced rewards) and only when its suggestion is clearly
+    // better in its own units (quality gap > 0.15, on a -1..1
+    // reward/10 scale) than the action the motor pattern would pick.
+    // A +15 Hz bias can overturn a near-tie, not a decisive motor
+    // pattern, and the override is counted at winner selection below.
     if (hasThoughtPlanned_) {
         ++plannerDecisionCount_;
         if (thoughtPlanned_ == decoded) ++plannerAgreementCount_;
@@ -497,6 +705,7 @@ std::vector<AgentBrain::MotorGroupActivity> AgentBrain::getMotorGroupActivities(
         float rateSum = 0.0f;
         for (const Neuron* n : neurons) {
             // Use membrane potential deviation from rest as activity measure
+            if (!n) continue; // Bounds checking
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
             if (n->getState().firingState == FiringState::Refractory) ++out.refractoryCount;
             rateSum += n->getFiringRate();
@@ -505,6 +714,7 @@ std::vector<AgentBrain::MotorGroupActivity> AgentBrain::getMotorGroupActivities(
         out.firingRate = rateSum / static_cast<float>(neurons.size());
         return out;
     };
+
     return {
         calc(motorForward_, "forward"),
         calc(motorBackward_, "backward"),
@@ -887,110 +1097,129 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 }
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
-    if (!brain_ || !rewardModulationEnabled_) return;
-    thoughtReward_ = reward;
-    hasThoughtOutcome_ = true;
-    // Phase 6 concept formation, wired into the loop: the pattern
-    // that led to this action, paired with this action's reward.
-    // Concepts therefore emerge from experienced pattern/reward
-    // pairings — a bright scene repeatedly followed by +10 becomes
-    // a different concept from a dark scene followed by -15 — and
-    // the concept bias in decode can then use them. The pattern is
-    // closeness (1 - vision) plus touch, so an empty scene is the
-    // zero pattern and is skipped (it is not a concept).
-    if (brain_->getConceptFormation() && !lastVision_.empty()) {
-        auto pat = conceptPattern();
-        float norm = 0.0f;
-        for (float v : pat) norm += v * v;
-        if (norm > 0.01f) {
-            brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
+    MemoryTracker::getInstance().trackAllocation(__LINE__, "applyRewardModulation");
+    
+    try {
+        if (!brain_ || !rewardModulationEnabled_) {
+            MemoryTracker::getInstance().trackDeallocation("applyRewardModulation");
+            return;
         }
-    }
-    // Phase 5 learning for the thought/preference systems, from the
-    // same reward the synaptic modulation below uses:
-    //  - Planner action quality: EMA toward reward/10 for the action
-    //    actually taken, so the planner's next suggestion reflects
-    //    experienced outcomes, not its initial zeros.
-    //  - Learned preference trait: only Interact outcomes move it
-    //    (a resource reward makes interacting more attractive, a
-    //    hazard penalty less so), by 0.1 * reward/10 per event. This
-    //    is the trait the checkpoint carries across a reload.
-    if (hasLastDecoded_) {
-        ActionType taken = ActionType::Wait;
-        switch (lastDecoded_) {
-            case MotorCommand::MoveForward: taken = ActionType::MoveForward; break;
-            case MotorCommand::MoveBackward: taken = ActionType::MoveBackward; break;
-            case MotorCommand::TurnLeft: taken = ActionType::TurnLeft; break;
-            case MotorCommand::TurnRight: taken = ActionType::TurnRight; break;
-            case MotorCommand::Interact: taken = ActionType::Interact; break;
-            default: break;
-        }
-        if (brain_->getPlanner()) {
-            float q = brain_->getPlanner()->getActionQuality(taken);
-            float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
-            brain_->getPlanner()->setActionQuality(taken, 0.9f * q + 0.1f * r);
-        }
-        if (lastDecoded_ == MotorCommand::Interact && std::abs(reward) > 0.01f) {
-            float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
-            brain_->setLearnedPreference(brain_->getLearnedPreference() + 0.1f * r);
-        }
-    }
-    
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
-    
-    // Update expected reward (exponential moving average)
-    expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
-    
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
-    
-    // Clamp to reasonable range
-    dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
-    
-    // Apply to all synapses with eligibility traces
-    for (const auto& region : brain_->getRegions()) {
-        for (const auto& syn : region->getSynapses()) {
-            float eligibility = syn->getEligibilityTrace();
+        thoughtReward_ = reward;
+        hasThoughtOutcome_ = true;
 
-            if (std::abs(eligibility) > 0.001f) {
-                // Reward-modulated weight change. Phase 4: the old
-                // rule used delta = eligibility * dopamine with no
-                // learning rate, and eligibility traces accumulate
-                // STDP deltas to ~4, so a single +10 reward (dopamine
-                // clamped to 1) drove every eligible synapse straight
-                // to its clamp — one event saturated the network. A
-                // 0.05 learning rate and a +-0.1 per-event cap keep a
-                // reward event meaningful without erasing all prior
-                // selectivity in one step (standard R-STDP scaling).
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
-                delta = std::clamp(delta, -0.1f, 0.1f);
-                syn->addToWeight(delta);
-                
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+        // Phase 6 concept formation, wired into the loop: the pattern
+        // that led to this action, paired with this action's reward.
+        // Concepts therefore emerge from experienced pattern/reward
+        // pairings — a bright scene repeatedly followed by +10 becomes
+        // a different concept from a dark scene followed by -15 — and
+        // the concept bias in decode can then use them. The pattern is
+        // closeness (1 - vision) plus touch, so an empty scene is the
+        // zero pattern and is skipped (it is not a concept).
+        if (brain_->getConceptFormation() && !lastVision_.empty()) {
+            auto pat = conceptPattern();
+            float norm = 0.0f;
+            for (float v : pat) norm += v * v;
+            if (norm > 0.01f) {
+                brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
             }
         }
+
+        // Phase 5 learning for the thought/preference systems, from the
+        // same reward the synaptic modulation below uses:
+        //  - Planner action quality: EMA toward reward/10 for the action
+        //    actually taken, so the planner's next suggestion reflects
+        //    experienced outcomes, not its initial zeros.
+        //  - Learned preference trait: only Interact outcomes move it
+        //    (a resource reward makes interacting more attractive, a
+        //    hazard penalty less so), by 0.1 * reward/10 per event. This
+        //    is the trait the checkpoint carries across a reload.
+        if (hasLastDecoded_) {
+            ActionType taken = ActionType::Wait;
+            switch (lastDecoded_) {
+                case MotorCommand::MoveForward: taken = ActionType::MoveForward; break;
+                case MotorCommand::MoveBackward: taken = ActionType::MoveBackward; break;
+                case MotorCommand::TurnLeft: taken = ActionType::TurnLeft; break;
+                case MotorCommand::TurnRight: taken = ActionType::TurnRight; break;
+                case MotorCommand::Interact: taken = ActionType::Interact; break;
+                default: break;
+            }
+            if (brain_->getPlanner()) {
+                float q = brain_->getPlanner()->getActionQuality(taken);
+                float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
+                brain_->getPlanner()->setActionQuality(taken, 0.9f * q + 0.1f * r);
+            }
+            if (lastDecoded_ == MotorCommand::Interact && std::abs(reward) > 0.01f) {
+                float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
+                brain_->setLearnedPreference(brain_->getLearnedPreference() + 0.1f * r);
+            }
+        }
+
+        // Compute prediction error
+        predictionError_ = reward - predictedReward;
+
+        // Update expected reward (exponential moving average)
+        expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+
+        // Dopamine-like signal (based on prediction error)
+        dopamineLevel_ = predictionError_;
+
+        // Clamp to reasonable range
+        dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
+
+        // Apply to all synapses with eligibility traces
+        for (const auto& region : brain_->getRegions()) {
+            for (const auto& syn : region->getSynapses()) {
+                float eligibility = syn->getEligibilityTrace();
+
+                if (std::abs(eligibility) > 0.001f) {
+                    // Reward-modulated weight change. Phase 4: the old
+                    // rule used delta = eligibility * dopamine with no
+                    // learning rate, and eligibility traces accumulate
+                    // STDP deltas to ~4, so a single +10 reward (dopamine
+                    // clamped to 1) drove every eligible synapse straight
+                    // to its clamp — one event saturated the network. A
+                    // 0.05 learning rate and a +-0.1 per-event cap keep a
+                    // reward event meaningful without erasing all prior
+                    // selectivity in one step (standard R-STDP scaling).
+                    float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
+                    delta = std::clamp(delta, -0.1f, 0.1f);
+                    syn->addToWeight(delta);
+
+                    // Decay eligibility trace
+                    syn->decayEligibilityTrace(0.1f);
+                }
+            }
+        }
+
+        // Modulate plasticity based on dopamine
+        // Positive dopamine increases plasticity, negative decreases
+        float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+        plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+
+        // Apply to STDP
+        auto* stdp = brain_->getSTDP();
+        if (stdp) {
+            stdp->setLTPWeight(0.01f * plasticityFactor);
+            stdp->setLTDWeight(0.012f * plasticityFactor);
+        }
     }
-    
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
-    
-    // Apply to STDP
-    auto* stdp = brain_->getSTDP();
-    if (stdp) {
-        stdp->setLTPWeight(0.01f * plasticityFactor);
-        stdp->setLTDWeight(0.012f * plasticityFactor);
+    catch (const std::exception& e) {
+        MemoryTracker::getInstance().trackDeallocation("applyRewardModulation");
+        NLM_LOG_ERROR(std::string("Exception in applyRewardModulation: ") + e.what(), 
+                     "AgentBrain::applyRewardModulation");
+        throw; // Re-throw after logging
     }
+
+    MemoryTracker::getInstance().trackDeallocation("applyRewardModulation");
 }
 
 void AgentBrain::updateDevelopment(double timestep) {
-    if (!brain_ || !developmentEnabled_) return;
-    
+    if (!brain_ || !developmentEnabled_) {
+        return;
+    }
+
     developmentalAge_ += timestep;
-    
+
     // Simple developmental stages based on age
     // This is a biologically inspired approximation
     if (developmentalAge_ < 60.0) {  // ~1 minute
@@ -1006,7 +1235,7 @@ void AgentBrain::updateDevelopment(double timestep) {
         plasticityModifier_ = 0.2f;  // Adult - more stable
         brain_->setDevelopmentalStage(DevelopmentalStage::Adult);
     }
-    
+
     // Structural plasticity changes with development
     if (structuralPlasticityEnabled_) {
         auto* sp = brain_->getStructuralPlasticity();
@@ -1018,6 +1247,43 @@ void AgentBrain::updateDevelopment(double timestep) {
             sp->setPruningRate(pruneRate);
         }
     }
+}
+
+void AgentBrain::reset() {
+    // Reset all state for a new episode
+    predictedVision_.clear();
+    developmentalAge_ = 0.0;
+    plasticityModifier_ = 1.0f;
+    
+    // Reset neuromodulation state
+    dopamineLevel_ = 0.0f;
+    noveltyLevel_ = 0.0f;
+    curiosityLevel_ = 0.0f;
+    predictionError_ = 0.0f;
+    expectedReward_ = 0.0f;
+    
+    // Reset counters
+    lastWinnerGroup_ = -1;
+    lastWinnerMargin_ = 0.0f;
+    consecutiveWinnerCount_ = 0;
+    stepsSinceTurn_ = 0;
+    repeatCount_ = 0;
+    reflexBonusCount_ = 0;
+    reflexSuppressCount_ = 0;
+    wtaPulseCount_ = 0;
+    lastDecoded_ = MotorCommand::Wait;
+    hasLastDecoded_ = false;
+    selfModelReady_ = false;
+    socialReady_ = false;
+    hasThoughtOutcome_ = false;
+    
+    // Clear temporary vectors
+    lastVision_.clear();
+    lastTouch_.clear();
+    lastText_.clear();
+    predictedVision_.clear();
+    
+    NLM_LOG_INFO("AgentBrain reset completed", "AgentBrain::reset");
 }
 
 DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
@@ -1041,6 +1307,46 @@ float AgentBrain::getPredictionError() const {
     return predictionError_;
 }
 
+std::string AgentBrain::getThoughtTrace() const {
+    std::string out = "perceived=[" + thoughtPercept_ + "] -> planned=[";
+    // Add planned action trace
+    switch (thoughtPlanned_) {
+        case MotorCommand::MoveForward: out += "MoveForward"; break;
+        case MotorCommand::MoveBackward: out += "MoveBackward"; break;
+        case MotorCommand::TurnLeft: out += "TurnLeft"; break;
+        case MotorCommand::TurnRight: out += "TurnRight"; break;
+        case MotorCommand::Interact: out += "Interact"; break;
+        default: out += "Wait"; break;
+    }
+    out += "] -> decoded=[";
+    // Add decoded action trace
+    switch (lastDecoded_) {
+        case MotorCommand::MoveForward: out += "MoveForward"; break;
+        case MotorCommand::MoveBackward: out += "MoveBackward"; break;
+        case MotorCommand::TurnLeft: out += "TurnLeft"; break;
+        case MotorCommand::TurnRight: out += "TurnRight"; break;
+        case MotorCommand::Interact: out += "Interact"; break;
+        default: out += "Wait"; break;
+    }
+    out += "] -> outcome=[";
+    // Add outcome trace
+    if (hasThoughtOutcome_) {
+        out += std::to_string(thoughtReward_);
+    } else {
+        out += "none";
+    }
+    out += "] -> novelty=" + std::to_string(noveltyLevel_) + 
+           " curiosity=" + std::to_string(curiosityLevel_) + 
+           " dop=" + std::to_string(dopamineLevel_);
+
+    return out;
+}
+
+float AgentBrain::getLearnedPreference() const {
+    if (!brain_) return 0.0f;
+    return brain_->getLearnedPreference();
+}
+
 namespace {
 const char* phase5CmdName(MotorCommand cmd) {
     switch (cmd) {
@@ -1055,56 +1361,5 @@ const char* phase5CmdName(MotorCommand cmd) {
     }
 }
 }  // namespace
-
-std::string AgentBrain::getThoughtTrace() const {
-    std::string out = "perceived=[" + thoughtPercept_ + "] -> planned=[";
-    out += hasThoughtPlanned_ ? phase5CmdName(thoughtPlanned_) : "none";
-    out += "] -> acted=[" + std::string(phase5CmdName(lastDecoded_)) + "] -> outcome=[";
-    out += hasThoughtOutcome_ ? ("reward=" + std::to_string(thoughtReward_)) : "none";
-    out += "] novelty=" + std::to_string(noveltyLevel_) +
-           " curiosity=" + std::to_string(curiosityLevel_);
-    return out;
-}
-
-float AgentBrain::getLearnedPreference() const {
-    return brain_ ? brain_->getLearnedPreference() : 0.0f;
-}
-
-void AgentBrain::reset() {
-    dopamineLevel_ = 0.0f;
-    noveltyLevel_ = 0.0f;
-    curiosityLevel_ = 0.0f;
-    predictionError_ = 0.0f;
-    expectedReward_ = 0.0f;
-    developmentalAge_ = 0.0;
-    plasticityModifier_ = 1.0f;
-    
-    // Clear the visual prediction (a new episode's first scene is
-    // novel again) and the touch state.
-    predictedVision_.clear();
-    maxTouch_ = 0.0f;
-    forwardTouch_ = 0.0f;
-    forwardObjectVision_ = 1.0f;
-    lastVision_.clear();
-    lastWinnerGroup_ = -1;
-    lastWinnerMargin_ = 0.0f;
-    consecutiveWinnerCount_ = 0;
-    reflexBonusCount_ = 0;
-    reflexSuppressCount_ = 0;
-    wtaPulseCount_ = 0;
-    plannerOverrideCount_ = 0;
-    plannerAgreementCount_ = 0;
-    plannerDecisionCount_ = 0;
-    conceptBiasCount_ = 0;
-    selfBiasCount_ = 0;
-    socialBiasCount_ = 0;
-    lastTouch_.clear();
-    lastText_.clear();
-    stepsSinceTurn_ = 0;
-    repeatCount_ = 0;
-    hasLastDecoded_ = false;
-    hasThoughtPlanned_ = false;
-    hasThoughtOutcome_ = false;
-}
 
 } // namespace nlm

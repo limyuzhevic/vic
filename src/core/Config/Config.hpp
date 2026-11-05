@@ -6,11 +6,9 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include "ConfigurationManager.hpp"
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -44,7 +42,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class - now uses ConfigurationManager internally
 class Config {
 public:
     Config();
@@ -56,7 +54,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (legacy format, now supports JSON/YAML via ConfigurationManager)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -66,12 +64,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -102,6 +100,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Configuration source getter - delegates to ConfigurationManager
+    friend class ConfigurationManager;
 };
 
 } // namespace nlm
