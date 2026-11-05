@@ -19,13 +19,44 @@
 namespace py = pybind11;
 namespace nlm {
 
-PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
-        NLM (Neural Learning Machine) Python Bindings
-        ---------------------------------------------
+        NLM (熙然) Python Bindings
+        ---------------------------
         A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
-    )pbdoc";
+        
+        This module provides access to all NLM Phase 6 systems including:
+        - Neural computation with LIF neurons and spike propagation
+        - Memory systems: working memory, episodic memory, associative memory
+        - Prediction systems: forward model and action-consequence prediction
+        - Cognitive systems: planning, concept formation, attention
+        - Development systems: neural development and maturation
+        - Neuromodulation: reward, curiosity, novelty detection
+        - Self-model and social learning capabilities
+        
+        Key features:
+        - Event-driven neural simulation with real LIF dynamics
+        - Integrated memory and prediction systems
+        - Advanced cognitive and developmental mechanisms
+        - Agent interface for world interaction
+        - Checkpoint save/load for persistent brains
+        
+        See pynlm.easy_usage.md for beginner examples and
+        pynlm.hOW_TO_USE.md for comprehensive documentation.
+        )pbdoc";
+    
+    // Add exception translation for better error handling
+    py::register_exception_translator([
+        ](std::exception_ptr p) {
+            try {
+                if (p) std::rethrow_exception(p);
+            } catch (const std::runtime_error& e) {
+                PyErr_SetString(PyExc_RuntimeError, e.what());
+            }
+        }
+    );
+    
+    // Register basic exception types
+    py::register_exception<std::runtime_error>(m, "RuntimeError", PyExc_RuntimeError);
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
@@ -355,10 +386,72 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
+    .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
-        .def("logStatus", &Brain::logStatus,
+    
+    // ========== MEMORY SYSTEMS (Phase 6) ==========
+    
+    .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+    .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+    .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+    
+    // ========== PREDICTION SYSTEM (Phase 6) ==========
+    
+    .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+    
+    // ========== COGNITION SYSTEMS (Phase 6) ==========
+    
+    .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+    .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+    .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+    
+    // ========== DEVELOPMENT SYSTEM (Phase 6) ==========
+    
+    .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+    
+    // ========== NEUROMODULATION SYSTEMS (Phase 6) ==========
+    
+    .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine system")
+    .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity system")
+    .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty detection system")
+    .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal system")
+    
+    // Get other systems
+    .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random generator")
+    .def("getLearnedPreference", &Brain::getLearnedPreference,
+             "Get learned preference trait")
+    .def("setLearnedPreference", &Brain::setLearnedPreference,
+             py::arg("preference"),
+             "Set learned preference trait")
+    
+    .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
