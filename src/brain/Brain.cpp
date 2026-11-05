@@ -3,6 +3,7 @@
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../core/SimulationClock/SimulationClock.hpp"
+#include "../core/Constants.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
@@ -71,7 +72,7 @@ struct Brain::Impl {
     // Phase 5 learned preference trait (see Brain.hpp). Updated only
     // from sandbox reward via AgentBrain; checkpointed with the
     // simulation state so a reloaded brain keeps what it learned.
-    float learnedPreference = 0.0f;
+    float learnedPreference = Constants::ZERO;
     
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
@@ -102,8 +103,8 @@ struct Brain::Impl {
         , totalSpikesTotal(0)
         , isResting(false)
         , stepsSinceLastEpisode(0)
-        , replayInterval(100)      // Replay every 100 steps
-        , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , replayInterval(Constants::REPLAY_INTERVAL)      // Replay every 100 steps
+        , consolidationInterval(Constants::CONSOLIDATION_INTERVAL)  // Consolidate every 1000 steps
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -143,9 +144,9 @@ struct Brain::Impl {
         novelty = std::make_unique<Novelty>();
         
         // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
+        float ltpWeight = config->getOr<float>("stdp_ltp_weight", Constants::STDP_LTP_WEIGHT);
+        float ltdWeight = config->getOr<float>("stdp_ltd_weight", Constants::STDP_LTD_WEIGHT);
+        float tau = config->getOr<float>("stdp_tau", Constants::STDP_TIME_CONSTANT);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
         // Configure structural plasticity
@@ -158,8 +159,8 @@ struct Brain::Impl {
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
         // Get integration intervals from config
-        replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
-        consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
+        replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", Constants::REPLAY_INTERVAL));
+        consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", Constants::CONSOLIDATION_INTERVAL));
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
@@ -267,7 +268,7 @@ bool Brain::initialize() {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
             // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, Constants::DEFAULT_EXCITATORY_WEIGHT, Constants::DEFAULT_INHIBITORY_WEIGHT);
         }
     }
     
@@ -275,11 +276,11 @@ bool Brain::initialize() {
     
     // Initialize working memory
     pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    pImpl->workingMemory->setCapacity(neuronCount * Constants::WORKING_MEMORY_CAPACITY_MULTIPLIER);
     
     // Initialize episodic memory
     pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    pImpl->episodicMemory->setMaxEpisodes(Constants::MAX_EPISODES);
     
     // Initialize associative memory
     pImpl->associativeMemory->initialize(this);
@@ -294,8 +295,8 @@ bool Brain::initialize() {
     pImpl->conceptFormation->initialize(this);
     
     pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    pImpl->attention->setInhibitionStrength(Constants::INHIBITORY_BIAS);
+    pImpl->attention->setExcitationStrength(Constants::EXCITATORY_BIAS);
     
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
@@ -305,19 +306,12 @@ bool Brain::initialize() {
     // again and double-count every spike.
     if (!pImpl->spikeHandlersRegistered) {
         pImpl->spikeHandlersRegistered = true;
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         auto it = pImpl->neuronById.find(event.destination_neuron.index());
         if (it != pImpl->neuronById.end()) {
             Neuron* neuron = it->second;
-            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            MembranePotential synapticCurrent = event.weight * Constants::SYNAPTIC_SCALING_FACTOR;  // Scale factor
             if (event.is_excitatory) {
                 neuron->receiveExcitatoryInput(synapticCurrent);
             } else {
@@ -329,7 +323,7 @@ bool Brain::initialize() {
     
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
-    pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
+    pImpl->checkpointManager->configure(checkpointDir, Constants::CHECKPOINT_MANAGER_MAX_VERSIONS, Constants::CHECKPOINT_MANAGER_MAX_FILES, Constants::CHECKPOINT_MANAGER_COMPRESSION_ENABLED);
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));

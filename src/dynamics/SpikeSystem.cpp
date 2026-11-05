@@ -63,7 +63,7 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         // Add to history
         pImpl->spikeHistory.push_back(detailed);
         
-        // Track spike count per neuron
+        // Track spike count per neuron (internal statistics)
         pImpl->spikeCountPerNeuron[event.source_neuron.value]++;
         
         // Trim history if needed
@@ -71,7 +71,7 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
             pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
         }
         
-        // Call handlers
+        // Call handlers (external systems may add their own statistics)
         for (auto& handler : pImpl->handlers) {
             handler(detailed);
         }
