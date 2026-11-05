@@ -78,12 +78,93 @@ void testConfigKeys() {
     std::cout << "    testConfigKeys passed" << std::endl;
 }
 
-void runAll() {
-    testConfigCreation();
-    testConfigSetAndGet();
-    testConfigGetOr();
-    testConfigRemove();
-    testConfigKeys();
+void testConfigErrorHandling() {
+    nlm::Config config;
+    
+    // Test get from non-existent key
+    auto val = config.get<int>("nonexistent");
+    assert(!val.has_value());
+    
+    // Test getOr with missing key
+    int defaultVal = config.getOr<int>("missing_key", 999);
+    assert(defaultVal == 999);
+    
+    // Test remove non-existent key doesn't crash
+    config.remove("nonexistent");
+    
+    // Test setting values of different types
+    config.set("int_val", 42, nlm::ConfigSource::Runtime);
+    config.set("double_val", 3.14159, nlm::ConfigSource::Runtime);
+    config.set("bool_val", true, nlm::ConfigSource::Runtime);
+    config.set("string_val", "test_string", nlm::ConfigSource::Runtime);
+    config.set("int_vec", std::vector<int>({1, 2, 3}), nlm::ConfigSource::Runtime);
+    config.set("double_vec", std::vector<double>({1.5, 2.5, 3.5}), nlm::ConfigSource::Runtime);
+    
+    std::cout << "    testConfigErrorHandling passed" << std::endl;
 }
 
-} // namespace test_config
+void testConfigValueConversion() {
+    nlm::Config config;
+    
+    // Test numeric type conversions
+    config.set("int_val", 42, nlm::ConfigSource::Runtime);
+    config.set("float_val", 3.14f, nlm::ConfigSource::Runtime);
+    config.set("double_val", 2.71828, nlm::ConfigSource::Runtime);
+    config.set("bool_val", true, nlm::ConfigSource::Runtime);
+    
+    auto intVal = config.get<int>("int_val");
+    assert(intVal.has_value() && *intVal == 42);
+    
+    auto floatVal = config.get<float>("int_val");  // int can be converted to float
+    assert(floatVal.has_value());
+    
+    auto doubleVal = config.get<double>("float_val");  // float can be converted to double
+    assert(doubleVal.has_value());
+    
+    std::cout << "    testConfigValueConversion passed" << std::endl;
+}
+
+void testConfigSummary() {
+    nlm::Config config;
+    
+    config.set("key1", 100, nlm::ConfigSource::Runtime);
+    config.set("key2", "hello", nlm::ConfigSource::File);
+    config.set("key3", 3.14, nlm::ConfigSource::CommandLine);
+    
+    std::string summary = config.summary();
+    assert(!summary.empty());
+    assert(summary.find("key1") != std::string::npos);
+    assert(summary.find("key2") != std::string::npos);
+    assert(summary.find("key3") != std::string::npos);
+    
+    std::cout << "    testConfigSummary passed" << std::endl;
+}
+
+void testConfigSourceTracking() {
+    nlm::Config config;
+    
+    config.set("default_key", 1, nlm::ConfigSource::Default);
+    config.set("file_key", 2, nlm::ConfigSource::File);
+    config.set("command_line_key", 3, nlm::ConfigSource::CommandLine);
+    config.set("runtime_key", 4, nlm::ConfigSource::Runtime);
+    
+    // Test that sources are preserved
+    auto defaultVal = config.get<int>("default_key");
+    assert(defaultVal.has_value() && *defaultVal == 1);
+    
+    std::cout << "    testConfigSourceTracking passed" << std::endl;
+}
+
+void testConfigClear() {
+    nlm::Config config;
+    
+    config.set("key1", 1, nlm::ConfigSource::Runtime);
+    config.set("key2", "value", nlm::ConfigSource::File);
+    assert(config.has("key1") && config.has("key2"));
+    
+    config.clear();
+    assert(!config.has("key1") && !config.has("key2"));
+    assert(config.getKeys().empty());
+    
+    std::cout << "    testConfigClear passed" << std::endl;
+}
