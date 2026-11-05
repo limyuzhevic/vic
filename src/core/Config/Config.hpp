@@ -16,11 +16,13 @@ class Config;
 using ConfigValue = std::variant<
     int,
     int64_t,
+    float,
     double,
     bool,
     std::string,
     std::vector<int>,
     std::vector<double>,
+    std::vector<float>,
     std::vector<std::string>
 >;
 

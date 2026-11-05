@@ -106,6 +106,15 @@ std::string ConsoleLogger::levelToColor(LogLevel level) const {
 struct Logger::Impl {
     std::vector<std::shared_ptr<ILogger>> loggers;
     std::mutex mutex;
+    
+    // Performance optimization
+    mutable std::atomic<size_t> totalLogs{0};
+    mutable std::atomic<size_t> droppedLogs{0};
+    std::chrono::steady_clock::time_point lastPerfCheck;
+    
+    Impl() : lastPerfCheck(std::chrono::steady_clock::now()) {
+        // Initialize per-logger statistics
+    }
 };
 
 Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
@@ -131,8 +140,27 @@ void Logger::setLevel(LogLevel level) {
 
 void Logger::log(LogLevel level, const std::string& message,
                 const std::string& file, int line, const std::string& function) {
-    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    // Performance optimization: skip early if no loggers or level not enabled
+    size_t loggerCount = pImpl->loggers.size();
+    if (loggerCount == 0) {
+        pImpl->droppedLogs++;
+        return;
+    }
     
+    bool levelEnabled = false;
+    for (auto& logger : pImpl->loggers) {
+        if (logger->getLevel() <= level) {
+            levelEnabled = true;
+            break;
+        }
+    }
+    
+    if (!levelEnabled) {
+        pImpl->droppedLogs++;
+        return;
+    }
+    
+    // Create log entry
     LogEntry entry;
     entry.level = level;
     entry.message = message;
@@ -141,8 +169,33 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
     
+    // Thread-safe logging
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    pImpl->totalLogs++;
+    
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
+    }
+    
+    // Performance monitoring
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - pImpl->lastPerfCheck);
+    if (elapsed.count() >= 60) {  // Check every minute
+        size_t total = pImpl->totalLogs.load();
+        size_t dropped = pImpl->droppedLogs.load();
+        if (total > 0) {
+            double dropRate = (static_cast<double>(dropped) / total) * 100.0;
+            if (dropRate > 50.0) {
+                // Log performance warning
+                std::cout << "[PERFORMANCE] Logger drop rate: " << std::fixed << std::setprecision(1) 
+                          << dropRate << "% (" << dropped << " dropped / " << total << " total)" << std::endl;
+            }
+        }
+        pImpl->lastPerfCheck = now;
+        // Reset counters periodically
+        pImpl->totalLogs = 0;
+        pImpl->droppedLogs = 0;
     }
 }
 

@@ -3,11 +3,40 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <vector>
+#include <map>
+#include <cctype>
+#include <algorithm>
 
 namespace nlm {
 
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+// Simple JSON value type for parsing
+struct JsonValue {
+    enum Type { OBJECT, ARRAY, STRING, NUMBER, BOOLEAN, NULLVAL };
+    Type type;
+    
+    // Union for values
+    std::string stringValue;
+    double numberValue;
+    bool boolValue;
+    std::map<std::string, JsonValue> objectValue;
+    std::vector<JsonValue> arrayValue;
+    
+    JsonValue() : type(NULLVAL) {}
+    JsonValue(const std::string& s) : type(STRING), stringValue(s) {}
+    JsonValue(double n) : type(NUMBER), numberValue(n) {}
+    JsonValue(bool b) : type(BOOLEAN), boolValue(b) {}
+    JsonValue(const std::map<std::string, JsonValue>& o) : type(OBJECT), objectValue(o) {}
+    JsonValue(const std::vector<JsonValue>& a) : type(ARRAY), arrayValue(a) {}
+};
+
+// Simple JSON parser
+class JsonParser {
+public:
+    static bool parse(const std::string& json, JsonValue& result);
+    static std::string unescapeString(const std::string& str);
+    static std::string trim(const std::string& str);
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -38,8 +67,8 @@ bool Config::loadFromFile(const std::string& filepath) {
         // Parse simple key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
+            std::string key = JsonParser::trim(line.substr(0, pos));
+            std::string value = JsonParser::trim(line.substr(pos + 1));
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -86,7 +115,40 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Properly serialize the ConfigValue
+        std::visit([&file](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << v << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << v[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << v[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[\"";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i > 0) file << "\", \"";
+                    file << v[i];
+                }
+                file << "\"]";
+            } else {
+                file << v;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
