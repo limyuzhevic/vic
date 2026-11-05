@@ -49,6 +49,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -138,6 +141,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -484,6 +490,63 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
     }
     
+    // Update acetylcholine (attention and memory)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+        
+        // Apply acetylcholine effects on memory consolidation
+        float acetylcholineLevel = pImpl->acetylcholine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Acetylcholine enhances memory trace stability
+                    float memoryMod = acetylcholineLevel * 0.8f;
+                    if (memoryMod > 0.0f) {
+                        neuron->injectCurrent(memoryMod * 0.5f);  // Subtle modulation
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update norepinephrine (arousal and vigilance)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        
+        // Apply norepinephrine effects on arousal
+        float norepinephrineLevel = pImpl->norepinephrine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Norepinephrine increases arousal and alertness
+                    float arousalMod = norepinephrineLevel * 0.6f;
+                    if (arousalMod > 0.0f) {
+                        neuron->injectCurrent(arousalMod * 0.3f);  // Moderate effect
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update serotonin (mood and impulse control)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        
+        // Apply serotonin effects on mood and impulsivity
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Serotonin modulates mood and impulse control
+                    float moodMod = serotoninLevel * 0.7f;
+                    if (moodMod > 0.0f) {
+                        neuron->injectCurrent(moodMod * 0.4f);  // Subtle mood modulation
+                    }
+                }
+            }
+        }
+    }
+    
     // Update dopamine (reward prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
@@ -511,6 +574,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    // Integrate acetylcholine, norepinephrine, and serotonin effects
+    if (pImpl->acetylcholine) {
+        plasticityMod *= pImpl->acetylcholine->getPlasticityFactor();
+    }
+    if (pImpl->norepinephrine) {
+        plasticityMod *= pImpl->norepinephrine->getPlasticityFactor();
+    }
+    if (pImpl->serotonin) {
+        plasticityMod *= pImpl->serotonin->getPlasticityFactor();
     }
     
     for (auto& region : pImpl->regions) {
@@ -653,10 +727,107 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Development affects multiple systems
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        
+        // 1. Development affects neural excitability and firing thresholds
+        if (stage == DevelopmentalStage::Initial) {
+            // High development: increase excitability, lower thresholds
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        auto& state = neuron->getState();
+                        // Lower threshold during development for more learning
+                        if (state.threshold > 10.0f) {
+                            neuron->setThreshold(state.threshold * 0.9f);
+                        }
+                        // Increase baseline excitability
+                        neuron->injectCurrent(0.5f);
+                    }
+                }
+            }
+        } else if (stage == DevelopmentalStage::CriticalPeriod) {
+            // Critical period: high plasticity, sensitive to experiences
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        neuron->injectCurrent(0.3f);
+                    }
+                }
+            }
+        } else if (stage == DevelopmentalStage::Maturation) {
+            // Maturation: stabilizing, moderate excitability
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        neuron->injectCurrent(0.1f);
+                    }
+                }
+            }
+        } else if (stage == DevelopmentalStage::Adult) {
+            // Adult: stable excitability, some refinement
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        neuron->injectCurrent(0.05f);
+                    }
+                }
+            }
+        }
+        
+        // 2. Development affects attention system (inhibition/excitation balance)
+        if (pImpl->attention) {
+            float attentionMod = 1.0f;
+            if (stage == DevelopmentalStage::Initial) {
+                attentionMod = 1.5f;  // More exploration, less focused attention
+            } else if (stage == DevelopmentalStage::CriticalPeriod) {
+                attentionMod = 1.2f;
+            } else if (stage == DevelopmentalStage::Maturation) {
+                attentionMod = 1.0f;
+            } else if (stage == DevelopmentalStage::Adult) {
+                attentionMod = 0.8f;  // More focused, less exploration
+            }
+            
+            // Apply to attention system
+            pImpl->attention->setInhibitionStrength(0.5f * attentionMod);
+            pImpl->attention->setExcitationStrength(1.5f * attentionMod);
+        }
+        
+        // 3. Development affects neuromodulation baseline levels
+        // acetylcholine baseline (attention/memory)
+        if (stage == DevelopmentalStage::Initial) {
+            if (pImpl->acetylcholine) pImpl->acetylcholine->setLevel(0.6f);
+            if (pImpl->dopamine) pImpl->dopamine->setLevel(0.2f);
+        } else if (stage == DevelopmentalStage::CriticalPeriod) {
+            if (pImpl->acetylcholine) pImpl->acetylcholine->setLevel(0.4f);
+            if (pImpl->dopamine) pImpl->dopamine->setLevel(0.3f);
+        } else if (stage == DevelopmentalStage::Maturation) {
+            if (pImpl->acetylcholine) pImpl->acetylcholine->setLevel(0.3f);
+            if (pImpl->dopamine) pImpl->dopamine->setLevel(0.4f);
+        } else if (stage == DevelopmentalStage::Adult) {
+            if (pImpl->acetylcholine) pImpl->acetylcholine->setLevel(0.2f);
+            if (pImpl->dopamine) pImpl->dopamine->setLevel(0.5f);
+        }
+        
+        // 4. Development affects memory consolidation
+        if (pImpl->episodicMemory) {
+            float consolidationRate = 0.3f;
+            if (stage == DevelopmentalStage::Initial) {
+                consolidationRate = 0.5f;  // Strong consolidation during development
+            } else if (stage == DevelopmentalStage::CriticalPeriod) {
+                consolidationRate = 0.4f;
+            } else if (stage == DevelopmentalStage::Maturation) {
+                consolidationRate = 0.3f;
+            } else if (stage == DevelopmentalStage::Adult) {
+                consolidationRate = 0.2f;  // Less consolidation in adulthood
+            }
+            // This would call a method to adjust consolidation threshold
+            // pImpl->episodicMemory->setConsolidationThreshold(1.0f - consolidationRate);
+        }
+        
+        // 5. Development affects structural plasticity (existing functionality)
         auto* sp = pImpl->structuralPlasticity.get();
         if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
             float plasticityMod = 1.0f;
             
             switch (stage) {
@@ -1529,6 +1700,18 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 Curiosity* Brain::getCuriosity() {
