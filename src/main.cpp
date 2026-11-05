@@ -48,6 +48,35 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printUsage() {
+    std::cout << R"(
+Usage: nlm [OPTIONS]
+
+Neural Learning Machine - Phase 2 Real Neural Computation
+
+Options:
+  --config=FILE           Load configuration from file (default: configs/default.cfg)
+  --neuron_count=N        Number of neurons (default: 500)
+  --region_count=N        Number of regions (default: 1)
+  --connection_probability=N  Connection probability (default: 0.15)
+  --random_seed=N         Random seed for reproducible experiments (default: 42)
+  --stdp_ltp_weight=N     STDP LTP weight (default: 0.02)
+  --stdp_ltd_weight=N     STDP LTD weight (default: 0.015)
+  --stdp_tau=N            STDP time constant (default: 20.0)
+  --synaptogenesis_rate=N  Synaptogenesis rate (default: 0.0001)
+  --pruning_rate=N        Pruning rate (default: 0.00001)
+  --help                  Show this help message and exit
+
+Examples:
+  nlm                           Run with default configuration
+  nlm --neuron_count=1000       Run with 1000 neurons
+  nlm --config=my_config.cfg     Use custom configuration file
+  nlm --random_seed=12345        Run with specific random seed for reproducibility
+  nlm --stdp_ltp_weight=0.03     Increase STDP learning rate
+  nlm --synaptogenesis_rate=0.001 Increase structural plasticity
+  )" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -327,6 +356,15 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     // Load configuration
+    // Check for help flag first
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        }
+    }
+    
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
@@ -339,6 +377,33 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg.find("--neuron_count=") != std::string::npos) {
+            double value = std::stod(arg.substr(arg.find("=") + 1));
+            config->set("neuron_count", static_cast<int64_t>(value), ConfigSource::CommandLine);
+        } else if (arg.find("--region_count=") != std::string::npos) {
+            double value = std::stod(arg.substr(arg.find("=") + 1));
+            config->set("region_count", static_cast<int64_t>(value), ConfigSource::CommandLine);
+        } else if (arg.find("--connection_probability=") != std::string::npos) {
+            double value = std::stod(arg.substr(arg.find("=") + 1));
+            config->set("connection_probability", static_cast<float>(value), ConfigSource::CommandLine);
+        } else if (arg.find("--random_seed=") != std::string::npos) {
+            double value = std::stod(arg.substr(arg.find("=") + 1));
+            config->set("random_seed", static_cast<int64_t>(value), ConfigSource::CommandLine);
+        } else if (arg.find("--stdp_ltp_weight=") != std::string::npos) {
+            double value = std::stod(arg.substr(arg.find("=") + 1));
+            config->set("stdp_ltp_weight", static_cast<float>(value), ConfigSource::CommandLine);
+        } else if (arg.find("--stdp_ltd_weight=") != std::string::npos) {
+            double value = std::stod(arg.substr(arg.find("=") + 1));
+            config->set("stdp_ltd_weight", static_cast<float>(value), ConfigSource::CommandLine);
+        } else if (arg.find("--stdp_tau=") != std::string::npos) {
+            double value = std::stod(arg.substr(arg.find("=") + 1));
+            config->set("stdp_tau", static_cast<float>(value), ConfigSource::CommandLine);
+        } else if (arg.find("--synaptogenesis_rate=") != std::string::npos) {
+            double value = std::stod(arg.substr(arg.find("=") + 1));
+            config->set("synaptogenesis_rate", static_cast<float>(value), ConfigSource::CommandLine);
+        } else if (arg.find("--pruning_rate=") != std::string::npos) {
+            double value = std::stod(arg.substr(arg.find("=") + 1));
+            config->set("pruning_rate", static_cast<float>(value), ConfigSource::CommandLine);
         }
     }
     

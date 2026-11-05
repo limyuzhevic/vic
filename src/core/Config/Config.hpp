@@ -68,10 +68,10 @@ public:
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>
     std::optional<T> get(const std::string& key) const;
-
-    template<typename T>
+    
+template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +95,33 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // ========== VALIDATION AND ERROR HANDLING ==========
+    
+    // Validate configuration against schema
+    bool validate() const;
+    std::string getValidationErrors() const;
+    
+    // Check for duplicate keys
+    bool hasDuplicateKeys() const;
+    
+    // Check for required keys
+    bool hasRequiredKeys(const std::vector<std::string>& requiredKeys) const;
+    
+    // Validate specific parameter ranges
+    bool validateParameterRange(const std::string& key, double min, double max) const;
+    
+    // Get configuration statistics
+    size_t getEntryCount() const;
+    std::map<ConfigSource, size_t> getSourceCounts() const;
+    
+    // Export configuration
+    std::string exportJSON() const;
+    std::string exportCSV() const;
+    
+    // Import configuration
+    bool importJSON(const std::string& jsonString);
+    bool importCSV(const std::string& csvString);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +129,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation helpers
+    bool validateEntry(const ConfigEntry& entry) const;
+    static bool isValidNumber(const std::string& str, double& outValue);
+    static bool isValidBool(const std::string& str, bool& outValue);
+    static bool isValidString(const std::string& str, std::string& outValue);
 };
 
 } // namespace nlm

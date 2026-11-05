@@ -56,6 +56,35 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // File management
+    void setMaxFileSize(size_t maxSizeBytes);
+    void setMaxFileCount(size_t maxFiles);
+    size_t getLogFileSize() const;
+    std::string getLogFilePath() const;
+    
+    // Performance monitoring
+    void enablePerformanceLogging(bool enable);
+    bool isPerformanceLoggingEnabled() const;
+    
+    // Structured logging
+    void logStructured(const std::string& category, const std::string& event,
+                      const std::string& message, LogLevel level = LogLevel::Info);
+    
+    // System state logging
+    void enableSystemStateLogging(bool enable);
+    bool isSystemStateLoggingEnabled() const;
+    
+    // Log filtering
+    void addLogFilter(const std::string& pattern);
+    void clearLogFilters();
+    bool shouldLog(const std::string& message, LogLevel level) const;
+    
+    // Metrics collection
+    void incrementMetric(const std::string& name);
+    void setMetric(const std::string& name, double value);
+    double getMetric(const std::string& name) const;
+    std::map<std::string, double> getAllMetrics() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -109,12 +138,74 @@ private:
     std::unique_ptr<Impl> pImpl;
 };
 
-// Convenience macro for file/line/function info
-#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+// Main Logger class
+class Logger {
+public:
+    Logger();
+    ~Logger();
+    
+    // Disable copying
+    Logger(const Logger&) = delete;
+    Logger& operator=(const Logger&) = delete;
+    
+    // Add logger sink
+    void addLogger(std::shared_ptr<ILogger> logger);
+    
+    // Remove all loggers
+    void clearLoggers();
+    
+    // Set minimum level for all loggers
+    void setLevel(LogLevel level);
+    
+    // Global logging functions
+    void log(LogLevel level, const std::string& message, 
+             const std::string& file = "", int line = 0, 
+             const std::string& function = "");
+    
+    // Convenience methods
+    void debug(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    void info(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    void warning(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
+    
+    // Check if level is enabled
+    bool isEnabled(LogLevel level) const;
+    
+    // Get global logger instance
+    static Logger& getGlobal();
+    
+    // Set global logger
+    static void setGlobal(std::shared_ptr<Logger> logger);
+    
+    // Performance monitoring
+    void enablePerformanceLogging(bool enable);
+    bool isPerformanceLoggingEnabled() const;
+    
+    // System state logging
+    void enableSystemStateLogging(bool enable);
+    bool isSystemStateLoggingEnabled() const;
+    
+    // Metrics collection
+    void incrementMetric(const std::string& name);
+    void setMetric(const std::string& name, double value);
+    double getMetric(const std::string& name) const;
+    std::map<std::string, double> getAllMetrics() const;
+    
+    // Structured logging
+    void logStructured(const std::string& category, const std::string& event,
+                      const std::string& message, LogLevel level = LogLevel::Info,
+                      const std::string& file = "", int line = 0, const std::string& function = "");
+    
+    // Log filtering
+    void addLogFilter(const std::string& pattern);
+    void clearLogFilters();
+    bool shouldLog(const std::string& message, LogLevel level) const;
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
 
 // Stream-style logging helper
 class LogStream {
@@ -137,5 +228,36 @@ private:
 };
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+
+// Enhanced convenience macros for structured logging
+#define NLM_LOG_STRUCTURED(category, event, msg) \
+    nlm::Logger::getGlobal().logStructured(category, event, msg, nlm::LogLevel::Info, __FILE__, __LINE__, __func__)
+
+#define NLM_LOG_PERFORMANCE(event, duration_ms) \
+    do { \
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start_time).count(); \
+        nlm::Logger::getGlobal().logStructured("performance", event, \
+            "Duration: " + std::to_string(duration) + "ms", nlm::LogLevel::Info); \
+    } while(0)
+
+// Performance timing helper
+class PerformanceTimer {
+public:
+    PerformanceTimer(const std::string& eventName);
+    ~PerformanceTimer();
+    
+    template<typename T>
+    PerformanceTimer& operator<<(const T& value) {
+        oss_ << value;
+        return *this;
+    }
+    
+private:
+    std::string eventName_;
+    std::chrono::steady_clock::time_point startTime_;
+    std::ostringstream oss_;
+};
+
+#define NLM_PERF(event_name) nlm::PerformanceTimer perf_timer(event_name)
 
 } // namespace nlm

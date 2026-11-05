@@ -12,6 +12,31 @@ struct ConsoleLogger::Impl {
     bool useColors = true;
     std::ofstream fileOut;
     std::mutex mutex;
+    
+    // File management
+    size_t maxFileSize = 10 * 1024 * 1024; // 10MB
+    size_t maxFileCount = 5;
+    std::string currentLogFile;
+    size_t currentFileSize = 0;
+    
+    // Performance monitoring
+    bool performanceLoggingEnabled = false;
+    
+    // System state logging
+    bool systemStateLoggingEnabled = false;
+    
+    // Log filtering
+    std::vector<std::string> logFilters;
+    
+    // Metrics collection
+    std::map<std::string, double> metrics;
+    std::mutex metricsMutex;
+    
+    // Structured logging
+    std::mutex structuredLogMutex;
+    
+    // Timestamp for performance measurements
+    std::chrono::steady_clock::time_point lastPerfLogTime;
 };
 
 ConsoleLogger::ConsoleLogger() : pImpl(std::make_unique<Impl>()) {}
