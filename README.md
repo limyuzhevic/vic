@@ -82,177 +82,280 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 - Memory consolidation for important episodes
 - Integration with sleep/rest cycle
 
-## Building
+# NLM — 熙然
+
+**An Experimental Artificial Developmental Brain**
+
+## What is NLM?
+
+NLM (熙然, meaning "serene flow") is an experimental computational brain project. The long-term goal is to create a neural system that begins in a primitive developmental state and acquires increasingly complex abilities through interaction with an environment.
+
+NLM is NOT:
+- A transformer or LLM
+- A chatbot
+- A deep learning model
+- A pretrained AI system
+
+NLM IS intended to become:
+- A neural system that learns from experience
+- A brain-inspired architecture with neurons and synapses
+- A system that develops and adapts over time
+- A system where cognition emerges from neural dynamics
+
+## Advanced Configuration
+
+NLM now includes an advanced configuration system for fine-tuning brain parameters and behavior. This allows users to customize the neural network's properties, plasticity rules, memory systems, neuromodulation, cognition, development, performance, checkpointing, reward computation, sensory/motor sensitivity, and environmental settings.
+
+### Configuration Categories
+
+1. **Neural** - Neuron properties and dynamics
+   - neuron_excitability (0.0-1.0)
+   - neuron_threshold (0.0-1.0)
+   - neuron_leak (0.0-1.0)
+   - neuron_reset_potential (-1.0-1.0)
+
+2. **Plasticity** - Learning and adaptation mechanisms
+   - stdp_learning_rate (0.0-0.1)
+   - stdp_time_constant (1-100)
+   - hebbian_strength (0.0-1.0)
+   - structural_plasticity_rate (0.0-0.001)
+
+3. **Memory** - Memory system parameters
+   - working_memory_capacity (10-1000)
+   - episodic_memory_limit (10-10000)
+   - associative_memory_strength (0.0-1.0)
+
+4. **Neuromodulation** - Neuromodulator settings
+   - dopamine_baseline (0.0-1.0)
+   - dopamine_sensitivity (0.0-1.0)
+   - curiosity_threshold (0.0-1.0)
+   - novelty_decay_rate (0.0-1.0)
+
+5. **Cognition** - Cognitive processing parameters
+   - planner_planning_depth (1-10)
+   - concept_formation_threshold (0.0-1.0)
+   - attention_strength (0.0-1.0)
+   - neural_planning_enabled (true/false)
+
+6. **Development** - Developmental stage parameters
+   - developmental_plasticity_rate (0.0-1.0)
+   - critical_period_duration (0-10000)
+   - maturation_rate (0.0-1.0)
+   - development_stages (comma-separated list)
+
+7. **Performance** - Performance and optimization settings
+   - spike_propagation_speed (0.1-10.0)
+   - plasticity_update_frequency (0-100)
+   - memory_update_frequency (0-100)
+   - checkpointer_frequency (0-100000)
+
+8. **Checkpoint** - Checkpoint and persistence settings
+   - checkpoint_compression (0=off, 1=balanced, 2=max)
+   - checkpoint_backup_count (0-100)
+   - checkpoint_auto_save (true/false)
+   - checkpoint_integrity_check (true/false)
+
+9. **Reward** - Reward computation settings
+   - reward_computation_method (classic/phasic/actor-critic)
+   - reward_scale_factor (0.0-10.0)
+   - reward_decay_rate (0.0-1.0)
+   - prediction_error_weight (0.0-1.0)
+
+10. **Sensory/Motor** - Sensory and motor sensitivity
+    - vision_sensitivity (0.0-1.0)
+    - touch_sensitivity (0.0-1.0)
+    - proprioception_sensitivity (0.0-1.0)
+    - motor_noise_level (0.0-1.0)
+
+11. **Environment** - Environment interaction settings
+    - environment_complexity (0=simple, 1=complex)
+    - reward_distribution (sparse/dense)
+    - task_difficulty (0.0-1.0)
+
+### Configuration Commands
+
+#### Basic Configuration
 
 ```bash
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j4
+# Load configuration from file
+nlm_config_tool --load config.txt
+
+# Save configuration to file
+nlm_config_tool --save config_modified.txt
+
+# Validate configuration
+nlm_config_tool --validate
 ```
 
-## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+#### Advanced Configuration
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
-./nlm_phase3_demo
-./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
+# Show all advanced options
+nlm_config_tool --show-advanced
+
+# Show configuration for a specific category
+nlm_config_tool --category neural
+nlm_config_tool --category plasticity
+nlm_config_tool --category memory
+
+# Set configuration options
+nlm_config_tool --neuron_excitability 0.8
+nlm_config_tool --stdp_learning_rate 0.05
+nlm_config_tool --working_memory_capacity 500
+nlm_config_tool --dopamine_baseline 0.2
+
+# Using short format
+nlm_config_tool -e 0.8 -l 0.05 -w 500
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+#### Configuration File Format
 
-## Project Structure
+NLM configuration files use a simple key=value format:
 
 ```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── agent/          # Agent-brain interface
-│   ├── world/          # Simple world
-│   ├── performance/    # Checkpoints, pools, queues (headers)
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+# Neural configuration
+neuron_excitability = 0.5
+neuron_threshold = 0.5
+neuron_leak = 0.05
+
+# Plasticity configuration
+stdp_learning_rate = 0.01
+stdp_time_constant = 20.0
+hebbian_strength = 0.5
+
+# Memory configuration
+working_memory_capacity = 100
+episodic_memory_limit = 1000
+
+# Save to file
+nlm_config_tool --save config.txt
 ```
 
-## Phase Summary
+### Configuration Validation
 
-### Phase 1 (Complete)
-- Project skeleton
-- Core types and configuration
-- Neural interfaces
+Before running your customized NLM simulation, you can validate the configuration:
 
-### Phase 2 (Complete)
-- Real LIF neuron dynamics
-- Event-driven spike propagation
-- STDP and Hebbian plasticity
-- Structural plasticity
-
-### Phase 3 (Complete)
-- World interaction loop
-- Sensory input and motor output
-- Reward prediction error
-- Developmental stages
-- Novelty and curiosity
-
-### Phase 4 (Complete)
-- Neural prediction system
-- Working memory
-- Episodic-like memory
-- Concept formation
-- Neural attention (NOT Transformer)
-- Predictive planning
-- Self-model
-- Social learning
-- Continual learning
-
-### Phase 5 (Complete)
-- Performance optimizations
-- Memory pools and event queues
-- SIMD vectorization
-- Parallel processing
-- Checkpoint system
-
-### Phase 6 (Complete - Final Integration)
-- All systems integrated into coherent brain loop
-- Memory systems connected to neural processing
-- Neuromodulation affects plasticity and dynamics
-- Prediction integrated with learning
-- Development affects plasticity rates
-- Checkpoint save/load working
-- Replay and consolidation functional
-- Phase 6 integration experiment created
-
-## Scientific Limitations
-
-NLM is a research project investigating computational brain-like systems. We make NO claims that NLM accurately reproduces biological brains. Current limitations include:
-
-- Simplified LIF neuron model (not Hodgkin-Huxley)
-- No realistic ion channel dynamics
-- No detailed dendritic morphology
-- No detailed cortical architecture
-- No claim of consciousness, intelligence, or human-like cognition
-- Limited to what can be simulated with available computing resources
-
-Phase 6 does NOT claim:
-- Human intelligence
-- Consciousness or sentience
-- Human-like reasoning
-- Genuine subjective experience
-
-Phase 6 DOES investigate:
-- Whether memory systems can integrate with neural dynamics
-- Whether neuromodulation can affect plasticity in a coordinated way
-- Whether prediction can become a central organizing principle
-- Whether developmental stages can modulate learning
-- Whether replay can reinforce memory consolidation
-- Whether the complete brain loop functions coherently
-
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
-```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+```bash
+nlm_config_tool --validate
 ```
 
-## License
+This will check for invalid parameter ranges and report any issues.
 
-MIT
+### Configuration for Advanced Users
 
-## Authors
+The advanced configuration system allows you to:
 
-Research project — See docs for scientific background.
+1. **Fine-tune neural properties** for specific experimental conditions
+2. **Adjust plasticity rules** to control learning speed and strength
+3. **Configure memory systems** to balance memory capacity and computational efficiency
+4. **Customize neuromodulation** to control reward and motivation systems
+5. **Tune cognitive parameters** to influence planning and decision-making
+6. **Control development trajectories** to study age-dependent learning
+7. **Optimize performance settings** for specific hardware or use cases
+8. **Configure checkpointing** for persistence and recovery
+9. **Customize reward computation** for different task environments
+10. **Adjust sensory/motor sensitivity** for different interaction modalities
+
+### Configuration Examples
+
+Here are some example configurations for common use cases:
+
+#### High-Performance Learning
+```
+# High-performance learning configuration
+spike_propagation_speed = 5.0
+plasticity_update_frequency = 10
+memory_update_frequency = 20
+checkpointer_frequency = 5000
+
+# Strong plasticity
+stdp_learning_rate = 0.05
+stdp_time_constant = 30.0
+hebbian_strength = 0.8
+structural_plasticity_rate = 0.001
+
+# Large working memory
+working_memory_capacity = 500
+episodic_memory_limit = 5000
+
+# Balanced neuromodulation
+dopamine_baseline = 0.2
+dopamine_sensitivity = 0.7
+curiosity_threshold = 0.4
+```
+
+#### Developmental Learning
+```
+# Developmental learning configuration
+developmental_plasticity_rate = 0.8
+critical_period_duration = 2000
+maturation_rate = 0.3
+development_stages = "Initial,CriticalPeriod,Maturation,Adult"
+
+# High early plasticity, lower later
+neuron_excitability = 0.6
+neuron_threshold = 0.4
+neuron_leak = 0.03
+
+# Strong reward modulation for exploration
+reward_computation_method = "actor-critic"
+reward_scale_factor = 2.0
+prediction_error_weight = 0.8
+```
+
+#### Simple Environment Learning
+```
+# Simple environment learning
+environment_complexity = 0.3
+reward_distribution = "dense"
+task_difficulty = 0.2
+
+# Efficient settings for simple tasks
+spike_propagation_speed = 2.0
+plasticity_update_frequency = 5
+memory_update_frequency = 5
+checkpointer_frequency = 20000
+
+# Conservative plasticity
+stdp_learning_rate = 0.005
+stdp_time_constant = 15.0
+hebbian_strength = 0.3
+```
+
+### Configuration Best Practices
+
+1. **Start with default values** and modify only what's necessary
+2. **Validate configuration** before running simulations
+3. **Use separate configuration files** for different experimental conditions
+4. **Document your configuration choices** for reproducibility
+5. **Test configuration changes** incrementally
+6. **Monitor performance** when using performance-related settings
+7. **Consider memory constraints** when configuring memory systems
+8. **Balance exploration vs. exploitation** in neuromodulation settings
+9. **Validate developmental timelines** against your experimental timeline
+10. **Test checkpointing** to ensure proper persistence and recovery
+
+### Configuration Troubleshooting
+
+If you encounter issues with your configuration:
+
+1. **Use `--validate`** to check for parameter range errors
+2. **Check file syntax** for configuration files
+3. **Review documentation** for valid parameter values
+4. **Start with minimal changes** and add more gradually
+5. **Use `--show-advanced`** to see all available options
+6. **Backup your configuration** before making major changes
+7. **Test in stages** to isolate problematic settings
+
+### Configuration File Management
+
+Advanced users can manage configuration files:
+
+1. **Create template configurations** for common experimental setups
+2. **Use version control** for configuration changes
+3. **Create configuration libraries** for different experiment types
+4. **Document configuration rationale** for future reference
+5. **Use environment variables** for dynamic configuration
+6. **Implement configuration inheritance** for modular setups
+
+The advanced configuration system provides NLM users with unprecedented control over brain parameters, enabling sophisticated experimental designs and optimized performance across a wide range of use cases.

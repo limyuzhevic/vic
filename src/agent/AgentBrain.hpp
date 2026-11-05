@@ -7,6 +7,7 @@
 #include "../world/SimpleWorld.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -169,6 +170,8 @@ private:
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
+    // Reward computation
+    Reward reward_;
     
     // Development state
     double developmentalAge_;

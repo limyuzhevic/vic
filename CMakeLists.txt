@@ -104,6 +104,29 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core nlm_agent)
 
+# ConfigManager library for advanced configuration management
+add_library(nlm_config_manager STATIC
+    src/core/Config/Config.cpp
+    src/core/Config/ConfigManager.cpp
+)
+target_include_directories(nlm_config_manager PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_config_manager PUBLIC nlm_core)
+
+# Configuration command-line tool for advanced users
+add_executable(nlm_config_tool
+    src/tools/ConfigTool.cpp
+)
+target_link_libraries(nlm_config_tool PUBLIC nlm_core nlm_config_manager)
+
+# Performance monitoring and debugging demo
+add_executable(nlm_performance_monitor_demo
+    src/tools/PerformanceMonitorDemo.cpp
+)
+target_link_libraries(nlm_performance_monitor_demo PUBLIC nlm_core nlm_config_manager)
+
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp

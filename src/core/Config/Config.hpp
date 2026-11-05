@@ -24,6 +24,22 @@ using ConfigValue = std::variant<
     std::vector<std::string>
 >;
 
+// Configuration categories for organization
+enum class ConfigCategory {
+    General,
+    Neural,
+    Plasticity,
+    Memory,
+    Neuromodulation,
+    Cognition,
+    Development,
+    Performance,
+    Checkpoint,
+    Reward,
+    SensoryMotor,
+    Environment
+};
+
 // Configuration source
 enum class ConfigSource {
     Default,
@@ -102,6 +118,40 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+};
+
+// Configuration helper for advanced users
+class ConfigManager {
+public:
+    ConfigManager() = default;
+    ~ConfigManager() = default;
+    
+    // Disable copying, enable moving
+    ConfigManager(const ConfigManager&) = delete;
+    ConfigManager& operator=(const ConfigManager&) = delete;
+    ConfigManager(ConfigManager&&) noexcept = default;
+    ConfigManager& operator=(ConfigManager&&) noexcept = default;
+    
+    // Initialize with default values
+    static void initializeDefaults(Config& config);
+    
+    // Validate configuration
+    static bool validate(const Config& config, std::string& errorMessage) const;
+    
+    // Get configuration for category
+    static std::vector<ConfigEntry> getByCategory(const Config& config, ConfigCategory category);
+    
+    // Merge configuration from file with command line override
+    static bool mergeConfig(Config& config, const std::string& filepath);
+    
+    // Get advanced configuration options
+    static std::vector<std::string> getAdvancedOptionNames() const;
+    
+    // Get help text for advanced options
+    static std::string getAdvancedOptionHelp(const std::string& option) const;
+    
+    // Set advanced configuration option
+    static bool setAdvancedOption(Config& config, const std::string& option, const std::string& value);
 };
 
 } // namespace nlm
