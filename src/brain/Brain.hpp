@@ -8,6 +8,7 @@
 #include "../plasticity/STDP.hpp"
 #include "../plasticity/Hebbian.hpp"
 #include "../plasticity/StructuralPlasticity.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include <memory>
 #include <string>
 
@@ -182,6 +183,9 @@ public:
     
     // Novelty - novelty detection
     Novelty* getNovelty();
+    
+    // Reward computation from observations
+    Reward* getReward();
     
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();

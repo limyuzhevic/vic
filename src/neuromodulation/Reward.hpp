@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Neuromodulator.hpp"
+#include <vector>
 
 namespace nlm {
 
@@ -25,6 +26,18 @@ public:
     // Compute reward from environment state
     // TODO PHASE 2: Implement real reward computation
     float computeReward(const class Observation& observation) const;
+    
+    // Enhanced reward computation based on sensory observations
+    float computeObservingReward(const class Observation& observation) const;
+    
+    // Calculate sensory variation for exploration motivation
+    float calculateSensoryVariation(const std::vector<float>& data) const;
+    
+    // Get developmental plasticity factor
+    float getDevelopmentalPlasticity() const;
+    
+    // Record observation for learning
+    void recordObservation(const class Observation& observation);
     
     // Reward history
     const std::vector<float>& getHistory() const;
