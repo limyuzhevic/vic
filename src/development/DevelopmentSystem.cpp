@@ -61,6 +61,8 @@ const char* DevelopmentSystem::getStageName() const {
 }
 
 void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
+    if (!brain) return;
+    
     ++pImpl->stepsInCurrentStage;
     age_ += 0.001;  // Approximate timestep
     pImpl->stageAge += 0.001;
@@ -77,6 +79,8 @@ void DevelopmentSystem::update(Brain* brain, SimulationStep currentStep) {
 }
 
 void DevelopmentSystem::update(Brain* brain, RandomGenerator& rng, TimestepDuration dt) {
+    if (!brain) return;
+    
     age_ += dt;
     pImpl->stageAge += dt;
     ++pImpl->stepsInCurrentStage;
