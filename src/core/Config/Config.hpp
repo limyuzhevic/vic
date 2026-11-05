@@ -95,6 +95,19 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Advanced configuration management
+    void merge(const Config& other);
+    
+    // Export configuration to different formats
+    std::string exportToJSON() const;
+    std::string exportToYAML() const;
+    
+    // Configuration validation and utilities
+    bool validate() const;
+    
+    // Configuration statistics
+    std::string statistics() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
