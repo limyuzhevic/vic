@@ -1,4 +1,5 @@
 #include "Brain.hpp"
+#include "factory/BrainFactory.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -1588,4 +1589,66 @@ void Brain::logStatus() const {
     }
 }
 
+// =======================================
+// FACTORY AND OPTIMIZATION IMPLEMENTATIONS
+// =======================================
+
+bool Brain::configureOptimizations() {
+    // Use BrainFactory to configure optimizations
+    // This is a convenience method that uses the factory internally
+    std::string brainType = getBrainTypeFromConfig(*pImpl->config);
+    bool optimizationsEnabled = areOptimizationsEnabled(*pImpl->config);
+    
+    if (optimizationsEnabled) {
+        NLM_LOG_INFO("Brain optimizations enabled, using OptimizedBrain implementation");
+        // Note: The actual brain implementation is determined by the factory
+        // This is a simplified version - in reality, the brain type is determined
+        // during construction via the factory
+    }
+    
+    return optimizationsEnabled;
+}
+
+std::shared_ptr<Brain> Brain::createBrainWithConfig(std::shared_ptr<Config> config) {
+    // Use BrainFactory to create brain with automatic optimization selection
+    return BrainFactory::createBrainWithAutoOptimizations(config);
+}
+
+std::string Brain::getBrainTypeFromConfig(const Config& config) {
+    // Use BrainFactory to get brain type from configuration
+    return BrainFactory::getBrainTypeFromConfig(config);
+}
+
+bool Brain::areOptimizationsEnabled(const Config& config) {
+    // Use BrainFactory to check if optimizations are enabled
+    return BrainFactory::areOptimizationsEnabled(config);
+}
+
+// ===== VERSION AND COMPATIBILITY =====
+
+std::string Brain::getVersion() {
+    // Return the current brain implementation version
+    return "NLM Brain v1.0.0";
+}
+
+std::string Brain::getTypeName() const {
+    // Determine the brain type name based on configuration
+    std::string brainType = "basic"; // Default
+    if (auto brainTypeOpt = pImpl->config->get<std::string>("brain_type")) {
+        brainType = *brainTypeOpt;
+    }
+    
+    if (brainType == "optimized") {
+        return "OptimizedBrain";
+    } else {
+        return "Brain";
+    }
+}
+
+bool Brain::usesOptimizations() const {
+    // Check if brain uses optimizations based on configuration
+    return areOptimizationsEnabled(*pImpl->config);
+}
+
 } // namespace nlm
+

@@ -201,12 +201,19 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
+# Factory system (Brain factory, component factory patterns)
+add_library(nlm_factory STATIC
+    src/factory/BrainFactory.cpp
+)
+target_include_directories(nlm_factory PUBLIC src)
+target_link_libraries(nlm_factory PUBLIC nlm_core)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark nlm_factory
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

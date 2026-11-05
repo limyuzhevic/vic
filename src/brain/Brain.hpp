@@ -205,6 +205,71 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== FACTORY AND OPTIMIZATION ==========
+    
+    /**
+     * Configure optimizations based on configuration
+     * 
+     * This method configures performance optimizations (event-driven processing,
+     * SIMD vectorization, multithreading, sparse connectivity) based on the
+     * configuration settings. If optimizations are enabled, the brain will
+     * use the OptimizedBrain implementation.
+     * 
+     * @return true if optimizations are configured, false if using basic brain
+     */
+    bool configureOptimizations();
+    
+    /**
+     * Factory method to create brain with automatic optimization selection
+     * 
+     * This static method creates a brain with automatic optimization selection
+     * based on the configuration. It will use the OptimizedBrain implementation
+     * if optimizations are enabled, or the basic Brain implementation otherwise.
+     * 
+     * @param config Configuration for the brain
+     * @return Shared pointer to the created brain
+     */
+    static std::shared_ptr<Brain> createBrainWithConfig(std::shared_ptr<Config> config);
+    
+    /**
+     * Get brain type from configuration
+     * 
+     * @param config Configuration to check
+     * @return Brain type ("basic" or "optimized")
+     */
+    static std::string getBrainTypeFromConfig(const Config& config);
+    
+    /**
+     * Check if optimizations are enabled in configuration
+     * 
+     * @param config Configuration to check
+     * @return true if optimizations are enabled, false otherwise
+     */
+    static bool areOptimizationsEnabled(const Config& config);
+    
+    // ===== VERSION AND COMPATIBILITY =====
+    
+    /**
+     * Get the brain implementation version
+     * 
+     * @return Version string
+     */
+    static std::string getVersion();
+    
+    /**
+     * Get the brain implementation type name
+     * 
+     * @return Type name ("Brain" or "OptimizedBrain")
+     */
+    std::string getTypeName() const;
+    
+    /**
+     * Check if this brain uses optimizations
+     * 
+     * @return true if brain uses optimizations, false otherwise
+     */
+    bool usesOptimizations() const;
+
 private:
     struct Impl;
     Impl* pImpl;

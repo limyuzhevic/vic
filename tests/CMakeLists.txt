@@ -14,6 +14,11 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_phase6_integration.cpp
+    test_phase5_integration.cpp
+    test_stress_large_networks.cpp
+    test_crossplatform_compatibility.cpp
+    test_edge_cases.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core nlm_agent)
