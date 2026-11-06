@@ -56,6 +56,26 @@ public:
     void setOutputFile(const std::string& filepath);
     void closeOutputFile();
     
+    // Configure log format
+    void setFormat(const std::string& format);
+    std::string getFormat() const;
+    
+    // Filter by source file
+    void addSourceFilter(const std::string& pattern);
+    void clearSourceFilters();
+    
+    // Enable log rotation
+    void setLogRotation(size_t maxSize, size_t maxFiles);
+    
+    // Get log statistics
+    struct LogStats {
+        size_t totalLogs;
+        size_t logsByLevel[5]; // Indexed by LogLevel
+        std::chrono::system_clock::time_point firstLog;
+        std::chrono::system_clock::time_point lastLog;
+    };
+    LogStats getStats() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

@@ -59,11 +59,16 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Helper methods for parsing
+    bool loadFromJSON(const std::string& content);
+    bool loadFromYAML(const std::string& content);
+    bool loadFromKeyValue(const std::string& content);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Validation and utility methods
+    bool validateConfig() const;
+    bool hasValidTypes() const;
+    std::string getConfigType(const std::string& key) const;
+    bool isKeyPresent(const std::string& key) const;
     
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>

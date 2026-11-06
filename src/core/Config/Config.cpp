@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.hpp>
 
 namespace nlm {
 
@@ -18,17 +20,123 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Forward declarations for JSON/YAML parsing
+namespace {
+    // Internal helper to add values from JSON parsing
+    void addFromJSON(const std::string& key, const nlohmann::json& value, ConfigSource source, Config& config);
     
+    // Internal helper to add values from YAML parsing
+    void addFromYAML(const std::string& key, const YAML::Node& value, ConfigSource source, Config& config);
+}
+
+// Helper methods for parsing
+bool Config::loadFromJSON(const std::string& content);
+bool Config::loadFromYAML(const std::string& content);
+bool Config::loadFromKeyValue(const std::string& content);
+
+// Validation and utility methods
+bool Config::validateConfig() const;
+bool Config::hasValidTypes() const;
+std::string Config::getConfigType(const std::string& key) const;
+bool Config::isKeyPresent(const std::string& key) const;
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // PHASE 2: Enhanced JSON/YAML parser with support for multiple formats
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Config file not found: " + filepath);
         return false;
     }
     
+    // Try to detect file format
+    std::string content;
+    {
+        std::stringstream buffer;
+        buffer << file;
+        content = buffer.str();
+    }
+    
+    if (content.empty()) {
+        NLM_LOG_WARNING("Config file is empty: " + filepath);
+        return true; // Empty file is valid
+    }
+    
+    // Determine format and parse accordingly
+    std::string extension = "";
+    size_t dotPos = filepath.find_last_of('.');
+    if (dotPos != std::string::npos) {
+        extension = filepath.substr(dotPos + 1);
+    }
+    
+    if (extension == "json") {
+        return loadFromJSON(content);
+    } else if (extension == "yaml" || extension == "yml") {
+        return loadFromYAML(content);
+    } else {
+        // Default to key=value format for backward compatibility
+        return loadFromKeyValue(content);
+    }
+}
+
+// JSON parsing implementation
+bool Config::loadFromJSON(const std::string& content) {
+    try {
+        auto json = nlohmann::json::parse(content);
+        
+        // Clear existing entries
+        clear();
+        
+        // Parse JSON object
+        for (auto it = json.begin(); it != json.end(); ++it) {
+            std::string key = it.key();
+            addFromJSON(key, *it, ConfigSource::File, *this);
+        }
+        
+        NLM_LOG_INFO("Successfully loaded JSON configuration with " + std::to_string(pImpl->entries.size()) + " entries");
+        return true;
+    } catch (const nlohmann::json::parse_error& e) {
+        NLM_LOG_ERROR("JSON parse error in config file: " + std::string(e.what()));
+        return false;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing JSON config: " + std::string(e.what()));
+        return false;
+    }
+}
+
+// YAML parsing implementation
+bool Config::loadFromYAML(const std::string& content) {
+    try {
+        auto yaml = YAML::Load(content);
+        
+        // Clear existing entries
+        clear();
+        
+        // Parse YAML mapping
+        for (const auto& it : yaml) {
+            std::string key = it.first.as<std::string>();
+            addFromYAML(key, it.second, ConfigSource::File, *this);
+        }
+        
+        NLM_LOG_INFO("Successfully loaded YAML configuration with " + std::to_string(pImpl->entries.size()) + " entries");
+        return true;
+    } catch (const YAML::ParserException& e) {
+        NLM_LOG_ERROR("YAML parse error in config file: " + std::string(e.what()));
+        return false;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing YAML config: " + std::string(e.what()));
+        return false;
+    }
+}
+
+// Legacy key=value format parsing
+bool Config::loadFromKeyValue(const std::string& content) {
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
+    int lineNumber = 0;
+    
+    while (std::getline(stream, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,9 +157,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid line in config file (line " + std::to_string(lineNumber) + "): " + line);
         }
     }
     
+    NLM_LOG_INFO("Successfully loaded key=value configuration with " + std::to_string(pImpl->entries.size()) + " entries");
     return true;
 }
 
@@ -190,6 +301,83 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
+// Internal helper implementations
+namespace {
+    void addFromJSON(const std::string& key, const nlohmann::json& value, ConfigSource source, Config& config) {
+        if (value.is_number_integer()) {
+            config.set(key, value.get<int64_t>(), source);
+        } else if (value.is_number_unsigned()) {
+            config.set(key, value.get<uint64_t>(), source);
+        } else if (value.is_number()) {
+            config.set(key, value.get<double>(), source);
+        } else if (value.is_boolean()) {
+            config.set(key, value.get<bool>(), source);
+        } else if (value.is_string()) {
+            config.set(key, value.get<std::string>(), source);
+        } else if (value.is_array()) {
+            // Try to detect array type
+            if (!value.empty()) {
+                if (value[0].is_number_integer()) {
+                    std::vector<int64_t> arr;
+                    for (const auto& item : value) {
+                        arr.push_back(item.get<int64_t>());
+                    }
+                    config.set(key, arr, source);
+                } else if (value[0].is_number()) {
+                    std::vector<double> arr;
+                    for (const auto& item : value) {
+                        arr.push_back(item.get<double>());
+                    }
+                    config.set(key, arr, source);
+                } else {
+                    std::vector<std::string> arr;
+                    for (const auto& item : value) {
+                        arr.push_back(item.get<std::string>());
+                    }
+                    config.set(key, arr, source);
+                }
+            }
+        }
+    }
+    
+    void addFromYAML(const std::string& key, const YAML::Node& value, ConfigSource source, Config& config) {
+        if (value.IsScalar()) {
+            if (value.IsInteger()) {
+                config.set(key, value.as<int64_t>(), source);
+            } else if (value.IsDouble()) {
+                config.set(key, value.as<double>(), source);
+            } else if (value.IsBoolean()) {
+                config.set(key, value.as<bool>(), source);
+            } else {
+                config.set(key, value.as<std::string>(), source);
+            }
+        } else if (value.IsSequence()) {
+            // Try to detect sequence type
+            if (!value.empty()) {
+                if (value[0].IsInteger()) {
+                    std::vector<int64_t> arr;
+                    for (const auto& item : value) {
+                        arr.push_back(item.as<int64_t>());
+                    }
+                    config.set(key, arr, source);
+                } else if (value[0].IsDouble()) {
+                    std::vector<double> arr;
+                    for (const auto& item : value) {
+                        arr.push_back(item.as<double>());
+                    }
+                    config.set(key, arr, source);
+                } else {
+                    std::vector<std::string> arr;
+                    for (const auto& item : value) {
+                        arr.push_back(item.as<std::string>());
+                    }
+                    config.set(key, arr, source);
+                }
+            }
+        }
+    }
+}
+
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
@@ -234,5 +422,113 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Helper method implementations
+bool Config::validateConfig() const {
+    bool isValid = true;
+    
+    // Check for required configuration keys
+    std::vector<std::string> requiredKeys = {
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count",
+        "region_count"
+    };
+    
+    for (const auto& key : requiredKeys) {
+        if (!has(key)) {
+            NLM_LOG_WARNING("Missing required configuration key: " + key);
+            isValid = false;
+        }
+    }
+    
+    // Validate specific value ranges
+    auto neuronCountOpt = get<int64_t>("neuron_count");
+    if (neuronCountOpt.has_value() && neuronCountOpt.value() <= 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: must be positive");
+        isValid = false;
+    }
+    
+    auto regionCountOpt = get<int64_t>("region_count");
+    if (regionCountOpt.has_value() && regionCountOpt.value() <= 0) {
+        NLM_LOG_ERROR("Invalid region_count: must be positive");
+        isValid = false;
+    }
+    
+    auto timestepOpt = get<double>("simulation_timestep");
+    if (timestepOpt.has_value() && (timestepOpt.value() <= 0.0 || timestepOpt.value() > 1.0)) {
+        NLM_LOG_ERROR("Invalid simulation_timestep: must be between 0 and 1");
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+bool Config::hasValidTypes() const {
+    bool isValid = true;
+    
+    // Check that configuration values have the expected types
+    for (const auto& entry : pImpl->entries) {
+        const auto& key = entry.key;
+        const auto& value = entry.value;
+        
+        std::visit([&](auto&& val) {
+            using T = std::decay_t<decltype(val)>;
+            
+            // Type-specific validation
+            if (key == "random_seed" && !std::is_same_v<T, int64_t>) {
+                NLM_LOG_WARNING("random_seed should be int64_t, got " + std::string(typeid(T).name()));
+            } else if (key == "simulation_timestep" && !std::is_same_v<T, double>) {
+                NLM_LOG_WARNING("simulation_timestep should be double, got " + std::string(typeid(T).name()));
+            } else if (key == "neuron_count" && !std::is_same_v<T, int64_t>) {
+                NLM_LOG_WARNING("neuron_count should be int64_t, got " + std::string(typeid(T).name()));
+            } else if (key == "region_count" && !std::is_same_v<T, int64_t>) {
+                NLM_LOG_WARNING("region_count should be int64_t, got " + std::string(typeid(T).name()));
+            } else if (key == "connection_probability" && !std::is_same_v<T, double>) {
+                NLM_LOG_WARNING("connection_probability should be double, got " + std::string(typeid(T).name()));
+            }
+        }, value);
+    }
+    
+    return isValid;
+}
+
+std::string Config::getConfigType(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it == pImpl->entries.end()) {
+        return "NOT_FOUND";
+    }
+    
+    const auto& value = it->value;
+    
+    return std::visit([](auto&& val) -> std::string {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int>) {
+            return "INT";
+        } else if constexpr (std::is_same_v<T, uint64_t>) {
+            return "UINT";
+        } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+            return "FLOAT";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return "BOOL";
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return "STRING";
+        } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+            return "INT_ARRAY";
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            return "FLOAT_ARRAY";
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            return "STRING_ARRAY";
+        } else {
+            return "UNKNOWN";
+        }
+    }, value);
+}
+
+bool Config::isKeyPresent(const std::string& key) const {
+    return has(key);
+}
 
 } // namespace nlm
