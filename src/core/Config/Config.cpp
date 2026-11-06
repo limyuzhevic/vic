@@ -3,11 +3,19 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cstring>
+#include <iomanip>
+#include <stdexcept>
+#include <cstring>
+#include <ctime>
+#include <regex>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::vector<ConfigSchema> schemas;
+    std::map<std::string, std::string> sourceLog;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -215,6 +223,152 @@ template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
     return val.has_value() ? val.value() : defaultValue;
+}
+
+// Helper function to get file extension and detect format
+static std::string getFileExtension(const std::string& filepath) {
+    size_t pos = filepath.find_last_of('.');
+    if (pos == std::string::npos) return "";
+    return filepath.substr(pos + 1);
+}
+
+// Helper function to read entire file content
+static std::string readFileContent(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) return "";
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+// Helper function to trim whitespace
+std::string Config::trim(const std::string& str) {
+    size_t start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    size_t end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+// Helper function to convert to lowercase
+std::string Config::toLower(const std::string& str) {
+    std::string result = str;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
+
+// Helper function to check if string represents a JSON value
+static bool isJSON(const std::string& content) {
+    if (content.empty()) return false;
+    
+    // Simple heuristic: check if it starts with { or [ (JSON object or array)
+    // Skip whitespace at the beginning
+    size_t start = 0;
+    while (start < content.size() && std::isspace(content[start])) start++;
+    
+    return !content.empty() && (content[start] == '{' || content[start] == '[');
+}
+
+// Helper function to check if string represents a YAML value
+static bool isYAML(const std::string& content) {
+    if (content.empty()) return false;
+    
+    // Simple heuristic: check for YAML key-value pairs with : separator
+    // or for indented structures with --- marker
+    size_t colonPos = content.find(':');
+    size_t dashDashDash = content.find("---");
+    
+    return (colonPos != std::string::npos) || (dashDashDash != std::string::npos);
+}
+
+// Helper function to parse a simple key=value value
+ConfigValue Config::parseSimpleValue(const std::string& valueStr) {
+    std::string trimmed = trim(valueStr);
+    
+    if (trimmed.empty()) return std::string("");
+    
+    // Try bool
+    if (trimmed == "true" || trimmed == "false") {
+        return trimmed == "true";
+    }
+    
+    // Try int
+    try {
+        if (trimmed.find('.') == std::string::npos) {
+            size_t pos = 0;
+            long val = std::stol(trimmed, &pos);
+            if (pos == trimmed.size()) {
+                return val;
+            }
+        }
+    } catch (...) {}
+    
+    // Try double
+    try {
+        double val = std::stod(trimmed);
+        return val;
+    } catch (...) {}
+    
+    // Return as string
+    return trimmed;
+}
+
+// Helper function to convert ConfigValue to string
+std::string Config::configValueToString(const ConfigValue& value) const {
+    return std::visit([](const auto& v) -> std::string {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            return v;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return v ? "true" : "false";
+        } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> ||
+                            std::is_same_v<T, uint64_t>) {
+            return std::to_string(v);
+        } else if constexpr (std::is_same_v<T, double>) {
+            // Format double to avoid scientific notation
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(6) << v;
+            return oss.str();
+        } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                            std::is_same_v<T, std::vector<double>> ||
+                            std::is_same_v<T, std::vector<std::string>>) {
+            std::ostringstream oss;
+            oss << "[";
+            for (size_t i = 0; i < v.size(); ++i) {
+                if (i) oss << ", ";
+                oss << v[i];
+            }
+            oss << "]";
+            return oss.str();
+        } else {
+            return "";
+        }
+    }, value);
+}
+
+// Helper function to validate against schema
+bool Config::validateAgainstSchema(const ConfigSchema& schema, const std::vector<ConfigEntry>& entries,
+                                 std::vector<ValidationError>& errors) {
+    errors.clear();
+    
+    for (const auto& rule : schema.rules) {
+        bool found = false;
+        for (const auto& entry : entries) {
+            if (entry.key == rule.key) {
+                found = true;
+                if (!rule.validator(entry.value)) {
+                    errors.emplace_back(entry.key, rule.errorMessage);
+                }
+                break;
+            }
+        }
+        
+        if (!found && rule.required) {
+            errors.emplace_back(rule.key, "Required configuration key missing");
+        }
+    }
+    
+    return errors.empty();
 }
 
 // Explicit template instantiations
