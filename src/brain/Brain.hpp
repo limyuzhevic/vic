@@ -30,6 +30,17 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
+class NeuralRegion;
+class Acetylcholine;
+class Norepinephrine;
+class Serotonin;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -186,11 +197,14 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Get acetylchorine (attention)
+    Acetylcholine* getAcetylcholine();
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+    // Get norepinephrine (arousal)
+    Norepinephrine* getNorepinephrine();
+    
+    // Get serotonin (mood)
+    Serotonin* getSerotonin();
 
     // Learned preference trait (Phase 5): a single scalar, -1..1,
     // updated only by sandbox reward through AgentBrain, saved in the
