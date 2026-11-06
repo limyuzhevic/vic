@@ -1,21 +1,46 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
+# ==============================================================================
+# NLM (熙然) - Neural Learning Machine Build Configuration
+# ==============================================================================
+# This CMake configuration builds the NLM neural simulation framework.
+# 
+# Build Types:
+#   Release   - Optimized builds with minimal debug information (default)
+#   Debug     - Unoptimized builds with full debug information  
+#   RelWithDebInfo - Optimized with debug symbols
+#   MinSizeRel - Optimized for minimum binary size
+#
+# ==============================================================================
+
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
+# Build type configuration
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build" FORCE)
+    message(STATUS "NLM Build Type: ${CMAKE_BUILD_TYPE}")
 endif()
 
 # Enable warnings
 if(MSVC)
     add_compile_options(/W4)
+    message(STATUS "Using MSVC with /W4 warnings")
 else()
     add_compile_options(-Wall -Wextra -Wpedantic)
+    message(STATUS "Using GCC/Clang with -Wall -Wextra -Wpedantic warnings")
+endif()
+
+# Python bindings build option
+# ==============================================================================
+option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module (requires pybind11)" ON)
+if(NLM_BUILD_PYTHON_BINDINGS)
+    message(STATUS "Python bindings enabled - will build pynlm module")
+else()
+    message(STATUS "Python bindings disabled - will skip pynlm module build")
 endif()
 
 # Source directory
@@ -179,35 +204,82 @@ add_executable(nlm_benchmark
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
-# Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
+# Python bindings module (pynlm)
+# ==============================================================================
+# Python bindings enable high-level interaction with NLM via Python API.
+# This is the primary interface for users who want to:
+# - Create and simulate neural networks
+# - Use NLM as part of Python-based AI systems
+# - Integrate with Python data science tools (numpy, pandas, etc.)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 CONFIG REQUIRED)
+    
+    message(STATUS "Building Python module with pybind11 ${pybind11_VERSION}")
+    
     # The module is shared, so the static libs it links need PIC.
     set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
         POSITION_INDEPENDENT_CODE ON)
+    
     pybind11_add_module(pynlm python/bindings.cpp)
     target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
     target_include_directories(pynlm PRIVATE src)
+    
     install(TARGETS pynlm LIBRARY DESTINATION .)
+    
+    message(STATUS "Python module pynlm will be installed to ${CMAKE_INSTALL_PREFIX}/")
 endif()
 
-# Testing
+# Testing configuration
+# ==============================================================================
+
+# Testing configuration
+# ==============================================================================
+# Comprehensive testing framework for all NLM components:
+# - Unit tests for core neural computation (brain, neurons, synapses)
+# - Integration tests for complete system functionality
+# - Performance benchmarks and regression testing
+# - Python bindings testing
+
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)
+# Installation targets (future releases)
+# ==============================================================================
+# Installation configuration for NLM components:
+# - Core libraries (nlm_core, nlm_agent, nlm_world) for development
+# - Demo executables for example usage and verification
+# - Python module for Python-based applications
+# - Benchmark executable for performance testing
+
+install(TARGETS nlm nlm_core nlm_agent nlm_world
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin)
+
+# Additional executable components
+# ==============================================================================
+# User-facing executables for different use cases:
+# - nlm: Basic neural computation demonstration (Phase 2)
+# - nlm_phase3_demo: World interaction and sensory-motor loops
+# - nlm_phase4_demo: Cognitive capabilities and working memory
+# - nlm_phase5_demo: Personality traits and sandbox learning
+# - nlm_phase6_demo: Full integration of all brain systems
+# - nlm_phase6_text_demo: Text processing and concept formation
+# - nlm_benchmark: Performance benchmarking
+
+install(TARGETS nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_phase6_text_demo
+        RUNTIME DESTINATION bin)
+
+install(TARGETS nlm_benchmark
+        RUNTIME DESTINATION bin)
+
+message(STATUS "NLM build configuration complete")
+message(STATUS "  - Core libraries: nlm_core, nlm_agent, nlm_world")
+message(STATUS "  - Phase libraries: nlm_phase3, nlm_phase4, nlm_phase5, nlm_phase6")
+message(STATUS "  - Executables: nlm, nlm_phase3_demo, nlm_phase4_demo, nlm_phase5_demo, nlm_phase6_demo, nlm_phase6_text_demo, nlm_benchmark")
+if(NLM_BUILD_PYTHON_BINDINGS)
+    message(STATUS "  - Python module: pynlm")
+endif()
+message(STATUS "  - Testing framework: enabled")
+message(STATUS "  - Installation targets: configured")

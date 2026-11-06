@@ -176,7 +176,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getDimensions", &SensoryInput::getDimensions, "Get the dimensionality")
         .def("getTimestamp", &SensoryInput::getTimestamp, "Get the timestamp")
         .def("setTimestamp", &SensoryInput::setTimestamp, py::arg("timestamp"),
-             "Set the timestamp");
+             "Set the timestamp")
+        // Property access for improved Python API
+        .def_property_readonly("type", &SensoryInput::getType, "Get the type of sensory input (property)")
+        .def_property_readonly("dimensions", &SensoryInput::getDimensions, "Get the dimensionality (property)")
+        .def_property_readonly("timestamp", &SensoryInput::getTimestamp, "Get the timestamp (property)");
 
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
@@ -187,7 +191,11 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        // Property access for improved Python API
+        .def_property_readonly("width", &Vision::getWidth, "Get the image width (property)")
+        .def_property_readonly("height", &Vision::getHeight, "Get the image height (property)")
+        .def_property_readonly("channels", &Vision::getChannels, "Get the number of channels (property)");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -197,12 +205,17 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        // Property access for improved Python API
+        .def_property_readonly("sample_rate", &Audio::getSampleRate, "Get the sample rate (property)")
+        .def_property_readonly("num_samples", &Audio::getNumSamples, "Get the number of samples (property)");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
+        // Note: InternalSignals doesn't have a signal count getter, so we can't add property without proper API
+        // .def_property_readonly("signal_count", &InternalSignals::addSignal, "Get number of signals (property)")
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -213,7 +226,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        // Property access for improved Python API
+        .def_property("type", &Action::getType, &Action::setType, "Get or set the action type (property)")
+        .def_property("parameters", &Action::getParameters, &Action::setParameters, "Get or set action parameters (property)")
+        .def_property_readonly("name", &Action::getName, "Get the action name (property)");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -225,7 +242,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("radius", &WorldObject::radius)
         .def_readwrite("type", &WorldObject::type)
         .def_readwrite("value", &WorldObject::value)
-        .def_readwrite("active", &WorldObject::active);
+        .def_readwrite("active", &WorldObject::active)
+        // Property access for improved Python API
+        .def_property("position", [](WorldObject& obj) { return std::make_pair(obj.x, obj.y); },
+                      [](WorldObject& obj, const std::pair<float, float>& pos) { obj.x = pos.first; obj.y = pos.second; },
+                      "Get or set the object position (property)")
+        .def_property("coordinates", [](WorldObject& obj) { return std::make_pair(obj.x, obj.y); },
+                      [](WorldObject& obj, const std::pair<float, float>& coord) { obj.x = coord.first; obj.y = coord.second; },
+                      "Get or set the object coordinates (property)");
 
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
@@ -241,7 +265,18 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("isMoving", &AgentBody::isMoving)
         .def_readwrite("isTurning", &AgentBody::isTurning)
         .def_readwrite("lastActionTime", &AgentBody::lastActionTime)
-        .def("reset", &AgentBody::reset);
+        .def("reset", &AgentBody::reset)
+        // Property access for improved Python API
+        .def_property("position", [](AgentBody& body) { return std::make_pair(body.x, body.y); },
+                      [](AgentBody& body, const std::pair<float, float>& pos) { body.x = pos.first; body.y = pos.second; },
+                      "Get or set the agent position (property)")
+        .def_property("velocity", [](AgentBody& body) { return std::make_pair(body.velocityX, body.velocityY); },
+                      [](AgentBody& body, const std::pair<float, float>& vel) { body.velocityX = vel.first; body.velocityY = vel.second; },
+                      "Get or set the agent velocity (property)")
+        .def_property_readonly("speed", [](AgentBody& body) { return std::sqrt(body.velocityX*body.velocityX + body.velocityY*body.velocityY); },
+                             "Get the agent speed (property)")
+        .def_property_readonly("is_active", &AgentBody::isMoving, "Check if agent is moving (property)")
+        .def_property_readonly("is_turning", &AgentBody::isTurning, "Check if agent is turning (property)");
 
     py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
         .def(py::init<>())
@@ -267,7 +302,17 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        // Property access for improved Python API
+        .def_property_readonly("vision", &SensoryPercept::getVision, "Get the vision signal (property)")
+        .def_property("vision", &SensoryPercept::getVision, &SensoryPercept::setVision, "Get or set the vision signal (property)")
+        .def_property_readonly("vision_width", &SensoryPercept::getVisionWidth, "Get vision width (property)")
+        .def_property_readonly("vision_height", &SensoryPercept::getVisionHeight, "Get vision height (property)")
+        .def_property("touch", &SensoryPercept::getTouch, &SensoryPercept::setTouch, "Get or set the touch signal (property)")
+        .def_property("internal_signals", &SensoryPercept::getInternal, &SensoryPercept::setInternal, "Get or set internal signals (property)")
+        .def_property("proprioception", &SensoryPercept::getProprioception, &SensoryPercept::setProprioception, "Get or set proprioception (property)")
+        .def_property("audio", &SensoryPercept::getAudio, &SensoryPercept::setAudio, "Get or set audio signal (property)")
+        .def_property("timestamp", &SensoryPercept::getTimestamp, &SensoryPercept::setTimestamp, "Get or set the timestamp (property)");
 
     py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -293,7 +338,23 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Property access for improved Python API
+        .def_property_readonly("width", &SimpleWorld::getWidth, "Get world width (property)")
+        .def_property_readonly("height", &SimpleWorld::getHeight, "Get world height (property)")
+        .def_property_readonly("vision_width", &SimpleWorld::getVisionWidth, "Get vision width (property)")
+        .def_property_readonly("vision_height", &SimpleWorld::getVisionHeight, "Get vision height (property)")
+        .def_property_readonly("max_energy", &SimpleWorld::getMaxEnergy, "Get max energy (property)")
+        .def_property("energy_decay_rate", &SimpleWorld::getEnergyDecayRate, &SimpleWorld::setEnergyDecayRate, "Get or set energy decay rate (property)")
+        .def_property_readonly("simulation_time", &SimpleWorld::getSimulationTime, "Get simulation time (property)")
+        .def_property_readonly("random_seed", &SimpleWorld::getRandomSeed, "Get random seed (property)")
+        // Convenience methods
+        .def("set_dimensions", [](SimpleWorld& world, size_t w, size_t h, size_t vw, size_t vh) {
+            world.configure(w, h, vw, vh);
+        }, py::arg("width"), py::arg("height"), py::arg("vision_width"), py::arg("vision_height"),
+           "Set world dimensions and vision size (convenience method)")
+        .def("spawn_agent", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set agent starting position (convenience method)");
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -359,7 +420,16 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Property access for improved Python API
+        .def_property_readonly("total_neuron_count", &Brain::getTotalNeuronCount, "Get total neuron count (property)")
+        .def_property_readonly("total_synapse_count", &Brain::getTotalSynapseCount, "Get total synapse count (property)")
+        .def_property_readonly("firing_neuron_count", &Brain::getFiringNeuronCount, "Get firing neuron count (property)")
+        .def_property_readonly("average_firing_rate", &Brain::getAverageFiringRate, "Get average firing rate (property)")
+        .def_property_readonly("excitement_inhibition_ratio", &Brain::getExcitationInhibitionRatio, "Get excitation/inhibition ratio (property)")
+        .def_property_readonly("total_spike_count", &Brain::getTotalSpikeCount, "Get total spike count (property)")
+        .def_property_readonly("region_count", &Brain::getRegionCount, "Get region count (property)")
+        .def_property_readonly("developmental_stage", &Brain::getDevelopmentalStage, "Get developmental stage (property)");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -406,28 +476,78 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Property access for improved Python API
+        .def_property_readonly("is_reward_modulation_enabled", &AgentBrain::isRewardModulationEnabled, "Check if reward modulation is enabled (property)")
+        .def_property_readonly("is_structural_plasticity_enabled", &AgentBrain::isStructuralPlasticityEnabled, "Check if structural plasticity is enabled (property)")
+        .def_property_readonly("is_development_enabled", &AgentBrain::isDevelopmentEnabled, "Check if development is enabled (property)")
+        .def_property_readonly("is_curiosity_enabled", &AgentBrain::isCuriosityEnabled, "Check if curiosity is enabled (property)");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+    }, "Create a default configuration")
+    .def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+    }, py::arg("config"), "Create a new brain with configuration")
+    .def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+    }, "Create a new simple world")
+    .def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    }, py::arg("brain"), "Create a new agent brain interface")
+    // Additional convenience functions for Python users
+    .def("create_complete_system", []() {
+        // Create a complete agent system with default configuration
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        agent->initialize(world);
+        
+        return std::make_tuple(config, brain, world, agent);
+    }, "Create a complete agent system (config, brain, world, agent)")
+    .def("run_agent_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                   std::shared_ptr<AgentBrain> agent, int num_steps) {
+        for (int step = 0; step < num_steps; ++step) {
+            world->update(0.1);
+            agent->processSensoryInput(world->getSensoryPercept());
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getFiringNeuronCount(),
+            agent->getCuriosityLevel(),
+            agent->getNoveltyLevel()
+        );
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("num_steps"),
+       "Run a complete agent simulation and return statistics")
+    // Python module metadata
+    .attr("__version__") = "0.1.0"
+    .attr("__author__") = "NLM Project"
+    .attr("__description__") = "Python bindings for NLM (Neural Learning Machine) neural simulation framework"
+    .attr("__license__") = "MIT"
+    .attr("__doc__") = R"pbdoc(
+        NLM (Neural Learning Machine) Python Bindings
+        ---------------------------------------------
+        A Python binding for the NLM C++ neural simulation framework.
+        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        Quick start example:
+        
+        import pynlm
+        
+        # Create a complete agent system
+        config, brain, world, agent = pynlm.create_complete_system()
+        brain.initialize()
+        agent.initialize(world)
+        
+        # Run simulation
+        stats = pynlm.run_agent_simulation(brain, world, agent, 100)
+        print(f"Spikes: {stats[0]}, Firing neurons: {stats[1]}, Curiosity: {stats[2]:.2f}, Novelty: {stats[3]:.2f}")
+    )pbdoc"
 
 } // namespace nlm
