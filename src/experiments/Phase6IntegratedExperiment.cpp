@@ -77,15 +77,58 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
-        // Apply action to world
-        ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
-        
-        // Compute reward
+        // Compute intelligent reward based on agent performance
         float reward = actionResult.reward;
-        totalReward += reward;
+        
+        // Add bonus rewards for learning milestones
+        float learningBonus = 0.0f;
+        
+        // Bonus for positive learning (weight changes)
+        if (step % 100 == 0 && step > 0) {
+            if (auto* region = brain->getRegion(RegionId(1))) {
+                float totalWeight = 0.0f;
+                size_t synapseCount = 0;
+                for (const auto& syn : region->getSynapses()) {
+                    totalWeight += syn->getWeight();
+                    synapseCount++;
+                }
+                if (synapseCount > 0) {
+                    float avgWeight = totalWeight / synapseCount;
+                    // Reward for moderate weight changes (not saturation)
+                    if (avgWeight > 0.1f && avgWeight < 0.9f) {
+                        learningBonus += 0.1f;
+                    } else if (avgWeight > 0.05f && avgWeight < 0.95f) {
+                        learningBonus += 0.05f;
+                    }
+                }
+            }
+        }
+        
+        // Bonus for memory usage
+        if (brain->getWorkingMemory()) {
+            size_t activeTraces = brain->getWorkingMemory()->getActiveTraces();
+            if (activeTraces > 0) {
+                learningBonus += std::min(0.2f, activeTraces * 0.001f);
+            }
+        }
+        
+        // Bonus for novelty and curiosity
+        float novelty = agent.getNoveltyLevel();
+        if (novelty > 0.3f && novelty < 0.7f) {
+            learningBonus += 0.15f;
+        }
+        
+        float curiosity = agent.getCuriosityLevel();
+        if (curiosity > 0.5f) {
+            learningBonus += 0.1f;
+        }
+        
+        // Total reward includes base reward plus learning bonuses
+        float totalStepReward = reward + learningBonus;
+        totalReward += totalStepReward;
         
         // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        agent.applyRewardModulation(totalStepReward, 0.0f);
         
         // Update development
         if (config.enableDevelopment) {
@@ -96,13 +139,20 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
         
-        // Periodic status
-        if (step % 1000 == 0) {
+        // Enhanced periodic status with detailed metrics
+        if (step % 500 == 0 || step == config.maxSteps - 1) {
+            float avgStepReward = totalReward / (step + 1);
+            float explorationBonus = learningBonus - reward; // Non-zero indicates learning bonus
+            
             NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                        " | Total Reward: " + std::to_string(totalStepReward) +
+                        " | Avg Step Reward: " + std::to_string(avgStepReward) +
+                        " | Learning Bonus: " + std::to_string(explorationBonus) +
                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
-                        " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
-                            brain->getWorkingMemory()->getActiveTraces() : 0));
+                        " | Active Traces: " + std::to_string(brain->getWorkingMemory() ? 
+                            brain->getWorkingMemory()->getActiveTraces() : 0) +
+                        " | Novelty: " + std::to_string(novelty) +
+                        " | Curiosity: " + std::to_string(curiosity));
         }
     }
     

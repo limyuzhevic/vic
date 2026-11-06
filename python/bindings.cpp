@@ -146,26 +146,98 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
+        // Improved loadFromArgs binding with better error handling and Pythonic API
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
-            std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
+            try {
+                return self.loadFromArgs(static_cast<int>(args.size()),
+                    const_cast<char**>(reinterpret_cast<const char**>(args.data())));
+            } catch (const std::exception& e) {
+                throw py::value_error("Failed to load configuration from arguments: " + std::string(e.what()));
+            }
         }, py::arg("args"),
            "Load configuration from command line arguments")
+        .def("loadFromArgsDict", [](Config& self, const py::dict& config_dict) {
+            // Alternative Python-friendly API for configuration
+            for (auto item : config_dict) {
+                std::string key = py::cast<std::string>(item.first);
+                auto value = item.second;
+                
+                // Try to infer type from Python value
+                if (py::isinstance<py::int_>(value)) {
+                    self.set(key, py::cast<int64_t>(value), ConfigSource::Python);
+                } else if (py::isinstance<py::float_>(value)) {
+                    self.set(key, py::cast<float>(value), ConfigSource::Python);
+                } else if (py::isinstance<py::str_>(value)) {
+                    self.set(key, py::cast<std::string>(value), ConfigSource::Python);
+                } else {
+                    throw py::type_error("Unsupported configuration value type for key: " + key);
+                }
+            }
+        }, py::arg("config_dict"),
+           "Load configuration from a Python dictionary")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](const Config& self, const std::string& key) {
+            // Get configuration value with type safety
+            if (!self.has(key)) {
+                throw py::key_error("Configuration key not found: " + key);
+            }
+            return self.getOr<std::string>(key, "");
+        }, py::arg("key"),
+           "Get configuration value (returns string)")
+        .def("getInt", [](const Config& self, const std::string& key) {
+            // Get configuration value as integer
+            if (!self.has(key)) {
+                throw py::key_error("Configuration key not found: " + key);
+            }
+            return self.getOr<int64_t>(key, 0);
+        }, py::arg("key"),
+           "Get configuration value as integer")
+        .def("getFloat", [](const Config& self, const std::string& key) {
+            // Get configuration value as float
+            if (!self.has(key)) {
+                throw py::key_error("Configuration key not found: " + key);
+            }
+            return self.getOr<float>(key,  omission);
+        }, py::arg("key"),
+           "Get configuration value as float")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+        .def("set", [](Config& self, const std::string& key, const py::dict& value_dict) {
+            // Enhanced set method with type inference
+            auto source = py::cast<ConfigSource>(value_dict.get("source", py::cast<ConfigSource>(ConfigSource::Python)));
+            auto val = value_dict.get("value", py::cast<std::string>(""));
+            
+            if (py::isinstance<py::int_>(val)) {
+                self.set(key, py::cast<int64_t>(val), source);
+            } else if (py::isinstance<py::float_>(val)) {
+                self.set(key, py::cast<float>(val), source);
+            } else if (py::isinstance<py::str_>(val)) {
+                self.set(key, py::cast<std::string>(val), source);
+            } else {
+                throw py::type_error("Unsupported value type for configuration key: " + key);
+            }
+        }, py::arg("key"), py::arg("value_dict"),
+           "Set configuration value with type inference")
+        .def("validate", [](const Config& self) {
+            // Validate configuration
+            std::string errors;
+            bool valid = self.validate(errors);
+            return py::make_tuple(valid, errors);
+        }, "Validate configuration and return (valid, errors)")
+        .def("getConfigSummary", [](const Config& self) {
+            // Get detailed configuration summary
+            std::string summary = self.summary();
+            py::dict summary_dict;
+            for (const auto& key : self.getKeys()) {
+                summary_dict[key.c_str()] = self.getOr<std::string>(key, "");
+            }
+            return summary_dict;
+        }, "Get configuration summary as Python dictionary")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
