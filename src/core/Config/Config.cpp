@@ -3,11 +3,15 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <unordered_map>
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // For efficient lookup
+    std::unordered_map<std::string, size_t> keyToIndex;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -18,41 +22,164 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Helper function to convert ConfigValue to JSON value
+static nlohmann::json configValueToJson(const ConfigValue& value) {
+    nlohmann::json result;
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    std::visit([&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, int>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            result = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            result = arg;
+        }
+    }, value);
+    
+    return result;
+}
+
+// Helper function to convert JSON value to ConfigValue
+static ConfigValue jsonToConfigValue(const nlohmann::json& j) {
+    if (j.is_string()) {
+        return j.get<std::string>();
+    } else if (j.is_number_integer()) {
+        return j.get<int>();
+    } else if (j.is_number_unsigned()) {
+        return j.get<uint64_t>();
+    } else if (j.is_number_float()) {
+        return j.get<double>();
+    } else if (j.is_boolean()) {
+        return j.get<bool>();
+    } else if (j.is_array()) {
+        // Check if it's an array of integers, doubles, or strings
+        if (!j.empty()) {
+            if (j[0].is_number_integer()) {
+                std::vector<int> vec = j.get<std::vector<int>>();
+                return vec;
+            } else if (j[0].is_number_float()) {
+                std::vector<double> vec = j.get<std::vector<double>>();
+                return vec;
+            } else if (j[0].is_string()) {
+                std::vector<std::string> vec = j.get<std::vector<std::string>>();
+                return vec;
+            }
+        }
+        // If we can't determine the type, treat as array of numbers
+        std::vector<double> vec = j.get<std::vector<double>>();
+        return vec;
+    } else {
+        // Fallback to empty string
+        return std::string();
     }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
+    try {
+        // Try to parse as JSON first
+        nlohmann::json configData;
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        // Peek at the first character to determine file type
+        std::ifstream peekFile(filepath);
+        char firstChar;
+        if (peekFile.get(firstChar)) {
+            if (firstChar == '{' || firstChar == '[') {
+                // JSON file
+                peekFile.close();
+                file.close();
+                
+                file >> configData;
+                
+                // Clear existing entries
+                clear();
+                
+                // Parse JSON and populate entries
+                if (configData.is_object()) {
+                    for (const auto& [key, value] : configData.items()) {
+                        ConfigValue configValue = jsonToConfigValue(value);
+                        set(key, configValue, ConfigSource::File);
+                    }
+                }
+                
+                return true;
+            }
+        }
+        
+        // If not JSON, try the original INI-like format
+        peekFile.close();
+        
+        std::ifstream fileStream(filepath);
+        if (!fileStream.is_open()) {
+            return false;
+        }
+        
+        std::string line;
+        while (std::getline(fileStream, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                // Try to infer value type
+                bool parsed = false;
+                
+                // Try to parse as boolean
+                if (value == "true" || value == "false") {
+                    set(key, value == "true", ConfigSource::File);
+                    parsed = true;
+                }
+                // Try to parse as integer
+                else if (std::all_of(value.begin(), value.end(), ::isdigit) ||
+                         (value[0] == '-' && std::all_of(value.begin() + 1, value.end(), ::isdigit))) {
+                    try {
+                        if (value.find('.') == std::string::npos) {
+                            set(key, std::stoll(value), ConfigSource::File);
+                        } else {
+                            set(key, std::stod(value), ConfigSource::File);
+                        }
+                        parsed = true;
+                    } catch (const std::exception&) {}
+                }
+                
+                if (!parsed) {
+                    set(key, value, ConfigSource::File);
+                }
+            }
         }
+        
+        return true;
+    } catch (const std::exception&) {
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,10 +211,15 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    nlohmann::json configData;
+    
+    // Add all entries to JSON
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        configData[entry.key] = configValueToJson(entry.value);
     }
+    
+    // Write formatted JSON
+    file << configData.dump(2);
     
     return true;
 }
@@ -101,6 +233,7 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         it->source = source;
     } else {
         pImpl->entries.emplace_back(key, value, source);
+        pImpl->keyToIndex[key] = pImpl->entries.size() - 1;
     }
 }
 
@@ -130,11 +263,21 @@ bool Config::has(const std::string& key) const {
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        size_t index = std::distance(pImpl->entries.begin(), it);
+        pImpl->entries.erase(it);
+        pImpl->keyToIndex.erase(key);
+        
+        // Update indices of remaining entries
+        for (auto& [k, idx] : pImpl->keyToIndex) {
+            if (idx > index) {
+                idx--;
+            }
+        }
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {
@@ -148,6 +291,7 @@ std::vector<std::string> Config::getKeys() const {
 
 void Config::clear() {
     pImpl->entries.clear();
+    pImpl->keyToIndex.clear();
 }
 
 std::string Config::summary() const {
