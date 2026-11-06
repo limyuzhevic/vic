@@ -84,8 +84,19 @@ add_library(nlm_core STATIC
     src/visualization/VisualizationInterface.cpp
 )
 
+# Include nlohmann/json for configuration parsing
+include(FetchContent)
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.2
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# Add include directory for nlohmann/json
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${nlohmann_json_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
@@ -173,7 +184,13 @@ add_executable(nlm_phase6_text_demo
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
 
-# Benchmark executable
+# Test executable
+add_executable(nlm_config_test
+    test_config.cpp
+)
+target_link_libraries(nlm_config_test PUBLIC nlm_core nlohmann_json::nlohmann_json)
+
+# Add benchmark executable
 add_executable(nlm_benchmark
     src/benchmark.cpp
 )

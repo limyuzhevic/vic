@@ -1,0 +1,113 @@
+# NLM Enhanced Configuration File
+# JSON format for NLM neural learning machine
+
+{
+  "brain": {
+    "neuron_count": 2048,
+    "region_count": 4,
+    "connection_probability": 0.15,
+    "v_thresh": -50.0,
+    "v_rest": -70.0,
+    "v_reset": -75.0,
+    "tau_mem": 20.0,
+    "tau_ref": 2.0
+  },
+  
+  "plasticity": {
+    "stdp": {
+      "enable": true,
+      "learning_rate": 0.001,
+      "tau_plus": 20.0,
+      "tau_minus": 20.0,
+      "weight_range": [-0.1, 0.1]
+    },
+    "hebbian": {
+      "enable": true,
+      "learning_rate": 0.01
+    },
+    "structural": {
+      "enable": true,
+      "synaptogenesis_rate": 0.0001,
+      "pruning_rate": 0.00001
+    }
+  },
+  
+  "neuromodulation": {
+    "dopamine": {
+      "baseline": 0.0,
+      "scale": 1.0,
+      "learning_rate": 0.1
+    },
+    "curiosity": {
+      "enable": true,
+      "sensitivity": 0.5,
+      "decay_rate": 0.99
+    },
+    "novelty": {
+      "enable": true,
+      "threshold": 0.7,
+      "detection_window": 100
+    }
+  },
+  
+  "development": {
+    "enable": true,
+    "initial_stage": "Initial",
+    "plasticity_decay_rate": 0.995,
+    "critical_period_start": 100,
+    "critical_period_end": 500
+  },
+  
+  "memory": {
+    "working_memory": {
+      "capacity": 100,
+      "decay_rate": 0.9
+    },
+    "episodic_memory": {
+      "max_episodes": 1000,
+      "replay_probability": 0.3,
+      "consolidation_threshold": 0.8
+    }
+  },
+  
+  "simulation": {
+    "timestep": 0.001,
+    "max_steps": 10000,
+    "checkpoint_interval": 1000,
+    "random_seed": 42
+  },
+  
+  "environment": {
+    "width": 20,
+    "height": 20,
+    "vision_width": 8,
+    "vision_height": 8,
+    "max_energy": 100.0,
+    "energy_decay_rate": 0.1
+  },
+  
+  "logging": {
+    "level": "INFO",
+    "log_to_file": true,
+    "log_filename": "nlm.log",
+    "console_colors": true
+  },
+  
+  "advanced_features": {
+    "prediction_system": {
+      "enable": true,
+      "prediction_horizon": 10,
+      "confidence_threshold": 0.7
+    },
+    "cognition_system": {
+      "enable": true,
+      "planning_depth": 5,
+      "attention_span": 50
+    },
+    "parallel_processing": {
+      "enable": true,
+      "thread_count": 4,
+      "load_balance": true
+    }
+  }
+}
