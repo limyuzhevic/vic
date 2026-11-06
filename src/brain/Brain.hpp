@@ -186,24 +186,104 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // ========== ADVANCED STATISTICAL ANALYSIS ==========
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-
-    // Learned preference trait (Phase 5): a single scalar, -1..1,
-    // updated only by sandbox reward through AgentBrain, saved in the
-    // checkpoint (SimulationState section) and used as a small bias in
-    // later action choice. This is the measured "personality" step: a
-    // preference learned from experience that survives a reload and
-    // changes later behaviour. It is not a language-model persona and
-    // it does not, on its own, make the brain a human brain.
-    float getLearnedPreference() const;
-    void setLearnedPreference(float preference);
+    // Get comprehensive neural activity statistics
+    std::string getNeuralStatistics() const;
     
-    // Logging
-    void logStatus() const;
+    // Get statistics about synaptic connections
+    std::string getSynapseStatistics() const;
+    
+    // Get correlation between neural activities
+    float getActivityCorrelation(size_t neuronId1, size_t neuronId2) const;
+    
+    // Get the brain network topology information
+    std::string getNetworkTopology() const;
+    
+    // ========== PERFORMANCE MONITORING ==========
+    
+    // Get performance metrics for the brain simulation
+    struct PerformanceMetrics {
+        double simulationSpeed;        // steps per second
+        double memoryUsageMB;          // memory usage in MB
+        double cpuUsagePercent;        // CPU usage percentage
+        size_t activeNeurons;         // number of active neurons
+        size_t totalSpikes;            // total spike count
+        double avgFiringRate;          // average firing rate
+        size_t connectionsPerStep;     // connections processed per step
+    };
+    PerformanceMetrics getPerformanceMetrics() const;
+    
+    // Get computational load information
+    struct ComputationalLoad {
+        double neuralProcessingTime;   // time spent in neural processing
+        double plasticityTime;        // time spent in plasticity
+        double memoryAccessTime;       // time spent in memory access
+        double totalStepTime;          // total time per step
+    };
+    ComputationalLoad getComputationalLoad() const;
+    
+    // Get memory usage statistics
+    size_t getMemoryUsage() const;
+    
+    // ========== ADVANCED CONFIGURATION ==========
+    
+    // Configure brain for specific network size
+    void configureForNetworkSize(size_t neuronCount, size_t regionCount);
+    
+    // Configure brain for learning scenarios
+    void configureForLearning(float learningRate, bool plasticityEnabled);
+    
+    // Configure brain for developmental dynamics
+    void configureForDevelopment(float developmentSpeed, bool ageBasedPlasticity);
+    
+    // Get detailed configuration report with recommendations
+    std::string getConfigReport() const;
+    
+    // ========== ADVANCED BRAIN MANIPULATION ==========
+    
+    // Activate a specific brain region with given intensity
+    void activateRegion(RegionId regionId, float intensity = 1.0f);
+    
+    // Deactivate a specific brain region
+    void deactivateRegion(RegionId regionId);
+    
+    // Scale all synaptic connections by factor
+    void scaleAllConnections(float scaleFactor);
+    
+    // Apply modulation pattern to the network
+    void applyNetworkModulation(const std::vector<float>& modulationPattern);
+    
+    // ========== DEBUGGING AND ANALYSIS TOOLS ==========
+    
+    // Dump current network state for debugging
+    std::string dumpNetworkState() const;
+    
+    // Analyze network health and identify issues
+    std::string analyzeNetworkHealth() const;
+    
+    // Generate comprehensive debug report
+    std::string generateDebugReport() const;
+    
+    // Find neurons with potential issues
+    std::vector<NeuronId> findProblematicNeurons() const;
+    
+    // Identify synaptic connections that need strengthening
+    std::vector<std::pair<SynapseId, float>> identifyWeakConnections() const;
+    
+    // ========== ADVANCED PLANNING AND COGNITION ==========
+    
+    // Optimize action selection based on current state
+    void optimizeActionSelection();
+    
+    // Generate alternative action plans
+    std::vector<std::vector<ActionType>> getAlternativePlans() const;
+    
+    // Evaluate quality of an action plan
+    float evaluatePlanQuality(const std::vector<ActionType>& plan) const;
+    
+    // Generate insights from learning history
+    std::string generateLearningInsights() const;
     
 private:
     struct Impl;

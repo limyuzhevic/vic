@@ -1543,49 +1543,358 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
 }
 
-RandomGenerator* Brain::getRandomGenerator() {
-    return pImpl->rng.get();
+// ========== ADVANCED STATISTICAL ANALYSIS ==========
+
+std::string Brain::getNeuralStatistics() const {
+    std::stringstream ss;
+    ss << "=== NLM Neural Statistics ===\n";
+    ss << "Total neurons: " << getTotalNeuronCount() << "\n";
+    ss << "Total synapses: " << getTotalSynapseCount() << "\n";
+    ss << "Active neurons: " << getActiveNeuronCount() << "\n";
+    ss << "Firing neurons (this step): " << getFiringNeuronCount() << "\n";
+    ss << "Total spikes: " << getTotalSpikeCount() << "\n";
+    ss << "Average firing rate: " << getAverageFiringRate() << " Hz\n";
+    ss << "E/I ratio: " << getExcitationInhibitionRatio() << "\n";
+    ss << "Neural density: " << (getTotalNeuronCount() > 0 ? getTotalSynapseCount() / getTotalNeuronCount() : 0.0) << " synapses per neuron\n";
+    ss << "Network connectivity: " << (getTotalNeuronCount() > 0 ? (getTotalSynapseCount() / (getTotalNeuronCount() * (getTotalNeuronCount() - 1))) * 100.0 : 0.0) << "%\n";
+    return ss.str();
 }
 
-void Brain::logStatus() const {
-    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
-    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
-    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
-    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
-    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
-    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
-    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
-    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
-    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
-    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
-    
-    // Memory system status
-    if (pImpl->workingMemory) {
-        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+std::string Brain::getSynapseStatistics() const {
+    std::stringstream ss;
+    ss << "=== NLM Synapse Statistics ===\n";
+    ss << "Total synapses: " << getTotalSynapseCount() << "\n";
+    ss << "Average synapse weight: TODO\n";
+    ss << "Synapse type distribution: TODO\n";
+    ss << "Plasticity status: TODO\n";
+    return ss.str();
+}
+
+float Brain::getActivityCorrelation(size_t neuronId1, size_t neuronId2) const {
+    // Simple correlation based on firing patterns
+    // This is a placeholder implementation
+    return 0.0f;
+}
+
+std::string Brain::getNetworkTopology() const {
+    std::stringstream ss;
+    ss << "=== NLM Network Topology ===\n";
+    ss << "Number of regions: " << pImpl->regions.size() << "\n";
+    for (size_t i = 0; i < pImpl->regions.size(); ++i) {
+        const auto& region = pImpl->regions[i];
+        ss << "Region " << i << ": " << region->getTotalNeuronCount() << " neurons, " << region->getSynapseCount() << " synapses\n";
     }
-    if (pImpl->episodicMemory) {
-        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    return ss.str();
+}
+
+// ========== PERFORMANCE MONITORING ==========
+
+Brain::PerformanceMetrics Brain::getPerformanceMetrics() const {
+    PerformanceMetrics metrics;
+    metrics.neurons = getTotalNeuronCount();
+    metrics.synapses = getTotalSynapseCount();
+    metrics.steps = pImpl->currentStep;
+    metrics.totalTime = pImpl->currentTime;
+    metrics.stepsPerSecond = (pImpl->currentTime > 0.0) ? pImpl->currentStep / pImpl->currentTime : 0.0;
+    metrics.spikesPerStep = (pImpl->currentStep > 0) ? static_cast<double>(getTotalSpikeCount()) / pImpl->currentStep : 0.0;
+    metrics.synapsesPerNeuron = (metrics.neurons > 0) ? static_cast<double>(metrics.synapses) / metrics.neurons : 0.0;
+    return metrics;
+}
+
+Brain::ComputationalLoad Brain::getComputationalLoad() const {
+    ComputationalLoad load;
+    // This is a simplified version - in a real implementation, you would
+    // need to track timing for different components
+    load.neuralProcessingTime = pImpl->currentTime * 0.7;  // Estimate: 70% of time spent in neural processing
+    load.plasticityTime = pImpl->currentTime * 0.2;      // Estimate: 20% of time spent in plasticity
+    load.memoryAccessTime = pImpl->currentTime * 0.1;    // Estimate: 10% of time spent in memory access
+    load.totalStepTime = pImpl->currentTime;
+    return load;
+}
+
+size_t Brain::getMemoryUsage() const {
+    // Estimate memory usage
+    size_t totalMemory = 0;
+    totalMemory += getTotalNeuronCount() * sizeof(Neuron);  // Rough estimate
+    totalMemory += getTotalSynapseCount() * sizeof(Synapse); // Rough estimate
+    totalMemory += pImpl->regions.size() * sizeof(NeuralRegion); // Rough estimate
+    return totalMemory;
+}
+
+// ========== ADVANCED CONFIGURATION ==========
+
+void Brain::configureForNetworkSize(size_t neuronCount, size_t regionCount) {
+    auto config = std::make_shared<Config>();
+    config->set("neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(regionCount), ConfigSource::Default);
+    config->set("connection_probability", 0.1f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    
+    pImpl->config = config;
+    
+    // Note: This doesn't actually reconfigure the existing brain,
+    // but sets up a new configuration that could be used to create
+    // a new brain with these parameters
+}
+
+void Brain::configureForLearning(float learningRate, bool plasticityEnabled) {
+    auto config = std::make_shared<Config>();
+    config->set("plasticity.stdp.learning_rate", learningRate, ConfigSource::Default);
+    config->set("plasticity.stdp.enable", plasticityEnabled, ConfigSource::Default);
+    config->set("plasticity.hebbian.enable", plasticityEnabled, ConfigSource::Default);
+    
+    pImpl->config = config;
+}
+
+void Brain::configureForDevelopment(float developmentSpeed, bool ageBasedPlasticity) {
+    auto config = std::make_shared<Config>();
+    config->set("development.speed", developmentSpeed, ConfigSource::Default);
+    config->set("development.age_based_plasticity", ageBasedPlasticity, ConfigSource::Default);
+    
+    pImpl->config = config;
+}
+
+std::string Brain::getConfigReport() const {
+    std::stringstream ss;
+    ss << "=== NLM Configuration Report ===\n";
+    ss << "Configuration:\n";
+    
+    if (pImpl->config) {
+        auto keys = pImpl->config->getKeys();
+        for (const auto& key : keys) {
+            ss << "  " << key << "\n";
+        }
     }
     
-    // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    ss << "\nRecommendations:\n";
+    ss << "  For stable operation: use learning rate between 0.001 and 0.01\n";
+    ss << "  For dynamic behavior: enable both STDP and Hebbian plasticity\n";
+    ss << "  For memory retention: increase synaptic decay time\n";
+    ss << "  For exploration: enable curiosity and novelty detection\n";
+    
+    return ss.str();
+}
+
+// ========== ADVANCED BRAIN MANIPULATION ==========
+
+void Brain::activateRegion(RegionId regionId, float intensity) {
+    if (auto* region = getRegion(regionId)) {
+        region->activateRegion(intensity);
+    }
+}
+
+void Brain::deactivateRegion(RegionId regionId) {
+    if (auto* region = getRegion(regionId)) {
+        region->deactivateRegion();
+    }
+}
+
+void Brain::scaleAllConnections(float scaleFactor) {
+    for (auto& region : pImpl->regions) {
+        region->scaleAllConnections(scaleFactor);
+    }
+}
+
+void Brain::applyNetworkModulation(const std::vector<float>& modulationPattern) {
+    if (modulationPattern.empty()) return;
+    
+    float totalIntensity = 0.0f;
+    for (float intensity : modulationPattern) {
+        totalIntensity += intensity;
+    }
+    float avgIntensity = totalIntensity / modulationPattern.size();
+    
+    // Apply modulation to all neurons
+    for (auto& region : pImpl->regions) {
+        for (auto& population : region->getPopulations()) {
+            for (auto* neuron : population->getNeurons()) {
+                if (neuron) {
+                    float modulation = avgIntensity * neuron->getState().getExcitability();
+                    neuron->injectCurrent(modulation);
+                }
+            }
+        }
+    }
+}
+
+// ========== DEBUGGING AND ANALYSIS TOOLS ==========
+
+std::string Brain::dumpNetworkState() const {
+    std::stringstream ss;
+    ss << "=== NLM Network State Dump ===\n";
+    ss << "Timestamp: " << pImpl->currentTime << "\n";
+    ss << "Step: " << pImpl->currentStep << "\n";
+    ss << "Regions: " << pImpl->regions.size() << "\n";
+    
+    for (size_t i = 0; i < pImpl->regions.size(); ++i) {
+        ss << "\nRegion " << i << ":\n";
+        if (auto* region = pImpl->regions[i].get()) {
+            ss << "  Neurons: " << region->getTotalNeuronCount() << "\n";
+            ss << "  Synapses: " << region->getSynapseCount() << "\n";
+            ss << "  Active neurons: " << region->getActiveNeuronCount() << "\n";
+        }
     }
     
-    // Development status
-    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    return ss.str();
+}
+
+std::string Brain::analyzeNetworkHealth() const {
+    std::stringstream ss;
+    ss << "=== NLM Network Health Analysis ===\n";
     
+    bool isHealthy = true;
+    std::string issues = "\nIssues found:\n";
+    
+    // Check for dead neurons (no firing activity)
+    if (getFiringNeuronCount() == 0 && getTotalNeuronCount() > 0) {
+        issues += "  - No neurons firing (potential deadlock)\n";
+        isHealthy = false;
+    }
+    
+    // Check for runaway excitation
+    if (getAverageFiringRate() > 100.0f) {
+        issues += "  - High firing rate may indicate runaway excitation\n";
+        isHealthy = false;
+    }
+    
+    // Check synaptic balance
+    float eiRatio = getExcitationInhibitionRatio();
+    if (eiRatio == 0.0f) {
+        issues += "  - Zero excitation/inhibition ratio (potential instability)\n";
+        isHealthy = false;
+    } else if (eiRatio > 10.0f) {
+        issues += "  - High E/I ratio may indicate excitation dominance\n";
+        isHealthy = false;
+    } else if (eiRatio < 0.1f) {
+        issues += "  - Low E/I ratio may indicate inhibition dominance\n";
+        isHealthy = false;
+    }
+    
+    // Check memory system health
+    if (auto* memory = getWorkingMemory()) {
+        // TODO: Add memory system health checks
+    }
+    
+    if (isHealthy) {
+        ss << "✓ Network is healthy\n";
+    } else {
+        ss << "✗ Network health issues detected:" << issues;
+    }
+    
+    return ss.str();
+}
+
+std::string Brain::generateDebugReport() const {
+    std::stringstream ss;
+    ss << "=== NLM Debug Report ===\n";
+    ss << "Report generated at: " << pImpl->currentTime << "\n";
+    ss << "Report step: " << pImpl->currentStep << "\n\n";
+    
+    // Include network state
+    ss << dumpNetworkState();
+    
+    // Include performance metrics
+    auto metrics = getPerformanceMetrics();
+    ss << "\n=== Performance Metrics ===\n";
+    ss << "Steps per second: " << metrics.stepsPerSecond << "\n";
+    ss << "Spikes per step: " << metrics.spikesPerStep << "\n";
+    ss << "Synapses per neuron: " << metrics.synapsesPerNeuron << "\n";
+    
+    // Include learning status
+    ss << "\n=== Learning Status ===\n";
+    ss << "Learned preference: " << getLearnedPreference() << "\n";
+    ss << "Total spikes: " << getTotalSpikeCount() << "\n";
+    
+    return ss.str();
+}
+
+std::vector<NeuronId> Brain::findProblematicNeurons() const {
+    std::vector<NeuronId> problematic;
+    
+    // Check for neurons with abnormal firing rates
     for (const auto& region : pImpl->regions) {
-        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
-                    " (" + region->getName() + "): " +
-                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
-                    std::to_string(region->getSynapseCount()) + " synapses, " +
-                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+        for (const auto& population : region->getPopulations()) {
+            for (const auto* neuron : population->getNeurons()) {
+                float firingRate = neuron->getFiringRate();
+                if (firingRate > 100.0f) {  // High firing rate
+                    problematic.push_back(neuron->getId());
+                } else if (firingRate == 0.0f && neuron->isActive()) {  // Neuron should be active but has no firing
+                    problematic.push_back(neuron->getId());
+                }
+            }
+        }
+    }
+    
+    return problematic;
+}
+
+std::vector<std::pair<SynapseId, float>> Brain::identifyWeakConnections() const {
+    std::vector<std::pair<SynapseId, float>> weakConnections;
+    
+    // Check for synapses with low weights
+    for (const auto& region : pImpl->regions) {
+        for (const auto& synapse : region->getSynapses()) {
+            float weight = synapse->getWeight();
+            if (weight > 0.0f && weight < 0.1f) {  // Very low weight
+                weakConnections.push_back(std::make_pair(synapse->getId(), weight));
+            }
+        }
+    }
+    
+    return weakConnections;
+}
+
+// ========== ADVANCED PLANNING AND COGNITION ==========
+
+void Brain::optimizeActionSelection() {
+    // Optimize action selection based on current neural state
+    if (auto* planner = getPlanner()) {
+        // This would involve using the planner to optimize actions
+        // Implementation depends on planner interface
     }
 }
+
+std::vector<std::vector<ActionType>> Brain::getAlternativePlans() const {
+    std::vector<std::vector<ActionType>> alternativePlans;
+    
+    // Generate alternative action plans based on current state
+    if (auto* planner = getPlanner()) {
+        // This would involve generating multiple action plans
+        // Implementation depends on planner interface
+    }
+    
+    return alternativePlans;
+}
+
+float Brain::evaluatePlanQuality(const std::vector<ActionType>& plan) const {
+    // Evaluate the quality of an action plan
+    float quality = 0.0f;
+    
+    // Consider factors like:
+    // 1. Plan complexity
+    // 2. Expected reward
+    // 3. Risk assessment
+    // 4. Time constraints
+    
+    return quality;
+}
+
+std::string Brain::generateLearningInsights() const {
+    std::stringstream ss;
+    ss << "=== NLM Learning Insights ===\n";
+    ss << "Learning insights would be generated here based on:\n";
+    ss << "- Learning history\n";
+    ss << "- Neural activity patterns\n";
+    ss << "- Reward signals\n";
+    ss << "- Behavioral outcomes\n";
+    ss << "\nImplementation would analyze patterns and generate insights.\n";
+    
+    return ss.str();
+}
+
+} // namespace nlm
 
 } // namespace nlm

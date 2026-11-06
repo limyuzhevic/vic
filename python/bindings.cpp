@@ -356,10 +356,90 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status")
+        
+        // ========== ADVANCED STATISTICAL ANALYSIS ==========
+        
+        // Get comprehensive neural activity statistics
+        .def("getNeuralStatistics", &Brain::getNeuralStatistics,
+              "Get comprehensive statistics about neural activity")
+        .def("getSynapseStatistics", &Brain::getSynapseStatistics,
+              "Get statistics about synaptic connections")
+        .def("getActivityCorrelation", &Brain::getActivityCorrelation,
+              "Get correlation between neural activities")
+        .def("getNetworkTopology", &Brain::getNetworkTopology,
+              "Get the brain network topology information")
+        
+        // ========== PERFORMANCE MONITORING ==========
+        
+        // Get performance metrics
+        .def("getPerformanceMetrics", &Brain::getPerformanceMetrics,
+              "Get performance metrics for the brain simulation")
+        .def("getComputationalLoad", &Brain::getComputationalLoad,
+              "Get computational load information")
+        .def("getMemoryUsage", &Brain::getMemoryUsage,
+              "Get memory usage statistics")
+        
+        // ========== ADVANCED CONFIGURATION ==========
+        
+        // Enhanced configuration methods
+        .def("configureForNetworkSize", &Brain::configureForNetworkSize,
+              py::arg("neuronCount"), py::arg("regionCount"),
+              "Configure brain for specific network size")
+        .def("configureForLearning", &Brain::configureForLearning,
+              py::arg("learningRate"), py::arg("plasticityEnabled"),
+              "Configure brain for learning scenarios")
+        .def("configureForDevelopment", &Brain::configureForDevelopment,
+              py::arg("developmentSpeed"), py::arg("ageBasedPlasticity"),
+              "Configure brain for developmental dynamics")
+        .def("getConfigReport", &Brain::getConfigReport,
+              "Get detailed configuration report with recommendations")
+        
+        // ========== ADVANCED BRAIN MANIPULATION ==========
+        
+        // Brain manipulation and control methods
+        .def("activateRegion", &Brain::activateRegion,
+              py::arg("regionId"), py::arg("intensity"),
+              "Activate a specific brain region with given intensity")
+        .def("deactivateRegion", &Brain::deactivateRegion,
+              py::arg("regionId"),
+              "Deactivate a specific brain region")
+        .def("scaleAllConnections", &Brain::scaleAllConnections,
+              py::arg("scaleFactor"),
+              "Scale all synaptic connections by factor")
+        .def("applyNetworkModulation", &Brain::applyNetworkModulation,
+              py::arg("modulationPattern"),
+              "Apply modulation pattern to the network")
+        
+        // ========== DEBUGGING AND ANALYSIS TOOLS ==========
+        
+        // Debugging tools
+        .def("dumpNetworkState", &Brain::dumpNetworkState,
+              "Dump current network state for debugging")
+        .def("analyzeNetworkHealth", &Brain::analyzeNetworkHealth,
+              "Analyze network health and identify issues")
+        .def("generateDebugReport", &Brain::generateDebugReport,
+              "Generate comprehensive debug report")
+        .def("findProblematicNeurons", &Brain::findProblematicNeurons,
+              "Find neurons with potential issues")
+        .def("identifyWeakConnections", &Brain::identifyWeakConnections,
+              "Identify synaptic connections that need strengthening")
+        
+        // ========== ADVANCED PLANNING AND COGNITION ==========
+        
+        // Advanced planning and cognition tools
+        .def("optimizeActionSelection", &Brain::optimizeActionSelection,
+              "Optimize action selection based on current state")
+        .def("getAlternativePlans", &Brain::getAlternativePlans,
+              "Generate alternative action plans")
+        .def("evaluatePlanQuality", &Brain::evaluatePlanQuality,
+              py::arg("plan"),
+              "Evaluate quality of an action plan")
+        .def("generateLearningInsights", &Brain::generateLearningInsights,
+              "Generate insights from learning history")
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))

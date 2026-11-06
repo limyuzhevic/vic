@@ -21,7 +21,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , selfModelReady_(false)
+    , socialReady_(false)
 {
+    // Note: selfModel_ and socialLearning_ are default-constructed
+    // by the compiler, which is fine for their default constructors
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
