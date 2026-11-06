@@ -227,6 +227,91 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &WorldObject::value)
         .def_readwrite("active", &WorldObject::active);
 
+    // Phase 6: Memory systems for storing experiences and learned information
+    py::class_<EpisodicMemoryItem>(m, "EpisodicMemoryItem", R"pbdoc(Episodic memory item representing an event)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("timestamp", &EpisodicMemoryItem::timestamp)
+        .def_readwrite("neurons", &EpisodicMemoryItem::neurons)
+        .def_readwrite("values", &EpisodicMemoryItem::values)
+        .def_readwrite("metadata", &EpisodicMemoryItem::metadata);
+
+    py::class_<EpisodicMemory, std::shared_ptr<EpisodicMemory>>(m, "EpisodicMemory", R"pbdoc(Episodic memory for storing events and experiences)pbdoc")
+        .def(py::init<>())
+        .def("storeEpisode", &EpisodicMemory::storeEpisode, py::arg("episode"),
+             "Store an episode in episodic memory")
+        .def("retrieveEpisode", &EpisodicMemory::retrieveEpisode, py::arg("index"),
+             "Retrieve an episode by index")
+        .def("getEpisodeCount", &EpisodicMemory::getEpisodeCount,
+             "Get the number of stored episodes")
+        .def("getRecentEpisodes", &EpisodicMemory::getRecentEpisodes, py::arg("count"),
+             "Get the most recent N episodes")
+        .def("clear", &EpisodicMemory::clear,
+             "Clear all episodes")
+        .def("consolidate", &EpisodicMemory::consolidate, py::arg("relevanceThreshold"),
+             "Consolidate episodes above relevance threshold");
+
+    py::class_<WorkingMemory, std::shared_ptr<WorkingMemory>>(m, "WorkingMemory", R"pbdoc(Working memory for temporary information storage)pbdoc")
+        .def(py::init<>())
+        .def("store", &WorkingMemory::store, py::arg("neuron"), py::arg("value"),
+             "Store a value for a neuron")
+        .def("retrieve", &WorkingMemory::retrieve, py::arg("neuron"),
+             "Retrieve a value for a neuron")
+        .def("contains", &WorkingMemory::contains, py::arg("neuron"),
+             "Check if neuron has stored value")
+        .def("clear", &WorkingMemory::clear,
+             "Clear all stored values")
+        .def("getCapacity", &WorkingMemory::getCapacity,
+             "Get working memory capacity")
+        .def("getCurrentSize", &WorkingMemory::getCurrentSize,
+             "Get current number of stored items")
+        .def("decay", &WorkingMemory::decay, py::arg("decayRate"),
+             "Decay all stored values at given rate");
+
+    py::class_<SemanticMemory, std::shared_ptr<SemanticMemory>>(m, "SemanticMemory", R"pbdoc(Semantic memory for learned facts and knowledge)pbdoc")
+        .def(py::init<>())
+        .def("storeFact", &SemanticMemory::storeFact, py::arg("key"), py::arg("value"),
+             "Store a fact with given key and value")
+        .def("retrieveFact", &SemanticMemory::retrieveFact, py::arg("key"),
+             "Retrieve a fact by key")
+        .def("hasFact", &SemanticMemory::hasFact, py::arg("key"),
+             "Check if a fact exists")
+        .def("getAllFacts", &SemanticMemory::getAllFacts,
+             "Get all facts as list of (key, value) pairs")
+        .def("clear", &SemanticMemory::clear,
+             "Clear all facts");
+
+    py::class_<Skill>(m, "Skill", R"pbdoc(A learned skill with neural pattern and proficiency)pbdoc")
+        .def(py::init<>())
+        .def_readwrite("name", &Skill::name)
+        .def_readwrite("neuralPattern", &Skill::neuralPattern)
+        .def_readwrite("proficiency", &Skill::proficiency);
+
+    py::class_<ProceduralMemory, std::shared_ptr<ProceduralMemory>>(m, "ProceduralMemory", R"pbdoc(Procedural memory for learned skills and habits)pbdoc")
+        .def(py::init<>())
+        .def("learnSkill", &ProceduralMemory::learnSkill, py::arg("name"), py::arg("pattern"),
+             "Learn a new skill with neural pattern")
+        .def("getSkill", &ProceduralMemory::getSkill, py::arg("name"),
+             "Get skill by name")
+        .def("getAllSkills", &ProceduralMemory::getAllSkills,
+             "Get all learned skills")
+        .def("updateProficiency", &ProceduralMemory::updateProficiency, py::arg("name"), py::arg("delta"),
+             "Update skill proficiency")
+        .def("clear", &ProceduralMemory::clear,
+             "Clear all skills");
+
+    py::class_<AssociativeMemory, std::shared_ptr<AssociativeMemory>>(m, "AssociativeMemory", R"pbdoc(Associative memory for relationships between representations)pbdoc")
+        .def(py::init<>())
+        .def("associate", &AssociativeMemory::associate, py::arg("a"), py::arg("b"), py::arg("strength"),
+             "Create association between two neurons with given strength")
+        .def("getAssociations", &AssociativeMemory::getAssociations, py::arg("neuron"),
+             "Get all associated neurons")
+        .def("getAssociationStrength", &AssociativeMemory::getAssociationStrength, py::arg("a"), py::arg("b"),
+             "Get association strength between two neurons")
+        .def("updateAssociation", &AssociativeMemory::updateAssociation, py::arg("a"), py::arg("b"), py::arg("delta"),
+             "Update association strength")
+        .def("clear", &AssociativeMemory::clear,
+             "Clear all associations");
+
     py::class_<AgentBody>(m, "AgentBody", R"pbdoc(Agent body state)pbdoc")
         .def(py::init<>())
         .def_readwrite("x", &AgentBody::x)
@@ -251,6 +336,35 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
+    // Neuromodulation system for learning and behavior
+    py::class_<Neuromodulator, std::shared_ptr<Neuromodulator>>(m, "Neuromodulator", R"pbdoc(Abstract base class for neuromodulatory signals)pbdoc")
+        .def("getName", &Neuromodulator::getName,
+             "Get neuromodulator name")
+        .def("getLevel", &Neuromodulator::getLevel,
+             "Get current concentration/level")
+        .def("setLevel", &Neuromodulator::setLevel, py::arg("level"),
+             "Set current concentration/level")
+        .def("getPlasticityFactor", &Neuromodulator::getPlasticityFactor,
+             "Get plasticity factor applied to synapses")
+        .def("update", &Neuromodulator::update, py::arg("dt"),
+             "Update neuromodulator state");
+
+    py::class_<Dopamine, std::shared_ptr<Dopamine>>(m, "Dopamine", R"pbdoc(Dopamine neuromodulator for reward and reinforcement learning)pbdoc")
+        .def(py::init<>())
+        .def("signalReward", &Dopamine::signalReward, py::arg("reward"),
+             "Signal reward reception")
+        .def("signalRewardPredictionError", &Dopamine::signalRewardPredictionError, py::arg("error"),
+             "Signal reward prediction error");
+
+    py::class_<Acetylcholine, std::shared_ptr<Acetylcholine>>(m, "Acetylcholine", R"pbdoc(Acetylcholine neuromodulator for attention and memory)pbdoc")
+        .def(py::init<>());
+
+    py::class_<Norepinephrine, std::shared_ptr<Norepinephrine>>(m, "Norepinephrine", R"pbdoc(Norepinephrine neuromodulator for arousal and vigilance)pbdoc")
+        .def(py::init<>());
+
+    py::class_<Serotonin, std::shared_ptr<Serotonin>>(m, "Serotonin", R"pbdoc(Serotonin neuromodulator for mood and social behavior)pbdoc")
+        .def(py::init<>());
+
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
         .def("getVision", &SensoryPercept::getVision)
@@ -268,6 +382,49 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+
+    // Prediction system for future state and reward prediction
+    py::class_<PredictionSystem, std::shared_ptr<PredictionSystem>>(m, "PredictionSystem", R"pbdoc(Prediction system for future state and reward prediction)pbdoc")
+        .def(py::init<>())
+        .def("predictNextState", &PredictionSystem::predictNextState, py::arg("currentState"),
+             "Make prediction for next timestep")
+        .def("updatePredictions", &PredictionSystem::updatePredictions, py::arg("predicted"), py::arg("actual"),
+             "Update predictions based on actual observation")
+        .def("getPredictionError", &PredictionSystem::getPredictionError,
+             "Get prediction error")
+        .def("getConfidence", &PredictionSystem::getConfidence,
+             "Get prediction confidence")
+        .def("getErrorHistory", &PredictionSystem::getErrorHistory,
+             "Get prediction error history")
+        .def("clearHistory", &PredictionSystem::clearHistory,
+             "Clear prediction history")
+        .def("train", &PredictionSystem::train, py::arg("observation"),
+             "Train prediction model with observation");
+
+    py::class_<DevelopmentSystem, std::shared_ptr<DevelopmentSystem>>(m, "DevelopmentSystem", R"pbdoc(Development system for neural maturation and plasticity)pbdoc")
+        .def(py::init<>())
+        .def("getStage", &DevelopmentSystem::getStage,
+             "Get current developmental stage")
+        .def("setStage", &DevelopmentSystem::setStage, py::arg("stage"),
+             "Set developmental stage")
+        .def("advanceStage", &DevelopmentSystem::advanceStage,
+             "Advance to next developmental stage")
+        .def("getStageName", &DevelopmentSystem::getStageName,
+             "Get name of current developmental stage")
+        .def("update", &DevelopmentSystem::update, py::arg("brain"), py::arg("currentStep"),
+             "Update development system (simple version)")
+        .def("updateWithParams", &DevelopmentSystem::update, py::arg("brain"), py::arg("rng"), py::arg("dt"),
+             "Update development system with full parameters")
+        .def("getPlasticityModifier", &DevelopmentSystem::getPlasticityModifier,
+             "Get plasticity modifier for current stage")
+        .def("isCriticalPeriod", &DevelopmentSystem::isCriticalPeriod,
+             "Check if in critical period")
+        .def("getCriticalPeriodProgress", &DevelopmentSystem::getCriticalPeriodProgress,
+             "Get critical period progress (0-1)")
+        .def("getDevelopmentalAge", &DevelopmentSystem::getDevelopmentalAge,
+             "Get developmental age in simulation time")
+        .def("setDevelopmentalAge", &DevelopmentSystem::setDevelopmentalAge, py::arg("age"),
+             "Set developmental age");
 
     py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -408,6 +565,92 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Phase 6 cognition systems
+    py::class_<NeuralPlanner, std::shared_ptr<NeuralPlanner>>(m, "NeuralPlanner", R"pbdoc(Neural planner for action sequence evaluation)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &NeuralPlanner::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("planAction", &NeuralPlanner::planAction, py::arg("currentState"), py::arg("targetReward") = 0.5f,
+             "Plan next action given current state and goal")
+        .def("evaluateSequence", &NeuralPlanner::evaluateSequence, py::arg("actions"), py::arg("startState"),
+             "Evaluate a potential action sequence")
+        .def("getPlanningDepth", &NeuralPlanner::getPlanningDepth,
+             "Get number of steps to look ahead")
+        .def("setPlanningDepth", &NeuralPlanner::setPlanningDepth, py::arg("depth"),
+             "Set planning depth")
+        .def("getPlanningConfidence", &NeuralPlanner::getPlanningConfidence,
+             "Get planning confidence")
+        .def("updatePlanQuality", &NeuralPlanner::updatePlanQuality, py::arg("plannedActions"), py::arg("actualActions"), py::arg("actualReward"),
+             "Update plans based on actual outcome")
+        .def("clearCache", &NeuralPlanner::clearCache,
+             "Clear planning cache")
+        .def("setActionQuality", &NeuralPlanner::setActionQuality, py::arg("action"), py::arg("quality"),
+             "Set action quality learned from experience")
+        .def("getActionQuality", &NeuralPlanner::getActionQuality, py::arg("action"),
+             "Get action quality from experience")
+        .def("getCurrentGoal", &NeuralPlanner::getCurrentGoal,
+             "Get current goal state")
+        .def("setCurrentGoal", &NeuralPlanner::setCurrentGoal, py::arg("goal"),
+             "Set current goal state")
+        .def("wasRecentPlanSuccessful", &NeuralPlanner::wasRecentPlanSuccessful,
+             "Check if recent planning was successful");
+
+    py::class_<SelfModel, std::shared_ptr<SelfModel>>(m, "SelfModel", R"pbdoc(Self-model for sensorimotor self-awareness)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SelfModel::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("recordSelfAction", &SelfModel::recordSelfAction, py::arg("action"), py::arg("beforeState"), py::arg("afterState"),
+             "Record that taking an action caused a specific sensory change")
+        .def("predictActionConsequence", &SelfModel::predictActionConsequence, py::arg("action"), py::arg("currentState"),
+             "Predict sensory consequence of an action")
+        .def("getSelfModelConfidence", &SelfModel::getSelfModelConfidence, py::arg("action"),
+             "Get confidence in self-model for a given action")
+        .def("computeSelfGeneratedLikeness", &SelfModel::computeSelfGeneratedLikeness, py::arg("beforeState"), py::arg("afterState"), py::arg("action"),
+             "Is this change likely caused by self (action) vs external?")
+        .def("getPreferredAction", &SelfModel::getPreferredAction, py::arg("state"),
+             "Get the body schema (preferred actions in different states)")
+        .def("updateSelfModel", &SelfModel::updateSelfModel, py::arg("predicted"), py::arg("actual"), py::arg("action"),
+             "Update self-model based on prediction error")
+        .def("getCapabilityLevel", &SelfModel::getCapabilityLevel,
+             "Get current capability level (0-1)")
+        .def("getBodyAwareness", &SelfModel::getBodyAwareness,
+             "Get body awareness (how accurately can predict consequences)")
+        .def("clear", &SelfModel::clear,
+             "Clear self-model")
+        .def("hasSelfModel", &SelfModel::hasSelfModel,
+             "Has self-model formed?");
+
+    py::class_<SocialLearning, std::shared_ptr<SocialLearning>>(m, "SocialLearning", R"pbdoc(Social learning from observing other agents)pbdoc")
+        .def(py::init<>())
+        .def("initialize", &SocialLearning::initialize, py::arg("brain"),
+             "Initialize with brain reference")
+        .def("observeAgentAction", &SocialLearning::observeAgentAction, py::arg("observedAction"), py::arg("observerState"), py::arg("resultingState"),
+             "Record observation of another agent's action and effect")
+        .def("canImitate", &SocialLearning::canImitate, py::arg("observedAction"),
+             "Can I imitate this observed action?")
+        .def("getImitationActionAndSimilarity", &SocialLearning::getImitationActionAndSimilarity, py::arg("currentState"),
+             "Phase 6: best imitation action for a state with similarity")
+        .def("getImitationAction", &SocialLearning::getImitationAction, py::arg("currentState"),
+             "Get the best action to imitate given current state")
+        .def("learnCommunicationSignal", &SocialLearning::learnCommunicationSignal, py::arg("signalPattern"), py::arg("signalReward"),
+             "Learn simple communication signal from another agent")
+        .def("detectSignal", &SocialLearning::detectSignal, py::arg("neuralPattern"),
+             "Detect if another agent is signaling")
+        .def("getSignalPattern", &SocialLearning::getSignalPattern,
+             "Get learned signal pattern")
+        .def("getSignalMeaning", &SocialLearning::getSignalMeaning,
+             "Get signal meaning (associated reward)")
+        .def("updateSocialKnowledge", &SocialLearning::updateSocialKnowledge, py::arg("interactionReward"),
+             "Update social knowledge based on interactions")
+        .def("computeSimilarity", &SocialLearning::computeSimilarity, py::arg("a"), py::arg("b"),
+             "Similarity between two patterns (cosine)")
+        .def("clear", &SocialLearning::clear,
+             "Clear social learning")
+        .def("hasSocialKnowledge", &SocialLearning::hasSocialKnowledge,
+             "Has learned from others?")
+        .def("getObservationCount", &SocialLearning::getObservationCount,
+             "Get observation count");
+
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -423,6 +666,53 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Phase 6 text processing: text-as-a-sense
+    m.def("encodeText", &AgentBrain::encodeText, py::arg("text"),
+         "Encode text into sparse sensory pattern (Phase 6 text-as-a-sense)");
+
+    // Diagnostic and thought trace functions
+    m.def("getThoughtTrace", &AgentBrain::getThoughtTrace,
+         "Get thought trace (human-readable record of most recent loop)");
+
+    m.def("getInternalFiringRates", &AgentBrain::getInternalFiringRates,
+         "Get internal (hidden) neuron firing rates");
+
+    // Brain statistics and counters
+    m.def("getPlannerOverrideCount", &AgentBrain::getPlannerOverrideCount,
+         "Phase 6: planner override count");
+    m.def("getPlannerAgreementCount", &AgentBrain::getPlannerAgreementCount,
+         "Phase 6: planner agreement count");
+    m.def("getPlannerDecisionCount", &AgentBrain::getPlannerDecisionCount,
+         "Phase 6: planner decision count");
+    m.def("getConceptBiasCount", &AgentBrain::getConceptBiasCount,
+         "Phase 6: concept bias count");
+    m.def("getSelfBiasCount", &AgentBrain::getSelfBiasCount,
+         "Phase 6: self bias count");
+    m.def("getSocialBiasCount", &AgentBrain::getSocialBiasCount,
+         "Phase 6: social bias count");
+    m.def("getConceptCount", &AgentBrain::getConceptCount,
+         "Phase 6: concept count");
+    m.def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence,
+         "Phase 6: self-model's mean confidence");
+    m.def("getSocialObservationCount", &AgentBrain::getSocialObservationCount,
+         "Phase 6: social observation count");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
