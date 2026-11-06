@@ -1579,7 +1579,18 @@ void Brain::logStatus() const {
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
+    // Plasticity learning rates (STDP and Hebbian)
+    NLM_LOG_INFO("STDP LTP weight: " + std::to_string(pImpl->stdp->getLTPWeight()));
+    NLM_LOG_INFO("STDP LTD weight: " + std::to_string(pImpl->stdp->getLTDWeight()));
+    NLM_LOG_INFO("STDP time constant: " + std::to_string(pImpl->stdp->getTimeConstant()));
+    
     for (const auto& region : pImpl->regions) {
+        NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
+                    " (" + region->getName() + "): " +
+                    std::to_string(region->getTotalNeuronCount()) + " neurons, " +
+                    std::to_string(region->getSynapseCount()) + " synapses, " +
+                    "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
+    }
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
                     " (" + region->getName() + "): " +
                     std::to_string(region->getTotalNeuronCount()) + " neurons, " +

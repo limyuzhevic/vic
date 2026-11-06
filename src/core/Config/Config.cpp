@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>  // For JSON parsing
 
 namespace nlm {
 
@@ -19,9 +20,77 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
     
+    // Read the entire file
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Try to parse as JSON first
+    try {
+        // Parse JSON using nlohmann::json
+        auto json = nlohmann::json::parse(content);
+        
+        // Convert JSON to Config entries
+        for (const auto& item : json.items()) {
+            std::string key = item.key();
+            setFromJsonValue(key, item.value(), ConfigSource::File);
+        }
+        
+        return true;
+    } catch (const nlohmann::json::parse_error& e) {
+        // If JSON parsing fails, try the simple format
+        return loadFromSimpleFormat(filepath);
+    }
+}
+
+// Helper function to convert JSON value to ConfigValue
+void Config::setFromJsonValue(const std::string& key, const nlohmann::json& jsonValue, ConfigSource source) {
+    if (jsonValue.is_string()) {
+        set(key, jsonValue.get<std::string>(), source);
+    } else if (jsonValue.is_number_integer()) {
+        set(key, jsonValue.get<int64_t>(), source);
+    } else if (jsonValue.is_number_float()) {
+        set(key, jsonValue.get<double>(), source);
+    } else if (jsonValue.is_boolean()) {
+        set(key, jsonValue.get<bool>(), source);
+    } else if (jsonValue.is_array()) {
+        // For arrays, convert to appropriate vector type
+        // This is a simplified implementation
+        if (!jsonValue.empty()) {
+            // Try to infer array type
+            if (jsonValue[0].is_number_integer()) {
+                std::vector<int64_t> intArray;
+                for (const auto& item : jsonValue) {
+                    intArray.push_back(item.get<int64_t>());
+                }
+                set(key, intArray, source);
+            } else if (jsonValue[0].is_number_float()) {
+                std::vector<double> doubleArray;
+                for (const auto& item : jsonValue) {
+                    doubleArray.push_back(item.get<double>());
+                }
+                set(key, doubleArray, source);
+            } else if (jsonValue[0].is_string()) {
+                std::vector<std::string> stringArray;
+                for (const auto& item : jsonValue) {
+                    stringArray.push_back(item.get<std::string>());
+                }
+                set(key, stringArray, source);
+            }
+        } else {
+            // Empty array
+            set(key, std::vector<double>(), source);
+        }
+    }
+}
+
+// Simple file format loader (key=value pairs)
+bool Config::loadFromSimpleFormat(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -54,8 +123,6 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     return true;
 }
-
-bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -78,15 +145,48 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
+    // Save actual config values instead of placeholders
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Convert ConfigValue to string representation
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << std::to_string(value[i]);
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]";
+            } else {
+                // Handle numeric and boolean types
+                if constexpr (std::is_arithmetic_v<T>) {
+                    file << value;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (value ? "true" : "false");
+                }
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -137,18 +237,18 @@ void Config::remove(const std::string& key) {
     );
 }
 
-std::vector<std::string> Config::getKeys() const {
-    std::vector<std::string> keys;
-    keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    std::vector<std::string> Config::getKeys() const {
+        std::vector<std::string> keys;
+        keys.reserve(pImpl->entries.size());
+        for (const auto& entry : pImpl->entries) {
+            keys.push_back(entry.key);
+        }
+        return keys;
     }
-    return keys;
-}
 
-void Config::clear() {
-    pImpl->entries.clear();
-}
+    void Config::clear() {
+        pImpl->entries.clear();
+    }
 
 std::string Config::summary() const {
     std::ostringstream oss;
