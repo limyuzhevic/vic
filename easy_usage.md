@@ -22,6 +22,14 @@ That's it! NLM simulates all of this.
 
 ---
 
+## The 3 Things You Need to Know
+
+1. **Brain** - The virtual brain that thinks
+2. **World** - The environment the brain lives in
+3. **Agent** - The bridge connecting brain to world
+
+---
+
 ## Quick Start (Copy & Paste)
 
 ### Example 1: Simplest Brain
@@ -42,33 +50,110 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Enhanced Brain with Performance Monitoring
 
 ```python
 import pynlm
+import time
 
-# Create everything
+def run_enhanced_simulation(brain, world, agent, num_steps):
+    """Run simulation with built-in performance monitoring and safety checks."""
+    
+    # Performance monitoring
+    stats = brain.getPerformanceStats()
+    print(f"Initial memory usage: {stats.get('memoryUsage', 'N/A')}")
+    
+    # Safety checks
+    if not agent.isSafetyChecksEnabled():
+        agent.enableSafetyChecks(True)
+        print("Safety checks enabled")
+    
+    # Run simulation
+    for step in range(num_steps):
+        # Performance: Set reasonable simulation speed
+        agent.setSimulationSpeed(1.0)
+        
+        world.update(0.1)
+        agent.processSensoryInput(world.getSensoryPercept())
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        # Get performance metrics
+        perf = agent.getPerformanceStats()
+        if step % 100 == 0:
+            print(f"Step {step}: {perf.get('spikes', 0)} spikes, "
+                  f"{perf.get('learningEfficiency', 0):.3f} learning efficiency")
+    
+    # Final performance report
+    final_perf = agent.getPerformanceStats()
+    print(f"Simulation complete!")
+    print(f"Final spikes: {final_perf.get('totalSpikes', 0)}")
+    print(f"Memory footprint: {final_perf.get('memoryFootprint', 0)} MB")
+
+# Usage
 brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
-
+agent = pynlm.createAgentBrain(brain)
 world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
 world.reset()
 
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+run_enhanced_simulation(brain, world, agent, 1000)
+```
 
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+### Example 3: Advanced Configuration and Benchmarking
 
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+```python
+import pynlm
+import json
+
+def run_advanced_config_demo():
+    """Demonstrate advanced configuration options and benchmarking."""
+    
+    # Create and configure brain
+    config = pynlm.createDefaultConfig()
+    
+    # Advanced configuration
+    config.set("brain.neuron_count", 2000)
+    config.set("brain.synapse_density", 0.15)
+    config.set("stdp_ltp_weight", 0.02)
+    config.set("stdp_ltd_weight", 0.015)
+    config.set("synaptogenesis_rate", 0.002)
+    config.set("pruning_rate", 0.0002)
+    
+    brain = pynlm.createBrain(config)
+    
+    # Create agent with advanced features
+    agent = pynlm.createAgentBrain(brain)
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    # Configure for performance
+    agent.configureForPerformance("balanced")
+    
+    # Run benchmark
+    print("Running benchmark simulation...")
+    benchmark_result = pynlm.benchmarkSimulation(brain, 1000)
+    
+    print(f"Benchmark results: {json.dumps(benchmark_result, indent=2)}")
+    
+    # Get system info
+    system_info = pynlm.getSystemInfo()
+    print(f"\nSystem: {system_info['architecture']}")
+    print(f"Neuron model: {system_info['neuronModel']}")
+    
+    # Run simulation
+    print("\nStarting simulation...")
+    for i in range(500):
+        brain.step(i)
+    
+    print(f"Simulation completed with {brain.getTotalSpikeCount()} total spikes")
+
+# Usage
+run_advanced_config_demo()
 ```
 
 ---

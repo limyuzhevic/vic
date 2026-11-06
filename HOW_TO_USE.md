@@ -193,76 +193,101 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Advanced Agent Configuration
 
 ```python
-import pynlm
+# Advanced agent configuration with performance monitoring
+agent = pynlm.createAgentBrain(brain)
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
-    brain.initialize()
-    
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+# Configure for specific performance mode
+agent.configureForPerformance("speed")       # For fast response
+agent.configureForPerformance("stability")  # For consistent performance
+agent.configureForPerformance("balanced")   # Balanced approach
 
-# Run the simulation
-run_agent_simulation(1000)
+# Enable/disable specific features
+agent.enableRewardModulation(True)     # Learn from rewards
+agent.enableStructuralPlasticity(True)  # Grow new connections
+agent.enableDevelopment(True)           # Brain matures over time
+agent.enableCuriosity(True)             # Explore new things
+agent.enableSafetyChecks(True)          # Safety and integrity checks
+agent.enableIntrusionDetection(True)    # Security monitoring
+
+# Real-time control
+agent.setSimulationSpeed(2.0)           # Run at 2x normal speed
+agent.pauseSimulation()                 # Pause execution
+agent.resumeSimulation()                # Resume execution
+
+# Memory optimization
+agent.enableMemoryPooling(True)         # Enable memory pooling
+agent.optimizeMemoryUsage()             # Optimize current usage
+
+# Export and import
+agent.exportBrainState("brain_state.bin")  # Save current state
+# agent.importBrainState("saved_state.bin")  # Restore state
+```
+
+### Performance Monitoring
+
+```python
+# Get comprehensive performance metrics
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+
+# Get detailed performance statistics
+perf_stats = agent.getPerformanceStats()
+print(f"Total spikes: {perf_stats['totalSpikes']}")
+print(f"Firing neurons: {perf_stats['firingNeurons']}")
+print(f"Memory footprint: {perf_stats['memoryFootprint']} MB")
+print(f"Learning efficiency: {perf_stats['learningEfficiency']:.3f}")
+print(f"Simulation speed: {perf_stats['simulationSpeed']:.1f}x")
+print(f"Safety status: {perf_stats['safetyStatus']}")
+print(f"Temperature: {perf_stats['temperature']:.1f}°C")
+
+# Get resource usage
+resource_usage = agent.getResourceUsage()
+print(f"CPU usage: {resource_usage['cpu']:.1f}%")
+print(f"Memory usage: {resource_usage['memory']:.1f} MB")
+print(f"Network I/O: {resource_usage['network']:.1f} KB")
+
+# Check system status
+is_overheating = agent.isOverheating()
+is_paused = agent.isSimulationPaused()
+safety_enabled = agent.isSafetyChecksEnabled()
+print(f"Overheating: {is_overheating}")
+print(f"Paused: {is_paused}")
+print(f"Safety enabled: {safety_enabled}")
+```
+
+### Advanced Configuration Options
+
+```python
+# Configure brain for specific use cases
+
+# For maximum learning performance
+config.set("brain.neuron_count", 3000)
+config.set("brain.synapse_density", 0.2)
+config.set("stdp_ltp_weight", 0.03)
+config.set("stdp_ltd_weight", 0.025)
+config.set("synaptogenesis_rate", 0.005)
+config.set("pruning_rate", 0.0005)
+
+# For real-time applications (speed optimization)
+agent.configureForPerformance("speed")
+config.set("brain.neuron_count", 500)    # Smaller brain
+config.set("brain.synapse_density", 0.05) # Fewer connections
+
+# For stability and reliability
+agent.configureForPerformance("stability")
+config.set("brain.synapse_density", 0.15)  # More connections
+config.set("stdp_ltp_weight", 0.005)       # Slower learning
+agent.enableSafetyChecks(True)
+
+# For exploration and discovery
+agent.configureForPerformance("exploration")
+agent.enableCuriosity(True)
+agent.enableIntrusionDetection(True)
+config.set("synaptogenesis_rate", 0.01)   # High growth rate
 ```
 
 ### Key Classes and Methods

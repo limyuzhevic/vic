@@ -28,24 +28,52 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+NLM - Neural Learning Machine
+Version: 2.0 (Phase 2: Real Neural Computation)
+
+Usage: nlm [OPTIONS] [CONFIG_FILE]
+
+Options:
+  --help, -h                Show this help message
+  --version, -v             Show version information
+  --config=FILE, --config FILE
+                              Load configuration from FILE (default: configs/default.cfg)
+
+Configuration Keys (can be set via command line):
+  brain.neuron_count           Number of neurons (default: 500)
+  brain.synapse_density        Synapse density (default: 0.15)
+  brain.connection_probability Probability of connection (default: 0.1)
+  stdp_ltp_weight             STDP LTP weight (default: 0.01)
+  stdp_ltd_weight             STDP LTD weight (default: 0.012)
+  stdp_tau                   STDP time constant (default: 20.0)
+  synaptogenesis_rate         Structural plasticity rate (default: 0.0001)
+  pruning_rate               Structural plasticity pruning rate (default: 0.00001)
+
+Examples:
+  nlm                        Run with default configuration
+  nlm --help                 Show help
+  nlm --version              Show version
+  nlm configs/my_config.cfg  Load custom config
+  nlm --config=my_config.cfg  Same as above
+  nlm --brain.neuron_count=1000 --stdp_ltp_weight=0.02 Run with custom settings
+
+Phase 6 Integration Features:
+  The brain includes integrated memory systems (working/episodic),
+  prediction systems, cognitive mechanisms, neuromodulation, and
+  developmental stages all working together as a unified artificial brain.
+
+For more information, visit: https://github.com/nlm-project/nlm
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Version 2.0 (Phase 2)" << std::endl;
+    std::cout << "Real spiking neural computation with LIF neurons, STDP, and structural plasticity." << std::endl;
+    std::cout << "Phase 6 integration includes memory, prediction, cognition, neuromodulation, and development." << std::endl;
+    std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+    std::cout << "Phase 2 Objectives: ✓ Real LIF neuron dynamics ✓ Event-driven spike propagation ✓ STDP and Hebbian plasticity ✓ Structural plasticity" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -123,12 +151,15 @@ struct LearningExperiment {
         NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
         
         // Count synapses that changed significantly
-        size_t strengthened = 0;
-        size_t weakened = 0;
-        size_t unchanged = 0;
+        if (initialWeights.size() != finalWeights.size()) {
+            NLM_LOG_ERROR("ERROR: Weight array size mismatch! " +
+                         std::to_string(initialWeights.size()) + " != " +
+                         std::to_string(finalWeights.size()) +
+                         ". This indicates structural plasticity during learning!");
+            return;
+        }
         
-        size_t minSize = std::min(initialWeights.size(), finalWeights.size());
-        for (size_t i = 0; i < minSize; ++i) {
+        for (size_t i = 0; i < initialWeights.size(); ++i) {
             float delta = finalWeights[i] - initialWeights[i];
             if (delta > 0.01f) ++strengthened;
             else if (delta < -0.01f) ++weakened;
@@ -326,8 +357,44 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
+    // Initialize logger
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
+    NLM_LOG_INFO("Implementing:");
+    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
+    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("");
+    
     // Load configuration
     auto config = std::make_shared<Config>();
+    
+        // Handle help and version flags
+    bool showHelp = false;
+    bool showVersion = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            showVersion = true;
+        }
+    }
+    
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    if (showVersion) {
+        printVersion();
+        return 0;
+    }
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -342,9 +409,12 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file with proper error handling
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else if (!configFile.empty() && configFile != "configs/default.cfg") {
+        NLM_LOG_WARNING("Failed to load configuration from: " + configFile);
+        NLM_LOG_WARNING("Using default configuration.");
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
@@ -398,14 +468,14 @@ int main(int argc, char** argv) {
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
-    // Reset brain for plasticity experiment
+    // Reset brain for plasticity experiment (reset() now clears everything)
     brain->reset();
     brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
-    // Reset and run Test 3: STDP verification
+    // Reset and run Test 3: STDP verification (reset() now handles full cleanup)
     brain->reset();
     brain->initialize();
     runStdpVerification(brain);

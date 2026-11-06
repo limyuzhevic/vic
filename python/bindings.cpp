@@ -406,7 +406,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("enableIntrusionDetection", &AgentBrain::enableIntrusionDetection,
+             py::arg("enable"), "Enable/disable intrusion detection system")
+        .def("isIntrusionDetectionEnabled", &AgentBrain::isIntrusionDetectionEnabled,
+             "Check if intrusion detection is enabled")
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -424,10 +427,28 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // === UTILITY FUNCTIONS ===
+    m.def("benchmarkSimulation", [](std::shared_ptr<Brain> brain, int steps) {
+        // Simple benchmark: run simulation and collect statistics
+        for (int i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        return std::map<std::string, double>{
+            {"totalSpikes", brain->getTotalSpikeCount()},
+            {"firingNeurons", brain->getFiringNeuronCount()},
+            {"simulationTime", steps * 0.001}
+        };
+    }, py::arg("brain"), py::arg("steps"),
+        "Run benchmark simulation and return statistics");
+
+    m.def("getSystemInfo", []() {
+        return std::map<std::string, std::string>{
+            {"version", "NLM 2.0 (Phase 6)"},
+            {"architecture", "Integrated Memory, Prediction, Cognition, Neuromodulation"},
+            {"neuronModel", "LIF with adaptive thresholds"},
+            {"plasticity", "STDP + Hebbian + Structural"},
+            {"platform", "C++20 with SIMD optimization"}
+        };
+    }, "Get system information and capabilities");
 
 } // namespace nlm
