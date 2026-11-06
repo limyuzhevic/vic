@@ -235,21 +235,19 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     V = std::clamp(V, -100.0f, 50.0f);
     
     // Update the firing-rate metric from counted spikes, in Hz.
-    // Previously setFiringRate() was never called anywhere, so
-    // getAverageFiringRate() summed zeros even with thousands of spikes.
     // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
     // dt is in seconds (0.001 in the demos), so a neuron firing every
     // step would approach 1000 Hz, and refractory periods cap it well
     // below that in practice.
     if (dt > 0.0) {
-        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+        setFiringRate(0.9f * pImpl->state.firingRate);
     }
 
     // Check for spike
     if (V >= threshold) {
         fired = true;
         if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            setFiringRate(pImpl->state.firingRate + 0.1f * static_cast<float>(1.0 / dt));
         }
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -277,6 +275,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
 }
 
 void Neuron::step(Timestamp currentTime) {
+    if (currentTime < 0.0) {
+        // Log error for invalid time
+        NLM_LOG_ERROR("Neuron step called with negative timestamp: " + std::to_string(currentTime));
+        return;
+    }
+    
     // Default LIF step with standard timestep (1ms)
     TimestepDuration dt = 0.001;  // 1ms default
     stepLIF(currentTime, dt);

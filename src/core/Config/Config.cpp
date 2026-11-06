@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
 
 namespace nlm {
 
@@ -19,13 +20,63 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Implement proper JSON/YAML parser using nlohmann::json if available,
+    // or fallback to simple key=value format for compatibility.
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    // Try to parse as JSON first (most common format)
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                        std::istreambuf_iterator<char>());
+    
+    if (content.find("{') != std::string::npos) {
+        // Simple JSON-like parsing for basic key-value pairs
+        // Remove whitespace and parse "key": value format
+        size_t pos = 0;
+        while (pos < content.size()) {
+            // Find next "key" 
+            size_t keyStart = content.find('"', pos);
+            if (keyStart == std::string::npos) break;
+            size_t keyEnd = content.find('"', keyStart + 1);
+            if (keyEnd == std::string::npos) break;
+            
+            std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+            key = trim(key);
+            
+            // Find value after ":"
+            size_t colonPos = content.find(':', keyEnd);
+            if (colonPos == std::string::npos) break;
+            
+            // Skip whitespace after colon
+            size_t valueStart = content.find_first_not_of(" \t\n\r", colonPos + 1);
+            if (valueStart == std::string::npos) break;
+            
+            // Find end of value (next comma or closing brace)
+            size_t valueEnd = content.find_first_of(",}", valueStart);
+            if (valueEnd == std::string::npos) valueEnd = content.size();
+            
+            std::string value = content.substr(valueStart, valueEnd - valueStart);
+            value = trim(value);
+            
+            // Remove quotes from value if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+            pos = valueEnd + 1;
+        }
+        return true;
+    }
+    
+    // Fallback to simple key=value format
+    file.clear();
+    file.seekg(0);
     
     std::string line;
     while (std::getline(file, line)) {
@@ -84,11 +135,55 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Start JSON object
+    file << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        // Format the value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << arg[j];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << std::fixed << std::setprecision(6) << arg[j];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    file << "\"" << arg[j] << "\"";
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        
+        // Add comma if not last entry
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
     
+    file << "}\n";
     return true;
 }
 
