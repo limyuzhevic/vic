@@ -78,18 +78,136 @@ bool Config::loadFromArgs(int argc, char** argv) {
     return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+// Add validation methods to Config.cpp
+
+// Validate the configuration
+bool Config::validate() const {
+    bool isValid = true;
+    
+    // Validate required fields
+    if (!has("random_seed")) {
+        NLM_LOG_WARNING("Configuration missing required field: random_seed");
+        isValid = false;
+    } else {
+        auto seedOpt = get<int64_t>("random_seed");
+        if (seedOpt && *seedOpt < 0) {
+            NLM_LOG_ERROR("Invalid random_seed: must be non-negative");
+            isValid = false;
+        }
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    if (!has("simulation_timestep")) {
+        NLM_LOG_WARNING("Configuration missing required field: simulation_timestep");
+        isValid = false;
+    } else {
+        auto timestepOpt = get<double>("simulation_timestep");
+        if (timestepOpt && *timestepOpt <= 0.0) {
+            NLM_LOG_ERROR("Invalid simulation_timestep: must be positive");
+            isValid = false;
+        }
     }
     
-    return true;
+    if (!has("neuron_count")) {
+        NLM_LOG_WARNING("Configuration missing required field: neuron_count");
+        isValid = false;
+    } else {
+        auto neuronsOpt = get<size_t>("neuron_count");
+        if (neuronsOpt && *neuronsOpt < 1) {
+            NLM_LOG_ERROR("Invalid neuron_count: must be at least 1");
+            isValid = false;
+        }
+    }
+    
+    if (!has("region_count")) {
+        NLM_LOG_WARNING("Configuration missing required field: region_count");
+        isValid = false;
+    } else {
+        auto regionsOpt = get<size_t>("region_count");
+        if (regionsOpt && *regionsOpt < 1) {
+            NLM_LOG_ERROR("Invalid region_count: must be at least 1");
+            isValid = false;
+        }
+    }
+    
+    if (!has("connection_probability")) {
+        NLM_LOG_WARNING("Configuration missing required field: connection_probability");
+        isValid = false;
+    } else {
+        auto probOpt = get<float>("connection_probability");
+        if (probOpt && (*probOpt < 0.0f || *probOpt > 1.0f)) {
+            NLM_LOG_ERROR("Invalid connection_probability: must be between 0.0 and 1.0");
+            isValid = false;
+        }
+    }
+    
+    // Validate consistency between neurons and regions
+    auto neuronsOpt = get<size_t>("neuron_count");
+    auto regionsOpt = get<size_t>("region_count");
+    if (neuronsOpt && regionsOpt && *neuronsOpt < *regionsOpt) {
+        NLM_LOG_ERROR("Invalid configuration: neuron_count (%zu) must be >= region_count (%zu)", 
+                     *neuronsOpt, *regionsOpt);
+        isValid = false;
+    }
+    
+    // Validate optional fields with reasonable ranges
+    if (has("stdp_ltp_weight")) {
+        auto ltpOpt = get<float>("stdp_ltp_weight");
+        if (ltpOpt && *ltpOpt < 0.0f) {
+            NLM_LOG_ERROR("Invalid stdp_ltp_weight: must be non-negative");
+            isValid = false;
+        }
+    }
+    
+    if (has("stdp_ltd_weight")) {
+        auto ltdOpt = get<float>("stdp_ltd_weight");
+        if (ltdOpt && *ltdOpt < 0.0f) {
+            NLM_LOG_ERROR("Invalid stdp_ltd_weight: must be non-negative");
+            isValid = false;
+        }
+    }
+    
+    if (has("stdp_time_constant")) {
+        auto tauOpt = get<float>("stdp_time_constant");
+        if (tauOpt && *tauOpt <= 0.0f) {
+            NLM_LOG_ERROR("Invalid stdp_time_constant: must be positive");
+            isValid = false;
+        }
+    }
+    
+    if (has("environment_width")) {
+        auto widthOpt = get<size_t>("environment_width");
+        if (widthOpt && *widthOpt < 1) {
+            NLM_LOG_ERROR("Invalid environment_width: must be at least 1");
+            isValid = false;
+        }
+    }
+    
+    if (has("environment_height")) {
+        auto heightOpt = get<size_t>("environment_height");
+        if (heightOpt && *heightOpt < 1) {
+            NLM_LOG_ERROR("Invalid environment_height: must be at least 1");
+            isValid = false;
+        }
+    }
+    
+    // Validate that development rates are non-negative
+    if (has("development_synaptogenesis_rate")) {
+        auto synOpt = get<float>("development_synaptogenesis_rate");
+        if (synOpt && *synOpt < 0.0f) {
+            NLM_LOG_ERROR("Invalid development_synaptogenesis_rate: must be non-negative");
+            isValid = false;
+        }
+    }
+    
+    if (has("development_pruning_rate")) {
+        auto pruneOpt = get<float>("development_pruning_rate");
+        if (pruneOpt && *pruneOpt < 0.0f) {
+            NLM_LOG_ERROR("Invalid development_pruning_rate: must be non-negative");
+            isValid = false;
+        }
+    }
+    
+    return isValid;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
@@ -230,9 +348,17 @@ template std::optional<std::string> Config::get<std::string>(const std::string&)
 template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+    template float Config::getOr<float>(const std::string&, const float&) const;
+    template double Config::getOr<double>(const std::string&, const double&) const;
+    template bool Config::getOr<bool>(const std::string&, const bool&) const;
+    template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+    // Apply validation callback if set
+    bool Config::validateWithCallback() const {
+        if (validationCallback) {
+            return validationCallback(*this);
+        }
+        return validate();
+    }
 
 } // namespace nlm

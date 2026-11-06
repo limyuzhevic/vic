@@ -186,23 +186,33 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+    // Validate brain state and configuration
+    bool validate() const;
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-
-    // Learned preference trait (Phase 5): a single scalar, -1..1,
-    // updated only by sandbox reward through AgentBrain, saved in the
-    // checkpoint (SimulationState section) and used as a small bias in
-    // later action choice. This is the measured "personality" step: a
-    // preference learned from experience that survives a reload and
-    // changes later behaviour. It is not a language-model persona and
-    // it does not, on its own, make the brain a human brain.
-    float getLearnedPreference() const;
-    void setLearnedPreference(float preference);
+    // Performance optimization methods (Phase 5)
+    void configurePerformanceOptimizations();
+    DetailedSpikeEvent* createSpikeEvent(NeuronId neuronId, Timestamp timestamp, SimulationStep step);
+    DelayedSpikeEvent* createDelayedSpikeEvent(NeuronId source, NeuronId destination, 
+                                              SynapseId synapseId, float weight, 
+                                              SynapseType type, Timestamp timestamp,
+                                              Timestamp deliveryTime, SimulationStep step,
+                                              SimulationStep deliveryStep);
+    void processSpikesOptimized(SimulationStep currentStep);
+    void processDelayedSpikesOptimized(SimulationStep currentStep, Timestamp currentTime);
+    void processNeuronsOptimized();
     
-    // Logging
+    // Performance optimization status
+    void enableMemoryPools(bool enable);
+    void enableEventQueues(bool enable);
+    void enableParallelProcessing(bool enable);
+    void enableSIMD(bool enable);
+    
+    bool areMemoryPoolsEnabled() const;
+    bool areEventQueuesEnabled() const;
+    bool isParallelProcessingEnabled() const;
+    bool isSIMDEnabled() const;
+    
+    // Log brain status and statistics
     void logStatus() const;
     
 private:

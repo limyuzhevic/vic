@@ -1,0 +1,446 @@
+#!/usr/bin/env bash
+# NLM Command Line Interface Script
+# Unified command line interface for all NLM demonstrations and operations
+
+set -e  # Exit on error
+
+# Default values
+BUILD_DIR="build"
+CONFIG_FILE="configs/default.cfg"
+VERBOSE=false
+DRY_RUN=false
+
+# Display help information
+function show_help() {
+    cat << EOF
+NLM - Neural Learning Machine Command Line Interface
+
+USAGE:
+    nlm [COMMAND] [OPTIONS]
+
+COMMANDS:
+    build [options]                    Build the NLM project
+    run [options]                      Run demonstrations
+    test                                Run tests
+    config [options]                    Manage configuration
+    docs                                Generate documentation
+    clean                               Clean build artifacts
+    help                                Show this help message
+
+OPTIONS (common):
+    --build-dir DIR                    Set build directory (default: build)
+    --config FILE                      Set configuration file (default: configs/default.cfg)
+    --verbose                          Enable verbose output
+    --dry-run                          Show what would be done without executing
+
+BUILD OPTIONS:
+    --type TYPE                        Build type: Debug, Release, RelWithDebInfo (default: Release)
+    --python-bindings                  Build Python bindings
+
+RUN OPTIONS:
+    --demo NAME                        Demo to run (nlm, nlm_phase3_demo, nlm_phase4_demo, nlm_phase6_demo, nlm_benchmark)
+    --episodes N                       Number of episodes for demos (default: 5)
+    --steps N                          Number of steps per episode (default: 200)
+    --checkpoint FILE                  Save/load checkpoint file
+    --seed N                           Set random seed (default: 42)
+
+CONFIG OPTIONS:
+    --set KEY VALUE                    Set configuration value
+    --get KEY                          Get configuration value
+    --list                              List all configuration values
+    --validate                         Validate configuration
+
+EXAMPLES:
+    # Build the project
+    nlm build --type Release
+    
+    # Run Phase 6 demo with custom config
+    nlm run --demo nlm_phase6_demo --config my_config.cfg
+    
+    # Run learning experiment with 10 episodes
+    nlm run --demo nlm --episodes 10 --steps 500
+    
+    # Get configuration value
+    nlm config --get neuron_count
+    
+    # Set configuration value
+    nlm config --set --random_seed 123
+    
+    # Run with checkpoint
+    nlm run --demo nlm --checkpoint my_brain.chk
+    
+    # Clean build artifacts
+    nlm clean
+
+EOF
+}
+
+# Parse command line arguments
+parse_args() {
+    if [[ $# -eq 0 ]]; then
+        show_help
+        exit 0
+    fi
+
+    COMMAND=$1
+    shift
+
+    # Parse common options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --build-dir)
+                BUILD_DIR="$2"
+                shift 2
+                ;;
+            --config)
+                CONFIG_FILE="$2"
+                shift 2
+                ;;
+            --verbose)
+                VERBOSE=true
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    # Call the appropriate command handler
+    case $COMMAND in
+        build)
+            build_nlm "$@"
+            ;;
+        run)
+            run_demo "$@"
+            ;;
+        test)
+            run_tests
+            ;;
+        config)
+            manage_config "$@"
+            ;;
+        docs)
+            generate_docs
+            ;;
+        clean)
+            clean_artifacts
+            ;;
+        help)
+            show_help
+            ;;
+        *)
+            echo "Unknown command: $COMMAND"
+            echo "Use 'nlm help' for usage information"
+            exit 1
+            ;;
+    esac
+}
+
+# Build the NLM project
+build_nlm() {
+    local build_type="Release"
+    local python_bindings=false
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --type)
+                build_type="$2"
+                shift 2
+                ;;
+            --python-bindings)
+                python_bindings=true
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "Would build NLM with type: $build_type"
+        echo "Build directory: $BUILD_DIR"
+        echo "Python bindings: $python_bindings"
+        return 0
+    fi
+
+    echo "Building NLM..."
+    echo "Build type: $build_type"
+    echo "Build directory: $BUILD_DIR"
+    echo "Python bindings: $python_bindings"
+
+    if [[ ! -d "$BUILD_DIR" ]]; then
+        mkdir -p "$BUILD_DIR"
+    fi
+
+    cd "$BUILD_DIR"
+    cmake .. -DCMAKE_BUILD_TYPE="$build_type" \
+        -DNLM_BUILD_PYTHON_BINDINGS="$python_bindings"
+    make -j$(nproc)
+    cd ..
+
+    echo "Build completed successfully!"
+}
+
+# Run demonstrations
+run_demo() {
+    local demo_name=""
+    local episodes=5
+    local steps=200
+    local checkpoint=""
+    local seed=42
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --demo)
+                demo_name="$2"
+                shift 2
+                ;;
+            --episodes)
+                episodes="$2"
+                shift 2
+                ;;
+            --steps)
+                steps="$2"
+                shift 2
+                ;;
+            --checkpoint)
+                checkpoint="$2"
+                shift 2
+                ;;
+            --seed)
+                seed="$2"
+                shift 2
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    if [[ -z "$demo_name" ]]; then
+        echo "Error: --demo option is required"
+        show_help
+        exit 1
+    fi
+
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "Would run demo: $demo_name"
+        echo "Episodes: $episodes"
+        echo "Steps: $steps"
+        echo "Checkpoint: $checkpoint"
+        echo "Seed: $seed"
+        return 0
+    fi
+
+    echo "Running demo: $demo_name"
+    echo "Episodes: $episodes"
+    echo "Steps: $steps"
+    echo "Checkpoint: $checkpoint"
+    echo "Seed: $seed"
+
+    # Set environment variable for seed if checkpoint is not used
+    if [[ -z "$checkpoint" ]]; then
+        export NLM_RANDOM_SEED="$seed"
+    fi
+
+    if [[ -f "$BUILD_DIR/$demo_name" ]]; then
+        ./"$BUILD_DIR"/"$demo_name"
+    else
+        echo "Error: Demo executable '$demo_name' not found in $BUILD_DIR"
+        echo "Available executables:"
+        ls -la "$BUILD_DIR"/*.exe 2>/dev/null || ls -la "$BUILD_DIR"/nlm* 2>/dev/null || echo "No executables found"
+        exit 1
+    fi
+}
+
+# Run tests
+run_tests() {
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "Would run tests"
+        return 0
+    fi
+
+    echo "Running NLM tests..."
+
+    if [[ -f "$BUILD_DIR/tests" ]]; then
+        ./"$BUILD_DIR"/tests
+    elif [[ -d "$BUILD_DIR" ]]; then
+        echo "Test directory found, but no test executable."
+        echo "Available executables:"
+        ls -la "$BUILD_DIR"/nlm* 2>/dev/null
+    else
+        echo "Build directory not found. Please run 'nlm build' first."
+        exit 1
+    fi
+}
+
+# Manage configuration
+manage_config() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --get)
+                get_config "$2"
+                shift 2
+                ;;
+            --set)
+                set_config "$2" "$3"
+                shift 3
+                ;;
+            --list)
+                list_config
+                shift
+                ;;
+            --validate)
+                validate_config
+                shift
+                ;;
+            *)
+                echo "Unknown config option: $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    # If no subcommand provided, show help
+    echo "Usage: nlm config [OPTIONS]"
+    echo "Options: --get KEY, --set KEY VALUE, --list, --validate"
+}
+
+# Get configuration value
+get_config() {
+    local key=$1
+
+    if [[ -f "$CONFIG_FILE" ]]; then
+        grep "^${key} = " "$CONFIG_FILE" | cut -d'=' -f2 | sed 's/^ *//;s/ *$//'
+    else
+        echo "Error: Configuration file '$CONFIG_FILE' not found"
+        exit 1
+    fi
+}
+
+# Set configuration value
+set_config() {
+    local key=$1
+    local value=$2
+
+    if [[ -f "$CONFIG_FILE" ]]; then
+        # Check if key exists
+        if grep -q "^${key} = " "$CONFIG_FILE"; then
+            # Update existing key
+            sed -i "s/^\(${key} = \).*/\1${value}/" "$CONFIG_FILE"
+        else
+            # Add new key
+            echo "${key} = ${value}" >> "$CONFIG_FILE"
+        fi
+        echo "Updated configuration: $key = $value"
+    else
+        echo "Error: Configuration file '$CONFIG_FILE' not found"
+        exit 1
+    fi
+}
+
+# List all configuration values
+list_config() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        echo "Configuration ($CONFIG_FILE):"
+        cat "$CONFIG_FILE"
+    else
+        echo "Error: Configuration file '$CONFIG_FILE' not found"
+        exit 1
+    fi
+}
+
+# Validate configuration
+validate_config() {
+    if [[ -f "$CONFIG_FILE" ]]; then
+        echo "Validating configuration..."
+
+        # Basic validation
+        local issues=0
+
+        # Check for required sections
+        if grep -q "^random_seed" "$CONFIG_FILE"; then
+            local seed=$(grep "^random_seed" "$CONFIG_FILE" | cut -d'=' -f2 | sed 's/^ *//;s/ *$//')
+            if [[ ! "$seed" =~ ^[0-9]+$ ]]; then
+                echo "Warning: random_seed is not a number: $seed"
+                ((issues++))
+            fi
+        else
+            echo "Warning: random_seed not found in config file"
+            ((issues++))
+        fi
+
+        if grep -q "^neuron_count" "$CONFIG_FILE"; then
+            local neurons=$(grep "^neuron_count" "$CONFIG_FILE" | cut -d'=' -f2 | sed 's/^ *//;s/ *$//')
+            if [[ ! "$neurons" =~ ^[0-9]+$ ]] || (( neurons < 1 )); then
+                echo "Warning: neuron_count is invalid: $neurons"
+                ((issues++))
+            fi
+        fi
+
+        if grep -q "^region_count" "$CONFIG_FILE"; then
+            local regions=$(grep "^region_count" "$CONFIG_FILE" | cut -d'=' -f2 | sed 's/^ *//;s/ *$//')
+            if [[ ! "$regions" =~ ^[0-9]+$ ]] || (( regions < 1 )); then
+                echo "Warning: region_count is invalid: $regions"
+                ((issues++))
+            fi
+        fi
+
+        if [[ $issues -eq 0 ]]; then
+            echo "Configuration validation passed!"
+        else
+            echo "Configuration validation failed with $issues issues"
+            return 1
+        fi
+    else
+        echo "Error: Configuration file '$CONFIG_FILE' not found"
+        return 1
+    fi
+}
+
+# Generate documentation
+generate_docs() {
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "Would generate documentation"
+        return 0
+    fi
+
+    echo "Generating documentation..."
+    # This would typically call doxygen or other documentation tools
+    echo "Documentation generation not yet implemented"
+}
+
+# Clean build artifacts
+clean_artifacts() {
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "Would clean build artifacts"
+        return 0
+    fi
+
+    echo "Cleaning build artifacts..."
+
+    if [[ -d "$BUILD_DIR" ]]; then
+        rm -rf "$BUILD_DIR"/*
+        echo "Cleaned build directory: $BUILD_DIR"
+    fi
+
+    rm -rf checkpoints
+    rm -f nlm.log
+    rm -f "*.chk" "*.checkpoint"
+
+    echo "Build artifacts cleaned"
+}
+
+# Main function
+main() {
+    parse_args "$@"
+}
+
+# Run main function with all arguments
+main "$@"

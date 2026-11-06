@@ -44,7 +44,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Configuration class
 class Config {
 public:
     Config();
@@ -71,7 +71,7 @@ template<typename T>
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +95,16 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration
+    bool validate() const;
+    
+    // Get validation errors
+    std::string getValidationErrors() const;
+    
+    // Set validation callback
+    using ValidationCallback = std::function<bool(const Config&)>;
+    void setValidationCallback(const ValidationCallback& callback);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +112,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Validation state
+    mutable std::vector<std::string> validationErrors;
+    ValidationCallback validationCallback;
 };
 
 } // namespace nlm

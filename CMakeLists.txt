@@ -205,6 +205,29 @@ endif()
 enable_testing()
 add_subdirectory(tests)
 
+# Additional test targets for enhanced testing
+add_custom_target("test_brain_enhanced" DEPENDS test_brain test_brain_enhanced)
+
+# Performance benchmarking targets
+add_executable(nlm_perf_benchmark
+    src/benchmark.cpp
+    src/performance/ParallelProcessing.cpp
+    src/performance/SIMDVectorization.cpp
+)
+target_link_libraries(nlm_perf_benchmark PUBLIC nlm_core)
+
+# Memory profiling targets (if available)
+if (DEFINED HAVE_VALGRIND)
+    find_package(Valgrind)
+    if (Valgrind_FOUND)
+        add_executable(nlm_memory_profiler
+            src/benchmark.cpp
+            src/performance/MemoryPool.cpp
+        )
+        target_link_libraries(nlm_memory_profiler PUBLIC nlm_core valgrind)
+    endif()
+endif()
+
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
     ARCHIVE DESTINATION lib
