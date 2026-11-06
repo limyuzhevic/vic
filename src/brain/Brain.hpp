@@ -206,6 +206,25 @@ public:
     void logStatus() const;
     
 private:
+    // Internal step methods (refactored for modularity)
+    void processDelayedSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateNeuronDynamics();
+    void detectAndProcessSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void processSpikes(SimulationStep currentStep);
+    void updateWorkingMemory();
+    void applyNeuromodulationEffects();
+    void applyPlasticityRules();
+    void applyHomeostaticSynapticScaling(SimulationStep currentStep);
+    void updateEpisodicMemory();
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayImportantMemories(SimulationStep currentStep);
+    void applyDevelopmentEffects(SimulationStep currentStep);
+    void consolidateMemories(SimulationStep currentStep);
+    void updateCheckpoints(SimulationStep currentStep, Timestamp currentTime);
+    
     struct Impl;
     Impl* pImpl;
 };

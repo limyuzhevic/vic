@@ -6,6 +6,10 @@
 // - Event-driven spike propagation with synaptic delays
 // - STDP and Hebbian plasticity
 // - Structural plasticity (synaptogenesis/pruning)
+//
+// Usage: ./nlm [--help] [--version] [--config=<file>] [args...]
+//             [--neuron_count=<n>] [--region_count=<n>]
+//             [--connection_probability=<p>] [--random_seed=<s>]
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"

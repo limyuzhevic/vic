@@ -56,26 +56,238 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool helpRequested = false;
+    bool versionRequested = false;
+    std::string configFile;
+    
+    // Enhanced command line argument parsing with better error handling
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
+        // Handle --help and -h
+        if (arg == "--help" || arg == "-h" || arg == "--usage") {
+            helpRequested = true;
+            // Continue to collect all arguments for help generation
+        }
+        // Handle --version and -v
+        else if (arg == "--version" || arg == "-v") {
+            versionRequested = true;
+            // Continue to collect all arguments
+        }
+        // Handle --config and -c
+        else if ((arg == "--config" || arg == "-c") && i + 1 < argc) {
+            configFile = argv[++i];
+            // Try to load from config file
+            if (loadFromFile(configFile)) {
+                NLM_LOG_INFO("Loaded configuration from command line config file: " + configFile);
+            } else {
+                NLM_LOG_WARNING("Configuration file not found or invalid: " + configFile);
+            }
+        }
         // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        else if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                // Validate and set the value
+                if (!setFromString(key, value)) {
+                    NLM_LOG_WARNING("Invalid value for argument " + key + ": " + value);
+                }
+            } else {
+                NLM_LOG_WARNING("Malformed argument (expected --key=value): " + arg);
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+        else if (arg[0] == '-' && arg.size() > 1) {
+            if (arg[1] == '-' || i + 1 >= argc) {
+                // It's --something or a flag-like argument without value
+                if (arg == "--verbose" || arg == "--quiet" || arg == "--debug") {
+                    set(arg.substr(2), true, ConfigSource::CommandLine);
+                } else {
+                    NLM_LOG_WARNING("Unrecognized argument: " + arg);
+                }
+            } else {
+                // It's -key value format
+                std::string key = arg.substr(1);
+                std::string value = argv[++i];
+                
+                // Validate and set the value
+                if (!setFromString(key, value)) {
+                    NLM_LOG_WARNING("Invalid value for argument " + key + ": " + value);
+                }
+            }
+        }
+        // Handle positional arguments (for future extensibility)
+        else if (!helpRequested && !versionRequested && arg.substr(0, 2) != "--") {
+            // Could be a positional argument, store for advanced usage
+            // Currently treating as unrecognized for backward compatibility
+            NLM_LOG_WARNING("Unrecognized positional argument: " + arg);
         }
     }
+    
+    // Handle help and version requests
+    if (helpRequested) {
+        printHelp();
+        return false; // Don't continue with help/version
+    }
+    
+    if (versionRequested) {
+        printVersion();
+        return false; // Don't continue with help/version
+    }
+    
     return true;
+}
+
+void Config::printHelp() const {
+    std::cout << "NLM (Neural Learning Machine) - Help" << std::endl;
+    std::cout << "===============================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: nlm [--help] [--version] [--config=<file>] [args...]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "General Options:" << std::endl;
+    std::cout << "  --help, -h          Show this help message" << std::endl;
+    std::cout << "  --version, -v       Show version information" << std::endl;
+    std::cout << "  --config=<file>, -c Load configuration from file" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Demo-Specific Options:" << std::endl;
+    printDemoOptions();
+    std::cout << std::endl;
+    std::cout << "Common Configuration Keys:" << std::endl;
+    printCommonOptions();
+    std::cout << std::endl;
+}
+
+void Config::printVersion() const {
+    std::cout << "NLM (Neural Learning Machine) Version 0.1.0" << std::endl;
+    std::cout << "Phase 6: Final Integration" << std::endl;
+    std::cout << "Built with C++20, CMake 3.16+" << std::endl;
+}
+
+bool Config::setFromString(const std::string& key, const std::string& value) {
+    // Try to parse the value based on key patterns
+    // This is a simple heuristic - more sophisticated parsing could be added
+    
+    // Check for numeric patterns
+    bool isInt = true;
+    bool isFloat = true;
+    for (char c : value) {
+        if (c == '-' || c == '+') continue;
+        if (c == '.') {
+            isInt = false;
+            continue;
+        }
+        if (!std::isdigit(c)) {
+            isInt = false;
+            isFloat = false;
+            break;
+        }
+    }
+    
+    // Check if it's a float (contains . and has digits after it)
+    if (isFloat && value.find('.') != std::string::npos) {
+        size_t dotPos = value.find('.');
+        if (dotPos == 0 || dotPos == value.size() - 1) {
+            isFloat = false; // . at start or end is not a valid float
+        } else {
+            // Check if there are any non-digit characters after the dot
+            std::string afterDot = value.substr(dotPos + 1);
+            for (char c : afterDot) {
+                if (!std::isdigit(c)) {
+                    isFloat = false;
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (isInt) {
+        try {
+            int intVal = std::stoi(value);
+            set(key, intVal, ConfigSource::CommandLine);
+            return true;
+        } catch (const std::exception&) {
+            // Fall through to float parsing
+        }
+    }
+    
+    if (isFloat) {
+        try {
+            float floatVal = std::stof(value);
+            set(key, floatVal, ConfigSource::CommandLine);
+            return true;
+        } catch (const std::exception&) {
+            // Fall through to boolean parsing
+        }
+    }
+    
+    // Try boolean parsing
+    std::string lowerValue = toLower(value);
+    if (lowerValue == "true" || lowerValue == "yes" || lowerValue == "1" || 
+        lowerValue == "on" || lowerValue == "enable" || lowerValue == "enabled") {
+        set(key, true, ConfigSource::CommandLine);
+        return true;
+    }
+    if (lowerValue == "false" || lowerValue == "no" || lowerValue == "0" || 
+        lowerValue == "off" || lowerValue == "disable" || lowerValue == "disabled") {
+        set(key, false, ConfigSource::CommandLine);
+        return true;
+    }
+    
+    // Try vector parsing (e.g., "1,2,3" or "1.5,2.7,3.9")
+    if (value.find(',') != std::string::npos) {
+        try {
+            std::vector<float> vec;
+            std::stringstream ss(value);
+            std::string token;
+            while (std::getline(ss, token, ',')) {
+                token = trim(token);
+                if (!token.empty()) {
+                    float val = std::stof(token);
+                    vec.push_back(val);
+                }
+            }
+            if (!vec.empty()) {
+                set(key, vec, ConfigSource::CommandLine);
+                return true;
+            }
+        } catch (const std::exception&) {
+            // Fall through to string parsing
+        }
+    }
+    
+    // Default to string
+    set(key, value, ConfigSource::CommandLine);
+    return true;
+}
+
+void Config::printDemoOptions() const {
+    // Common demo-specific options
+    std::cout << "  Brain Options:" << std::endl;
+    std::cout << "    --neuron_count=<n>     Number of neurons (default: 1000)" << std::endl;
+    std::cout << "    --region_count=<n>      Number of neural regions (default: 1)" << std::endl;
+    std::cout << "    --connection_probability=<p> Probability of connections (default: 0.1)" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "  Simulation Options:" << std::endl;
+    std::cout << "    --simulation_timestep=<t> Time step in seconds (default: 0.001)" << std::endl;
+    std::cout << "    --max_steps=<n>         Maximum simulation steps" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "  Plasticity Options:" << std::endl;
+    std::cout << "    --stdp_ltp_weight=<w>   STDP LTP weight (default: 0.01)" << std::endl;
+    std::cout << "    --stdp_ltd_weight=<w>   STDP LTD weight (default: 0.012)" << std::endl;
+    std::cout << "    --stdp_tau=<t>          STDP time constant (default: 20)" << std::endl;
+    std::cout << std::endl;
+}
+
+void Config::printCommonOptions() const {
+    // Print all registered configuration keys
+    for (const auto& entry : pImpl->entries) {
+        std::cout << "    --" << entry.key << "=<value>     " << entry.description << std::endl;
+    }
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
