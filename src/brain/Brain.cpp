@@ -129,9 +129,9 @@ struct Brain::Impl {
         predictionSystem = std::make_unique<PredictionSystem>();
         
         // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
+        planner = std::make_unique<ConceptFormation>();
         conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
+        attention = std::make_unique<ConceptFormation>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -186,8 +186,14 @@ Brain& Brain::operator=(Brain&& other) noexcept {
     return *this;
 }
 
-bool Brain::initialize() {
+    bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    
+    // Validate configuration
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Failed to initialize brain: Config is null!");
+        return false;
+    }
 
     // Re-initialising must rebuild, not append: a previous run left
     // reset()+initialize() reporting 1000 neurons for a 500-neuron brain.
@@ -206,6 +212,20 @@ bool Brain::initialize() {
     size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", 1));
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
     
+    // Validate configuration values
+    if (neuronCount == 0) {
+        NLM_LOG_ERROR("Failed to initialize brain: neuron_count must be greater than 0!");
+        return false;
+    }
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Failed to initialize brain: region_count must be greater than 0!");
+        return false;
+    }
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Failed to initialize brain: connection_probability must be between 0.0 and 1.0!");
+        return false;
+    }
+    
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
@@ -219,56 +239,76 @@ bool Brain::initialize() {
     size_t nextNeuronIndex = 1;  // globally unique IDs across regions (see setNextNeuronIndex)
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            region->setNextNeuronIndex(nextNeuronIndex);
-            // Add populations. The old layout had no inhibitory neurons at
-            // all (Sensory/Internal/Motor are all treated as excitatory by
-            // initializeRandomConnectivity), so any input caused runaway
-            // excitation and every weight saturated. Split the internal
-            // population 80/20 into excitatory and inhibitory neurons.
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            size_t internalCount = neuronsPerRegion / 2;
-            size_t internalExcitatory = internalCount * 4 / 5;
-            auto internalPopId = region->addPopulation(internalExcitatory, NeuronType::Internal);
-            auto inhibitoryPopId = region->addPopulation(internalCount - internalExcitatory, NeuronType::Inhibitory);
-            (void)internalPopId; (void)inhibitoryPopId;
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
-            
-            // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
-                }
-            }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
-                }
-            }
-            
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) +
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
-            nextNeuronIndex += region->getTotalNeuronCount();
+        if (!region) {
+            NLM_LOG_ERROR("Failed to initialize brain: Could not create region " + std::to_string(i + 1) + "!");
+            return false;
         }
+        region->setNextNeuronIndex(nextNeuronIndex);
+        // Add populations. The old layout had no inhibitory neurons at
+        // all (Sensory/Internal/Motor are all treated as excitatory by
+        // initializeRandomConnectivity), so any input caused runaway
+        // excitation and every weight saturated. Split the internal
+        // population 80/20 into excitatory and inhibitory neurons.
+        auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
+        size_t internalCount = neuronsPerRegion / 2;
+        size_t internalExcitatory = internalCount * 4 / 5;
+        auto internalPopId = region->addPopulation(internalExcitatory, NeuronType::Internal);
+        auto inhibitoryPopId = region->addPopulation(internalCount - internalExcitatory, NeuronType::Inhibitory);
+        (void)internalPopId; (void)inhibitoryPopId;
+        auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+        
+        // Collect sensory and motor neurons for I/O
+        auto* sensoryPop = region->getPopulation(sensoryPopId);
+        auto* motorPop = region->getPopulation(motorPopId);
+        if (!sensoryPop || !motorPop) {
+            NLM_LOG_ERROR("Failed to initialize brain: Could not create sensory or motor populations in region " + std::to_string(i + 1) + "!");
+            return false;
+        }
+        if (sensoryPop) {
+            for (auto* neuron : sensoryPop->getNeurons()) {
+                pImpl->sensoryNeurons.push_back(neuron);
+            }
+        }
+        if (motorPop) {
+            for (auto* neuron : motorPop->getNeurons()) {
+                pImpl->motorNeurons.push_back(neuron);
+            }
+        }
+        
+        NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) +
+                     ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                     std::to_string(region->getTotalNeuronCount()) + " neurons");
+        nextNeuronIndex += region->getTotalNeuronCount();
     }
     
     // Build the neuron lookup used by synaptic delivery and injection.
     for (auto& region : pImpl->regions) {
+        if (!region) {
+            NLM_LOG_ERROR("Failed to initialize brain: Found null region in regions list!");
+            return false;
+        }
         for (auto* neuron : region->getAllNeurons()) {
+            if (!neuron) {
+                NLM_LOG_ERROR("Failed to initialize brain: Found null neuron in region!");
+                return false;
+            }
             pImpl->neuronById[neuron->getId().index()] = neuron;
         }
     }
-
+    
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+        if (!region) {
+            NLM_LOG_ERROR("Failed to initialize brain: Could not get region " + std::to_string(i + 1) + " for connectivity!");
+            return false;
         }
+        if (!pImpl->rng) {
+            NLM_LOG_ERROR("Failed to initialize brain: Random generator not initialized!");
+            return false;
+        }
+        // Initialize random connectivity and synapse weights
+        region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
     }
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========

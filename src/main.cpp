@@ -28,6 +28,25 @@
 
 using namespace nlm;
 
+void printHelp() {
+    std::cout << "NLM (Neural Learning Machine) - Usage:" << std::endl;
+    std::cout << "  nlm [options]" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                    Show this help message" << std::endl;
+    std::cout << "  --config <file>               Load configuration from file" << std::endl;
+    std::cout << "  --config=<file>               Load configuration from file (alternative format)" << std::endl;
+    std::cout << "  --neuron_count <num>          Number of neurons (default: 1000)" << std::endl;
+    std::cout << "  --region_count <num>          Number_PROMPT" = <num>      Number of brain regions (default: 1)" << std::endl;
+    std::cout << "  --connection_probability <num> Connection probability (0.0-1.0, default: 0.1)" << std::endl;
+    std::cout << "  --random_seed <num>           Random seed for reproducible experiments (default: 42)" << std::endl;
+    std::cout << "  --simulation_timestep <sec>    Simulation timestep in seconds (default: 0.001)" << std::endl;
+    std::cout << "  --log_level <level>           Logging level: INFO, WARNING, ERROR, DEBUG (default: INFO)" << std::endl;
+    std::cout << "  --save_config <file>          Save current configuration to file" << std::endl;
+    std::cout << "" << std::endl;
+    std::cout << "For more information, visit: https://github.com/nlm-project/nlm" << std::endl;
+}
+
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -309,6 +328,15 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 
 int main(int argc, char** argv) {
     printBanner();
+    
+    // Check for help flag
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        }
+    }
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     

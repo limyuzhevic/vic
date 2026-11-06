@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
 
 namespace nlm {
 
@@ -22,11 +23,40 @@ bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
+    // Try to detect file format and use appropriate parser
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Read first few lines to detect format
+    std::string firstLine;
+    if (!std::getline(file, firstLine)) {
+        return false;
+    }
+    file.clear();
+    file.seekg(0);
+    
+    // Check if it's JSON format (starts with { or [) or YAML format
+    bool isJsonOrYaml = false;
+    if (firstLine.find('{') != std::string::npos || firstLine.find('[') != std::string::npos ||
+        (firstLine.find(":") != std::string::npos && firstLine.find("\"") != std::string::npos)) {
+        isJsonOrYaml = true;
+    }
+    
+    if (isJsonOrYaml) {
+        // TODO: Implement JSON parser
+        // For now, fall back to simple format
+        file.clear();
+        file.seekg(0);
+        return loadFromSimpleFile(file);
+    } else {
+        // Use existing simple key=value format parser
+        return loadFromSimpleFile(file);
+    }
+}
+
+bool Config::loadFromSimpleFile(std::ifstream& file) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -184,11 +214,7 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
+// Note: toLower function was removed as it was not used
 
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
@@ -197,8 +223,6 @@ std::optional<T> Config::get(const std::string& key) const {
     if (it == pImpl->entries.end()) {
         return std::nullopt;
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
     return std::visit([](auto&& v) -> std::optional<T> {
         using V = std::decay_t<decltype(v)>;
         if constexpr (std::is_same_v<V, T>) {
@@ -218,7 +242,6 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 // Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
