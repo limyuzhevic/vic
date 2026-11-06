@@ -60,6 +60,10 @@ Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
     pImpl->shortTermFacilitation = 0.0f;
     pImpl->lastPreSpikeTime = -1.0f;
     pImpl->lastPostSpikeTime = -1.0f;
+    
+    // Initialize spike history vectors
+    pImpl->preSpikeHistory.reserve(Impl::MAX_SPIKE_HISTORY);
+    pImpl->postSpikeHistory.reserve(Impl::MAX_SPIKE_HISTORY);
 }
 
 Synapse::~Synapse() = default;
@@ -120,14 +124,20 @@ void Synapse::setType(SynapseType type) {
 }
 
 bool Synapse::isExcitatory() const {
+    // Check if synapse is excitatory
+    // Excitatory synapses increase the likelihood of postsynaptic neuron firing
     return pImpl->type == SynapseType::Excitatory;
 }
 
 bool Synapse::isInhibitory() const {
+    // Check if synapse is inhibitory
+    // Inhibitory synapses decrease the likelihood of postsynaptic neuron firing
     return pImpl->type == SynapseType::Inhibitory;
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
+    // Record presynaptic spike for Spike-Timing-Dependent Plasticity (STDP)
+    // STDP depends on the precise timing of pre- and post-synaptic spikes
     pImpl->preSpikeHistory.push_back(timestamp);
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
@@ -135,6 +145,8 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
+    // Record postsynaptic spike for Spike-Timing-Dependent Plasticity (STDP)
+    // STDP depends on the precise timing of pre- and post-synaptic spikes
     pImpl->postSpikeHistory.push_back(timestamp);
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
@@ -142,16 +154,26 @@ void Synapse::recordPostSpike(Timestamp timestamp) {
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
+    // Get historical record of presynaptic spikes for plasticity computations
     return pImpl->preSpikeHistory;
 }
 
 const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
+    // Get historical record of postsynaptic spikes for plasticity computations
     return pImpl->postSpikeHistory;
 }
 
 void Synapse::clearHistory() {
+    // Clear all spike history for this synapse
+    // Used when synapse is reset or reinitialized
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
+    
+    // Reset short-term plasticity state
+    pImpl->shortTermDepression = 1.0f;
+    pImpl->shortTermFacilitation = 0.0f;
+    pImpl->lastPreSpikeTime = -1.0f;
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 void Synapse::setPreSpikeHistory(const std::vector<Timestamp>& history) {
@@ -177,28 +199,32 @@ void Synapse::setPostSpikeHistory(const std::vector<Timestamp>& history) {
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
+    // Access mutable plasticity flags for configuring synaptic learning rules
+    // Used by STDP and reward-modulated plasticity systems
     return pImpl->plasticityFlags;
 }
 
-void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
-}
-
 const PlasticityFlags& Synapse::getPlasticityFlags() const {
+    // Access immutable plasticity flags for reading current plasticity settings
+    // Used by plasticity system to determine which rules are active
     return pImpl->plasticityFlags;
 }
 
 float Synapse::getEligibilityTrace() const {
+    // Get eligibility trace value for reward-modulated learning
+    // Tracks recent activity for delayed reward association
     return pImpl->eligibilityTrace;
 }
 
 void Synapse::setEligibilityTrace(float trace) {
+    // Set eligibility trace value directly
+    // Used for initializing or debugging eligibility traces
     pImpl->eligibilityTrace = trace;
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    // Decay eligibility trace exponentially toward zero
+    // Models the fading of reward prediction error signals over time
     pImpl->eligibilityTrace *= (1.0f - decayRate);
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
@@ -206,10 +232,14 @@ void Synapse::decayEligibilityTrace(float decayRate) {
 }
 
 float Synapse::getEfficacy() const {
+    // Get synaptic efficacy value for use-dependent modulation
+    // Represents the current strength/availability of synaptic connections
     return pImpl->efficacy;
 }
 
 void Synapse::setEfficacy(float efficacy) {
+    // Set synaptic efficacy with validation
+    // Efficacy represents synaptic strength (0.0 = silent, 1.0 = normal, >1.0 = enhanced)
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 

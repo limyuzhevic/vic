@@ -256,9 +256,24 @@ bool Brain::initialize() {
     }
     
     // Build the neuron lookup used by synaptic delivery and injection.
-    for (auto& region : pImpl->regions) {
-        for (auto* neuron : region->getAllNeurons()) {
-            pImpl->neuronById[neuron->getId().index()] = neuron;
+    for (size_t r = 0; r < pImpl->regions.size(); ++r) {
+        auto& region = pImpl->regions[r];
+        // Pre-allocate neuronById for this region to avoid reallocation
+        pImpl->neuronById.reserve(pImpl->neuronById.size() + region->getTotalNeuronCount());
+        
+        // Fast path: iterate all neurons once per region initialization
+        auto neurons = region->getAllNeurons();
+        for (auto* neuron : neurons) {
+            if (neuron) {
+                pImpl->neuronById[neuron->getId().value()] = neuron;
+                
+                // Categorize neurons by type for fast access during simulation
+                if (neuron->getType() == nlm::NeuronType::Sensory) {
+                    pImpl->sensoryNeurons.push_back(neuron);
+                } else if (neuron->getType() == nlm::NeuronType::Motor) {
+                    pImpl->motorNeurons.push_back(neuron);
+                }
+            }
         }
     }
 
@@ -1188,28 +1203,30 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
 
-        // Apply synapse states. The old load only logged the count and
-        // restored nothing, so a "loaded" brain kept its freshly
-        // initialised weights. Match by (source, destination) pair —
-        // not by position — so the restore is correct even if synapse
-        // creation order ever changes; fall back to position only for
-        // pairs that have no match (e.g. duplicate pairs).
+        // Apply synapse states. Use O(n) approach with O(m) lookup for efficient synapse restoration
         {
             std::unordered_map<uint64_t, std::vector<Synapse*>> byPair;
+            // Pre-allocate with estimated capacity to avoid rehashing
+            byPair.reserve(pImpl->regions.size() * 100); // Estimate 100 synapses per region
+            
             auto pairKey = [](uint64_t src, uint64_t dst) {
                 return (src << 32) ^ dst;
             };
+            
             for (auto& region : pImpl->regions) {
-                for (auto& syn : region->getSynapses()) {
+                auto synapses = region->getSynapses();
+                byPair.reserve(byPair.size() + synapses.size()); // Reserve for this region
+                for (auto& syn : synapses) {
                     byPair[pairKey(syn->getSourceNeuron().index(),
                                    syn->getDestinationNeuron().index())].push_back(syn.get());
                 }
             }
+            
             std::unordered_map<uint64_t, size_t> usedCount;
+            usedCount.reserve(byPair.size());
             size_t restored = 0;
             for (size_t i = 0; i < synapseData.weight.size(); ++i) {
-                uint64_t key = pairKey(synapseData.sourceNeuron[i],
-                                       synapseData.destinationNeuron[i]);
+                uint64_t key = pairKey(synapseData.sourceNeuron[i], synapseData.destinationNeuron[i]);
                 auto it = byPair.find(key);
                 Synapse* target = nullptr;
                 if (it != byPair.end()) {

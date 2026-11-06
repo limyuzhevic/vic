@@ -27,12 +27,25 @@ struct Neuron::Impl {
              totalCurrent(0.0f), synapticInput(0.0f) {}
 };
 
-Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
+// Initialize neuron with ID
     pImpl->id = id;
     pImpl->type = NeuronType::Internal;
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    // Initialize state with default parameters for LIF neuron
+    pImpl->state.membranePotential = -70.0f; // Resting potential
+    pImpl->state.restingPotential = -70.0f;
+    pImpl->state.threshold = -55.0f;
+    pImpl->state.resetPotential = -70.0f;
+    pImpl->state.leakConductance = 10.0f;
+    pImpl->state.synapseConductance = 0.0f;
+    pImpl->state.firingRate = 0.0f;
+    pImpl->state.firingState = FiringState::Resting;
+    pImpl->state.refractoryRemaining = 0;
+    pImpl->state.refractoryPeriod = 9; // See comment in Neuron.hpp for refractory period
+    pImpl->state.adaptationVariable = 0.0f;
+    pImpl->state.lastSpikeTime = -1.0f;
 }
 
 Neuron::~Neuron() = default;
