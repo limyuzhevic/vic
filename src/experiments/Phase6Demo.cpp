@@ -64,12 +64,13 @@ int main(int argc, char* argv[]) {
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;
-    std::cout << "Total reward: " << result.totalReward << std::endl;
+    std::cout << "Average reward: " << result.totalReward << std::endl;
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
     std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;
     std::cout << std::endl;
     
+    std::cout << std::endl;
     std::cout << "=== INTEGRATION STATUS ===" << std::endl;
     std::cout << "Working Memory: " << (result.memoryWorkingMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
     std::cout << "Episodic Memory: " << (result.memoryEpisodicMemoryIntegrated ? "CONNECTED" : "DISCONNECTED") << std::endl;
