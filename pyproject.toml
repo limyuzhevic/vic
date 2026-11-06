@@ -48,10 +48,9 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
-    # Phase 5: without this the root build produces no pynlm module
-    # at all (the option is OFF by default for plain C++ builds).
     "-DNLM_BUILD_PYTHON_BINDINGS=ON",
 ]
+cmake.define = { NLM_BUILD_PYTHON_BINDINGS = true }
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
