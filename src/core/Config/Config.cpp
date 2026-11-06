@@ -1,26 +1,121 @@
 #include "Config.hpp"
+#include "JsonConfigParser.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <memory>
 
-namespace nlm {
-
-struct Config::Impl {
-    std::vector<ConfigEntry> entries;
-};
-
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
-
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
+// Helper to detect file format
+static bool isJsonFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    // Read first non-empty line to detect format
+    while (std::getline(file, line)) {
+        line = trim(line);
+        if (line.empty()) continue;
+        
+        // JSON files typically start with { or [ or have " at the beginning
+        if (line.find('{') == 0 || line.find('[') == 0 || 
+            (line.find('"') != std::string::npos && line.find('=') == std::string::npos)) {
+            return true;
+        }
+        
+        // Check for JSON key-value format ("key": "value")
+        if (line.find('"') != std::string::npos && line.find(':') != std::string::npos) {
+            return true;
+        }
+        
+        // Simple key=value format detected
+        return false;
+    }
+    
+    return false;
+}
+static bool isJsonFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string line;
+    // Read first non-empty line to detect format
+    while (std::getline(file, line)) {
+        line = trim(line);
+        if (line.empty()) continue;
+        
+        // JSON files typically start with { or [ or have " at the beginning
+        if (line.find('{') == 0 || line.find('[') == 0 || 
+            (line.find('"') != std::string::npos && line.find('=') == std::string::npos)) {
+            return true;
+        }
+        
+        // Check for JSON key-value format ("key": "value")
+        if (line.find('"') != std::string::npos && line.find(':') != std::string::npos) {
+            return true;
+        }
+        
+        // Simple key=value format detected
+        return false;
+    }
+    
+    return false;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON parsing first (Phase 2+ feature)
+    if (isJsonFile(filepath)) {
+        NLM_LOG_INFO("Detected JSON config file: " + filepath);
+        std::unordered_map<std::string, std::string> jsonConfig;
+        if (JsonConfigParser::parseFromFile(filepath, jsonConfig)) {
+            // Load JSON config into Config object
+            for (const auto& pair : jsonConfig) {
+                // Convert string value back to appropriate type
+                std::string value = pair.second;
+                
+                // Try to determine type from value
+                bool parsed = false;
+                
+                // Check if it's a boolean
+                if (value == "true" || value == "false") {
+                    bool boolVal = (value == "true");
+                    set(pair.first, boolVal, ConfigSource::File);
+                    parsed = true;
+                }
+                // Check if it's an integer
+                else if (std::all_of(value.begin(), value.end(), ::isdigit) || 
+                         (value[0] == '-' && std::all_of(value.begin() + 1, value.end(), ::isdigit))) {
+                    int intVal = std::stoi(value);
+                    set(pair.first, intVal, ConfigSource::File);
+                    parsed = true;
+                }
+                // Check if it's a float
+                else {
+                    try {
+                        float floatVal = std::stof(value);
+                        set(pair.first, floatVal, ConfigSource::File);
+                        parsed = true;
+                    } catch (...) {
+                        // Keep as string
+                        set(pair.first, value, ConfigSource::File);
+                        parsed = true;
+                    }
+                }
+                
+                if (!parsed) {
+                    NLM_LOG_WARNING("Could not parse config value for key: " + pair.first);
+                }
+            }
+            return true;
+        }
+    }
+    
+    // Fallback to simple key=value format (Phase 1 style)
+    NLM_LOG_INFO("Loading simple config file: " + filepath);
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
