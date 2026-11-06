@@ -559,20 +559,67 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // drive is then at most ~5 * (3.0/25) * 10 = 6 mV per step before
     // leak — below the ~15 mV spike gap, so a neuron must integrate
     // over several steps to fire instead of firing every cycle.
-    if (currentStep > 0 && currentStep % 100 == 0) {
-        constexpr float kIncomingExcitatoryCap = 3.0f;
+    // Phase 6, tried and reverted: global inhibitory feedback
+    // (inhibit every neuron when >10% of the population fired in
+    // a step). It lowered mean rate only slightly (80.8 -> 76.2 Hz
+    // in Phase 3) while making behaviour worse — a planner-driven
+    // Interact trap returned (115 empty interacts in one episode)
+    // and a hazard was consumed — because uniform inhibition
+    // flattens the motor pattern that the biases need to read, so
+    // the biases dominate more, not less. Population inhibition
+    // is the wrong lever here; see the drive-scaling change in
+    // AgentBrain/Neuron instead. This block is intentionally empty
+    // so the experiment and its result stay in the record.
+
+    // IMPROVEMENT: Enhanced homeostatic synaptic scaling to prevent saturation
+    if (currentStep > 0 && currentStep % 50 == 0) {  // More frequent scaling
+        constexpr float kIncomingExcitatoryCap = 2.5f;  // Lower cap to prevent saturation
+        constexpr float kHomeostaticAdaptation = 0.05f;  // Strength of homeostatic adaptation
+        
         for (auto& region : pImpl->regions) {
             for (auto* neuron : region->getAllNeurons()) {
                 auto incoming = region->getSynapsesTo(neuron->getId());
-                float sum = 0.0f;
+                float sumExcitatory = 0.0f;
+                float sumInhibitory = 0.0f;
+                
                 for (Synapse* syn : incoming) {
-                    if (syn->getWeight() > 0.0f) sum += syn->getWeight();
+                    if (syn->getWeight() > 0.0f) {
+                        sumExcitatory += syn->getWeight();
+                    } else if (syn->getWeight() < 0.0f) {
+                        sumInhibitory += std::abs(syn->getWeight());
+                    }
                 }
-                if (sum > kIncomingExcitatoryCap) {
-                    float scale = kIncomingExcitatoryCap / sum;
+                
+                // Apply homeostatic scaling if excitation exceeds threshold
+                if (sumExcitatory > kIncomingExcitatoryCap) {
+                    float scale = kIncomingExcitatoryCap / sumExcitatory;
                     for (Synapse* syn : incoming) {
                         if (syn->getWeight() > 0.0f) {
-                            syn->setWeight(syn->getWeight() * scale);
+                            // Scale excitatory weights
+                            float newWeight = syn->getWeight() * scale;
+                            syn->setWeight(newWeight);
+                            
+                            // Apply homeostatic adaptation based on firing history
+                            if (neuron->getState().firingRate > 100.0f) {
+                                newWeight *= (1.0f - kHomeostaticAdaptation);
+                                syn->setWeight(newWeight);
+                            }
+                        }
+                    }
+                }
+                
+                // Boost inhibitory weights when excitation is high to maintain E/I balance
+                if (sumExcitatory > kIncomingExcitatoryCap * 1.5f) {
+                    float excess = (sumExcitatory - kIncomingExcitatoryCap * 1.5f) / sumExcitatory;
+                    for (Synapse* syn : incoming) {
+                        if (syn->getWeight() > 0.0f) {
+                            // Add inhibitory bias to maintain balance
+                            float inhibitoryWeight = -excess * 0.5f;
+                            if (syn->getType() == SynapseType::Excitatory) {
+                                // Convert some excitation to inhibition
+                                float newWeight = syn->getWeight() * 0.5f + inhibitoryWeight;
+                                syn->setWeight(std::clamp(newWeight, -0.5f, 0.5f));
+                            }
                         }
                     }
                 }

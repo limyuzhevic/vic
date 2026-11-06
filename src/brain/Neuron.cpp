@@ -205,16 +205,33 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
-    // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
-    
-    MembranePotential& V = pImpl->state.membranePotential;
-    MembranePotential V_rest = pImpl->state.restingPotential;
-    MembranePotential V_reset = pImpl->state.resetPotential;
-    MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    // IMPROVEMENT: Homeostatic regulation to prevent excessive firing
+    // Adjust threshold based on recent activity history
+    if (!pImpl->spikeHistory.empty()) {
+        // Calculate firing rate over last few spikes
+        float recentActivity = 0.0f;
+        if (pImpl->spikeHistory.size() > 1) {
+            float timeSinceFirst = static_cast<float>(currentTime) - pImpl->spikeHistory.front();
+            if (timeSinceFirst > 0.0f) {
+                recentActivity = (pImpl->spikeHistory.size() - 1) / timeSinceFirst;  // spikes per second
+            }
+        }
+        
+        // Adaptive threshold regulation: increase threshold if firing rate is too high
+        if (recentActivity > 100.0f) {  // More than 100 spikes/sec
+            pImpl->state.threshold += 0.01f;  // Gradually increase threshold
+        } else if (recentActivity < 10.0f) {  // Less than 10 spikes/sec
+            pImpl->state.threshold -= 0.005f;  // Gradually decrease threshold
+        }
+        
+        // Clamp threshold to reasonable bounds
+        pImpl->state.threshold = std::clamp(pImpl->state.threshold, -60.0f, 15.0f);
+        
+        // Homeostatic adaptation variable: stronger adaptation for high activity
+        if (recentActivity > 50.0f) {
+            pImpl->state.adaptationVariable += 0.5f;
+        }
+    }
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;

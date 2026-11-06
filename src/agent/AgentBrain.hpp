@@ -7,6 +7,7 @@
 #include "../world/SimpleWorld.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../neuromodulation/Reward.hpp"  // Add Reward system support
 #include <memory>
 #include <string>
 #include <vector>
@@ -82,7 +83,7 @@ public:
     // Learned preference trait, stored on the Brain so it survives a
     // checkpoint reload (see Brain::getLearnedPreference).
     float getLearnedPreference() const;
-
+    
     // Phase 5 diagnostic counters (see private section): how often the
     // vision-gated reflex bonus / hazard suppression / WTA pulse fired.
     int getReflexBonusCount() const { return reflexBonusCount_; }
@@ -105,7 +106,7 @@ public:
     // actually changed the decoded action (not just advised it).
     int getPlannerOverrideCount() const { return plannerOverrideCount_; }
     int getPlannerAgreementCount() const { return plannerAgreementCount_; }
-    int getPlannerDecisionCount() const { return plannerDecisionCount_; }
+    seen    int getPlannerDecisionCount() const { return plannerDecisionCount_; }
     int getConceptBiasCount() const { return conceptBiasCount_; }
     int getSelfBiasCount() const { return selfBiasCount_; }
     int getSocialBiasCount() const { return socialBiasCount_; }
@@ -130,7 +131,7 @@ public:
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
-    
+
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
