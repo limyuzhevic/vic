@@ -331,13 +331,171 @@ bool Brain::initialize() {
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
-    NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
+NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
     NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
-    
+
     return true;
+}
+
+// Extracted method to setup neural population structure
+def Brain::Impl::setupNeuralPopulations(size_t neuronCount, size_t regionCount) {
+    size_t neuronsPerRegion = neuronCount / regionCount;
+    size_t nextNeuronIndex = 1;
+    
+    for (size_t i = 0; i < regionCount; ++i) {
+        auto* region = getRegion(RegionId(i + 1));
+        if (region) {
+            region->setNextNeuronIndex(nextNeuronIndex);
+            
+            // Create balanced excitatory/inhibitory internal population
+            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
+            size_t internalCount = neuronsPerRegion / 2;
+            size_t internalExcitatory = internalCount * 4 / 5;
+            auto internalPopId = region->addPopulation(internalExcitatory, NeuronType::Internal);
+            auto inhibitoryPopId = region->addPopulation(internalCount - internalExcitatory, NeuronType::Inhibitory);
+            (void)internalPopId; (void)inhibitoryPopId;
+            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+            
+            // Collect sensory and motor neurons for I/O
+            auto* sensoryPop = region->getPopulation(sensoryPopId);
+            auto* motorPop = region->getPopulation(motorPopId);
+            
+            if (sensoryPop) {
+                for (auto* neuron : sensoryPop->getNeurons()) {
+                    sensoryNeurons.push_back(neuron);
+                }
+            }
+            
+            if (motorPop) {
+                for (auto* neuron : motorPop->getNeurons()) {
+                    motorNeurons.push_back(neuron);
+                }
+            }
+            
+            nextNeuronIndex += region->getTotalNeuronCount();
+            
+            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) +
+                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+        }
+    }
+}
+
+// Extracted method to setup synaptic connectivity
+def Brain::Impl::setupSynapticConnectivity(float connectionProbability) {
+    if (connectionProbability <= 0.0f) return;
+    
+    for (size_t i = 0; i < regions.size(); ++i) {
+        auto* region = getRegion(RegionId(i + 1));
+        if (region) {
+            // Initialize random connectivity and synapse weights
+            region->initializeRandomConnectivity(*rng, connectionProbability, 0.2f, 0.1f);
+        }
+    }
+}
+
+// Extracted method to setup neuron lookup for efficient access
+def Brain::Impl::setupNeuronLookup() {
+    // Build the neuron lookup used by synaptic delivery and injection.
+    for (auto& region : regions) {
+        for (auto* neuron : region->getAllNeurons()) {
+            neuronById[neuron->getId().index()] = neuron;
+        }
+    }
+}
+
+// Extracted method to setup integrated systems
+def Brain::Impl::setupIntegratedSystems() {
+    // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
+    
+    // Initialize working memory
+    workingMemory->initialize(this);
+    workingMemory->setCapacity(1000 / 10);  // neuronCount / 10
+    
+    // Initialize episodic memory
+    episodicMemory->initialize(this);
+    episodicMemory->setMaxEpisodes(1000);
+    
+    // Initialize associative memory
+    associativeMemory->initialize(this);
+    
+    // Initialize cognition systems
+    planner->initialize(this);
+    planner->setPlanningDepth(5);
+    
+    conceptFormation->initialize(this);
+    
+    attention->initialize(this);
+    attention->setInhibitionStrength(0.5f);
+    attention->setExcitationStrength(1.5f);
+    
+    // Initialize neuromodulation
+    novelty->initialize(this);
+    curiosity->initialize(this);
+}
+
+// Extracted method to register spike handlers
+def Brain::Impl::registerSpikeHandlers() {
+    // Register spike handlers once; re-initialising used to register them
+    // again and double-count every spike.
+    if (!spikeHandlersRegistered) {
+        spikeHandlersRegistered = true;
+        // Register spike handlers for event-driven processing
+        spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++totalSpikesThisStep;
+            ++totalSpikesTotal;
+        });
+        
+        // Register delayed spike handler to deliver synaptic input
+        spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            auto it = neuronById.find(event.destination_neuron.index());
+            if (it != neuronById.end()) {
+                Neuron* neuron = it->second;
+                MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                if (event.is_excitatory) {
+                    neuron->receiveExcitatoryInput(synapticCurrent);
+                } else {
+                    neuron->receiveInhibitoryInput(-synapticCurrent);
+                }
+            }
+        });
+    }
+}
+
+// Extracted method to configure checkpoint manager
+def Brain::Impl::configureCheckpointManager() {
+    std::string checkpointDir = config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+    checkpointManager->configure(checkpointDir, 10000, 5, true);
+}
+
+// Extracted method to setup simulation parameters from config
+def Brain::Impl::setupSimulationParameters() {
+    // Get timestep
+    timestep = config->getOr<double>("simulation_timestep", 0.001);
+    
+    // Get integration intervals from config
+    replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
+    consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
+}
+
+// Extracted method to setup plasticity systems
+def Brain::Impl::setupPlasticitySystems() {
+    // Configure STDP parameters
+    float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+    float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+    float tau = config->getOr<float>("stdp_tau", 20.0f);
+    stdp->configure(ltpWeight, ltdWeight, tau);
+    
+    // Configure structural plasticity
+    float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
+    structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+    structuralPlasticity->setPruningRate(pruningRate);
+}
 }
 
 void Brain::step(SimulationStep currentStep) {

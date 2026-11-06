@@ -99,6 +99,12 @@ private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+        // Check if a key is valid for configuration
+    static bool isValidKey(const std::string& key);
+    
+    // Helper function to convert ConfigValue to string for logging
+    static std::string valueToString(const ConfigValue& value);
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
