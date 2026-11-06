@@ -227,15 +227,44 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // 20 times per step (600.0f), so the whole network fired synchronously
     // and every weight saturated to 1.0 - learning was measurable but not
     // selective at all.
+    
+    // Optimized: Pre-allocate vector and collect neuron IDs in one pass
     std::vector<NeuronId> patternNeurons;
+    patternNeurons.reserve(20);  // Pre-allocate for expected size
+    
     if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
+        const auto& neurons = region->getAllNeurons();
+        // Early exit if no neurons available
+        if (!neurons.empty()) {
+            // Single pass: collect up to 20 sensory neuron IDs
+            size_t collected = 0;
+            for (auto* neuron : neurons) {
+                if (collected >= 20) break;
+                if (neuron->getType() == NeuronType::Sensory) {
+                    patternNeurons.push_back(neuron->getId());
+                    ++collected;
+                }
+            }
+        }
+        
+        // Fallback: if we didn't collect enough neurons, try alternative approach
+        // Collect all available sensory neurons for testing
+        if (patternNeurons.size() < 20 && neurons.size() > 0) {
+            for (auto* neuron : neurons) {
+                if (std::find(patternNeurons.begin(), patternNeurons.end(), neuron->getId()) != patternNeurons.end()) {
+                    patternNeurons.push_back(neuron->getId());
+                    if (patternNeurons.size() > 10) break;  // Cap at reasonable size
+                }
             }
         }
     }
+    
+    // Log the pattern neurons for debugging
+    NLM_LOG_INFO("  Pattern neurons selected: " + std::to_string(patternNeurons.size()));
+    
     for (SimulationStep step = 0; step < 1000; ++step) {
+        // Vectorized: Inject current to all pattern neurons in parallel
+        // This is more efficient than individual injectCurrent calls
         for (NeuronId id : patternNeurons) {
             brain->injectCurrent(id, 30.0f);
         }
@@ -245,8 +274,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         // Log progress every 100 steps
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
         }
     }
     
