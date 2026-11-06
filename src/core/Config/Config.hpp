@@ -6,6 +6,17 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <set>
+#include <map>
+#include <sstream>
+#include <iomanip>
+#include <filesystem>
+
+// Add forward declarations for JSON parsing
+#include <memory>
+namespace nlohmann {
+    class json;
+}
 
 namespace nlm {
 
