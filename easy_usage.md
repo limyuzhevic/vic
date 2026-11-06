@@ -12,6 +12,18 @@ Think of it like this:
 
 That's it! NLM simulates all of this.
 
+## Why Use NLM?
+
+NLM offers several advantages for brain-inspired computing:
+
+- **Realistic Neuroscience**: Implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation
+- **Learning**: Multiple plasticity mechanisms (STDP, Hebbian, structural)
+- **Developmental**: Brains can mature and adapt over time
+- **Memory**: Working memory, episodic memory, and concept formation
+- **Neuromodulation**: Dopamine, curiosity, novelty detection
+- **Open-source**: MIT licensed, easy to extend and modify
+- **Performance**: Optimized for large-scale simulations with SIMD and parallel processing
+
 ---
 
 ## The 3 Things You Need to Know
