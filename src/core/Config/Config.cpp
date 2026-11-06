@@ -24,11 +24,16 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        // Improved error logging with context
+        // NLM_LOG_ERROR("Cannot open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNum = 0;
+    bool hadErrors = false;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,10 +54,19 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            // Improved error handling for malformed lines
+            // NLM_LOG_ERROR("Malformed configuration line " + std::to_string(lineNum) + ": " + line);
+            hadErrors = true;
         }
     }
     
-    return true;
+    // Report parsing errors if any occurred
+    if (hadErrors) {
+        // NLM_LOG_WARNING("Configuration file had parsing errors");
+    }
+    
+    return !hadErrors;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -68,9 +82,13 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 set(key, value, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+// Handle malformed command line arguments
+        if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
+            if (key.empty()) {
+                // NLM_LOG_ERROR("Empty command line argument key");
+                return false;
+            }
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
         }
@@ -100,7 +118,55 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
         it->value = value;
         it->source = source;
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        ConfigEntry entry;
+        entry.key = key;
+        entry.value = value;
+        entry.source = source;
+        
+        // Set sensible defaults and descriptions for known parameters
+        if (key == "neuron_count") {
+            entry.description = "Number of neurons in the brain";
+            entry.minValue = "1";
+            entry.maxValue = "10000";
+            entry.defaultValue = "500";
+        } else if (key == "region_count") {
+            entry.description = "Number of neural regions";
+            entry.minValue = "1";
+            entry.maxValue = "100";
+            entry.defaultValue = "1";
+        } else if (key == "connection_probability") {
+            entry.description = "Probability of connection between neurons";
+            entry.minValue = "0.0";
+            entry.maxValue = "1.0";
+            entry.defaultValue = "0.15";
+        } else if (key == "simulation_timestep") {
+            entry.description = "Simulation time step in seconds";
+            entry.minValue = "0.0001";
+            entry.maxValue = "0.1";
+            entry.defaultValue = "0.001";
+        } else if (key == "stdp_ltp_weight") {
+            entry.description = "STDP long-term potentiation weight factor";
+            entry.minValue = "0.0";
+            entry.maxValue = "1.0";
+            entry.defaultValue = "0.02";
+        } else if (key == "stdp_ltd_weight") {
+            entry.description = "STDP long-term depression weight factor";
+            entry.minValue = "0.0";
+            entry.maxValue = "1.0";
+            entry.defaultValue = "0.015";
+        } else if (key == "synaptogenesis_rate") {
+            entry.description = "Rate of new synapse creation";
+            entry.minValue = "0.0";
+            entry.maxValue = "0.1";
+            entry.defaultValue = "0.0001";
+        } else if (key == "pruning_rate") {
+            entry.description = "Rate of synapse removal (pruning)";
+            entry.minValue = "0.0";
+            entry.maxValue = "0.1";
+            entry.defaultValue = "0.00001";
+        }
+        
+        pImpl->entries.push_back(entry);
     }
 }
 

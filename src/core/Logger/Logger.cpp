@@ -112,6 +112,26 @@ Logger::Logger() : pImpl(std::make_unique<Impl>()) {}
 
 Logger::~Logger() = default;
 
+void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Info, message, file, line, function);
+}
+
+void Logger::info(const std::string& message) {
+    log(LogLevel::Info, message, "", 0, "");
+}
+
+void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Warning, message, file, line, function);
+}
+
+void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Error, message, file, line, function);
+}
+
+void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
+    log(LogLevel::Critical, message, file, line, function);
+}
+
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->loggers.push_back(logger);
@@ -148,22 +168,6 @@ void Logger::log(LogLevel level, const std::string& message,
 
 void Logger::debug(const std::string& message, const std::string& file, int line, const std::string& function) {
     log(LogLevel::Debug, message, file, line, function);
-}
-
-void Logger::info(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Info, message, file, line, function);
-}
-
-void Logger::warning(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Warning, message, file, line, function);
-}
-
-void Logger::error(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Error, message, file, line, function);
-}
-
-void Logger::critical(const std::string& message, const std::string& file, int line, const std::string& function) {
-    log(LogLevel::Critical, message, file, line, function);
 }
 
 bool Logger::isEnabled(LogLevel level) const {
