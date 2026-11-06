@@ -47,6 +47,9 @@ public:
     void setMembraneTimeConstant(float tau);
     float getMembraneTimeConstant() const;
     
+    // IMPROVEMENT: Add synaptic dynamics calculation helper
+    float calculateSynapticDynamics(float lastSpikeTime, TimestepDuration dt);
+    
 private:
     struct Impl;
     Impl* pImpl;

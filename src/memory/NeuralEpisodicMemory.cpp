@@ -275,6 +275,62 @@ void NeuralEpisodicMemory::replaySequence(const std::vector<size_t>& episodeIds)
     }
 }
 
+// Implement range query method for NeuralEpisodicMemory
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByRange(
+    float minReward, float maxReward,
+    float minEnergy, float maxEnergy,
+    float minNovelty, float maxNovelty,
+    size_t maxResults) const {
+    
+    std::vector<const EpisodicMemoryItem*> results;
+    
+    for (const auto& ep : episodes_) {
+        bool rewardMatch = (ep.reward >= minReward && ep.reward <= maxReward);
+        bool energyMatch = (ep.energy >= minEnergy && ep.energy <= maxEnergy);
+        bool noveltyMatch = (ep.novelty >= minNovelty && ep.novelty <= maxNovelty);
+        
+        if (rewardMatch && energyMatch && noveltyMatch) {
+            results.push_back(&ep);
+        }
+    }
+    
+    // Sort by recency (most recent first)
+    std::sort(results.begin(), results.end(),
+        [](const EpisodicMemoryItem* a, const EpisodicMemoryItem* b) {
+            return a->timestamp > b->timestamp;
+        });
+    
+    if (results.size() > maxResults) {
+        results.resize(maxResults);
+    }
+    
+    return results;
+}
+
+// Implement range query method for NeuralEpisodicMemory (reward range)
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByRewardRange(
+    float minReward, float maxReward,
+    size_t maxResults) const {
+    
+    return retrieveByRange(minReward, maxReward, -1000.0f, 1000.0f, 0.0f, 1.0f, maxResults);
+}
+
+// Implement range query method for NeuralEpisodicMemory (energy range)
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByEnergyRange(
+    float minEnergy, float maxEnergy,
+    size_t maxResults) const {
+    
+    return retrieveByRange(-1000.0f, 1000.0f, minEnergy, maxEnergy, 0.0f, 1.0f, maxResults);
+}
+
+// Implement range query method for NeuralEpisodicMemory (novelty range)
+std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveByNoveltyRange(
+    float minNovelty, float maxNovelty,
+    size_t maxResults) const {
+    
+    return retrieveByRange(-1000.0f, 1000.0f, -1000.0f, 1000.0f, minNovelty, maxNovelty, maxResults);
+}
+
 float NeuralEpisodicMemory::computeSimilarity(const std::vector<float>& query,
                                              const EpisodicMemoryItem& episode) const {
     if (query.empty() || episode.sensoryState.empty()) return 0.0f;

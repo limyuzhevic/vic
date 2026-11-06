@@ -72,7 +72,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-
+    
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
@@ -83,20 +83,24 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryTimestamps_.push_back(0);
         it = memoryNeurons_.end() - 1;
     }
-
-    // Phase 6: activeTraces_ is the trace list getActiveTraces()
-    // reports, and it was never populated — only cleared — so it
-    // always read 0 even when memory held 50 neurons. A stored
-    // neuron is an active trace; decayWeakTraces() below removes
-    // it again when its activation falls below threshold, and
-    // clear()/restoreSnapshot() reset the list with the content.
+    
+    // IMPROVEMENT: Ensure activeTraces_ is properly maintained
+    // This creates a robust association between neurons in working memory
+    // and their activation levels, ensuring that active traces are correctly
+    // tracked even when neurons are updated through other mechanisms
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
-        if (activation > 0.1f && !present) activeTraces_.push_back(idx);
-        if (activation <= 0.1f && present) {
-            activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
-                                activeTraces_.end());
+        
+        if (activation > 0.1f) {
+            if (!present) {
+                activeTraces_.push_back(idx);
+            }
+        } else {
+            if (present) {
+                activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
+                                    activeTraces_.end());
+            }
         }
     }
     

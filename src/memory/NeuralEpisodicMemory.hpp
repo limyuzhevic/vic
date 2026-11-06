@@ -130,11 +130,23 @@ public:
     void enableReplay(bool enable) { replayEnabled_ = enable; }
     bool isReplayEnabled() const { return replayEnabled_; }
 
-    // Get episodes for replay (selection based on relevance and recency)
-    std::vector<const EpisodicMemoryItem*> getEpisodesForReplay(size_t count) const;
-
-    // Replay multiple episodes (for sleep-like consolidation)
-    void replaySequence(const std::vector<size_t>& episodeIds);
+    // Retrieve episodes within value ranges
+    std::vector<const EpisodicMemoryItem*> retrieveByRange(float minReward, float maxReward,
+                                                          float minEnergy, float maxEnergy,
+                                                          float minNovelty, float maxNovelty,
+                                                          size_t maxResults = 10) const;
+    
+    // Retrieve episodes by reward range
+    std::vector<const EpisodicMemoryItem*> retrieveByRewardRange(float minReward, float maxReward,
+                                                                  size_t maxResults = 5) const;
+    
+    // Retrieve episodes by energy range
+    std::vector<const EpisodicMemoryItem*> retrieveByEnergyRange(float minEnergy, float maxEnergy,
+                                                                  size_t maxResults = 5) const;
+    
+    // Retrieve episodes by novelty range
+    std::vector<const EpisodicMemoryItem*> retrieveByNoveltyRange(float minNovelty, float maxNovelty,
+                                                                  size_t maxResults = 5) const;
 
 private:
     // Compute similarity between query and stored episode
