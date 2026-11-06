@@ -30,6 +30,11 @@ void Maturation::setProgress(float progress) {
 void Maturation::update(Brain* brain, SimulationStep currentStep) {
     // TODO PHASE 2: Implement real maturation
     // PLACEHOLDER: Progress increases over simulation time
+    if (currentStep > 0) {
+        pImpl->progress = static_cast<float>(currentStep) / 1000.0f;
+    } else {
+        pImpl->progress = 0.0f;
+    }
 }
 
 MembranePotential Maturation::getMatureThreshold() const {
