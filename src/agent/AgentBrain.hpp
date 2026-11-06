@@ -13,6 +13,11 @@
 
 namespace nlm {
 
+// Include helper classes
+#include "AgentBrainNeuronManager.hpp"
+#include "AgentBrainStateValidator.hpp"
+#include "AgentBrainConfigManager.hpp"
+
 // AgentBrain: Connects NLM brain to the world
 // Handles sensory transduction and motor decoding
 class AgentBrain {
