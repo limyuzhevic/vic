@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "core/Logger/Logger.hpp"
 
 namespace nlm {
 
@@ -22,13 +23,23 @@ bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
+    // Validate filepath
+    if (filepath.empty()) {
+        return false;
+    }
+    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    size_t validEntries = 0;
+    
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -41,6 +52,12 @@ bool Config::loadFromFile(const std::string& filepath) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_WARNING("Config file " + filepath + ": line " + std::to_string(lineNumber) + ": ignoring empty key");
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
@@ -49,14 +66,26 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            validEntries++;
+        } else {
+            NLM_LOG_WARNING("Config file " + filepath + ": line " + std::to_string(lineNumber) + ": ignoring malformed line (no '=')");
         }
     }
     
+    NLM_LOG_INFO("Config file " + filepath + ": loaded " + std::to_string(validEntries) + " configuration entries");
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 1) {
+        return true; // No arguments to process
+    }
+    
     for (int i = 1; i < argc; ++i) {
+        if (!argv[i]) {
+            continue; // Skip null pointer
+        }
+        
         std::string arg(argv[i]);
         
         // Handle --key=value format
@@ -65,14 +94,35 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key format
+                if (key.empty()) {
+                    NLM_LOG_WARNING("Ignoring empty configuration key");
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg[0] == '-' && i + 1 < argc && argv[i + 1]) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key format
+            if (key.empty()) {
+                NLM_LOG_WARNING("Ignoring empty configuration key");
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+        }
+        // Handle standalone --key without value (set to true)
+        else if (arg.substr(0, 2) == "--" && arg.find('=') == std::string::npos) {
+            std::string key = arg.substr(2);
+            if (!key.empty()) {
+                set(key, "true", ConfigSource::CommandLine);
+            }
         }
     }
     return true;
@@ -84,23 +134,72 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Write configuration entries in a simple key=value format
     for (const auto& entry : pImpl->entries) {
+        // Write comment/description
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write key=value pair
+        file << entry.key << " = ";
+        
+        // Write the actual value using proper formatting based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<int>>) {
+                        file << arg[i];
+                    } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                        file << arg[i];
+                    } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        file << "\"" << arg[i] << "\"";
+                    }
+                }
+                file << "]";
+            } else {
+                // For simple types (int, double, bool, etc.)
+                if constexpr (std::is_same_v<T, bool>) {
+                    file << (arg ? "true" : "false");
+                } else {
+                    file << arg;
+                }
+            }
+        }, entry.value);
+        
+        file << "\n\n"; // Blank line between entries for readability
     }
     
     return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate key format
+    if (key.empty()) {
+        NLM_LOG_WARNING("Ignoring configuration setting with empty key");
+        return;
+    }
+    
+    // Validate key doesn't contain problematic characters
+    if (key.find('=') != std::string::npos || key.find(' ') != std::string::npos) {
+        NLM_LOG_WARNING("Configuration key contains invalid characters: " + key);
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
         it->value = value;
         it->source = source;
+        NLM_LOG_INFO("Updated configuration key: " + key);
     } else {
         pImpl->entries.emplace_back(key, value, source);
+        NLM_LOG_INFO("Added configuration key: " + key);
     }
 }
 
