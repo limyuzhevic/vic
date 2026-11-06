@@ -30,6 +30,8 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class SelfModel;
+class SocialLearning;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -172,19 +174,27 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+    // SelfModel: Represents the agent's internal model of itself
+    // NOT consciousness - sensorimotor self-awareness through experience
+    //
+    // Key mechanisms:
+    // - Learns body schema (how actions affect sensory state)
+    // - Predicts consequences of own actions
+    // - Distinguishes self from external events
+    // - Represents own capabilities and limitations
     
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
+    SelfModel* getSelfModel();
     
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
+    // SocialLearning: Enables learning from observing other agents
+    // NOT language - simple action-effect learning from observation
+    //
+    // Key mechanisms:
+    // - Observes other agent's actions
+    // - Learns that other agents cause predictable changes
+    // - Can imitate observed actions
+    // - Develops simple communication signals
     
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
+    SocialLearning* getSocialLearning();
     
     // Get current configuration
     std::shared_ptr<const Config> getConfig() const;

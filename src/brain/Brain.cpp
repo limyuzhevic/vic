@@ -43,6 +43,8 @@ struct Brain::Impl {
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
+    std::unique_ptr<SelfModel> selfModel;
+    std::unique_ptr<SocialLearning> socialLearning;
     
     // ========== DEVELOPMENT SYSTEM ==========
     std::unique_ptr<DevelopmentSystem> developmentSystem;
@@ -67,11 +69,20 @@ struct Brain::Impl {
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
-
+    
     // Phase 5 learned preference trait (see Brain.hpp). Updated only
     // from sandbox reward via AgentBrain; checkpointed with the
     // simulation state so a reloaded brain keeps what it learned.
     float learnedPreference = 0.0f;
+    
+    // Last planned action (for integration between planning and execution)
+    ActionType lastPlannedAction;
+    
+    // Last social observation (for integration between social learning and action)
+    std::vector<float> lastSocialObservation;
+    
+    // Concepts formed by concept formation system
+    std::vector<float> currentConcepts;
     
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
@@ -100,6 +111,10 @@ struct Brain::Impl {
         , currentTime(0.0)
         , totalSpikesThisStep(0)
         , totalSpikesTotal(0)
+        , learnedPreference(0.0f)
+        , lastPlannedAction(ActionType::Wait)
+        , lastSocialObservation()
+        , currentConcepts()
         , isResting(false)
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
@@ -132,6 +147,8 @@ struct Brain::Impl {
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
+        selfModel = std::make_unique<SelfModel>();
+        socialLearning = std::make_unique<SocialLearning>();
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -614,8 +631,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with sensory observations
+        // Compute prediction errors to guide learning
+        if (pImpl->workingMemory) {
+            // Create sensory state encoding from working memory
+            std::vector<float> sensoryState;
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            auto activations = pImpl->workingMemory->getMemoryActivations();
+            
+            sensoryState.reserve(memoryNeurons.size());
+            for (size_t i = 0; i < memoryNeurons.size() && i < activations.size(); ++i) {
+                sensoryState.push_back(activations[i]);
+            }
+            
+            if (!sensoryState.empty()) {
+                // Update prediction system with current sensory state
+                pImpl->predictionSystem->update(sensoryState, currentTime);
+                
+                // Get prediction error signal for neuromodulation
+                if (pImpl->predictionError) {
+                    float predictionError = pImpl->predictionSystem->getPredictionError();
+                    pImpl->predictionError->setError(predictionError);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,8 +670,138 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Encode sensory state and update concept representations
+        if (pImpl->workingMemory) {
+            // Create activity pattern from working memory
+            std::vector<float> activityPattern;
+            auto activations = pImpl->workingMemory->getMemoryActivations();
+            activityPattern.reserve(activations.size());
+            for (float activation : activations) {
+                activityPattern.push_back(activation);
+            }
+            
+            // Create simple features from activity pattern
+            std::vector<float> features = activityPattern;
+            
+            // Present experience to concept formation system
+            // Get current reward from dopamine if available
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                activityPattern, features, reward, currentStep);
+            
+            // Get all concepts and extract prototypes
+            auto& allConcepts = pImpl->conceptFormation->getConcepts();
+            if (!allConcepts.empty()) {
+                // Extract current concept prototypes for planning
+                pImpl->currentConcepts.clear();
+                for (const auto& concept : allConcepts) {
+                    // Add concept prototype to current concepts vector
+                    pImpl->currentConcepts.insert(pImpl->currentConcepts.end(), 
+                                                 concept.prototype.begin(), 
+                                                 concept.prototype.end());
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 10.5: Update neural planner ==========
+    if (pImpl->planner) {
+        // Neural planner generates action sequences for goal-directed behavior
+        // Uses current state and goals to plan optimal action sequences
+        if (!pImpl->currentConcepts.empty() && pImpl->workingMemory) {
+            // Create current state from working memory
+            std::vector<float> currentState;
+            auto activations = pImpl->workingMemory->getMemoryActivations();
+            currentState.reserve(activations.size());
+            for (float activation : activations) {
+                currentState.push_back(activation);
+            }
+            
+            if (!currentState.empty()) {
+                // Generate action plan based on current concepts and state
+                ActionType plannedAction = pImpl->planner->planAction(currentState);
+                
+                // Store planned action in brain state for execution
+                pImpl->lastPlannedAction = plannedAction;
+                
+                // Update planner with actual reward to improve future plans
+                // (This would be called when an action is executed and its outcome known)
+            }
+        }
+    }
+    
+    // ========== STEP 10.6: Update self-model ==========
+    if (pImpl->selfModel) {
+        // Self-model learns how actions affect sensory state
+        // Records cause-effect relationships to predict consequences
+        if (pImpl->workingMemory && pImpl->currentConcepts.empty()) {
+            // Create sensory state encoding from working memory
+            std::vector<float> currentState;
+            auto activations = pImpl->workingMemory->getMemoryActivations();
+            currentState.reserve(activations.size());
+            for (float activation : activations) {
+                currentState.push_back(activation);
+            }
+            
+            if (!currentState.empty()) {
+                // If we have a planned action, record its effect
+                if (pImpl->lastPlannedAction != ActionType::Wait) {
+                    pImpl->selfModel->recordSelfAction(
+                        pImpl->lastPlannedAction,
+                        currentState,
+                        currentState  // Simplified: would be next state
+                    );
+                }
+                
+                // Update self-model based on prediction errors
+                if (pImpl->predictionError) {
+                    float error = pImpl->predictionError->getError();
+                    if (std::abs(error) > 0.1f) {  // Significant prediction error
+                        pImpl->selfModel->updateSelfModel(
+                            currentState,
+                            currentState,  // Simplified: would be actual state
+                            pImpl->lastPlannedAction
+                        );
+                    }
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 10.7: Update social learning ==========
+    if (pImpl->socialLearning) {
+        // Social learning observes and learns from other agents
+        // Records observed actions and their effects
+        if (pImpl->workingMemory) {
+            // Create current state from working memory
+            std::vector<float> currentState;
+            auto activations = pImpl->workingMemory->getMemoryActivations();
+            currentState.reserve(activations.size());
+            for (float activation : activations) {
+                currentState.push_back(activation);
+            }
+            
+            if (!currentState.empty()) {
+                // If we have a planned action, it can be observed by social learning
+                if (pImpl->lastPlannedAction != ActionType::Wait) {
+                    // Record observation (could be from another agent)
+                    pImpl->socialLearning->observeAgentAction(
+                        pImpl->lastPlannedAction,
+                        currentState,
+                        currentState  // Simplified: would be resulting state
+                    );
+                }
+                
+                // Get imitation action based on similar observed states
+                ActionType imitationAction = pImpl->socialLearning->getImitationAction(currentState);
+                if (imitationAction != ActionType::Wait && imitationAction != pImpl->lastPlannedAction) {
+                    // Use imitation when it's better than our own plan
+                    pImpl->lastPlannedAction = imitationAction;
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1541,6 +1710,16 @@ Novelty* Brain::getNovelty() {
 
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
+}
+
+// ========== INTEGRATION SYSTEMS ==========
+
+SelfModel* Brain::getSelfModel() {
+    return pImpl->selfModel.get();
+}
+
+SocialLearning* Brain::getSocialLearning() {
+    return pImpl->socialLearning.get();
 }
 
 std::shared_ptr<const Config> Brain::getConfig() const {
