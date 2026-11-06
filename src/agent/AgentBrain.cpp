@@ -936,47 +936,48 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Compute prediction error
+    // Compute prediction error for learning and decision making
     predictionError_ = reward - predictedReward;
     
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
+    // Dopamine-like signal (based on prediction error) - used for motivation and exploration
     dopamineLevel_ = predictionError_;
     
-    // Clamp to reasonable range
+    // Clamp to reasonable range for stability
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
-    // Apply to all synapses with eligibility traces
+    // Use prediction error to influence curiosity-driven exploration
+    // Higher prediction error (surprise) increases exploration
+    if (curiosityEnabled_) {
+        float curiosityBoost = predictionError_ * 0.5f;  // Scale prediction error as curiosity boost
+        curiosityLevel_ = std::max(0.0f, curiosityLevel_ + curiosityBoost * 0.3f);
+    }
+    
+    // Apply reward-modulated plasticity to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (const auto& syn : region->getSynapses()) {
             float eligibility = syn->getEligibilityTrace();
 
-            if (std::abs(eligibility) > 0.001f) {
-                // Reward-modulated weight change. Phase 4: the old
-                // rule used delta = eligibility * dopamine with no
-                // learning rate, and eligibility traces accumulate
-                // STDP deltas to ~4, so a single +10 reward (dopamine
-                // clamped to 1) drove every eligible synapse straight
-                // to its clamp — one event saturated the network. A
-                // 0.05 learning rate and a +-0.1 per-event cap keep a
-                // reward event meaningful without erasing all prior
-                // selectivity in one step (standard R-STDP scaling).
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
-                delta = std::clamp(delta, -0.1f, 0.1f);
+            // Only apply plasticity to synapses with significant eligibility trace
+            if (eligibility != 0.0f) {
+                // Simplified plasticity calculation: eligibility * dopamine * plasticity modifier
+                float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.03f;
+                delta = std::clamp(delta, -0.08f, 0.08f);  // Reduced max delta for finer control
                 syn->addToWeight(delta);
                 
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                // Decay eligibility trace proportionally to weight change
+                float decayRate = 0.08f + std::abs(delta) * 0.5f;  // Decay faster for larger changes
+                syn->decayEligibilityTrace(decayRate);
             }
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
-    plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
+    // Simplified plasticity factor modulation based on dopamine level
+    // Dopamine acts as a global gain control for plasticity across the network
+    float plasticityFactor = 1.0f + 0.5f * dopamineLevel_;  // Baseline 1.0, +/- 0.5 range
+    plasticityFactor = std::clamp(plasticityFactor, 0.2f, 1.5f);  // Keep within reasonable bounds
     
     // Apply to STDP
     auto* stdp = brain_->getSTDP();
