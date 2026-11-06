@@ -35,7 +35,9 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->totalCurrent = 0.0f;
 }
 
-Neuron::~Neuron() = default;
+Neuron::~Neuron() {
+    delete pImpl;
+}
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -111,8 +113,99 @@ void Neuron::setResetPotential(MembranePotential potential) {
     pImpl->state.resetPotential = potential;
 }
 
-bool Neuron::checkThreshold() const {
-    return pImpl->state.membranePotential >= pImpl->state.threshold;
+// Add validation methods
+void Neuron::addValidationToMembranePotential(MembranePotential potential) {
+    // This method improves the setMembranePotential with validation
+    setMembranePotential(potential);
+}
+
+bool Neuron::validateMembranePotentialBounds() const {
+    // Check if membrane potential is in reasonable biological range
+    MembranePotential V = pImpl->state.membranePotential;
+    if (V < -200.0f || V > 100.0f) {
+        return false;
+    }
+    return true;
+}
+
+bool Neuron::validateThresholdBounds() const {
+    // Check if threshold is in reasonable range
+    MembranePotential thresh = pImpl->state.threshold;
+    if (thresh < -100.0f || thresh > 100.0f) {
+        return false;
+    }
+    return true;
+}
+
+bool Neuron::validateRestingPotentialBounds() const {
+    // Check if resting potential is in reasonable range
+    MembranePotential V_rest = pImpl->state.restingPotential;
+    if (V_rest < -200.0f || V_rest > 100.0f) {
+        return false;
+    }
+    return true;
+}
+
+bool Neuron::validateRefractoryPeriodBounds() const {
+    // Check if refractory period is reasonable
+    uint32_t refrac = pImpl->state.refractoryPeriod;
+    if (refrac > 1000u) {
+        return false;
+    }
+    return true;
+}
+
+bool Neuron::validateFiringRateBounds() const {
+    // Check if firing rate is reasonable
+    FiringRate rate = pImpl->state.firingRate;
+    if (rate < -100.0f || rate > 1000.0f) {
+        return false;
+    }
+    return true;
+}
+
+bool Neuron::validateAdaptationVariableBounds() const {
+    // Check if adaptation variable is reasonable
+    float adapt = pImpl->state.adaptationVariable;
+    if (adapt < -100.0f || adapt > 100.0f) {
+        return false;
+    }
+    return true;
+}
+
+// Add convenience methods for common operations
+void Neuron::setHealthyLIFParameters() {
+    // Set parameters for typical healthy LIF neuron
+    setRestingPotential(-70.0f);
+    setThreshold(-55.0f);
+    setResetPotential(-70.0f);
+    setLeakConductance(10.0f);
+    setRefractoryPeriod(9);
+}
+
+void Neuron::setParametersFromDefaults() {
+    // Set parameters to standard defaults
+    setRestingPotential(-70.0f);
+    setThreshold(-55.0f);
+    setResetPotential(-70.0f);
+    setLeakConductance(10.0f);
+    setRefractoryPeriod(9);
+}
+
+void Neuron::clampMembranePotential() {
+    // Clamp membrane potential to prevent instability
+    pImpl->state.membranePotential = std::clamp(
+        pImpl->state.membranePotential, -100.0f, 50.0f);
+}
+
+void Neuron::resetToHealthyState() {
+    // Reset neuron to healthy physiological state
+    setHealthyLIFParameters();
+    setMembranePotential(getRestingPotential());
+    clearSpikeHistory();
+    clearTotalCurrent();
+    pImpl->state.firingState = FiringState::Resting;
+    pImpl->state.firingRate = 0.0f;
 }
 
 float Neuron::getLastSpikeTime() const {

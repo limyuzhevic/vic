@@ -142,15 +142,19 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
-    
-    // Reset to initial state
-    void reset();
-    
-    // Initialize with random parameters
-    void initializeRandom(RandomGenerator& rng);
+    // Validation methods
+void validateMembranePotentialBounds() const;
+void validateThresholdBounds() const;
+void validateRestingPotentialBounds() const;
+void validateRefractoryPeriodBounds() const;
+void validateFiringRateBounds() const;
+void validateAdaptationVariableBounds() const;
+
+// Convenience methods for common operations
+void setHealthyLIFParameters();
+void setParametersFromDefaults();
+void clampMembranePotential();
+void resetToHealthyState();
     
 private:
     struct Impl;

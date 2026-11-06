@@ -77,12 +77,58 @@ public:
     float getAverageSpikeRate() const;
     std::vector<NeuronId> getMostActiveNeurons(size_t count) const;
     
-    // Reset
-    void reset();
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+    // Clear pending spikes and history
+    void clear();
 
-} // namespace nlm
+    // Get detailed spike information
+    const DetailedSpikeEvent* getLastSpike() const;
+    
+    // Check if spike system is empty
+    bool isEmpty() const;
+    bool hasPendingSpikes() const;
+    bool hasPendingDelayedSpikes() const;
+    
+    // Configuration
+    void setMaxHistorySize(size_t size);
+    size_t getMaxHistorySize() const;
+    
+    // Performance optimization
+    void optimizeMemory();
+    
+    // Statistics enhancement
+    float getStandardDeviationSpikeRate() const;
+    float getMinSpikeRate() const;
+    float getMaxSpikeRate() const;
+    
+    // Advanced event handling
+    void setEventFilter(std::function<bool(const DetailedSpikeEvent&)> filter);
+    void removeEventFilter();
+    
+    // Batch processing
+    void processSpikeBatch(const std::vector<SpikeEvent>& batch);
+    void processDelayedSpikeBatch(const std::vector<DelayedSpikeEvent>& batch);
+    
+    // Priority queue support
+    void enablePriorityQueue(bool enable);
+    bool isPriorityQueueEnabled() const;
+    
+    // Statistics caching
+    void enableStatisticsCaching(bool enable);
+    bool isStatisticsCachingEnabled() const;
+    
+    // Validation and error handling
+    bool validateEvent(const SpikeEvent& event) const;
+    bool validateDelayedEvent(const DelayedSpikeEvent& event) const;
+    std::vector<std::string> getEventValidationErrors() const;
+    
+    // Configuration and monitoring
+    void setLogLevel(LogLevel level);
+    LogLevel getLogLevel() const;
+    
+    // Performance monitoring
+    double getAverageProcessingTime() const;
+    double getMemoryUsage() const;
+    
+    // Health check
+    bool healthCheck() const;
+    std::string getHealthStatus() const;

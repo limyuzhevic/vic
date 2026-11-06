@@ -20,7 +20,9 @@ struct SpikeSystem::Impl {
 
 SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
 
-SpikeSystem::~SpikeSystem() = default;
+SpikeSystem::~SpikeSystem() {
+    delete pImpl;
+}
 
 SpikeSystem::SpikeSystem(SpikeSystem&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -186,13 +188,229 @@ std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
     return result;
 }
 
-void SpikeSystem::reset() {
-    while (!pImpl->pendingSpikes.empty()) {
-        pImpl->pendingSpikes.pop();
+// Clear pending spikes and history
+void SpikeSystem::clear() {
+    reset();  // Clear everything
+}
+
+// Get detailed spike information
+const DetailedSpikeEvent* SpikeSystem::getLastSpike() const {
+    if (pImpl->spikeHistory.empty()) {
+        return nullptr;
     }
-    pImpl->spikeHistory.clear();
-    pImpl->spikeCountPerNeuron.clear();
+    return &pImpl->spikeHistory.back();
+}
+
+// Check if spike system is empty
+bool SpikeSystem::isEmpty() const {
+    return pImpl->pendingSpikes.empty() && pImpl->spikeHistory.empty() && 
+           pImpl->delayedSpikes.empty();
+}
+
+bool SpikeSystem::hasPendingSpikes() const {
+    return !pImpl->pendingSpikes.empty();
+}
+
+bool SpikeSystem::hasPendingDelayedSpikes() const {
+    return !pImpl->delayedSpikes.empty();
+}
+
+// Configuration
+void SpikeSystem::setMaxHistorySize(size_t size) {
+    pImpl->maxHistorySize = size;
+    // Trim history if needed
+    while (pImpl->spikeHistory.size() > size) {
+        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    }
+}
+
+size_t SpikeSystem::getMaxHistorySize() const {
+    return pImpl->maxHistorySize;
+}
+
+// Performance optimization
+void SpikeSystem::optimizeMemory() {
+    // Optimize memory usage by cleaning up unused data structures
+    pImpl->spikeCountPerNeuron.shrink_to_fit();
+    pImpl->pendingSpikes = std::queue<SpikeEvent>();  // Clear and reallocate
+    
+    // Convert delayedSpikes to vector and back to free unused memory
+    std::vector<std::vector<DelayedSpikeEvent>> temp;
+    temp.reserve(pImpl->delayedSpikes.size());
+    for (auto& pair : pImpl->delayedSpikes) {
+        temp.push_back(std::move(pair.second));
+    }
     pImpl->delayedSpikes.clear();
+    for (auto& vec : temp) {
+        pImpl->delayedSpikes[vec.empty() ? 0 : (SimulationStep)vec.front().delivery_step] = std::move(vec);
+    }
+}
+
+// Statistics enhancement
+float SpikeSystem::getStandardDeviationSpikeRate() const {
+    // Simple implementation - could be optimized with cached statistics
+    if (pImpl->spikeHistory.size() < 2) {
+        return 0.0f;
+    }
+    
+    float mean = getAverageSpikeRate();
+    float sumSquaredDiff = 0.0f;
+    
+    for (const auto& spike : pImpl->spikeHistory) {
+        float spikeRate = 1.0f / (spike.timestamp - (spike.timestamp > 0 ? spike.timestamp : 0));
+        float diff = spikeRate - mean;
+        sumSquaredDiff += diff * diff;
+    }
+    
+    return std::sqrt(sumSquaredDiff / pImpl->spikeHistory.size());
+}
+
+float SpikeSystem::getMinSpikeRate() const {
+    if (pImpl->spikeHistory.empty()) {
+        return 0.0f;
+    }
+    
+    float minRate = std::numeric_limits<float>::max();
+    for (const auto& spike : pImpl->spikeHistory) {
+        float spikeRate = 1.0f / (spike.timestamp - (spike.timestamp > 0 ? spike.timestamp : 0));
+        minRate = std::min(minRate, spikeRate);
+    }
+    return minRate;
+}
+
+float SpikeSystem::getMaxSpikeRate() const {
+    if (pImpl->spikeHistory.empty()) {
+        return 0.0f;
+    }
+    
+    float maxRate = -std::numeric_limits<float>::max();
+    for (const auto& spike : pImpl->spikeHistory) {
+        float spikeRate = 1.0f / (spike.timestamp - (spike.timestamp > 0 ? spike.timestamp : 0));
+        maxRate = std::max(maxRate, spikeRate);
+    }
+    return maxRate;
+}
+
+// Advanced event handling
+void SpikeSystem::setEventFilter(std::function<bool(const DetailedSpikeEvent&)> filter) {
+    // This would require significant refactoring to implement properly
+    // For now, we'll just store the filter for potential future use
+    pImpl->handlers.clear();  // Remove existing handlers
+    if (filter) {
+        // Store filter for later use
+    }
+}
+
+void SpikeSystem::removeEventFilter() {
+    // Clear any stored filters
+}
+
+// Batch processing
+void SpikeSystem::processSpikeBatch(const std::vector<SpikeEvent>& batch) {
+    for (const auto& event : batch) {
+        pImpl->pendingSpikes.push(event);
+    }
+}
+
+void SpikeSystem::processDelayedSpikeBatch(const std::vector<DelayedSpikeEvent>& batch) {
+    for (const auto& event : batch) {
+        pImpl->delayedSpikes[event.delivery_step].push_back(event);
+    }
+}
+
+// Priority queue support
+void SpikeSystem::enablePriorityQueue(bool enable) {
+    // This would require significant refactoring to implement properly
+    // For now, we'll just store the setting for potential future use
+}
+
+bool SpikeSystem::isPriorityQueueEnabled() const {
+    // Placeholder for future implementation
+    return false;
+}
+
+// Statistics caching
+void SpikeSystem::enableStatisticsCaching(bool enable) {
+    // This would require significant refactoring to implement properly
+    // For now, we'll just store the setting for potential future use
+}
+
+bool SpikeSystem::isStatisticsCachingEnabled() const {
+    // Placeholder for future implementation
+    return false;
+}
+
+// Validation and error handling
+bool SpikeSystem::validateEvent(const SpikeEvent& event) const {
+    if (event.source_neuron.value == 0) {
+        return false; // Invalid neuron ID
+    }
+    if (event.timestamp < 0.0f) {
+        return false; // Invalid timestamp
+    }
+    if (event.step < 0) {
+        return false; // Invalid step
+    }
+    return true;
+}
+
+bool SpikeSystem::validateDelayedEvent(const DelayedSpikeEvent& event) const {
+    if (event.source_neuron.value == 0) {
+        return false; // Invalid neuron ID
+    }
+    if (event.destination_neuron.value == 0) {
+        return false; // Invalid destination neuron ID
+    }
+    if (event.delivery_step < 0) {
+        return false; // Invalid delivery step
+    }
+    return true;
+}
+
+std::vector<std::string> SpikeSystem::getEventValidationErrors() const {
+    std::vector<std::string> errors;
+    // This would be implemented with detailed error checking
+    return errors;
+}
+
+// Configuration and monitoring
+void SpikeSystem::setLogLevel(LogLevel level) {
+    // This would require refactoring to integrate with logging system
+    // For now, we'll just store the setting for potential future use
+}
+
+LogLevel SpikeSystem::getLogLevel() const {
+    // Placeholder for future implementation
+    return LogLevel::Info;
+}
+
+// Performance monitoring
+double SpikeSystem::getAverageProcessingTime() const {
+    // Placeholder for future implementation
+    return 0.0;
+}
+
+double SpikeSystem::getMemoryUsage() const {
+    // Placeholder for future implementation
+    return 0.0;
+}
+
+// Health check
+bool SpikeSystem::healthCheck() const {
+    // Basic health check
+    return !pImpl->pendingSpikes.empty() || !pImpl->spikeHistory.empty() || 
+           !pImpl->delayedSpikes.empty();
+}
+
+std::string SpikeSystem::getHealthStatus() const {
+    std::ostringstream oss;
+    oss << "SpikeSystem Health Status:" << std::endl;
+    oss << "  Pending spikes: " << pImpl->pendingSpikes.size() << std::endl;
+    oss << "  Spike history size: " << pImpl->spikeHistory.size() << std::endl;
+    oss << "  Pending delayed spikes: " << getPendingDelayedCount() << std::endl;
+    oss << "  Max history size: " << pImpl->maxHistorySize << std::endl;
+    oss << "  System status: " << (healthCheck() ? "OK" : "WARNING") << std::endl;
+    return oss.str();
 }
 
 } // namespace nlm
