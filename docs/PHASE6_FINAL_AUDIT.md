@@ -15,7 +15,7 @@ The NLM/熙然 codebase contains a sophisticated architecture with many well-des
 
 ## 1. System Audit Results
 
-### 1.1 Neural Core (Brain) - STATUS: PARTIALLY INTEGRATED
+### 1.1 Neural Core (Brain) - STATUS: MOSTLY INTEGRATED (with documentation discrepancies)
 
 **Location:** `src/brain/Brain.hpp`, `src/brain/Brain.cpp`
 
@@ -27,34 +27,33 @@ The NLM/熙然 codebase contains a sophisticated architecture with many well-des
 | STDP plasticity | ✅ WORKING | Applied each step |
 | Hebbian plasticity | ✅ WORKING | Available |
 | Structural plasticity | ✅ WORKING | Synaptogenesis/pruning every 100 steps |
-| Working memory | ❌ DISCONNECTED | Returns nullptr |
-| Episodic memory | ❌ DISCONNECTED | Returns nullptr |
-| Semantic memory | ❌ DISCONNECTED | Returns nullptr |
-| Procedural memory | ❌ DISCONNECTED | Returns nullptr |
-| Prediction system | ❌ DISCONNECTED | Returns nullptr |
-| Checkpoint save | ❌ NOT IMPLEMENTED | Just returns false |
-| Checkpoint load | ❌ NOT IMPLEMENTED | Just returns false |
+| Working memory | ✅ IMPLEMENTED | NeuralWorkingMemory exists, properly integrated |
+| Episodic memory | ✅ IMPLEMENTED | NeuralEpisodicMemory exists, properly integrated |
+| Semantic memory | ❌ IMPLEMENTED | Placeholder only |
+| Procedural memory | ❌ IMPLEMENTED | Placeholder only |
+| Prediction system | ⚠️ PARTIALLY INTEGRATED | NeuralPredictionSystem exists but not trained |
+| Checkpoint save | ❌ IMPLEMENTED | Stubs in Brain.cpp, CheckpointSystem is separate |
+| Checkpoint load | ❌ IMPLEMENTED | Stubs in Brain.cpp, CheckpointSystem is separate |
 | Development system | ⚠️ PARTIAL | Created but minimal effect |
+
+**Current Reality (vs Documentation):**
+The audit documentation appears to be outdated. Current Brain.cpp implementation shows:
+
+- ✅ Working memory: `pImpl->workingMemory->initialize(this)` (line 277), properly used in step() at line 473
+- ✅ Episodic memory: `pImpl->episodicMemory->initialize(this)` (line 281), properly used in step() at lines 585-613
+- ⚠️ Prediction system: `pImpl->predictionSystem->update(pImpl->timestep)` (line 616), but only placeholder implementation
+- ⚠️ Checkpoints: `CheckpointManager` is separate from Brain's save/load stubs
+
+The main integration gap is that cognition systems (planner, concept formation, self-model) are initialized but not integrated into the brain loop.
 
 **Critical Issues:**
 ```cpp
-// Brain.cpp lines 602-616
-class WorkingMemory* Brain::getWorkingMemory() { return nullptr; }
-class EpisodicMemory* Brain::getEpisodicMemory() { return nullptr; }
-class SemanticMemory* Brain::getSemanticMemory() { return nullptr; }
-class ProceduralMemory* Brain::getProceduralMemory() { return nullptr; }
-
-// Brain.cpp lines 634-636
-PredictionSystem* Brain::getPredictionSystem() { return nullptr; }
-
-// Brain.cpp lines 497-505
-bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath + " (not implemented)");
-    return false;
+// Brain.cpp lines 142-151 (Actual implementations):
+NeuralWorkingMemory* Brain::getWorkingMemory() {
+    return pImpl->workingMemory.get();
 }
-bool Brain::load(const std::string& filepath) {
-    NLM_LOG_INFO("Loading brain state from " + filepath + " (not implemented)");
-    return false;
+NeuralEpisodicMemory* Brain::getEpisodicMemory() {
+    return pImpl->episodicMemory.get();
 }
 ```
 

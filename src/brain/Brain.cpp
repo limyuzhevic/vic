@@ -49,6 +49,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -138,6 +141,9 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
@@ -300,6 +306,11 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->dopamine->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
+    pImpl->predictionError->initialize(this);
     
     // Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.
@@ -614,8 +625,12 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with sensory observations
+        // This requires access to sensory input
+        if (pImpl->brain) { // Brain::Impl should have access to brain through pointer
+            // TODO: Integrate with actual sensory input from environment
+            // For now, just track basic prediction error
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -630,9 +645,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->brain) {
+        // Process current neural activity patterns to form concepts
+        // Extract sensory-relevant activity from working memory and sensory neurons
+        std::vector<float> currentPattern;
+        
+        // Collect neural activity patterns
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (neuron->isFiring() || 
+                        std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                        currentPattern.push_back(neuron->getState().membranePotential);
+                    }
+                }
+            }
+        }
+        
+        // Only form concepts if we have meaningful activity
+        if (!currentPattern.empty()) {
+            // Create features from neural pattern
+            std::vector<float> features = currentPattern;
+            
+            // Present to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentPattern, features, 
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                pImpl->currentStep
+            );
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1529,6 +1570,18 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 Dopamine* Brain::getDopamine() {
     return pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->acetylcholine.get();
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->norepinephrine.get();
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->serotonin.get();
 }
 
 Curiosity* Brain::getCuriosity() {
