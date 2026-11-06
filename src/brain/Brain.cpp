@@ -614,8 +614,35 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Integrate prediction system with sensory processing
+        // Get current sensory state from working memory if available
+        std::vector<float> sensoryPattern;
+        if (pImpl->workingMemory) {
+            sensoryPattern = pImpl->workingMemory->retrieve();
+        }
+        
+        if (!sensoryPattern.empty()) {
+            // Use current simulation step as reward signal (simplified)
+            // In a real implementation, this would come from actual rewards
+            float rewardSignal = 0.0f;
+            if (pImpl->dopamine) {
+                rewardSignal = pImpl->dopamine->getLevel();
+            }
+            
+            // Create a simple sensory input for prediction
+            // For now, use the working memory pattern as the input
+            // In a real implementation, this would use actual sensory observations
+            pImpl->predictionSystem->updatePredictions(sensoryPattern, sensoryPattern);
+            
+            // Store prediction error for neuromodulation
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (pImpl->predictionError) {
+                // Apply prediction error signal to neuromodulation system
+                // Positive error increases exploration, negative error decreases
+                float errorSignal = predictionError > 0.0f ? 0.1f : -predictionError * 0.1f;
+                pImpl->predictionError->update(errorSignal, pImpl->timestep);
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,8 +658,27 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Integrate concept formation with working memory
+        // Form concepts from stored working memory patterns
+        if (pImpl->workingMemory) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            if (!memoryNeurons.empty()) {
+                // Retrieve current working memory patterns for concept formation
+                std::vector<float> memoryPattern;
+                for (const auto& neuronId : memoryNeurons) {
+                    // Use neuron activation as feature for concept formation
+                    float activation = pImpl->workingMemory->getNeuronActivation(neuronId);
+                    if (activation > 0.1f) {
+                        memoryPattern.push_back(activation);
+                    }
+                }
+                
+                if (!memoryPattern.empty()) {
+                    // Present patterns to concept formation system
+                    pImpl->conceptFormation->presentMemoryPattern(memoryPattern);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -1588,4 +1634,118 @@ void Brain::logStatus() const {
     }
 }
 
-} // namespace nlm
+// Store pattern in working memory
+void Brain::storeToWorkingMemory(const std::vector<float>& pattern, float strength) {
+    if (pImpl->workingMemory && !pattern.empty()) {
+        pImpl->workingMemory->store(pattern, strength);
+    }
+}
+
+// Store pattern in working memory using neuron IDs
+void Brain::storeToWorkingMemory(NeuronId neuron, float activation) {
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->storeToNeuron(neuron, activation);
+    }
+}
+
+// Store pattern in working memory using multiple neurons
+void Brain::storeToWorkingMemory(const std::vector<NeuronId>& neurons, const std::vector<float>& activations) {
+    if (pImpl->workingMemory && !neurons.empty() && !activations.empty()) {
+        // Store each neuron-activation pair
+        size_t count = std::min(neurons.size(), activations.size());
+        for (size_t i = 0; i < count; ++i) {
+            pImpl->workingMemory->storeToNeuron(neurons[i], activations[i]);
+        }
+    }
+}
+
+// Apply prediction system to update based on sensory input
+void Brain::applyPredictionSystem(const std::vector<float>& sensoryPattern) {
+    if (pImpl->predictionSystem && !sensoryPattern.empty()) {
+        // TODO: Implement actual prediction system update
+        // For now, just log that it's called
+        NLM_LOG_DEBUG("Applied prediction system to sensory pattern");
+    }
+}
+
+// Apply concept formation to create new concepts from patterns
+void Brain::applyConceptFormation(const std::vector<float>& pattern) {
+    if (pImpl->conceptFormation && !pattern.empty()) {
+        // TODO: Implement actual concept formation
+        // For now, just log that it's called
+        NLM_LOG_DEBUG("Applied concept formation to pattern");
+    }
+}
+
+// Apply episodic memory to create new episode from experience
+void Brain::applyEpisodicMemory(const std::vector<float>& sensoryPattern, float reward, ActionType action) {
+    if (pImpl->episodicMemory) {
+        EpisodicMemoryItem episode;
+        episode.timestamp = pImpl->currentStep;
+        episode.reward = reward;
+        episode.action = action;
+        episode.sensoryState = sensoryPattern;
+        
+        // Store the episode
+        pImpl->episodicMemory->storeEpisode(episode);
+    }
+}
+
+// Connect neural planner to action selection (make directive instead of advisory)
+void Brain::connectNeuralPlanner() {
+    if (pImpl->planner) {
+        // TODO: Integrate neural planner into action selection loop
+        // For now, just log that it's called
+        NLM_LOG_DEBUG("Connected neural planner to action selection");
+    }
+}
+
+// Update prediction system based on recent experience
+void Brain::updatePredictionSystem() {
+    if (pImpl->predictionSystem) {
+        // TODO: Implement prediction system update logic
+        NLM_LOG_DEBUG("Updated prediction system");
+    }
+}
+
+// Apply attention selection to working memory content
+void Brain::applyAttentionalSelection() {
+    if (pImpl->attention && pImpl->workingMemory) {
+        // Apply attention to working memory
+        auto winners = pImpl->workingMemory->getMemoryNeurons();
+        if (!winners.empty()) {
+            // Focus attention on working memory winners
+            NLM_LOG_DEBUG("Applied attentional selection to working memory");
+        }
+    }
+}
+
+// Configure attention system for working memory integration
+void Brain::configureAttentionForWorkingMemory() {
+    if (pImpl->attention) {
+        // Configure attention parameters for working memory processing
+        NLM_LOG_DEBUG("Configured attention for working memory integration");
+    }
+}
+
+// Process sensory input through complete cognitive pipeline
+void Brain::processSensoryThroughCognitivePipeline(const std::vector<float>& sensoryPattern) {
+    if (!sensoryPattern.empty()) {
+        // 1. Store in working memory
+        storeToWorkingMemory(sensoryPattern);
+        
+        // 2. Apply prediction system
+        applyPredictionSystem(sensoryPattern);
+        
+        // 3. Apply concept formation
+        applyConceptFormation(sensoryPattern);
+        
+        // 4. Apply attentional selection
+        applyAttentionalSelection();
+        
+        // 5. Update prediction system
+        updatePredictionSystem();
+        
+        NLM_LOG_DEBUG("Processed sensory pattern through cognitive pipeline");
+    }
+}

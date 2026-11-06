@@ -204,6 +204,37 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     }
     lastText_ = percept.getText();
 
+    // Store sensory input in working memory for memory integration
+    // This connects AgentBrain's sensory processing to Brain's working memory
+    if (brain_ && percept.getVision().size() == 16) {
+        // Convert vision to pattern for working memory
+        std::vector<float> visionPattern = percept.getVision();
+        float visionStrength = 0.0f;
+        for (float v : visionPattern) visionStrength += v;
+        if (visionStrength > 0.01f) {
+            brain_->storeToWorkingMemory(visionPattern, visionStrength * 0.1f);
+        }
+        
+        // Store touch and proprioception patterns as well
+        auto touchPattern = percept.getTouch();
+        if (!touchPattern.empty()) {
+            float touchStrength = 0.0f;
+            for (float t : touchPattern) touchStrength += t;
+            if (touchStrength > 0.01f) {
+                brain_->storeToWorkingMemory(touchPattern, touchStrength * 0.1f);
+            }
+        }
+        
+        auto proprioPattern = percept.getProprioception();
+        if (!proprioPattern.empty()) {
+            float proprioStrength = 0.0f;
+            for (float p : proprioPattern) proprioStrength += p;
+            if (proprioStrength > 0.01f) {
+                brain_->storeToWorkingMemory(proprioPattern, proprioStrength * 0.1f);
+            }
+        }
+    }
+
     // Phase 5 winner-take-all lateral inhibition: if the last decode
     // had a decisive winner (margin > 5 Hz) and the scene is stable
     // (low novelty), suppress the losing motor groups with an
@@ -432,6 +463,58 @@ MotorCommand AgentBrain::decodeMotorCommand() {
     }
 
     MotorCommand decoded = decodeFromMotorNeurons();
+    
+    // NEW: Phase 6 directive planning - when the planner is confident,
+    // it can override the motor neuron decoding to make it directive
+    // instead of advisory. This enables more sophisticated goal-directed
+    // behavior where learned action preferences can override immediate
+    // motor patterns.
+    if (brain_->getPlanner() && hasThoughtPlanned_ && thoughtPlanned_ != MotorCommand::Wait) {
+        auto toAction = [](MotorCommand c) {
+            switch (c) {
+                case MotorCommand::MoveForward: return ActionType::MoveForward;
+                case MotorCommand::MoveBackward: return ActionType::MoveBackward;
+                case MotorCommand::TurnLeft: return ActionType::TurnLeft;
+                case MotorCommand::TurnRight: return ActionType::TurnRight;
+                case MotorCommand::Interact: return ActionType::Interact;
+                default: return ActionType::Wait;
+            }
+        };
+        
+        auto* planner = brain_->getPlanner();
+        
+        // Check if planner has learned meaningful action qualities
+        bool learned = false;
+        for (ActionType a : {ActionType::MoveForward, ActionType::MoveBackward,
+                             ActionType::TurnLeft, ActionType::TurnRight,
+                             ActionType::Interact, ActionType::Wait}) {
+            if (std::abs(planner->getActionQuality(a)) > 0.02f) {
+                learned = true;
+                break;
+            }
+        }
+        
+        if (learned) {
+            float qPlanned = planner->getActionQuality(toAction(thoughtPlanned_));
+            float qBest = planner->getActionQuality(toAction(decoded));
+            
+            // If planner's action is significantly better than motor decoding
+            // and there's no conflicting sensory cue (like no touch for interact),
+            // make the planner directive by overriding the motor decoding
+            bool interactWithoutTouch = thoughtPlanned_ == MotorCommand::Interact && maxTouch_ <= 0.05f;
+            bool hazardCue = forwardTouch_ > 0.05f && forwardObjectVision_ < 0.35f;
+            
+            if (!interactWithoutTouch && !hazardCue && qPlanned - qBest > 0.05f) {
+                // Make planner directive - override motor decoding
+                decoded = thoughtPlanned_;
+                // Log this directive override for debugging
+                // NLM_LOG_INFO("Planner made directive override: " + 
+                //              std::to_string(static_cast<int>(thoughtPlanned_)) + 
+                //              " (planner q=" + std::to_string(qPlanned) + 
+                //              ", motor q=" + std::to_string(qBest) + ")");
+            }
+        }
+    }
 
     // Phase 5 winner-take-all state for the next presentation: the
     // winning group (in decode order) and its margin over the

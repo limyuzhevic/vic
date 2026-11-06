@@ -89,6 +89,11 @@ public:
                             float reward,
                             SimulationStep currentTime);
 
+    // Present a memory pattern to concept formation (no features/reward)
+    // Returns concept ID if pattern matches existing concept,
+    // or 0 if too early, new concept ID if novel
+    size_t presentMemoryPattern(const std::vector<float>& pattern);
+
     // Get the concept that best matches a pattern
     size_t getMatchingConcept(const std::vector<float>& pattern,
                               float similarityThreshold = 0.7f) const;

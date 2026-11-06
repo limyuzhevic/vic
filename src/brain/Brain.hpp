@@ -192,11 +192,32 @@ public:
     // Get random generator
     RandomGenerator* getRandomGenerator();
 
-    // Learned preference trait (Phase 5): a single scalar, -1..1,
-    // updated only by sandbox reward through AgentBrain, saved in the
-    // checkpoint (SimulationState section) and used as a small bias in
-    // later action choice. This is the measured "personality" step: a
-    // preference learned from experience that survives a reload and
+    // Store pattern in working memory
+    void storeToWorkingMemory(const std::vector<float>& pattern, float strength = 1.0f);
+    
+    // Store pattern in working memory using neuron IDs
+    void storeToWorkingMemory(NeuronId neuron, float activation);
+    
+    // Store pattern in working memory using multiple neurons
+    void storeToWorkingMemory(const std::vector<NeuronId>& neurons, const std::vector<float>& activations);
+    
+    // Apply prediction system to update based on sensory input
+    void applyPredictionSystem(const std::vector<float>& sensoryPattern);
+    
+    // Apply concept formation to create new concepts from patterns
+    void applyConceptFormation(const std::vector<float>& pattern);
+    
+    // Apply episodic memory to create new episode from experience
+    void applyEpisodicMemory(const std::vector<float>& sensoryPattern, float reward, ActionType action);
+    
+    // Connect neural planner to action selection (make directive instead of advisory)
+    void connectNeuralPlanner();
+    
+    // Update prediction system based on recent experience
+    void updatePredictionSystem();
+    
+    // Apply attention selection to working memory content
+    void applyAttentionalSelection();
     // changes later behaviour. It is not a language-model persona and
     // it does not, on its own, make the brain a human brain.
     float getLearnedPreference() const;

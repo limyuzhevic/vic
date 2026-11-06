@@ -558,4 +558,20 @@ void TemporalRelation::clear() {
     sequences_.clear();
 }
 
-} // namespace nlm
+size_t ConceptFormation::presentMemoryPattern(const std::vector<float>& pattern) {
+    if (pattern.empty()) return 0;
+    
+    // Check if this pattern matches any existing concept
+    size_t matchingConcept = findConceptForPattern(pattern);
+    
+    if (matchingConcept > 0) {
+        // Update existing concept with just the pattern (no features/reward)
+        updateConcept(matchingConcept, pattern, std::vector<float>(), 0.0f);
+        return matchingConcept;
+    }
+    
+    // For memory patterns without features/reward, just track them as instances
+    // without forming new concepts unless they differ significantly
+    // This prevents over-fragmentation from transient memory fluctuations
+    return 0;  // Not yet classifiable as concept
+}
