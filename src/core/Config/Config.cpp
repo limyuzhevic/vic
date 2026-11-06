@@ -3,6 +3,13 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <optional>
+#include <limits>
+#include <stdexcept>
+
+// Include nlohmann/json - this should be available through pybind11's dependencies
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,9 +26,89 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Determine file format based on extension and content
+    std::string ext = filepath.substr(filepath.find_last_of('.') + 1);
     
+    if (ext == "json" || ext == "JSON") {
+        return loadFromJSONFile(filepath);
+    } else {
+        return loadFromKeyValueFile(filepath);
+    }
+}
+
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // Parse JSON file
+        auto json = nlohmann::json::parse(file);
+        
+        // Convert JSON to config entries
+        if (json.is_object()) {
+            for (const auto& [key, value] : json.items()) {
+                ConfigValue configValue;
+                
+                // Convert JSON value to ConfigValue based on type
+                if (value.is_string()) {
+                    configValue = value.get<std::string>();
+                } else if (value.is_number_integer()) {
+                    // Check if it fits in int64_t to avoid precision loss
+                    if (value.get<int64_t>() >= std::numeric_limits<int>::min() && 
+                        value.get<int64_t>() <= std::numeric_limits<int>::max()) {
+                        configValue = value.get<int>();
+                    } else {
+                        configValue = value.get<int64_t>();
+                    }
+                } else if (value.is_number_unsigned()) {
+                    configValue = value.get<uint64_t>();
+                } else if (value.is_number()) {
+                    configValue = value.get<double>();
+                } else if (value.is_boolean()) {
+                    configValue = value.get<bool>();
+                } else if (value.is_array()) {
+                    // Handle arrays - convert based on element types
+                    std::vector<int> intArray;
+                    std::vector<double> doubleArray;
+                    std::vector<std::string> stringArray;
+                    
+                    for (const auto& element : value) {
+                        if (element.is_string()) {
+                            stringArray.push_back(element.get<std::string>());
+                        } else if (element.is_number_integer()) {
+                            intArray.push_back(element.get<int>());
+                        } else if (element.is_number()) {
+                            doubleArray.push_back(element.get<double>());
+                        }
+                    }
+                    
+                    // Choose the most appropriate array type
+                    if (!stringArray.empty()) {
+                        configValue = stringArray;
+                    } else if (!intArray.empty()) {
+                        configValue = intArray;
+                    } else if (!doubleArray.empty()) {
+                        configValue = doubleArray;
+                    } else {
+                        // Fallback to empty vector
+                        configValue = std::vector<int>{};
+                    }
+                }
+                
+                set(key, configValue, ConfigSource::File);
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        // Fall back to key=value format on JSON parsing error
+        return loadFromKeyValueFile(filepath);
+    }
+}
+
+bool Config::loadFromKeyValueFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -55,30 +142,41 @@ bool Config::loadFromFile(const std::string& filepath) {
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
+bool Config::saveToFile(const std::string& filepath) const {
+    // Determine file format based on extension
+    std::string ext = filepath.substr(filepath.find_last_of('.') + 1);
+    
+    if (ext == "json" || ext == "JSON") {
+        return saveToJSONFile(filepath);
+    } else {
+        return saveToKeyValueFile(filepath);
     }
-    return true;
 }
 
-bool Config::saveToFile(const std::string& filepath) const {
+bool Config::saveToJSONFile(const std::string& filepath) const {
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        nlohmann::json json;
+        
+        // Convert config entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            json[entry.key] = entry.value;
+        }
+        
+        // Write JSON to file with pretty formatting
+        file << std::setw(2) << json << std::endl;
+        
+        return true;
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
+
+bool Config::saveToKeyValueFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;

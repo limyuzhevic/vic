@@ -56,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports JSON and key=value formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -64,14 +64,14 @@ public:
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
-    
+
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -102,6 +102,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Private implementation methods
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromKeyValueFile(const std::string& filepath);
+    bool saveToJSONFile(const std::string& filepath) const;
+    bool saveToKeyValueFile(const std::string& filepath) const;
 };
 
 } // namespace nlm
