@@ -21,11 +21,15 @@ endif()
 # Source directory
 set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
+# Nlohmann JSON (required for AdvancedConfigManager)
+find_package(nlohmann_json 3.2.0 REQUIRED)
+
 # Core library
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp
     src/core/Config/Config.cpp
+    src/core/Config/AdvancedConfigManager.cpp
     src/core/Random/Random.cpp
     src/core/Logger/Logger.cpp
     src/core/SimulationClock/SimulationClock.cpp
@@ -132,11 +136,12 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main unified executable
 add_executable(nlm
     src/main.cpp
+    src/nlm.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
