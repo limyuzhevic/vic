@@ -100,6 +100,13 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         }
     }
     
+    // Ensure all high-activation neurons are in activeTraces_
+    // (this fixes the bug where storeToNeuron only handled individual neurons)
+    activeTraces_.clear();
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) activeTraces_.push_back(i);
+    }
+    
     // Inject current to maintain activation
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);

@@ -464,10 +464,10 @@ MotorCommand AgentBrain::decodeMotorCommand() {
         decoded = selectWithCuriosity(decoded);
     }
 
-    // Phase 6 planner agreement: planned vs finally acted, after
+// Phase 6 planner agreement: planned vs finally acted, after
     // curiosity exploration (which can still override both).
     if (hasThoughtPlanned_) {
-        ++plannerDecisionCount_;
+        ++plannerDecisionCount_;  // Track when there was any planned decision
         if (thoughtPlanned_ == decoded) ++plannerAgreementCount_;
     }
 
@@ -1094,7 +1094,6 @@ void AgentBrain::reset() {
     wtaPulseCount_ = 0;
     plannerOverrideCount_ = 0;
     plannerAgreementCount_ = 0;
-    plannerDecisionCount_ = 0;
     conceptBiasCount_ = 0;
     selfBiasCount_ = 0;
     socialBiasCount_ = 0;

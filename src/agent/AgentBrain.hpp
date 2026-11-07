@@ -100,12 +100,12 @@ public:
     // internal pattern evoked by text alone moves toward the pattern
     // evoked by the paired visual scene.
     std::vector<float> getInternalFiringRates() const;
-    // Phase 6 thought/planning counters: how often the planner, a
-    // learned concept, the self-model, or a social observation
-    // actually changed the decoded action (not just advised it).
+    // Phase 6 cognitive influence metrics: how often different cognitive
+    // systems actually changed the decoded action (not just advised it).
+    // These metrics track which internal processes successfully influenced
+    // motor output selection.
     int getPlannerOverrideCount() const { return plannerOverrideCount_; }
     int getPlannerAgreementCount() const { return plannerAgreementCount_; }
-    int getPlannerDecisionCount() const { return plannerDecisionCount_; }
     int getConceptBiasCount() const { return conceptBiasCount_; }
     int getSelfBiasCount() const { return selfBiasCount_; }
     int getSocialBiasCount() const { return socialBiasCount_; }
@@ -243,10 +243,12 @@ private:
     // formation (pattern -> action -> reward, in that order).
     std::vector<float> lastTouch_;
     std::string lastText_;
-    // Phase 6 counters for planner/concept/self/social influence.
+    // Phase 6 counters for cognitive influence: how often different
+    // cognitive systems actually changed the decoded action (not just advised it).
+    // These metrics track planner overrides, concept formation, self-model,
+    // and social learning influences on motor output selection.
     int plannerOverrideCount_ = 0;
     int plannerAgreementCount_ = 0;
-    int plannerDecisionCount_ = 0;
     int conceptBiasCount_ = 0;
     int selfBiasCount_ = 0;
     int socialBiasCount_ = 0;
