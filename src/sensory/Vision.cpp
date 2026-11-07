@@ -16,6 +16,8 @@ VisionProcessor::~VisionProcessor() = default;
 void VisionProcessor::process(const Vision& input) {
     // TODO PHASE 2: Implement real vision processing using NLM's neural machinery
     // PLACEHOLDER: Just pass through raw data
+    // IMPROVEMENT: Implement proper neural vision processing
+    // Real implementation: Use NLM neural networks for feature extraction
     pImpl->features = input.getData();
     pImpl->featureDimensions = input.getDimensions();
 }

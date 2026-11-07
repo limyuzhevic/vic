@@ -26,6 +26,8 @@ void HebbianRule::update(Synapse* synapse,
                           TimestepDuration dt) {
     // TODO PHASE 2: Implement real Hebbian learning
     // PLACEHOLDER: Simple correlated firing increases weight
+    // IMPROVEMENT: Implement real Hebbian learning with spike timing dependence
+    // Real implementation: STDP-based Hebbian learning with precise timing
     
     if (preSpikes.empty() || postSpikes.empty()) {
         return;

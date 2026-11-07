@@ -17,6 +17,8 @@ WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
     // TODO PHASE 2: Implement real storage with capacity limits
+    // PLACEHOLDER: Simple storage with basic capacity limits
+    // IMPROVEMENT: Implement advanced storage strategies with competition
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
@@ -25,6 +27,15 @@ void WorkingMemory::store(NeuronId neuron, float value) {
     }
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+    } else {
+        // Simple replacement: replace least recent item
+        // Real implementation: implement LRU, LRU-K, or other eviction policies
+        auto it = std::min_element(pImpl->items.begin(), pImpl->items.end(),
+                                  [](const auto& a, const auto& b) {
+                                      return a.second < b.second; // Use smallest value
+                                  });
+        it->first = neuron;
+        it->second = value;
     }
 }
 

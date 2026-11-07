@@ -331,6 +331,59 @@ bool Brain::initialize() {
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
+    // Set up checkpoint data providers
+    // These provide the current brain state for checkpointing
+    pImpl->checkpointManager->setNeuronProvider([this]() -> NeuronCheckpointData {
+        NeuronCheckpointData data;
+        data.membranePotential.reserve(getTotalNeuronCount());
+        data.restingPotential.reserve(getTotalNeuronCount());
+        data.threshold.reserve(getTotalNeuronCount());
+        data.resetPotential.reserve(getTotalNeuronCount());
+        data.leakConductance.reserve(getTotalNeuronCount());
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    data.membranePotential.push_back(state.membranePotential);
+                    data.restingPotential.push_back(state.restingPotential);
+                    data.threshold.push_back(state.threshold);
+                    data.resetPotential.push_back(state.resetPotential);
+                    data.leakConductance.push_back(state.leakConductance);
+                    data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                    data.refractoryRemaining.push_back(state.refractoryRemaining);
+                    data.refractoryPeriod.push_back(state.refractoryPeriod);
+                    data.lastSpikeTime.push_back(state.lastSpikeTime);
+                    data.firingRate.push_back(state.firingRate);
+                    data.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                    data.regionId.push_back(region->getId().index());
+                    data.populationId.push_back(pop->getId().index());
+                }
+            }
+        }
+        return data;
+    });
+    
+    pImpl->checkpointManager->setSynapseProvider([this]() -> SynapseCheckpointData {
+        SynapseCheckpointData data;
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                data.weight.push_back(syn->getWeight());
+                data.delay.push_back(syn->getDelay());
+                data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                data.plasticityFlags.push_back(static_cast<uint8_t>(syn->getPlasticityFlags()));
+                data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                data.efficacy.push_back(syn->getEfficacy());
+                data.shortTermDepression.push_back(syn->getShortTermDepression());
+                data.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+            }
+        }
+        return data;
+    });
+    
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));

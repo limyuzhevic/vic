@@ -35,6 +35,8 @@ void Reward::reset() {
 float Reward::computeReward(const Observation& observation) const {
     // TODO PHASE 2: Implement real reward computation from observation
     // PLACEHOLDER: Returns 0
+    // IMPROVEMENT: Implement proper reward function based on observation metrics
+    // Real implementation would evaluate observation against goals/environment state
     return 0.0f;
 }
 
