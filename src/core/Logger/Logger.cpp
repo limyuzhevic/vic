@@ -36,6 +36,14 @@ void ConsoleLogger::log(const LogEntry& entry) {
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
     oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
     
+    // Add file/line info if available
+    if (!entry.file.empty()) {
+        oss << " " << entry.file;
+        if (entry.line > 0) {
+            oss << ":" << entry.line;
+        }
+    }
+    
     oss << " " << entry.message;
     
     std::string output = oss.str();

@@ -201,17 +201,20 @@ bool Brain::initialize() {
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     
-    // Get configuration values
-    size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000));
-    size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", 1));
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    // Validate configuration before proceeding
+    if (!validateConfiguration()) {
+        NLM_LOG_ERROR("Configuration validation failed. Brain initialization aborted.");
+        return false;
+    }
     
-    NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
-                 std::to_string(regionCount) + " regions");
-    
-    // Create regions
-    for (size_t i = 0; i < regionCount; ++i) {
-        addRegion("Region_" + std::to_string(i + 1));
+    try {
+        // Validate essential configuration values
+        validateConfigurationValues();
+        
+        NLM_LOG_INFO("Configuration validation complete");
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Configuration validation error: " + std::string(e.what()));
+        return false;
     }
     
     // Create neurons across regions
@@ -261,7 +264,7 @@ bool Brain::initialize() {
             pImpl->neuronById[neuron->getId().index()] = neuron;
         }
     }
-
+    
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
@@ -1588,4 +1591,102 @@ void Brain::logStatus() const {
     }
 }
 
-} // namespace nlm
+bool Brain::validateConfiguration() const {
+    // Validate configuration consistency and completeness
+    NLM_LOG_DEBUG("Validating configuration...");
+    
+    // Check for required configuration keys
+    const std::vector<std::string> requiredKeys = {
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count",
+        "region_count",
+        "connection_probability"
+    };
+    
+    for (const auto& key : requiredKeys) {
+        if (!pImpl->config->has(key)) {
+            NLM_LOG_ERROR("Missing required configuration key: " + key);
+            return false;
+        }
+    }
+    
+    // Validate configuration ranges
+    if (pImpl->config->has("neuron_count")) {
+        auto neuronCount = pImpl->config->get<int64_t>("neuron_count");
+        if (neuronCount < 1) {
+            NLM_LOG_ERROR("Invalid neuron_count: must be at least 1");
+            return false;
+        }
+        if (neuronCount > 100000) {
+            NLM_LOG_WARNING("Large neuron_count may impact performance: " + std::to_string(neuronCount));
+        }
+    }
+    
+    if (pImpl->config->has("region_count")) {
+        auto regionCount = pImpl->config->get<int64_t>("region_count");
+        if (regionCount < 1) {
+            NLM_LOG_ERROR("Invalid region_count: must be at least 1");
+            return false;
+        }
+        if (regionCount > 100) {
+            NLM_LOG_WARNING("Large region_count may impact connectivity: " + std::to_string(regionCount));
+        }
+    }
+    
+    if (pImpl->config->has("connection_probability")) {
+        auto prob = pImpl->config->get<double>("connection_probability");
+        if (prob < 0.0 || prob > 1.0) {
+            NLM_LOG_ERROR("Invalid connection_probability: must be between 0.0 and 1.0");
+            return false;
+        }
+    }
+    
+    if (pImpl->config->has("simulation_timestep")) {
+        auto timestep = pImpl->config->get<double>("simulation_timestep");
+        if (timestep <= 0.0) {
+            NLM_LOG_ERROR("Invalid simulation_timestep: must be positive");
+            return false;
+        }
+        if (timestep > 1.0) {
+            NLM_LOG_WARNING("Large simulation_timestep may impact stability: " + std::to_string(timestep));
+        }
+    }
+    
+    NLM_LOG_DEBUG("Configuration validation complete");
+    return true;
+}
+
+void Brain::validateConfigurationValues() const {
+    // Validate that configuration values are within acceptable ranges
+    NLM_LOG_DEBUG("Validating configuration values...");
+    
+    // Validate STDP parameters
+    if (pImpl->config->has("stdp_ltp_weight")) {
+        auto ltp = pImpl->config->get<double>("stdp_ltp_weight");
+        if (std::abs(ltp) > 10.0) {
+            NLM_LOG_WARNING("STDP LTP weight may be too large: " + std::to_string(ltp));
+        }
+    }
+    
+    if (pImpl->config->has("stdp_ltd_weight")) {
+        auto ltd = pImpl->config->get<double>("stdp_ltd_weight");
+        if (std::abs(ltd) > 10.0) {
+            NLM_LOG_WARNING("STDP LTD weight may be too large: " + std::to_string(ltd));
+        }
+    }
+    
+    // Validate connectivity parameters
+    if (pImpl->config->has("connection_probability")) {
+        auto prob = pImpl->config->get<double>("connection_probability");
+        NLM_LOG_DEBUG("Connection probability: " + std::to_string(prob));
+    }
+    
+    // Validate plasticity parameters
+    if (pImpl->config->has("plasticity_learning_rate")) {
+        auto rate = pImpl->config->get<double>("plasticity_learning_rate");
+        NLM_LOG_DEBUG("Plasticity learning rate: " + std::to_string(rate));
+    }
+    
+    NLM_LOG_DEBUG("Configuration values validation complete");
+}

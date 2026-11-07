@@ -102,6 +102,23 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Enhanced config value parsing
+    void setConfigValue(const std::string& key, const std::string& value, 
+                       ConfigSource source, size_t lineNumber = 0);
+    std::string detectConfigType(const std::string& value) const;
+    
+    // Format detection methods
+    bool isJSONFile(const std::string& content) const;
+    bool isYAMLFile(const std::string& content) const;
+    
+    // Advanced parsing (placeholder for future implementation)
+    bool parseJSONConfig(const std::string& content);
+    bool parseYAMLConfig(const std::string& content);
+    
+    // Config validation
+    void validateConfig() const;
+    void ensureRequiredKeys() const;
 };
 
 } // namespace nlm

@@ -85,6 +85,35 @@ public:
     // Initialize with random parameters
     void initializeRandom(class RandomGenerator& rng);
     
+    // Enhanced spike history management
+    void recordPreSpike(Timestamp timestamp);
+    void recordPostSpike(Timestamp timestamp);
+    const std::vector<Timestamp>& getPreSpikeHistory() const;
+    const std::vector<Timestamp>& getPostSpikeHistory() const;
+    void clearHistory();
+    void setPreSpikeHistory(const std::vector<Timestamp>& history);
+    void setPostSpikeHistory(const std::vector<Timestamp>& history);
+    
+    // STDP calculations and updates
+    void updateForSTDP(Timestamp preTime, Timestamp postTime, float learningRate);
+    void updateForReward(float reward, float predictionError, float decayRate);
+    float calculateSTDPWeightChange(Timestamp preTime, Timestamp postTime, float ltpRate, float ltdRate);
+    
+    // Enhanced short-term plasticity
+    float getShortTermFacilitation() const;
+    float getShortTermDepression() const;
+    Timestamp getLastPreSpikeTime() const;
+    Timestamp getLastPostSpikeTime() const;
+    
+    // Spike activity analysis
+    size_t getPreSpikeCount(Timestamp sinceTime = 0.0f) const;
+    size_t getPostSpikeCount(Timestamp sinceTime = 0.0f) const;
+    float getSpikeFrequency(Timestamp sinceTime = 0.0f) const;
+    
+    // Plasticity analysis
+    bool isPotentiationExpected(Timestamp preTime, Timestamp postTime) const;
+    float getEstimatedWeightChange(Timestamp preTime, Timestamp postTime) const;
+    
 private:
     struct Impl;
     Impl* pImpl;
