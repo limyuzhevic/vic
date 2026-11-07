@@ -214,6 +214,11 @@ void Synapse::setEfficacy(float efficacy) {
 }
 
 void Synapse::step(Timestamp currentTime) {
+    // CRITICAL: Ensure pImpl is valid before proceeding
+    if (!pImpl) {
+        return;
+    }
+    
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
@@ -245,17 +250,24 @@ void Synapse::step(Timestamp currentTime) {
 }
 
 void Synapse::reset() {
-    // Do NOT zero the weight here. Brain::reset() is called at the start
+    // CRITICAL FIX: Do NOT zero the weight here. Brain::reset() is called at the start
     // of every Phase 3 episode, and zeroing weights there disconnected the
     // whole network: every sensory spike then delivered weight 0, so
     // internal and motor neurons stayed exactly at rest and the agent
     // could never move. Weight is long-term connectivity / learned state;
     // reset only clears short-term state (spike histories, eligibility)
     // and restores efficacy, so a new episode starts with an intact brain.
+    // The weight preservation is essential for maintaining learned behavior
+    // across episodes in reinforcement learning scenarios.
+    
     pImpl->preSpikeHistory.clear();
     pImpl->postSpikeHistory.clear();
     pImpl->eligibilityTrace = 0.0f;
     pImpl->efficacy = 1.0f;
+    pImpl->shortTermDepression = 1.0f;      // Reset to fully recovered state
+    pImpl->shortTermFacilitation = 0.0f;   // Reset facilitation to zero
+    pImpl->lastPreSpikeTime = -1.0f;       // Clear spike timestamps
+    pImpl->lastPostSpikeTime = -1.0f;
 }
 
 void Synapse::initializeRandom(RandomGenerator& rng) {
