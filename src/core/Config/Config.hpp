@@ -6,6 +6,7 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -56,7 +57,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -69,7 +70,7 @@ public:
 template<typename T>
     std::optional<T> get(const std::string& key) const;
 
-    template<typename T>
+template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
 
     // Set values
@@ -102,6 +103,17 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parsing helpers (declared in Impl)
+    static std::unordered_map<std::string, std::string> parseJson(const std::string& jsonStr);
+    static std::unordered_map<std::string, std::string> parseYaml(const std::string& yamlStr);
+    static ConfigValue convertStringToConfigValue(const std::string& str, bool& success);
 };
+
+// Helper function for recursive JSON parsing
+void parseJsonRecursive(const nlohmann::json& json, const std::string& prefix, std::unordered_map<std::string, std::string>& parsedEntries);
+
+// Helper function for recursive YAML parsing
+void parseYamlRecursive(const YAML::Node& yaml, const std::string& prefix, std::unordered_map<std::string, std::string>& parsedEntries);
 
 } // namespace nlm

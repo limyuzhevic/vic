@@ -8,7 +8,7 @@
 namespace nlm {
 
 // NeuralPopulation: A group of neurons with shared properties
-// PLACEHOLDER - Phase 2 will implement population-level dynamics
+// OPTIMIZED VERSION: Phase 2 with caching and performance improvements
 
 class NeuralPopulation {
 public:
@@ -36,7 +36,7 @@ public:
     
     // Add neuron to population (caller retains ownership)
     void addNeuron(Neuron* neuron);
-
+    
     // Create `size` neurons owned by this population, with sequential IDs
     // starting at startId. This is what actually materialises a population:
     // before this fix a population only stored a size counter and no neurons.
@@ -49,7 +49,7 @@ public:
     NeuronType getNeuronType() const;
     void setNeuronType(NeuronType type);
     
-    // Statistics
+    // Statistics (optimized with caching)
     size_t getActiveCount() const;
     size_t getFiringCount() const;
     float getAverageFiringRate() const;
@@ -58,7 +58,7 @@ public:
     // Initialize all neurons randomly
     void initializeRandom(class RandomGenerator& rng);
     
-    // Step all neurons
+    // Step all neurons (optimized)
     void step(Timestamp currentTime);
     
     // Reset all neurons
@@ -71,6 +71,30 @@ public:
     void recordActivity();  // Record current state for statistics
     float getMeanMembranePotential() const;
     float getVarianceMembranePotential() const;
+    
+    // Optimized batch operations for better performance
+    void batchStep(Timestamp currentTime, float timestep);
+    void batchInitializeRandom(class RandomGenerator& rng);
+    
+    // Cache management
+    void updateCachedStats() const;
+    void invalidateCachedStats();
+    bool isCacheDirty() const;
+    
+    // Enhanced connectivity and spike delivery
+    void addOutputConnection(class NeuralPopulation* target, float weight);
+    void deliverSynapticInputBatch(const std::vector<SynapticInput>& inputs);
+    void processSpikesBatch(const std::vector<SpikeEvent>& spikeEvents);
+    void processSpikesBatch(const std::vector<SpikeEvent>& spikeEvents);
+    void deliverSpikeToTargets(const SpikeEvent& spikeEvent);
+    
+    // Neuron filtering and access patterns
+    std::vector<Neuron*> getNeuronsByType(NeuronType type) const;
+    std::vector<Neuron*> getFiringNeurons() const;
+    
+    // Condition checks
+    bool hasActiveNeurons() const;
+    float getTotalExcitatoryInput() const;
     
 private:
     struct Impl;

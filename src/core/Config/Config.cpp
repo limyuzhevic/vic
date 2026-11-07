@@ -3,11 +3,27 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <regex>
+#include <stdexcept>
+
+// Include JSON/YAML libraries if available
+#ifdef HAVE_NLOHMANN_JSON
+#include <nlohmann/json.hpp>
+#endif
+
+#ifdef HAVE_YAML_CPP
+#include <yaml-cpp/yaml.h>
+#endif
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Parse helpers for JSON/YAML
+    static std::unordered_map<std::string, std::string> parseJson(const std::string& jsonStr);
+    static std::unordered_map<std::string, std::string> parseYaml(const std::string& yamlStr);
+    static ConfigValue convertStringToConfigValue(const std::string& str, bool& success);
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,39 +35,112 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    // Determine file format based on extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Remove comments and validate
+    content = trim(content);
+    
+    std::unordered_map<std::string, std::string> parsedEntries;
+    bool parseSuccess = false;
+    
+    // Precedence check for JSON/YAML libraries
+    bool haveJson = false;
+    bool haveYaml = false;
+    
+#if defined(HAVE_NLOHMANN_JSON)
+    haveJson = true;
+#endif
+    
+#if defined(HAVE_YAML_CPP)
+    haveYaml = true;
+#endif
+    
+    if (ext == ".json" && haveJson) {
+        try {
+            // Try to parse as JSON
+            auto json = nlohmann::json::parse(content);
+            parseJsonRecursive(json, "", parsedEntries);
+            parseSuccess = true;
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to parse JSON config file " + filepath + ": " + std::string(e.what()));
+            return false;
         }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+    } else if (ext == ".yaml" || ext == ".yml" && haveYaml) {
+        try {
+            // Try to parse as YAML
+            auto yaml = YAML::Load(content);
+            parseYamlRecursive(yaml, "", parsedEntries);
+            parseSuccess = true;
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to parse YAML config file " + filepath + ": " + std::string(e.what()));
+            return false;
+        }
+    } else if (ext == ".cfg" || ext == ".txt" || ext.empty() || ext == ".unknown") {
+        // Legacy support for simple key=value format files
+        std::istringstream lineStream(content);
+        std::string line;
+        while (std::getline(lineStream, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '\"' && value.back() == '\"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                parsedEntries[key] = value;
+            }
+        }
+        parseSuccess = true;
+    } else {
+        NLM_LOG_ERROR("Unsupported config file format: " + ext + " for file " + filepath);
+        return false;
+    }
+    
+    if (!parseSuccess) {
+        NLM_LOG_ERROR("Failed to parse config file: " + filepath);
+        return false;
+    }
+    
+    // Clear existing entries
+    pImpl->entries.clear();
+    
+    // Convert string values to appropriate ConfigValue types
+    for (const auto& pair : parsedEntries) {
+        bool success = false;
+        ConfigValue configValue = Impl::convertStringToConfigValue(pair.second, success);
+        if (success) {
+            pImpl->entries.emplace_back(pair.first, configValue, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Could not parse config value for key \"" + pair.first + "\": \"" + pair.second + "\"");
+            pImpl->entries.emplace_back(pair.first, ConfigValue(pair.second), ConfigSource::File);
         }
     }
     
+    NLM_LOG_INFO("Successfully loaded configuration from: " + filepath);
     return true;
 }
 
@@ -217,22 +306,118 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+#include <stdexcept>
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+// Implementation of JSON/YAML parsing helpers
+void Config::Impl::parseJsonRecursive(const nlohmann::json& json, const std::string& prefix, std::unordered_map<std::string, std::string>& parsedEntries) {
+    for (auto it = json.begin(); it != json.end(); ++it) {
+        std::string key = it.key();
+        std::string fullKey = prefix.empty() ? key : prefix + "." + key;
+        
+        if (it.is_object()) {
+            parseJsonRecursive(*it, fullKey, parsedEntries);
+        } else if (it.is_array()) {
+            // Convert array to JSON string representation for compatibility
+            std::ostringstream oss;
+            oss << "[";
+            for (size_t i = 0; i < it.size(); ++i) {
+                if (i > 0) oss << ",";
+                oss << *it[i];
+            }
+            oss << "]";
+            parsedEntries[fullKey] = oss.str();
+        } else {
+            // Convert JSON value to string
+            parsedEntries[fullKey] = it->dump();
+        }
+    }
+}
 
-} // namespace nlm
+void Config::Impl::parseYamlRecursive(const YAML::Node& yaml, const std::string& prefix, std::unordered_map<std::string, std::string>& parsedEntries) {
+    for (auto it = yaml.begin(); it != yaml.end(); ++it) {
+        std::string key = it->first.as<std::string>();
+        std::string fullKey = prefix.empty() ? key : prefix + "." + key;
+        
+        if (it->second.IsMap()) {
+            parseYamlRecursive(it->second, fullKey, parsedEntries);
+        } else if (it->second.IsSequence()) {
+            // Convert YAML sequence to JSON string representation
+            std::ostringstream oss;
+            oss << "[";
+            for (size_t i = 0; i < it->second.size(); ++i) {
+                if (i > 0) oss << ",";
+                oss << it->second[i].to_string();
+            }
+            oss << "]";
+            parsedEntries[fullKey] = oss.str();
+        } else {
+            // Convert YAML value to string
+            parsedEntries[fullKey] = it->second.to_string();
+        }
+    }
+}
+
+ConfigValue Config::Impl::convertStringToConfigValue(const std::string& str, bool& success) {
+    success = false;
+    
+    // Try integer conversion
+    try {
+        if (str.find('.') == std::string::npos && str.find('e') == std::string::npos) {
+            size_t pos;
+            long long_val = std::stol(str, &pos);
+            if (pos == str.size()) {
+                success = true;
+                return ConfigValue(long_val);
+            }
+        }
+    } catch (...) {}
+    
+    // Try double conversion
+    try {
+        double double_val = std::stod(str);
+        success = true;
+        return ConfigValue(double_val);
+    } catch (...) {}
+    
+    // Try bool conversion
+    if (str == "true" || str == "false") {
+        bool bool_val = (str == "true");
+        success = true;
+        return ConfigValue(bool_val);
+    }
+    
+    // Check if it's a JSON array
+    if (str.size() >= 2 && str.front() == '[' && str.back() == ']') {
+        // Parse as array - very basic implementation
+        success = true;
+        return ConfigValue(str); // Return as string for now
+    }
+    
+    // Default to string
+    success = true;
+    return ConfigValue(str);
+}
+
+// Update the loadFromArgs method to support nested key=value format
+bool Config::loadFromArgs(int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        // Handle -key value format
+        else if (arg[0] == '-' && i + 1 < argc) {
+            std::string key = arg.substr(1);
+            std::string value = argv[++i];
+            set(key, value, ConfigSource::CommandLine);
+        }
+    }
+    return true;
+}
