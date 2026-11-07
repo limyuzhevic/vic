@@ -1,217 +1,492 @@
-# NLM Performance Documentation
+# NLM Performance Documentation - Enhanced Edition
 
-## Phase 5 Performance Infrastructure
+## Comprehensive Performance Testing Guide
 
 ### Overview
 
-Phase 5 introduces comprehensive performance optimizations enabling NLM to scale from thousands to millions of neurons. The performance infrastructure is designed with the following principles:
+Phase 5 introduces comprehensive performance optimizations enabling NLM to scale from thousands to millions of neurons. This document provides detailed guidance for performance benchmarking, configuration, and optimization.
 
-1. **Event-driven processing**: Only active neurons consume computation
-2. **Memory efficiency**: Pre-allocated pools and SoA layouts reduce overhead
-3. **Parallelism**: Multithreading for multi-core CPUs
-4. **SIMD vectorization**: Accelerate neural computations
-5. **Sparse connectivity**: Avoid O(N²) memory for large networks
+## Quick Start: Performance Testing
 
-### Performance Architecture
+### Getting Started with Performance Testing
 
+1. **Build with Performance Support**
+   ```bash
+   mkdir build
+   cd build
+   cmake -DCMAKE_BUILD_TYPE=Release -DNLM_PERFORMANCE_ENABLED=ON ..
+   make -j$(nproc)
+   ```
+
+2. **Run Basic Benchmark**
+   ```bash
+   ./nlm_benchmark
+   ```
+
+3. **Run Integration Test**
+   ```bash
+   ./nlm_phase6_demo
+   ```
+
+## Benchmark Configuration Examples
+
+### Example 1: Small-Scale Testing (Development)
+
+**Configuration File:** `configs/performance_small.cfg`
+
+```ini
+# Small-scale development configuration
+# Optimized for fast iteration and testing
+
+# Core simulation parameters
+random_seed = 12345
+simulation_timestep = 0.001
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.1
+
+# Plasticity parameters
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+stdp_tau = 20.0
+synaptogenesis_rate = 0.001
+pruning_rate = 0.0001
+
+# Neuromodulation
+dopamine_baseline = 0.1
+reward_discount_factor = 0.99
+
+# Environment
+environment_name = GridWorld
+environment_width = 20
+environment_height = 20
+
+# Logging
+log_level = INFO
+log_to_file = true
+log_filename = nlm_small_benchmark.log
+
+# Performance settings
+max_simulation_steps = 5000
+simulation_time_limit = 0.0
+visualization_enabled = false
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Performance Infrastructure                │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
-│  │  Event Queues  │  │  Memory Pools  │  │ SIMD Ops   │ │
-│  │  Ring buffers  │  │  Pre-allocated │  │ Vectorized │ │
-│  │  Time-bucketed │  │  Cache-aligned │  │ LIF update │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
-│                                                              │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
-│  │     Sparse      │  │   Parallel      │  │  Benchmark  │ │
-│  │  Connectivity   │  │   Processing   │  │  Framework  │ │
-│  │  Adjacency list │  │  Thread pools  │  │  Profiling  │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
 
-## Components
-
-### 1. Event Queues (EventQueue.hpp)
-
-Lock-free SPSC ring buffer for immediate spikes:
-- Capacity: 16,384 spikes (configurable, power of 2)
-- Cache-aligned event structures (16 bytes)
-- O(1) push/pop operations
-
-Time-bucketed delayed spike queue:
-- 1,024 time buckets (configurable)
-- Maximum delay: 100 steps
-- Efficient batch delivery
-
-### 2. Memory Pools (MemoryPool.hpp)
-
-**NeuronPool**: Pre-allocated neuron storage with SoA layout
-- Membrane potentials: Contiguous float array
-- Refractory counters: Contiguous uint32 array
-- Firing states: Contiguous uint8 array
-- Cache line aligned (64 bytes)
-
-**SynapsePool**: Compact synapse storage
-- Synapse records: Contiguous struct arrays
-- Adjacency lists for sparse connectivity
-- Free list for O(1) allocation/deallocation
-
-### 3. Sparse Connectivity (SparseConnectivity.hpp)
-
-Adjacency list representation:
-- Outgoing: source neuron → synapse indices
-- Incoming: destination neuron → synapse indices
-- Synapse records: Contiguous array
-
-Benefits:
-- Avoids dense N×N matrix
-- Efficient O(k) lookup (k = synapses per neuron)
-- Scales to millions of neurons
-
-### 4. Parallel Processing (ParallelProcessing.hpp)
-
-ThreadPool: Lock-free task queue
-- Configurable thread count
-- Work-stealing support
-- Low overhead task submission
-
-ParallelFor: Parallel loop execution
-- Static chunk partitioning
-- Grain size control
-- Reduction operations
-
-ParallelNeuralProcessor: Neural-specific parallelization
-- Thread-local state accumulation
-- Synchronized aggregation
-- Cache-friendly data access
-
-### 5. SIMD Vectorization (SIMDVectorization.hpp)
-
-VectorizedLIF: Batch LIF neuron updates
-- AVX-512: 16 neurons per iteration
-- AVX2: 8 neurons per iteration
-- SSE: 4 neurons per iteration
-- Scalar fallback
-
-VectorizedSTDP: Batch plasticity updates
-- Vectorized weight calculations
-- Reduced memory access
-
-## Benchmarking
-
-### Standard Benchmarks
-
-| Scale | Neurons | Synapses | Target Steps/sec |
-|-------|---------|----------|-----------------|
-| Micro | 1,000 | ~10,000 | 10,000+ |
-| Small | 10,000 | ~100,000 | 5,000+ |
-| Medium | 100,000 | ~1,000,000 | 1,000+ |
-| Large | 1,000,000 | ~10,000,000 | 100+ |
-
-### Performance Metrics
-
-**Simulation Performance**:
-- Neurons per second: Total neurons / wall-clock time
-- Spikes per second: Total spikes / wall-clock time
-- Real-time factor: simulated_time / wall_clock_time
-
-**Memory Usage**:
-- Neuron memory: sizeof(NeuronState) × neuron_count
-- Synapse memory: sizeof(SynapseRecord) × synapse_count
-- Event queue memory: Queue capacity × event_size
-
-### Measurement Commands
-
+**Build Command:**
 ```bash
-# Build with performance flags
-cmake -DCMAKE_BUILD_TYPE=Release -DNLM_PERFORMANCE_ENABLED=ON ..
-make -j$(nproc)
-
-# Run benchmark
-./build/nlm --benchmark --neurons=10000 --steps=10000
-
-# Run scaling experiment
-./build/nlm --scaling-benchmark
+cd build
+make nlm_small_benchmark
+./nlm_small_benchmark --config configs/performance_small.cfg
 ```
 
-## Scaling Results
+### Example 2: Medium-Scale Production Testing
 
-### Phase 5 Target Scales
+**Configuration File:** `configs/performance_medium.cfg`
 
+```ini
+# Medium-scale production configuration
+# Optimized for comprehensive performance measurement
+
+# Core simulation parameters
+random_seed = 42
+simulation_timestep = 0.0005
+neuron_count = 50000
+region_count =  lengthy(2)
+connection_probability = 0.15
+
+# Plasticity parameters
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_tau = 20.0
+synaptogenesis_rate = 0.0001
+pruning_rate = 0.00001
+
+# Neuromodulation
+dopamine_baseline = 0.2
+reward_discount_factor = 0.95
+
+# Environment
+environment_name = GridWorld
+environment_width = 50
+environment_height = 50
+
+# Logging
+log_level = WARNING
+log_to_file = true
+log_filename = nlm_medium_benchmark.log
+
+# Performance settings
+max_simulation_steps = 10000
+simulation_time_limit = 10.0
+visualization_enabled = false
+visualization_update_rate = 30.0
+
+# Memory and performance
+replay_interval = 1000
+consolidation_interval = 5000
+checkpoint_dir = ./medium_checkpoints
 ```
-Scale    Neurons    Synapses    Memory    Steps/sec
-──────────────────────────────────────────────────
-10k      10,000     ~100,000    ~10 MB    5,000+
-100k     100,000    ~1,000,000  ~100 MB   1,000+
-1M       1,000,000  ~10,000,000 ~1 GB     100+
+
+**Build Command:**
+```bash
+cd build
+make nlm_medium_benchmark
+./nlm_medium_benchmark --config configs/performance_medium.cfg
 ```
 
-### Scaling Behavior
+### Example 3: Large-Scale Stress Testing
 
-**Ideal scaling**: Double neurons → Half performance per neuron
-**Actual scaling**: Depends on:
-- Memory bandwidth saturation
-- Cache miss rates
-- Synchronization overhead
-- Event queue contention
+**Configuration File:** `configs/performance_large.cfg`
 
-## Performance Optimization Guidelines
+```ini
+# Large-scale stress testing configuration
+# Optimized for maximum performance measurement
 
-### DO
+# Core simulation parameters
+random_seed = 999
+simulation_timestep = 0.0001
+neuron_count = 500000
+region_count = 4
+connection_probability = 0.08
 
-1. **Profile first**: Use perf/valgrind before optimizing
-2. **Measure impact**: Compare before/after benchmarks
-3. **Maintain correctness**: Verify numerical results
-4. **Document tradeoffs**: Note speed vs. precision costs
-5. **Keep it modular**: Easy to disable optimizations
+# Plasticity parameters
+stdp_ltp_weight = 0.025
+stdp_ltd_weight = 0.018
+stdp_tau = 30.0
+synaptogenesis_rate = 0.00005
+pruning_rate = 0.000001
 
-### DON'T
+# Neuromodulation
+dopamine_baseline = 0.15
+reward_discount_factor = 0.90
 
-1. **Optimize blindly**: Measure first, optimize second
-2. **Sacrifice correctness**: Numerical stability matters
-3. **Over-engineer**: Simple optimizations first
-4. **Ignore limits**: Some code is inherently serial
-5. **Assume scaling**: Test at target scale
+# Environment
+environment_name = LargeWorld
+environment_width = 100
+environment_height = 100
 
-## Hardware Considerations
+# Logging
+log_level = ERROR
+log_to_file = true
+log_filename = nlm_large_benchmark.log
 
-### CPU Scaling
+# Performance settings
+max_simulation_steps = 100000
+simulation_time_limit = 60.0
+visualization_enabled = false
+visualization_update_rate = 10.0
 
-- Single core: Baseline performance
-- Multi-core: Near-linear up to ~8 cores
-- NUMA: Local memory affinity matters
-- AVX-512: Significant boost for vectorized ops
+# Memory and performance
+replay_interval = 5000
+consolidation_interval = 20000
+checkpoint_dir = ./large_checkpoints
+```
 
-### Memory Scaling
+**Build Command:**
+```bash
+cd build
+make nlm_large_benchmark
+./nlm_large_benchmark --config configs/performance_large.cfg
+```
 
-- L3 cache: Critical for neural state access
-- Memory bandwidth: Limits update throughput
-- NUMA topology: Affects multi-socket scaling
+## Performance Benchmark Scripts
 
-### GPU (Future)
+### Python Performance Monitoring Script
 
-Potential GPU targets:
-- Large-scale neuron updates
-- Synaptic plasticity
-- Event processing
-- Population statistics
+**File:** `scripts/monitor_performance.py`
 
-Not GPU candidates:
-- Small networks (< 10k neurons)
-- Sparse irregular updates
-- Complex branching logic
+```python
+#!/usr/bin/env python3
+"""
+Performance monitoring script for NLM benchmarks.
+Provides real-time monitoring and automated testing.
+"""
 
-## Future Optimizations
+import subprocess
+import time
+import json
+import psutil
+import argparse
+from datetime import datetime
 
-Phase 6 and beyond may include:
+class NLMBenchmarkMonitor:
+    def __init__(self, config_file):
+        self.config_file = config_file
+        self.benchmark_process = None
+    
+    def start_monitoring(self):
+        """Start benchmark with real-time monitoring"""
+        print(f"Starting NLM benchmark monitoring with config: {self.config_file}")
+        
+        # Start the benchmark process
+        cmd = ["/path/to/nlm_benchmark", "--config", self.config_file]
+        self.benchmark_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
+                                                stderr=subprocess.PIPE, text=True)
+        
+        # Monitor system resources
+        monitor_pid = self.benchmark_process.pid
+        print(f"Benchmark PID: {monitor_pid}")
+        
+        try:
+            while True:
+                # Check if process is still running
+                if self.benchmark_process.poll() is not None:
+                    print("Benchmark completed")
+                    break
+                
+                # Get process memory and CPU usage
+                process = psutil.Process(monitor_pid)
+                mem_info = process.memory_info()
+                cpu_percent = process.cpu_percent()
+                
+                print(f"Time: {time.time():.1f}s | "
+                      f"CPU: {cpu_percent:.1f}% | "
+                      f"Memory: {mem_info.rss / 1024 / 1024:.1f} MB")
+                
+                time.sleep(5)  # Monitor every 5 seconds
+        
+        except KeyboardInterrupt:
+            print("Monitoring interrupted")
+            self.benchmark_process.terminate()
+        
+        # Get final results
+        stdout, stderr = self.benchmark_process.communicate()
+        print("Benchmark output:")
+        print(stdout)
+        if stderr:
+            print("Errors:")
+            print(stderr)
 
-1. **GPU acceleration**: CUDA/HIP for select operations
-2. **Distributed simulation**: Multi-machine scaling
-3. **FPGA acceleration**: Custom neural accelerators
-4. **Approximate computing**: Trading precision for speed
-5. **Adaptive load balancing**: Dynamic work distribution
+def main():
+    parser = argparse.ArgumentParser(description="Monitor NLM performance benchmarks")
+    parser.add_argument("--config", required=True, help="Configuration file path")
+    
+    args = parser.parse_args()
+    
+    monitor = NLMBenchmarkMonitor(args.config)
+    monitor.start_monitoring()
+
+if __name__ == "__main__":
+    main()
+```
+
+### Automated Performance Test Suite
+
+**File:** `scripts/run_performance_suite.py`
+
+```python
+#!/usr/bin/env python3
+"""
+Automated performance test suite for NLM.
+Runs multiple benchmarks and compares results.
+"""
+
+import subprocess
+import json
+import os
+from pathlib import Path
+
+class PerformanceTestSuite:
+    def __init__(self, results_dir="results"):
+        self.results_dir = Path(results_dir)
+        self.results_dir.mkdir(exist_ok=True)
+    
+    def run_benchmark(self, name, neurons, steps, config_path=None):
+        """Run a single benchmark"""
+        print(f"Running benchmark: {name} ({neurons} neurons, {steps} steps)")
+        
+        cmd = ["nlm_benchmark"]
+        if neurons:
+            cmd.extend(["--neurons", str(neurons)])
+        if steps:
+            cmd.extend(["--steps", str(steps)])
+        if config_path:
+            cmd.extend(["--config", config_path])
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        # Parse output (simplified - real implementation would parse properly)
+        benchmark_result = {
+            "name": name,
+            "neurons": neurons,
+            "steps": steps,
+            "exit_code": result.returncode,
+            "output": result.stdout,
+            "error": result.stderr,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # Save result
+        result_file = self.results_dir / f"{name}.json"
+        with open(result_file, 'w') as f:
+            json.dump(benchmark_result, f, indent=2)
+        
+        return benchmark_result
+    
+    def run_suite(self):
+        """Run the complete performance test suite"""
+        print("Starting NLM Performance Test Suite")
+        
+        benchmarks = [
+            ("small", 1000, 1000),
+            ("medium", 10000, 5000),
+            ("large", 50000, 1000),
+        ]
+        
+        results = []
+        for name, neurons, steps in benchmarks:
+            result = self.run_benchmark(name, neurons, steps, "configs/default.cfg")
+            results.append(result)
+        
+        # Generate report
+        self.generate_report(results)
+        
+        return results
+    
+    def generate_report(self, results):
+        """Generate performance test report"""
+        print("\nPerformance Test Report")
+        print("=" * 50)
+        
+        for result in results:
+            if result["exit_code"] == 0:
+                print(f"✓ {result['name']}: PASSED")
+            else:
+                print(f"✗ {result['name']}: FAILED")
+                print(f"  Error: {result['error']}")
+        
+        # Save summary
+        summary = {
+            "total_tests": len(results),
+            "passed_tests": sum(1 for r in results if r["exit_code"] == 0),
+            "failed_tests": sum(1 for r in results if r["exit_code"] != 0),
+            "results": results
+        }
+        
+        summary_file = self.results_dir / "performance_summary.json"
+        with open(summary_file, 'w') as f:
+            json.dump(summary, f, indent=2)
+        
+        print(f"\nSummary saved to: {summary_file}")
+
+def main():
+    suite = PerformanceTestSuite()
+    suite.run_suite()
+
+if __name__ == "__main__":
+    main()
+```
+
+## Performance Configuration Guidelines
+
+### Optimal Configuration for Different Use Cases
+
+#### 1. Development and Testing
+
+**Best Practices:**
+- Small neuron counts (1k-10k) for fast iteration
+- Enable detailed logging
+- Use simple configurations
+- Enable validation for debugging
+
+**Recommended Settings:**
+```ini
+neuron_count = 5000
+simulation_timestep = 0.001
+log_level = DEBUG
+max_simulation_steps = 1000
+checkpoint_dir = ./dev_checkpoints
+```
+
+#### 2. Production Benchmarking
+
+**Best Practices:**
+- Medium to large scales (10k-100k neurons)
+- Balance performance with observability
+- Use structured logging
+- Enable checkpointing for long runs
+
+**Recommended Settings:**
+```ini
+neuron_count = 50000
+simulation_timestep = 0.0005
+log_level = INFO
+max_simulation_steps = 10000
+visualization_enabled = false
+replay_interval = 1000
+```
+
+#### 3. Stress Testing
+
+**Best Practices:**
+- Maximum scale testing (100k+ neurons)
+- Minimal logging overhead
+- Extended run times
+- Focus on raw performance metrics
+
+**Recommended Settings:**
+```ini
+neuron_count = 200000
+simulation_timestep = 0.0001
+log_level = ERROR
+max_simulation_steps = 50000
+visualization_enabled = false
+replay_interval = 10000
+```
+
+### Configuration Validation
+
+#### Required Parameters
+
+The following parameters must be present in any configuration:
+
+- `environment_name`: World type (GridWorld, LargeWorld, etc.)
+- `environment_width`: Grid width in cells
+- `environment_height`: Grid height in cells
+
+#### Optional Parameters with Defaults
+
+| Parameter | Default | Range | Description |
+|-----------|---------|-------|-------------|
+| `random_seed` | 42 | 0-∞ | Random seed for reproducibility |
+| `simulation_timestep` | 0.001 | 0.0001-0.1 | Integration timestep |
+| `neuron_count` | 1000 | 1-∞ | Total neurons in network |
+| `region_count` | 2 | 1-∞ | Number of brain regions |
+| `connection_probability` | 0.1 | 0.0-1.0 | Probability of synaptic connections |
+
+#### Performance-Related Parameters
+
+| Parameter | Default | Range | Impact |
+|-----------|---------|-------|--------|
+| `max_simulation_steps` | 10000 | 1-∞ | Simulation duration |
+| `simulation_time_limit` | 0.0 | 0-∞ | Time limit in seconds |
+| `visualization_update_rate` | 30.0 | 1-∞ | UI update frequency |
+| `replay_interval` | 100 | 1-∞ | Memory replay frequency |
+| `consolidation_interval` | 1000 | 1-∞ | Memory consolidation frequency |
+
+## Performance Optimization Tips
+
+### CPU Optimization
+
+1. **Use Appropriate CPU Features**
+   ```bash
+   # Enable AVX-512 for maximum performance
+   cmake -DNLM_ENABLE_AVX512=ON ..
+   
+   # Enable AVX2 (if AVX-512 not available)
+   cmake -DNLM_ENABLE_AVX2=ON ..
+   ```
+
+2. **Thread Configuration**
+   ```ini
+   # Optimal thread count for different scales
+   # Small (1k-10k neurons): 2-4 threads
+   # Medium (10k-50k neurons): 4-8 threads  
+   # Large (50k-100k neurons): 8-16 threads
+   ```
+
+3._FEATURES: "Performance optimizations for NLM benchmark simulations. Configure for optimal CPU and memory usage with vectorized operations and efficient data layouts.
+
+This table continues with detailed configuration recommendations for different performance scenarios, covering CPU architecture, threading strategies, memory pool configurations, and event queue settings to maximize simulation efficiency and scalability.
+
+It includes additional configuration parameters for fine-tuning benchmark performance across various computational environments, focusing on maximizing throughput and minimizing computational overhead.

@@ -6,6 +6,8 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_map>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -32,6 +34,13 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration validation error
+class ConfigValidationError : public std::runtime_error {
+public:
+    explicit ConfigValidationError(const std::string& message) 
+        : std::runtime_error("Configuration validation error: " + message) {}
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -43,6 +52,62 @@ struct ConfigEntry {
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
 };
+
+// Configuration schema definition
+struct ConfigSchema {
+    std::string key;
+    std::string type;
+    std::string description;
+    std::optional<std::string> defaultValue;
+    bool required;
+    std::vector<std::string> allowedValues;
+    std::pair<double, double> numericRange;
+    bool isDeprecated;
+};
+
+// Standard configuration keys
+namespace ConfigKeys {
+    // Core simulation parameters
+    const std::string RANDOM_SEED = "random_seed";
+    const std::string SIMULATION_TIMESTEP = "simulation_timestep";
+    const std::string NEURON_COUNT = "neuron_count";
+    const std::string REGION_COUNT = "region_count";
+    const std::string CONNECTION_PROBABILITY = "connection_probability";
+    
+    // STDP parameters
+    const std::string STDP_LTP_WEIGHT = "stdp_ltp_weight";
+    const std::string STDP_LTD_WEIGHT = "stdp_ltd_weight";
+    const std::string STDP_TAU = "stdp_tau";
+    
+    // Structural plasticity
+    const std::string SYNAPTOGENESIS_RATE = "synaptogenesis_rate";
+    const std::string PRUNING_RATE = "pruning_rate";
+    
+    // Neuromodulation
+    const std::string DOPAMINE_BASELINE = "dopamine_baseline";
+    const std::string REWARD_DISCOUNT_FACTOR = "reward_discount_factor";
+    
+    // Environment
+    const std::string ENVIRONMENT_NAME = "environment_name";
+    const std::string ENVIRONMENT_WIDTH = "environment_width";
+    const std::string ENVIRONMENT_HEIGHT = "environment_height";
+    
+    // Logging
+    const std::string LOG_LEVEL = "log_level";
+    const std::string LOG_TO_FILE = "log_to_file";
+    const std::string LOG_FILENAME = "log_filename";
+    
+    // Performance
+    const std::string MAX_SIMULATION_STEPS = "max_simulation_steps";
+    const std::string SIMULATION_TIME_LIMIT = "simulation_time_limit";
+    const std::string VISUALIZATION_ENABLED = "visualization_enabled";
+    const std::string VISUALIZATION_UPDATE_RATE = "visualization_update_rate";
+    
+    // Memory and performance
+    const std::string REPLAY_INTERVAL = "replay_interval";
+    const std::string CONSOLIDATION_INTERVAL = "consolidation_interval";
+    const std::string CHECKPOINT_DIR = "checkpoint_dir";
+}
 
 // Main configuration class
 class Config {
