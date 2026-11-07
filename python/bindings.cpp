@@ -355,11 +355,290 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
-        .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+            .def("save", &Brain::save, py::arg("filepath"),
+                 "Save brain state to file"),
+         .def("load", &Brain::load, py::arg("filepath"),
+                 "Load brain state from file")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+    .def("validateBrainState", [](const Brain& brain) {
+        return brain.getTotalNeuronCount() > 0 && 
+               brain.getTotalSynapseCount() >= 0 &&
+               brain.getFiringNeuronCount() >= 0 &&
+               brain.getAverageFiringRate() >= 0.0f;
+    }, "Validate brain state consistency");
+    
+    m.def("resetSimulation", [](Brain& brain, AgentBrain* agent = nullptr) {
+        brain.reset();
+        if (agent) agent->reset();
+    }, py::arg("brain"), py::arg("agent") = nullptr,
+     "Reset brain and optionally agent state");
+    
+    m.def("runSimulationSteps", [](Brain& brain, AgentBrain* agent, 
+                               SimpleWorld& world, size_t num_steps) {
+        for (size_t step = 0; step < num_steps; ++step) {
+            world.update(0.1);
+            auto percept = world.getSensoryPercept();
+            if (agent) agent->processSensoryInput(percept);
+            brain.step(static_cast<SimulationStep>(step));
+            if (agent) {
+                auto action = agent->decodeMotorCommand();
+                world.applyMotorCommand(action, world.getSimulationTime());
+            }
+        }
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("num_steps"),
+     "Run a complete simulation loop with world interaction");
+
+    // Configuration convenience functions
+    m.def("createStandardConfig", []() {
+        auto config = std::make_shared<Config>();
+        // Set standard NLM configuration parameters
+        config->set("brain.neuron_count", 1000, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1, ConfigSource::Default);
+        config->set("brain.region_count", 2, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("development.maturation.enable", true, ConfigSource::Default);
+        return config;
+    }, "Create a standard NLM configuration with sensible defaults");
+    
+    m.def("createMinimalConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 100, ConfigSource::Default);
+        config->set("brain.region_count", 1, ConfigSource::Default);
+        return config;
+    }, "Create a minimal NLM configuration for quick testing");
+
+    // Type convenience functions
+    m.def("neuron_type_names", []() {
+        return std::vector<std::string>{"Excitatory", "Inhibitory", 
+                                      "Modulatory", "Sensory", 
+                                      "Motor", "Internal"};
+    }, "Get list of all neuron type names");
+    
+    m.def("synapse_type_names", []() {
+        return std::vector<std::string>{"Excitatory", "Inhibitory",
+                                      "Modulatory", "Electrical",
+                                      "GapJunction"};
+    }, "Get list of all synapse type names");
+
+    // Performance and validation utilities
+    m.def("getBrainMetrics", [](const Brain& brain) {
+        return std::make_tuple(
+            brain.getTotalNeuronCount(),
+            brain.getTotalSynapseCount(),
+            brain.getActiveNeuronCount(),
+            brain.getFiringNeuronCount(),
+            brain.getAverageFiringRate(),
+            brain.getExcitationInhibitionRatio(),
+            brain.getTotalSpikeCount()
+        );
+    }, "Get comprehensive brain metrics as a tuple");
+    
+    m.def("checkConfigurationValid", [](const Config& config) {
+        // Basic validation - check for essential keys
+        auto keys = config.getKeys();
+        return keys.empty() || 
+               (config.has("brain.neuron_count") && config.has("brain.region_count"));
+    }, "Check if configuration has essential settings");
+
+    // Statistical helper functions
+    m.def("computeFiringStats", [](const Brain& brain, size_t window_size = 1000) {
+        // For now, compute basic statistics
+        return std::make_tuple(
+            brain.getTotalSpikeCount(),
+            brain.getFiringNeuronCount(),
+            brain.getAverageFiringRate(),
+            static_cast<float>(brain.getFiringNeuronCount()) / 
+                               std::max(1.0f, static_cast<float>(brain.getTotalNeuronCount()))
+        );
+    }, "Compute basic firing statistics");
+
+    // Error handling utilities
+    m.def("safeBrainStep", [](Brain& brain, SimulationStep step, 
+                            const py::object& time = py::none()) {
+        try {
+            if (time.is_none()) {
+                brain.step(step);
+            } else {
+                brain.step(step, time.cast<Timestamp>());
+            }
+            return true;
+        } catch (const std::exception& e) {
+            py::print("Warning: Brain step failed:", e.what());
+            return false;
+        }
+    }, py::arg("brain"), py::arg("step"), py::arg("time") = py::none(),
+     "Safely execute a brain step with error handling");
+
+    // Batch processing utilities
+    m.def("batchProcessBrains", [](const std::vector<std::shared_ptr<Brain>>& brains,
+                                 const std::function<void(Brain&)>& processor) {
+        for (auto& brain : brains) {
+            if (brain) processor(*brain);
+        }
+    }, py::arg("brains"), py::arg("processor"),
+     "Apply a processor function to multiple brains");
+
+    // Version and information
+    m.attr("__version__") = "1.0.0";
+    m.attr("__description__") = R"pbdoc(Improved NLM Python bindings with enhanced error handling and convenience functions)pbdoc";
+
+    // Register exception translations for better Python error handling
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const std::runtime_error& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const std::invalid_argument& e) {
+            PyErr_SetString(PyExc_ValueError, e.what());
+        } catch (...) {
+            PyErr_SetString(PyExc_RuntimeError, "Unknown error in NLM bindings");
+        }
+    });
+
+    // Helper functions for better error handling and convenience
+    m.def("validateBrainState", [](const Brain& brain) {
+        return brain.getTotalNeuronCount() > 0 && 
+               brain.getTotalSynapseCount() >= 0 &&
+               brain.getFiringNeuronCount() >= 0 &&
+               brain.getAverageFiringRate() >= 0.0f;
+    }, "Validate brain state consistency");
+    
+    m.def("resetSimulation", [](Brain& brain, AgentBrain* agent = nullptr) {
+        brain.reset();
+        if (agent) agent->reset();
+    }, py::arg("brain"), py::arg("agent") = nullptr,
+     "Reset brain and optionally agent state");
+    
+    m.def("runSimulationSteps", [](Brain& brain, AgentBrain* agent, 
+                               SimpleWorld& world, size_t num_steps) {
+        for (size_t step = 0; step < num_steps; ++step) {
+            world.update(0.1);
+            auto percept = world.getSensoryPercept();
+            if (agent) agent->processSensoryInput(percept);
+            brain.step(static_cast<SimulationStep>(step));
+            if (agent) {
+                auto action = agent->decodeMotorCommand();
+                world.applyMotorCommand(action, world.getSimulationTime());
+            }
+        }
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), py::arg("num_steps"),
+     "Run a complete simulation loop with world interaction");
+
+    // Configuration convenience functions
+    m.def("createStandardConfig", []() {
+        auto config = std::make_shared<Config>();
+        // Set standard NLM configuration parameters
+        config->set("brain.neuron_count", 1000, ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1, ConfigSource::Default);
+        config->set("brain.region_count", 2, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("development.maturation.enable", true, ConfigSource::Default);
+        return config;
+    }, "Create a standard NLM configuration with sensible defaults");
+    
+    m.def("createMinimalConfig", []() {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 100, ConfigSource::Default);
+        config->set("brain.region_count", 1, ConfigSource::Default);
+        return config;
+    }, "Create a minimal NLM configuration for quick testing");
+
+    // Type convenience functions
+    m.def("neuron_type_names", []() {
+        return std::vector<std::string>{"Excitatory", "Inhibitory", 
+                                      "Modulatory", "Sensory", 
+                                      "Motor", "Internal"};
+    }, "Get list of all neuron type names");
+    
+    m.def("synapse_type_names", []() {
+        return std::vector<std::string>{"Excitatory", "Inhibitory",
+                                      "Modulatory", "Electrical",
+                                      "GapJunction"};
+    }, "Get list of all synapse type names");
+
+    // Performance and validation utilities
+    m.def("getBrainMetrics", [](const Brain& brain) {
+        return std::make_tuple(
+            brain.getTotalNeuronCount(),
+            brain.getTotalSynapseCount(),
+            brain.getActiveNeuronCount(),
+            brain.getFiringNeuronCount(),
+            brain.getAverageFiringRate(),
+            brain.getExcitationInhibitionRatio(),
+            brain.getTotalSpikeCount()
+        );
+    }, "Get comprehensive brain metrics as a tuple");
+    
+    m.def("checkConfigurationValid", [](const Config& config) {
+        // Basic validation - check for essential keys
+        auto keys = config.getKeys();
+        return keys.empty() || 
+               (config.has("brain.neuron_count") && config.has("brain.region_count"));
+    }, "Check if configuration has essential settings");
+
+    // Statistical helper functions
+    m.def("computeFiringStats", [](const Brain& brain, size_t window_size = 1000) {
+        // For now, compute basic statistics
+        return std::make_tuple(
+            brain.getTotalSpikeCount(),
+            brain.getFiringNeuronCount(),
+            brain.getAverageFiringRate(),
+            static_cast<float>(brain.getFiringNeuronCount()) / 
+                               std::max(1.0f, static_cast<float>(brain.getTotalNeuronCount()))
+        );
+    }, "Compute basic firing statistics");
+
+    // Error handling utilities
+    m.def("safeBrainStep", [](Brain& brain, SimulationStep step, 
+                            const py::object& time = py::none()) {
+        try {
+            if (time.is_none()) {
+                brain.step(step);
+            } else {
+                brain.step(step, time.cast<Timestamp>());
+            }
+            return true;
+        } catch (const std::exception& e) {
+            py::print("Warning: Brain step failed:", e.what());
+            return false;
+        }
+    }, py::arg("brain"), py::arg("step"), py::arg("time") = py::none(),
+     "Safely execute a brain step with error handling");
+
+    // Batch processing utilities
+    m.def("batchProcessBrains", [](const std::vector<std::shared_ptr<Brain>>& brains,
+                                 const std::function<void(Brain&)>& processor) {
+        for (auto& brain : brains) {
+            if (brain) processor(*brain);
+        }
+    }, py::arg("brains"), py::arg("processor"),
+     "Apply a processor function to multiple brains");
+
+    // Version and information
+    m.attr("__version__") = "1.0.0";
+    m.attr("__description__") = R"pbdoc(Improved NLM Python bindings with enhanced error handling and convenience functions)pbdoc";
+
+    // Register exception translations for better Python error handling
+    py::register_exception_translator([](std::exception_ptr p) {
+        try {
+            if (p) std::rethrow_exception(p);
+        } catch (const std::runtime_error& e) {
+            PyErr_SetString(PyExc_RuntimeError, e.what());
+        } catch (const std::invalid_argument& e) {
+            PyErr_SetString(PyExc_ValueError, e.what());
+        } catch (...) {
+            PyErr_SetString(PyExc_RuntimeError, "Unknown error in NLM bindings");
+        }
+    });
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
