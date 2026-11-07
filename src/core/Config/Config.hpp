@@ -32,6 +32,9 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration validation function
+using ValidationFunction = std::function<bool(const ConfigValue&)>;
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -65,23 +68,32 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    // Get values with better type safety and validation
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
 
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    template<typename T>
+    T getOrWithValidation(const std::string& key, const T& defaultValue,
+                          const ValidationFunction& validator) const;
+
+    // Enhanced set methods with validation support
+    template<typename T>
+    void set(const std::string& key, const T& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set with validation
+    template<typename T>
+    bool setWithValidation(const std::string& key, const T& value,
+                          const ValidationFunction& validator,
+                          ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;
+    
+    // Get validation function for a key
+    ValidationFunction getValidator(const std::string& key) const;
     
     // Remove key
     void remove(const std::string& key);
@@ -89,12 +101,18 @@ template<typename T>
     // Get all keys
     std::vector<std::string> getKeys() const;
     
+    // Get keys by pattern
+    std::vector<std::string> getKeysMatching(const std::string& pattern) const;
+    
     // Clear all
     void clear();
     
     // Get configuration summary
     std::string summary() const;
     
+    // Get detailed configuration info
+    std::vector<ConfigEntry> getAllEntries() const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
