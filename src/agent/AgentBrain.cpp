@@ -890,6 +890,30 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     thoughtReward_ = reward;
     hasThoughtOutcome_ = true;
+    
+    // Phase 6 dopamine in the loop (was advisory only). The reward
+    // signal now drives two neural systems: the brain's learned
+    // preference trait (only for Interact actions) and the brain's
+    // actual dopamine system, which modulates neural excitability
+    // and plasticity in real-time. This makes reward a direct driver
+    // of neural dynamics, not just an advisory signal.
+    float clampedReward = std::clamp(reward / 10.0f, -1.0f, 1.0f);
+    
+    // Apply reward to brain's learned preference trait (for Interact actions only)
+    if (lastDecoded_ == MotorCommand::Interact && std::abs(reward) > 0.01f) {
+        brain_->setLearnedPreference(brain_->getLearnedPreference() + 0.1f * clampedReward);
+    }
+    
+    // Pass reward to brain's dopamine system for real-time modulation
+    // This creates the crucial feedback loop that makes the brain
+    // respond directly to rewards
+    auto* dopamine = brain_->getDopamine();
+    if (dopamine) {
+        // Reset and set new prediction error as dopamine signal
+        dopamine->reset();
+        dopamine->setLevel(clampedReward);
+    }
+    
     // Phase 6 concept formation, wired into the loop: the pattern
     // that led to this action, paired with this action's reward.
     // Concepts therefore emerge from experienced pattern/reward
@@ -911,10 +935,6 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     //  - Planner action quality: EMA toward reward/10 for the action
     //    actually taken, so the planner's next suggestion reflects
     //    experienced outcomes, not its initial zeros.
-    //  - Learned preference trait: only Interact outcomes move it
-    //    (a resource reward makes interacting more attractive, a
-    //    hazard penalty less so), by 0.1 * reward/10 per event. This
-    //    is the trait the checkpoint carries across a reload.
     if (hasLastDecoded_) {
         ActionType taken = ActionType::Wait;
         switch (lastDecoded_) {
@@ -927,8 +947,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
         if (brain_->getPlanner()) {
             float q = brain_->getPlanner()->getActionQuality(taken);
-            float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
-            brain_->getPlanner()->setActionQuality(taken, 0.9f * q + 0.1f * r);
+            brain_->getPlanner()->setActionQuality(taken, 0.9f * q + 0.1f * clampedReward);
         }
         if (lastDecoded_ == MotorCommand::Interact && std::abs(reward) > 0.01f) {
             float r = std::clamp(reward / 10.0f, -1.0f, 1.0f);
