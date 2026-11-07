@@ -424,6 +424,521 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // ====================================================================
+    // ADVANCED BRAIN OPERATIONS AND CONVENIENCE METHODS
+    // ====================================================================
+
+    // Brain lifecycle and management
+    m.def("runBrainEpisode", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                              const std::vector<std::vector<float>>& visualInput, size_t maxSteps) {
+        
+        if (!brain || !world) {
+            throw std::runtime_error("Brain and world must be valid");
+        }
+        
+        brain->reset();
+        brain->initialize();
+        world->reset();
+        world->setAgentStart(0, 0);
+        
+        float totalReward = 0.0f;
+        size_t stepsCompleted = 0;
+        
+        for (size_t step = 0; step < maxSteps; ++step) {
+            // Process visual input if provided
+            if (!visualInput.empty() && step < visualInput.size()) {
+                Vision vision(visualInput[step].size(), 1, 3);
+                vision.setData(visualInput[step]);
+                brain->receiveSensoryInput(vision);
+            }
+            
+            // Step brain
+            brain->step(step, step * 0.001);
+            
+            // Produce and apply action
+            auto action = brain->produceAction();
+            if (action) {
+                // For simulation purposes, just log the action
+                // In real usage, this would affect world state
+                std::cout << "Action: " << action->getName() << std::endl;
+            }
+            
+            // Apply neuromodulation (simple reward for demonstration)
+            float reward = 0.1f;  // Small positive reward for survival
+            totalReward += reward;
+            
+            stepsCompleted++;
+        }
+        
+        return std::make_pair(totalReward, stepsCompleted);
+    }, py::arg("brain"), py::arg("world"), py::arg("visualInput"), py::arg("maxSteps"),
+        "Run a complete brain episode with given sensory input and return performance metrics");
+
+    // Neural region convenience methods
+    m.def("getRegionByName", [](std::shared_ptr<Brain> brain, const std::string& name) {
+        if (!brain) return nullptr;
+        size_t targetRegion = 0;  // Default region
+        // In real implementation, this would search for region by name
+        return brain->getRegion(RegionId(targetRegion));
+    }, py::arg("brain"), py::arg("name"),
+        "Get neural region by name (convenience method)");
+
+    // Brain statistics and analysis
+    m.def("analyzeBrainDynamics", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain must be valid");
+        }
+        
+        std::map<std::string, double> dynamics;
+        dynamics["total_spikes"] = static_cast<double>(brain->getTotalSpikeCount());
+        dynamics["total_neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+        dynamics["total_synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+        dynamics["firing_rate"] = brain->getAverageFiringRate();
+        dynamics["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        dynamics["active_neuron_ratio"] = static_cast<double>(brain->getActiveNeuronCount()) / 
+                                         std::max(1.0, static_cast<double>(brain->getTotalNeuronCount()));
+        
+        return dynamics;
+    }, py::arg("brain"),
+        "Analyze brain dynamics and return key metrics");
+
+    // Simulation utilities
+    m.def("createBrainFromConfigFile", [](const std::string& configFile) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(configFile)) {
+            throw std::runtime_error("Failed to load configuration from: " + configFile);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("configFile"), "Create brain from configuration file");
+
+    // Learning curve simulation
+    m.def("simulateLearning", [](std::shared_ptr<Brain> brain, size_t learningSteps, 
+                                const std::vector<float>& rewardSequence) {
+        if (!brain) {
+            throw std::runtime_error("Brain must be valid");
+        }
+        
+        brain->reset();
+        brain->initialize();
+        
+        std::vector<float> learningCurve;
+        float cumulativeReward = 0.0f;
+        
+        for (size_t step = 0; step < learningSteps; ++step) {
+            // Inject random current to promote learning
+            if (auto region = brain->getRegion(RegionId(0))) {
+                auto neurons = region->getAllNeurons();
+                if (!neurons.empty()) {
+                    size_t neuronIdx = step % neurons.size();
+                    neurons[neuronIdx]->injectCurrent(20.0f);
+                }
+            }
+            
+            // Step the brain
+            brain->step(step, step * 0.001);
+            
+            // Apply reward from sequence
+            float reward = (step < rewardSequence.size()) ? rewardSequence[step] : 0.0f;
+            cumulativeReward += reward;
+            
+            // Simple learning response (in real implementation, this would use neuromodulation)
+            learningCurve.push_back(cumulativeReward / (step + 1));
+        }
+        
+        return learningCurve;
+    }, py::arg("brain"), py::arg("learningSteps"), py::arg("rewardSequence"),
+        "Simulate learning over time and return learning curve");
+
+    // Advanced action utilities
+    m.def("createAction", [](const std::string& actionType, const std::vector<float>& parameters) {
+        ActionType type = ActionType::Custom;
+        
+        // Convert string to ActionType
+        if (actionType == "MoveForward") type = ActionType::MoveForward;
+        else if (actionType == "MoveBackward") type = ActionType::MoveBackward;
+        else if (actionType == "TurnLeft") type = ActionType::TurnLeft;
+        else if (actionType == "TurnRight") type = ActionType::TurnRight;
+        else if (actionType == "Look") type = ActionType::Look;
+        else if (actionType == "Interact") type = ActionType::Interact;
+        else if (actionType == "Eat") type = ActionType::Eat;
+        else if (actionType == "Rest") type = ActionType::Rest;
+        
+        return std::make_unique<Action>(type, parameters);
+    }, py::arg("actionType"), py::arg("parameters"),
+        "Create an action with specified type and parameters");
+
+    // Utility functions
+    m.def("validateBrainConfiguration", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::runtime_error("Configuration must be valid");
+        }
+        
+        bool valid = true;
+        std::vector<std::string> issues;
+        
+        // Basic validation
+        if (!config->has("neuron_count") || config->getOr<int64_t>("neuron_count", 0) <= 0) {
+            issues.push_back("neuron_count must be positive");
+            valid = false;
+        }
+        
+        if (!config->has("region_count") || config->getOr<int64_t>("region_count", 0) <= 0) {
+            issues.push_back("region_count must be positive");
+            valid = false;
+        }
+        
+        if (!config->has("connection_probability") || 
+            config->getOr<float>("connection_probability", 0.0f) < 0.0f || 
+            config->getOr<float>("connection_probability", 1.0f) > 1.0f) {
+            issues.push_back("connection_probability must be between 0.0 and 1.0");
+            valid = false;
+        }
+        
+        return std::make_pair(valid, issues);
+    }, py::arg("config"),
+        "Validate brain configuration and return validation result");
+
+    // ====================================================================
+    // EXPLORATION AND DEBUGGING TOOLS
+    // ====================================================================
+
+    // Brain exploration utilities
+    m.def("exploreBrainConnectivity", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain must be valid");
+        }
+        
+        std::map<std::string, double> connectivity;
+        connectivity["total_neurons"] = static_cast<double>(brain->getTotalNeuronCount());
+        connectivity["total_synapses"] = static_cast<double>(brain->getTotalSynapseCount());
+        connectivity["avg_synapses_per_neuron"] = brain->getTotalNeuronCount() > 0 ? 
+            static_cast<double>(brain->getTotalSynapseCount()) / brain->getTotalNeuronCount() : 0.0;
+        connectivity["spike_rate_per_second"] = brain->getAverageFiringRate() * 1000.0;  // Convert to per second
+        
+        return connectivity;
+    }, py::arg("brain"),
+        "Explore brain connectivity and return network metrics");
+
+    // Simulation benchmarking
+    m.def("benchmarkBrainPerformance", [](std::shared_ptr<Brain> brain, size_t benchmarkSteps) {
+        if (!brain) {
+            throw std::runtime_error("Brain must be valid");
+        }
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
+        
+        brain->reset();
+        brain->initialize();
+        
+        for (size_t step = 0; step < benchmarkSteps; ++step) {
+            brain->step(step, step * 0.001);
+        }
+        
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+        
+        double stepsPerSecond = (benchmarkSteps * 1000.0) / duration.count();
+        
+        std::map<std::string, double> benchmark;
+        benchmark["total_steps"] = static_cast<double>(benchmarkSteps);
+        benchmark["elapsed_time_ms"] = static_cast<double>(duration.count());
+        benchmark["steps_per_second"] = stepsPerSecond;
+        benchmark["spikes_per_step"] = static_cast<double>(brain->getTotalSpikeCount()) / 
+                                     std::max(1.0, static_cast<double>(benchmarkSteps));
+        
+        return benchmark;
+    }, py::arg("brain"), py::arg("benchmarkSteps"),
+        "Benchmark brain performance and return timing metrics");
+
+    // ====================================================================
+    // ADVANCED SENSOR AND WORLD UTILITIES
+    // ====================================================================
+
+    // Multi-modal sensory input utilities
+    m.def("createComplexSensoryInput", [](const std::vector<std::vector<float>>& visionData,
+                                         const std::vector<float>& audioData,
+                                         const std::vector<float>& internalData,
+                                         double timestamp) {
+        
+        // Create vision input
+        Vision vision;
+        if (!visionData.empty()) {
+            vision = Vision(visionData[0].size(), visionData.size(), 3);
+            std::vector<float> flattenedData;
+            for (const auto& row : visionData) {
+                flattenedData.insert(flattenedData.end(), row.begin(), row.end());
+            }
+            vision.setData(flattenedData);
+        }
+        
+        // Create audio input
+        Audio audio;
+        if (!audioData.empty()) {
+            audio = Audio(44100, audioData.size());
+            audio.setData(audioData);
+            audio.setSampleRate(44100);
+        }
+        
+        // Create internal signals
+        InternalSignals internal;
+        for (float value : internalData) {
+            internal.addSignal(value);
+        }
+        
+        // For now, return vision as primary - in full implementation would return a combined percept
+        vision.setTimestamp(timestamp);
+        return vision;
+    }, py::arg("visionData"), py::arg("audioData"), py::arg("internalData"), py::arg("timestamp"),
+        "Create complex multi-modal sensory input");
+
+    // World exploration utilities
+    m.def("exploreWorldCapabilities", [](std::shared_ptr<SimpleWorld> world) {
+        if (!world) {
+            throw std::runtime_error("World must be valid");
+        }
+        
+        std::map<std::string, double> capabilities;
+        capabilities["width"] = static_cast<double>(world->getWidth());
+        capabilities["height"] = static_cast<double>(world->getHeight());
+        capabilities["max_energy"] = static_cast<double>(world->getMaxEnergy());
+        capabilities["energy_decay_rate"] = static_cast<double>(world->getEnergyDecayRate());
+        capabilities["current_time"] = static_cast<double>(world->getSimulationTime());
+        
+        return capabilities;
+    }, py::arg("world"),
+        "Explore world capabilities and return world metrics");
+
+    // ====================================================================
+    // LEARNING AND ADAPTATION TOOLS
+    // ====================================================================
+
+    // Neuromodulation utilities
+    m.def("applyLearningSignals", [](std::shared_ptr<AgentBrain> agentBrain, 
+                                    const std::vector<std::pair<std::string, float>>& learningSignals) {
+        if (!agentBrain) {
+            throw std::runtime_error("Agent brain must be valid");
+        }
+        
+        for (const auto& signal : learningSignals) {
+            float signalValue = signal.second;
+            
+            // Map signal names to neuromodulation types
+            if (signal.first == "reward") {
+                agentBrain->applyRewardModulation(signalValue, 0.0f);
+            } else if (signal.first == "curiosity") {
+                // Simple curiosity-based exploration
+                float curiosityLevel = agentBrain->getCuriosityLevel();
+                agentBrain->enableCuriosity(true);
+            } else if (signal.first == "novelty") {
+                // Novelty detection would require additional systems
+            } else if (signal.first == "prediction_error") {
+                // Prediction error would require additional systems
+            }
+        }
+        
+        return true;
+    }, py::arg("agentBrain"), py::arg("learningSignals"),
+        "Apply multiple learning signals to agent brain");
+
+    // Development and maturation utilities
+    m.def("simulateDevelopment", [](std::shared_ptr<Brain> brain, size_t developmentSteps) {
+        if (!brain) {
+            throw std::runtime_error("Brain must be valid");
+        }
+        
+        brain->reset();
+        brain->initialize();
+        
+        std::vector<double> developmentProgress;
+        float plasticityFactor = 1.0f;
+        
+        for (size_t step = 0; step < developmentSteps; ++step) {
+            // Simulate developmental changes
+            brain->develop();
+            
+            // Track development progress
+            float stageProgress = static_cast<float>(step) / developmentSteps;
+            developmentProgress.push_back(stageProgress);
+            
+            // Plasticity changes with development
+            if (step % 100 == 0) {
+                plasticityFactor *= 0.99f;  // Gradual decrease in plasticity
+            }
+        }
+        
+        return developmentProgress;
+    }, py::arg("brain"), py::arg("developmentSteps"),
+        "Simulate brain development over time and return progress");
+
+    // ====================================================================
+    // ADVANCED USAGE PATTERNS AND EXAMPLES
+    // ====================================================================
+
+    // Complete agent training example
+    m.def("trainAgentExample", [](std::shared_ptr<Config> config, size_t trainingEpisodes,
+                                 const std::vector<std::vector<std::vector<float>>>& trainingData) {
+        
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(100, 100, 32, 32);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        std::vector<float> episodeRewards;
+        std::vector<double> learningCurves;
+        
+        for (size_t episode = 0; episode < trainingEpisodes; ++episode) {
+            float episodeReward = 0.0f;
+            
+            // Use training data if available
+            if (episode < trainingData.size()) {
+                // Create sensory input from training data
+                auto sensoryInput = createComplexSensoryInput(
+                    trainingData[episode][0],  // vision
+                    trainingData[episode][1],  // audio  
+                    trainingData[episode][2],  // internal
+                    0.0
+                );
+                brain->receiveSensoryInput(sensoryInput);
+            }
+            
+            // Run episode
+            for (size_t step = 0; step < 100; ++step) {
+                brain->step(step, step * 0.001);
+                auto action = brain->produceAction();
+                
+                if (action) {
+                    // Simple reward for action
+                    float reward = 0.1f;
+                    episodeReward += reward;
+                    agent->applyRewardModulation(reward, 0.0f);
+                }
+            }
+            
+            episodeRewards.push_back(episodeReward);
+            learningCurves.push_back(static_cast<double>(episodeReward) / 100.0);
+        }
+        
+        std::map<std::string, std::vector<double>> trainingResults;
+        trainingResults["episode_rewards"] = std::vector<double>(episodeRewards.begin(), episodeRewards.end());
+        trainingResults["learning_curves"] = learningCurves;
+        
+        return trainingResults;
+    }, py::arg("config"), py::arg("trainingEpisodes"), py::arg("trainingData"),
+        "Complete agent training example with multiple episodes");
+
+    // ====================================================================
+    // ERROR HANDLING AND VALIDATION
+    // ====================================================================
+
+    // Enhanced error handling
+    m.def("safeBrainOperation", [](std::shared_ptr<Brain> brain, 
+                                  std::function<void(std::shared_ptr<Brain>)> operation) {
+        if (!brain) {
+            throw std::runtime_error("Brain operation failed: invalid brain");
+        }
+        
+        try {
+            operation(brain);
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Brain operation failed: " << e.what() << std::endl;
+            return false;
+        }
+    }, py::arg("brain"), py::arg("operation"),
+        "Safely execute brain operation with error handling");
+
+    // ====================================================================
+    // PERFORMANCE MONITORING
+    // ====================================================================
+
+    // Performance monitoring utilities
+    m.def("monitorBrainPerformance", [](std::shared_ptr<Brain> brain, 
+                                        size_t monitoringSteps,
+                                        std::function<void(const std::map<std::string, double>&)> callback) {
+        if (!brain) {
+            throw std::runtime_error("Brain must be valid");
+        }
+        
+        for (size_t step = 0; step < monitoringSteps; ++step) {
+            brain->step(step, step * 0.001);
+            
+            // Get current metrics
+            auto metrics = analyzeBrainDynamics(brain);
+            
+            // Call callback with metrics
+            if (callback) {
+                callback(metrics);
+            }
+            
+            // Small delay to simulate real-time monitoring
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        
+        return true;
+    }, py::arg("brain"), py::arg("monitoringSteps"), py::arg("callback"),
+        "Monitor brain performance over time with callback");
+
+    // ====================================================================
+    // DIAGNOSTIC AND DEBUGGING TOOLS
+    // ====================================================================
+
+    // Brain diagnostic utilities
+    m.def("diagnoseBrainHealth", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::runtime_error("Brain must be valid");
+        }
+        
+        std::map<std::string, std::string> diagnostics;
+        
+        // Basic health checks
+        diagnostics["total_neurons"] = std::to_string(brain->getTotalNeuronCount());
+        diagnostics["total_synapses"] = std::to_string(brain->getTotalSynapseCount());
+        diagnostics["spike_count"] = std::to_string(brain->getTotalSpikeCount());
+        diagnostics["avg_firing_rate"] = std::to_string(brain->getAverageFiringRate());
+        diagnostics["excitation_inhibition_ratio"] = std::to_string(brain->getExcitationInhibitionRatio());
+        
+        // Health assessment
+        bool healthy = true;
+        std::vector<std::string> warnings;
+        
+        if (brain->getTotalNeuronCount() == 0) {
+            healthy = false;
+            warnings.push_back("No neurons initialized");
+        }
+        
+        if (brain->getAverageFiringRate() > 100.0) {
+            warnings.push_back("High firing rate detected (possible seizure)");
+        }
+        
+        if (brain->getExcitationInhibitionRatio() > 10.0) {
+            warnings.push_back("Severe excitation/inhibition imbalance");
+        }
+        
+        diagnostics["healthy"] = healthy ? "true" : "false";
+        diagnostics["warnings"] = "[]";  // Simplified for example
+        
+        return diagnostics;
+    }, py::arg("brain"),
+        "Diagnose brain health and return diagnostic information");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

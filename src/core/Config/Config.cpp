@@ -3,14 +3,98 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
+#include <cstring>
 
 namespace nlm {
+
+namespace {
+    // Helper function to trim whitespace from strings
+    std::string trim(const std::string& str) {
+        size_t start = 0;
+        size_t end = str.size();
+        
+        // Trim leading whitespace
+        while (start < end && std::isspace(str[start])) {
+            ++start;
+        }
+        
+        // Trim trailing whitespace
+        while (end > start && std::isspace(str[end - 1])) {
+            --end;
+        }
+        
+        return str.substr(start, end - start);
+    }
+    
+    // Helper function to check if a string is a valid key
+    bool isValidKey(const std::string& key) {
+        return !key.empty() && std::find_if(key.begin(), key.end(),
+            [](unsigned char c) { return !std::isalnum(c) && c != '_' && c != '-'; }) == key.end();
+    }
+    
+    // Helper function to convert string to appropriate ConfigValue type
+    ConfigValue stringToConfigValue(const std::string& value) {
+        // Check if it's a boolean
+        if (value == "true" || value == "false") {
+            return value == "true";
+        }
+        
+        // Check if it's an integer
+        try {
+            size_t pos;
+            long long intVal = std::stoll(value);
+            // Check if it fits in int range
+            if (intVal >= std::numeric_limits<int>::min() && intVal <= std::numeric_limits<int>::max()) {
+                return static_cast<int>(intVal);
+            }
+            return intVal;
+        } catch (...) {}
+        
+        // Check if it's a floating point
+        try {
+            double doubleVal = std::stod(value);
+            // Check if it fits in float range
+            if (doubleVal >= std::numeric_limits<float>::lowest() && 
+                doubleVal <= std::numeric_limits<float>::max()) {
+                return static_cast<float>(doubleVal);
+            }
+            return doubleVal;
+        } catch (...) {}
+        
+        // Return as string (default)
+        return value;
+    }
+}
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with default values
+    pImpl->entries = {
+        ConfigEntry("neuron_count", 500, ConfigSource::Default, "Number of neurons in the brain"),
+        ConfigEntry("region_count", 1, ConfigSource::Default, "Number of neural regions"),
+        ConfigEntry("connection_probability", 0.15f, ConfigSource::Default, "Probability of connections between neurons"),
+        ConfigEntry("stdp_ltp_weight", 0.02f, ConfigSource::Default, "STDP long-term potentiation weight"),
+        ConfigEntry("stdp_ltd_weight", 0.015f, ConfigSource::Default, "STDP long-term depression weight"),
+        ConfigEntry("stdp_tau", 20.0f, ConfigSource::Default, "STDP time constant"),
+        ConfigEntry("synaptogenesis_rate", 0.0001f, ConfigSource::Default, "Rate of new synapse formation"),
+        ConfigEntry("pruning_rate", 0.00001f, ConfigSource::Default, "Rate of synapse elimination"),
+        ConfigEntry("simulation_timestep", 0.001, ConfigSource::Default, "Simulation time step in seconds"),
+        ConfigEntry("random_seed", static_cast<int64_t>(42), ConfigSource::Default, "Random seed for reproducibility"),
+        ConfigEntry("max_energy", 100.0f, ConfigSource::Default, "Maximum energy for agents"),
+        ConfigEntry("energy_decay_rate", 0.1f, ConfigSource::Default, "Energy decay rate per step"),
+        ConfigEntry("development_stage", static_cast<int>(DevelopmentalStage::Adult), ConfigSource::Default, "Current developmental stage"),
+        ConfigEntry("enable_plasticity", true, ConfigSource::Default, "Enable/disable plasticity mechanisms"),
+        ConfigEntry("enable_development", true, ConfigSource::Default, "Enable/disable developmental processes"),
+        ConfigEntry("enable_checkpointing", true, ConfigSource::Default, "Enable/disable checkpoint saving"),
+        ConfigEntry("learning_rate", 0.01f, ConfigSource::Default, "Learning rate for plasticity"),
+        ConfigEntry("novelty_threshold", 0.5f, ConfigSource::Default, "Threshold for novelty detection"),
+        ConfigEntry("curiosity_factor", 0.1f, ConfigSource::Default, "Curiosity-driven exploration factor")
+    };
+}
 
 Config::~Config() = default;
 
@@ -19,16 +103,32 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Validate file path
+    if (filepath.empty()) {
+        throw std::invalid_argument("Filepath cannot be empty");
+    }
+    
+    // Check if file exists and is readable
+    if (!std::filesystem::exists(filepath)) {
+        throw std::runtime_error("Configuration file does not exist: " + filepath);
+    }
+    
+    if (!std::filesystem::is_regular_file(filepath)) {
+        throw std::runtime_error("Configuration path is not a file: " + filepath);
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        throw std::runtime_error("Cannot open configuration file for reading: " + filepath);
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    bool hasValidContent = false;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -48,16 +148,47 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Validate key
+            if (!isValidKey(key)) {
+                throw std::runtime_error("Invalid configuration key at line " + std::to_string(lineNumber) + ": " + key);
+            }
+            
+            // Parse and set value
+            try {
+                ConfigValue configValue = stringToConfigValue(value);
+                set(key, configValue, ConfigSource::File);
+                hasValidContent = true;
+            } catch (const std::exception& e) {
+                throw std::runtime_error("Error parsing configuration value at line " + std::to_string(lineNumber) + ": " + std::string(e.what()));
+            }
+        } else {
+            throw std::runtime_error("Invalid configuration format at line " + std::to_string(lineNumber) + ": missing '='");
         }
+    }
+    
+    if (!hasValidContent) {
+        throw std::runtime_error("Configuration file contains no valid key=value pairs");
     }
     
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (!argv) {
+        throw std::invalid_argument("argv cannot be nullptr");
+    }
+    
+    if (argc < 1) {
+        throw std::invalid_argument("argc must be at least 1");
+    }
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        
+        // Validate argument
+        if (arg.empty()) {
+            throw std::invalid_argument("Argument " + std::to_string(i) + " is empty");
+        }
         
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
@@ -65,6 +196,12 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key
+                if (!isValidKey(key)) {
+                    throw std::runtime_error("Invalid configuration key in argument: " + key);
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
             }
         }
@@ -72,6 +209,12 @@ bool Config::loadFromArgs(int argc, char** argv) {
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key
+            if (!isValidKey(key)) {
+                throw std::runtime_error("Invalid configuration key in argument: " + key);
+            }
+            
             set(key, value, ConfigSource::CommandLine);
         }
     }
@@ -79,14 +222,54 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
+    // Validate file path
+    if (filepath.empty()) {
+        throw std::invalid_argument("Filepath cannot be empty");
     }
     
+    // Check if directory exists (file may not exist yet)
+    std::filesystem::path filepathObj(filepath);
+    if (!filepathObj.has_parent_path() || !std::filesystem::exists(filepathObj.parent_path())) {
+        throw std::runtime_error("Cannot write to directory: " + filepathObj.parent_path().to_string());
+    }
+    
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Cannot open configuration file for writing: " + filepath);
+    }
+    
+    // Write header
+    file << "// NLM Configuration File" << std::endl;
+    file << "// Generated: " << std::chrono::system_clock::now() << std::endl;
+    file << "// Version: 0. aspettare della Configuration File (placeholder for values)" << std::endl;
+    file << std::endl;
+    
     for (const auto& entry : pImpl->entries) {
+        // Write comment
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Write key=value pair
+        file << entry.key << " = ";
+        
+        // Convert ConfigValue to string
+        std::visit([&file](const auto& val) {
+            if constexpr (std::is_same<const std::string&, decltype(val)>::value) {
+                file << "\"" << val << "\"\n";
+            } else if constexpr (std::is_same<const int, decltype(val)>::value) {
+                file << val << "\n";
+            } else if constexpr (std::is_same<const int64_t, decltype(val)>::value) {
+                file << val << "LL\n";
+            } else if constexpr (std::is_same<const double, decltype(val)>::value) {
+                file << val << "\n";
+            } else if constexpr (std::is_same<const bool, decltype(val)>::value) {
+                file << (val ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same<const float, decltype(val)>::value) {
+                file << val << "f\n";
+            } else {
+                // Handle vector types (simplified for example)
+                file << "// Vector value: " << val << "\n";
+            }
+        }, entry.value);
     }
     
     return true;

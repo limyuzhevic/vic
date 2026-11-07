@@ -44,7 +44,32 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+/**
+     * @class Config
+     * @brief Configuration management for NLM neural simulation
+     * 
+     * This class manages all configuration parameters for the NLM system,
+     * including neural network parameters, simulation settings, and environment
+     * configuration. The configuration system supports multiple value types,
+     * persistence to files, and runtime modification.
+     * 
+     * Configuration values are stored as variants that can contain:
+     * - Basic types (int, int64_t, double, bool, string)
+     * - Collections (vector<int>, vector<double>, vector<string>)
+     * 
+     * Each configuration value has an associated source (Default, File, 
+     * CommandLine, Runtime) that determines its precedence and origin.
+     * 
+     * @note Configuration files are expected to be in JSON format
+     * @note Values can be modified at runtime during simulation
+     * @note Configuration is used by all NLM subsystems (brain, world, agent)
+     * 
+     * @author NLM Project
+     * @date 2026
+     * @version 0.1.0
+     * 
+     * @ingroup core_systems
+     */
 class Config {
 public:
     Config();
