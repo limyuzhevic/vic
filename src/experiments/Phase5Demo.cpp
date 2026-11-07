@@ -35,6 +35,7 @@
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "demo_utils.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -42,48 +43,16 @@
 #include <string>
 #include <utility>
 
-namespace nlm {
+using namespace nlm;
 
-namespace {
-
-const char* cmdName(MotorCommand cmd) {
-    switch (cmd) {
-        case MotorCommand::MoveForward: return "MoveForward";
-        case MotorCommand::MoveBackward: return "MoveBackward";
-        case MotorCommand::TurnLeft: return "TurnLeft";
-        case MotorCommand::TurnRight: return "TurnRight";
-        case MotorCommand::LookLeft: return "LookLeft";
-        case MotorCommand::LookRight: return "LookRight";
-        case MotorCommand::Interact: return "Interact";
-        default: return "Wait";
+int main(int argc, char* argv[]) {
+    nlm::demo_utils::CLIOptions cli;
+    if (!cli.parse(argc, argv)) {
+        return 0;
     }
-}
-
-std::shared_ptr<Config> makeConfig() {
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", 500);
-    config->set("region_count", 2);
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", static_cast<int64_t>(42));
-    config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
-    config->set("stdp_tau", 20.0f);
-    config->set("synaptogenesis_rate", 0.0001f);
-    config->set("pruning_rate", 0.00001f);
-    return config;
-}
-
-SensoryPercept makePercept(const std::vector<float>& vision,
-                           const std::vector<float>& touch) {
-    SensoryPercept p;
-    p.setVision(vision);
-    p.setTouch(touch);
-    p.setInternal({1.0f, 1.0f, 0.0f, 0.0f});
-    p.setProprioception({0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 0.0f});
-    p.setAudio({});
-    return p;
-}
+    
+    std::cout << "Phase 5 demo — brain-personality / sandbox-teachable brain.\n";
+    std::cout << "===========================================================\n\n";
 
 // Run one pattern through a fresh brain and report the decode.
 void probePattern(const char* label, const SensoryPercept& percept) {

@@ -368,6 +368,37 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Add advanced configuration parameters for Phase 2
+    config->set("hebbian_learning_rate", 0.01f, ConfigSource::Default);
+    config->set("hebbian_max_weight", 1.0f, ConfigSource::Default);
+    config->set("hebbian_min_weight", 0.0f, ConfigSource::Default);
+    config->set("dopamine_baseline", 0.1f, ConfigSource::Default);
+    config->set("dopamine_decay_rate", 0.95f, ConfigSource::Default);
+    config->set("reward_discount_factor", 0.99f, ConfigSource::Default);
+    config->set("working_memory_capacity", 100, ConfigSource::Default);
+    config->set("episodic_memory_max_duration", 10000, ConfigSource::Default);
+    config->set("prediction_system_horizon", 10, ConfigSource::Default);
+    config->set("concept_formation_min_examples", 5, ConfigSource::Default);
+    config->set("novelty_threshold", 0.5f, ConfigSource::Default);
+    config->set("curiosity_baseline", 0.1f, ConfigSource::Default);
+    config->set("development_max_iterations", 1000, ConfigSource::Default);
+    config->set("pruning_threshold", 0.1f, ConfigSource::Default);
+    config->set("maturation_rate", 0.01f, ConfigSource::Default);
+    config->set("synaptogenesis_max_connections", 1000, ConfigSource::Default);
+    config->set("lif_resting_potential", -0.7f, ConfigSource::Default);
+    config->set("lif_threshold_potential", -0.55f, ConfigSource::Default);
+    config->set("lif_refractory_period", 0.005f, ConfigSource::Default);
+    config->set("synaptic_delay_min", 0.001f, ConfigSource::Default);
+    config->set("synaptic_delay_max", 0.01f, ConfigSource::Default);
+    config->set("stdp_max_weight_change", 0.1f, ConfigSource::Default);
+    config->set("plasticity_stddev", 0.01f, ConfigSource::Default);
+    
+    // Validate configuration
+    if (!config->validate()) {
+        NLM_LOG_ERROR("Configuration validation failed!");
+        return 1;
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -376,6 +407,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  hebbian_learning_rate: " + std::to_string(config->getOr<float>("hebbian_learning_rate", 0.01f)));
+    NLM_LOG_INFO("  dopamine_baseline: " + std::to_string(config->getOr<float>("dopamine_baseline", 0.1f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

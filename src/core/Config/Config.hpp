@@ -95,6 +95,12 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration parameters
+    bool validate() const;
+    
+    // Get configuration parameter information for help
+    std::string getParameterInfo(const std::string& key) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

@@ -43,6 +43,7 @@
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "demo_utils.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -51,8 +52,7 @@
 #include <utility>
 #include <vector>
 
-namespace nlm {
-namespace {
+using namespace nlm;
 
 const char* cmdName(MotorCommand cmd) {
     switch (cmd) {

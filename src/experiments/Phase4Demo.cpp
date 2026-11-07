@@ -13,37 +13,21 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
+#include "demo_utils.hpp"
 
 using namespace nlm;
 
-void printHeader(const std::string& title) {
-    std::cout << "\n" << std::string(60, '=') << "\n";
-    std::cout << "  " << title << "\n";
-    std::cout << std::string(60, '=') << "\n";
-}
-
-void printResult(const std::string& name, float value, float max = 1.0f) {
-    std::cout << "  " << std::left << std::setw(30) << name << ": ";
-    std::cout << std::fixed << std::setprecision(3) << value;
-    if (max > 0) {
-        std::cout << " (" << std::setprecision(1) << (value/max*100) << "%)";
-    }
-    std::cout << "\n";
-}
-
-void printSection(const std::string& title) {
-    std::cout << "\n--- " << title << " ---\n";
-}
-
 int main(int argc, char* argv[]) {
+    nlm::demo_utils::CLIOptions cli;
+    if (!cli.parse(argc, argv)) {
+        return 0;
+    }
+    
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
     
-    // Parse command line arguments
-    size_t numTrials = 50;
-    if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
-    }
+    // Get number of trials from CLI (default from demo_utils is 50)
+    size_t numTrials = cli.numTrials;
     
     // Create configuration
     auto config = std::make_shared<Config>();

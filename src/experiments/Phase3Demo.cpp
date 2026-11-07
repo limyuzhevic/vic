@@ -6,6 +6,7 @@
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "demo_utils.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -342,18 +343,21 @@ private:
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
+    nlm::demo_utils::CLIOptions cli;
+    if (!cli.parse(argc, argv)) {
+        return 0;
+    }
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
-    }
+    int numEpisodes = cli.numEpisodes;
+    int stepsPerEpisode = cli.stepsPerEpisode;
+    
+    std::cout << "NLM Phase 3: World Interaction Demo" << std::endl;
+    std::cout << std::string(60, '=') << std::endl << std::endl;
     
     nlm::Phase3Demo demo;
     demo.run(numEpisodes, stepsPerEpisode);
+    
+    return  Affiliate Code << std::endl;
     
     return 0;
 }
