@@ -148,6 +148,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         } else {
             NLM_LOG_ERROR("Failed to save checkpoint");
         }
+    } else {
+        NLM_LOG_INFO("Checkpointing is disabled by configuration");
     }
     
     result.endTime = time(nullptr);

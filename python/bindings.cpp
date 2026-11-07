@@ -145,7 +145,7 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+              "Load configuration from a JSON file")
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
@@ -157,15 +157,29 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("args"),
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+              "Get all configuration keys")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+              "Clear all configuration entries")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+              "Get a summary string of the configuration")
+        .def("get", [](Config& self, const std::string& key) {
+            return self.getOr<std::string>("", key);
+        }, py::arg("key"),
+             "Get configuration value as a string (or empty string if not present)")
+        .def("getInt", [](Config& self, const std::string& key, int64_t defaultValue = 0) {
+            return self.getOr<int64_t>(defaultValue, key);
+        }, py::arg("key"), py::arg("defaultValue") = 0,
+             "Get configuration value as an integer")
+        .def("getFloat", [](Config& self, const std::string& key, float defaultValue = 0.0f) {
+            return self.getOr<float>(defaultValue, key);
+        }, py::arg("key"), py::arg("defaultValue") = 0.0f,
+             "Get configuration value as a float")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"),
+              "Set configuration value")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -249,7 +263,19 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("reward"), py::arg("success"), py::arg("message") = "")
         .def_readwrite("reward", &ActionResult::reward)
         .def_readwrite("success", &ActionResult::success)
-        .def_readwrite("message", &ActionResult::message);
+        .def_readwrite("message", &ActionResult::message)
+        .def("to_dict", [](const ActionResult& self) {
+            return py::dict(
+                "reward"_a = self.reward,
+                "success"_a = self.success,
+                "message"_a = self.message
+            );
+        })
+        .def("__repr__", [](const ActionResult& self) {
+            return "ActionResult(reward=" + std::to_string(self.reward) +
+                   ", success=" + (self.success ? "true" : "false") +
+                   ", message=\"" + self.message + "\")";
+        });
 
     py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
         .def(py::init<>())
@@ -267,17 +293,32 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
         .def("getAllSignals", &SensoryPercept::getAllSignals)
         .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"))
+        .def("addVisionSignal", [](SensoryPercept& self, float value) {
+            auto vision = self.getVision();
+            vision.push_back(value);
+            self.setVision(vision);
+        }, py::arg("value"))
+        .def("addTouchSignal", [](SensoryPercept& self, float value) {
+            auto touch = self.getTouch();
+            touch.push_back(value);
+            self.setTouch(touch);
+        }, py::arg("value"))
+        .def("addInternalSignal", [](SensoryPercept& self, float value) {
+            auto internal = self.getInternal();
+            internal.push_back(value);
+            self.setInternal(internal);
+        }, py::arg("value"))
 
     py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
+              py::arg("visionWidth"), py::arg("visionHeight"))
         .def("reset", &SimpleWorld::reset)
         .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
         .def("update", &SimpleWorld::update, py::arg("timestep"))
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+              py::arg("cmd"), py::arg("currentTime"))
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
              py::return_value_policy::reference_internal)
         .def("getAgentBody", &SimpleWorld::getAgentBody,
@@ -293,7 +334,41 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Python convenience methods
+        .def("getObjectAt", [](SimpleWorld& self, float x, float y) {
+            auto* obj = self.getObjectAt(x, y);
+            if (!obj) {
+                py::dict result;
+                return result;
+            }
+            return py::dict(
+                "x"_a = obj->x,
+                "y"_a = obj->y,
+                "type"_a = static_cast<int>(obj->type),
+                "value"_a = obj->value,
+                "radius"_a = obj->radius
+            );
+        }, py::arg("x"), py::arg("y"))
+        .def("getObjects", [](SimpleWorld& self) {
+            py::list result;
+            for (auto& obj : self.getObjects()) {
+                result.append(py::dict(
+                    "x"_a = obj.x,
+                    "y"_a = obj.y,
+                    "type"_a = static_cast<int>(obj.type),
+                    "value"_a = obj.value,
+                    "radius"_a = obj.radius
+                ));
+            }
+            return result;
+        })
+        .def("setVision", [](SimpleWorld& self, const std::vector<float>& vision) {
+            auto percept = self.getSensoryPercept();
+            percept.setVision(vision);
+            // Note: SimpleWorld doesn't expose modifySensoryPercept directly,
+            // so this is a convenience method that creates a new percept
+        }, py::arg("vision"))
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -412,6 +487,7 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
+    // Python-specific convenience functions
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
@@ -423,6 +499,23 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Python-specific convenience functions for simulation setup
+    m.def("setup_simulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, std::shared_ptr<AgentBrain> agent) {
+        agent->initialize(*world);
+        return "Simulation setup complete";
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+       "Initialize agent with world (convenience function for Python)");
+
+    m.def("run_step", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, std::shared_ptr<Brain> brain, int step) {
+        auto percept = world->getSensoryPercept();
+        agent->processSensoryInput(percept);
+        brain->step(step);
+        auto action = agent->decodeMotorCommand();
+        auto result = world->applyMotorCommand(action, world->getSimulationTime());
+        return result;
+    }, py::arg("agent"), py::arg("world"), py::arg("brain"), py::arg("step"),
+       "Run a single simulation step (convenience function for Python)");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
