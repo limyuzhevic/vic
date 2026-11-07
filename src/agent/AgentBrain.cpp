@@ -222,15 +222,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (lastWinnerGroup_ >= 0 && lastWinnerGroup_ != 4 &&
         consecutiveWinnerCount_ < 3 &&
         lastWinnerMargin_ > 5.0f && noveltyLevel_ < 0.3f) {
-        const std::vector<Neuron*>* groups[5] = {
-            &motorForward_, &motorBackward_, &motorTurnLeft_,
-            &motorTurnRight_, &motorInteract_};
-        for (int g = 0; g < 5; ++g) {
-            if (g == lastWinnerGroup_) continue;
-            for (Neuron* n : *groups[g]) {
-                if (n) n->injectCurrent(-4.0f);
-            }
-        }
+        applyWinnerTakeAllInhibition(lastWinnerGroup_);
         ++wtaPulseCount_;
     }
 
@@ -406,6 +398,10 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
                         + 0.6f * curiosityLevel_;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
+    
+    updateNoveltyPrediction(vision);
+    float novel = computeSceneNovelty(vision);
+    noveltyLevel_ = novel * sensoryNoveltyDecay_;
 }
 
 MotorCommand AgentBrain::decodeMotorCommand() {
@@ -984,9 +980,114 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
     }
+void AgentBrain::applyWinnerTakeAllInhibition(int winnerGroup) {
+    const std::vector<Neuron*>* groups[5] = {
+        &motorForward_, &motorBackward_, &motorTurnLeft_,
+        &motorTurnRight_, &motorInteract_};
+    for (int g = 0; g < 5; ++g) {
+        if (g == winnerGroup) continue;
+        for (Neuron* n : *groups[g]) {
+            if (n) n->injectCurrent(-4.0f);
+        }
+    }
 }
 
-void AgentBrain::updateDevelopment(double timestep) {
+void AgentBrain::applyConceptBias() {
+    if (brain_ && brain_->getConceptFormation()) {
+        auto pat = conceptPattern();
+        float norm = 0.0f;
+        for (float v : pat) norm += v * v;
+        if (norm > 0.01f) {
+            size_t cid = brain_->getConceptFormation()->getMatchingConcept(pat);
+            const auto* foundConcept = cid ? brain_->getConceptFormation()->getConcept(cid) : nullptr;
+            if (foundConcept && !foundConcept->instances.empty()) {
+                float avg = 0.0f;
+                for (const auto& inst : foundConcept->instances) avg += inst.avgReward;
+                avg /= static_cast<float>(foundConcept->instances.size());
+                // Interact boost for positive concepts, turn penalties for negative concepts
+                if (avg > 0.1f && maxTouch_ > 0.05f) { /* interactRate += 8.0f; */ ++conceptBiasCount_; }
+                else if (avg < -0.1f) { /* interactRate = std::max(0.0f, interactRate - 8.0f); */ ++conceptBiasCount_; }
+            }
+        }
+    }
+}
+
+void AgentBrain::applyReflexBonus() {
+    // TODO: Implement reflex bonus logic
+}
+
+void AgentBrain::applyHazardSuppression() {
+    // TODO: Implement hazard suppression logic
+}
+
+void AgentBrain::applyPlannerBias() {
+    // TODO: Implement planner bias logic
+}
+
+void AgentBrain::applySelfModelBias() {
+    // TODO: Implement self model bias logic
+}
+
+void AgentBrain::applySocialBias() {
+    // TODO: Implement social bias logic
+}
+
+void AgentBrain::applyTurnDiversityPenalty() {
+    // TODO: Implement turn diversity penalty logic
+}
+
+void AgentBrain::applyMomentumReversalPenalty() {
+    // TODO: Implement momentum reversal penalty logic
+}
+
+MotorCommand AgentBrain::selectActionFromFilteredRates(const std::vector<MotorCommand>& candidates, const std::vector<float>& rates) {
+    // TODO: Implement action selection from filtered rates
+    return MotorCommand::Wait;
+}
+
+void AgentBrain::updateNoveltyPrediction(const std::vector<float>& vision) {
+    if (!vision.empty()) {
+        if (predictedVision_.size() != vision.size()) {
+            predictedVision_.assign(vision.size(), 0.0f);
+        }
+        constexpr float kPredictionAlpha = 0.05f;
+        for (size_t i = 0; i < vision.size(); ++i) {
+            predictedVision_[i] += kPredictionAlpha * (vision[i] - predictedVision_[i]);
+        }
+    }
+}
+
+float AgentBrain::computeSceneNovelty(const std::vector<float>& vision) {
+    if (vision.empty() || predictedVision_.size() != vision.size()) return 0.0f;
+    float totalDiff = 0.0f;
+    for (size_t i = 0; i < vision.size(); ++i) {
+        totalDiff += std::abs(vision[i] - predictedVision_[i]);
+    }
+    return totalDiff / static_cast<float>(vision.size()) * sensoryNoveltyDecay_;
+}
+
+std::string AgentBrain::formatThoughtTrace() const {
+    std::string out = "perceived=[" + thoughtPercept_ + "] -> planned=[";
+    switch (thoughtPlanned_) {
+        case MotorCommand::MoveForward: out += "MoveForward"; break;
+        case MotorCommand::MoveBackward: out += "MoveBackward"; break;
+        case MotorCommand::TurnLeft: out += "TurnLeft"; break;
+        case MotorCommand::TurnRight: out += "TurnRight"; break;
+        case MotorCommand::Interact: out += "Interact"; break;
+        default: out += "Wait"; break;
+    }
+    out += "] -> acted=[";
+    switch (lastDecoded_) {
+        case MotorCommand::MoveForward: out += "MoveForward"; break;
+        case MotorCommand::MoveBackward: out += "MoveBackward"; break;
+        case MotorCommand::TurnLeft: out += "TurnLeft"; break;
+        case MotorCommand::TurnRight: out += "TurnRight"; break;
+        case MotorCommand::Interact: out += "Interact"; break;
+        default: out += "Wait"; break;
+    }
+    out += "] -> reward=" + std::to_string(thoughtReward_);
+    return out;
+}
     if (!brain_ || !developmentEnabled_) return;
     
     developmentalAge_ += timestep;
@@ -1018,9 +1119,135 @@ void AgentBrain::updateDevelopment(double timestep) {
             sp->setPruningRate(pruneRate);
         }
     }
+// Implementation of helper functions for AgentBrain
+void AgentBrain::applyWinnerTakeAllInhibition(int winnerGroup) {
+    const std::vector<Neuron*>* groups[5] = {
+        &motorForward_, &motorBackward_, &motorTurnLeft_,
+        &motorTurnRight_, &motorInteract_};
+    for (int g = 0; g < 5; ++g) {
+        if (g == winnerGroup) continue;
+        for (Neuron* n : *groups[g]) {
+            if (n) n->injectCurrent(-4.0f);
+        }
+    }
 }
 
-DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
+void AgentBrain::applyConceptBias() {
+    if (brain_ && brain_->getConceptFormation()) {
+        auto pat = conceptPattern();
+        float norm = 0.0f;
+        for (float v : pat) norm += v * v;
+        if (norm > 0.01f) {
+            size_t cid = brain_->getConceptFormation()->getMatchingConcept(pat);
+            const auto* foundConcept = cid ? brain_->getConceptFormation()->getConcept(cid) : nullptr;
+            if (foundConcept && !foundConcept->instances.empty()) {
+                float avg = 0.0f;
+                for (const auto& inst : foundConcept->instances) avg += inst.avgReward;
+                avg /= static_cast<float>(foundConcept->instances.size());
+                if (avg > 0.1f && maxTouch_ > 0.05f) { 
+                    // interactRate += 8.0f; 
+                    ++conceptBiasCount_; 
+                } 
+                else if (avg < -0.1f) { 
+                    // interactRate = std::max(0.0f, interactRate - 8.0f);
+                    ++conceptBiasCount_; 
+                }
+            }
+        }
+    }
+}
+
+void AgentBrain::applyReflexBonus() {
+    // TODO: Implement reflex bonus logic
+}
+
+void AgentBrain::applyHazardSuppression() {
+    // TODO: Implement hazard suppression logic
+}
+
+void AgentBrain::applyPlannerBias() {
+    // TODO: Implement planner bias logic
+}
+
+void AgentBrain::applySelfModelBias() {
+    // TODO: Implement self model bias logic
+}
+
+void AgentBrain::applySocialBias() {
+    // TODO: Implement social bias logic
+}
+
+void AgentBrain::applyTurnDiversityPenalty() {
+    // TODO: Implement turn diversity penalty logic
+}
+
+void AgentBrain::applyMomentumReversalPenalty() {
+    // TODO: Implement momentum reversal penalty logic
+}
+
+MotorCommand AgentBrain::selectActionFromFilteredRates(const std::vector<MotorCommand>& candidates, const std::vector<float>& rates) {
+    if (candidates.empty() || rates.empty() || candidates.size() != rates.size()) {
+        return MotorCommand::Wait;
+    }
+    
+    MotorCommand bestCmd = MotorCommand::Wait;
+    float bestRate = 0.0f;
+    
+    for (size_t i = 0; i < candidates.size(); ++i) {
+        if (rates[i] > bestRate) {
+            bestRate = rates[i];
+            bestCmd = candidates[i];
+        }
+    }
+    
+    return (bestRate > 0.1f) ? bestCmd : MotorCommand::Wait;
+}
+
+void AgentBrain::updateNoveltyPrediction(const std::vector<float>& vision) {
+    if (!vision.empty()) {
+        if (predictedVision_.size() != vision.size()) {
+            predictedVision_.assign(vision.size(), 0.0f);
+        }
+        constexpr float kPredictionAlpha = 0.05f;
+        for (size_t i = 0; i < vision.size(); ++i) {
+            predictedVision_[i] += kPredictionAlpha * (vision[i] - predictedVision_[i]);
+        }
+    }
+}
+
+float AgentBrain::computeSceneNovelty(const std::vector<float>& vision) {
+    if (vision.empty() || predictedVision_.size() != vision.size()) return 0.0f;
+    float totalDiff = 0.0f;
+    for (size_t i = 0; i < vision.size(); ++i) {
+        totalDiff += std::abs(vision[i] - predictedVision_[i]);
+    }
+    return totalDiff / static_cast<float>(vision.size()) * sensoryNoveltyDecay_;
+}
+
+std::string AgentBrain::formatThoughtTrace() const {
+    std::string out = "perceived=[" + thoughtPercept_ + "] -> planned=[";
+    switch (thoughtPlanned_) {
+        case MotorCommand::MoveForward: out += "MoveForward"; break;
+        case MotorCommand::MoveBackward: out += "MoveBackward"; break;
+        case MotorCommand::TurnLeft: out += "TurnLeft"; break;
+        case MotorCommand::TurnRight: out += "TurnRight"; break;
+        case MotorCommand::Interact: out += "Interact"; break;
+        default: out += "Wait"; break;
+    }
+    out += "] -> acted=[";
+    switch (lastDecoded_) {
+        case MotorCommand::MoveForward: out += "MoveForward"; break;
+        case MotorCommand::MoveBackward: out += "MoveBackward"; break;
+        case MotorCommand::TurnLeft: out += "TurnLeft"; break;
+        case MotorCommand::TurnRight: out += "TurnRight"; break;
+        case MotorCommand::Interact: out += "Interact"; break;
+        default: out += "Wait"; break;
+    }
+    out += "] -> reward=" + std::to_string(thoughtReward_);
+    return out;
+}
+
+// End of helper function implementations
     if (!brain_) return DevelopmentalStage::Initial;
     return brain_->getDevelopmentalStage();
 }
@@ -1057,13 +1284,7 @@ const char* phase5CmdName(MotorCommand cmd) {
 }  // namespace
 
 std::string AgentBrain::getThoughtTrace() const {
-    std::string out = "perceived=[" + thoughtPercept_ + "] -> planned=[";
-    out += hasThoughtPlanned_ ? phase5CmdName(thoughtPlanned_) : "none";
-    out += "] -> acted=[" + std::string(phase5CmdName(lastDecoded_)) + "] -> outcome=[";
-    out += hasThoughtOutcome_ ? ("reward=" + std::to_string(thoughtReward_)) : "none";
-    out += "] novelty=" + std::to_string(noveltyLevel_) +
-           " curiosity=" + std::to_string(curiosityLevel_);
-    return out;
+    return formatThoughtTrace();
 }
 
 float AgentBrain::getLearnedPreference() const {

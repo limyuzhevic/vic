@@ -420,14 +420,64 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Additional convenience methods for Python users
+    .def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world")
+    
+    // Phase 6 text encoding: expose encodeText function for teacher words
+    m.def("encodeText", &nlm::AgentBrain::encodeText,
+          py::arg("text"), "Encode text as sparse pattern for teacher words (Phase 6)");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Module-level convenience functions
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world (convenience function)");
+    
+    // Text encoding functions
+    m.def("encodeText", &nlm::AgentBrain::encodeText,
+          py::arg("text"), "Encode text as sparse pattern for teacher words (Phase 6)");
+    
+    // Phase 6 thought/planning counters
+    .def("getPlannerOverrideCount", &AgentBrain::getPlannerOverrideCount,
+          "Get number of times planner overrode motor decoder")
+    .def("getPlannerAgreementCount", &AgentBrain::getPlannerAgreementCount,
+          "Get number of times planner agreed with motor decoder")
+    .def("getPlannerDecisionCount", &AgentBrain::getPlannerDecisionCount,
+          "Get total number of planner decisions")
+    .def("getConceptBiasCount", &AgentBrain::getConceptBiasCount,
+          "Get number of concept biases applied")
+    .def("getSelfBiasCount", &AgentBrain::getSelfBiasCount,
+          "Get number of self model biases applied")
+    .def("getSocialBiasCount", &AgentBrain::getSocialBiasCount,
+          "Get number of social biases applied")
+
+    // Phase 6 integrated systems
+    .def("getConceptCount", &AgentBrain::getConceptCount,
+          "Get number of concepts formed")
+    .def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence,
+          "Get self model confidence (0-1)")
+    .def("getSocialObservationCount", &AgentBrain::getSocialObservationCount,
+          "Get social observation count")
+    .def("observeOtherAgent", &AgentBrain::observeOtherAgent,
+          py::arg("observed"), py::arg("beforeVision"), py::arg("afterVision"),
+          "Observe another agent (Phase 6 social learning)")
+    .def("reset", &AgentBrain::reset,
+          "Reset agent for new episode")
+    .def("getBrain", &AgentBrain::getBrain,
+          py::return_value_policy::reference_internal,
+          "Get the underlying brain")
+    .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+          py::arg("enable"))
+    .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+          py::arg("enable"))
+    .def("enableDevelopment", &AgentBrain::enableDevelopment,
+          py::arg("enable"))
+    .def("enableCuriosity", &AgentBrain::enableCuriosity,
+          py::arg("enable"))
+    .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+    .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+    .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+    .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
 } // namespace nlm

@@ -136,6 +136,21 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Helper functions for the refactored methods
+    void applyWinnerTakeAllInhibition(int winnerGroup);
+    void applyConceptBias();
+    void applyReflexBonus();
+    void applyHazardSuppression();
+    void applyPlannerBias();
+    void applySelfModelBias();
+    void applySocialBias();
+    void applyTurnDiversityPenalty();
+    void applyMomentumReversalPenalty();
+    MotorCommand selectActionFromFilteredRates(const std::vector<MotorCommand>& candidates, const std::vector<float>& rates);
+    void updateNoveltyPrediction(const std::vector<float>& vision);
+    float computeSceneNovelty(const std::vector<float>& vision);
+    std::string formatThoughtTrace() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();
