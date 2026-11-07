@@ -86,7 +86,38 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert the variant value to string based on its type
+        std::visit([&file](const auto& value) {
+            file << entry.key << " = ";
+            if constexpr (std::is_same_v<decltype(value), std::string>) {
+                file << "\"" << value << "\"";
+            } else if constexpr (std::is_same_v<decltype(value), std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<decltype(value), std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << value[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<decltype(value), std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    file << "\"" << value[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << value;
+            }
+            file << "\n";
+        }, entry.value);
     }
     
     return true;
