@@ -1,0 +1,64 @@
+# Compiled Python extensions
+*.so
+*.pyd
+*.pyc
+__pycache__/
+*.pyo
+
+# Build directories
+build/
+dist/
+*.egg-info/
+
+# C++ build artifacts
+*.o
+*.obj
+*.exe
+*.so
+*.dylib
+*.a
+
+# CMake build directories
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Python virtual environment
+venv/
+env/
+
+# Node.js (if present)
+node_modules/
+
+# Gitbook/Book documentation files
+*.epub
+*.mobi
+*.pdf
+
+# Configuration backup files
+*.bak
+*.orig
+
+# NLM specific
+nlm.log
+debug.log
+*.checkpoint
+*.backup

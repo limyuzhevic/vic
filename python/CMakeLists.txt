@@ -93,9 +93,28 @@ add_library(nlm_world STATIC ${NLM_WORLD_SOURCES})
 target_include_directories(nlm_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 target_link_libraries(nlm_world PUBLIC nlm_core)
 
-pybind11_add_module(pynlm bindings.cpp)
+# Compile all binding source files into a single module
+pybind11_add_module(pynlm
+    bindings_basic_types.cpp
+    bindings_config.cpp
+    bindings_sensor.cpp
+    bindings_action_world.cpp
+    bindings_agent_state.cpp
+    bindings_simulation.cpp
+    bindings_helpers.cpp
+)
 target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
 target_include_directories(pynlm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+if(MSVC)
+    target_compile_options(pynlm PRIVATE /permissive-)
+endif()
+
+install(TARGETS pynlm
+    LIBRARY DESTINATION pynlm
+    ARCHIVE DESTINATION pynlm
+    RUNTIME DESTINATION pynlm
+)
 
 if(MSVC)
     target_compile_options(pynlm PRIVATE /permissive-)
