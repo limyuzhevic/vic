@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
 
 namespace nlm {
 
@@ -86,7 +87,47 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Convert config value back to string based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            
+            if constexpr (std::is_same_v<T, int>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << entry.key << " = " << arg << "\n";
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format to avoid scientific notation for readability
+                file << entry.key << " = " << std::fixed << std::setprecision(6) << arg << "\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) file << ", ";
+                    file << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) file << ", ";
+                    file << std::fixed << std::setprecision(6) << arg[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
     }
     
     return true;

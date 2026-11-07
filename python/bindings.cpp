@@ -149,26 +149,67 @@ PYBIND11_MODULE(pynlm, m) {
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
+        .def("loadFromArgs", [](const std::vector<std::string>& args) {
+            Config config;
             std::vector<char*> argv;
-            argv.reserve(args.size());
+            argv.reserve(args.size() + 1);
+            argv.push_back(const_cast<char*>("--dummy")); // dummy program name
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
-        }, py::arg("args"),
-           "Load configuration from command line arguments")
+            return config.loadFromArgs(static_cast<int>(argv.size()), argv.data());
+        }, py::arg("args"), "Load configuration from command line arguments")
+        .def("loadFromArgs", &Config::loadFromArgs, "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+.def("has", &Config::has, py::arg("key"),
+              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
+              "Get all configuration keys")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+              "Clear all configuration entries")
         .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Convenience methods for common configuration operations
+        .def("getBool", py::overload_cast<const std::string&, bool>(&Config::getOr<bool>),
+              py::arg("key"), py::arg("defaultValue"),
+              "Get a boolean value (returns default if not found)")
+        .def("getInt", py::overload_cast<const std::string&, int>(&Config::getOr<int>),
+              py::arg("key"), py::arg("defaultValue"),
+              "Get an integer value (returns default if not found)")
+        .def("getFloat", py::overload_cast<const std::string&, float>(&Config::getOr<float>),
+              py::arg("key"), py::arg("defaultValue"),
+              "Get a float value (returns default if not found)")
+        .def("getDouble", py::overload_cast<const std::string&, double>(&Config::getOr<double>),
+              py::arg("key"), py::arg("defaultValue"),
+              "Get a double value (returns default if not found)")
+        .def("getString", py::overload_cast<const std::string&, const std::string&>(&Config::getOr<std::string>),
+              py::arg("key"), py::arg("defaultValue"),
+              "Get a string value (returns default if not found)")
+        // Set convenience methods with different sources
+        .def("setBool", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+              "Set a boolean configuration value (runtime source)")
+        .def("setInt", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+              "Set an integer configuration value (runtime source)")
+        .def("setFloat", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+              "Set a float configuration value (runtime source)")
+        .def("setDouble", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+              "Set a double configuration value (runtime source)")
+        .def("setString", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+              "Set a string configuration value (runtime source)")
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -338,28 +379,45 @@ PYBIND11_MODULE(pynlm, m) {
              "Get all regions")
         .def("getTotalNeuronCount", &Brain::getTotalNeuronCount,
              "Get total neuron count across all regions")
+.def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
+              "Get total spike count")
         .def("getTotalSynapseCount", &Brain::getTotalSynapseCount,
-             "Get total synapse count across all regions")
+              "Get total synapse count")
         .def("getActiveNeuronCount", &Brain::getActiveNeuronCount,
-             "Get count of active neurons")
+              "Get count of active neurons")
         .def("getFiringNeuronCount", &Brain::getFiringNeuronCount,
-             "Get count of currently firing neurons")
+              "Get count of currently firing neurons")
         .def("getAverageFiringRate", &Brain::getAverageFiringRate,
-             "Get average firing rate across all neurons")
+              "Get average firing rate across all neurons")
         .def("getExcitationInhibitionRatio", &Brain::getExcitationInhibitionRatio,
-             "Get excitation/inhibition balance ratio")
+              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
-             "Get total spike count")
+              "Get total spike count")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
-             "Get current developmental stage")
+              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
-             py::arg("stage"),
-             "Set developmental stage")
+              py::arg("stage"),
+              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status")
+        // Convenience methods for common operations
+        .def("resetAndInitialize", [](Brain& self) {
+            self.reset();
+            self.initialize();
+        }, "Reset and re-initialize brain")
+        .def("simulateSteps", [](Brain& self, size_t numSteps) {
+            for (SimulationStep step = 0; step < numSteps; ++step) {
+                self.step(step);
+            }
+        }, py::arg("numSteps"), "Simulate a number of steps")
+        .def("simulateStepsWithTime", [](Brain& self, size_t numSteps) {
+            for (SimulationStep step = 0; step < numSteps; ++step) {
+                self.step(step, step * 0.001); // Default timestep
+            }
+        }, py::arg("numSteps"), "Simulate a number of steps with time")
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
