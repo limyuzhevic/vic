@@ -92,6 +92,7 @@ make -j4
 ```
 
 ## Running
+
 Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
 
@@ -99,6 +100,7 @@ currently separate demos per phase, not a single unified binary:
 ./nlm                 # Phase 2 demo in src/main.cpp
 ./nlm_phase3_demo
 ./nlm_phase4_demo
+./nlm_phase5_demo
 ./nlm_phase6_demo     # Phase 6 integration test
 ./nlm_benchmark
 ```
@@ -107,7 +109,187 @@ currently separate demos per phase, not a single unified binary:
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
 library in CMake; it does not yet have a standalone demo executable.
 
-## Project Structure
+## Command Line Interface
+
+NLM now features an enhanced command-line interface for flexible configuration and operation:
+
+### Basic Usage
+
+```bash
+# Run with help
+./nlm --help
+
+# Run with version info
+./nlm --version
+
+# Run with quiet mode (minimal output)
+./nlm --quiet
+
+# Run with verbose output (debug info)
+./nlm --verbose
+```
+
+### Configuration Options
+
+```bash
+# Load custom configuration file
+./nlm --config my_config.cfg
+
+# Configure parameters directly
+./nlm --neuron-count 2000 --region-count 4 --connection-prob 0.2
+
+# Configure STDP parameters
+./nlm --stdp-ltp 0.03 --stdp-ltd 0.035 --stdp-tau 25.0
+
+# Configure plasticity parameters
+./nlm --synaptogenesis 0.002 --pruning 0.00002
+
+# Set random seed for reproducibility
+./nlm --seed 12345
+
+# Set demo mode (controls what gets tested)
+./nlm --demo-mode basic      # Just basic connectivity
+./nlm --demo-mode plasticity  # Plasticity learning experiment
+./nlm --demo-mode stdp       # STDP verification only
+./nlm --demo-mode all        # All tests (default)
+```
+
+### Checkpoint Options
+
+```bash
+# Enable checkpointing
+./nlm --checkpoint
+
+# Load brain state from checkpoint
+./nlm --load saved_brain.nbl
+
+# Save brain state to checkpoint
+./nlm --save checkpoint.nbl
+```
+
+### Simulation Control
+
+```bash
+# Set number of simulation steps
+./nlm --steps 2000
+
+# Combine multiple options
+./nlm --demo-mode stdp --steps 500 --quiet --checkpoint
+```
+
+### Examples
+
+```bash
+# Minimal demo with custom neurons
+./nlm --neuron-count 500 --region-count 1 --steps 1000
+
+# Full plasticity experiment
+./nlm --demo-mode plasticity --stdp-ltp 0.02 --stdp-ltd 0.015 --synaptogenesis 0.0001 --quiet
+
+# Debug mode with checkpointing
+./nlm --verbose --demo-mode all --checkpoint --save debug_brain.nbl
+```
+
+### Configuration File Format
+
+The default configuration file `configs/default.cfg` contains all available parameters. You can create a custom configuration file and load it with `--config`.
+
+```cfg
+# Example custom configuration
+random_seed = 12345
+simulation_timestep = 0.001
+neuron_count = 1500
+region_count = 3
+connection_probability = 0.2
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+stdp_time_constant = 20.0
+synaptogenesis_rate = 0.001
+pruning_rate = 0.00001
+checkpoint_dir = ./my_checkpoints
+replay_interval = 200
+```
+
+### Configuration Categories
+
+The configuration system is organized into logical categories:
+
+#### **Core Simulation**
+- `random_seed`: Random number generator seed
+- `simulation_timestep`: Simulation time step (s)
+- `neuron_count`: Total number of neurons
+- `region_count`: Number of brain regions
+- `connection_probability`: Neural connectivity density
+
+#### **Plasticity**
+- `stdp_ltp_weight`: STDP long-term potentiation weight
+- `stdp_ltd_weight`: STDP long-term depression weight
+- `stdp_time_constant`: STDP time constant (ms)
+- `synaptogenesis_rate`: Rate of new synapse formation
+- `pruning_rate`: Rate of synapse elimination
+
+#### **Neuromodulation**
+- `dopamine_baseline`: Baseline dopamine level
+- `curiosity_threshold`: Curiosity activation threshold
+- `novelty_sensitivity`: Novelty detection sensitivity
+- `prediction_error_decay`: Prediction error decay rate
+
+#### **Development**
+- `development_critical_period_start`: Critical period start
+- `development_critical_period_end`: Critical period end
+- `development_plasticity_decay_rate`: Plasticity decay during development
+
+#### **Memory**
+- `working_memory_capacity`: Working memory capacity
+- `episodic_memory_max_episodes`: Maximum episodic memories
+- `associative_memory_capacity`: Associative memory capacity
+
+#### **Performance**
+- `enable_vectorization`: Enable vectorized operations
+- `enable_parallel_processing`: Enable parallel execution
+- `enable_simd`: Enable SIMD optimizations
+
+#### **Checkpointing**
+- `checkpoint_dir`: Directory for checkpoint files
+- `checkpoint_interval`: Checkpoint save interval
+- `checkpoint_compress`: Enable checkpoint compression
+- `checkpoint_max_files`: Maximum number of checkpoints to keep
+
+#### **Replay**
+- `replay_interval`: Memory replay interval
+- `replay_episodes`: Number of episodes to replay
+- `replay_decay_factor`: Memory decay during replay
+
+### Environment Interaction
+
+NLM can interact with external environments for behavioral experiments:
+
+```bash
+# Run in specific environment (if supported)
+./nlm --environment GridWorld --environment-width 10 --environment-height 10
+
+# Configure sensory parameters
+./nlm --sensory-input-range 15.0 --motor-output-scale 2.0
+
+# Set action selection strategy
+./nlm --action-selection-method attention
+```
+
+### Development and Debugging
+
+```bash
+# Enable debug mode
+./nlm --debug-mode
+
+# Set debug output file
+./nlm --debug-output debug.log
+
+# Enable performance profiling
+./nlm --profile-performance
+
+# Enable statistics collection
+./nlm --enable-stats-collection
+```
 
 ```
 NLM/
