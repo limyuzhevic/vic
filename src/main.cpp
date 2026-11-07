@@ -176,14 +176,16 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Get initial spike count
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
+    // Inject strong current into first 10 neurons (configurable via config->set("test1_current", 50.0f, ConfigSource::Default))
+    float test1Current = brain->getConfig()->getOr<float>("test1_current", 50.0f);
+    NLM_LOG_INFO("  Injecting current " + std::to_string(test1Current) + " into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        neurons[i]->injectCurrent(test1Current);
     }
     
-    // Run a few steps
-    for (SimulationStep step = 0; step < 50; ++step) {
+    // Run a few steps (configurable via config->set("test1_steps", 50, ConfigSource::Default))
+    size_t test1Steps = static_cast<size_t>(brain->getConfig()->getOr<int64_t>("test1_steps", 50));
+    for (SimulationStep step = 0; step < test1Steps; ++step) {
         brain->step(step, step * 0.001);
     }
     
@@ -220,9 +222,15 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
+    // Get configurable parameters
+    float test2Current = brain->getConfig()->getOr<float>("test2_current", 30.0f);
+    size_t test2Steps = static_cast<size_t>(brain->getConfig()->getOr<int64_t>("test2_steps", 1000));
+    size_t test2PatternNeurons = static_cast<size_t>(brain->getConfig()->getOr<int64_t>("test2_pattern_neurons", 20));
+    
+    NLM_LOG_INFO("Applying repeated input patterns (" + std::to_string(test2Steps) + " steps)...");
+    
+    // A pattern, not a seizure: stimulate only the first N sensory neurons
     // each step. The old code injected 30.0f into *every* sensory neuron
     // 20 times per step (600.0f), so the whole network fired synchronously
     // and every weight saturated to 1.0 - learning was measurable but not
@@ -230,20 +238,21 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < test2PatternNeurons) {
                 patternNeurons.push_back(neuron->getId());
             }
         }
     }
-    for (SimulationStep step = 0; step < 1000; ++step) {
+    for (SimulationStep step = 0; step < test2Steps; ++step) {
         for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+            brain->injectCurrent(id, test2Current);
         }
         
         brain->step(step, step * 0.001);
         
-        // Log progress every 100 steps
-        if (step % 100 == 0) {
+        // Log progress every 100 steps (configurable)
+        size_t logInterval = static_cast<size_t>(brain->getConfig()->getOr<int64_t>("test2_log_interval", 100));
+        if (step % logInterval == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
@@ -279,22 +288,26 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
+    // Get configurable parameters
+    float test3Current = brain->getConfig()->getOr<float>("test3_current", 60.0f);
+    size_t test3Trials = static_cast<size_t>(brain->getConfig()->getOr<int64_t>("test3_trials", 50));
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
-    for (int trial = 0; trial < 50; ++trial) {
-        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
+    
+    for (int trial = 0; trial < test3Trials; ++trial) {
+        brain->injectCurrent(syn->getSourceNeuron(), test3Current);
         brain->step(trial * 2, trial * 2 * 0.001);
-        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
+        brain->injectCurrent(syn->getDestinationNeuron(), test3Current);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -368,6 +381,18 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Test-specific configurable parameters
+    config->set("test1_current", 50.0f, ConfigSource::Default);  // Current injection for Test 1
+    config->set("test1_steps", 50, ConfigSource::Default);      // Steps for Test 1
+    
+    config->set("test2_current", 30.0f, ConfigSource::Default);  // Current injection for Test 2
+    config->set("test2_steps", 1000, ConfigSource::Default);    // Steps for Test 2
+    config->set("test2_pattern_neurons", 20, ConfigSource::Default);  // Pattern size for Test 2
+    config->set("test2_log_interval", 100, ConfigSource::Default);    // Logging interval for Test 2
+    
+    config->set("test3_current", 60.0f, ConfigSource::Default);  // Current injection for Test 3
+    config->set("test3_trials", 50, ConfigSource::Default);     // Trials for Test 3
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -376,17 +401,22 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
     
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
+    // Log test-specific configuration
+    NLM_LOG_INFO("  test1_current: " + std::to_string(config->getOr<float>("test1_current", 50.0f)));
+    NLM_LOG_INFO("  test1_steps: " + std::to_string(config->getOr<int64_t>("test1_steps", 50)));
+    NLM_LOG_INFO("  test2_current: " + std::to_string(config->getOr<float>("test2_current", 30.0f)));
+    NLM_LOG_INFO("  test2_steps: " + std::to_string(config->getOr<int64_t>("test2_steps", 1000)));
+    NLM_LOG_INFO("  test2_pattern_neurons: " + std::to_string(config->getOr<int64_t>("test2_pattern_neurons", 20)));
+    NLM_LOG_INFO("  test2_log_interval: " + std::to_string(config->getOr<int64_t>("test2_log_interval", 100)));
+    NLM_LOG_INFO("  test3_current: " + std::to_string(config->getOr<float>("test3_current", 60.asalahanf>");
+    NLM_LOG_INFO("  test3_trials: " + std::to_string(config->getOr<int64_t>("test3_trials", 50)));
+    NLM_LOG_INFO("")
     NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
     
     // Initialize brain
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
-    auto brain = std::make_shared<Brain>(config);
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
@@ -395,7 +425,7 @@ int main(int argc, char** argv) {
     
     brain->logStatus();
     
-    // Run Test 1: Basic connectivity
+// Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
     // Reset brain for plasticity experiment
@@ -411,25 +441,28 @@ int main(int argc, char** argv) {
     runStdpVerification(brain);
     
     // Final brain status
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("")
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
     
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("")
     NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("")
     NLM_LOG_INFO("Phase 2 Objectives Completed:");
     NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
     NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
     NLM_LOG_INFO("  ✓ STDP plasticity rule");
     NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning");
     NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("")
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("")
+    
+    // Ensure resources are cleaned up
+    Logger::setGlobal(nullptr);
     
     return 0;
 }
