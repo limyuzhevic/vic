@@ -77,26 +77,27 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
-    } else if (memoryNeurons_.size() < capacity_) {
-        memoryNeurons_.push_back(neuron);
-        memoryActivations_.push_back(activation);
-        memoryTimestamps_.push_back(0);
-        it = memoryNeurons_.end() - 1;
-    }
-
-    // Phase 6: activeTraces_ is the trace list getActiveTraces()
-    // reports, and it was never populated — only cleared — so it
-    // always read 0 even when memory held 50 neurons. A stored
-    // neuron is an active trace; decayWeakTraces() below removes
-    // it again when its activation falls below threshold, and
-    // clear()/restoreSnapshot() reset the list with the content.
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        // Update active traces for existing neuron (bug fix: was missing)
         bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
         if (activation > 0.1f && !present) activeTraces_.push_back(idx);
         if (activation <= 0.1f && present) {
             activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
                                 activeTraces_.end());
+        }
+    } else if (memoryNeurons_.size() < capacity_) {
+        memoryNeurons_.push_back(neuron);
+        memoryActivations_.push_back(activation);
+        memoryTimestamps_.push_back(0);
+        it = memoryNeurons_.end() - 1;
+        // Phase 6: activeTraces_ is the trace list getActiveTraces()
+        // reports, and it was never populated — only cleared — so it
+        // always read 0 even when memory held 50 neurons. A stored
+        // neuron is an active trace; decayWeakTraces() below removes
+        // it again when its activation falls below threshold, and
+        // clear()/restoreSnapshot() reset the list with the content.
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        if (activation > 0.1f) {
+            activeTraces_.push_back(idx);
         }
     }
     

@@ -846,6 +846,7 @@ void Brain::develop() {
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
     
+    // Clear simulation state (don't reinitialize)
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     pImpl->totalSpikesThisStep = 0;
@@ -853,11 +854,15 @@ void Brain::reset() {
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
     
+    // Clear per-neuron state by calling reset on all neurons
     for (auto& region : pImpl->regions) {
         region->reset();
     }
     
+    // Reset spike system
     pImpl->spikeSystem->reset();
+    
+    // Reset development stage
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
@@ -865,6 +870,20 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Reset neuromodulators
+    if (pImpl->novelty) pImpl->novelty->reset();
+    if (pImpl->curiosity) pImpl->curiosity->reset();
+    if (pImpl->dopamine) pImpl->dopamine->setLevel(0.0f);
+    if (pImpl->predictionError) pImpl->predictionError->reset();
+    
+    // Reset neuron lookup (needed for re-injecting after reset)
+    pImpl->neuronById.clear();
+    for (auto& region : pImpl->regions) {
+        for (auto* neuron : region->getAllNeurons()) {
+            pImpl->neuronById[neuron->getId().index()] = neuron;
+        }
+    }
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
