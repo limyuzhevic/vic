@@ -287,11 +287,194 @@ print("Agent simulation complete!")
 
 ---
 
-## Next Steps
+| Make action | `agent.decodeMotorCommand()` |
+        | Get neuromodulation state | `agent.getNeuromodulationState()` |
+
+---
+
+## Advanced Usage (NEW!)
+
+### Advanced Agent Setup
+
+This section shows how to use the new advanced convenience methods:
+
+```python
+import pynlm
+
+# Advanced agent setup with learning configuration
+config_dict = {
+    "reward_modulation": True,
+    "structural_plasticity": True,
+    "development": True,
+    "curiosity": True
+}
+
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Setup advanced agent with learning
+agent = pynlm.setupLearningAgent(brain, world, config_dict)
+
+# Run experiment episode
+spike_count, curiosity = agent.simulateEpisode(world, 100)
+print(f"Episode completed: {spike_count} spikes, curiosity level: {curiosity:.3f}")
+```
+
+### Batch Operations for Performance
+
+```python
+import pynlm
+import time
+
+# Create brain and world
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Batch current injection for efficiency
+injections = []
+for i in range(100):
+    injections.append((pynlm.NeuronId(i), 30.0))
+
+start_time = time.time()
+brain.injectCurrentBatch(injections)
+for step in range(50):
+    brain.step(step)
+end_time = time.time()
+
+print(f"Batch injection completed in {end_time - start_time:.3f} seconds")
+```
+
+### Experiment Configuration
+
+```python
+import pynlm
+
+# Create configuration from dictionary
+config_dict = {
+    "brain.neuron_count": 1000,
+    "brain.synapse_density": 0.1,
+    "plasticity.stdp.enable": True,
+   �ית
+}
+
+config = pynlm.createConfigFromDict(config_dict)
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Get comprehensive system statistics
+stats = brain.getComprehensiveStats()
+print(f"Neuron count: {stats[0]}, Synapse count: {stats[1]}, "
+      f"Active neurons: {stats[2]}, Firing rate: {stats[4]:.2f}")
+```
+
+### Complete Experiment Setup
+
+```python
+import pynlm
+
+def run_complex_experiment(num_steps=1000):
+    # Create brain and world
+    config = pynlm.createDefaultConfig()
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    world = pynlm.createSimpleWorld()
+    world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+    world.reset()
+    
+    # Create agent with all learning enabled
+    agent = pynlm.createAgentBrain(brain)
+    agent.initialize(world)
+    
+    # Run simulation
+    for step in range(num_steps):
+        world.update(0.1)
+        percept = world.getSensoryPercept()
+        agent.processSensoryInput(percept)
+        brain.step(step)
+        action = agent.decodeMotorCommand()
+        world.applyMotorCommand(action, world.getSimulationTime())
+        
+        if step % 200 ==  handlebars():
+            print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing, "
+                  f"curiosity: {agent.getCuriosityLevel():.3f}")
+    
+    # Get final statistics
+    final_spikes = brain.getTotalSpikeCount()
+    avg_firing = brain.getAverageFiringRate()
+    curiosity = agent.getCuriosityLevel()
+    
+    return {
+        "spikes": final_spikes,
+        "firing_rate": avg_firing,
+        "curiosity": curiosity
+    }
+
+# Run experiment
+results = run_complex_experiment(1000)
+print(f"Experiment results: {results}")
+```
+
+---
+
+## Advanced Troubleshooting
+
+### Performance Issues
+
+**"Simulation is slow"**
+- Use batch operations: `brain.injectCurrentBatch()` for multiple injections
+- Reduce neuron count in config: `"brain.neuron_count": 500`
+- Use fewer simulation steps
+
+**"Memory usage is high"**
+- Save brain state periodically: `brain.save("checkpoint.bin")`
+- Use more efficient data structures (batch operations)
+- Consider running in smaller regions
+
+### Debugging Advanced Issues
+
+**"Learning isn't working"**
+- Check subsystem enable flags: `agent.enableRewardModulation(True)`
+- Verify curiosity is enabled: `agent.enableCuriosity(True)`
+- Check neuromodulation levels: `agent.getNeuromodulationState()`
+
+**"Agent isn't exploring"**
+- Enable curiosity: `agent.enableCuriosity(True)`
+- Check novelty detection: `agent.getNoveltyLevel()`
+- Adjust exploration parameters in config
+
+---
+
+## Next Steps (Enhanced)
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **For Advanced Users:**
+   - Read `HOW_TO_USE.md` for comprehensive details
+   - Explore Phase 6 integration features
+   - Use `brain.getSystemStats()` for detailed diagnostics
+   - Implement custom batch operations for your specific use case
+
+2. **Research Applications:**
+   - Use `createConfigFromDict()` for experimental parameter sets
+   - Leverage `simulateEpisode()` for standardized experiments
+   - Apply `injectCurrentBatch()` for high-throughput simulations
+
+3. **Development & Testing:**
+   - Use `setupLearningAgent()` for reproducible experimental setups
+   - Monitor `getAdvancedStats()` for system health
+   - Implement checkpointing with `brain.save()` for long simulations
+
+That's it! You're now equipped to use both basic and advanced NLM features effectively.
+
+**New Features Added:**
+- Batch operations for performance
+- Advanced agent configuration
+- Comprehensive statistics gathering
+- Flexible configuration loading
+- Enhanced debugging tools

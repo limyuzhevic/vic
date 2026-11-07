@@ -29,49 +29,27 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
-            return "<NeuronId: " + std::to_string(id.value) + ">";
-        });
+    // Template to reduce repetition in ID class bindings
+    template<typename T>
+    void bindIdClass(py::module_& m, const std::string& name, const std::string& doc) {
+        py::class_<T>(m, name.c_str(), doc.c_str())
+            .def(py::init<>())
+            .def(py::init<uint64_t>(), py::arg("value"))
+            .def_readwrite("value", &T::value)
+            .def("index", &T::index)
+            .def("__eq__", &T::operator==)
+            .def("__ne__", &T::operator!=)
+            .def("__hash__", [](const T& id) { return std::hash<uint64_t>{}(id.value); })
+            .def("__repr__", [](const T& id) {
+                return "<" + name + ": " + std::to_string(id.value) + ">";
+            });
+    }
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const SynapseId& id) {
-            return "<SynapseId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
-            return "<RegionId: " + std::to_string(id.value) + ">";
-        });
-
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
-        .def(py::init<>())
-        .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+    // Bind individual ID classes using the template
+    bindIdClass<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc");
+    bindIdClass<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc");
+    bindIdClass<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc");
+    bindIdClass<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc");
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -185,9 +163,28 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("getData", &Vision::getData, "Get the vision data as a vector")
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getType", &Vision::getType, "Get the type of sensory input")
+        .def("getDimensions", &Vision::getDimensions, "Get the dimensionality")
+        .def("clone", &Vision::clone, "Clone the vision data")
+        .def("toArray", [](const Vision& self) {
+            return self.getData();
+        }, "Convert vision data to Python array (convenience method)")
+        .def("fromArray", [](Vision& self, py::object array) {
+            // Handle numpy array or Python list
+            std::vector<float> data;
+            if (py::isinstance(array, py::module::get_object("numpy").attr("ndarray"))) {
+                // Extract data from numpy array
+                py::array_t<float> arr = array.cast<py::array_t<float>>();
+                data.assign(arr.begin(), arr.end());
+            } else {
+                data = array.cast<std::vector<float>>();
+            }
+            self.setData(data);
+        }, py::arg("array"), "Set vision data from Python array or list (convenience method)");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -356,10 +353,191 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status");
+
+    // ===== ADVANCED CONVENIENCE AND BATCH METHODS =====
+    
+    // Batch operations for efficiency
+    m.def("injectCurrentBatch", [](Brain& self, const std::vector<std::pair<NeuronId, MembranePotential>>& injections) {
+        for (const auto& inj : injections) {
+            self.injectCurrent(inj.first, inj.second);
+        }
+    }, py::arg("brain"), py::arg("injections"),
+         "Inject current into multiple neurons at once (batch operation)")
+    .def("getComprehensiveStats", [](const Brain& self) {
+        return std::vector<float>{
+            static_cast<float>(self.getTotalNeuronCount()),
+            static_cast<float>(self.getTotalSynapseCount()),
+            static_cast<float>(self.getActiveNeuronCount()),
+            static_cast<float>(self.getFiringNeuronCount()),
+            self.getAverageFiringRate(),
+            self.getExcitationInhibitionRatio(),
+            static_cast<float>(self.getTotalSpikeCount()),
+            static_cast<float>(self.getPendingSpikeEventCount()),
+            self.getDevelopmentalStage() == DevelopmentalStage::CriticalPeriod ? 1.0f : 0.0f
+        };
+    }, py::arg("brain"),
+         "Get comprehensive system statistics (convenience method)")
+    .def("createConfigFromDict", [](const py::dict& config_dict) {
+        auto config = std::make_shared<Config>();
+        for (auto item : config_dict) {
+            std::string key = py::cast<std::string>(item.first);
+            py::object value_obj = item.second;
+            
+            if (py::isinstance(value_obj, py::int_())) {
+                config->set(key, static_cast<int64_t>(value_obj.cast<int64_t>()), ConfigSource::User);
+            } else if (py::isinstance(value_obj, py::float_())) {
+                config->set(key, value_obj.cast<double>(), ConfigSource::User);
+            } else if (py::isinstance(value_obj, py::bool_())) {
+                config->set(key, value_obj.cast<bool>(), ConfigSource::User);
+            } else if (py::isinstance(value_obj, py::str())) {
+                config->set(key, value_obj.cast<std::string>(), ConfigSource::User);
+            }
+        }
+        return config;
+    }, py::arg("config_dict"),
+         "Create configuration from Python dictionary (convenience method)")
+    .def("runSimulationSteps", [](Brain& self, SimulationStep startStep, SimulationStep endStep, Timestamp timestep) {
+        for (SimulationStep step = startStep; step <= endStep; ++step) {
+            self.step(step, timestep * (step - startStep));
+        }
+    }, py::arg("brain"), py::arg("startStep"), py::arg("endStep"), py::arg("timestep"),
+         "Run simulation over a range of steps (convenience method)")
+    .def("getSystemActivity", [](Brain& self) {
+        return std::vector<float>{
+            static_cast<float>(self.getTotalNeuronCount()),
+            static_cast<float>(self.getFiringNeuronCount()),
+            self.getAverageFiringRate(),
+            self.getExcitationInhibitionRatio(),
+            static_cast<float>(self.getTotalSpikeCount()) / std::max(1.0f, static_cast<float>(self.getTotalSynapseCount()))
+        };
+    }, py::arg("brain"),
+         "Get normalized system activity metrics (convenience method)")
+    .def("enableAllSubsystems", [](AgentBrain& agent) {
+        agent.enableRewardModulation(true);
+        agent.enableStructuralPlasticity(true);
+        agent.enableDevelopment(true);
+        agent.enableCuriosity(true);
+    }, py::arg("agent"),
+         "Enable all learning subsystems (convenience method)")
+    .def("getNeuromodulationState", [](AgentBrain& agent) {
+        return std::vector<float>{
+            agent.getCuriosityLevel(),
+            agent.getNoveltyLevel(),
+            agent.getPredictionError(),
+            agent.getNeuromodulationLevel()
+        };
+    }, py::arg("agent"),
+         "Get neuromodulation state as vector (convenience method)")
+    
+    // Configuration convenience methods
+    .def("getConfigValue", [](const Config& cfg, const std::string& key) {
+        // Try to get common types with fallback
+        if (cfg.has(key)) {
+            // Try int first, then double, then string, then bool
+            if (cfg.get<int>(key)) {
+                return py::make_tuple("int", cfg.getOr<int>(key, 0));
+            } else if (cfg.get<double>(key)) {
+                return py::make_tuple("double", cfg.getOr<double>(key, 0.0));
+            } else if (cfg.get<bool>(key)) {
+                return py::make_tuple("bool", cfg.getOr<bool>(key, false));
+            } else if (cfg.get<std::string>(key)) {
+                return py::make_tuple("string", cfg.getOr<std::string>(key, ""));
+            }
+        }
+        throw py::key_error("Key '" + key + "' not found in configuration");
+    }, py::arg("key"),
+         "Get configuration value with type detection (returns tuple of (type, value))")
+    
+    // Simulation convenience methods
+    .def("runSimulation", [](Brain& self, SimulationStep startStep, SimulationStep endStep, Timestamp timestep) {
+        for (SimulationStep step = startStep; step <= endStep; ++step) {
+            self.step(step, timestep * (step - startStep));
+        }
+    }, py::arg("startStep"), py::arg("endStep"), py::arg("timestep"),
+         "Run simulation over a range of steps (convenience method)")
+    .def("stepWithTime", [](Brain& self, SimulationStep step, Timestamp time) {
+        self.step(step, time);
+    }, py::arg("step"), py::arg("time"),
+         "Perform simulation step with specific time (convenience method)")
+    
+    // Debug and diagnostic methods
+    .def("getDebugInfo", &Brain::logStatus,
+         "Get debug information (same as logStatus but returns empty string)")
+    .def("getSystemStats", [](const Brain& self) {
+        return std::vector<float>{
+            static_cast<float>(self.getTotalNeuronCount()),
+            static_cast<float>(self.getTotalSynapseCount()),
+            static_cast<float>(self.getActiveNeuronCount()),
+            static_cast<float>(self.getFiringNeuronCount()),
+            self.getAverageFiringRate(),
+            self.getExcitationInhibitionRatio(),
+            static_cast<float>(self.getTotalSpikeCount()),
+            static_cast<float>(self.getPendingSpikeEventCount())
+        };
+    }, "Get system statistics as a vector of floats (convenience method)")
+    
+    // Memory system access convenience methods
+    .def("getWorkingMemory", [](Brain& self) {
+        return self.getWorkingMemory();
+    }, "Get working memory system (convenience method)")
+    .def("getEpisodicMemory", [](Brain& self) {
+        return self.getEpisodicMemory();
+    }, "Get episodic memory system (convenience method)")
+    .def("getAssociativeMemory", [](Brain& self) {
+        return self.getAssociativeMemory();
+    }, "Get associative memory system (convenience method)")
+    .def("getPredictionSystem", [](Brain& self) {
+        return self.getPredictionSystem();
+    }, "Get prediction system (convenience method)")
+    .def("getPlanner", [](Brain& self) {
+        return self.getPlanner();
+    }, "Get neural planner (convenience method)")
+    .def("getConceptFormation", [](Brain& self) {
+        return self.getConceptFormation();
+    }, "Get concept formation system (convenience method)")
+    .def("getAttention", [](Brain& self) {
+        return self.getAttention();
+    }, "Get attentional selection system (convenience method)")
+    .def("getDevelopmentSystem", [](Brain& self) {
+        return self.getDevelopmentSystem();
+    }, "Get development system (convenience method)")
+    .def("getDopamine", [](Brain& self) {
+        return self.getDopamine();
+    }, "Get dopamine neuromodulator (convenience method)")
+    .def("getCuriosity", [](Brain& self) {
+        return self.getCuriosity();
+    }, "Get curiosity neuromodulator (convenience method)")
+    .def("getNovelty", [](Brain& self) {
+        return self.getNovelty();
+    }, "Get novelty neuromodulator (convenience method)")
+    .def("getPredictionErrorSignal", [](Brain& self) {
+        return self.getPredictionErrorSignal();
+    }, "Get prediction error signal (convenience method)")
+    .def("getRandomGenerator", [](Brain& self) {
+        return self.getRandomGenerator();
+    }, "Get random number generator (convenience method)")
+    
+    // Legacy compatibility methods
+    .def("getNeuronCount", &Brain::getTotalNeuronCount,
+         "Get total neuron count (legacy alias for getTotalNeuronCount)")
+    .def("getSynapseCount", &Brain::getTotalSynapseCount,
+         "Get total synapse count (legacy alias for getTotalSynapseCount)")
+    .def("getActiveNeurons", &Brain::getActiveNeuronCount,
+         "Get active neuron count (legacy alias for getActiveNeuronCount)")
+    .def("getFiringNeurons", &Brain::getFiringNeuronCount,
+         "Get firing neuron count (legacy alias for getFiringNeuronCount)")
+    .def("getAverageFiring", &Brain::getAverageFiringRate,
+         "Get average firing rate (legacy alias for getAverageFiringRate)")
+    .def("getTotalSpikes", &Brain::getTotalSpikeCount,
+         "Get total spike count (legacy alias for getTotalSpikeCount)")
+    .def("getE/I_Ratio", &Brain::getExcitationInhibitionRatio,
+         "Get excitation/inhibition ratio (legacy alias for getExcitationInhibitionRatio)")
+    .def("getRegionCount", &Brain::getRegionCount,
+         "Get region count (legacy alias for getRegionCount)");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -408,26 +586,74 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
-
-} // namespace nlm
+    // ===== ADVANCED AGENT BRAIN CONVENIENCE METHODS =====
+    
+    // Advanced agent configuration and setup
+    m.def("setupLearningAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, const py::dict& config) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Apply learning configurations
+        if (config.contains("reward_modulation")) {
+            agent->enableRewardModulation(config["reward_modulation"].cast<bool>());
+        }
+        if (config.contains("structural_plasticity")) {
+            agent->enableStructuralPlasticity(config["structural_plasticity"].cast<bool>());
+        }
+        if (config.contains("development")) {
+            agent->enableDevelopment(config["development"].cast<bool>());
+        }
+        if (config.contains("curiosity")) {
+            agent->enableCuriosity(config["curiosity"].cast<bool>());
+        }
+        
+        return agent;
+    }, py::arg("brain"), py::arg("world"), py::arg("config") = py::dict(),
+         "Setup an agent brain with learning configurations (convenience method)")
+    .def("createExperimentSetup", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        agent->enableAllSubsystems(); // Convenience method to enable all learning
+        return std::make_pair(brain, agent);
+    }, py::arg("brain"), py::arg("world"),
+         "Create complete experiment setup with brain and agent (convenience method)")
+    .def("simulateEpisode", [](AgentBrain& agent, SimpleWorld& world, SimulationStep steps) {
+        for (SimulationStep step = 0; step < steps; ++step) {
+            auto percept = world.getSensoryPercept();
+            agent.processSensoryInput(percept);
+            auto action = agent.decodeMotorCommand();
+            world.applyMotorCommand(action, world.getSimulationTime());
+            agent.updateDevelopment(0.1); // Fixed timestep for agent development
+        }
+        return std::make_tuple(agent.getBrain()->getTotalSpikeCount(), 
+                              agent.getCuriosityLevel());
+    }, py::arg("agent"), py::arg("world"), py::arg("steps"),
+         "Run a complete simulation episode (convenience method)")
+    .def("batchProcessPercepts", [](AgentBrain& agent, const std::vector<SensoryPercept>& percepts) {
+        for (const auto& percept : percepts) {
+            agent.processSensoryInput(percept);
+        }
+    }, py::arg("agent"), py::arg("percepts"),
+         "Process multiple percepts in batch (convenience method)")
+    .def("batchApplyRewards", [](AgentBrain& agent, const std::vector<float>& rewards) {
+        float cumulative_reward = 0.0f;
+        for (const auto& reward : rewards) {
+            cumulative_reward += reward;
+            agent.applyRewardModulation(reward, 0.0f);
+        }
+        return cumulative_reward;
+    }, py::arg("agent"), py::arg("rewards"),
+         "Apply multiple rewards and return cumulative reward (convenience method)")
+    .def("getAdvancedStats", [](AgentBrain& agent) {
+        return std::vector<float>{
+            agent.getCuriosityLevel(),
+            agent.getNoveltyLevel(),
+            agent.getPredictionError(),
+            agent.getNeuromodulationLevel(),
+            agent.isRewardModulationEnabled() ? 1.0f : 0.0f,
+            agent.isStructuralPlasticityEnabled() ? 1.0f : 0.0f,
+            agent.isDevelopmentEnabled() ? 1.0f : 0.0f,
+            agent.isCuriosityEnabled() ? 1.0f : 0.0f
+        };
+    }, py::arg("agent"),
+         "Get comprehensive advanced agent statistics (convenience method)")
