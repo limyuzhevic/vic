@@ -19,8 +19,9 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO PHASE 3: Implement proper JSON/YAML parser
+    // PLACEHOLDER - Phase 2 uses simple key=value format with improved parsing
+    // This will be upgraded to full JSON support
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -86,7 +87,36 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Properly serialize the variant value
+        std::visit([&file](auto&& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || std::is_same_v<T, double> || std::is_same_v<T, bool>) {
+                file << entry.key << " = " << val << "\n";
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << val << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << val[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << val[i];
+                }
+                file << "]\n";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << val[i] << "\"";
+                }
+                file << "]\n";
+            }
+        }, entry.value);
     }
     
     return true;

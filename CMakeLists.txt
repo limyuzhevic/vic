@@ -54,14 +54,17 @@ add_library(nlm_core STATIC
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
     src/neuromodulation/Curiosity.cpp
+    src/neuromodulation/Dopamine.cpp
     # Memory
     src/memory/Memory.cpp
     src/performance/CheckpointSystem.cpp
     src/memory/NeuralWorkingMemory.cpp
     src/memory/NeuralEpisodicMemory.cpp
+    src/memory/NeuralAssociativeMemory.cpp
     # Cognition
     src/cognition/ConceptFormation.cpp
     src/cognition/NeuralPlanner.cpp
+    src/cognition/AttentionalSelection.cpp
     # Sensory
     src/sensory/SensoryInput.cpp
     src/sensory/Vision.cpp

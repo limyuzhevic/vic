@@ -33,6 +33,18 @@ namespace test_stdp {
     void runAll();
 }
 
+namespace test_associative_memory {
+    void runAll();
+}
+
+namespace test_attentional_selection {
+    void runAll();
+}
+
+namespace test_dopamine {
+    void runAll();
+}
+
 namespace test_brain {
     void runAll();
 }
@@ -104,6 +116,33 @@ int main() {
     std::cout << "Running STDP tests..." << std::endl;
     try {
         test_stdp::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Associative Memory tests..." << std::endl;
+    try {
+        test_associative_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Attentional Selection tests..." << std::endl;
+    try {
+        test_attentional_selection::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Dopamine tests..." << std::endl;
+    try {
+        test_dopamine::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

@@ -10,11 +10,14 @@
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
+#include "../neuromodulation/Dopamine.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../cognition/AttentionalSelection.hpp"
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
@@ -92,8 +95,8 @@ struct Brain::Impl {
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
-        , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
+        , rng(std::make_unique<RandomGenerator>(42))
+        , developmentStage(DevelopmentalStage::Initial)
         , nextRegionId(1)
         , timestep(0.001)
         , currentStep(0)
@@ -105,13 +108,6 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<int64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
-        
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
