@@ -104,7 +104,19 @@ private:
 // Template implementations
 template<typename Container>
 void RandomGenerator::shuffle(Container& container) {
-    std::shuffle(container.begin(), container.end(), engine());
+    // Use Fisher-Yates shuffle algorithm as a workaround for std::shuffle
+    if (container.size() <= 1) return;
+    
+    auto rng = engine();
+    size_t n = container.size();
+    for (size_t i = n - 1; i > 0; --i) {
+        size_t j = rng() % (i + 1);
+        if (i != j) {
+            auto it1 = std::next(container.begin(), i);
+            auto it2 = std::next(container.begin(), j);
+            std::iter_swap(it1, it2);
+        }
+    }
 }
 
 template<typename Container>

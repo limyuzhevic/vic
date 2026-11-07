@@ -18,6 +18,7 @@
 #include "../performance/CheckpointSystem.hpp"
 #include <fstream>
 #include <algorithm>
+#include <cmath>
 #include <unordered_map>
 #include <cmath>
 #include <cstring>
