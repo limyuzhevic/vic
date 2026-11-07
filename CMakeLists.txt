@@ -173,7 +173,7 @@ add_executable(nlm_phase6_text_demo
 )
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
 
-# Benchmark executable
+# Benchmark executable (Phase 5: standard performance benchmark)
 add_executable(nlm_benchmark
     src/benchmark.cpp
 )

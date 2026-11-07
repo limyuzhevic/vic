@@ -17,7 +17,7 @@
 #include "sensory/SensoryInput.hpp"
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
-#include "experiments/ExperimentRunner.hpp"
+#include "experiments/Phase2Experiment.hpp"
 
 #include <iostream>
 #include <memory>
@@ -282,7 +282,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
@@ -294,7 +294,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");

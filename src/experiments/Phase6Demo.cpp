@@ -1,17 +1,24 @@
-/**
- * Phase 6 Demo - Integration Test
- * 
- * This demo runs the Phase 6 integration experiment to verify
- * that all brain systems are properly connected.
- */
-
+#include "experiments/Phase6Demo.hpp"
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
 
 using namespace nlm;
 
-int main(int argc, char* argv[]) {
+void printDemoBanner() {
+    std::cout << R"(
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║     NLM — 熙然                                                ║
+    ║     Neural Learning Machine                                   ║
+    ║                                                               ║
+    ║     Phase 6 Demo - Integration Test                           ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    )" << std::endl;
+}
+
+void runIntegrationDemo() {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
@@ -29,7 +36,7 @@ int main(int argc, char* argv[]) {
     
     if (!integrationOK) {
         std::cerr << "ERROR: Integration verification failed!" << std::endl;
-        return 1;
+        return;
     }
     
     std::cout << "Integration verification passed!" << std::endl << std::endl;
@@ -58,7 +65,7 @@ int main(int argc, char* argv[]) {
     config.maxSteps = 2000;
     config.enableCheckpointing = true;
     config.enableReplay = true;
-    config.enableDevelopment = true;
+    config.enableDevelopment = false;
     
     auto result = experiment.run(config);
     
@@ -80,6 +87,10 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
-    
+}
+
+int main() {
+    printDemoBanner();
+    runIntegrationDemo();
     return 0;
 }

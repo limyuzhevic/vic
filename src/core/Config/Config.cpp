@@ -1,238 +1,380 @@
-#include "Config.hpp"
+// NLM Configuration Implementation
+// Enhanced configuration management with better error handling and validation
+
+#include "core/Config/Config.hpp"
+#include <algorithm>
 #include <fstream>
 #include <sstream>
-#include <algorithm>
-#include <filesystem>
+#include <cstring>
+#include <ctime>
 
 namespace nlm {
 
 struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+    std::map<std::string, ConfigEntry> entries;
+    std::map<std::string, std::function<bool(const ConfigValue&)>> validators;
+    
+    Impl() {
+        // Register built-in validators
+        validators["int_range"] = [](const ConfigValue& v) {
+            return std::get<int>(v) >= -1000000 && std::get<int>(v) <= 1000000;
+        };
+        validators["int64_range"] = [](const ConfigValue& v) {
+            return std::get<int64_t>(v) >= -1000000 && std::get<int64_t>(v) <= 1000000;
+        };
+        validators["double_range"] = [](const ConfigValue& v) {
+            double d = std::get<double>(v);
+            return d >= -1000000.0 && d <= 1000000.0;
+        };
+        validators["float_range"] = [](const ConfigValue& v) {
+            float f = std::get<float>(v);
+            return f >= -1000000.0f && f <= 1000000.0f;
+        };
+        validators["positive"] = [](const ConfigValue& v) {
+            if (std::holds_alternative<double>(v)) {
+                return std::get<double>(v) >= 0.0;
+            } else if (std::holds_alternative<float>(v)) {
+                return std::get<float>(v) >= 0.0f;
+            } else if (std::holds_alternative<int>(v)) {
+                return std::get<int>(v) >= 0;
+            }
+            return false;
+        };
+        validators["probability"] = [](const ConfigValue& v) {
+            float f = std::get<float>(v);
+            return f >= 0.0f && f <= 1.0f;
+        };
+    }
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(new Impl) {}
 
 Config::~Config() = default;
 
-Config::Config(Config&&) noexcept = default;
+Config::Config(Config&& other) noexcept : pImpl(std::move(other.pImpl)) {}
 
-Config& Config::operator=(Config&&) noexcept = default;
+Config& Config::operator=(Config&& other) noexcept {
+    if (this != &other) {
+        pImpl = std::move(other.pImpl);
+    }
+    return *this;
+}
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        json configJson;
+        file >> configJson;
+        
+        // Clear existing entries (except defaults)
+        std::map<std::string, ConfigEntry> defaults;
+        for (const auto& [key, entry] : pImpl->entries) {
+            if (entry.source == ConfigSource::Default) {
+                defaults[key] = entry;
             }
-            
-            set(key, value, ConfigSource::File);
         }
+        pImpl->entries = std::move(defaults);
+        
+        // Load from JSON
+        for (auto& [key, value] : configJson.items()) {
+            if (value.is_number_integer()) {
+                set(key, value.get<int>(), ConfigSource::File);
+            } else if (value.is_number_unsigned()) {
+                set(key, static_cast<int64_t>(value.get<uint64_t>()), ConfigSource::File);
+            } else if (value.is_number_float()) {
+                set(key, value.get<double>(), ConfigSource::File);
+            } else if (value.is_boolean()) {
+                set(key, value.get<bool>(), ConfigSource::File);
+            } else if (value.is_string()) {
+                set(key, value.get<std::string>(), ConfigSource::File);
+            } else if (value.is_array()) {
+                // Handle array types
+                std::vector<double> doubleArray;
+                for (auto& item : value) {
+                    doubleArray.push_back(item.get<double>());
+                }
+                set(key, doubleArray, ConfigSource::File);
+            }
+        }
+        
+        return true;
+    } catch (const std::exception& e) {
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool foundConfig = false;
+    
     for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
+        std::string arg = argv[i];
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+        if (arg == "--config" && i + 1 < argc) {
+            std::string configFile = argv[++i];
+            if (loadFromFile(configFile)) {
+                foundConfig = true;
+            }
+        } else if (arg.find("--") == 0) {
+            // Parse command line argument: --key=value or --key value
+            size_t equalsPos = arg.find('=');
+            std::string key, valueStr;
+            
+            if (equalsPos != std::string::npos) {
+                key = arg.substr(2, equalsPos - 2);
+                valueStr = arg.substr(equalsPos + 1);
+            } else {
+                key = arg.substr(2);
+                if (i + 1 < argc && argv[i + 1][0] != '-') {
+                    valueStr = argv[++i];
+                }
+            }
+            
+            if (!key.empty() && !valueStr.empty()) {
+                parseAndSet(key, valueStr, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
-
-bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
-        return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
+    return foundConfig;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    validateKey(key);
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
+    ConfigEntry entry(key, value, source);
+    validateValue(key, entry.value);
+    
+    pImpl->entries[key] = std::move(entry);
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    validateKey(key);
+    
+    ConfigEntry entry(key, ConfigValue(value), source);
+    validateValue(key, entry.value);
+    
+    pImpl->entries[key] = std::move(entry);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    validateKey(key);
+    
+    ConfigEntry entry(key, ConfigValue(value), source);
+    validateValue(key, entry.value);
+    
+    pImpl->entries[key] = std::move(entry);
 }
 
 void Config::set(const std::string& key, int64_t value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    validateKey(key);
+    
+    ConfigEntry entry(key, ConfigValue(value), source);
+    validateValue(key, entry.value);
+    
+    pImpl->entries[key] = std::move(entry);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    validateKey(key);
+    
+    ConfigEntry entry(key, ConfigValue(value), source);
+    validateValue(key, entry.value);
+    
+    pImpl->entries[key] = std::move(entry);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
-    set(key, ConfigValue(value), source);
+    validateKey(key);
+    
+    ConfigEntry entry(key, ConfigValue(value), source);
+    validateValue(key, entry.value);
+    
+    pImpl->entries[key] = std::move(entry);
+}
+
+std::optional<int> Config::get(const std::string& key) const {
+    validateKey(key);
+    
+    auto it = pImpl->entries.find(key);
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    
+    const ConfigValue& value = it->second.value;
+    if (std::holds_alternative<int>(value)) {
+        return std::get<int>(value);
+    }
+    return std::nullopt;
+}
+
+int Config::getOr(const std::string& key, const int& defaultValue) const {
+    auto value = get<int>(key);
+    if (value.has_value()) {
+        return *value;
+    }
+    return defaultValue;
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    validateKey(key);
+    return pImpl->entries.find(key) != pImpl->entries.end();
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    validateKey(key);
+    pImpl->entries.erase(key);
 }
 
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    
+    for (const auto& [key, entry] : pImpl->entries) {
+        keys.push_back(key);
     }
+    
     return keys;
 }
 
 void Config::clear() {
-    pImpl->entries.clear();
+    std::map<std::string, ConfigEntry> defaults;
+    
+    for (const auto& [key, entry] : pImpl->entries) {
+        if (entry.source == ConfigSource::Default) {
+            defaults[key] = entry;
+        }
+    }
+    
+    pImpl->entries = std::move(defaults);
 }
 
 std::string Config::summary() const {
-    std::ostringstream oss;
-    oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
-        oss << "  " << entry.key << " = [";
-        std::visit([&oss](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, std::string>) {
-                oss << "\"" << arg << "\"";
-            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
-                                 std::is_same_v<T, std::vector<double>> ||
-                                 std::is_same_v<T, std::vector<std::string>>) {
-                oss << "[";
-                for (size_t i = 0; i < arg.size(); ++i) {
-                    if (i) oss << ", ";
-                    oss << arg[i];
+    std::stringstream ss;
+    ss << "Configuration Summary:" << std::endl;
+    
+    for (const auto& [key, entry] : pImpl->entries) {
+        ss << "  " << key << ": ";
+        
+        const ConfigValue& value = entry.value;
+        std::visit([&ss](const auto& val) {
+            if constexpr (std::is_same_v<decltype(val), int>) {
+                ss << val;
+            } else if constexpr (std::is_same_v<decltype(val), int64_t>) {
+                ss << val;
+            } else if constexpr (std::is_same_v<decltype(val), double>) {
+                ss << val;
+            } else if constexpr (std::is_same_v<decltype(val), float>) {
+                ss << val;
+            } else if constexpr (std::is_same_v<decltype(val), bool>) {
+                ss << (val ? "true" : "false");
+            } else if constexpr (std::is_same_v<decltype(val), std::string>) {
+                ss << "\"" << val << "\"";
+            } else if constexpr (std::is_same_v<decltype(val), std::vector<int>>) {
+                ss << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) ss << ", ";
+                    ss << val[i];
                 }
-                oss << "]";
-            } else {
-                oss << arg;
+                ss << "]";
+            } else if constexpr (std::is_same_v<decltype(val), std::vector<double>>) {
+                ss << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) ss << ", ";
+                    ss << val[i];
+                }
+                ss << "]";
+            } else if constexpr (std::is_same_v<decltype(val), std::vector<std::string>>) {
+                ss << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i > 0) ss << ", ";
+                    ss << "\"" << val[i] << "\"";
+                }
+                ss << "]";
             }
-        }, entry.value);
-        oss << "] (" << static_cast<int>(entry.source) << ")\n";
+        }, value);
+        
+        ss << " (source: " << static_cast<int>(entry.source) << ")" << std::endl;
     }
-    return oss.str();
+    
+    return ss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+void Config::validateKey(const std::string& key) const {
+    if (key.empty()) {
+        throw ConfigurationError("Configuration key cannot be empty");
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
-        } else {
-            return std::nullopt;
+    if (key.find('.') != std::string::npos) {
+        throw ConfigurationError("Configuration key cannot contain dots");
+    }
+}
+
+void Config::validateValue(const std::string& key, const ConfigValue& value) {
+    std::string typeName;
+    
+    if (std::holds_alternative<int>(value)) {
+        typeName = "int_range";
+    } else if (std::holds_alternative<int64_t>(value)) {
+        typeName = "int64_range";
+    } else if (std::holds_alternative<double>(value)) {
+        typeName = "double_range";
+    } else if (std::holds_alternative<float>(value)) {
+        typeName = "float_range";
+    } else if (std::holds_alternative<bool>(value)) {
+        typeName = "bool_range";
+    } else if (std::holds_alternative<std::string>(value)) {
+        typeName = "string_range";
+    }
+    
+    auto it = pImpl->validators.find(typeName);
+    if (it != pImpl->validators.end() && !it->second(value)) {
+        throw ConfigurationError("Validation failed for key " + key);
+    }
+}
+
+void Config::parseAndSet(const std::string& key, const std::string& valueStr, ConfigSource source) {
+    // Try to parse as int
+    try {
+        size_t pos;
+        int intValue = std::stoi(valueStr, &pos);
+        if (pos == valueStr.length()) {
+            set(key, intValue, source);
+            return;
         }
-    }, it->value);
+    } catch (...) {}
+    
+    // Try to parse as int64
+    try {
+        size_t pos;
+        int64_t int64Value = std::stoll(valueStr, &pos);
+        if (pos == valueStr.length()) {
+            set(key, int64Value, source);
+            return;
+        }
+    } catch (...) {}
+    
+    // Try to parse as double
+    try {
+        size_t pos;
+        double doubleValue = std::stod(valueStr, &pos);
+        if (pos == valueStr.length()) {
+            set(key, doubleValue, source);
+            return;
+        }
+    } catch (...) {}
+    
+    // Try to parse as bool
+    if (valueStr == "true" || valueStr == "false") {
+        bool boolValue = (valueStr == "true");
+        set(key, boolValue, source);
+        return;
+    }
+    
+    // Otherwise treat as string
+    set(key, valueStr, source);
 }
-
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
-}
-
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm
