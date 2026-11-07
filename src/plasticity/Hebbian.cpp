@@ -1,6 +1,4 @@
-#include "Hebbian.hpp"
-#include "../brain/Synapse.hpp"
-#include <algorithm>
+#include "../plasticity/PlasticityRule.hpp"
 
 namespace nlm {
 
@@ -14,14 +12,15 @@ struct Hebbian::Impl {
              covarianceThreshold(0.0f) {}
 };
 
-Hebbian::Hebbian() : pImpl(new Impl) {}
+Hebbian::Hebbian() : pImpl(std::make_unique<Impl>()) {}
 
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                       const std::vector<Timestamp>& preSpikes,
+                       const std::vector<Timestamp>& postSpikes,
+                       TimestepDuration dt) {
+    if (!pImpl) return;
     /*
      * Real Hebbian learning implementation
      * 
@@ -48,38 +47,32 @@ void Hebbian::update(Synapse* synapse,
      *   - Single learning rate (no separate potentiation/depression rates)
      *   - Assumes stationary statistics
      */
-    
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
-    
-    // Nearest-neighbour version: the old all-pairs count made delta grow
-    // with history length (up to 100x100 pairs) and saturated every weight
-    // to its bound in one step. One correlated recent pair = one step.
-    // Timestamps are in seconds, so the 100ms window is 0.1s.
-    float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
-    float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
-    if (synapse->getType() == SynapseType::Inhibitory) {
-        delta = -delta;  // strengthen inhibition, don't flip it to excitatory
-    }
-    
-    // Apply with bounds. Soft bound, Phase 4 (see STDP.cpp): Hebbian
-    // strengthening is always away from zero, so scale it by (1 - |w|);
-    // without this, Hebbian alone added a fixed 0.01 per co-active step
-    // and saturated every weight together with STDP.
-    if (std::abs(delta) > 1e-6f) {
-        delta *= (1.0f - std::abs(synapse->getWeight()));
-        applyWeightChange(synapse, delta);
-        if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
-            synapse->setWeight(-0.01f);
-        } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
-            synapse->setWeight(0.01f);
-        }
-    }
+     
+     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+         return;
+     }
+     
+     // Nearest-neighbour version: the old all-pairs count made delta grow
+     // with history length (up to 100x100 pairs) and saturated every weight
+     // to its bound in one step. One correlated recent pair = one step.
+     // Timestamps are in seconds, so the 100ms window is 0.1s.
+     float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
+     float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
+     if (synapse->getType() == SynapseType::Inhibitory) {
+         delta = -delta;  // strengthen inhibition, don't flip it to excitatory
+     }
+     
+      // Apply with bounds. Soft bound using common helper.
+      if (std::abs(delta) > 1e-6f) {
+          // Scale by weight using common helper
+          PlasticityRule::applySoftBounds(synapse, delta);
+          // Enforce sign using common helper
+          PlasticityRule::enforceSynapseWeightBounds(synapse);
+      }
 }
 
 void Hebbian::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!pImpl || !synapse) return;
     
     float newWeight = synapse->getWeight() + delta;
     newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
@@ -91,18 +84,22 @@ const char* Hebbian::getName() const {
 }
 
 void Hebbian::setLearningRate(float rate) {
+    if (!pImpl) return;
     pImpl->learningRate = std::clamp(rate, 0.0f, 1.0f);
 }
 
 float Hebbian::getLearningRate() const {
+    if (!pImpl) return 0.0f;
     return pImpl->learningRate;
 }
 
 void Hebbian::setMaxWeight(float maxWeight) {
+    if (!pImpl) return;
     pImpl->maxWeight = std::clamp(maxWeight, 0.0f, 10.0f);
 }
 
 float Hebbian::getMaxWeight() const {
+    if (!pImpl) return 0.0f;
     return pImpl->maxWeight;
 }
 

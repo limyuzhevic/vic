@@ -18,16 +18,23 @@ struct NeuralWorkingMemory::Impl {
 };
 
 NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , activeTraces_()
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , recurrentConnections_()
+    , winners_()
 {
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
+    if (!pImpl) return;
     pImpl->brain = brain;
     brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
@@ -162,6 +169,7 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
 }
 
 void NeuralWorkingMemory::clear() {
+    if (!pImpl) return;
     memoryNeurons_.clear();
     memoryActivations_.clear();
     memoryTimestamps_.clear();
@@ -170,6 +178,7 @@ void NeuralWorkingMemory::clear() {
 }
 
 void NeuralWorkingMemory::strengthenMemory(float factor) {
+    if (!pImpl) return;
     for (auto& activation : memoryActivations_) {
         activation = std::min(1.0f, activation * factor);
     }
@@ -215,6 +224,7 @@ float NeuralWorkingMemory::getMemoryActivity() const {
 }
 
 void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, float strength) {
+    if (!pImpl) return;
     // Check if connection already exists
     for (const auto& conn : pImpl->maintenanceSynapses) {
         if (conn.first == from && conn.second == to) return;
@@ -224,6 +234,7 @@ void NeuralWorkingMemory::createRecurrentConnection(NeuronId from, NeuronId to, 
 }
 
 void NeuralWorkingMemory::updateRecurrentConnections() {
+    if (!pImpl) return;
     // Apply maintenance currents through recurrent connections
     for (const auto& conn : pImpl->maintenanceSynapses) {
         float fromActivation = 0.0f;
@@ -243,6 +254,7 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
 }
 
 void NeuralWorkingMemory::decayWeakTraces() {
+    if (!pImpl) return;
     std::vector<size_t> toRemove;
     
     for (size_t i = 0; i < memoryActivations_.size(); ++i) {
@@ -278,7 +290,7 @@ struct AttentionalSelection::Impl {
 };
 
 AttentionalSelection::AttentionalSelection()
-    : pImpl(new Impl)
+    : pImpl(std::make_unique<Impl>())
     , brain_(nullptr)
     , inhibitionStrength_(0.5f)
     , excitationStrength_(1.5f)
@@ -399,6 +411,7 @@ float AttentionalSelection::getExcitationFor(NeuronId neuron) const {
 }
 
 void AttentionalSelection::update(TimestepDuration dt) {
+    if (!pImpl) return;
     // Decay salience and bias over time
     for (auto& s : bottomUpSalience_) {
         s.second *= 0.95f;
@@ -439,6 +452,7 @@ void AttentionalSelection::applyBottomUpSalience(NeuronId neuron, float salience
 }
 
 void AttentionalSelection::reset() {
+    if (!pImpl) return;
     winners_.clear();
     attendedRegions_.clear();
     neuronSalience_.clear();

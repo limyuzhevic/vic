@@ -25,16 +25,47 @@ public:
     // Get rule name
     virtual const char* getName() const = 0;
     
-    // Check if rule is enabled
-    bool isEnabled() const;
-    void setEnabled(bool enabled);
+    namespace nlm {
+
+// Weight management utilities
+inline void PlasticityRule::enforceSynapseWeightBounds(Synapse* synapse) {
+    if (!synapse) return;
     
+    // Enforce sign: excitatory stays >= 0.01, inhibitory stays <= -0.01
+    if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
+        synapse->setWeight(-0.01f);
+    } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
+        synapse->setWeight(0.01f);
+    }
+}
+
+inline void PlasticityRule::applySoftBounds(Synapse* synapse, SynapticWeight delta) {
+    if (!synapse) return;
+    
+    float w = synapse->getWeight();
+    bool awayFromZero = std::abs(w + delta) > std::abs(w);
+    float effectiveDelta = delta * (awayFromZero ? (1.0f - std::abs(w)) : std::abs(w));
+    
+    float newWeight = w + effectiveDelta;
+    newWeight = std::clamp(newWeight, -1.0f, 1.0f);  // Use standard weight bounds
+    synapse->setWeight(newWeight);
+}
+
+// Check if rule is enabled
+inline bool PlasticityRule::isEnabled() const {
+    return enabled_;
+}
+
+inline void PlasticityRule::setEnabled(bool enabled) {
+    enabled_ = enabled;
+}
+
 protected:
     PlasticityRule() : enabled_(true) {}
     
 private:
     bool enabled_;
-};
+} // namespace nlm
 
 // Hebbian plasticity rule: "neurons that fire together, wire together"
 // PLACEHOLDER - Phase 2 will implement real Hebbian learning

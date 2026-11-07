@@ -1,7 +1,4 @@
-#include "STDP.hpp"
-#include "../brain/Synapse.hpp"
-#include <cmath>
-#include <algorithm>
+#include "../plasticity/PlasticityRule.hpp"
 
 namespace nlm {
 
@@ -16,7 +13,7 @@ struct STDP::Impl {
              minWeight(-1.0f), maxWeight(1.0f) {}
 };
 
-STDP::STDP() : pImpl(new Impl) {}
+STDP::STDP() : pImpl(std::make_unique<Impl>()) {}
 
 STDP::~STDP() = default;
 
@@ -24,6 +21,7 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
+    if (!pImpl) return;
     /*
      * Real STDP implementation based on spike-timing correlation
      * 
@@ -51,13 +49,48 @@ void STDP::update(Synapse* synapse,
      *   - Assumes single exponential window (more complex in biology)
      *   - Doesn't account for synaptic eligibility traces
      */
-    
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
+     
+     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
+         return;
+     }
+     
+     float totalDelta = 0.0f;
+     float tau = pImpl->timeConstant;
+     
+     // Nearest-neighbour STDP: only the most recent pre/post pair is used.
+     // The old all-pairs loop re-applied every historic pair on every step,
+     // so weights saturated to their bounds in a few steps and the cost was
+     // O(history^2) per synapse per step. Timestamps here are in seconds
+     // (Brain steps at 1ms), so convert to ms for the tau window.
+     float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
+     if (dtMs > 0) {
+         totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
+     } else if (dtMs < 0) {
+         totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+     }
+     
+    // Scale by synaptic efficacy if available
+    float efficacy = synapse->getEfficacy();
+    totalDelta *= efficacy;
+
+    // Invert sign for inhibitory synapses (strengthen inhibition, don't flip to excitatory)
+    if (synapse->getType() == SynapseType::Inhibitory) {
+        totalDelta = -totalDelta;
     }
+
+    // Apply soft (weight-dependent) bounds using common helper
+    PlasticityRule::applySoftBounds(synapse, totalDelta);
+
+    // Apply weight change
+    synapse->addToWeight(totalDelta);
+    // Enforce sign using common helper
+    PlasticityRule::enforceSynapseWeightBounds(synapse);
     
-    float totalDelta = 0.0f;
-    float tau = pImpl->timeConstant;
+    // Update eligibility trace for reward-modulated learning
+    float currentTrace = synapse->getEligibilityTrace();
+    synapse->setEligibilityTrace(currentTrace + totalDelta);
+}
+}
 
     // Nearest-neighbour STDP: only the most recent pre/post pair is used.
     // The old all-pairs loop re-applied every historic pair on every step,
@@ -116,7 +149,7 @@ void STDP::update(Synapse* synapse,
 }
 
 void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
+    if (!pImpl || !synapse) return;
     
     // Clamp weight to bounds
     float newWeight = synapse->getWeight() + delta;
@@ -129,26 +162,32 @@ const char* STDP::getName() const {
 }
 
 void STDP::setLTPWeight(float weight) {
+    if (!pImpl) return;
     pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
 }
 
 float STDP::getLTPWeight() const {
+    if (!pImpl) return 0.0f;
     return pImpl->ltpWeight;
 }
 
 void STDP::setLTDWeight(float weight) {
+    if (!pImpl) return;
     pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
 }
 
 float STDP::getLTDWeight() const {
+    if (!pImpl) return 0.0f;
     return pImpl->ltdWeight;
 }
 
 void STDP::setTimeConstant(float tau) {
+    if (!pImpl) return;
     pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
 }
 
 float STDP::getTimeConstant() const {
+    if (!pImpl) return 0.0f;
     return pImpl->timeConstant;
 }
 
