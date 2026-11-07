@@ -614,8 +614,31 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // Get current sensory state from the brain's last input
+        // Note: In a full implementation, sensory input would be tracked here
+        // For now, we simulate with a simple pattern
+        std::vector<float> sensoryPattern;
+        sensoryPattern.reserve(32);
+        
+        // Get a simple pattern from current brain state (for simulation)
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                if (pop->getNeuronCount() > 0) {
+                    auto* neuron = pop->getNeuron(0);
+                    sensoryPattern.push_back(neuron->getState().membranePotential);
+                }
+            }
+        }
+        
+        if (!sensoryPattern.empty()) {
+            // Create a simple sensory input for prediction
+            auto sensoryInput = std::make_shared<InternalSignals>();
+            sensoryInput->setData(sensoryPattern);
+            
+            // Update prediction system
+            pImpl->predictionSystem->train(*sensoryInput);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -630,9 +653,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+    if (pImpl->conceptFormation && pImpl->conceptFormation->getBrain()) {
+        // Concept formation processes neural activity patterns to discover concepts
+        // Use working memory patterns for concept discovery
+        std::vector<float> conceptPattern;
+        conceptPattern.reserve(64);
+        
+        // Collect neural activity patterns from working memory and active neurons
+        if (pImpl->workingMemory) {
+            // Get working memory patterns
+            auto wmPatterns = pImpl->workingMemory->getMemoryPatterns();
+            conceptPattern.insert(conceptPattern.end(), wmPatterns.begin(), wmPatterns.end());
+        }
+        
+        // Add some neural activity patterns from current brain state
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (size_t i = 0; i < std::min(size_t(4), pop->getNeuronCount()); ++i) {
+                    auto* neuron = pop->getNeuron(i);
+                    if (neuron->isFiring()) {
+                        conceptPattern.push_back(neuron->getState().firingRate);
+                    }
+                }
+            }
+        }
+        
+        if (conceptPattern.size() >= 16) {
+            // Create features vector (simplified version of sensory features)
+            std::vector<float> features;
+            features.reserve(8);
+            // Add some basic features derived from brain state
+            features.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);
+            features.push_back(pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f);
+            features.push_back(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f);
+            features.push_back(pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f);
+            features.push_back(static_cast<float>(pImpl->currentStep));
+            
+            // Present experience to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                conceptPattern, features, 
+                pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                currentStep);
+            
+            if (conceptId > 0) {
+                NLM_LOG_INFO("Brain: ConceptFormation discovered concept " + std::to_string(conceptId));
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

@@ -141,56 +141,56 @@ public:
     
     // ========== MEMORY SYSTEMS ==========
     
-    // Working memory - transient active information
-    NeuralWorkingMemory* getWorkingMemory();
-    
-    // Episodic memory - experience storage
-    NeuralEpisodicMemory* getEpisodicMemory();
-    
-    // Associative memory - pattern associations
-    NeuralAssociativeMemory* getAssociativeMemory();
+// Working memory - transient active information
+	NeuralWorkingMemory* getWorkingMemory() const;
+	
+	// Episodic memory - experience storage
+	NeuralEpisodicMemory* getEpisodicMemory() const;
+	
+	// Associative memory - pattern associations
+	NeuralAssociativeMemory* getAssociativeMemory() const;
     
     // ========== PREDICTION SYSTEM ==========
     
-    // Prediction system for sensory prediction and error computation
-    PredictionSystem* getPredictionSystem();
-    
-    // ========== COGNITION SYSTEMS ==========
-    
-    // Neural planner for action planning
-    NeuralPlanner* getPlanner();
-    
-    // Concept formation for pattern discovery
-    ConceptFormation* getConceptFormation();
-    
-    // Attentional selection for focus
-    AttentionalSelection* getAttention();
-    
-    // ========== DEVELOPMENT SYSTEM ==========
-    
-    DevelopmentSystem* getDevelopmentSystem();
-    DevelopmentalStage getDevelopmentalStage() const;
-    void setDevelopmentalStage(DevelopmentalStage stage);
-    
-    // ========== NEUROMODULATION SYSTEMS ==========
-    
-    // Dopamine - reward and reinforcement
-    Dopamine* getDopamine();
-    
-    // Curiosity - exploration motivation
-    Curiosity* getCuriosity();
-    
-    // Novelty - novelty detection
-    Novelty* getNovelty();
-    
-    // Prediction error signal
-    PredictionError* getPredictionErrorSignal();
-    
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
-    
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
+// Prediction system for sensory prediction and error computation
+	PredictionSystem* getPredictionSystem() const;
+	
+	// ========== COGNITION SYSTEMS ==========
+	
+	// Neural planner for action planning
+	NeuralPlanner* getPlanner() const;
+	
+	// Concept formation for pattern discovery
+	ConceptFormation* getConceptFormation() const;
+	
+	// Attentional selection for focus
+	AttentionalSelection* getAttention() const;
+// ========== DEVELOPMENT SYSTEM ==========
+	
+	DevelopmentSystem* getDevelopmentSystem() const;
+	
+	DevelopmentalStage getDevelopmentalStage() const;
+	void setDevelopmentalStage(DevelopmentalStage stage);
+	
+	// ========== NEUROMODULATION SYSTEMS ==========
+	
+	// Dopamine - reward and reinforcement
+	Dopamine* getDopamine() const;
+	
+	// Curiosity - exploration motivation
+	Curiosity* getCuriosity() const;
+	
+	// Novelty - novelty detection
+	Novelty* getNovelty() const;
+	
+	// Prediction error signal
+	PredictionError* getPredictionErrorSignal() const;
+	
+	// Get current configuration
+	std::shared_ptr<const Config> getConfig() const;
+	
+	// Get random generator
+	RandomGenerator* getRandomGenerator() const;
 
     // Learned preference trait (Phase 5): a single scalar, -1..1,
     // updated only by sandbox reward through AgentBrain, saved in the
