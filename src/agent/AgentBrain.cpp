@@ -1025,8 +1025,8 @@ DevelopmentalStage AgentBrain::getDevelopmentalStage() const {
     return brain_->getDevelopmentalStage();
 }
 
-float AgentBrain::getNeuromodulationLevel() const {
-    return dopamineLevel_;
+float AgentBrain::getExpectedReward() const {
+    return expectedReward_;
 }
 
 float AgentBrain::getCuriosityLevel() const {

@@ -84,8 +84,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         float reward = actionResult.reward;
         totalReward += reward;
         
-        // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        // Apply reward modulation with agent's expectation
+        agent.applyRewardModulation(reward, agent.getExpectedReward());
         
         // Update development
         if (config.enableDevelopment) {

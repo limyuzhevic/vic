@@ -92,20 +92,60 @@ make -j4
 ```
 
 ## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+
+Build all targets first (see Building below). The unified CLI is now available:
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
-./nlm_phase3_demo
-./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
+# Phase 2: Basic neural computation
+./nlm_phase2
+
+# Or use the unified CLI with subcommands:
+./nlm_unified phase2
+
+# Phase 3: World interaction
+./nlm_unified phase3
+
+# Phase 4: Cognitive capabilities
+./nlm_unified phase4
+
+# Phase 5: Advanced features
+./nlm_unified phase5
+
+# Phase 6: Integration test
+./nlm_unified phase6
+
+# Phase 6 text demo (text-as-a-sense)
+./nlm_unified phase6-text
+
+# Performance benchmark
+./nlm_unified benchmark
+
+# Show help
+./nlm_unified help
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
+You can also run individual commands with additional arguments:
+
+```bash
+# Phase 3 with custom settings
+./nlm_unified phase3 10 300
+
+# Benchmark for 120 seconds
+./nlm_unified benchmark 120
+```
+
+The unified CLI provides a consistent interface for running NLM demos across all phases, making it easier to explore the system's capabilities and integrate with automation tools.
+
+`nlm_unified phase6` runs a comprehensive integration test verifying all
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
 library in CMake; it does not yet have a standalone demo executable.
+
+The unified CLI (`nlm_unified`) provides a single interface for all NLM demos,
+replacing the multiple individual executables. This makes it easier to:
+- Explore the system's capabilities
+- Automate testing
+- Integrate with CI/CD pipelines
+- Document and run consistent experiments
 
 ## Project Structure
 

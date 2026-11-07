@@ -68,8 +68,8 @@ public:
     // Get novelty level
     float getNoveltyLevel() const;
     
-    // Get prediction error
-    float getPredictionError() const;
+    // Get expected reward (the agent's prediction of future rewards)
+    float getExpectedReward() const { return expectedReward_; }
 
     // Thought trace (Phase 5): a one-line, human-readable record of the
     // most recent loop — what was perceived, what the planner suggested
