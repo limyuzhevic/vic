@@ -37,6 +37,27 @@ namespace test_brain {
     void runAll();
 }
 
+// New test namespaces for enhanced functionality
+namespace test_performance {
+    void runAll();
+}
+
+namespace test_command_line {
+    void runAll();
+}
+
+namespace test_config_presets {
+    void runAll();
+}
+
+namespace test_plasticity_config {
+    void runAll();
+}
+
+namespace test_world_config {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -113,6 +134,52 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    // New test categories for enhanced functionality
+    std::cout << "Running Performance Monitor tests..." << std::endl;
+    try {
+        test_performance::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Command-Line Interface tests..." << std::endl;
+    try {
+        test_command_line::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Configuration Preset tests..." << std::endl;
+    try {
+        test_config_presets::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Plasticity Configuration tests..." << std::endl;
+    try {
+        test_plasticity_config::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running World Configuration tests..." << std::endl;
+    try {
+        test_world_config::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;
