@@ -359,7 +359,106 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Advanced features
+        .def("enableWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Access working memory system")
+        .def("enableEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Access episodic memory system")
+        .def("enableAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Access associative memory system")
+        .def("enablePredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Access prediction system")
+        .def("enablePlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Access neural planner")
+        .def("enableConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Access concept formation system")
+        .def("enableAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Access attentional selection system")
+        .def("enableDevelopment", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Access development system")
+        .def("enableDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Access dopamine neuromodulation")
+        .def("enableCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Access curiosity neuromodulation")
+        .def("enableNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Access novelty detection")
+        .def("enablePredictionError", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Access prediction error signaling");
+        
+        // Convenience methods for common operations
+        .def("runEpisode", [](std::shared_ptr<Brain> brain, size_t steps) {
+            for (size_t i = 0; i < steps; ++i) {
+                brain->step(i);
+            }
+            return brain->getTotalSpikeCount();
+        }, py::arg("steps"), 
+             "Run a complete episode for given steps")
+        .def("createConfig", [](const std::string& filepath) {
+            auto config = std::make_shared<Config>();
+            if (!filepath.empty()) {
+                config->loadFromFile(filepath);
+            }
+            return config;
+        }, py::arg("filepath") = "",
+             "Create and optionally load configuration from file")
+        .def("exportState", &Brain::save,
+             py::arg("filepath"),
+             "Export brain state to file (alias for save)")
+        .def("importState", &Brain::load,
+             py::arg("filepath"),
+             "Import brain state from file (alias for load)")
+        .def("getStats", [](const std::shared_ptr<Brain>& brain) {
+            py::dict stats;
+            stats["total_neurons"] = brain->getTotalNeuronCount();
+            stats["total_synapses"] = brain->getTotalSynapseCount();
+            stats["firing_neurons"] = brain->getFiringNeuronCount();
+            stats["average_firing_rate"] = brain->getAverageFiringRate();
+            stats["total_spikes"] = brain->getTotalSpikeCount();
+            stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+            return stats;
+        }, "Get comprehensive brain statistics")
+        .def("getState", [](const std::shared_ptr<Brain>& brain) {
+            py::dict state;
+            state["step"] = brain->getTotalSpikeCount();
+            state["neuron_count"] = brain->getTotalNeuronCount();
+            state["synapse_count"] = brain->getTotalSynapseCount();
+            state["firing_count"]-selective brain->getFiringNeuronCount();
+            state["average_firing_rate"] = brain->getAverageFiringRate();
+            state["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+            return state;
+        }, "Get current brain state as dictionary");
+        
+        // Integration verification
+        .def("verifyIntegration", [](std::shared_ptr<Brain> brain) {
+            py::dict integration;
+            integration["working_memory"] = brain->getWorkingMemory() != nullptr;
+            integration["episodic_memory"] = brain->getEpisodicMemory() != nullptr;
+            integration["associative_memory"] = brain->getAssociativeMemory() != nullptr;
+            integration["prediction_system"] = brain->getPredictionSystem() != nullptr;
+            integration["planner"] = brain->getPlanner() != nullptr;
+            integration["concept_formation"] = brain->getConceptFormation() != nullptr;
+            integration["attention"] = brain->getAttention() != nullptr;
+            integration["development"] = brain->getDevelopmentSystem() != nullptr;
+            integration["dopamine"] = brain->getDopamine() != nullptr;
+            integration["curiosity"] = brain->getCuriosity() != nullptr;
+            integration["novelty"] = brain->getNovelty() != nullptr;
+            integration["prediction_error"] = brain->getPredictionErrorSignal() != nullptr;
+            return integration;
+        }, "Verify integration of all brain systems");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
