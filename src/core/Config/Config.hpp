@@ -6,11 +6,16 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
 
 // Forward declarations
 class Config;
+
+// JSON library forward declaration (to avoid hard dependency)
+namespace json { struct json_value; }
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -23,6 +28,56 @@ using ConfigValue = std::variant<
     std::vector<double>,
     std::vector<std::string>
 >;
+
+// Configuration schema entry for validation
+struct ConfigSchemaEntry {
+    std::string key;
+    std::function<bool(const ConfigValue&)> validator;
+    std::string description;
+    ConfigValue defaultValue;
+    bool required;
+};
+
+// Configuration group for organization
+struct ConfigGroup {
+    std::string name;
+    std::vector<std::string> keys;
+    std::string description;
+};
+
+// Configuration statistics
+struct ConfigStats {
+    size_t totalEntries;
+    size_t fromFile;
+    size_t fromCommandLine;
+    size_t fromDefault;
+    size_t fromRuntime;
+};
+
+// Configuration schema entry for validation
+struct ConfigSchemaEntry {
+    std::string key;
+    std::function<bool(const ConfigValue&)> validator;
+    std::string description;
+    ConfigValue defaultValue;
+    bool required;
+};
+
+// Configuration group for organization
+struct ConfigGroup {
+    std::string name;
+    std::vector<std::string> keys;
+    std::string description;
+};
+
+// Configuration statistics
+struct ConfigStats {
+    size_t totalEntries;
+    size_t fromFile;
+    size_t fromCommandLine;
+    size_t fromDefault;
+    size_t fromRuntime;
+};
 
 // Configuration source
 enum class ConfigSource {
@@ -92,16 +147,41 @@ template<typename T>
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+// Configuration validation and schema support
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Validation functions for common configuration patterns
+    static bool validatePositive(const ConfigValue& value);
+    static bool validateNonNegative(const ConfigValue& value);
+    static bool validateRange(const ConfigValue& value, double min, double max);
+    static bool validateSize(const ConfigValue& value, size_t minSize, size_t maxSize);
+    static bool validateString(const ConfigValue& value, size_t minLength = 0);
+    static bool validatePositiveInt(const ConfigValue& value);
+    static bool validateProbability(const ConfigValue& value);
+    static bool validateStringEnum(const ConfigValue& value, 
+                                   const std::vector<std::string>& allowedValues);
+    static bool validateFilePath(const ConfigValue& value, bool mustExist = false);
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    // Create validation schema for common configuration patterns
+    static std::vector<ConfigSchemaEntry> createCoreSchema();
+    static std::vector<ConfigSchemaEntry> createNeuralNetworkSchema();
+    static std::vector<ConfigSchemaEntry> createPlasticitySchema();
+    static std::vector<ConfigSchemaEntry> createDevelopmentSchema();
+    static std::vector<ConfigSchemaEntry> createNeuromodulationSchema();
+    
+    // Configuration validation utilities
+    static std::vector<std::string> getInvalidKeys(const std::vector<ConfigSchemaEntry>& schema) const;
+    static std::string getValidationReport(const std::vector<ConfigSchemaEntry>& schema) const;
+    static bool isValid(const std::vector<ConfigSchemaEntry>& schema) const;
+    
+    // Configuration comparison and merging
+    static bool configEqual(const ConfigValue& a, const ConfigValue& b);
+    static ConfigValue mergeValues(const ConfigValue& base, const ConfigValue& override);
+    
+    // Configuration transformation
+    static ConfigValue toString(const ConfigValue& value);
+    static ConfigValue toDouble(const ConfigValue& value);
+    static ConfigValue toInt(const ConfigValue& value);
+    static ConfigValue toBool(const ConfigValue& value);
 };
 
 } // namespace nlm
