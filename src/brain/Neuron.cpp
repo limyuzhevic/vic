@@ -245,6 +245,26 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
 
+    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        V -= pImpl->state.adaptationVariable * 0.01f;
+        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    }
+    
+    // Clamp membrane potential to prevent instability
+    V = std::clamp(V, -100.0f, 50.0f);
+    
+    // Update the firing-rate metric from counted spikes, in Hz.
+    // Previously setFiringRate() was never called anywhere, so
+    // getAverageFiringRate() summed zeros even with thousands of spikes.
+    // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
+    // dt is in seconds (0.001 in the demos), so a neuron firing every
+    // step would approach 1000 Hz, and refractory periods cap it well
+    // below that in practice.
+    if (dt > 0.0) {
+        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+    }
+    
     // Check for spike
     if (V >= threshold) {
         fired = true;

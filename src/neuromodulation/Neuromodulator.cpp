@@ -42,9 +42,22 @@ void Dopamine::update(TimestepDuration dt) {
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    if (reward == 0.0f) return;  // No-op for zero reward
+    
+    // Implement real reward signaling
+    // Dopamine release is proportional to reward prediction error
+    // For now, use a simplified model
+    float rewardMagnitude = std::abs(reward);
+    float rewardSign = reward > 0.0f ? 1.0f : -1.0f;
+    
+    // Faster rise for larger rewards, but saturate at peak level
+    float levelChange = rewardMagnitude * pImpl->releaseRate;
+    pImpl->level = std::min(pImpl->peak, pImpl->level + levelChange * rewardSign);
+    
+    // Decay baseline toward current level for the next prediction
+    if (pImpl->level < pImpl->baseline * 0.5f) {
+        pImpl->baseline = pImpl->level * 0.9f + pImpl->baseline * 0.1f;
+    }
 }
 
 void Dopamine::signalRewardPredictionError(float error) {

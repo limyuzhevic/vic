@@ -188,6 +188,8 @@ target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 # it must not be added here as a subdirectory: it defines its own
 # nlm_core/nlm_agent/nlm_world targets, which would collide with the
 # ones above. This target reuses the root libraries instead.
+# Python bindings are now handled in the standalone python/CMakeLists.txt
+# for pip install builds.
 option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)

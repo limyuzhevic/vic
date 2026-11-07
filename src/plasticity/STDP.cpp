@@ -45,7 +45,7 @@ void STDP::update(Synapse* synapse,
      *   - Reflects NMDA receptor-mediated calcium signaling
      *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
      *   - Post-before-pre causes backpropagating action potentials
-     *   
+     * 
      * Limitations:
      *   - Simplified pairwise rule (doesn't capture triplet interactions)
      *   - Assumes single exponential window (more complex in biology)
@@ -59,16 +59,19 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
 
-    // Nearest-neighbour STDP: only the most recent pre/post pair is used.
-    // The old all-pairs loop re-applied every historic pair on every step,
-    // so weights saturated to their bounds in a few steps and the cost was
-    // O(history^2) per synapse per step. Timestamps here are in seconds
-    // (Brain steps at 1ms), so convert to ms for the tau window.
-    float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
-    if (dtMs > 0) {
-        totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
-    } else if (dtMs < 0) {
-        totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+    // Full pair-based STDP: consider all spike pairs within the time window
+    // This prevents rapid saturation and allows for more selective learning
+    // compared to the nearest-neighbor approach which only considers the most recent spikes
+    for (size_t i = 0; i < preSpikes.size(); ++i) {
+        for (size_t j = 0; j < postSpikes.size(); ++j) {
+            float dtMs = static_cast<float>((postSpikes[j] - preSpikes[i]) * 1000.0);
+            
+            if (dtMs > 0) {
+                totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
+            } else if (dtMs < 0) {
+                totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+            }
+        }
     }
     
     // Apply weight change with bounds

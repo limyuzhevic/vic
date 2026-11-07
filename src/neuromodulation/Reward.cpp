@@ -25,6 +25,7 @@ void Reward::setValue(float value) {
 void Reward::add(float delta) {
     pImpl->accumulatedReward += delta;
     pImpl->currentValue += delta;
+    pImpl->history.push_back(pImpl->currentValue);
 }
 
 void Reward::reset() {

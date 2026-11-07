@@ -19,9 +19,9 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                     const std::vector<Timestamp>& preSpikes,
+                     const std::vector<Timestamp>& postSpikes,
+                     TimestepDuration dt) {
     /*
      * Real Hebbian learning implementation
      * 
@@ -53,23 +53,36 @@ void Hebbian::update(Synapse* synapse,
         return;
     }
     
-    // Nearest-neighbour version: the old all-pairs count made delta grow
-    // with history length (up to 100x100 pairs) and saturated every weight
-    // to its bound in one step. One correlated recent pair = one step.
-    // Timestamps are in seconds, so the 100ms window is 0.1s.
-    float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
-    float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
+    // Full pair-based Hebbian: consider all spike pairs within the time window
+    // This provides more balanced learning and prevents rapid saturation
+    // compared to the nearest-neighbor approach which only considers the most recent spikes
+    float totalDelta = 0.0f;
+    float dtSeconds;
+    
+    // Calculate correlation using all spike pairs
+    for (size_t i = 0; i < preSpikes.size(); ++i) {
+        for (size_t j = 0; j < postSpikes.size(); ++j) {
+            dtSeconds = postSpikes[j] - preSpikes[i];
+            float correlation = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
+            totalDelta += correlation;
+        }
+    }
+    
+    // Average correlation per pair
+    float avgDelta = totalDelta / static_cast<float>(preSpikes.size() * postSpikes.size());
+    
+    // Apply with sign based on synapse type
     if (synapse->getType() == SynapseType::Inhibitory) {
-        delta = -delta;  // strengthen inhibition, don't flip it to excitatory
+        avgDelta = -avgDelta;  // strengthen inhibition, don't flip it to excitatory
     }
     
     // Apply with bounds. Soft bound, Phase 4 (see STDP.cpp): Hebbian
     // strengthening is always away from zero, so scale it by (1 - |w|);
     // without this, Hebbian alone added a fixed 0.01 per co-active step
     // and saturated every weight together with STDP.
-    if (std::abs(delta) > 1e-6f) {
-        delta *= (1.0f - std::abs(synapse->getWeight()));
-        applyWeightChange(synapse, delta);
+    if (std::abs(avgDelta) > 1e-6f) {
+        avgDelta *= (1.0f - std::abs(synapse->getWeight()));
+        applyWeightChange(synapse, avgDelta);
         if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
             synapse->setWeight(-0.01f);
         } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
