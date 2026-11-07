@@ -42,7 +42,7 @@ for i in range(100):
 print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Brain in a Simple World (NEW - Advanced Features)
 
 ```python
 import pynlm
@@ -57,6 +57,10 @@ world.reset()
 
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
+
+# Enable advanced learning features (NEW)
+agent.enableRewardModulation(True)  # Brain learns from rewards
+agent.enableCuriosity(True)         # Brain explores new things
 
 # Run for 50 steps
 for step in range(50):
@@ -133,7 +137,7 @@ def run_simulation(brain, world, agent, num_steps):
 run_simulation(brain, world, agent, 1000)
 ```
 
-### Pattern 2: Get Brain Stats
+### Pattern 2: Get Brain Stats (NEW - Advanced Features)
 
 ```python
 # Just add these inside your loop:
@@ -141,9 +145,11 @@ print("Neurons firing:", brain.getFiringNeuronCount())
 print("Total spikes:", brain.getTotalSpikeCount())
 print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
+print("Memory utilization:", brain.getWorkingMemoryUtilization())
+print("E/I ratio:", brain.getExcitationInhibitionRatio())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Enable Brain Features (NEW - Advanced Features)
 
 ```python
 # These are all optional:
@@ -151,6 +157,8 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+agent.enablePredictionSystem(True)      # Brain predicts outcomes
+agent.enableConceptFormation(True)      # Brain forms concepts
 ```
 
 ---
@@ -197,7 +205,7 @@ for i in range(10):
 print("Silent brain test done!")
 ```
 
-### Project 2: Brain Watching a World
+### Project 2: Brain Watching a World (NEW - Advanced Features)
 
 ```python
 import pynlm
@@ -211,17 +219,25 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
+# Enable advanced learning
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+
 # Watch the world for 30 steps
 for i in range(30):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(i)
     
+    # Brain makes decisions
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
 print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Project 3: Complete Agent with Learning (NEW - Advanced Features)
 
 ```python
 import pynlm
@@ -236,11 +252,13 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+# Enable advanced features (NEW)
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableCuriosity(True)             # Explore new things
+agent.enablePredictionSystem(True)      # Predict outcomes
+agent.enableConceptFormation(True)      # Form concepts
 
-# Run agent
+# Run agent with advanced learning
 for step in range(100):
     world.update(0.1)
     agent.processSensoryInput(world.getSensoryPercept())
@@ -248,8 +266,14 @@ for step in range(100):
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
     
+    # Brain learns from experience
+    reward = world.getReward()
+    prediction_error = agent.getPredictionError()
+    agent.applyRewardModulation(reward, prediction_error)
+    
     if step % 20 == 0:
         print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"  Reward: {reward}, Learning: {agent.getLearningRate()}")
 
 print("Agent simulation complete!")
 ```
@@ -268,6 +292,45 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+
+---
+
+## Advanced Features (NEW)
+
+The updated NLM includes many **advanced features**:
+
+### 1. Enhanced Learning
+```python
+agent.enableRewardModulation(True)  # Learn from rewards
+agent.enableCuriosity(True)         # Explore new things
+agent.enablePredictionSystem(True)  # Predict outcomes
+```
+
+### 2. Better Statistics
+```python
+brain.getTotalSpikeCount()          # Total spikes fired
+brain.getAverageFiringRate()        # Average firing rate (Hz)
+brain.getExcitationInhibitionRatio() # E/I balance
+brain.getWorkingMemoryUtilization()  # Memory usage
+brain.getDevelopmentStage()          # Brain maturity
+```
+
+### 3. Advanced Experiment Control
+```python
+# From command line:
+./nlm --mode integration    # Run advanced integration
+./nlm --json                # Output as JSON
+./nlm --benchmark           # Run benchmark mode
+```
+
+### 4. Checkpoint & Persistence
+```python
+# Save brain state:
+brain.save("my_brain.bin")
+
+# Load brain state:
+brain.load("my_brain.bin")
+```
 
 ---
 
@@ -293,5 +356,8 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the new `--benchmark` mode for testing
+5. Use `--json` output for data analysis
+6. Enable `--profile` for performance optimization
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with all the **advanced features** and **new capabilities**!

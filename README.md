@@ -96,12 +96,94 @@ Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
+./nlm                 # Phase 2 demo with advanced features
 ./nlm_phase3_demo
 ./nlm_phase4_demo
 ./nlm_phase6_demo     # Phase 6 integration test
 ./nlm_benchmark
 ```
+
+The `./nlm` executable now includes **ADVANCED FEATURES**:
+
+### Basic Usage (Backward Compatible):
+```bash
+./nlm                 # Run default auto-mode experiment
+```
+
+### Advanced Features:
+```bash
+./nlm --help         # Show basic help and available options
+./nlm --advanced-help # Show comprehensive advanced help guide
+./nlm --benchmark    # Run benchmark with minimal output
+./nlm --quiet        # Quiet mode, only errors
+./nlm --verbose      # Verbose mode with detailed logs
+./nlm config.cfg     # Load custom config file
+```
+
+### Advanced Command-Line Options:
+```bash
+# Experiment Control
+./nlm --mode auto            # Automatic multi-phase experiment (default)
+./nlm --mode connectivity    # Only neural connectivity test
+./nlm --mode plasticity      # Plasticity learning experiment
+./nlm --mode stdp            # STDP verification only
+./nlm --mode integration     # Advanced integration test
+./nlm --mode comprehensive   # All tests together
+./nlm --mode custom          # Custom experiment (use --config with params)
+
+# Output & Export
+./nlm --json                # JSON output for machine processing
+./nlm --csv                 # CSV output for data analysis
+./nlm --table               # Formatted table output
+./nlm --export format       # Export results in specified format
+./nlm --report file         # Save report to file
+
+# Checkpoint & Persistence
+./nlm --checkpoint           # Save brain state at the end
+./nlm --checkpoint-file file # Save/load specific checkpoint file
+
+# Configuration & Customization
+./nlm --param key=value      # Set custom configuration parameters
+./nlm --max-steps N          # Maximum simulation steps (default: unlimited)
+./nlm --min-steps N          # Minimum simulation steps (default: 0)
+./nlm --config file.cfg      # Load custom configuration
+
+# Performance & Analysis
+./nlm --profile              # Enable performance profiling
+./nlm --benchmark           # Benchmark mode with optimized output
+```
+
+### Configuration Files:
+- `configs/default.cfg`     - Default configuration
+- `configs/benchmark.cfg`   - Optimized for benchmarking
+- `configs/development.cfg` - Development-focused settings
+- `configs/custom.cfg`      - Template for custom configurations
+
+### Quick Start (NEW):
+```bash
+1. Basic usage:
+   ./nlm                    # Run default experiment with advanced features
+   ./nlm --benchmark       # Run fast benchmark with minimal output
+   ./nlm --quiet           # Silent mode, only errors
+
+2. Advanced usage:
+   ./nlm --mode integration --json --report results.json
+   ./nlm --mode plasticity --checkpoint --checkpoint-file brain_state.bin
+   ./nlm --mode custom --param neuron_count=2000 --param connection_probability=0.2
+
+3. Development:
+   ./nlm --advanced-help    # See all available options
+   ./nlm --profile          # Enable profiling for optimization
+```
+
+The `nlm` executable now includes:
+- **Advanced experiment control** with multiple modes
+- **Flexible output formats** (JSON, CSV, table, custom)
+- **Checkpoint persistence** for brain state saving/loading
+- **Performance profiling** and benchmarking tools
+- **Custom parameter injection** for experimentation
+- **Comprehensive statistics** and progress tracking
+- **Backward compatibility** with original Phase 2 interface
 
 `nlm_phase6_demo` runs a comprehensive integration test verifying all
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
