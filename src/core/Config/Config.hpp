@@ -95,6 +95,15 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Validate configuration
+    bool validate(std::string& errors) const;
+    
+    // Check for duplicate keys
+    bool hasDuplicates() const;
+    
+    // Get configuration schema information
+    static std::vector<std::string> getDefaultKeys();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

@@ -48,6 +48,43 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printHelp() {
+    std::cout << R"(
+NLM Command Line Interface
+
+Usage:
+  nlm [OPTIONS] [--config=FILE] [--validate-config]
+
+Options:
+  --help, -h           Show this help message
+  --version            Show version information
+  --config=FILE        Load configuration from FILE (default: configs/default.cfg)
+  --validate-config     Validate current configuration and exit
+
+Examples:
+  nlm                     Run with default configuration
+  nlm --config=custom.cfg  Load custom configuration
+  nlm --validate-config     Validate configuration before running
+  nlm --help              Show help information
+  nlm --version           Show version information
+
+Phase 2: Basic Neural Computation
+  Implements real spiking neural computation with:
+  - Leaky Integrate-and-Fire (LIF) neurons
+  - Event-driven spike propagation with synaptic delays
+  - STDP and Hebbian plasticity
+  - Structural plasticity (synaptogenesis/pruning)
+
+For more information, visit: https://github.com/nlm-project/nlm
+)" << std::endl;
+}
+
+void printVersion() {
+    std::cout << "NLM Neural Learning Machine v0.1.0" << std::endl;
+    std::cout << "Phase 2: Basic Neural Computation" << std::endl;
+    std::cout << "An experimental artificial developmental brain." << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -279,22 +316,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -338,6 +375,21 @@ int main(int argc, char** argv) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
+            }
+        } else if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        } else if (arg == "--version") {
+            printVersion();
+            return 0;
+        } else if (arg == "--validate-config") {
+            std::string errors;
+            if (config->validate(errors)) {
+                std::cout << "Configuration is valid!" << std::endl;
+            } else {
+                std::cout << "Configuration validation errors:" << std::endl;
+                std::cout << errors << std::endl;
+                return 1;
             }
         }
     }

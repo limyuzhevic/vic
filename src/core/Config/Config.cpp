@@ -19,8 +19,8 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO: Implement proper JSON/YAML parser for advanced configuration
+    // Currently uses simple key=value format for compatibility
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -86,7 +86,43 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Helper function to convert ConfigValue to string
+        auto valueToString = [](const ConfigValue& val) -> std::string {
+            std::ostringstream oss;
+            std::visit([&oss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    oss << '"' << arg << '"';
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i) oss << ", ";
+                        oss << arg[i];
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i) oss << ", ";
+                        oss << arg[i];
+                    }
+                    oss << "]";
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i) oss << ", ";
+                        oss << '"' << arg[i] << '"';
+                    }
+                    oss << "]";
+                } else {
+                    oss << arg;
+                }
+            }, val);
+            return oss.str();
+        };
+        
+        file << entry.key << " = " << valueToString(entry.value) << "\n\n";
     }
     
     return true;
@@ -209,6 +245,109 @@ std::optional<T> Config::get(const std::string& key) const {
             return std::nullopt;
         }
     }, it->value);
+}
+
+bool Config::validate(std::string& errors) const {
+    errors.clear();
+    
+    // Check for duplicate keys
+    if (hasDuplicates()) {
+        errors += "ERROR: Configuration contains duplicate keys. ";
+    }
+    
+    // Validate specific configuration values based on type
+    for (const auto& entry : pImpl->entries) {
+        // Check for empty values
+        if (entry.key.empty()) {
+            errors += "ERROR: Configuration entry has empty key. ";
+        }
+        
+        // Validate specific key-value pairs based on known defaults
+        std::string lowerKey = toLower(entry.key);
+        
+        // Validate neuron_count should be positive
+        if (lowerKey == "neuron_count") {
+            if (std::holds_alternative<int64_t>(entry.value)) {
+                auto val = std::get<int64_t>(entry.value);
+                if (val <= 0) {
+                    errors += "ERROR: neuron_count must be positive. ";
+                }
+            } else if (std::holds_alternative<int>(entry.value)) {
+                auto val = std::get<int>(entry.value);
+                if (val <= 0) {
+                    errors += "ERROR: neuron_count must be positive. ";
+                }
+            }
+        }
+        
+        // Validate connection_probability should be between 0 and 1
+        if (lowerKey == "connection_probability") {
+            if (std::holds_alternative<double>(entry.value)) {
+                auto val = std::get<double>(entry.value);
+                if (val < 0.0 || val > 1.0) {
+                    errors += "ERROR: connection_probability must be between 0.0 and 1.0. ";
+                }
+            } else if (std::holds_alternative<float>(entry.value)) {
+                auto val = std::get<float>(entry.value);
+                if (val < 0.0f || val > 1.0f) {
+                    errors += "ERROR: connection_probability must be between 0.0 and 1.0. ";
+                }
+            }
+        }
+        
+        // Validate region_count should be positive
+        if (lowerKey == "region_count") {
+            if (std::holds_alternative<int64_t>(entry.value)) {
+                auto val = std::get<int64_t>(entry.value);
+                if (val <= 0) {
+                    errors += "ERROR: region_count must be positive. ";
+                }
+            }
+        }
+    }
+    
+    return errors.empty();
+}
+
+bool Config::hasDuplicates() const {
+    std::vector<std::string> keys;
+    keys.reserve(pImpl->entries.size());
+    
+    for (const auto& entry : pImpl->entries) {
+        keys.push_back(entry.key);
+    }
+    
+    std::sort(keys.begin(), keys.end());
+    auto last = std::unique(keys.begin(), keys.end());
+    return last != keys.end();
+}
+
+std::vector<std::string> Config::getDefaultKeys() {
+    return {
+        "random_seed",
+        "simulation_timestep",
+        "neuron_count",
+        "region_count",
+        "connection_probability",
+        "plasticity_learning_rate",
+        "stdp_ltp_weight",
+        "stdp_ltd_weight",
+        "stdp_time_constant",
+        "development_synaptogenesis_rate",
+        "development_pruning_rate",
+        "dopamine_baseline",
+        "reward_discount_factor",
+        "environment_name",
+        "environment_width",
+        "environment_height",
+        "log_level",
+        "log_to_file",
+        "log_filename",
+        "max_simulation_steps",
+        "simulation_time_limit",
+        "visualization_enabled",
+        "visualization_update_rate"
+    };
 }
 
 template<typename T>
