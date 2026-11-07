@@ -36,9 +36,45 @@ void Novelty::setLevel(float level) {
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
     // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
-    pImpl->history.push_back(pImpl->level);
+    // For Phase 6: Use actual sensory input features for meaningful novelty detection
+    if (!observation.isValid() || !previousObservation.isValid()) {
+        pImpl->level = 0.0f;
+        return;
+    }
+    
+    // Get sensory inputs from observations
+    const SensoryInput* currentInput = observation.getSensoryInput();
+    const SensoryInput* previousInput = previousObservation.getSensoryInput();
+    
+    if (!currentInput || !previousInput) {
+        pImpl->level = 0.0f;
+        return;
+    }
+    
+    // Extract features from sensory inputs
+    std::vector<float> currentPattern;
+    std::vector<float> previousPattern;
+    
+    // For vision: use pixel intensities
+    if (currentInput->getType() == "Vision") {
+        // Get vision data (if available)
+        // For now, use placeholder implementation
+        currentPattern = currentInput->getData();
+    }
+    
+    // For internal signals: use energy, health, movement state
+    if (currentInput->getType() == "InternalSignals") {
+        const InternalSignals* internalInput = static_cast<const InternalSignals*>(currentInput);
+        // For now, use placeholder implementation
+        currentPattern = internalInput->getData();
+    }
+    
+    // Use existing vector<float> overload for pattern comparison
+    currentPattern = currentInput->getData();
+    previousPattern = previousInput->getData();
+    
+    // Compute difference between patterns
+    detectNovelty(currentPattern, previousPattern);
 }
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
