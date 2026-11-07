@@ -85,7 +85,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         totalReward += reward;
         
         // Apply reward modulation
-        agent.applyRewardModulation(reward, 0.0f);
+        agent.applyRewardModulation(reward, agent.getNeuromodulationLevel());
         
         // Update development
         if (config.enableDevelopment) {
@@ -107,7 +107,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
+    result.totalReward = totalReward;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;

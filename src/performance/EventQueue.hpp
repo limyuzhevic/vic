@@ -26,6 +26,7 @@
 #include <optional>
 #include <limits>
 #include <algorithm>
+#include "../core/Exceptions.hpp"
 
 namespace nlm {
 
@@ -292,7 +293,10 @@ inline SpikeRingBuffer::SpikeRingBuffer(size_t capacity)
     , tail_(0)
 {
     // Verify capacity is power of 2
-    assert((capacity & (capacity - 1)) == 0 && "SpikeRingBuffer capacity must be power of 2");
+    if ((capacity & (capacity - 1)) != 0) {
+        throw InvalidParameterException("capacity", 
+            "SpikeRingBuffer capacity must be power of 2, got " + std::to_string(capacity));
+    }
 }
 
 inline SpikeRingBuffer::~SpikeRingBuffer() = default;
@@ -350,7 +354,10 @@ inline DelayedSpikeQueue::DelayedSpikeQueue(size_t numBuckets, size_t maxDelaySt
     , buckets_(numBuckets)
     , pendingCounts_(numBuckets, 0)
 {
-    assert(numBuckets >= maxDelaySteps && "numBuckets must be >= maxDelaySteps");
+    if (numBuckets < maxDelaySteps) {
+        throw InvalidParameterException("numBuckets", 
+            "DelayedSpikeQueue numBuckets must be >= maxDelaySteps, got " + std::to_string(numBuckets) + " < " + std::to_string(maxDelaySteps));
+    }
 }
 
 inline DelayedSpikeQueue::~DelayedSpikeQueue() = default;

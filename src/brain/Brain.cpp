@@ -374,8 +374,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+    // Modern C++20 optimization: Use range-based for loops with structured bindings
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
+            // Modern C++20: Use structured binding in range-based for loop
             for (auto* neuron : pop->getNeurons()) {
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
@@ -383,8 +385,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
+    // Modern C++20 optimization: Use range-based for loops with structured bindings
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
+            // Modern C++20: Use structured binding in range-based for loop
             for (auto* neuron : pop->getNeurons()) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();

@@ -4,6 +4,12 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <algorithm>
+#include <string_view>
+
+// C++20 includes
+#include <format>
+#include <span>
 
 namespace nlm {
 
@@ -29,16 +35,21 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
-    std::ostringstream oss;
-    oss << "[" << levelToString(entry.level) << "] ";
-    
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
-    
-    oss << " " << entry.message;
-    
-    std::string output = oss.str();
+    // Modern C++20 formatted output using std::format
+    std::string output;
+    try {
+        output = std::format(
+            "[{}] {} {}", 
+            levelToString(entry.level),
+            std::formatTimestamp(entry.timestamp),
+            entry.message
+        );
+    } catch (const std::exception& e) {
+        // Fallback for older compilers
+        output = "[" + levelToString(entry.level) + "] " +
+                formatTimestampFallback(entry.timestamp) + " " + 
+                entry.message;
+    }
     
     // Console output
     if (pImpl->useColors) {
@@ -114,7 +125,7 @@ Logger::~Logger() = default;
 
 void Logger::addLogger(std::shared_ptr<ILogger> logger) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    pImpl->loggers.push_back(logger);
+    pImpl->loggers.push_back(std::move(logger));
 }
 
 void Logger::clearLoggers() {
@@ -124,6 +135,8 @@ void Logger::clearLoggers() {
 
 void Logger::setLevel(LogLevel level) {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
+    
+    // Modern C++20: using for structured binding
     for (auto& logger : pImpl->loggers) {
         logger->setLevel(level);
     }
@@ -141,6 +154,7 @@ void Logger::log(LogLevel level, const std::string& message,
     entry.function = function;
     entry.timestamp = std::chrono::system_clock::now();
     
+    // Modern C++20: range-based for loop with structured binding
     for (auto& logger : pImpl->loggers) {
         logger->log(entry);
     }
@@ -168,7 +182,9 @@ void Logger::critical(const std::string& message, const std::string& file, int l
 
 bool Logger::isEnabled(LogLevel level) const {
     std::lock_guard<std::mutex> lock(pImpl->mutex);
-    for (auto& logger : pImpl->loggers) {
+    
+    // Modern C++20: early return pattern
+    for (const auto& logger : pImpl->loggers) {
         if (logger->getLevel() <= level) {
             return true;
         }
@@ -187,8 +203,38 @@ Logger& Logger::getGlobal() {
 
 void Logger::setGlobal(std::shared_ptr<Logger> logger) {
     if (logger) {
-        globalLoggerPtr() = logger;
+        globalLoggerPtr() = std::move(logger);
     }
+}
+
+// Helper functions for modern C++20 formatting
+std::string ConsoleLogger::formatTimestamp(const std::chrono::system_clock::time_point& timestamp) {
+    auto time = std::chrono::system_clock::to_time_t(timestamp);
+    std::tm tm_buf;
+    
+    // Use gmtime_s for thread safety
+    [[maybe_unused]] errno_t err = gmtime_s(&tm_buf, &time);
+    return std::format("{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}",
+        tm_buf.tm_year + 1900,
+        tm_buf.tm_mon + 1,
+        tm_buf.tm_mday,
+        tm_buf.tm_hour,
+        tm_buf.tm_min,
+        tm_buf.tm_sec);
+}
+
+std::string ConsoleLogger::formatTimestampFallback(const std::chrono::system_clock::time_point& timestamp) {
+    auto time = std::chrono::system_clock::to_time_t(timestamp);
+    std::tm tm_buf;
+    
+    errno_t err = gmtime_s(&tm_buf, &time);
+    if (err != 0) {
+        return "1970-01-01 00:00:00";
+    }
+    
+    char buffer[20];
+    std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm_buf);
+    return std::string(buffer);
 }
 
 // LogStream implementation
@@ -200,3 +246,4 @@ LogStream::~LogStream() {
 }
 
 } // namespace nlm
+

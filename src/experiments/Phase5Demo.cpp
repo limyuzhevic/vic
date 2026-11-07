@@ -179,7 +179,7 @@ int main() {
         for (int i = 0; i < 10; ++i) brain->step(brainStep++);
         MotorCommand cmd = agent.decodeMotorCommand();
         ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
-        agent.applyRewardModulation(result.reward, 0.0f);
+        agent.applyRewardModulation(result.reward, agent.getNeuromodulationLevel());
         world.update(0.1);  // Phase 6 pacing: one decision = one 0.1 s action interval.
         totalReward += result.reward;
         if (cmd == MotorCommand::Interact) {
