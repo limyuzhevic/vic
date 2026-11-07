@@ -48,6 +48,26 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printHelp() {
+    std::cout << "\n=== NLM Phase 2 Help ===\n" << std::endl;
+    std::cout << "Usage: nlm [OPTIONS]\n" << std::endl;
+    std::cout << "\nOptions:\n" << std::endl;
+    std::cout << "  --config=<file>     Load configuration from file (default: configs/default.cfg)\n" << std::endl;
+    std::cout << "  --neurons=<count>   Set number of neurons (default: 500)\n" << std::endl;
+    std::cout << "  --regions=<count>   Set number of regions (default: 1)\n" << std::endl;
+    std::cout << "  --density=<value>   Connection density (0.0-1.0, default: 0.15)\n" << std::endl;
+    std::cout << "  --seed=<seed>       Random seed (default: 42)\n" << std::endl;
+    std::cout << "  --steps=<steps>      Number of simulation steps (default: 2000)\n" << std::endl;
+    std::cout << "  --timestep=<time>    Simulation timestep in seconds (default: 0.001)\n" << std::endl;
+    std::cout << "  --verbose           Enable verbose logging\n" << std::endl;
+    std::cout << "  -h, --help          Show this help message\n" << std::endl;
+    std::cout << "\nExamples:\n" << std::endl;
+    std::cout << "  ./nlm                    Run with default settings\n" << std::endl;
+    std::cout << "  ./nlm --neurons=1000    Create larger brain with 1000 neurons\n" << std::endl;
+    std::cout << "  ./nlm --config=myconfig.cfg Use custom configuration\n" << std::endl;
+    std::cout << "  ./nlm --seed=12345      Run with reproducible random seed\n" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -310,6 +330,15 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Check for help first
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        }
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
@@ -325,6 +354,38 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
+
+    // Parse command line arguments
+    int numSteps = 2000;
+    double timestep = 0.001;
+    bool verbose = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 11) == "--neurons=") {
+            size_t neurons = std::stoul(arg.substr(11));
+            config->set("neuron_count", static_cast<int64_t>(neurons), ConfigSource::CommandLine);
+        } else if (arg.substr(0, 10) == "--regions=") {
+            size_t regions = std::stoul(arg.substr(10));
+            config->set("region_count", static_cast<int64_t>(regions), ConfigSource::CommandLine);
+        } else if (arg.substr(0, 10) == "--density=") {
+            float density = std::stof(arg.substr(10));
+            config->set("connection_probability", density, ConfigSource::CommandLine);
+        } else if (arg.substr(0, 8) == "--seed=") {
+            uint64_t seed = std::stoull(arg.substr(8));
+            config->set("random_seed", static_cast<int64_t>(seed), ConfigSource::CommandLine);
+        } else if (arg.substr(0, 8) == "--steps=") {
+            numSteps = std::stoi(arg.substr(8));
+        } else if (arg.substr(0, 9) == "--timestep=") {
+            timestep = std::stod(arg.substr(9));
+        } else if (arg == "--verbose") {
+            verbose = true;
+            consoleLogger->setLevel(LogLevel::Debug);
+        } else if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        }
+    }
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -348,14 +409,14 @@ int main(int argc, char** argv) {
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
-    
+
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    config->set("simulation_timestep", timestep, ConfigSource::CommandLine);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
