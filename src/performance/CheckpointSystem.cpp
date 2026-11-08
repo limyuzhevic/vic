@@ -278,24 +278,38 @@ CheckpointWriter::CheckpointWriter()
     : compression_(CompressionLevel::Balanced), bytesWritten_(0) {}
 CheckpointWriter::~CheckpointWriter() { close(); }
 
-bool CheckpointWriter::create(const std::string& filepath, CompressionLevel compression) {
-    close();
-    filepath_ = filepath;
-    compression_ = compression;
-    header_ = CheckpointHeader();
-    header_.compressionLevel = static_cast<uint32_t>(compression);
-    sections_.clear();
-    neuronPayload_.clear();
-    synapsePayload_.clear();
-    delayedSpikePayload_.clear();
-    bytesWritten_ = 0;
-    // Open (truncating) now so a failure to create the file is reported
-    // here, not silently at finalize(). Payloads are buffered and only
-    // written at finalize(), when the header is complete.
-    stream_.open(filepath, std::ios::binary | std::ios::trunc);
-    if (!stream_) return false;
-    return true;
-}
+    bool CheckpointWriter::create(const std::string& filepath, CompressionLevel compression) {
+        close();
+        filepath_ = filepath;
+        compression_ = compression;
+        header_ = CheckpointHeader();
+        header_.compressionLevel = static_cast<uint32_t>(compression);
+        sections_.clear();
+        neuronPayload_.clear();
+        synapsePayload_.clear();
+        delayedSpikePayload_.clear();
+        bytesWritten_ = 0;
+        
+        // Ensure the directory exists before creating the file
+        // This is important for checkpointing in different directories
+        std::filesystem::path filepathPath(filepath);
+        std::filesystem::path parentDir = filepathPath.parent_path();
+        if (!parentDir.empty() && !std::filesystem::exists(parentDir)) {
+            try {
+                std::filesystem::create_directories(parentDir);
+            } catch (const std::filesystem::filesystem_error& e) {
+                NLM_LOG_ERROR(std::string("Failed to create checkpoint directory: ") + e.what());
+                return false;
+            }
+        }
+        
+        // Open (truncating) now so a failure to create the file is reported
+        // here, not silently at finalize(). Payloads are buffered and only
+        // written at finalize(), when the header is complete.
+        stream_.open(filepath, std::ios::binary | std::ios::trunc);
+        if (!stream_) return false;
+        return true;
+    }
 
 void CheckpointWriter::close() {
     if (stream_.is_open()) stream_.close();
