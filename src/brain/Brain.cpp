@@ -614,25 +614,202 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input and neural state
+        // This enables predictive coding and forward models
+        std::vector<float> currentSensoryPattern;
+        // Collect current sensory neuron activity as pattern
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == NeuronType::Sensory) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        if (neuron->isFiring() || 
+                            std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                            currentSensoryPattern.push_back(std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 20.0f);
+                        } else {
+                            currentSensoryPattern.push_back(0.0f);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Create a SensoryInput from the pattern for the prediction system
+        SensoryInput sensoryInput;
+        sensoryInput.setData(currentSensoryPattern);
+        sensoryInput.setTimestamp(static_cast<size_t>(currentTime));
+        
+        // Train prediction model on current experience
+        pImpl->predictionSystem->train(sensoryInput);
+        
+        // Generate prediction for next state
+        auto prediction = pImpl->predictionSystem->predictNextState(sensoryInput);
+        
+        // Compare prediction with current state to compute prediction error
+        float error = pImpl->predictionSystem->getPredictionError();
+        
+        // Use prediction error to modulate neural excitability
+        if (error > 0.1f) {  // High prediction error increases exploration/excitability
+            float explorationBoost = error * 0.5f;
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // High prediction error increases exploration behavior
+                        neuron->injectCurrent(explorationBoost * 2.0f);
+                    }
+                }
+            }
+        }
     }
     
-    // ========== STEP 9: Update attention system ==========
-    if (pImpl->attention) {
-        pImpl->attention->update(pImpl->timestep);
+    // ========== STEP 9a: Update neural planner ==========
+    if (pImpl->planner) {
+        // Neural planner should make decisions based on current state and learned goals
+        // Collect current state for planning
+        std::vector<float> currentState;
         
-        // Apply attention to working memory winners
-        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
-            std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+        // Get current goal from planner or use default exploration
+        std::vector<float> goal = pImpl->planner->getCurrentGoal();
+        if (goal.empty()) {
+            // Default goal: maintain moderate activity and reduce prediction error
+            goal.resize(neuralPattern.size(), 0.5f);
+            goal[0] = 0.7f;  // First neuron has higher importance (sensory)
         }
+        
+        // Plan action based on current state and goal
+        ActionType plannedAction = pImpl->planner->planAction(currentState, 0.5f);
+        
+        // If a planner is active and has decided on an action, 
+        // inject current into motor neurons to implement it
+        if (plannedAction != ActionType::Wait) {
+            // Determine which motor neuron to activate based on action type
+            NeuronType motorType;
+            switch (plannedAction) {
+                case ActionType::MoveForward: motorType = NeuronType::Motor; break;
+                case ActionType::MoveBackward: motorType = NeuronType::Motor; break;
+                case ActionType::TurnLeft: motorType = NeuronType::Motor; break;
+                case ActionType::TurnRight: motorType = NeuronType::Motor; break;
+                case ActionType::Look: motorType = NeuronType::Motor; break;
+                case ActionType::LookUp: motorType = NeuronType::Motor; break;
+                case ActionType::LookDown: motorType = NeuronType::Motor; break;
+                default: motorType = NeuronType::Motor; break;
+            }
+            
+            // Inject current into motor neurons for planned action
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    if (pop->getNeuronType() == motorType) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            neuron->injectCurrent(30.0f);  // Strong motor command
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Update planner with outcome
+        pImpl->planner->updatePlanQuality(std::vector<ActionType>{plannedAction}, std::vector<ActionType>{plannedAction}, 0.5f);
+    }
+    
+    // ========== STEP 9b: Update self-model ==========
+    if (pImpl->brain && pImpl->conceptFormation) {
+        // Self-model learns how its own actions affect sensory state
+        // This is the foundation for agency and forward models
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            const auto& state = neuron->getState();
+            
+            // Record that this sensory neuron is firing (or changing) as part of self
+            float activation = 0.0f;
+            if (neuron->isFiring()) {
+                activation = 1.0f;
+            } else {
+                activation = std::abs(state.membranePotential - state.restingPotential) / 30.0f;
+            }
+            
+            // Update self-model with this sensory change
+            std::vector<float> currentSensoryState;
+            for (size_t j = 0; j < values.size(); ++j) {
+                float feature = std::max(0.0f, std::min(1.0f, (static_cast<float>(values[j]) + 1.0f) / 2.0f));
+                currentSensoryState.push_back(feature);
+            }
+            
+            if (pImpl->conceptFormation && !currentSensoryState.empty()) {
+                // Present sensory consequence to concept formation
+                size_t conceptId = pImpl->conceptFormation->presentExperience(currentSensoryState, currentSensoryState, 0.5f, currentStep);
+                
+                // If this is a new or matching concept, record in self-model
+                if (conceptId > 0) {
+                    std::cout << "Self-model: sensory change detected as concept " << conceptId << std::endl;
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 9c: Update spatial representation ==========
+    if (pImpl->brain) {
+        // Simple spatial tracking - record position changes
+        static float lastX = 0.0f;
+        static float lastY = 0.0f;
+        float currentX = 0.0f;  // Would come from actual position tracking
+        float currentY = 0.0f;  // Would come from actual position tracking
+        
+        // Record spatial experience
+        std::vector<float> spatialPattern;
+        spatialPattern.push_back(currentX);
+        spatialPattern.push_back(currentY);
+        spatialPattern.push_back(currentX - lastX);
+        spatialPattern.push_back(currentY - lastY);
+        spatialPattern.push_back(pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f);
+        
+        // Update spatial representation
+        if (pImpl->conceptFormation) {
+            pImpl->conceptFormation->presentExperience(spatialPattern, spatialPattern, 0.3f, currentStep);
+        }
+        
+        lastX = currentX;
+        lastY = currentY;
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Present current neural activity pattern to concept formation system
+        // Collect neural activity pattern across all regions
+        std::vector<float> neuralPattern;
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Get normalized activation as pattern feature
+                    float activation = 0.0f;
+                    if (neuron->isFiring()) {
+                        activation = 1.0f;
+                    } else {
+                        activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) / 30.0f;
+                    }
+                    neuralPattern.push_back(activation);
+                }
+            }
+        }
+        
+        // Get sensory features from working memory
+        std::vector<float> features;
+        if (pImpl->workingMemory) {
+            features = pImpl->workingMemory->getMemoryActivations();
+        }
+        
+        // Calculate average reward for this experience
+        float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+        
+        // Present experience to concept formation system
+        size_t conceptId = pImpl->conceptFormation->presentExperience(neuralPattern, features, reward, currentStep);
+        
+        if (conceptId > 0) {
+            // If a new concept was formed or an existing one matched,
+            // this suggests the pattern is meaningful and should be reinforced
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->storeToNeuron(neuronById.begin()->second->getId(), 0.8f * (pImpl->conceptFormation->getConceptStability(conceptId) + 0.1f));
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -693,7 +870,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
 
 void Brain::receiveSensoryInput(const class SensoryInput& input) {
     // Inject current into sensory neurons based on input
-    // This is a simple mapping - sensory encoding
+    // Enhanced: store input in working memory for pattern recognition
     
     const auto& values = input.getData();
     if (values.empty()) return;
@@ -712,9 +889,29 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
-        // Also store in working memory
-        if (pImpl->workingMemory && normalizedValue > 0.5f) {
-            pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
+        // Store in working memory for pattern recognition
+        if (pImpl->workingMemory) {
+            // Store normalized activation (0-1 range)
+            float activation = std::max(0.0f, std::min(1.0f, (normalizedValue + 10.0f) / 20.0f));
+            
+            // If this is a strong stimulus, store it as an experience
+            if (activation > 0.5f) {
+                pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), activation);
+                
+                // Also send to concept formation for pattern discovery
+                if (pImpl->conceptFormation) {
+                    // Convert sensory pattern to neural pattern
+                    std::vector<float> sensoryPattern;
+                    for (size_t j = 0; j < values.size(); ++j) {
+                        float feature = std::max(0.0f, std::min(1.0f, (static_cast<float>(values[j]) + 1.0f) / 2.0f));
+                        sensoryPattern.push_back(feature);
+                    }
+                    
+                    // Present to concept formation with reward level
+                    float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+                    pImpl->conceptFormation->presentExperience(sensoryPattern, sensoryPattern, reward, currentStep);
+                }
+            }
         }
     }
 }
