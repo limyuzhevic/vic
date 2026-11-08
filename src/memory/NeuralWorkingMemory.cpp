@@ -82,6 +82,13 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
         it = memoryNeurons_.end() - 1;
+        
+        // Also add to active traces for newly added neurons
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        if (activation > 0.1f) {
+            bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
+            if (!present) activeTraces_.push_back(idx);
+        }
     }
 
     // Phase 6: activeTraces_ is the trace list getActiveTraces()
