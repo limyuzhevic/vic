@@ -5,14 +5,14 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Enhanced Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework with advanced API, error handling, and convenience methods"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -25,20 +25,30 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python",
+    "Topic :: System :: Embedded Systems",
+    "Topic :: File Formats :: File conversion",
 ]
-
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "numpy>=1.20",
+    "pybind11>=2.11.0",
+    "scikit-build-core>=0.5.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+Source-Code = "https://github.com/nlm-project/nlm.git"
+
+[project.scripts]
+install-nlm-bindings = "scripts/install_bindings.py"
 
 [tool.scikit-build]
 # scikit-build-core >= 0.8 renamed minimum-version to version.
@@ -48,8 +58,7 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
-    # Phase 5: without this the root build produces no pynlm module
-    # at all (the option is OFF by default for plain C++ builds).
+    # Build the enhanced Python bindings with advanced API
     "-DNLM_BUILD_PYTHON_BINDINGS=ON",
 ]
 
@@ -59,3 +68,22 @@ NLM_SOURCE_DIR = "src"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+
+[project.entry-points]
+console-scripts = [
+    "nlm-python-demo = "scripts/nlm_python_demo.py:demo",
+    "nlm-benchmark = "scripts/nlm_benchmark.py:benchmark",
+]
+
+[tool.pylnlm.config]
+# Configuration for enhanced NLM Python bindings
+auto_validate = true
+error_handling = "strict"
+batch_operations = true
+progress_monitoring = true
+
+[tool.pylnlm.performance]
+# Performance settings for the enhanced bindings
+max_threads = "auto"
+optimize_batch_operations = true
+use_context_managers = true
