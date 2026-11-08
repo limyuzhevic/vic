@@ -102,6 +102,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string escapeString(const std::string& str);
 };
+
+// Helper function to parse boolean values
+bool parseBool(const std::string& str, bool& value);
+
+// Helper function to parse integer values
+bool parseInt(const std::string& str, int64_t& value);
+
+// Helper function to parse double values
+bool parseDouble(const std::string& str, double& value);
 
 } // namespace nlm
