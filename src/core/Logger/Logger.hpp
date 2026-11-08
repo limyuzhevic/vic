@@ -116,6 +116,11 @@ private:
 #define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
 
+// Advanced logging macro for performance-critical code
+#define NLM_PERF_LOG_START(tag) auto nlm_perf_start_##tag = std::chrono::high_resolution_clock::now()
+#define NLM_PERF_LOG_END(tag) auto nlm_perf_end_##tag = std::chrono::high_resolution_clock::now(); \
+    NLM_LOG_DEBUG(std::string("PERF ") + #tag + ": " + std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(nlm_perf_end_##tag - nlm_perf_start_##tag).count()) + "us")
+
 // Stream-style logging helper
 class LogStream {
 public:
