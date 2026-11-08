@@ -540,3 +540,9 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+
+---
+
+## Credits
+
+This documentation is based on the NLM project's official documentation and user contributions.

@@ -2,15 +2,102 @@
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM (熙然) is an experimental artificial developmental brain project that creates virtual brains capable of learning, memory, and decision-making. It implements spiking neural networks with Leaky Integrate-and-Fire (LIF) neurons and event-driven dynamics.
 
 Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+- **Neurons** = Brain cells that send electrical signals
+- **Synapses** = Connections between neurons that can strengthen or weaken
+- **Learning** = STDP (Spike-Timing-Dependent Plasticity) and Hebbian learning
+- **Memory** = Working memory, episodic memory, and associative memory systems
 
-That's it! NLM simulates all of this.
+NLM simulates the complete brain loop: sensory input → neural processing → memory → neuromodulation → action → feedback.
+
+---
+
+## Core Components
+
+NLM consists of three main components:
+
+### 1. Brain (nlm::Brain)
+The central neural system with neurons, synapses, and all brain functions.
+
+**Key Features:**
+- 500+ neurons with LIF dynamics
+- Event-driven spike propagation
+- Multiple plasticity rules (STDP, Hebbian, structural)
+- Integrated memory systems
+- Neuromodulation (dopamine, curiosity, novelty)
+- Developmental stages
+
+### 2. World (nlm::SimpleWorld)
+The simulation environment where the agent interacts.
+
+**Key Features:**
+- 2D grid world with configurable size
+- Sensory input (vision, touch, proprioception)
+- Motor output actions
+- Resources and hazards for reward/punishment
+- Time-based dynamics
+
+### 3. AgentBrain (nlm::AgentBrain)
+The interface between brain and environment.
+
+**Key Features:**
+- Processes sensory input from world
+- Translates brain activity into actions
+- Applies reward-based learning
+- Manages development and plasticity
+
+---
+
+## Quick Start (Copy & Paste)
+
+### Example 1: Create a Simple Brain
+
+```python
+import pynlm
+
+# Step 1: Make a brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Step 2: Turn it on
+brain.initialize()
+
+# Step 3: Make it think for 100 steps
+for i in range(100):
+    brain.step(i)  # One step of thinking
+
+print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+```
+
+### Example 2: Brain in a Simple World
+
+```python
+import pynlm
+
+# Create everything
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run for 50 steps
+for step in range(50):
+    world.update(0.1)  # Update world
+    percept = world.getSensoryPercept()  # What does the agent see?
+    agent.processSensoryInput(percept)  # Brain sees it
+    brain.step(step)  # Brain thinks
+    action = agent.decodeMotorCommand()  # Brain decides action
+    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+
+print("Simulation finished!")
+print("Firing neurons:", brain.getFiringNeuronCount())
+```
 
 ---
 

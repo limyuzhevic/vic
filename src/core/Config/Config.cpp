@@ -19,8 +19,8 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // TODO PHASE 3: Implement proper JSON/YAML parser
+    // PLACEHOLDER - Phase 1 uses a simple key=value format with basic error handling
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -49,6 +49,9 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            // Log warning for malformed line
+            std::cerr << "WARNING: Malformed config line in " << filepath << ": " << line << std::endl;
         }
     }
     
@@ -66,6 +69,8 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                std::cerr << "WARNING: Missing value for argument " << arg << std::endl;
             }
         }
         // Handle -key value format
@@ -73,6 +78,8 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+        } else {
+            std::cerr << "WARNING: Invalid argument format: " << arg << std::endl;
         }
     }
     return true;
@@ -86,7 +93,48 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Save the actual value based on its type
+        std::visit([&file](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << v << "\"";
+            } else if constexpr (std::is_same_v<T, int>) {
+                file << v;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << v;
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << v;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (v ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "["; 
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i) file << ", ";
+                    file << v[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "["; 
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i) file << ", ";
+                    file << v[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "["; 
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i) file << ", ";
+                    file << "\"" << v[i] << "\"";
+                }
+                file << "]";
+            } else {
+                file << v;
+            }
+        }, entry.value);
+        
+        file << "\n";
     }
     
     return true;
@@ -209,6 +257,87 @@ std::optional<T> Config::get(const std::string& key) const {
             return std::nullopt;
         }
     }, it->value);
+}
+
+bool Config::validate() const {
+    std::vector<std::string> errors = getValidationErrors();
+    return errors.empty();
+}
+
+std::vector<std::string> Config::getValidationErrors() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Basic validation for required keys based on known configuration patterns
+        if (entry.key == "neuron_count" || entry.key == "brain.neuron_count") {
+            auto val = std::get_if<int64_t>(&entry.value);
+            if (val) {
+                if (*val <= 0) {
+                    errors.push_back("neuron_count must be positive, got " + std::to_string(*val));
+                } else if (*val > 1000000) {
+                    errors.push_back("neuron_count seems too large: " + std::to_string(*val));
+                }
+            } else {
+                errors.push_back("neuron_count has invalid type");
+            }
+        }
+        else if (entry.key == "region_count" || entry.key == "brain.region_count") {
+            auto val = std::get_if<int64_t>(&entry.value);
+            if (val) {
+                if (*val <= 0) {
+                    errors.push_back("region_count must be positive, got " + std::to_string(*val));
+                } else if (*val > 1000) {
+                    errors.push_back("region_count seems too large: " + std::to_string(*val));
+                }
+            } else {
+                errors.push_back("region_count has invalid type");
+            }
+        }
+        else if (entry.key == "connection_probability" || entry.key == "brain.connection_probability") {
+            auto val = std::get_if<double>(&entry.value);
+            if (val) {
+                if (*val < 0.0 || *val > 1.0) {
+                    errors.push_back("connection_probability must be between 0.0 and 1.0, got " + std::to_string(*val));
+                }
+            } else {
+                errors.push_back("connection_probability has invalid type");
+            }
+        }
+        else if (entry.key == "simulation_timestep" || entry.key == "brain.simulation_timestep") {
+            auto val = std::get_if<double>(&entry.value);
+            if (val) {
+                if (*val <= 0.0) {
+                    errors.push_back("simulation_timestep must be positive, got " + std::to_string(*val));
+                } else if (*val > 0.1) {
+                    errors.push_back("simulation_timestep seems too large (may cause instability): " + std::to_string(*val));
+                }
+            } else {
+                errors.push_back("simulation_timestep has invalid type");
+            }
+        }
+        else if (entry.key == "random_seed" || entry.key == "brain.random_seed") {
+            auto val = std::get_if<int64_t>(&entry.value);
+            if (val) {
+                if (*val < 0) {
+                    errors.push_back("random_seed must be non-negative, got " + std::to_string(*val));
+                }
+            } else {
+                errors.push_back("random_seed has invalid type");
+            }
+        }
+        else if (entry.key == "plasticity_learning_rate" || entry.key == "plasticity.stdp.learning_rate") {
+            auto val = std::get_if<double>(&entry.value);
+            if (val) {
+                if (*val < 0.0 || *val > 1.0) {
+                    errors.push_back("plasticity_learning_rate must be between 0.0 and 1.0, got " + std::to_string(*val));
+                }
+            } else {
+                errors.push_back("plasticity_learning_rate has invalid type");
+            }
+        }
+    }
+    
+    return errors;
 }
 
 template<typename T>

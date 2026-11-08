@@ -86,14 +86,11 @@ template<typename T>
     // Remove key
     void remove(const std::string& key);
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Validate configuration values
+    bool validate() const;
     
-    // Clear all
-    void clear();
-    
-    // Get configuration summary
-    std::string summary() const;
+    // Get validation errors
+    std::vector<std::string> getValidationErrors() const;
     
 private:
     struct Impl;
