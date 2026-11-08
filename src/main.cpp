@@ -326,10 +326,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Load configuration using improved system (environment + file + command line)
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Determine config file from command line or use default
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -342,15 +342,22 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Load config from all sources with improved error handling
+    if (!config->loadFromAllSources(configFile, argc, argv)) {
+        NLM_LOG_WARNING("Configuration has validation errors");
+        // Continue with default values for critical settings
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Log configuration source information
+    std::vector<std::string> keys = config->getKeys();
+    if (!keys.empty()) {
+        NLM_LOG_INFO("Loaded configuration sources:");
+        for (const auto& key : keys) {
+            ConfigSource source = ConfigSource::Default;  // We need to get this from entries
+            // For now, just log that we have configuration
+            NLM_LOG_INFO("  " + key);
+        }
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);

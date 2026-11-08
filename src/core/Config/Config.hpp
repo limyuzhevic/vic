@@ -1,11 +1,4 @@
-#pragma once
-
-#include <string>
-#include <memory>
-#include <vector>
-#include <variant>
-#include <optional>
-#include <algorithm>
+#include <set>
 
 namespace nlm {
 
@@ -80,20 +73,28 @@ template<typename T>
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
-    
-    // Remove key
-    void remove(const std::string& key);
-    
     // Get all keys
     std::vector<std::string> getKeys() const;
     
-    // Clear all
-    void clear();
+    // Validate configuration
+    bool validate(std::vector<std::string>& errors) const;
     
-    // Get configuration summary
-    std::string summary() const;
+    // Check for duplicate keys
+    bool hasDuplicateKeys() const;
+    
+    // Get entries with their sources
+    const std::vector<ConfigEntry>& getEntries() const;
+    
+    // Get value type information
+    std::string getValueType(const std::string& key) const;
+    
+    // Check if value can be converted to target type
+    template<typename T>
+    bool canConvertTo(const std::string& key) const;
+    
+    // Enhanced get with type checking
+    template<typename T>
+    std::optional<T> getWithValidation(const std::string& key) const;
     
 private:
     struct Impl;
