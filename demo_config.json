@@ -1,0 +1,185 @@
+// Enhanced Demo Configuration Example
+// This JSON file demonstrates the advanced configuration options for NLM demos
+
+{
+    "demo_name": "Enhanced Phase 6 Demo",
+    
+    "configuration": {
+        "random_seed": 42,
+        "simulation_timestep": 0.001,
+        "neuron_count": 500,
+        "region_count": 1,
+        "connection_probability": 0.15,
+        
+        "stdp_ltp_weight": 0.02,
+        "stdp_ltd_weight": 0.015,
+        "stdp_tau": 20.0,
+        
+        "synaptogenesis_rate": 0.0001,
+        "pruning_rate": 0.00001,
+        
+        "enable_checkpointing": true,
+        "enable_replay": true,
+        "enable_development": true,
+        
+        "enable_curiosity": true,
+        "curiosity_strength": 1.0,
+        
+        "enable_reward_modulation": true,
+        "reward_scaling": 1.0,
+        
+        "max_steps": 2000,
+        "enable_visualization": false,
+        
+        "memory_capacity": 1000,
+        "episodic_memory_capacity": 100,
+        
+        "planning_horizon": 10,
+        "attention_window": 20
+    },
+    
+    "demo_settings": {
+        "verbose_logging": false,
+        "quiet_mode": false,
+        "json_output": true,
+        "output_file": "demo_results.json",
+        "log_level": "info",
+        
+        "progress_tracking": true,
+        "metrics_collection": true,
+        "performance_monitoring": true,
+        
+        "enable_network_stimulation": true,
+        "stimulation_pattern": "sensory_sequence",
+        "stimulation_strength": 40.0,
+        
+        "enable_error_recovery": true,
+        "max_retry_attempts": 3,
+        
+        "enable_performance_benchmarks": true,
+        "benchmark_iterations": 5
+    },
+    
+    "test_suite": {
+        "enabled_tests": [
+            "integration_verification",
+            "memory_integration",
+            "neuromodulation_integration",
+            "checkpointing_test",
+            "replay_test",
+            "full_integration_experiment"
+        ],
+        
+        "test_parameters": {
+            "integration_verification": {
+                "timeout": 30.0,
+                "expected_systems": ["memory", "neuromodulation", "prediction", "development"]
+            },
+            
+            "memory_integration": {
+                "working_memory_neuron_count": 50,
+                "episodic_memory_episode_count": 10,
+                "consolidation_threshold": 0.8
+            },
+            
+            "neuromodulation_integration": {
+                "dopamine_sensitivity": 0.5,
+                "curiosity_threshold": 0.3,
+                "novelty_sensitivity": 0.7
+            },
+            
+            "checkpointing_test": {
+                "checkpoint_interval": 100,
+                "max_checkpoints": 5,
+                "restore_after_save": true
+            },
+            
+            "replay_test": {
+                "replay_steps": 50,
+                "replay_accuracy_threshold": 0.9,
+                "consolidation_strength": 0.8
+            }
+        }
+    },
+    
+    "output_format": {
+        "text_summary": true,
+        "json_detailed": true,
+        "csv_metrics": true,
+        "html_report": true,
+        
+        "report_sections": [
+            "executive_summary",
+            "system_status",
+            "performance_metrics",
+            "integration_results",
+            "recommendations"
+        ],
+        
+        "chart_options": {
+            "include_firing_rate_graph": true,
+            "include_memory_usage_chart": true,
+            "include_system_performance_graph": true,
+            "chart_width": 800,
+            "chart_height": 600
+        }
+    },
+    
+    "advanced_features": {
+        "machine_learning_integration": false,
+        "genetic_algorithm": false,
+        "neural_architectural_search": false,
+        
+        "distributed_computing": {
+            "enabled": false,
+            "worker_nodes": 1,
+            "task_distribution": "static"
+        },
+        
+        "cloud_compatibility": {
+            "aws_integration": false,
+            "gcp_integration": false,
+            "azure_integration": false
+        }
+    },
+    
+    "quality_assurance": {
+        "unit_tests": true,
+        "integration_tests": true,
+        "performance_tests": true,
+        "stress_tests": true,
+        
+        "quality_thresholds": {
+            "integration_success_rate": 0.95,
+            "performance_response_time": 1000.0,
+            "memory_usage_limit": 1024.0,
+            "cpu_usage_limit": 90.0
+        }
+    },
+    
+    "logging_config": {
+        "log_file": "demo.log",
+        "max_log_size": 10485760,
+        "log_rotation": "daily",
+        "include_timestamps": true,
+        "include_thread_ids": true,
+        "log_colors": true,
+        
+        "log_levels": {
+            "default": "info",
+            "experiments": "debug",
+            "performance": "warning",
+            "errors": "error"
+        }
+    },
+    
+    "security_config": {
+        "enable_access_control": false,
+        "authentication_required": false,
+        "encryption_enabled": false,
+        
+        "allowed_users": [],
+        "ip_whitelist": [],
+        "audit_logging": false
+    }
+}
