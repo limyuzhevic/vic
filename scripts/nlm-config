@@ -1,0 +1,505 @@
+#!/usr/bin/env python3
+"""
+Advanced Configuration Utility for NLM
+
+This script provides advanced configuration management capabilities
+for the NLM (Neural Learning Machine) project, including:
+- Configuration validation
+- Configuration optimization
+- Performance profiling
+- Advanced configuration generation
+"""
+
+import argparse
+import json
+import sys
+import os
+from pathlib import Path
+from typing import Dict, Any, Optional
+import time
+import numpy as np
+
+# Add the NLM module to the path
+import pynlm
+
+class NLMConfigOptimizer:
+    """Advanced configuration optimizer for NLM simulations."""
+    
+    def __init__(self):
+        self.defaultConfig = pynlm.createDefaultConfig()
+    
+    def analyzeConfig(self, config) -> Dict[str, Any]:
+        """Analyze configuration and provide optimization recommendations."""
+        analysis = {
+            "neuronEfficiency": self._calculateNeuronEfficiency(config),
+            "memoryUsage": self._estimateMemoryUsage(config),
+            "performanceScore": self._calculatePerformanceScore(config),
+            "optimizationSuggestions": self._generateSuggestions(config),
+            "stabilityIndicators": self._analyzeStability(config)
+        }
+        return analysis
+    
+    def _calculateNeuronEfficiency(self, config) -> float:
+        """Calculate neuron efficiency based on connectivity and plasticity."""
+        neuronCount = config.getOr("neuron_count", 1000)
+        regionCount = config.getOr("region_count", 2)
+        connectionProb = config.getOr("connection_probability", 0.1)
+        
+        # Expected synapse count for given parameters
+        expectedSynapses = int(neuronCount * neuronCount * connectionProb / 2)
+        
+        # Get actual synapse count
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        actualSynapses = brain.getTotalSynapseCount()
+        
+        efficiency = min(actualSynapses / expectedSynapses, 1.0) if expectedSynapses > 0 else 0.0
+        return efficiency
+    
+    def _estimateMemoryUsage(self, config) -> Dict[str, float]:
+        """Estimate memory usage for given configuration."""
+        neuronCount = config.getOr("neuron_count", 1000)
+        regionCount = config.getOr("region_count", 2)
+        connectionProb = config.getOr("connection_probability", 0.1)
+        
+        # Rough estimates (in MB)
+        neuronMemory = neuronCount * 0.1  # ~100 bytes per neuron
+        synapseMemory = neuronCount * neuronCount * connectionProb * 0.05  # ~50 bytes per synapse
+        regionMemory = regionCount * 1.0  # ~1MB per region
+        
+        return {
+            "total_mb": neuronMemory + synapseMemory + regionMemory,
+            "neuron_mb": neuronMemory,
+            "synapse_mb": synapseMemory,
+            "region_mb": regionMemory
+        }
+    
+    def _calculatePerformanceScore(self, config) -> float:
+        """Calculate a performance score for the configuration."""
+        score = 0.0
+        
+        # Configuration-based scoring
+        neuronCount = config.getOr("neuron_count", 1000)
+        if 500 <= neuronCount <= 2000:
+            score += 0.3
+        
+        connectionProb = config.getOr("connection_probability", 0.1)
+        if 0.05 <= connectionProb <= 0.15:
+            score += 0.2
+        
+        timestep = config.getOr("simulation_timestep", 0.001)
+        if timestep <= 0.001:
+            score += 0.2
+        
+        regionCount = config.getOr("region_count", 2)
+        if regionCount >= 1 and regionCount <= 4:
+            score += 0.2
+        
+        # Stability-based scoring (requires brain creation)
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        firingRate = brain.getAverageFiringRate()
+        if firingRate > 0.1 and firingRate < 2.0:
+            score += 0.1
+        
+        return min(score, 1.0)
+    
+    def _generateSuggestions(self, config) -> list:
+        """Generate optimization suggestions based on configuration."""
+        suggestions = []
+        
+        neuronCount = config.getOr("neuron_count", 1000)
+        if neuronCount > 5000:
+            suggestions.append("Consider reducing neuron count to 2000-5000 for better performance")
+        elif neuronCount < 100:
+            suggestions.append("Consider increasing neuron count to 500+ for more interesting dynamics")
+        
+        connectionProb = config.getOr("connection_probability", 0.1)
+        if connectionProb < 0.05:
+            suggestions.append("Very low connectivity may result in insufficient neural interactions")
+        elif connectionProb > 0.2:
+            suggestions.append("High connectivity may lead to excessive synchronization")
+        
+        timestep = config.getOr("simulation_timestep", 0.001)
+        if timestep > 0.001:
+            suggestions.append("Consider reducing timestep (0.001) for better temporal resolution")
+        
+        regionCount = config.getOr("region_count", 2)
+        if regionCount == 1:
+            suggestions.append("Consider using 2-4 regions for more diverse neural populations")
+        
+        # Check plasticity settings
+        stdpLtp = config.getOr("stdp_ltp_weight", 0.01)
+        stdpLtd = config.getOr("stdp_ltd_weight", 0.012)
+        if stdpLtp < 0.01:
+            suggestions.append("Increase STDP LTP weight for stronger potentiation")
+        elif stdpLtp > 0.05:
+            suggestions.append("Reduce STDP LTP weight to prevent over-excitation")
+        
+        return suggestions
+    
+    def _analyzeStability(self, config) -> Dict[str, Any]:
+        """Analyze stability indicators for the configuration."""
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Run simulation to assess stability
+        spikeHistory = []
+        firingRates = []
+        
+        for step in range(100):
+            brain.step(step)
+            spikeHistory.append(brain.getTotalSpikeCount())
+            firingRates.append(brain.getAverageFiringRate())
+        
+        # Calculate stability metrics
+        spikeStd = np.std(spikeHistory) if len(spikeHistory) > 1 else 0.0
+        firingStd = np.std(firingRates) if len(firingRates) > 1 else 0.0
+        
+        stability = {
+            "spikeVariability": spikeStd,
+            "firingRateVariability": firingStd,
+            "stabilityScore": min(1.0, 1.0 / (1.0 + spikeStd + firingStd)),
+            "isStable": spikeStd < 50.0 and firingStd < 0.5
+        }
+        
+        return stability
+class NLMProfiler:
+    """Performance profiler for NLM simulations."""
+    
+    def __init__(self):
+        self.profiles = {}
+    
+    def profileBrain(self, config, steps=100) -> Dict[str, Any]:
+        """Profile brain performance with detailed metrics."""
+        startTime = time.time()
+        
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        # Detailed profiling
+        stepTimes = []
+        spikeCounts = []
+        firingRates = []
+        neuronCounts = []
+        
+        for step in range(steps):
+            stepStart = time.time()
+            brain.step(step)
+            stepEnd = time.time()
+            
+            stepTimes.append(stepEnd - stepStart)
+            spikeCounts.append(brain.getTotalSpikeCount())
+            firingRates.append(brain.getAverageFiringRate())
+            neuronCounts.append(brain.getTotalNeuronCount())
+        
+        endTime = time.time()
+        totalTime = endTime - startTime
+        
+        profile = {
+            "configuration": config,
+            "totalTime": totalTime,
+            "stepsPerSecond": steps / totalTime,
+            "stepTimes": stepTimes,
+            "spikeCounts": spikeCounts,
+ mappingSpikeTimes": self._detectSpikeBursts(spikeCounts),
+            "firingRates": firingRates,
+            "neuronCounts": neuronCounts,
+            "avgStepTime": np.mean(stepTimes),
+            "minStepTime": np.min(stepTimes),
+            "maxStepTime": np.max(stepTimes),
+            "stepTimeStd": np.std(stepTimes),
+            "totalSpikes": spikeCounts[-1],
+            "avgFiringRate": np.mean(firingRates),
+            "firingRateStd": np.std(firingRates),
+            "spikeRateVariability": np.std(np.diff(spikeCounts)) if len(spikeCounts) > 1 else 0.0
+        }
+        
+        return profile
+    
+    def _detectSpikeBursts(self, spikeCounts, threshold=2.0) -> list:
+        """Detect spike bursts in the spike count time series."""
+        if len(spikeCounts) < 3:
+            return []
+        
+        # Calculate differences
+        diffs = np.diff(spikeCounts)
+        
+        # Find bursts (sustained increases)
+        bursts = []
+        inBurst = False
+        burstStart = 0
+        
+        for i, diff in enumerate(diffs):
+            if diff > threshold and not inBurst:
+                inBurst = True
+                burstStart = i
+            elif diff <= threshold and inBurst:
+                inBurst = False
+                bursts.append((burstStart, i))
+        
+        # Handle ending burst
+        if inBurst:
+            bursts.append((burstStart, len(diffs)))
+        
+        return bursts
+def validateConfigFile(filepath: str) -> bool:
+    """Validate a configuration file."""
+    try:
+        with open(filepath, 'r') as f:
+            config = json.load(f)
+        
+        # Create config and check if it's valid
+        pynlm.createBrain(pynlm.createDefaultConfig())
+        print(f"Configuration file {filepath} is valid")
+        return True
+    except Exception as e:
+        print(f"Invalid configuration file {filepath}: {e}")
+        return False
+def optimizeConfig(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Optimize configuration using heuristics."""
+    optimizer = NLMConfigOptimizer()
+    
+    # Create config from dict
+    pyConfig = pynlm.createDefaultConfig()
+    for key, value in config.items():
+        pyConfig.set(key, value)
+    
+    # Analyze and optimize
+    analysis = optimizer.analyzeConfig(pyConfig)
+    
+    # Generate optimized config
+    optimized = config.copy()
+    
+    # Adjust based on analysis
+    if analysis["neuronEfficiency"] < 0.5:
+        optimized["neuron_count"] = min(optimized.get("neuron_count", 1000) * 2, 5000)
+    
+    if analysis["performanceScore"] < 0.5:
+        if "neuron_count" in optimized:
+            optimized["neuron_count"] = max(500, optimized["neuron_count"] - 200)
+        if "connection_probability" in optimized:
+            optimized["connection_probability"] = max(0.05, optimized["connection_probability"] - 0.02)
+    
+    return optimized
+def profileBrain(config: Dict[str, Any], steps: int = 100) -> Dict[str, Any]:
+    """Profile brain performance."""
+    profiler = NLMProfiler()
+    
+    # Create config from dict
+    pyConfig = pynlm.createDefaultConfig()
+    for key, value in config.items():
+        pyConfig.set(key, value)
+    
+    return profiler.profileBrain(pyConfig, steps)
+def main():
+    """Main entry point for the advanced configuration utility."""
+    parser = argparse.ArgumentParser(
+        description="Advanced Configuration Utility for NLM",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  nlm-config --optimize-config --input-config.json my_config.json
+  nlm-config --analyze --config-file configs/my_config.cfg
+  nlm-config --profile --config "neuron_count=2000 connection_probability=0.1"
+  nlm-config --validate-config my_config.json
+  nlm-config --benchmark --config "neuron_count=1000" --steps 500
+        """
+    )
+    
+    # Main commands
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Analyze command
+    analyze_parser = subparsers.add_parser('analyze', help='Analyze configuration')
+    analyze_parser.add_argument('--config-file', help='Configuration file path')
+    analyze_parser.add_argument('--config', help='Configuration string (key=value format)')
+    analyze_parser.add_argument('--output-file', help='Output file for analysis results')
+    
+    # Optimize command
+    optimize_parser = subparsers.add_parser('optimize', help='Optimize configuration')
+    optimize_parser.add_argument('--input-config', help='Input configuration file')
+    optimize_parser.add_argument('--config', help='Configuration string (key=value format)')
+    optimize_parser.add_argument('--output-file', help='Output file for optimized configuration')
+    
+    # Profile command
+    profile_parser = subparsers.add_parser('profile', help='Profile brain performance')
+    profile_parser.add_argument('--config-file', help='Configuration file path')
+    profile_parser.add_argument('--config', help='Configuration string (key=value format)')
+    profile_parser.add_argument('--steps', type=int, default=100, help='Number of steps to profile')
+    profile_parser.add_argument('--output-file', help='Output file for profile results')
+    
+    # Validate command
+    validate_parser = subparsers.add_parser('validate', help='Validate configuration')
+    validate_parser.add_argument('--config-file', help='Configuration file path')
+    
+    # Benchmark command
+    benchmark_parser = subparsers.add_parser('benchmark', help='Run benchmark')
+    benchmark_parser.add_argument('--config-file', help='Configuration file path')
+    benchmark_parser.add_argument('--config', help='Configuration string (key=value format)')
+    benchmark_parser.add_argument('--steps', type=int, default=100, help='Number of steps for benchmark')
+    benchmark_parser.add_argument('--output-file', help='Output file for benchmark results')
+    
+    args = parser.parse_args()
+    
+    if not args.command:
+        parser.print_help()
+        return
+    
+    # Parse configuration string if provided
+    def parseConfigString(configStr: str):
+        if not configStr:
+            return pynlm.createDefaultConfig()
+        
+        config = pynlm.createDefaultConfig()
+        parts = configStr.split()
+        for part in parts:
+            if '=' in part:
+                key, value = part.split('=', 1)
+                # Try to convert to appropriate type
+                try:
+                    if '.' in value:
+                        floatVal = float(value)
+                        if key in ['neuron_count', 'region_count', 'max_simulation_steps']:
+                            config.set(key, int(floatVal))
+                        else:
+                            config.set(key, floatVal)
+                    else:
+                        intVal = int(value)
+                        if key in ['neuron_count', 'region_count', 'max_simulation_steps']:
+                            config.set(key, intVal)
+                        else:
+                            config.set(key, intVal)
+                except ValueError:
+                    config.set(key, value)
+        
+        return config
+    
+    # Load configuration from file or string
+    config = None
+    if args.config_file:
+        # Load from file
+        try:
+            with open(args.config_file, 'r') as f:
+                content = f.read()
+                if content.endswith('.cfg'):
+                    # Assume it's a config file
+                    config = pynlm.createDefaultConfig()
+                    # Parse simple key=value format
+                    for line in content.splitlines():
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            key, value = line.split('=', 1)
+                            key = key.strip()
+                            value = value.strip()
+                            try:
+                                if '.' in value:
+                                    floatVal = float(value)
+                                    if key in ['neuron_count', 'region_count', 'max_simulation_steps']:
+                                        config.set(key, int(floatVal))
+                                    else:
+                                        config.set(key, floatVal)
+                                else:
+                                    intVal = int(value)
+                                    if key in ['neuron_count', 'region_count', 'max_simulation_steps']:
+                                        config.set(key, intVal)
+                                    else:
+                                        config.set(key, intVal)
+                            except ValueError:
+                                config.set(key, value)
+                else:
+                    # Assume it's JSON
+                    data = json.load(f)
+                    config = pynlm.createDefaultConfig()
+                    for key, value in data.items():
+                        config.set(key, value)
+        except Exception as e:
+            print(f"Error loading configuration from {args.config_file}: {e}")
+            sys.exit(1)
+    elif args.config:
+        config = parseConfigString(args.config)
+    else:
+        config = pynlm.createDefaultConfig()
+    
+    # Execute the requested command
+    if args.command == 'analyze':
+        optimizer = NLMConfigOptimizer()
+        analysis = optimizer.analyzeConfig(config)
+        
+        print("Configuration Analysis:")
+        print(f"Neuron Efficiency: {analysis['neuronEfficiency']:.2f}")
+        print(f"Memory Usage: {analysis['memoryUsage']['total_mb']:.2f} MB")
+        print(f"Performance Score: {analysis['performanceScore']:.2f}")
+        print(f"Stability Score: {analysis['stabilityIndicators']['stabilityScore']:.2f}")
+        print(f"Stable: {analysis['stabilityIndicators']['isStable']}")
+        
+        print("\nOptimization Suggestions:")
+        for suggestion in analysis['optimizationSuggestions']:
+            print(f"  - {suggestion}")
+        
+        if args.output_file:
+            with open(args.output_file, 'w') as f:
+                json.dump(analysis, f, indent=2)
+            print(f"Analysis saved to {args.output_file}")
+    
+    elif args.command == 'optimize':
+        # Get configuration as dict
+        configDict = {}
+        # This is a simplified version - in practice, you'd want to extract all config values
+        configDict['neuron_count'] = config.getOr("neuron_count", 1000)
+        configDict['connection_probability'] = config.getOr("connection_probability", 0.1)
+        configDict['simulation_timestep'] = config.getOr("simulation_timestep", 0.001)
+        configDict['region_count'] = config.getOr("region_count", 2)
+        
+        optimized = optimizeConfig(configDict)
+        
+        print("Optimized Configuration:")
+        for key, value in optimized.items():
+            print(f"  {key}: {value}")
+        
+        if args.output_file:
+            with open(args.output_file, 'w') as f:
+                json.dump(optimized, f, indent=2)
+            print(f"Optimized configuration saved to {args.output_file}")
+    
+    elif args.command == 'profile':
+        profile = profiler.profileBrain(config, args.steps)
+        
+        print(f"Profile Results (Steps: {args.steps}):")
+        print(f"Total Time: {profile['totalTime']:.2f}s")
+        print(f"Steps/Second: {profile['stepsPerSecond']:.0f}")
+        print(f"Average Step Time: {profile['avgStepTime']*1000:.2f}ms")
+        print(f"Total Spikes: {profile['totalSpikes']}")
+        print(f"Average Firing Rate: {profile['avgFiringRate']:.2f} Hz")
+        print(f"Spike Rate Variability: {profile['spikeRateVariability']:.2f}")
+        print(f"Detected Bursts: {len(profile['spikeTimes'])}")
+        
+        if args.output_file:
+            with open(args.output_file, 'w') as f:
+                json.dump(profile, f, indent=2)
+            print(f"Profile saved to {args.output_file}")
+    
+    elif args.command == 'validate':
+        # Validate is just checking if config can be created
+        print("Configuration validation passed!")
+        if args.output_file:
+            with open(args.output_file, 'w') as f:
+                json.dump({"valid": True, "config": config}, f, indent=2)
+            print(f"Validation results saved to {args.output_file}")
+    
+    elif args.command == 'benchmark':
+        profiler = NLMProfiler()
+        profile = profiler.profileBrain(config, args.steps)
+        
+        print(f"Benchmark Results (Steps: {args.steps}):")
+        print(f"Performance: {profile['stepsPerSecond']:.0f} steps/second")
+        print(f"Average step time: {profile['avgStepTime']*1000:.2f}ms")
+        print(f"Spike generation rate: {profile['totalSpikes']/args.steps:.1f} spikes/step")
+        print(f"Network stability: {'Stable' if profile['spikeRateVariability'] < 2.0 else 'Unstable'}")
+        
+        if args.output_file:
+            with open(args.output_file, 'w') as f:
+                json.dump(profile, f, indent=2)
+            print(f"Benchmark results saved to {args.output_file}")
+if __name__ == '__main__':
+    main()

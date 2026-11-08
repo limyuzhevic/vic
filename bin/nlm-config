@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+"""
+NLM Advanced Configuration Tool
+
+This script provides advanced configuration management capabilities
+for the NLM (Neural Learning Machine) project.
+"""
+
+import argparse
+import json
+import sys
+import os
+from pathlib import Path
+
+import pynlm
+
+def parseConfigString(configStr: str):
+    """Parse configuration string and return config object."""
+    if not configStr:
+        return pynlm.createDefaultConfig()
+    
+    config = pynlm.createDefaultConfig()
+    parts = configStr.split()
+    for part in parts:
+        if '=' in part:
+            key, value = part.split('=', 1)
+            # Try to convert to appropriate type
+            try:
+                if '.' in value:
+                    floatVal = float(value)
+                    if key in ['neuron_count', 'region_count', 'max_simulation_steps']:
+                        config.set(key, int(floatVal))
+                    else:
+                        config.set(key, floatVal)
+                else:
+                    intVal = int(value)
+                    if key in ['neuron_count', 'region_count', 'max_simulation_steps']:
+                        config.set(key, intVal)
+                    else:
+                        config.set(key, intVal)
+            except ValueError:
+                config.set(key, value)
+    
+    return config
+def analyzeConfig(config):
+    """Analyze configuration and provide optimization recommendations."""
+    print("Configuration Analysis:")
+    
+    # Basic config analysis
+    neuronCount = config.getOr("neuron_count", 1000)
+    regionCount = config.getOr("region_count", 2)
+    connectionProb = config.getOr("connection_probability", 0.1)
+    timestep = config.getOr("simulation_timestep", 0.001)
+    
+    print(f"  Neurons: {neuronCount}")
+    print(f"  Regions: {regionCount}")
+    print(f"  Connection Probability: {connectionProb}")
+    print(f"  Time Step: {timestep}")
+    
+    # Analyze efficiency
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    expectedSynapses = int(neuronCount * neuronCount * connectionProb / 2)
+    actualSynapses = brain.getTotalSynapseCount()
+    
+    efficiency = min(actualSynapses / expectedSynapses, 1.0) if expectedSynapses > 0 else 0.0
+    print(f"  Expected Synapses: {expectedSynapses}")
+    print(f"  Actual Synapses: {actualSynapses}")
+    print(f"  Network Efficiency: {efficiency:.2f}")
+    
+    # Performance analysis
+    firingRate = brain.getAverageFiringRate()
+    print(f"  Average Firing Rate: {firingRate:.2f} Hz")
+    
+    if firingRate > 0.1 and firingRate < 2.0:
+        print("  ✓ Performance: Good")
+    else:
+        print("  ⚠ Performance: May need adjustment")
+    
+    return efficiency
+def optimizeConfig(config):
+    """Generate optimization recommendations."""
+    print("\nOptimization Recommendations:")
+    
+    neuronCount = config.getOr("neuron_count", 1000)
+    connectionProb = config.getOr("connection_probability", 0.1)
+    timestep = config.getOr("simulation_timestep", 0.001)
+    regionCount = config.getOr("region_count", 2)
+    
+    suggestions = []
+    
+    # Neuron count recommendations
+    if neuronCount > 5000:
+        suggestions.append(f"Reduce neuron count from {neuronCount} to 2000-5000 for better performance")
+    elif neuronCount < 100:
+        suggestions.append(f"Increase neuron count from {neuronCount} to 500+ for more interesting dynamics")
+    
+    # Connectivity recommendations
+    if connectionProb < 0.05:
+        suggestions.append(f"Increase connection probability from {connectionProb} to 0.05-0.15 for better interaction")
+    elif connectionProb > 0.2:
+        suggestions.append(f"Reduce connection probability from {connectionProb} to 0.05-0.15 to prevent over-excitation")
+    
+    # Time step recommendations
+    if timestep > 0.001:
+        suggestions.append(f"Reduce timestep from {timestep} to 0.001 for better temporal resolution")
+    
+    # Region recommendations
+    if regionCount == 1:
+        suggestions.append(f"Consider using 2-4 regions instead of 1 for more diverse populations")
+    
+    for suggestion in suggestions:
+        print(f"  • {suggestion}")
+    
+    return suggestions
+def profileBrain(config, steps=100):
+    """Profile brain performance."""
+    print(f"\nPerformance Profile (Steps: {steps}):")
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Simple timing
+    import time
+    startTime = time.time()
+    
+    for step in range(steps):
+        brain.step(step)
+    
+    endTime = time.time()
+    totalTime = endTime - startTime
+    
+    stepsPerSecond = steps / totalTime
+    totalSpikes = brain.getTotalSpikeCount()
+    avgFiringRate = brain.getAverageFiringRate()
+    
+    print(f"  Total Time: {totalTime:.2f}s")
+    print(f"  Performance: {stepsPerSecond:.0f} steps/second")
+    print(f"  Total Spikes: {totalSpikes}")
+    print(f"  Spike Rate: {totalSpikes/steps:.1f} spikes/step")
+    print(f"  Average Firing Rate: {avgFiringRate:.2f} Hz")
+    
+    # Stability assessment
+    if avgFiringRate > 0.1 and avgFiringRate < 2.0:
+        print("  Network Stability: ✓ Stable")
+    else:
+        print("  Network Stability: ⚠ May need adjustment")
+    
+    return {
+        'steps_per_second': stepsPerSecond,
+        'total_spikes': totalSpikes,
+        'avg_firing_rate': avgFiringRate,
+        'total_time': totalTime
+    }
+def main():
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description="NLM Advanced Configuration Tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  nlm-config --analyze "neuron_count=2000 connection_probability=0.1"
+  nlm-config --optimize "neuron_count=1000 region_count=3"
+  nlm-config --profile "neuron_count=500" --steps 200
+  nlm-config --benchmark "neuron_count=1000 connection_probability=0.1"
+        """
+    )
+    
+    # Create mutually exclusive group for commands
+    command_group = parser.add_mutually_exclusive_group(required=True)
+    command_group.add_argument('--analyze', action='store_true', help='Analyze configuration')
+    command_group.add_argument('--optimize', action='store_true', help='Optimize configuration')
+    command_group.add_argument('--profile', action='store_true', help='Profile brain performance')
+    command_group.add_argument('--benchmark', action='store_true', help='Run benchmark')
+    
+    parser.add_argument('--config', help='Configuration string (e.g., "neuron_count=2000 connection_probability=0.1")')
+    parser.add_argument('--steps', type=int, default=100, help='Number of steps for profiling/benchmark (default: 100)')
+    parser.add_argument('--output-file', help='Output file for results')
+    
+    args = parser.parse_args()
+    
+    # Get configuration
+    config = parseConfigString(args.config)
+    
+    # Execute command
+    results = {}
+    
+    if args.analyze:
+        results['efficiency'] = analyzeConfig(config)
+        results['recommendations'] = optimizeConfig(config)
+    
+    elif args.optimize:
+        results['recommendations'] = optimizeConfig(config)
+    
+    elif args.profile:
+        results['profile'] = profileBrain(config, args.steps)
+    
+    elif args.benchmark:
+        results['benchmark'] = profileBrain(config, args.steps)
+    
+    # Save results if requested
+    if args.output_file:
+        with open(args.output_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        print(f"\nResults saved to {args.output_file}")
+    
+    # Print summary
+    print("\n" + "="*50)
+    print("Operation completed successfully!")
+    print("="*50)
+if __name__ == '__main__':
+    main()
