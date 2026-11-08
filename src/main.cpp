@@ -229,9 +229,27 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // selective at all.
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
+        // Use population APIs for more efficient and correct neuron access
+        auto populations = region->getAllPopulations();
+        for (auto* pop : populations) {
+            if (pop->getNeuronType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+                // Get neurons directly from the sensory population
+                auto neurons = pop->getNeurons();
+                for (auto* neuron : neurons) {
+                    if (patternNeurons.size() < 20) {
+                        patternNeurons.push_back(neuron->getId());
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+        // Fallback: if we couldn't find a sensory population, use all neurons
+        if (patternNeurons.empty()) {
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+                    patternNeurons.push_back(neuron->getId());
+                }
             }
         }
     }
@@ -352,31 +370,62 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 with error handling
+    try {
+        // Basic configuration
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+
+        // STDP parameters
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+
+        // Structural plasticity parameters
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+        
+        // Add more advanced configuration options for Phase 4+
+        config->set("max_replay_ep", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("replay_interval", static_cast<int64_t>(100), ConfigSource::Default);
+        config->set("consolidation_interval", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("novelty_threshold", 0.1f, ConfigSource::Default);
+        config->set("curiosity_factor", 0.5f, ConfigSource::Default);
+        config->set("prediction_error_weight", 0.3f, ConfigSource::Default);
+        
+        // Advanced cognitive configuration
+        config->set("concept_formulation_depth", static_cast<int64_t>(5), ConfigSource::Default);
+        config->set("attentional_focus_strength", 0.5f, ConfigSource::Default);
+        config->set("planning_depth", static_cast<int64_t>(5), ConfigSource::Default);
+        config->set("reward_prediction_error_decay", 0.9f, ConfigSource::Default);
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Error in configuration: " << e.what() << std::endl;
+        return 1;
+    }
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
-    
-    // Log configuration summary
+    // Log configuration summary with error handling
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    try {
+        NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+        NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+        NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+        NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+        NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+        
+        // Log advanced configuration options
+        NLM_LOG_INFO("  concept_formulation_depth: " + std::to_string(config->getOr<int64_t>("concept_formulation_depth", 5)));
+        NLM_LOG_INFO("  attentional_focus_strength: " + std::to_string(config->getOr<float>("attentional_focus_strength", 0.5f)));
+        NLM_LOG_INFO("  planning_depth: " + std::to_string(config->getOr<int64_t>("planning_depth", 5)));
+        NLM_LOG_INFO("  reward_prediction_error_decay: " + std::to_string(config->getOr<float>("reward_prediction_error_decay", 0.9f)));
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error logging configuration: " + std::string(e.what()));
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);

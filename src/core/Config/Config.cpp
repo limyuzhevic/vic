@@ -19,40 +19,23 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
+    // Try to parse as JSON first
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
     
-    return true;
+    // Simple JSON parsing for key-value pairs
+    // This handles basic JSON objects like {"key": "value", "number": 42}
+    if (content.find('{') != std::string::npos && content.find('}') != std::string::npos) {
+        return parseJSON(content);
+    } else {
+        // Fallback to simple key=value format for backward compatibility
+        return parseKeyValueFormat(content);
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -188,6 +171,158 @@ std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);
     return result;
+}
+
+bool Config::parseKeyValueFormat(const std::string& content) {
+    std::istringstream stream(content);
+    std::string line;
+    while (std::getline(stream, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    return true;
+}
+
+bool Config::parseJSON(const std::string& json) {
+    // Simple JSON parsing for basic objects
+    // This is a simplified implementation that handles:
+    // { "key": "value", "number": 42, "array": [1, 2, 3] }
+    // Assumes valid JSON format
+    
+    size_t start = json.find('{');
+    if (start == std::string::npos) {
+        return false;
+    }
+    
+    size_t end = json.find('}', start);
+    if (end == std::string::npos) {
+        return false;
+    }
+    
+    std::string object = json.substr(start + 1, end - start - 1);
+    
+    // Parse key-value pairs
+    size_t pos = 0;
+    while (pos < object.size()) {
+        // Find next key
+        size_t keyStart = object.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = object.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = object.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find colon after key
+        size_t colonPos = object.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        // Find value
+        size_t valueStart = object.find_first_not_of(' ', colonPos);
+        if (valueStart == std::string::npos) break;
+        
+        // Parse different value types
+        if (valueStart < object.size() && object[valueStart] == '"') {
+            // String value
+            size_t valueEnd = object.find('"', valueStart + 1);
+            if (valueEnd == std::string::npos) break;
+            std::string value = object.substr(valueStart + 1, valueEnd - valueStart - 1);
+            set(key, value, ConfigSource::File);
+            pos = valueEnd + 2; // Skip " and potential comma
+        } else if (valueStart < object.size() && (object[valueStart] == '-' || std::isdigit(object[valueStart]))) {
+            // Number value - extract digits
+            size_t numEnd = valueStart;
+            while (numEnd < object.size() && (std::isdigit(object[numEnd]) || object[numEnd] == '.' || object[numEnd] == '-')) {
+                numEnd++;
+            }
+            std::string numStr = object.substr(valueStart, numEnd - valueStart);
+            
+            // Try to parse as integer first
+            try {
+                int intVal = std::stoi(numStr);
+                set(key, intVal, ConfigSource::File);
+            } catch (...) {
+                try {
+                    double floatVal = std::stod(numStr);
+                    set(key, floatVal, ConfigSource::File);
+                } catch (...) {
+                    // If parsing fails, try string value
+                    set(key, numStr, ConfigSource::File);
+                }
+            }
+            pos = numEnd;
+        } else if (valueStart < object.size() && object[valueStart] == '[') {
+            // Array value - simple implementation for numeric arrays only
+            size_t arrayEnd = object.find(']', valueStart);
+            if (arrayEnd == std::string::npos) break;
+            
+            std::vector<double> array;
+            size_t arrayPos = valueStart + 1;
+            while (arrayPos < arrayEnd) {
+                // Skip whitespace and commas
+                while (arrayPos < arrayEnd && (std::isspace(object[arrayPos]) || object[arrayPos] == ',')) {
+                    arrayPos++;
+                }
+                if (arrayPos >= arrayEnd) break;
+                
+                // Extract number
+                size_t numStart = arrayPos;
+                while (arrayPos < arrayEnd && (std::isdigit(object[arrayPos]) || object[arrayPos] == '.' || object[arrayPos] == '-')) {
+                    arrayPos++;
+                }
+                
+                if (numStart < arrayPos) {
+                    std::string numStr = object.substr(numStart, arrayPos - numStart);
+                    try {
+                        double val = std::stod(numStr);
+                        array.push_back(val);
+                    } catch (...) {
+                        // Skip invalid numbers
+                    }
+                }
+            }
+            
+            // Store array as string for now (simplified)
+            std::string arrayStr = "[";
+            for (size_t i = 0; i < array.size(); ++i) {
+                if (i > 0) arrayStr += ", ";
+                arrayStr += std::to_string(array[i]);
+            }
+            arrayStr += "]";
+            set(key, arrayStr, ConfigSource::File);
+            
+            pos = arrayEnd + 1;
+        } else {
+            // Unknown value type, skip
+            pos = valueStart + 1;
+        }
+        
+        // Skip comma separator
+        while (pos < object.size() && (object[pos] == ',' || std::isspace(object[pos]))) {
+            pos++;
+        }
+    }
+    
+    return true;
 }
 
 template<typename T>

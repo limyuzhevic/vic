@@ -87,6 +87,16 @@ struct Brain::Impl {
     size_t replayInterval;
     size_t consolidationInterval;
     
+    // ========== ADVANCED CONFIGURATION ==========
+    size_t maxReplayEpisodes;
+    float noveltyThreshold;
+    float curiosityFactor;
+    float predictionErrorWeight;
+    size_t conceptFormulationDepth;
+    float attentionalFocusStrength;
+    size_t planningDepth;
+    float rewardPredictionErrorDecay;
+    
     // Checkpoint system
     std::unique_ptr<CheckpointManager> checkpointManager;
     
@@ -104,6 +114,14 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , maxReplayEpisodes(1000)
+        , noveltyThreshold(0.1f)
+        , curiosityFactor(0.5f)
+        , predictionErrorWeight(0.3f)
+        , conceptFormulationDepth(5)
+        , attentionalFocusStrength(0.5f)
+        , planningDepth(5)
+        , rewardPredictionErrorDecay(0.9f)
     {
         // Initialize random generator with seed from config
         uint64_t seed = 42;  // Default seed
@@ -157,12 +175,44 @@ struct Brain::Impl {
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);
         
-        // Get integration intervals from config
-        replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
-        consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+    // Get integration intervals from config
+    replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
+    consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
+    
+    // Add more advanced configuration options for Phase 4+
+    maxReplayEpisodes = static_cast<size_t>(config->getOr<int64_t>("max_replay_ep", 1000));
+    noveltyThreshold = config->getOr<float>("novelty_threshold", 0.1f);
+    curiosityFactor = config->getOr<float>("curiosity_factor", 0.5f);
+    predictionErrorWeight = config->getOr<float>("prediction_error_weight", 0.3f);
+    
+    // Advanced cognitive configuration
+    conceptFormulationDepth = static_cast<size_t>(config->getOr<int64_t>("concept_formulation_depth", 5));
+    attentionalFocusStrength = config->getOr<float>("attentional_focus_strength", 0.5f);
+    planningDepth = static_cast<size_t>(config->getOr<int64_t>("planning_depth", 5));
+    rewardPredictionErrorDecay = config->getOr<float>("reward_prediction_error_decay", 0.9f);
+    
+    // Initialize checkpoint manager
+    checkpointManager = std::make_unique<CheckpointManager>();
+    
+    // Configure advanced options
+    if (predictionSystem) {
+        predictionSystem->setPredictionErrorWeight(predictionErrorWeight);
+        predictionSystem->setNoveltyThreshold(noveltyThreshold);
+        predictionSystem->setCuriosityFactor(curiosityFactor);
+    }
+    
+    if (attention) {
+        attention->setFocusStrength(attentionalFocusStrength);
+    }
+    
+    if (dopamine) {
+        dopamine->setErrorWeight(predictionErrorWeight);
+    }
+    
+    if (developmentSystem) {
+        developmentSystem->setConceptFormulationDepth(conceptFormulationDepth);
+        developmentSystem->setPlanningDepth(planningDepth);
+    }
     }
     
     DevelopmentalStage developmentalStage;

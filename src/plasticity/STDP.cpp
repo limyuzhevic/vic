@@ -97,7 +97,33 @@ void STDP::update(Synapse* synapse,
         {
             float w = synapse->getWeight();
             bool awayFromZero = std::abs(w + totalDelta) > std::abs(w);
-            totalDelta *= awayFromZero ? (1.0f - std::abs(w)) : std::abs(w);
+            
+            // Improved soft bounds calculation with better control
+            if (awayFromZero) {
+                // Potentiation: scaling factor decreases as weight approaches bound
+                // Add a minimum scaling factor to ensure some learning continues
+                float scalingFactor = (1.0f - std::abs(w)) * 0.9f + 0.05f;
+                totalDelta *= scalingFactor;
+                
+                // Ensure we don't overscale for small weights
+                if (std::abs(w) < 0.2f && std::abs(totalDelta) > 0.01f) {
+                    totalDelta *= 0.5f;
+                }
+            } else {
+                // Depression: scaling factor decreases as weight approaches zero
+                float scalingFactor = std::abs(w) * 0.8f + 0.02f;
+                totalDelta *= scalingFactor;
+                
+                // For very small weights, ensure stable depression
+                if (std::abs(w) < 0.05f) {
+                    totalDelta *= 0.7f;
+                }
+            }
+            
+            // Additional normalization to prevent explosive growth
+            if (synapse->getType() == SynapseType::Excitatory) {
+                totalDelta = std::min(totalDelta, 0.1f);
+            }
         }
 
         // Apply weight change
