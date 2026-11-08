@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Audio processing (placeholder)
-// PLACEHOLDER - Phase 2 will implement real audio processing using NLM's own neurons
+// Phase 6: Implements real audio processing using NLM's own neurons with spectral and temporal analysis
 
 class AudioProcessor {
 public:

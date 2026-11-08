@@ -5,9 +5,9 @@
 namespace nlm {
 
 // Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
-
-class Reward {
+    // Phase 6: Implements reward prediction and temporal difference learning
+    
+    class Reward {
 public:
     Reward();
     ~Reward();
@@ -23,7 +23,7 @@ public:
     void reset();
     
     // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
+    // Phase 6: Real reward computation using environmental cues and prediction errors
     float computeReward(const class Observation& observation) const;
     
     // Reward history

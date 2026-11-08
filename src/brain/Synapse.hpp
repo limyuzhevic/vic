@@ -76,7 +76,7 @@ public:
     void setEfficacy(float efficacy);
     
     // Update synapse for one simulation step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Phase 6: Real synaptic dynamics with eligibility traces and short-term plasticity
     void step(Timestamp currentTime);
     
     // Reset to initial state

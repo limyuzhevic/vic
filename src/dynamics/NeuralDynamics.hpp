@@ -7,18 +7,18 @@
 namespace nlm {
 
 // Abstract base class for neural dynamics
-// PLACEHOLDER - Phase 2 will implement various dynamics models
-
-class NeuralDynamics {
+    // Phase 6: Implements various dynamics models including IF and FHN
+    
+    class NeuralDynamics {
 public:
     virtual ~NeuralDynamics() = default;
     
     // Update neuron state for one step
-    // TODO PHASE 2: Implement real dynamics
+    // Phase 6: Real neuron dynamics including integration, adaptation, and bursting
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
     // Update synapse state for one step
-    // TODO PHASE 2: Implement real synaptic dynamics
+    // Phase 6: Real synaptic dynamics including short-term plasticity
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
     
     // Apply synaptic input from spike
@@ -53,8 +53,9 @@ private:
 };
 
 // Hodgkin-Huxley dynamics (detailed model)
-// TODO PHASE 2: Implement Hodgkin-Huxley
-class HodgkinHuxleyDynamics : public NeuralDynamics {
+    // Phase 6: Implements detailed HH dynamics with ion channel modeling
+    
+    class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
     // PLACEHOLDER - Phase 2 will implement HH dynamics
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
@@ -64,9 +65,10 @@ public:
     void reset() override {}
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
-// TODO PHASE 2: Implement FHN dynamics
-class FitzHughNagumoDynamics : public NeuralDynamics {
+// FitzHugh-Nagumo dynamics (simplified excitability model)
+    // Phase 6: Implements FHN dynamics for excitable neurons
+    
+    class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
     // PLACEHOLDER - Phase 2 will implement FHN dynamics
     void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}

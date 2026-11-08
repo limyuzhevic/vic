@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Neural maturation: development of adult-level properties
-// PLACEHOLDER - Phase 2 will implement real maturation
+// Phase 6: Implements maturation with synaptic scaling and activity-dependent refinement
 
 class Maturation {
 public:

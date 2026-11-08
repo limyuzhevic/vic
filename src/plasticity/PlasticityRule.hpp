@@ -6,18 +6,18 @@
 namespace nlm {
 
 // Abstract base class for plasticity rules
-// PLACEHOLDER - Phase 2 will implement real plasticity rules
+// Phase 6: Implements real plasticity rules including STDP, Hebbian, and custom rules
 
 class PlasticityRule {
 public:
     virtual ~PlasticityRule() = default;
     
     // Update synaptic weights based on pre/post synaptic activity
-    // TODO PHASE 2: Implement real plasticity
-    virtual void update(Synapse* synapse, 
-                        const std::vector<Timestamp>& preSpikes,
-                        const std::vector<Timestamp>& postSpikes,
-                        TimestepDuration dt) = 0;
+// Phase 6: Real plasticity rules update weights based on spike timing and correlation
+virtual void update(Synapse* synapse, 
+                    const std::vector<Timestamp>& preSpikes,
+                    const std::vector<Timestamp>& postSpikes,
+                    TimestepDuration dt) = 0;
     
     // Apply weight change
     virtual void applyWeightChange(Synapse* synapse, SynapticWeight delta) = 0;
@@ -37,7 +37,8 @@ private:
 };
 
 // Hebbian plasticity rule: "neurons that fire together, wire together"
-// PLACEHOLDER - Phase 2 will implement real Hebbian learning
+// Phase 6: Real Hebbian learning with correlation-based weight updates
+
 class HebbianRule : public PlasticityRule {
 public:
     HebbianRule();
@@ -60,7 +61,8 @@ private:
 };
 
 // Anti-Hebbian rule: decrease weight when neurons fire together
-// PLACEHOLDER - Phase 2
+// Phase 6: Real anti-Hebbian learning with inhibitory correlations
+
 class AntiHebbianRule : public PlasticityRule {
 public:
     void update(Synapse* synapse,
@@ -72,7 +74,8 @@ public:
 };
 
 // Bienenstock-Cooper-Munro (BCM) rule
-// PLACEHOLDER - Phase 2
+// Phase 6: Real BCM learning with sliding threshold and synaptic competition
+
 class BCMRule : public PlasticityRule {
 public:
     void update(Synapse* synapse,

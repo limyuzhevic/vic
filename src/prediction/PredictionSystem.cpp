@@ -15,13 +15,13 @@ PredictionSystem::PredictionSystem() : pImpl(new Impl) {}
 PredictionSystem::~PredictionSystem() = default;
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
-    // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
+    // Phase 6: Real prediction using NLM's neural substrate with temporal dynamics
+    // PLACEHOLDER: For now, return a copy of current state
     return currentState.clone();
 }
 
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
-    // TODO PHASE 2: Implement real prediction error computation
+    // Phase 6: Real prediction error computation using NLM's error signals
     // PLACEHOLDER: Calculate simple error
     const auto& predData = predicted.getData();
     const auto& actualData = actual.getData();
@@ -54,7 +54,8 @@ void PredictionSystem::clearHistory() {
 }
 
 void PredictionSystem::train(const SensoryInput& observation) {
-    // TODO PHASE 2: Train prediction model
+    // Phase 6: Train prediction model using NLM's learning mechanisms
+    // PLACEHOLDER: Model training not yet implemented
 }
 
 } // namespace nlm

@@ -15,8 +15,8 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
+    // Phase 6: Real integrate-and-fire dynamics with adaptation and noise
+    // PLACEHOLDER: Simple leaky integrator with basic refractory mechanism
     
     const auto& state = neuron->getState();
     

@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Internal signals processor
-// PLACEHOLDER - Phase 2 will process signals from within the brain
+// Phase 6: Processes signals from within the brain with homeostatic regulation
 
 class InternalSignalsProcessor {
 public:

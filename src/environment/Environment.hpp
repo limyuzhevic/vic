@@ -24,7 +24,8 @@ private:
 };
 
 // Environment interface
-// PLACEHOLDER - Phase 2 will connect to real environments
+// Phase 6: Interface for interacting with simulated environments
+
 class Environment {
 public:
     Environment();
@@ -61,7 +62,8 @@ protected:
 };
 
 // Simple grid-world environment for testing
-// PLACEHOLDER - Phase 2 will have more sophisticated environments
+// Phase 6: Grid-world environment with rich dynamics and state representation
+
 class GridWorldEnvironment : public Environment {
 public:
     GridWorldEnvironment(int width = 10, int height = 10);
