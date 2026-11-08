@@ -408,26 +408,191 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Factory functions with better error handling and type safety
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
+        auto config = std::make_shared<Config>();
+        NLM_LOG_INFO("Created default configuration");
+        return config;
     }, "Create a default configuration");
 
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
+        if (!config) {
+            throw std::invalid_argument("Configuration cannot be null");
+        }
+        auto brain = std::make_shared<Brain>(config);
+        NLM_LOG_INFO("Created new brain with configuration");
+        return brain;
     }, py::arg("config"), "Create a new brain with configuration");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
+        auto world = std::make_shared<SimpleWorld>();
+        NLM_LOG_INFO("Created simple world");
+        return world;
     }, "Create a new simple world");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        auto agent = std::make_shared<AgentBrain>(brain);
+        NLM_LOG_INFO("Created agent brain interface");
+        return agent;
     }, py::arg("brain"), "Create a new agent brain interface");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+
+    // Convenience functions with improved error handling
+    m.def("createBrainWithDefaults", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+        auto brain = std::make_shared<Brain>(config);
+        NLM_LOG_INFO("Created brain with default configuration");
+        return brain;
+    }, "Create a brain with default configuration");
+
+    m.def("createWorldWithConfig", [](size_t width, size_t height, size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        world->reset();
+        NLM_LOG_INFO("Created world with specified dimensions");
+        return world;
+    }, py::arg("width"), py::arg("height"), py::arg("visionWidth"), py::arg("visionHeight"),
+       "Create a simple world with specified dimensions");
+
+    // Improved error handling wrapper functions
+    m.def("safeStep", [](std::shared_ptr<Brain> brain, SimulationStep step) {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        brain->step(step);
+        NLM_LOG_INFO("Successfully performed brain step");
+    }, py::arg("brain"), py::arg("step"), "Safely perform a brain step");
+
+    m.def("safeInjectCurrent", [](std::shared_ptr<Brain> brain, NeuronId neuron, float current) {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        brain->injectCurrent(neuron, current);
+        NLM_LOG_INFO("Successfully injected current into neuron");
+    }, py::arg("brain"), py::arg("neuron"), py::arg("current"), "Safely inject current into neuron");
+
+    // Statistical helper functions
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        std::map<std::string, double> stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["firing_neuron_count"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitation_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics");
+
+    m.def("getAgentStats", [](std::shared_ptr<AgentBrain> agent) {
+        if (!agent) {
+            throw std::invalid_argument("Agent cannot be null");
+        }
+        std::map<std::string, double> stats;
+        stats["curiosity_level"] = agent->getCuriosityLevel();
+        stats["novelty_level"] = agent->getNoveltyLevel();
+        stats["prediction_error"] = agent->getPredictionError();
+        stats["neuromodulation_level"] = agent->getNeuromodulationLevel();
+        stats["development_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+        return stats;
+    }, py::arg("agent"), "Get comprehensive agent statistics");
+
+    // Configuration validation helper
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::invalid_argument("Config cannot be null");
+        }
+        std::vector<std::string> errors;
+        
+        // Check critical configuration parameters
+        if (!config->has("brain.neuron_count") || config->getOr<int64_t>("brain.neuron_count", 0) <= 0) {
+            errors.push_back("brain.neuron_count must be a positive integer");
+        }
+        
+        if (config->has("brain.synapse_density") && 
+            (config->getOr<float>("brain.synapse_density", 0.0f) < 0.0f || 
+             config->getOr<float>("brain.synapse_density", 0.0f) > 1.0f)) {
+            errors.push_back("brain.synapse_density must be between 0.0 and 1.0");
+        }
+        
+        if (config->has("brain.connection_probability") && 
+            (config->getOr<float>("brain.connection_probability", 0.0f) < 0.0f || 
+             config->getOr<float>("brain.connection_probability", 0.0f) > 1.0f)) {
+            errors.push_back("brain.connection_probability must be between 0.0 and 1.0");
+        }
+        
+        if (!errors.empty()) {
+            std::string error_msg = "Configuration validation failed:\n";
+            for (const auto& error : errors) {
+                error_msg += "  - " + error + "\n";
+            }
+            throw std::invalid_argument(error_msg);
+        }
+        
+        NLM_LOG_INFO("Configuration validation passed");
+        return true;
+    }, py::arg("config"), "Validate configuration and return true if valid");
+
+    // Simulation utility functions
+    m.def("runSimulationSteps", [](std::shared_ptr<Brain> brain, uint64_t steps) {
+        if (!brain) {
+            throw std::invalid_argument("Brain cannot be null");
+        }
+        NLM_LOG_INFO("Starting simulation with " + std::to_string(steps) + " steps");
+        
+        for (uint64_t step = 0; step < steps; ++step) {
+            brain->step(step);
+            
+            // Log progress every 10% of simulation
+            if (steps > 100 && step % (steps / 10) == 0) {
+                NLM_LOG_INFO("Simulation progress: " + std::to_string((step * 100) / steps) + "% complete");
+            }
+        }
+        
+        NLM_LOG_INFO("Simulation completed successfully");
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("steps"), "Run simulation for specified number of steps");
+
+    m.def("createCompleteAgentSetup", [](std::shared_ptr<Config> config) -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<AgentBrain>, std::shared_ptr<SimpleWorld>> {
+        if (!config) {
+            throw std::invalid_argument("Config cannot be null");
+        }
+        
+        // Create brain
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Create world with default settings
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        
+        // Create agent
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        // Enable all subsystems
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        NLM_LOG_INFO("Created complete agent setup with all subsystems enabled");
+        
+        return std::make_tuple(brain, agent, world);
+    }, py::arg("config"), "Create complete agent setup with brain, agent, and world");
 
 } // namespace nlm

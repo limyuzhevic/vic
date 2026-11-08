@@ -294,4 +294,60 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+---
+
+## Advanced Usage Examples
+
+### Running Multiple Simulations in Parallel
+
+```python
+import pynlm
+import time
+
+def run_simulation_with_config(config_settings, simulation_name):
+    """Run a simulation with custom configuration."""
+    config = pynlm.createDefaultConfig()
+    for key, value in config_settings.items():
+        config.set(key, value)
+    
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    
+    # Add some initial activity
+    agent = pynlm.createAgentBrain(brain)
+    agent.enableRewardModulation(True)
+    agent.enableCuriosity(True)
+    
+    start_time = time.time()
+    for step in range(1000):
+        brain.step(step)
+    
+    end_time = time.time()
+    
+    return {
+        "name": simulation_name,
+        "total_neurons": brain.getTotalNeuronCount(),
+        "total_synapses": brain.getTotalSynapseCount(),
+        "total_spikes": brain.getTotalSpikeCount(),
+        "firing_rate": brain.getAverageFiringRate(),
+        "execution_time": end_time - start_time,
+        "development_stage": brain.getDevelopmentalStage()
+    }
+
+# Run multiple simulations with different configurations
+sim_configs = [
+    {"brain.neuron_count": 500, "plasticity.stdp.enable": True},
+    {"brain.neuron_count": 1000, "plasticity.stdp.enable": False},
+    {"brain.neuron_count": 2000, "plasticity.stdp.enable": True, "plasticity.hebbian.enable": True}
+]
+
+results = []
+for i, config in enumerate(sim_configs):
+    result = run_simulation_with_config(config, f"Simulation_{i+1}")
+    results.append(result)
+    print(f"Completed {result['name']}: {result['total_spikes']} spikes in {result['execution_time']:.2f}s")
+
+print(f"\nSummary of {len(results)} simulations:")
+for result in results:
+    print(f"  {result['name']}: {result['total_spikes']} spikes, {result['firing_rate']:.2f} Hz average")
+```
