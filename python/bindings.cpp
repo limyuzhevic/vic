@@ -1,3 +1,6 @@
+#include <functional>
+#include <tuple>
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
@@ -428,6 +431,130 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+
+    // Convenience functions for simplified usage
+    m.def("quick_brain", [](size_t steps) {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        return brain;
+    }, py::arg("steps"),
+         "Quick one-line brain creation and simulation. Creates a brain with default config, "
+         "initializes it, and runs the specified number of steps. Returns the brain object "
+         "so you can access its final state and statistics.");
+
+    m.def("quick_brain", [](std::shared_ptr<Config> config, size_t steps) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        return brain;
+    }, py::arg("config"), py::arg("steps"),
+         "Quick brain creation with custom configuration. Creates a brain with the provided "
+         "config, initializes it, and runs the specified number of steps. Returns the brain "
+         "object for access to final state and statistics.");
+
+    m.def("quick_agent", [](size_t brain_size, size_t world_width, size_t world_height, 
+                           size_t steps, size_t vision_width, size_t vision_height) {
+        // Create and configure config
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int>(brain_size));
+        
+        // Create brain and world
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(world_width, world_height, vision_width, vision_height);
+        world->reset();
+        world->setAgentStart(world_width / 2, world_height / 2);
+        
+        // Create agent
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Enable advanced features
+        agent->enableRewardModulation(true);
+        agent->enableCuriosity(true);
+        agent->enableDevelopment(true);
+        
+        // Run simulation
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        // Return structured result
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("brain_size") = 1000, py::arg("world_width") = 20, py::arg("world_height") = 20,
+        py::arg("steps") = 500, py::arg("vision_width") = 8, py::arg("vision_height") = 8,
+        "Quick agent simulation. Creates a brain, world, and agent with reasonable defaults, "
+         "enables learning features, and runs a complete simulation. Returns a tuple of "
+         "(brain, world, agent) for inspection of results.");
+
+    m.def("quick_world", [](size_t width, size_t height, size_t vision_width, size_t vision_height) {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, vision_width, vision_height);
+        world->reset();
+        world->setAgentStart(width / 2, height / 2);
+        return world;
+    }, py::arg("width") = 20, py::arg("height") = 20, py::arg("vision_width") = 8, py::arg("vision_height") = 8,
+        "Quick world setup. Creates a configured SimpleWorld with center agent start. "
+         "Useful for creating worlds for agent simulations.");
+
+    m.def("learn", [](std::shared_ptr<Config> config, std::function<double(const SensoryPercept&)> reward_func,
+                     size_t steps, bool enable_curiosity, bool enable_reward_modulation, bool enable_development) {
+        // Create components
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        world->setAgentStart(10, 10);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        // Configure learning features
+        agent->enableRewardModulation(enable_reward_modulation);
+        agent->enableCuriosity(enable_curiosity);
+        agent->enableDevelopment(enable_development);
+        
+        // Learning simulation
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Apply reward modulation
+            double reward = reward_func(percept);
+            double predicted = agent->getPredictionError();
+            agent->applyRewardModulation(reward, predicted);
+        }
+        
+        // Return learning results
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("config"), py::arg("reward_func"), py::arg("steps") = 1000,
+        py::arg("enable_curiosity") = true, py::arg("enable_reward_modulation") = true,
+        py::arg("enable_development") = true,
+        "Learning-focused API. Creates a brain, world, and agent, runs a learning simulation "
+         "using the provided reward function, and returns results. Automatically enables "
+         "neuromodulation systems for adaptive learning.");
 
 } // namespace nlm
