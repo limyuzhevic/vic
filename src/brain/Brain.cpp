@@ -709,6 +709,11 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
             normalizedValue = static_cast<float>(values[i]) * 10.0f;
         }
         
+        // Null check before accessing neuron
+        if (!pImpl->sensoryNeurons[i]) {
+            continue;
+        }
+        
         // Inject current into this sensory neuron
         pImpl->sensoryNeurons[i]->injectCurrent(normalizedValue);
         
@@ -722,12 +727,17 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
 void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
     auto it = pImpl->neuronById.find(neuron.index());
     if (it != pImpl->neuronById.end()) {
-        it->second->injectCurrent(current);
+        // Null check before accessing neuron
+        if (it->second) {
+            it->second->injectCurrent(current);
+        }
         return;
     }
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
+            // Null check before accessing neuron
+            if (!n) continue;
             if (n->getId() == neuron) {
                 n->injectCurrent(current);
                 return;
@@ -738,9 +748,15 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
     for (auto& region : pImpl->regions) {
+        // Null check for region
+        if (!region) continue;
         for (auto& pop : region->getPopulations()) {
+            // Null check for population
+            if (!pop) continue;
             if (pop->getNeuronType() == type) {
                 for (auto* neuron : pop->getNeurons()) {
+                    // Null check for neuron
+                    if (!neuron) continue;
                     neuron->injectCurrent(current);
                 }
             }
@@ -773,7 +789,11 @@ float Brain::getExcitationInhibitionRatio() const {
     float totalInhibitory = 0.0f;
     
     for (const auto& region : pImpl->regions) {
+        // Null check for region
+        if (!region) continue;
         for (const auto& syn : region->getSynapses()) {
+            // Null check for synapse
+            if (!syn) continue;
             float weight = syn->getWeight();
             if (weight > 0) {
                 totalExcitatory += weight;
@@ -794,7 +814,11 @@ size_t Brain::getTotalSpikeCount() const {
 }
 
 size_t Brain::getPendingSpikeEventCount() const {
-    return pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
+    size_t count = 0;
+    if (pImpl->spikeSystem) {
+        count = pImpl->spikeSystem->getPendingSpikeCount() + pImpl->spikeSystem->getPendingDelayedCount();
+    }
+    return count;
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
@@ -808,6 +832,8 @@ std::unique_ptr<class Action> Brain::produceAction() {
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
     for (auto* neuron : pImpl->motorNeurons) {
+        // Null check for neuron
+        if (!neuron) continue;
         if (neuron->isFiring()) {
             ++firingMotor;
         }
@@ -828,9 +854,11 @@ void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
     // Apply neuromodulation effects on plasticity
     float modulation = signal.getLevel();
     
-    // Scale STDP learning rates
-    pImpl->stdp->setLTPWeight(0.01f * modulation);
-    pImpl->stdp->setLTDWeight(0.012f * modulation);
+    // Scale STDP learning rates with null check
+    if (pImpl->stdp) {
+        pImpl->stdp->setLTPWeight(0.01f * modulation);
+        pImpl->stdp->setLTDWeight(0.012f * modulation);
+    }
 }
 
 void Brain::updatePlasticity() {
@@ -840,7 +868,9 @@ void Brain::updatePlasticity() {
 
 void Brain::develop() {
     // Development updates structural plasticity
-    pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    }
 }
 
 void Brain::reset() {
@@ -854,10 +884,14 @@ void Brain::reset() {
     pImpl->stepsSinceLastEpisode = 0;
     
     for (auto& region : pImpl->regions) {
+        // Null check for region
+        if (!region) continue;
         region->reset();
     }
     
-    pImpl->spikeSystem->reset();
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    }
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems

@@ -93,6 +93,8 @@ std::vector<NeuralPopulation*> NeuralRegion::getAllPopulations() {
     std::vector<NeuralPopulation*> result;
     result.reserve(pImpl->populations.size());
     for (auto& pop : pImpl->populations) {
+        // Null check for population
+        if (!pop) continue;
         result.push_back(pop.get());
     }
     return result;
@@ -160,6 +162,8 @@ std::vector<Synapse*> NeuralRegion::getSynapsesTo(NeuronId neuron) {
 size_t NeuralRegion::getTotalNeuronCount() const {
     size_t total = 0;
     for (const auto& pop : pImpl->populations) {
+        // Null check for population
+        if (!pop) continue;
         total += pop->getSize();
     }
     return total;
@@ -168,6 +172,8 @@ size_t NeuralRegion::getTotalNeuronCount() const {
 size_t NeuralRegion::getActiveNeuronCount() const {
     size_t total = 0;
     for (const auto& pop : pImpl->populations) {
+        // Null check for population
+        if (!pop) continue;
         total += pop->getActiveCount();
     }
     return total;
@@ -176,6 +182,8 @@ size_t NeuralRegion::getActiveNeuronCount() const {
 size_t NeuralRegion::getFiringNeuronCount() const {
     size_t total = 0;
     for (const auto& pop : pImpl->populations) {
+        // Null check for population
+        if (!pop) continue;
         total += pop->getFiringCount();
     }
     return total;
@@ -187,6 +195,8 @@ float NeuralRegion::getAverageFiringRate() const {
     
     float sum = 0.0f;
     for (const auto& pop : pImpl->populations) {
+        // Null check for population
+        if (!pop) continue;
         sum += pop->getAverageFiringRate();
     }
     return sum / static_cast<float>(popCount);
@@ -198,6 +208,8 @@ float NeuralRegion::getAverageSynapticWeight() const {
     }
     float sum = 0.0f;
     for (const auto& syn : pImpl->synapses) {
+        // Null check for synapse
+        if (!syn) continue;
         sum += syn->getWeight();
     }
     return sum / static_cast<float>(pImpl->synapses.size());
@@ -217,20 +229,28 @@ float NeuralRegion::getSynapticDensity() const {
 void NeuralRegion::step(Timestamp currentTime) {
     // Step all populations
     for (auto& pop : pImpl->populations) {
+        // Null check for population
+        if (!pop) continue;
         pop->step(currentTime);
     }
     
     // Step all synapses
     for (auto& syn : pImpl->synapses) {
+        // Null check for synapse
+        if (!syn) continue;
         syn->step(currentTime);
     }
 }
 
 void NeuralRegion::reset() {
     for (auto& pop : pImpl->populations) {
+        // Null check for population
+        if (!pop) continue;
         pop->reset();
     }
     for (auto& syn : pImpl->synapses) {
+        // Null check for synapse
+        if (!syn) continue;
         syn->reset();
     }
 }
@@ -304,6 +324,8 @@ void NeuralRegion::initializeRandomConnectivity(RandomGenerator& rng,
 std::vector<Neuron*> NeuralRegion::getAllNeurons() {
     std::vector<Neuron*> result;
     for (auto& pop : pImpl->populations) {
+        // Null check for population
+        if (!pop) continue;
         auto popNeurons = pop->getNeurons();
         result.insert(result.end(), popNeurons.begin(), popNeurons.end());
     }

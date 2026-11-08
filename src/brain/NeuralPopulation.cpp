@@ -72,6 +72,8 @@ void NeuralPopulation::createNeurons(NeuronId startId) {
 }
 
 void NeuralPopulation::addNeuron(Neuron* neuron) {
+    // Null check for neuron
+    if (!neuron) return;
     pImpl->neurons.push_back(neuron);
     if (pImpl->size < pImpl->neurons.size()) {
         pImpl->size = pImpl->neurons.size();
@@ -89,6 +91,8 @@ NeuronType NeuralPopulation::getNeuronType() const {
 void NeuralPopulation::setNeuronType(NeuronType type) {
     pImpl->neuronType = type;
     for (auto* neuron : pImpl->neurons) {
+        // Null check for neuron
+        if (!neuron) continue;
         neuron->setType(type);
     }
 }
@@ -96,6 +100,8 @@ void NeuralPopulation::setNeuronType(NeuronType type) {
 size_t NeuralPopulation::getActiveCount() const {
     size_t count = 0;
     for (const auto* neuron : pImpl->neurons) {
+        // Null check for neuron
+        if (!neuron) continue;
         if (neuron->isFiring() || neuron->getFiringRate() > 0.0f) {
             ++count;
         }
@@ -106,6 +112,8 @@ size_t NeuralPopulation::getActiveCount() const {
 size_t NeuralPopulation::getFiringCount() const {
     size_t count = 0;
     for (const auto* neuron : pImpl->neurons) {
+        // Null check for neuron
+        if (!neuron) continue;
         if (neuron->isFiring()) {
             ++count;
         }
@@ -119,6 +127,8 @@ float NeuralPopulation::getAverageFiringRate() const {
     }
     float sum = 0.0f;
     for (const auto* neuron : pImpl->neurons) {
+        // Null check for neuron
+        if (!neuron) continue;
         sum += neuron->getFiringRate();
     }
     return sum / static_cast<float>(pImpl->neurons.size());
@@ -128,11 +138,21 @@ float NeuralPopulation::getActivityLevel() const {
     if (pImpl->neurons.empty()) {
         return 0.0f;
     }
-    return static_cast<float>(getActiveCount()) / static_cast<float>(pImpl->neurons.size());
+    float activeCount = 0.0f;
+    for (const auto* neuron : pImpl->neurons) {
+        // Null check for neuron
+        if (!neuron) continue;
+        if (neuron->isFiring() || neuron->getFiringRate() > 0.0f) {
+            ++activeCount;
+        }
+    }
+    return activeCount / static_cast<float>(pImpl->neurons.size());
 }
 
 void NeuralPopulation::initializeRandom(RandomGenerator& rng) {
     for (auto* neuron : pImpl->neurons) {
+        // Null check for neuron
+        if (!neuron) continue;
         neuron->initializeRandom(rng);
     }
 }
