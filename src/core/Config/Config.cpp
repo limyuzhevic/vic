@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -19,40 +20,27 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Cannot open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
+    std::string content((std::istreambuf_iterator<char>(file)),
+                        std::istreambuf_iterator<char>());
+    file.close();
     
-    return true;
+    // Try to parse as JSON first, then fallback to simple key=value format
+    if (parseJSON(content)) {
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        return true;
+    } else if (parseSimpleKeyValue(content)) {
+        NLM_LOG_INFO("Loaded configuration from simple key=value file: " + filepath);
+        return true;
+    } else {
+        NLM_LOG_WARNING("Failed to parse config file: " + filepath + " (tried JSON and simple formats)");
+        return false;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -234,5 +222,181 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// JSON and key-value parsing helper methods
+
+bool Config::parseJSON(const std::string& content) {
+    // Simple JSON parsing implementation
+    // Remove comments
+    std::string cleaned;
+    for (size_t i = 0; i < content.size(); ++i) {
+        if (i + 1 < content.size() && content[i] == '/' && content[i + 1] == '/') {
+            // Skip line comment
+            while (i + 1 < content.size() && content[i] != '\n') {
+                ++i;
+            }
+        } else if (i + 1 < content.size() && content[i] == '/' && content[i + 1] == '*') {
+            // Skip block comment
+            while (i + 1 < content.size() && !(content[i] == '*' && content[i + 1] == '/')) {
+                ++i;
+            }
+            if (i + 1 < content.size()) {
+                i += 2; // Skip */
+            }
+        } else {
+            cleaned += content[i];
+        }
+    }
+    
+    // Parse key-value pairs from JSON
+    // This is a simplified parser - for production use, consider a proper JSON library
+    size_t pos = 0;
+    while (pos < cleaned.size()) {
+        // Find next key (quoted or unquoted)
+        pos = cleaned.find('"', pos);
+        if (pos == std::string::npos) break;
+        
+        size_t keyEnd = cleaned.find('"', pos + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = cleaned.substr(pos + 1, keyEnd - pos - 1);
+        pos = keyEnd + 1;
+        
+        // Skip whitespace and colon
+        while (pos < cleaned.size() && (cleaned[pos] == ' ' || cleaned[pos] == '\t' || cleaned[pos] == ':')) {
+            pos++;
+        }
+        
+        // Find value (could be string, number, boolean, or array)
+        if (pos >= cleaned.size()) break;
+        
+        if (cleaned[pos] == '"') {
+            // String value
+            size_t valueEnd = cleaned.find('"', pos + 1);
+            if (valueEnd == std::string::npos) break;
+            std::string value = cleaned.substr(pos + 1, valueEnd - pos - 1);
+            set(key, value, ConfigSource::File);
+            pos = valueEnd + 1;
+        } else if (cleaned[pos] == '[') {
+            // Array value - simplified parsing
+            size_t arrayEnd = cleaned.find(']', pos);
+            if (arrayEnd == std::string::npos) break;
+            std::string arrayContent = cleaned.substr(pos + 1, arrayEnd - pos - 1);
+            // For now, treat arrays as strings
+            set(key, arrayContent, ConfigSource::File);
+            pos = arrayEnd + 1;
+        } else if (std::isdigit(cleaned[pos]) || cleaned[pos] == '-') {
+            // Number value - simplified parsing
+            size_t valueEnd = pos;
+            while (valueEnd < cleaned.size() && (std::isdigit(cleaned[valueEnd]) || 
+                                                  cleaned[valueEnd] == '.' || 
+                                                  cleaned[valueEnd] == 'e' || 
+                                                  cleaned[valueEnd] == 'E' || 
+                                                  cleaned[valueEnd] == '+' || 
+                                                  cleaned[valueEnd] == '-')) {
+                valueEnd++;
+            }
+            std::string value = cleaned.substr(pos, valueEnd - pos);
+            try {
+                if (value.find('.') != std::string::npos || value.find('e') != std::string::npos || value.find('E') != std::string::npos) {
+                    set(key, std::stod(value), ConfigSource::File);
+                } else {
+                    set(key, std::stoll(value), ConfigSource::File);
+                }
+            } catch (...) {
+                set(key, value, ConfigSource::File);
+            }
+            pos = valueEnd;
+        } else if (cleaned[pos] == 't' || cleaned[pos] == 'f') {
+            // Boolean value
+            size_t valueEnd = pos;
+            while (valueEnd < cleaned.size() && (cleaned[valueEnd] == 't' || cleaned[valueEnd] == 'f' || cleaned[valueEnd] == ' ' || cleaned[valueEnd] == ',' || cleaned[valueEnd] == '}')) {
+                valueEnd++;
+            }
+            std::string value = cleaned.substr(pos, valueEnd - pos);
+            if (value == "true" || value == "True" || value == "TRUE") {
+                set(key, true, ConfigSource::File);
+            } else if (value == "false" || value == "False" || value == "FALSE") {
+                set(key, false, ConfigSource::File);
+            } else {
+                set(key, value, ConfigSource::File);
+            }
+            pos = valueEnd;
+        } else {
+            // Unknown type, treat as string
+            size_t valueEnd = pos;
+            while (valueEnd < cleaned.size() && (cleaned[valueEnd] != ',' && cleaned[valueEnd] != '}')) {
+                valueEnd++;
+            }
+            std::string value = cleaned.substr(pos, valueEnd - pos);
+            set(key, value, ConfigSource::File);
+            pos = valueEnd;
+        }
+        
+        // Skip comma and whitespace
+        while (pos < cleaned.size() && (cleaned[pos] == ',' || cleaned[pos] == ' ' || cleaned[pos] == '\t')) {
+            pos++;
+        }
+    }
+    
+    return !pImpl->entries.empty();
+}
+
+bool Config::parseSimpleKeyValue(const std::string& content) {
+    // Parse simple key=value format
+    std::istringstream stream(content);
+    std::string line;
+    
+    while (std::getline(stream, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/' || line[0] == '{' || line[0] == '}') {
+            continue;
+        }
+        
+        // Parse key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove trailing comma if present
+            if (!value.empty() && value.back() == ',') {
+                value.pop_back();
+            }
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    
+    return !pImpl->entries.empty();
+}
+
+bool Config::validate() const {
+    // Basic validation for the configuration
+    for (const auto& entry : pImpl->entries) {
+        // Check for required keys
+        if (entry.key == "brain.neuron_count") {
+            auto value = get<int>(entry.key);
+            if (value && *value <= 0) {
+                throw std::runtime_error("brain.neuron_count must be positive: " + entry.key);
+            }
+        } else if (entry.key == "brain.synapse_density") {
+            auto value = get<double>(entry.key);
+            if (value && (*value < 0.0 || *value > 1.0)) {
+                throw std::runtime_error("brain.synapse_density must be between 0.0 and 1.0: " + entry.key);
+            }
+        }
+    }
+    
+    return true;
+}
 
 } // namespace nlm

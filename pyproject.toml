@@ -1,21 +1,22 @@
 [build-system]
-requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0", "wheel>=0.37.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework - an experimental artificial developmental brain"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
-    {name = "NLM Authors"}
+    {name = "NLM Authors", email = "contact@nlm-project.org"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "ai", "neuroscience"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,6 +26,10 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
 ]
 
 dependencies = []
@@ -32,13 +37,23 @@ dependencies = []
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-cov>=4.0",
     "numpy>=1.20",
+    "black>=23.0",
+    "flake8>=6.0",
+    "mypy>=1.0",
+    "sphinx>=6.0",
+    "sphinx-rtd-theme>=2.0",
+    "jupyter>=1.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Bug Tracker" = "https://github.com/nlm-project/nlm/issues"
+"Twitter" = "https://twitter.com/nlm_project"
+"Research Papers" = "https://arxiv.org/search/cs?searchtype=author&query=NLM+Project"
 
 [tool.scikit-build]
 # scikit-build-core >= 0.8 renamed minimum-version to version.
@@ -47,15 +62,92 @@ cmake.build-type = "Release"
 cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
+    "-DCMAKE_CXX_EXTENSIONS=OFF",
     "-DPYTHON_EXECUTABLE={python}",
     # Phase 5: without this the root build produces no pynlm module
     # at all (the option is OFF by default for plain C++ builds).
     "-DNLM_BUILD_PYTHON_BINDINGS=ON",
+    "-DCMAKE_POSITION_INDEPENDENT_CODE=ON", # Required for shared libraries
 ]
 
+# Additional build options
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_BUILD_TESTS = OFF
+NLM_BUILD_DOCS = OFF
+NLM_BUILD_EXAMPLES = ON
+NLM_BUILD_BENCHMARKS = ON
 
+# Python-specific build configuration
+[tool.scikit-build.cmake]
+options = {
+    "BUILD_TESTING" = false,
+    "BUILD_DOCS" = false,
+    "BUILD_EXAMPLES" = true,
+    "BUILD_BENCHMARKS" = true,
+}
+
+# Testing configuration
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --cov=pynlm --cov-report=term-missing --cov-report=html"
+
+[tool.coverage.run]
+source = ["pynlm"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == __main__",
+    "if __name__ == '__main__'",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+(/benchmarks
+  /docs
+  /examples
+  /tests
+  /tests/.*
+  /build
+  /dist
+  /\.eggs
+  /\.*venv
+  /\.*env
+)
+'''
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+exclude = [
+    "benchmarks/",
+    "docs/",
+    "examples/",
+    "tests/",
+    ".*/\.*venv/",
+    ".*/\.*env/",
+]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = "3"
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+known_first_party = ["pynlm"]
+known_third_party = ["pybind11", "numpy"]
+sections = ["FUTURE", "STDLIB", "THIRD_PARTY", "FIRST_PARTY", "LOCALFOLDER"]

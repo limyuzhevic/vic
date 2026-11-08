@@ -145,7 +145,7 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON file. Supports both JSON and simple key=value formats.")
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
@@ -166,6 +166,73 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Add convenience methods for common operations
+        .def("getInt", &Config::get<int>, py::arg("key"),
+             "Get an integer value from configuration. Returns None if not found.")
+        .def("getFloat", &Config::get<double>, py::arg("key"),
+             "Get a float value from configuration. Returns None if not found.")
+        .def("getBool", &Config::get<bool>, py::arg("key"),
+             "Get a boolean value from configuration. Returns None if not found.")
+        .def("getString", &Config::get<std::string>, py::arg("key"),
+             "Get a string value from configuration. Returns None if not found.")
+        .def("setInt", [](Config& self, const std::string& key, int value, bool validate) {
+            if (validate) {
+                // Add validation for integer values
+                if (value < 0) {
+                    throw std::runtime_error("Integer value cannot be negative");
+                }
+            }
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), py::arg("validate") = true,
+           "Set an integer value with optional validation")
+        .def("setFloat", [](Config& self, const std::string& key, double value, bool validate) {
+            if (validate) {
+                if (value < 0.0 || value > 1.0) {
+                    throw std::runtime_error("Float value should be between 0.0 and 1.0 for typical use cases");
+                }
+            }
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"), py::arg("validate") = true,
+           "Set a float value with optional validation")
+        .def("setBool", &Config::set<bool>, py::arg("key"), py::arg("value"),
+             "Set a boolean value")
+        .def("setString", &Config::set<std::string>, py::arg("key"), py::arg("value"),
+             "Set a string value")
+        .def("getOrInt", &Config::getOr<int>, py::arg("key"), py::arg("defaultValue"),
+             "Get an integer value with a default fallback")
+        .def("getOrFloat", &Config::getOr<double>, py::arg("key"), py::arg("defaultValue"),
+             "Get a float value with a default fallback")
+        .def("getOrBool", &Config::getOr<bool>, py::arg("key"), py::arg("defaultValue"),
+             "Get a boolean value with a default fallback")
+        .def("getOrString", &Config::getOr<std::string>, py::arg("key"), py::arg("defaultValue"),
+             "Get a string value with a default fallback")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
+        .def("validate", [](Config& self) {
+            // Basic validation method
+            auto keys = self.getKeys();
+            std::vector<std::string> errors;
+            
+            for (const auto& key : keys) {
+                // Add validation logic for specific keys if needed
+                if (key.find("neuron_count") != std::string::npos) {
+                    auto val = self.get<int>(key);
+                    if (val.has_value() && *val <= 0) {
+                        errors.push_back("neuron_count must be positive: " + key);
+                    }
+                }
+            }
+            
+            if (!errors.empty()) {
+                std::string errorMsg = "Configuration validation failed:\n";
+                for (const auto& error : errors) {
+                    errorMsg += "  " + error + "\n";
+                }
+                throw std::runtime_error(errorMsg);
+            }
+            
+            return true;
+        }, "Validate the configuration and throw an error if invalid")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -272,28 +339,85 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
-        .def("reset", &SimpleWorld::reset)
-        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
-        .def("update", &SimpleWorld::update, py::arg("timestep"))
+             py::arg("visionWidth"), py::arg("visionHeight"),
+             "Configure the world with dimensions and sensory limits")
+        .def("reset", &SimpleWorld::reset,
+             "Reset world to initial state")
+        .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"),
+             "Set agent starting position")
+        .def("update", &SimpleWorld::update, py::arg("timestep"),
+             "Update the world by the given timestep")
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+             py::arg("cmd"), py::arg("currentTime"),
+             "Apply a motor command to the world")
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::reference_internal,
+             "Get the current sensory percept (vision, touch, internal signals)")
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
-        .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
-        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
-        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
-        .def("getWidth", &SimpleWorld::getWidth)
-        .def("getHeight", &SimpleWorld::getHeight)
-        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
-        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"))
-        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate)
-        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
-        .def("getSimulationTime", &SimpleWorld::getSimulationTime)
-        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+             py::return_value_policy::reference_internal,
+             "Get the agent's body state")
+        .def("addObject", &SimpleWorld::addObject, py::arg("obj"),
+             "Add a world object (resource, hazard, wall, etc.)")
+        .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"),
+             "Remove a world object at the given position")
+        .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if a position is valid (not inside a wall)")
+        .def("getWidth", &SimpleWorld::getWidth,
+             "Get world width")
+        .def("getHeight", &SimpleWorld::getHeight,
+             "Get world height")
+        .def("getMaxEnergy", &SimpleWorld::getMaxEnergy,
+             "Get maximum energy for the agent")
+        .def("setMaxEnergy", &SimpleWorld::setMaxEnergy, py::arg("e"),
+             "Set maximum energy for the agent")
+        .def("getEnergyDecayRate", &SimpleWorld::getEnergyDecayRate,
+             "Get energy decay rate")
+        .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"),
+             "Set energy decay rate")
+        .def("getSimulationTime", &SimpleWorld::getSimulationTime,
+             "Get current simulation time")
+        .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducible simulations")
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed,
+             "Get the current random seed")
+        // Add convenience methods for common world operations
+        .def("addResource", [](SimpleWorld& self, float x, float y, float value = 1.0f, float radius = 0.5f) {
+            WorldObject obj(x, y, WorldObjectType::Resource, value, radius);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), py::arg("value") = 1.0f, py::arg("radius") = 0.5f,
+           "Add a resource object at the given position")
+        .def("addHazard", [](SimpleWorld& self, float x, float y, float radius = 0.5f) {
+            WorldObject obj(x, y, WorldObjectType::Hazard, 0.0f, radius);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), py::arg("radius") = 0.5f,
+           "Add a hazard object at the given position")
+        .def("addWall", [](SimpleWorld& self, float x, float y, float radius = 0.5f) {
+            WorldObject obj(x, y, WorldObjectType::Wall, 0.0f, radius);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), py::arg("radius") = 0.5f,
+           "Add a wall object at the given position")
+        .def("spawnAgent", [](SimpleWorld& self, float x, float y) {
+            self.setAgentStart(x, y);
+            self.reset();
+        }, py::arg("x"), py::arg("y"),
+           "Spawn the agent at the given position")
+        .def("getResourceAtPosition", [](SimpleWorld& self, float x, float y) {
+            // Note: This requires implementing a method to check for objects at position
+            // For now, return None as a placeholder
+            py::none result;
+            return result;
+        }, py::arg("x"), py::arg("y"),
+           "Get resource value at position (placeholder - requires implementation)")
+        .def("getDistanceToNearestResource", [](SimpleWorld& self, float x, float y) {
+            // Calculate distance to nearest resource
+            float minDistance = std::numeric_limits<float>::max();
+            auto body = self.getAgentBody();
+            
+            // This is a simplified implementation - in practice, you'd iterate through all objects
+            // For now, return a placeholder value
+            return 100.0f; // Placeholder
+        }, py::arg("x"), py::arg("y"),
+           "Get distance to nearest resource (placeholder - requires implementation)");
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -406,28 +530,302 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Add convenience methods for common agent operations
+        .def("runEpisode", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world, 
+                           const std::function<void(int, float, const SensoryPercept&, const ActionResult&)>& callback,
+                           int maxSteps = 1000) {
+            self.initialize(world);
+            for (int step = 0; step < maxSteps; ++step) {
+                auto percept = world->getSensoryPercept();
+                self.processSensoryInput(percept);
+                
+                auto brain = self.getBrain();
+                brain->step(step);
+                
+                auto action = self.decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                // Get reward from internal signals
+                float reward = 0.0f;
+                auto internal = percept.getInternal();
+                if (!internal.empty()) {
+                    reward = internal[0];
+                }
+                
+                ActionResult result(reward, true, "");
+                
+                if (callback) {
+                    callback(step, reward, percept, result);
+                }
+                
+                // Update development if enabled
+                if (self.isDevelopmentEnabled()) {
+                    self.updateDevelopment(0.1f);
+                }
+                
+                world->update(0.1f);
+                
+                if (world->getAgentBody().health <= 0.0f) {
+                    break; // Agent died
+                }
+            }
+            self.reset();
+        }, py::arg("world"), py::arg("callback"), py::arg("maxSteps") = 1000,
+           "Run a complete episode with optional callback for step-by-step monitoring")
+        .def("runEpisodeSimple", [](AgentBrain& self, std::shared_ptr<SimpleWorld> world, int maxSteps = 1000) {
+            self.initialize(world);
+            for (int step = 0; step < maxSteps; ++step) {
+                auto percept = world->getSensoryPercept();
+                self.processSensoryInput(percept);
+                
+                auto brain = self.getBrain();
+                brain->step(step);
+                
+                auto action = self.decodeMotorCommand();
+                world->applyMotorCommand(action, world->getSimulationTime());
+                
+                world->update(0.1f);
+                
+                if (world->getAgentBody().health <= 0.0f) {
+                    break;
+                }
+            }
+            self.reset();
+        }, py::arg("world"), py::arg("maxSteps") = 1000,
+           "Run a complete episode with simple default behavior (no callback)")
+        .def("enableAllSystems", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+        }, "Enable all agent systems (reward modulation, structural plasticity, development, curiosity)")
+        .def("disableAllSystems", [](AgentBrain& self) {
+            self.enableRewardModulation(false);
+            self.enableStructuralPlasticity(false);
+            self.enableDevelopment(false);
+            self.enableCuriosity(false);
+        }, "Disable all agent systems")
+        .def("getSystemStatus", [](const AgentBrain& self) {
+            py::dict status;
+            status["reward_modulation"] = self.isRewardModulationEnabled();
+            status["structural_plasticity"] = self.isStructuralPlasticityEnabled();
+            status["development"] = self.isDevelopmentEnabled();
+            status["curiosity"] = self.isCuriosityEnabled();
+            status["neuromodulation_level"] = self.getNeuromodulationLevel();
+            status["curiosity_level"] = self.getCuriosityLevel();
+            status["novelty_level"] = self.getNoveltyLevel();
+            status["prediction_error"] = self.getPredictionError();
+            status["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return status;
+        }, "Get the current status of all agent systems");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
-
+    }, "Create a default configuration")
+    
+    // Add utility functions for common operations
+    m.def("createDebugConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set up a debug-friendly configuration
+        config->set("brain.neuron_count", 100, ConfigSource::Runtime);
+        config->set("brain.synapse_density", 0.2, ConfigSource::Runtime);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.dopamine.scale", 1.0, ConfigSource::Runtime);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Runtime);
+        
+        return config;
+    }, "Create a debug-friendly configuration")
+    
+    m.def("createDevelopmentConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set up a development-friendly configuration
+        config->set("brain.neuron_count", 500, ConfigSource::Runtime);
+        config->set("brain.synapse_density", 0.15, ConfigSource::Runtime);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.stdp.learning_rate", 0.001, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.structural.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.dopamine.scale", 2.0, ConfigSource::Runtime);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Runtime);
+        config->set("development.enable", true, ConfigSource::Runtime);
+        
+        return config;
+    }, "Create a development-friendly configuration")
+    
+    m.def("createResearchConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        
+        // Set up a research-friendly configuration with many neurons
+        config->set("brain.neuron_count", 2000, ConfigSource::Runtime);
+        config->set("brain.synapse_density", 0.1, ConfigSource::Runtime);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.stdp.learning_rate", 0.0001, ConfigSource::Runtime);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Runtime);
+        config->set("plasticity.structural.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.dopamine.scale", 1.5, ConfigSource::Runtime);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Runtime);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Runtime);
+        config->set("development.enable", true, ConfigSource::Runtime);
+        config->set("memory.enable", true, ConfigSource::Runtime);
+        config->set("prediction.enable", true, ConfigSource::Runtime);
+        config->set("cognition.enable", true, ConfigSource::Runtime);
+        
+        return config;
+    }, "Create a research-friendly configuration")
+    
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
+    }, py::arg("config"), "Create a new brain with configuration")
+    
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
+    }, "Create a new simple world")
+    
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    }, py::arg("brain"), "Create a new agent brain interface")
+    
+    // Add utility functions for common operations
+    m.def("runCompleteSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                     std::shared_ptr<AgentBrain> agent, int steps) {
+        agent->initialize(world);
+        agent->enableAllSystems();
+        
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1f);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Get reward from internal signals
+            float reward = 0.0f;
+            auto internal = percept.getInternal();
+            if (!internal.empty()) {
+                reward = internal[0];
+            }
+            
+            agent->applyRewardModulation(reward, 0.0f);
+            agent->updateDevelopment(0.1f);
+        }
+        
+        agent->reset();
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+       "Run a complete simulation with all systems enabled")
+    
+    m.def("runCompleteSimulationWithCallback", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world,
+                                                 std::shared_ptr<AgentBrain> agent, int steps,
+                                                 std::function<void(int, float, const SensoryPercept&, const ActionResult&)> callback) {
+        agent->initialize(world);
+        agent->enableAllSystems();
+        
+        for (int step = 0; step < steps; ++step) {
+            world->update(0.1f);
+            
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            brain->step(step);
+            
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+            
+            // Get reward from internal signals
+            float reward = 0.0f;
+            auto internal = percept.getInternal();
+            if (!internal.empty()) {
+                reward = internal[0];
+            }
+            
+            ActionResult result(reward, true, "");
+            
+            if (callback) {
+                callback(step, reward, percept, result);
+            }
+            
+            agent->applyRewardModulation(reward, 0.0f);
+            agent->updateDevelopment(0.1f);
+        }
+        
+        agent->reset();
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"), py::arg("callback"),
+       "Run a complete simulation with step-by-step callback")
+    
+    m.def("validateConfiguration", [](const std::shared_ptr<Config>& config) {
+        return config->validate();
+    }, py::arg("config"),
+       "Validate a configuration (returns True if valid, throws exception if invalid)")
+    
+    m.def("createWorldFromConfig", [](const std::shared_ptr<Config>& config) {
+        auto world = std::make_shared<SimpleWorld>();
+        
+        // Extract world parameters from config
+        auto width = config->getOr<int>("world.width", 20);
+        auto height = config->getOr<int>("world.height", 20);
+        auto visionWidth = config->getOr<int>("world.vision_width", 8);
+        auto visionHeight = config->getOr<int>("world.vision_height", 8);
+        
+        world->configure(width.value_or(20), height.value_or(20), 
+                         visionWidth.value_or(8), visionHeight.value_or(8));
+        
+        return world;
+    }, py::arg("config"),
+       "Create a world from configuration parameters")
+    
+    m.def("createBrainFromConfig", [](const std::shared_ptr<Config>& config) {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"),
+       "Create a brain from configuration")
+    
+    m.def("createAgentFromConfig", [](const std::shared_ptr<Config>& config) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return std::make_tuple(brain, agent);
+    }, py::arg("config"),
+       "Create a brain and agent from configuration (returns tuple: (brain, agent))")
+    
+    // Module attributes for debugging and information
+    m.attr("__version__") = "0.1.0";
+    m.attr("__description__") = "NLM (Neural Learning Machine) Python Bindings";
+    
+    m.def("getVersion", []() {
+        return std::string("0.1.0");
+    }, "Get the version of the NLM Python bindings")
+    
+    m.def("printWelcomeMessage", []() {
+        std::cout << R"(
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║     NLM — 熙然                                                ║
+║     Neural Learning Machine                                   ║
+║                                                               ║
+║     Python Bindings (Version 0.1.0)                           ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+Welcome to NLM Python bindings!
+
+This is an experimental artificial developmental brain system.
+
+Quick start:
+1. Create a brain: brain = pynlm.createBrain(pynlm.createDefaultConfig())
+2. Initialize: brain.initialize()
+3. Run simulation: for i in range(100): brain.step(i)
+4. Create agent interface: agent = pynlm.createAgentBrain(brain)
+
+For more help, see: https://github.com/nlm-project/nlm
+        )" << std::endl;
+    }, "Print a welcome message with quick start instructions")
 
 } // namespace nlm
