@@ -12,19 +12,33 @@ class RandomGenerator;
 
 // Neuron state structure for efficient storage
 struct NeuronState {
-    MembranePotential membranePotential;    // Current membrane potential (mV)
-    MembranePotential restingPotential;    // Resting potential (mV)
-    MembranePotential threshold;           // Firing threshold (mV)
-    MembranePotential resetPotential;       // Post-spike reset value (mV)
-    MembranePotential leakConductance;      // Leak conductance (nS)
-    MembranePotential synapseConductance;   // Synaptic conductance (nS)
-    FiringRate firingRate;                 // Current firing rate (Hz)
-    FiringState firingState;               // Current firing state
-    uint32_t refractoryRemaining;          // Steps remaining in refractory period
-    uint32_t refractoryPeriod;             // Total refractory period (steps)
-    float adaptationVariable;              // For spike-frequency adaptation
-    float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
+    // Membrane potential (mV)
+    MembranePotential membranePotential;
+    MembranePotential restingPotential;
+    MembranePotential threshold;
+    MembranePotential resetPotential;
+    MembranePotential leakConductance;
+    MembranePotential synapseConductance;
     
+    // Firing rate (Hz)
+    FiringRate firingRate;
+    
+    // Firing state
+    FiringState firingState;
+    
+    // Refractory period
+    uint32_t refractoryRemaining;  // Steps remaining in refractory period
+    uint32_t refractoryPeriod;     // Total refractory period (steps)
+    
+    // Spike tracking
+    float lastSpikeTime;           // Timestamp of last spike (-1 if none)
+    
+    // Spike-frequency adaptation
+    float adaptationVariable;      // For spike-frequency adaptation
+    
+    // Spike history (recent spikes for STDP)
+    std::vector<Timestamp> spikeHistory;
+
     NeuronState()
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)
@@ -35,18 +49,25 @@ struct NeuronState {
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        // Phase 6: 9 steps, not 5. One action presentation is 10
-        // brain steps, so a 5-step refractory let a neuron fire
-        // twice inside a single burst; 9 steps caps it at about
-        // one spike per presentation, which is the population's
-        // natural burst rhythm anyway. This lowers the reported
-        // rate without changing any drive constant (drive
-        // scaling was tried and reverted: -30% drive silenced
-        // the network entirely, 0 Hz, because this is a
-        // threshold system with no gentle middle ground).
-        , refractoryPeriod(9)
+        , refractoryPeriod(9)  // Phase 6: 9 steps (see comments in original)
         , adaptationVariable(0.0f)
-        , lastSpikeTime(-1.0f) {}
+        , lastSpikeTime(-1.0f)
+    {}
+    
+    // Static initialization helper
+    static NeuronState createDefault() {
+        NeuronState state;
+        // All fields are already initialized in constructor
+        return state;
+    }
+    
+    // Validation helper
+    bool isValid() const {
+        return membranePotential >= -100.0f && membranePotential <= 50.0f &&
+               threshold >= -100.0f && threshold <= 50.0f &&
+               restingPotential >= -100.0f && restingPotential <= 50.0f &&
+               lastSpikeTime == -1.0f || lastSpikeTime >= 0.0f;
+    }
 };
 
 // Neuron class representing a single neuron

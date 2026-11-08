@@ -154,6 +154,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         }
     }
     
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
+    
     // Decay weak traces
     decayWeakTraces();
     
@@ -180,8 +183,9 @@ void NeuralWorkingMemory::runCompetition() {
     
     if (memoryActivations_.empty()) return;
     
-    // Find neurons with above-threshold activation
+    // Find neurons with above-threshold activation - optimized O(n) search
     float threshold = 0.3f;
+    winners_.reserve(memoryNeurons_.size());
     
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         if (memoryActivations_[i] >= threshold) {
@@ -189,11 +193,18 @@ void NeuralWorkingMemory::runCompetition() {
         }
     }
     
+    // Create unordered set for O(1) winner lookup
+    std::unordered_set<NeuronId, uint64_t(*)(NeuronId)> winnerSet(
+        memoryNeurons_.size(),
+        [](NeuronId id) { return id.index(); }
+    );
+    for (const auto& winner : winners_) {
+        winnerSet.insert(winner);
+    }
+    
     // Inhibitory competition - suppress non-winners
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
-        bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
-        
-        if (!isWinner && brain_) {
+        if (!winnerSet.count(memoryNeurons_[i]) && brain_) {
             // Apply strong inhibition
             brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
         }

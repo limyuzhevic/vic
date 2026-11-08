@@ -5,6 +5,7 @@
 namespace nlm {
 
 // Hebbian learning implementation
+// "Neurons that fire together, wire together" - classic Hebbian learning
 class Hebbian : public PlasticityRule {
 public:
     Hebbian();

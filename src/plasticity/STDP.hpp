@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Spike-Timing-Dependent Plasticity
-// PLACEHOLDER - Phase 2 will implement real STDP
+// This is the primary STDP implementation used by Phase 6
 
 class STDP : public PlasticityRule {
 public:
@@ -36,27 +36,55 @@ private:
 };
 
 // Reward-modulated STDP (R-STDP)
-// PLACEHOLDER - Phase 2
+// This is a simpler STDP variant that incorporates reward signals for more adaptive learning
 class RewardModulatedSTDP : public PlasticityRule {
 public:
+    RewardModulatedSTDP();
+    ~RewardModulatedSTDP() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override { return "R-STDP"; }
+    
+    // Reward modulation parameters
+    void setRewardSensitivity(float sensitivity);
+    float getRewardSensitivity() const;
+    void setBaselineLearningRate(float rate);
+    float getBaselineLearningRate() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // Spike-timing dependent plasticity with triplet interactions
-// PLACEHOLDER - Phase 2
+// Models neural dynamics with facilitating and depressing resources
 class TripletSTDP : public PlasticityRule {
 public:
+    TripletSTDP();
+    ~TripletSTDP() override;
+    
     void update(Synapse* synapse,
                  const std::vector<Timestamp>& preSpikes,
                  const std::vector<Timestamp>& postSpikes,
-                 TimestepDuration dt) override {}
-    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override {}
+                 TimestepDuration dt) override;
+    void applyWeightChange(Synapse* synapse, SynapticWeight delta) override;
     const char* getName() const override { return "TripletSTDP"; }
+    
+    // Triplet model parameters
+    void setUAModulation(float modulation);
+    float getUAModulation() const;
+    void setUAMax(float umax);
+    float getUAMax() const;
+    void setFAPMax(float faMax);
+    float getFAPMax() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
