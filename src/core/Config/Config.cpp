@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <yaml-cpp/yaml.h>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -18,41 +20,322 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+class YAMLConfigParser {
+public:
+    bool parse(const std::string& filepath, std::vector<ConfigEntry>& entries) {
+        try {
+            YAML::Node root = YAML::LoadFile(filepath);
+            
+            for (const auto& node : root) {
+                std::string key;
+                if (node.first.IsScalar()) {
+                    key = node.first.as<std::string>();
+                }
+                
+                std::string description;
+                if (key.find("_") != std::string::npos) {
+                    description = key;
+                }
+                
+                ConfigValue value;
+                if (node.second.IsScalar()) {
+                    std::string strValue = node.second.as<std::string>();
+                    
+                    // Try to convert to numeric types
+                    try {
+                        size_t pos;
+                        int intVal = std::stoi(strValue, &pos);
+                        if (pos == strValue.length()) {
+                            value = intVal;
+                        } else {
+                            value = strValue;
+                        }
+                    } catch (...) {
+                        // Try double
+                        try {
+                            size_t pos;
+                            double doubleVal = std::stod(strValue, &pos);
+                            if (pos == strValue.length()) {
+                                value = doubleVal;
+                            } else {
+                                value = strValue;
+                            }
+                        } catch (...) {
+                            // Try boolean
+                            std::string lowerStr = toLower(strValue);
+                            if (lowerStr == "true") {
+                                value = true;
+                            } else if (lowerStr == "false") {
+                                value = false;
+                            } else {
+                                value = strValue;
+                            }
+                        }
+                    }
+                } else if (node.second.IsSequence()) {
+                    // Handle arrays
+                    std::vector<int> intArray;
+                    std::vector<double> doubleArray;
+                    std::vector<std::string> stringArray;
+                    
+                    for (const auto& item : node.second) {
+                        if (item.IsScalar()) {
+                            std::string strVal = item.as<std::string>();
+                            
+                            // Try to parse as int
+                            try {
+                                size_t pos;
+                                int intVal = std::stoi(strVal, &pos);
+                                if (pos == strVal.length()) {
+                                    intArray.push_back(intVal);
+                                    continue;
+                                }
+                            } catch (...) {}
+                            
+                            // Try to parse as double
+                            try {
+                                size_t pos;
+                                double doubleVal = std::stod(strVal, &pos);
+                                if (pos == strVal.length()) {
+                                    doubleArray.push_back(doubleVal);
+                                    continue;
+                                }
+                            } catch (...) {}
+                            
+                            // Fall back to string
+                            stringArray.push_back(strVal);
+                        }
+                    }
+                    
+                    // Prefer int array if all are int
+                    if (!intArray.empty() && doubleArray.empty()) {
+                        value = intArray;
+                    } else if (!doubleArray.empty()) {
+                        value = doubleArray;
+                    } else {
+                        value = stringArray;
+                    }
+                }
+                
+                entries.emplace_back(key, value, ConfigSource::File, description);
+            }
+            
+            return true;
+        } catch (const YAML::Exception& e) {
+            return false;
+        }
+    }
+};
+
+class JSONConfigParser {
+public:
+    bool parse(const std::string& filepath, std::vector<ConfigEntry>& entries) {
+        try {
+            std::ifstream file(filepath);
+            nlohmann::json root = nlohmann::json::parse(file);
+            
+            if (root.is_object()) {
+                for (auto it = root.begin(); it != root.end(); ++it) {
+                    std::string key = it.key();
+                    
+                    std::string description;
+                    if (key.find("_") != std::string::npos) {
+                        description = key;
+                    }
+                    
+                    ConfigValue value;
+                    const auto& jsonValue = *it;
+                    
+                    if (jsonValue.is_scalar()) {
+                        if (jsonValue.is_string()) {
+                            std::string strValue = jsonValue.get<std::string>();
+                            
+                            // Try to convert to numeric types
+                            try {
+                                size_t pos;
+                                int intVal = std::stoi(strValue, &pos);
+                                if (pos == strValue.length()) {
+                                    value = intVal;
+                                } else {
+                                    value = strValue;
+                                }
+                            } catch (...) {
+                                // Try double
+                                try {
+                                    size_t pos;
+                                    double doubleVal = std::stod(strValue, &pos);
+                                    if (pos == strValue.length()) {
+                                        value = doubleVal;
+                                    } else {
+                                        value = strValue;
+                                    }
+                                } catch (...) {
+                                    // Try boolean
+                                    std::string lowerStr = toLower(strValue);
+                                    if (lowerStr == "true") {
+                                        value = true;
+                                    } else if (lowerStr == "false") {
+                                        value = false;
+                                    } else {
+                                        value = strValue;
+                                    }
+                                }
+                            }
+                        } else if (jsonValue.is_number_integer()) {
+                            value = jsonValue.get<int>();
+                        } else if (jsonValue.is_number_float()) {
+                            value = jsonValue.get<double>();
+                        } else if (jsonValue.is_boolean()) {
+                            value = jsonValue.get<bool>();
+                        } else {
+                            value = jsonValue.get<std::string>();
+                        }
+                    } else if (jsonValue.is_array()) {
+                        // Handle arrays
+                        std::vector<int> intArray;
+                        std::vector<double> doubleArray;
+                        std::vector<std::string> stringArray;
+                        
+                        for (const auto& item : jsonValue) {
+                            if (item.is_scalar()) {
+                                std::string strVal;
+                                if (item.is_string()) {
+                                    strVal = item.get<std::string>();
+                                } else if (item.is_number_integer()) {
+                                    strVal = std::to_string(item.get<int>());
+                                } else if (item.is_number_float()) {
+                                    strVal = std::to_string(item.get<double>());
+                                } else if (item.is_boolean()) {
+                                    strVal = item.get<bool>() ? "true" : "false";
+                                }
+                                
+                                // Try to parse as int
+                                try {
+                                    size_t pos;
+                                    int intVal = std::stoi(strVal, &pos);
+                                    if (pos == strVal.length()) {
+                                        intArray.push_back(intVal);
+                                        continue;
+                                    }
+                                } catch (...) {}
+                                
+                                // Try to parse as double
+                                try {
+                                    size_t pos;
+                                    double doubleVal = std::stod(strVal, &pos);
+                                    if (pos == strVal.length()) {
+                                        doubleArray.push_back(doubleVal);
+                                        continue;
+                                    }
+                                } catch (...) {}
+                                
+                                // Fall back to string
+                                stringArray.push_back(strVal);
+                            }
+                        }
+                        
+                        // Prefer int array if all are int
+                        if (!intArray.empty() && doubleArray.empty()) {
+                            value = intArray;
+                        } else if (!doubleArray.empty()) {
+                            value = doubleArray;
+                        } else {
+                            value = stringArray;
+                        }
+                    }
+                    
+                    entries.emplace_back(key, value, ConfigSource::File, description);
+                }
+            }
+            
+            return true;
+        } catch (const nlohmann::json::exception& e) {
+            return false;
+        }
+    }
+};
+
+YAMLConfigParser yamlParser;
+JSONConfigParser jsonParser;
+
+ConfigFormat Config::detectFormat(const std::string& filepath) {
+    std::filesystem::path path(filepath);
+    std::string extension = path.extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
+    
+    if (extension == ".yaml" || extension == ".yml") {
+        return ConfigFormat::YAML;
+    } else if (extension == ".json") {
+        return ConfigFormat::JSON;
+    } else if (extension == ".cfg") {
+        return ConfigFormat::SIMPLE;
+    }
+    
+    // Try to guess based on file content
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return ConfigFormat::SIMPLE;  // Default to simple format if cannot open
+    }
+    
+    char firstChar;
+    if (file >> firstChar) {
+        if (firstChar == '{' || firstChar == '[') {
+            return ConfigFormat::JSON;
+        } else if (firstChar == '#') {
+            return ConfigFormat::SIMPLE;
+        }
+    }
+    
+    return ConfigFormat::SIMPLE;  // Default
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    ConfigFormat format = detectFormat(filepath);
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        switch (format) {
+            case ConfigFormat::YAML:
+                return yamlParser.parse(filepath, pImpl->entries);
+            case ConfigFormat::JSON:
+                return jsonParser.parse(filepath, pImpl->entries);
+            case ConfigFormat::SIMPLE:
+                // Use existing simple parser logic
+                std::string line;
+                while (std::getline(file, line)) {
+                    // Skip empty lines and comments
+                    line = trim(line);
+                    if (line.empty() || line[0] == '#' || line[0] == '/') {
+                        continue;
+                    }
+                    
+                    // Parse simple key=value pairs
+                    size_t pos = line.find('=');
+                    if (pos != std::string::npos) {
+                        std::string key = trim(line.substr(0, pos));
+                        std::string value = trim(line.substr(pos + 1));
+                        
+                        // Remove quotes if present
+                        if (value.size() >= 2 && 
+                            ((value.front() == '"' && value.back() == '"') ||
+                             (value.front() == '\'' && value.back() == '\''))) {
+                            value = value.substr(1, value.size() - 2);
+                        }
+                        
+                        set(key, value, ConfigSource::File);
+                    }
+                }
+                return true;
         }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+    } catch (const std::exception& e) {
+        return false;
     }
     
-    return true;
+    return false;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,9 +367,60 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Saved in YAML format\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << ": ";
+        
+        // Visit the value to write it properly
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                // Format to avoid scientific notation for nice numbers
+                if (std::fmod(arg, 1.0) == 0) {
+                    file << static_cast<int64_t>(arg);
+                } else {
+                    file << arg;
+                }
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[ ";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) file << ", ";
+                    file << arg[i];
+                }
+                file << " ]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[ ";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) file << ", ";
+                    // Format to avoid scientific notation
+                    if (std::fmod(arg[i], 1.0) == 0) {
+                        file << static_cast<int64_t>(arg[i]);
+                    } else {
+                        file << arg[i];
+                    }
+                }
+                file << " ]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[ ";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << " ]";
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;

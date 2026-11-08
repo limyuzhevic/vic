@@ -32,6 +32,13 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration format
+enum class ConfigFormat {
+    SIMPLE,
+    YAML,
+    JSON
+};
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -56,15 +63,18 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+// Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
-    
+
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
-    
+
     // Save to file
     bool saveToFile(const std::string& filepath) const;
-    
+
+    // Save to file with specific format
+    bool saveToFile(const std::string& filepath, ConfigFormat format) const;
+
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>
     std::optional<T> get(const std::string& key) const;
@@ -102,6 +112,7 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static ConfigFormat detectFormat(const std::string& filepath);
 };
 
 } // namespace nlm
