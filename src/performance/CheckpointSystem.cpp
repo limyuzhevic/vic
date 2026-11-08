@@ -401,14 +401,34 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    if (!stream_.is_open()) return false;
+    stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+    return !stream_;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    if (!stream_.is_open()) return false;
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    return !stream_;
+}
+
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    if (!stream_.is_open()) return false;
+    size_t current = static_cast<size_t>(stream_.tellp());
+    size_t padding = (alignment - (current % alignment)) % alignment;
+    if (padding > 0) {
+        std::vector<uint8_t> paddingData(padding, 0);
+        stream_.write(reinterpret_cast<const char*>(paddingData.data()), padding);
+    }
+    return !stream_;
+}
 
 // ---------------- CheckpointManager ----------------
 
 CheckpointManager::CheckpointManager()
-    : saveIntervalSteps_(10000), maxCheckpoints_(10), compress_(true), lastSaveStep_(0) {}
+    : checkpointDir_(), saveIntervalSteps_(10000), maxCheckpoints_(10), compress_(true), lastSaveStep_(0), lastCheckpointPath_()
+    , neuronProvider_(), synapseProvider_() {}
 CheckpointManager::~CheckpointManager() = default;
 
 void CheckpointManager::configure(const std::string& checkpointDir,

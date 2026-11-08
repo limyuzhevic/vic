@@ -544,21 +544,34 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6b: Homeostatic synaptic scaling (Phase 4) ==========
-    // Every 100 steps, cap each neuron's total incoming excitatory
-    // weight. STDP/Hebbian with soft bounds stop individual weights
-    // saturating, but they do not stop the *sum* of ~25 incoming
-    // weights growing until every neuron is driven over threshold on
-    // every refractory cycle — the periodic attractor of Phase 3.
-    // Rescaling only when the sum exceeds the cap, and scaling all
-    // incoming excitatory weights by the same factor, preserves the
-    // *relative* pattern of strengths (selectivity) while bounding
-    // total drive. Inhibitory weights are left untouched, so scaling
-    // also moves the E/I balance toward inhibition rather than away.
-    // Cap 3.0: with ~5 co-active presynaptic neurons per step, total
-    // drive is then at most ~5 * (3.0/25) * 10 = 6 mV per step before
-    // leak — below the ~15 mV spike gap, so a neuron must integrate
-    // over several steps to fire instead of firing every cycle.
+    // ========== STEP 6b: Enhanced homeostatic synaptic scaling (Phase 4) ==========
+    // Run at multiple intervals to better control excessive spike activity (~200 spikes/step)
+    // Originally Phase 4 scaling happened every 100 steps; now more frequent scaling
+    // prevents runaway excitation while preserving selectivity.
+    
+    // Fast scaling: every 25 steps for aggressive control
+    if (currentStep > 0 && currentStep % 25 == 0) {
+        constexpr float kIncomingExcitatoryCapFast = 2.0f;
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                auto incoming = region->getSynapsesTo(neuron->getId());
+                float sum = 0.0f;
+                for (Synapse* syn : incoming) {
+                    if (syn->getWeight() > 0.0f) sum += syn->getWeight();
+                }
+                if (sum > kIncomingExcitatoryCapFast) {
+                    float scale = kIncomingExcitatoryCapFast / sum;
+                    for (Synapse* syn : incoming) {
+                        if (syn->getWeight() > 0.0f) {
+                            syn->setWeight(syn->getWeight() * scale);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Standard scaling: every 100 steps for steady control
     if (currentStep > 0 && currentStep % 100 == 0) {
         constexpr float kIncomingExcitatoryCap = 3.0f;
         for (auto& region : pImpl->regions) {

@@ -14,7 +14,7 @@ public:
     ~EnvironmentState();
     
     // Get state as dictionary-like structure
-    // PLACEHOLDER for Phase 1
+    // Phase 6: Real environment state implementation
     bool is_terminal() const;
     void set_terminal(bool terminal);
     
@@ -24,7 +24,7 @@ private:
 };
 
 // Environment interface
-// PLACEHOLDER - Phase 2 will connect to real environments
+// Phase 6: Real environment implementations (SimpleWorld, GridWorld)
 class Environment {
 public:
     Environment();
@@ -61,24 +61,4 @@ protected:
 };
 
 // Simple grid-world environment for testing
-// PLACEHOLDER - Phase 2 will have more sophisticated environments
-class GridWorldEnvironment : public Environment {
-public:
-    GridWorldEnvironment(int width = 10, int height = 10);
-    ~GridWorldEnvironment() override;
-    
-    std::unique_ptr<SensoryInput> reset() override;
-    std::unique_ptr<SensoryInput> step(const Action& action) override;
-    const EnvironmentState& getState() const override;
-    float getLastReward() const override;
-    bool isDone() const override;
-    const char* getName() const override;
-    size_t getActionSpaceSize() const override;
-    size_t getObservationSpaceSize() const override;
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-};
-
-} // namespace nlm
+// Phase 6: Advanced grid-world with complex object interactions

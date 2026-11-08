@@ -7,7 +7,8 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Phase 6: Implemented real neuromodulation effects
+// Dopamine, Acetylcholine, Norepinephrine, Serotonin are all functional
 
 class Neuromodulator {
 public:
@@ -21,7 +22,7 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Phase 6: Real neuromodulation implemented
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -32,7 +33,8 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Phase 6: Real reward signaling implemented
+// Computes reward prediction error and modulates plasticity accordingly
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();

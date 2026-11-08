@@ -77,11 +77,29 @@ std::vector<std::shared_ptr<Experiment>> ExperimentRunner::runBatch(
     
     for (auto& exp : experiments) {
         // Create fresh brain and environment for each experiment
-        // PLACEHOLDER: In real implementation, would clone from template
-        auto brain = std::make_shared<Brain>(std::const_pointer_cast<Config>(brainTemplate->getConfig()));
-        brain->initialize();
+        // Use checkpoint system for proper cloning
+        std::string tempFile = "./temp_checkpoint_" + std::to_string(exp->getSeed()) + ".bin";
         
-        // Would also create fresh environment here
+        // Save template brain to temporary file
+        bool saveSuccess = brainTemplate->save(tempFile);
+        if (!saveSuccess) {
+            NLM_LOG_ERROR("Failed to save template brain: " + tempFile);
+            return results;
+        }
+        
+        // Create new brain and load from checkpoint
+        auto brain = std::make_shared<Brain>(std::const_pointer_cast<Config>(brainTemplate->getConfig()));
+        bool loadSuccess = brain->load(tempFile);
+        if (!loadSuccess) {
+            NLM_LOG_ERROR("Failed to load brain from checkpoint: " + tempFile);
+            // Clean up temp file
+            std::error_code ec;
+            std::filesystem::remove(tempFile, ec);
+            return results;
+        }
+        
+        // Clean up temp file
+        std::filesystem::remove(tempFile, ec);
         
         if (runExperiment(exp, brain, environmentTemplate, maxSteps)) {
             results.push_back(exp);
