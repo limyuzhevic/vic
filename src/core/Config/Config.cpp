@@ -18,41 +18,8 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
-        }
-        
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
-    }
-    
-    return true;
+bool Config::loadFromString(const std::string& content, ConfigSource source) {
+    return parseConfigFormat(content, source);
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -211,11 +178,278 @@ std::optional<T> Config::get(const std::string& key) const {
     }, it->value);
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+// Internal helpers
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    
+    // Helper functions for parsing
+    bool parseJSONValue(const std::string& str, ConfigValue& value);
+    bool parseYAMLValue(const std::string& str, ConfigValue& value);
+    bool parseSimpleValue(const std::string& str, ConfigValue& value);
+    
+    // Parse both JSON and YAML formats
+    bool parseConfigFormat(const std::string& content, ConfigSource source);
+    
+    // Internal parser implementations
+    bool parseJSON(const std::string& content, ConfigSource source);
+    bool parseYAML(const std::string& content, ConfigSource source);
+    bool parseSimpleFormat(const std::string& content, ConfigSource source);
+
+// Helper functions for parsing
+namespace {
+
+bool isJSON(const std::string& str) {
+    if (str.empty()) return false;
+    char first = str.front();
+    return first == '{' || first == '[';
 }
+
+bool isYAML(const std::string& str) {
+    if (str.empty()) return false;
+    // Simple heuristic: YAML usually has colons and isn't wrapped in brackets
+    return !isJSON(str) && str.find(':') != std::string::npos;
+}
+
+bool parseJSONValue(const std::string& str, ConfigValue& value) {
+    // Remove surrounding quotes for strings
+    std::string trimmed = trim(str);
+    if (trimmed.size() >= 2 && ((trimmed.front() == '"' && trimmed.back() == '"') ||
+                                (trimmed.front() == '\'' && trimmed.back() == '\''))) {
+        value = trimmed.substr(1, trimmed.size() - 2);
+        return true;
+    }
+    
+    // Try to parse as boolean
+    if (trimmed == "true") {
+        value = true;
+        return true;
+    } else if (trimmed == "false") {
+        value = false;
+        return true;
+    }
+    
+    // Try to parse as number
+    try {
+        if (trimmed.find('.') != std::string::npos || trimmed.find('e') != std::string::npos || 
+            trimmed.find('E') != std::string::npos) {
+            size_t pos;
+            float floatVal = std::stof(trimmed, &pos);
+            if (pos == trimmed.size()) {
+                value = floatVal;
+                return true;
+            }
+            double doubleVal = std::stod(trimmed, &pos);
+            if (pos == trimmed.size()) {
+                value = doubleVal;
+                return true;
+            }
+        } else {
+            size_t pos;
+            int intVal = std::stoi(trimmed, &pos);
+            if (pos == trimmed.size()) {
+                value = intVal;
+                return true;
+            }
+            int64_t int64Val = std::stoll(trimmed, &pos);
+            if (pos == trimmed.size()) {
+                value = int64Val;
+                return true;
+            }
+        }
+    } catch (...) {
+    }
+    
+    return false;
+}
+
+bool parseYAMLValue(const std::string& str, ConfigValue& value) {
+    return parseJSONValue(str, value);
+}
+
+bool parseSimpleValue(const std::string& str, ConfigValue& value) {
+    return parseJSONValue(str, value);
+}
+
+bool parseConfigFormat(const std::string& content, ConfigSource source) {
+    if (isJSON(content)) {
+        return parseJSON(content, source);
+    } else if (isYAML(content)) {
+        return parseYAML(content, source);
+    } else {
+        return parseSimpleFormat(content, source);
+    }
+}
+
+bool parseJSON(const std::string& content, ConfigSource source) {
+    // Very simple JSON parser for key=value pairs
+    // Real implementation would use a proper JSON library
+    size_t pos = 0;
+    while (pos < content.size()) {
+        // Find key
+        size_t keyStart = content.find('"', pos);
+        if (keyStart == std::string::npos) {
+            break; // No more keys
+        }
+        
+        size_t keyEnd = content.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) {
+            break;
+        }
+        
+        std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find value (skip whitespace)
+        size_t valuePos = content.find(':', keyEnd);
+        if (valuePos == std::string::npos) {
+            break;
+        }
+        
+        size_t valueStart = content.find_first_not_of(": \t\n\r", valuePos + 1);
+        if (valueStart == std::string::npos) {
+            break;
+        }
+        
+        // Parse value based on first character
+        ConfigValue value;
+        if (content[valueStart] == '"') {
+            size_t valueEnd = content.find('"', valueStart + 1);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+            value = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+            pos = valueEnd + 1;
+        } else if (content[valueStart] == '{') {
+            // Array - simplified parsing
+            size_t valueEnd = content.find('}', valueStart);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+            // For arrays, we'd need to parse individual elements
+            // For now, treat as string
+            value = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+            pos = valueEnd + 1;
+        } else {
+            // Number or boolean - parse until comma or closing brace
+            size_t valueEnd = content.find_first_of(",}", valueStart);
+            if (valueEnd == std::string::npos) {
+                valueEnd = content.size();
+            }
+            std::string valueStr = content.substr(valueStart, valueEnd - valueStart);
+            if (!parseJSONValue(valueStr, value)) {
+                // Try simple parsing
+                if (!parseSimpleValue(valueStr, value)) {
+                    break;
+                }
+            }
+            pos = valueEnd;
+        }
+        
+        set(key, value, source);
+        
+        // Skip to next key
+        pos = content.find_first_not_of(", \t\n\r", pos);
+    }
+    
+    return true;
+}
+
+bool parseYAML(const std::string& content, ConfigSource source) {
+    // Very simple YAML parser for key=value pairs
+    // Real implementation would use a proper YAML library
+    size_t pos = 0;
+    while (pos < content.size()) {
+        // Find key (YAML format: key: value)
+        size_t colonPos = content.find(':', pos);
+        if (colonPos == std::string::npos) {
+            break;
+        }
+        
+        // Find key start (before colon, skip whitespace)
+        size_t keyEnd = content.find_last_not_of(" \t\n\r", colonPos - 1);
+        if (keyEnd == std::string::npos) {
+            break;
+        }
+        
+        size_t keyStart = content.find_last_of(" \t\n\r", keyEnd);
+        if (keyStart == std::string::npos) {
+            keyStart = 0;
+        } else {
+            keyStart++;
+        }
+        
+        std::string key = content.substr(keyStart, keyEnd - keyStart + 1);
+        
+        // Find value start (after colon)
+        size_t valuePos = content.find_first_not_of(": \t\n\r", colonPos + 1);
+        if (valuePos == std::string::npos) {
+            break;
+        }
+        
+        // Parse value based on first character
+        ConfigValue value;
+        if (content[valuePos] == '"') {
+            size_t valueEnd = content.find('"', valuePos + 1);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+            value = content.substr(valuePos + 1, valueEnd - valuePos - 1);
+            pos = valueEnd + 1;
+        } else {
+            // Number or boolean - parse until newline or comment
+            size_t valueEnd = content.find_first_of("\n#", valuePos);
+            if (valueEnd == std::string::npos) {
+                valueEnd = content.size();
+            }
+            std::string valueStr = content.substr(valuePos, valueEnd - valuePos);
+            if (!parseJSONValue(valueStr, value)) {
+                // Try simple parsing
+                if (!parseSimpleValue(valueStr, value)) {
+                    break;
+                }
+            }
+            pos = valueEnd;
+        }
+        
+        set(key, value, source);
+        
+        // Skip to next line
+        pos = content.find_first_not_of("\n\r", pos);
+    }
+    
+    return true;
+}
+
+bool parseSimpleFormat(const std::string& content, ConfigSource source) {
+    // Parse simple key=value format (original format)
+    std::istringstream stream(content);
+    std::string line;
+    while (std::getline(stream, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, source);
+        }
+    }
+    
+    return true;
+}
+
+} // anonymous namespace
+
 
 // Explicit template instantiations
 // (uint64_t and size_t are the same type on this platform, so only one is listed)

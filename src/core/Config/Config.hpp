@@ -59,6 +59,9 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from string (JSON/YAML)
+    bool loadFromString(const std::string& content, ConfigSource source = ConfigSource::File);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     

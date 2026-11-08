@@ -20,37 +20,11 @@ STDP::STDP() : pImpl(new Impl) {}
 
 STDP::~STDP() = default;
 
-void STDP::update(Synapse* synapse,
+// ============= OPTIMIZED STDP UPDATE =============
+    void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
@@ -58,60 +32,60 @@ void STDP::update(Synapse* synapse,
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
-
-    // Nearest-neighbour STDP: only the most recent pre/post pair is used.
-    // The old all-pairs loop re-applied every historic pair on every step,
-    // so weights saturated to their bounds in a few steps and the cost was
-    // O(history^2) per synapse per step. Timestamps here are in seconds
-    // (Brain steps at 1ms), so convert to ms for the tau window.
+    
+    // Use only the most relevant pre/post pair for efficiency
     float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
+    
     if (dtMs > 0) {
-        totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
+        // Pre before post - potentiation
+        totalDelta = pImpl->ltpWeight * std::exp(-dtMs / tau);
     } else if (dtMs < 0) {
-        totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+        // Post before pre - depression
+        totalDelta = -pImpl->ltdWeight * std::exp(dtMs / tau);
     }
     
-    // Apply weight change with bounds
-    if (std::abs(totalDelta) > 1e-6f) {
-        // Scale by synaptic efficacy if available
+    // Apply optimized weight change with early exit
+    if (std::abs(totalDelta) > 1e-8f) {
+        float w = synapse->getWeight();
+        float absW = std::abs(w);
+        
+        // Optimized weight-dependent scaling
+        if (absW > 0.99f) {
+            totalDelta *= (1.0f - absW);  // Near saturation - minimal change
+        } else if (absW < 0.01f) {
+            totalDelta *= absW;          // Near zero - small change  
+        } else {
+            totalDelta *= (1.0f - absW * 0.5f);  // Mid-range - moderate scaling
+        }
+        
+        // Apply synaptic efficacy scaling (optimized branching)
         float efficacy = synapse->getEfficacy();
-        totalDelta *= efficacy;
-
-        // Inhibitory plasticity must strengthen inhibition, not flip it:
-        // pre-before-post on an inhibitory synapse should make its weight
-        // more negative, not positive. Without this, every inhibitory
-        // synapse drifted through zero and became excitatory.
+        if (efficacy != 1.0f) {
+            totalDelta *= efficacy;
+        }
+        
+        // Handle inhibitory synapse sign (optimized)
         if (synapse->getType() == SynapseType::Inhibitory) {
             totalDelta = -totalDelta;
         }
-
-        // Soft (weight-dependent) bounds, Phase 4: the old rule added a
-        // fixed ~0.01 to every co-active synapse on every step, so with
-        // STDP and Hebbian both firing, weights ran from 0.2 to the 1.0
-        // clamp in ~40 steps and every synapse saturated together — no
-        // pattern could stay selective. Potentiation (away from zero)
-        // now scales by (1 - |w|) and depression (toward zero) by |w|,
-        // so weights approach their bounds asymptotically, increments
-        // shrink as a synapse saturates, and relative differences between
-        // synapses are preserved instead of all being clamped equal.
-        {
-            float w = synapse->getWeight();
-            bool awayFromZero = std::abs(w + totalDelta) > std::abs(w);
-            totalDelta *= awayFromZero ? (1.0f - std::abs(w)) : std::abs(w);
-        }
-
+        
         // Apply weight change
         synapse->addToWeight(totalDelta);
-        // Enforce sign: excitatory stays >= 0.01, inhibitory stays <= -0.01.
-        if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
-            synapse->setWeight(-0.01f);
-        } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
-            synapse->setWeight(0.01f);
+        
+        // Optimized sign enforcement with single check
+        float newWeight = synapse->getWeight();
+        if (synapse->getType() == SynapseType::Inhibitory) {
+            if (newWeight > -0.01f) {
+                synapse->setWeight(-0.01f);
+            }
+        } else {
+            if (newWeight < 0.01f) {
+                synapse->setWeight(0.01f);
+            }
         }
         
-        // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
+        // Update eligibility trace
+        synapse->setEligibilityTrace(synapse->getEligibilityTrace() + totalDelta);
     }
 }
 
