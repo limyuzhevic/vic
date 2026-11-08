@@ -95,6 +95,59 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration schema definition for validation
+    struct ConfigSchema {
+        std::string key;
+        std::string description;
+        ConfigSource defaultSource;
+        bool required;
+        std::string type; // "int", "double", "bool", "string", "vector"
+        std::vector<std::pair<std::string, double>> range; // min/max for numeric types
+        std::vector<std::string> allowedValues; // for string types
+        
+        ConfigSchema() : key(), description(), defaultSource(ConfigSource::Default), 
+                       required(false), type("string") {}
+    };
+    
+    // Configuration validation result
+    struct ValidationResult {
+        bool valid;
+        std::string errorMessage;
+        std::vector<std::string> invalidKeys;
+        
+        ValidationResult() : valid(true), errorMessage(""), invalidKeys() {}
+    };
+
+    // Schema management
+    void addSchema(const std::string& key, const std::string& description, 
+                   ConfigSource source, bool required, const std::string& type,
+                   const std::vector<std::pair<std::string, double>>& range = {},
+                   const std::vector<std::string>& allowedValues = {});
+    
+    void removeSchema(const std::string& key);
+    
+    // Validation
+    ValidationResult validate() const;
+    
+    // Schema inspection
+    std::vector<ConfigSchema> getSchema() const;
+    std::optional<ConfigSchema> getSchema(const std::string& key) const;
+    
+    // Get schema information as string
+    std::string getSchemaSummary() const;
+    
+    // Merge configuration with another config (schema-compatible)
+    void merge(const Config& other, bool override = false);
+    
+    // Environment variable integration
+    void loadFromEnvironment(const std::string& prefix = "NLM_");
+    
+    // Copy configuration with schema validation
+    Config copy() const;
+    
+    // Get configuration statistics
+    std::string getStats() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;

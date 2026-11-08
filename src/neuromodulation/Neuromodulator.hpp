@@ -32,7 +32,7 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Real dopamine signaling based on RL theory
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -47,6 +47,22 @@ public:
     // Reward signaling
     void signalReward(float reward);
     void signalRewardPredictionError(float error);
+    
+    // Get prediction error value
+    float getPredictionError() const;
+    
+    // Set dopamine parameters
+    void setBaseline(float baseline);
+    void setPeak(float peak);
+    void setDecayRate(float rate);
+    void setReleaseRate(float rate);
+    
+    // Reset dopamine state
+    void reset();
+    
+    // Get statistics
+    float getAccumulatedReward() const;
+    size_t getHistorySize() const;
     
 private:
     struct Impl;
