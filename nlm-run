@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+
+# NLM Demo Runner Script
+# Comprehensive script to run different NLM demos with various configurations
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NLM_ROOT="$(dirname "$SCRIPT_DIR")"
+BUILD_DIR="${NLM_ROOT}/build"
+
+# Default configuration
+DEMO="nlm"
+CONFIG="configs/default.cfg"
+VERBOSE=false
+PROFILE=false
+PROFILE_OUTPUT="profile_data.csv"
+CUSTOM_ARGS=""
+
+# Usage function
+usage() {
+    cat << EOF
+NLM Demo Runner
+Usage: nlm-run [OPTIONS]
+
+Options:
+  -d, --demo NAME           Run specific demo (nlm, nlm_phase3_demo, nlm_phase4_demo, 
+                           nlm_phase5_demo, nlm_phase6_demo, nlm_phase6_text_demo,
+                           nlm_benchmark)
+  -c, --config FILE         Use custom configuration file
+  -v, --verbose             Enable verbose output
+  -p, --profile             Enable performance profiling
+  -o, --output FILE         Profile output file
+  --                       Additional arguments passed to the demo
+
+Examples:
+  nlm-run                           # Run default NLM demo with default config
+  nlm-run -d nlm_phase6_demo        # Run Phase 6 integration demo
+  nlm-run -d nlm_benchmark -c configs/benchmark.cfg
+  nlm-run -v -p                     # Run verbose with profiling
+  nlm-run -- --neuron-count 2000   # Pass additional args to demo
+
+Available Demos:
+  nlm               Phase 2: Basic neural computation with plasticity tests
+  nlm_phase3_demo   Phase 3: World interaction and reward learning
+  nlm_phase4_demo   Phase 4: Memory and cognition integration
+  nlm_phase5_demo   Phase 5: Performance optimizations and advanced features
+  nlm_phase6_demo   Phase 6: Full brain integration (default integration test)
+  nlm_phase6_text_demo Phase 6 text demo with language processing
+  nlm_benchmark     Performance benchmark suite
+
+Configuration Files:
+  configs/default.cfg      Standard configuration
+  configs/benchmark.cfg    Optimized for benchmarking
+  configs/debug.cfg        Debug configuration with verbose output
+  configs/integration.cfg  Integration test configuration
+
+Environment Variables:
+  NLM_BUILD_DIR          Path to build directory (default: $BUILD_DIR)
+  NLM_VERBOSE           Enable verbose output (true/false)
+  NLM_CONFIG            Default config file (default: $CONFIG)
+
+EOF
+}
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -d|--demo)
+            DEMO="$2"
+            shift 2
+            ;;
+        -c|--config)
+            CONFIG="$2"
+            shift 2
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        -p|--profile)
+            PROFILE=true
+            shift
+            ;;
+        -o|--output)
+            PROFILE_OUTPUT="$2"
+            shift 2
+            ;;
+        --)
+            shift
+            CUSTOM_ARGS="$@"
+            break
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+# Check if build directory exists
+if [[ ! -d "$BUILD_DIR" ]]; then
+    echo "Build directory not found: $BUILD_DIR"
+    echo "Please run: mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release"
+    exit 1
+fi
+
+# Check if demo executable exists
+DEMO_PATH="${BUILD_DIR}/${DEMO}"
+if [[ ! -x "$DEMO_PATH" ]]; then
+    echo "Demo executable not found: $DEMO_PATH"
+    exit 1
+fi
+
+# Check if config file exists
+if [[ ! -f "$CONFIG" ]]; then
+    echo "Config file not found: $CONFIG"
+    exit 1
+fi
+
+# Build command
+echo "Running NLM demo: $DEMO"
+echo "Config file: $CONFIG"
+
+echo "=== Execution Command ==="
+echo "$DEMO_PATH --config $CONFIG"
+if [[ "$VERBOSE" == true ]]; then
+    echo "Verbosity: enabled"
+fi
+if [[ "$PROFILE" == true ]]; then
+    echo "Profiling: enabled"
+fi
+
+echo "========================="
+
+# Set up profiling if requested
+if [[ "$PROFILE" == true ]]; then
+    echo "Starting profiling..."
+    START_TIME=$(date +%s.%N)
+fi
+
+# Run the demo with timing and profiling
+if [[ "$PROFILE" == true ]]; then
+    ${DEMO_PATH} --config "$CONFIG" $CUSTOM_ARGS
+    END_TIME=$(date +%s.%N)
+    TOTAL_TIME=$(echo "$END_TIME - $START_TIME" | bc)
+    
+    # Record timing information
+    echo "$DEMO,$CONFIG,$TOTAL_TIME" >> "$PROFILE_OUTPUT"
+    
+    echo "=== Profile Results ==="
+    echo "Total execution time: ${TOTAL_TIME} seconds"
+    echo "Profile data appended to: $PROFILE_OUTPUT"
+else
+    ${DEMO_PATH} --config "$CONFIG" $CUSTOM_ARGS
+fi
+
+# Set exit code
+echo "Demo completed with exit code: $?"
+exit $?
