@@ -132,48 +132,64 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Error handling test executable
+add_executable(error_handling_test
+    src/error_handling_test.cpp
+)
+target_link_libraries(error_handling_test PUBLIC nlm_core)
+
+# Configuration validation test executable
+add_executable(config_validation_test
+    src/config_validation_test.cpp
+)
+target_link_libraries(config_validation_test PUBLIC nlm_core)
+
+# Dependency injection demonstration executable
+add_executable(dependency_demo
+    src/dependency_demo.cpp
+)
+target_link_libraries(dependency_demo PUBLIC nlm_core nlm_agent nlm_world)
+
+# Main unified demo executable (replaces individual phase demos)
 add_executable(nlm
-    src/main.cpp
+    src/demo.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
+# Legacy demo executables (for backward compatibility - will be deprecated)
+# These are kept for now but point to the unified demo
+add_executable(nlm_phase3_demo_legacy
+    src/demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
-
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
+target_link_libraries(nlm_phase3_demo_legacy PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+add_custom_command(TARGET nlm_phase3_demo_legacy POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "WARNING: nlm_phase3_demo_legacy is deprecated. Use 'nlm 3' instead."
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Phase 5 demo executable (Phase 5, added here: pattern probe,
-# sandbox run, and checkpoint round-trip for the brain-personality
-# step — previously Phase 5 was library-only with no demo).
-add_executable(nlm_phase5_demo
-    src/experiments/Phase5Demo.cpp
+add_executable(nlm_phase4_demo_legacy
+    src/demo.cpp
 )
-target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
-
-# Phase 6 demo executable
-add_executable(nlm_phase6_demo
-    src/experiments/Phase6Demo.cpp
+target_link_libraries(nlm_phase4_demo_legacy PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+add_custom_command(TARGET nlm_phase4_demo_legacy POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "WARNING: nlm_phase4_demo_legacy is deprecated. Use 'nlm 4' instead."
 )
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
-# Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
-# association probe, concept/social probes, and a sandbox run with
-# a teacher, planner overrides, and a checkpoint round-trip. The old
-# nlm_phase6_demo integration demo is left unchanged.
-add_executable(nlm_phase6_text_demo
-    src/experiments/Phase6TextDemo.cpp
+add_executable(nlm_phase5_demo_legacy
+    src/demo.cpp
 )
-target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+target_link_libraries(nlm_phase5_demo_legacy PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+add_custom_command(TARGET nlm_phase5_demo_legacy POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "WARNING: nlm_phase5_demo_legacy is deprecated. Use 'nlm 5' instead."
+)
 
-# Benchmark executable
+add_executable(nlm_phase6_demo_legacy
+    src/demo.cpp
+)
+target_link_libraries(nlm_phase6_demo_legacy PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6)
+add_custom_command(TARGET nlm_phase6_demo_legacy POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "WARNING: nlm_phase6_demo_legacy is deprecated. Use 'nlm 6' instead."
+)
+
 add_executable(nlm_benchmark
     src/benchmark.cpp
 )
@@ -206,8 +222,22 @@ enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_benchmark
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# Legacy demo executables for backward compatibility
+install(TARGETS nlm_phase3_demo_legacy
+    RUNTIME DESTINATION bin
+)
+install(TARGETS nlm_phase4_demo_legacy
+    RUNTIME DESTINATION bin
+)
+install(TARGETS nlm_phase5_demo_legacy
+    RUNTIME DESTINATION bin
+)
+install(TARGETS nlm_phase6_demo_legacy
     RUNTIME DESTINATION bin
 )
