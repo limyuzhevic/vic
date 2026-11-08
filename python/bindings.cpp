@@ -29,6 +29,9 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
+    // === Basic Type Bindings ===
+
+    // Neuron identifier
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -41,6 +44,7 @@ PYBIND11_MODULE(pynlm, m) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
         });
 
+    // Synapse identifier
     py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -53,6 +57,7 @@ PYBIND11_MODULE(pynlm, m) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
         });
 
+    // Region identifier
     py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -65,6 +70,7 @@ PYBIND11_MODULE(pynlm, m) {
             return "<RegionId: " + std::to_string(id.value) + ">";
         });
 
+    // Population identifier
     py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
@@ -72,6 +78,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
         .def("__ne__", &PopulationId::operator!=);
+
+    // === Enum Bindings ===
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -142,20 +150,19 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // === Configuration Class ===
+
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
             argv.reserve(args.size());
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+             "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -168,7 +175,45 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Python-friendly configuration methods
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::Default);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (string)")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, ConfigSource::Default);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (int)")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::Default);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (float)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::Default);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (double)")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, ConfigSource::Default);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (bool)")
+        .def("set", [](Config& self, const std::string& key, const char* value) {
+            self.set(key, std::string(value), ConfigSource::Default);
+        }, py::arg("key"), py::arg("value"),
+             "Set configuration value (const char*)")
+        // Python-style getters
+        .def("getString", &Config::getOr<std::string>, py::arg("key"), py::arg("default") = "",
+             "Get configuration value as string")
+        .def("getInt", &Config::getOr<int64_t>, py::arg("key"), py::arg("default") = 0,
+             "Get configuration value as int")
+        .def("getFloat", &Config::getOr<float>, py::arg("key"), py::arg("default") = 0.0f,
+             "Get configuration value as float")
+        .def("getDouble", &Config::getOr<double>, py::arg("key"), py::arg("default") = 0.0,
+             "Get configuration value as double")
+        .def("getBool", &Config::getOr<bool>, py::arg("key"), py::arg("default") = false,
+             "Get configuration value as bool");
+
+    // === Sensory Input Classes ===
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -203,6 +248,26 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
         .def("clearSignals", &InternalSignals::clearSignals);
+
+    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
+        .def(py::init<>())
+        .def("getVision", &SensoryPercept::getVision)
+        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
+        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
+        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
+        .def("getTouch", &SensoryPercept::getTouch)
+        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
+        .def("getInternal", &SensoryPercept::getInternal)
+        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
+        .def("getProprioception", &SensoryPercept::getProprioception)
+        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
+        .def("getAudio", &SensoryPercept::getAudio)
+        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
+        .def("getAllSignals", &SensoryPercept::getAllSignals)
+        .def("getTimestamp", &SensoryPercept::getTimestamp)
+        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+
+    // === Action and World Classes ===
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -251,23 +316,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("success", &ActionResult::success)
         .def_readwrite("message", &ActionResult::message);
 
-    py::class_<SensoryPercept>(m, "SensoryPercept", R"pbdoc(Sensory percept data)pbdoc")
-        .def(py::init<>())
-        .def("getVision", &SensoryPercept::getVision)
-        .def("setVision", &SensoryPercept::setVision, py::arg("vision"))
-        .def("getVisionWidth", &SensoryPercept::getVisionWidth)
-        .def("getVisionHeight", &SensoryPercept::getVisionHeight)
-        .def("getTouch", &SensoryPercept::getTouch)
-        .def("setTouch", &SensoryPercept::setTouch, py::arg("touch"))
-        .def("getInternal", &SensoryPercept::getInternal)
-        .def("setInternal", &SensoryPercept::setInternal, py::arg("internal"))
-        .def("getProprioception", &SensoryPercept::getProprioception)
-        .def("setProprioception", &SensoryPercept::setProprioception, py::arg("proprioception"))
-        .def("getAudio", &SensoryPercept::getAudio)
-        .def("setAudio", &SensoryPercept::setAudio, py::arg("audio"))
-        .def("getAllSignals", &SensoryPercept::getAllSignals)
-        .def("getTimestamp", &SensoryPercept::getTimestamp)
-        .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
+    // === Simple World ===
 
     py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
@@ -294,6 +343,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+
+    // === Brain Class ===
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -324,7 +375,6 @@ PYBIND11_MODULE(pynlm, m) {
              "Load brain state from file")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
-        // getRegion is const/non-const overloaded; bind the mutable one.
         .def("getRegion", static_cast<NeuralRegion* (Brain::*)(RegionId)>(&Brain::getRegion),
              py::arg("id"),
              py::return_value_policy::reference_internal,
@@ -361,6 +411,8 @@ PYBIND11_MODULE(pynlm, m) {
         .def("logStatus", &Brain::logStatus,
              "Log brain status");
 
+    // === AgentBrain Class ===
+
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
@@ -374,6 +426,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
+        .def("getMotorGroupActivities", &AgentBrain::getMotorGroupActivities,
+             "Get activity of all motor neuron groups for diagnostics")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
@@ -382,6 +436,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Update development system")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
+        .def("getThoughtTrace", &AgentBrain::getThoughtTrace,
+             "Get thought trace (last perceived scene, planned action, and outcome)")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
              "Get current neuromodulation level")
         .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
@@ -390,11 +446,17 @@ PYBIND11_MODULE(pynlm, m) {
              "Get novelty level")
         .def("getPredictionError", &AgentBrain::getPredictionError,
              "Get prediction error")
+        .def("getLearnedPreference", &AgentBrain::getLearnedPreference,
+             "Get learned preference trait (survives checkpoint reload)")
         .def("reset", &AgentBrain::reset,
              "Reset agent for new episode")
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        // Convenience methods for enabling brain systems
+        .def("enableAll", &AgentBrain::enableRewardModulation,
+             py::arg("rewardEnable"),
+             "Enable all major brain systems at once (reward modulation, curiosity, development, structural plasticity)")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
@@ -406,7 +468,44 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        // Phase 6: Text and social learning methods
+        .def("encodeText", &AgentBrain::encodeText,
+             py::arg("text"),
+             "Encode text into neural pattern for text association learning")
+        .def("getInternalFiringRates", &AgentBrain::getInternalFiringRates,
+             "Get internal neuron firing rates (for recall probe)")
+        .def("getConceptCount", &AgentBrain::getConceptCount,
+             "Get number of learned concepts")
+        .def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence,
+             "Get self-model confidence")
+        .def("getSocialObservationCount", &AgentBrain::getSocialObservationCount,
+             "Get number of social observations")
+        .def("observeOtherAgent", &AgentBrain::observeOtherAgent,
+             py::arg("observed"), py::arg("beforeVision"), py::arg("afterVision"),
+             "Observe another agent's actions for social learning")
+        // Diagnostic counters
+        .def("getPlannerOverrideCount", &AgentBrain::getPlannerOverrideCount,
+             "Get number of planner overrides")
+        .def("getPlannerAgreementCount", &AgentBrain::getPlannerAgreementCount,
+             "Get number of planner agreements")
+        .def("getPlannerDecisionCount", &AgentBrain::getPlannerDecisionCount,
+             "Get number of planner decisions")
+        .def("getConceptBiasCount", &AgentBrain::getConceptBiasCount,
+             "Get number of concept biases")
+        .def("getSelfBiasCount", &AgentBrain::getSelfBiasCount,
+             "Get number of self biases")
+        .def("getSocialBiasCount", &AgentBrain::getSocialBiasCount,
+             "Get number of social biases")
+        // Phase 5: Diagnostic counters
+        .def("getReflexBonusCount", &AgentBrain::getReflexBonusCount,
+             "Get number of vision-gated reflex bonuses")
+        .def("getReflexSuppressCount", &AgentBrain::getReflexSuppressCount,
+             "Get number of hazard suppressions")
+        .def("getWtaPulseCount", &AgentBrain::getWtaPulseCount,
+             "Get number of winner-take-all pulses");
+
+    // === Module-level Functions ===
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
