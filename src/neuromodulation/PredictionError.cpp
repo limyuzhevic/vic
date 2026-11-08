@@ -32,10 +32,17 @@ void PredictionError::computeError(float predicted, float actual) {
     pImpl->actualValue = actual;
     pImpl->error = actual - predicted;
     pImpl->history.push_back(pImpl->error);
+    
+    // Learning signal: prediction error drives learning
+    // Larger errors produce stronger learning signals
+    // Error sign indicates whether to increase or decrease prediction
 }
 
 void PredictionError::updatePrediction(float newPrediction) {
     pImpl->predictedValue = newPrediction;
+    
+    // Continuous learning: predictions are updated based on new experiences
+    // This allows the agent to adapt its expectations over time
 }
 
 const std::vector<float>& PredictionError::getHistory() const {

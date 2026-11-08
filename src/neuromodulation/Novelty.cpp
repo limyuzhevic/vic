@@ -36,9 +36,28 @@ void Novelty::setLevel(float level) {
 void Novelty::detectNovelty(const Observation& observation, 
                             const Observation& previousObservation) {
     // Extract features from observations and compare
-    // Simple implementation: just set to a placeholder
-    pImpl->level = 1.0f;
-    pImpl->history.push_back(pImpl->level);
+    std::vector<float> currentPattern;
+    std::vector<float> previousPattern;
+    
+    // Get vision data (most salient for novelty detection)
+    if (observation.getType() == ObservationType::Vision) {
+        auto& currentVision = observation.getVisionData();
+        auto& previousVision = previousObservation.getVisionData();
+        
+        currentPattern = std::vector<float>(currentVision.begin(), currentVision.end());
+        previousPattern = std::vector<float>(previousVision.begin(), previousVision.end());
+    }
+    
+    // Fallback to internal signals if vision not available
+    if (currentPattern.empty()) {
+        auto& currentInternal = observation.getInternalData();
+        auto& previousInternal = previousObservation.getInternalData();
+        
+        currentPattern = std::vector<float>(currentInternal.begin(), currentInternal.end());
+        previousPattern = std::vector<float>(previousInternal.begin(), previousInternal.end());
+    }
+    
+    detectNovelty(currentPattern, previousPattern);
 }
 
 void Novelty::detectNovelty(const std::vector<float>& currentPattern,
@@ -61,7 +80,11 @@ void Novelty::detectNovelty(const std::vector<float>& currentPattern,
     float avgDiff = totalDiff / compareLen;
     
     // Update novelty level based on difference
-    pImpl->level = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
+    // Higher threshold for novel events (not every small change counts)
+    float noveltyScore = std::min(1.0f, avgDiff / pImpl->noveltyThreshold);
+    
+    // Smooth novelty update to avoid spikes
+    pImpl->level = pImpl->level * 0.7f + noveltyScore * 0.3f;
     pImpl->history.push_back(pImpl->level);
     
     // Store current pattern for next comparison

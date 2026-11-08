@@ -890,6 +890,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     thoughtReward_ = reward;
     hasThoughtOutcome_ = true;
+    
     // Phase 6 concept formation, wired into the loop: the pattern
     // that led to this action, paired with this action's reward.
     // Concepts therefore emerge from experienced pattern/reward
@@ -906,6 +907,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
         }
     }
+    
     // Phase 5 learning for the thought/preference systems, from the
     // same reward the synaptic modulation below uses:
     //  - Planner action quality: EMA toward reward/10 for the action
@@ -942,8 +944,36 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Update expected reward (exponential moving average)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
-    // Dopamine-like signal (based on prediction error)
-    dopamineLevel_ = predictionError_;
+    // Use real neuromodulator systems for reward signaling
+    if (brain_->getDopamine()) {
+        // Signal reward and prediction error to dopamine system
+        brain_->getDopamine()->signalReward(reward);
+        brain_->getDopamine()->signalRewardPredictionError(predictionError_);
+        
+        // Update agent dopamine level from neuromodulator
+        dopamineLevel_ = brain_->getDopamine()->getLevel();
+    }
+    
+    // Update prediction error system
+    if (brain_->getPredictionErrorSignal()) {
+        brain_->getPredictionErrorSignal()->computeError(expectedReward_, reward);
+    }
+    
+    // Update novelty and curiosity systems
+    if (brain_->getNovelty()) {
+        // Novelty is updated separately based on sensory patterns
+        // For now, set based on prediction error magnitude
+        brain_->getNovelty()->setLevel(std::abs(predictionError_) * 0.1f);
+        noveltyLevel_ = brain_->getNovelty()->getLevel();
+    }
+    
+    if (brain_->getCuriosity()) {
+        // Update curiosity based on novelty and prediction error
+        float novelty = noveltyLevel_;
+        float error = std::abs(predictionError_);
+        brain_->getCuriosity()->update(novelty, error, 0.001f);
+        curiosityLevel_ = brain_->getCuriosity()->getLevel();
+    }
     
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
@@ -973,16 +1003,24 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
+    // Apply plasticity modulation from neuromodulators
+    // Dopamine modulates both STDP and Hebbian plasticity
     float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
-    // Apply to STDP
+    // Apply to STDP using neuromodulator system
     auto* stdp = brain_->getSTDP();
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+    
+    // Also modulate Hebbian plasticity based on dopamine
+    auto* hebbian = brain_->getHebbian();
+    if (hebbian) {
+        // Hebbian learning: stronger dopamine enhances co-activation learning
+        float hebbianFactor = 0.5f + 0.5f * dopamineLevel_;
+        hebbian->setLearningRate(hebbianFactor * 0.02f);
     }
 }
 

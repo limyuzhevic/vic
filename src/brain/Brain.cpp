@@ -579,6 +579,173 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
+    
+    // ========== STEP 6c: Enhanced homeostatic regulation ==========
+    // Additional regulation to control excessive spiking (~200 spikes/step)
+    // Implement adaptive firing threshold adjustment based on recent activity
+    
+    if (currentStep > 100) {
+        // Compute average firing rate across all neurons
+        size_t activeCount = 0;
+        size_t totalNeurons = 0;
+        for (auto& region : pImpl->regions) {
+            totalNeurons += region->getTotalNeuronCount();
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron->isFiring() || 
+                    std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f) {
+                    activeCount++;
+                }
+            }
+        }
+        
+        if (totalNeurons > 0) {
+            float firingRate = static_cast<float>(activeCount) / static_cast<float>(totalNeurons);
+            
+            // If firing rate is too high, adjust excitability globally
+            if (firingRate > 0.3f) {  // 30% of neurons firing is too high for stable behavior
+                float excessFiring = (firingRate - 0.3f) / 0.3f;  // How much over threshold
+                excessFiring = std::min(1.0f, excessFiring);  // Cap at 100% excess
+                
+                float excitabilityReduction = 0.2f * excessFiring;  // Reduce excitability by up to 20%
+                
+                // Apply excitability reduction to all neurons
+                // This is similar to dopamine but more conservative
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            // Reduce effective excitability by decreasing input sensitivity
+                            // This is implemented by temporarily reducing the leak conductance
+                            // and making the neuron less responsive to inputs
+                            if (excitabilityReduction > 0.0f) {
+                                // Increase leak conductance to make neuron less excitable
+                                float currentLeak = neuron->getState().leakConductance;
+                                neuron->setLeakConductance(currentLeak * (1.0f - excitabilityReduction));
+                            }
+                        }
+                    }
+                }
+                
+                // Also reduce overall neural excitability through global mechanisms
+                if (pImpl->dopamine) {
+                    // Apply additional inhibitory dopamine signal
+                    float currentDA = pImpl->dopamine->getLevel();
+                    pImpl->dopamine->setLevel(std::max(0.0f, currentDA - excitabilityReduction * 0.5f));
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 6d: Activity-dependent inhibition ==========
+    // Implement activity-dependent inhibitory feedback based on population firing rates
+    
+    // Calculate population firing rates for different neuron types
+    size_t sensoryFiring = 0;
+    size_t internalFiring = 0;
+    size_t inhibitoryFiring = 0;
+    size_t motorFiring = 0;
+    
+    size_t sensoryCount = 0, internalCount = 0, inhibitoryCount = 0, motorCount = 0;
+    
+    for (auto& region : pImpl->regions) {
+        for (auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                bool isFiring = neuron->isFiring() || 
+                               std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential) > 5.0f;
+                
+                switch (pop->getNeuronType()) {
+                    case NeuronType::Sensory:
+                        sensoryCount++;
+                        if (isFiring) sensoryFiring++;
+                        break;
+                    case NeuronType::Internal:
+                        internalCount++;
+                        if (isFiring) internalFiring++;
+                        break;
+                    case NeuronType::Inhibitory:
+                        inhibitoryCount++;
+                        if (isFiring) inhibitoryFiring++;
+                        break;
+                    case NeuronType::Motor:
+                        motorCount++;
+                        if (isFiring) motorFiring++;
+                        break;
+                }
+            }
+        }
+    }
+    
+    // Apply inhibition based on excessive firing in specific populations
+    if (sensoryCount > 0 && static_cast<float>(sensoryFiring) / sensoryCount > 0.5f) {
+        // Excessive sensory neuron firing -> apply global inhibition
+        float inhibitionStrength = 0.15f * (static_cast<float>(sensoryFiring) / sensoryCount - 0.5f) / 0.5f;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Apply inhibitory current based on population firing rate
+                    if (inhibitionStrength > 0.0f) {
+                        // This is implemented through the neuron's input injection
+                        // Negative current acts as inhibition
+                        neuron->injectCurrent(-inhibitionStrength * 5.0f);
+                    }
+                }
+            }
+        }
+    }
+    
+    if (motorCount > 0 && static_cast<float>(motorFiring) / motorCount > 0.5f) {
+        // Excessive motor neuron firing -> apply calming inhibition
+        float inhibitionStrength = 0.1f * (static_cast<float>(motorFiring) / motorCount - 0.5f) / 0.5f;
+        
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    if (inhibitionStrength > 0.0f) {
+                        neuron->injectCurrent(-inhibitionStrength * 3.0f);
+                    }
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 6e: Development-based firing regulation ==========
+    // Adjust firing thresholds based on developmental stage
+    // Younger brains (higher plasticity) have different firing characteristics
+    
+    if (currentStep % 1000 == 0 && pImpl->developmentSystem) {
+        DevelopmentalStage stage = pImpl->developmentalStage;
+        
+        // Adjust neuron parameters based on developmental stage
+        float stageMod = 1.0f;
+        switch (stage) {
+            case DevelopmentalStage::Initial:
+                stageMod = 1.2f;  // Higher excitability in early development
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                stageMod = 1.0f;  // Normal excitability
+                break;
+            case DevelopmentalStage::Maturation:
+                stageMod = 0.9f;  // Slightly reduced excitability
+                break;
+            case DevelopmentalStage::Adult:
+                stageMod = 0.8f;  // Reduced excitability in adulthood
+                break;
+            case DevelopmentalStage::Aging:
+                stageMod = 0.7f;  // Further reduced excitability in aging
+                break;
+        }
+        
+        // Apply stage-based adjustments to neuron excitability
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Adjust excitability based on developmental stage
+                    float currentLeak = neuron->getState().leakConductance;
+                    neuron->setLeakConductance(currentLeak * stageMod);
+                }
+            }
+        }
+    }
 
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;

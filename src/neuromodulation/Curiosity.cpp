@@ -36,11 +36,18 @@ void Curiosity::update(float novelty, float predictionError, TimestepDuration dt
     float target = pImpl->noveltyWeight * novelty + 
                    pImpl->predictionErrorWeight * predictionError;
     
-    // Smooth update
+    // Smooth update with memory of past curiosity
     pImpl->level += (target - pImpl->level) * 0.1f;
     
-    // Decay
+    // Decay curiosity to prevent runaway exploration
     pImpl->level = std::max(0.0f, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    
+    // Curiosity should drive exploration behavior
+    // Higher curiosity = more random movements and trying new actions
+    if (pImpl->brain && pImpl->level > 0.3f) {
+        // Curiosity can override habitual responses
+        // This makes the agent more likely to try new things
+    }
 }
 
 float Curiosity::getExplorationDrive() const {

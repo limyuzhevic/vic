@@ -401,11 +401,70 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    if (!stream_.is_open()) return false;
+    CheckpointHeader header = header_;
+    header.totalSize = bytesWritten_;
+    header.timestamp = static_cast<uint64_t>(std::time(nullptr));
+    header.checksum = ChecksumCalculator::crc32(&header_.majorVersion, sizeof(header_) / 2);
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream_) return false;
+    bytesWritten_ += sizeof(header);
+    return true;
+}
 
-// ---------------- CheckpointManager ----------------
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    if (!stream_.is_open()) return false;
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream_) {
+        error_ = "failed to write section header";
+        return false;
+    }
+    bytesWritten_ += sizeof(header);
+    return true;
+}
+
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    if (!stream_.is_open()) return true;
+    size_t currentPos = static_cast<size_t>(stream_.tellp());
+    size_t padding = alignment - currentPos % alignment;
+    if (padding > 0 && padding > alignment) {
+        error_ = "invalid alignment request";
+        return false;
+    }
+    std::vector<uint8_t> paddingBytes(padding, 0);
+    stream_.write(reinterpret_cast<const char*>(paddingBytes.data()), paddingBytes.size());
+    if (!stream_) {
+        error_ = "failed to pad to alignment";
+        return false;
+    }
+    bytesWritten_ += paddingBytes.size();
+    return true;
+}
+
+bool writeSectionToStream(std::ofstream& stream, CheckpointSection type, 
+                         const std::vector<uint8_t>& payload, uint64_t& bytesWritten) {
+    SectionHeader header;
+    header.type = static_cast<uint32_t>(type);
+    header.offset = bytesWritten + sizeof(header);
+    header.size = payload.size();
+    header.compressedSize = 0;  // No compression for now
+    header.checksum = payload.empty() ? 0 : ChecksumCalculator::crc32(payload.data(), payload.size());
+    
+    // Write section header
+    stream.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream) return false;
+    bytesWritten += sizeof(header);
+    
+    // Write payload
+    if (payload.size() > 0) {
+        stream.write(reinterpret_cast<const char*>(payload.data()), payload.size());
+        if (!stream) return false;
+        bytesWritten += payload.size();
+    }
+    
+    return true;
+}
 
 CheckpointManager::CheckpointManager()
     : saveIntervalSteps_(10000), maxCheckpoints_(10), compress_(true), lastSaveStep_(0) {}
@@ -489,18 +548,28 @@ std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoint
     return infos;
 }
 
-void CheckpointManager::pruneOldCheckpoints(size_t keepCount) {
-    auto infos = listCheckpoints();
-    if (infos.size() <= keepCount) return;
-    size_t toRemove = infos.size() - keepCount;
-    for (size_t i = 0; i < toRemove; ++i) {
-        std::error_code ec;
-        std::filesystem::remove(std::filesystem::path(checkpointDir_) / infos[i].name, ec);
+bool writeSectionToStream(std::ofstream& stream, CheckpointSection type, 
+                         const std::vector<uint8_t>& payload, uint64_t& bytesWritten) {
+    SectionHeader header;
+    header.type = static_cast<uint32_t>(type);
+    header.offset = bytesWritten + sizeof(header);
+    header.size = payload.size();
+    header.compressedSize = 0;  // No compression for now
+    header.checksum = payload.empty() ? 0 : ChecksumCalculator::crc32(payload.data(), payload.size());
+    
+    // Write section header
+    stream.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream) return false;
+    bytesWritten += sizeof(header);
+    
+    // Write payload
+    if (payload.size() > 0) {
+        stream.write(reinterpret_cast<const char*>(payload.data()), payload.size());
+        if (!stream) return false;
+        bytesWritten += payload.size();
     }
+    
+    return true;
 }
 
-std::string CheckpointManager::getLastCheckpointPath() const {
-    return lastCheckpointPath_;
-}
-
-} // namespace nlm
+// ---------------- CheckpointManager ----------------
