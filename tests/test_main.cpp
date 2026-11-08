@@ -37,6 +37,10 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_phase4_6 {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;

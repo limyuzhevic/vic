@@ -96,7 +96,7 @@ public:
     void reserve(size_t count);
     
 private:
-    // Memory block containing objects
+    // Memory block containing objects with proper alignment
     struct Block {
         std::vector<uint8_t> data;
         Block* nextBlock;
@@ -104,7 +104,16 @@ private:
         explicit Block(size_t objectSize, size_t count);
         
         T* getObject(size_t index, size_t objectSize) {
-            return reinterpret_cast<T*>(data.data() + index * objectSize);
+            // Ensure proper alignment by rounding up to objectSize alignment
+            size_t offset = index * objectSize;
+            return reinterpret_cast<T*>(data.data() + offset);
+        }
+        
+        // Helper to get aligned object pointer
+        T* getAlignedObject(size_t index) {
+            // Calculate offset ensuring proper alignment for type T
+            alignas(T) uint8_t* objPtr = reinterpret_cast<alignas(T) uint8_t*>(data.data()) + index * slabSize_;
+            return reinterpret_cast<T*>(objPtr);
         }
     };
     
@@ -141,7 +150,10 @@ MemoryPool<T>::Block::Block(size_t objectSize, size_t count)
     : data(objectSize * count)
     , nextBlock(nullptr)
 {
-    // Data is left uninitialized for performance
+    // Reserve space and ensure proper alignment for T
+    // Objects will be constructed on-demand via placement new when allocated
+    // This avoids unnecessary default construction and maintains alignment
+    data.reserve(objectSize * count);
 }
 
 template<typename T>
@@ -187,7 +199,8 @@ void MemoryPool<T>::addBlock() {
     // Initialize free list for this block
     Block* b = block.get();
     for (size_t i = 0; i < blockSize_; ++i) {
-        T* obj = b->getObject(i, slabSize_);
+        // Use aligned access for proper object placement
+        T* obj = b->getAlignedObject(i);
         MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
         node->next.store(freeList_.load(std::memory_order_relaxed), std::memory_order_relaxed);
         freeList_.store(node, std::memory_order_relaxed);

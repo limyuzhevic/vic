@@ -220,13 +220,12 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     
     // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Applying varied input patterns (1000 steps)...");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // Improved: Use varied patterns that encourage selective learning
+    // Instead of the old code which injected 30.0f into *every* sensory neuron
+    // 20 times per step (600.0f) causing global synchronization and weight saturation
+    
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
@@ -235,16 +234,30 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             }
         }
     }
+    
+    if (patternNeurons.empty()) {
+        NLM_LOG_ERROR("No sensory neurons found for learning experiment");
+        return;
+    }
+    
+    // Create different patterns over time for more interesting learning
     for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
-        }
+        // Vary the pattern based on step to create more interesting dynamics
+        NeuronId targetNeuron = patternNeurons[step % patternNeurons.size()];
+        
+        // Use a pattern that changes over time to prevent synchronization
+        float inputAmplitude = 20.0f + 10.0f * std::sin(step * 0.01f);
+        
+        // Inject current into a single neuron at a time for selective learning
+        brain->injectCurrent(targetNeuron, inputAmplitude);
         
         brain->step(step, step * 0.001);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
+                        " | Target neuron: " + std::to_string(targetNeuron.index()) +
+                        " | Input: " + std::to_string(inputAmplitude) +
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
         }
@@ -342,10 +355,39 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file with better error reporting
+    bool configLoaded = false;
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
+        configLoaded = true;
+        
+        // Validate required configuration parameters
+        bool validConfig = true;
+        
+        // Check required parameters
+        if (!config->has("neuron_count")) {
+            NLM_LOG_ERROR("Configuration error: 'neuron_count' not found");
+            validConfig = false;
+        } else if (config->getOr<int64_t>("neuron_count", 0) <= 0) {
+            NLM_LOG_ERROR("Configuration error: 'neuron_count' must be positive");
+            validConfig = false;
+        }
+        
+        if (!config->has("simulation_timestep")) {
+            NLM_LOG_ERROR("Configuration error: 'simulation_timestep' not found");
+            validConfig = false;
+        } else if (config->getOr<double>("simulation_timestep", 0.0) <= 0.0) {
+            NLM_LOG_ERROR("Configuration error: 'simulation_timestep' must be positive");
+            validConfig = false;
+        }
+        
+        if (!validConfig) {
+            NLM_LOG_ERROR("Invalid configuration. Using defaults.");
+            config->clear();
+            configLoaded = false;
+        }
     } else {
+        NLM_LOG_ERROR("Failed to load configuration file: " + configFile);
         NLM_LOG_INFO("Using default configuration.");
     }
     
@@ -368,15 +410,65 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
-    // Log configuration summary
+    // Verify configuration was loaded and is valid
+    if (!configLoaded) {
+        NLM_LOG_ERROR("Critical: No valid configuration available");
+        return 1;
+    }
+    
+    // Display configuration summary with error checks
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Configuration Summary ===");
+    
+    // Log all configuration values with validation
+    auto keys = config->getKeys();
+    bool configErrors = false;
+    
+    for (const auto& key : keys) {
+        try {
+            // Try to get value based on expected type
+            if (key == "random_seed") {
+                auto value = config->getOr<int64_t>("random_seed", 42);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value));
+            } else if (key == "simulation_timestep") {
+                auto value = config->getOr<double>("simulation_timestep", 0.001);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value) + "s");
+            } else if (key == "neuron_count") {
+                auto value = config->getOr<int64_t>("neuron_count", 500);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value));
+            } else if (key == "region_count") {
+                auto value = config->getOr<int64_t>("region_count", 1);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value));
+            } else if (key == "connection_probability") {
+                auto value = config->getOr<float>("connection_probability", 0.15f);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value));
+            } else if (key == "stdp_ltp_weight") {
+                auto value = config->getOr<float>("stdp_ltp_weight", 0.02f);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value));
+            } else if (key == "stdp_ltd_weight") {
+                auto value = config->getOr<float>("stdp_ltd_weight", 0.015f);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value));
+            } else if (key == "stdp_tau") {
+                auto value = config->getOr<float>("stdp_tau", 20. FLC);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value));
+            } else if (key == "synaptogenesis_rate") {
+                auto value = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value));
+            } else if (key == "pruning_rate") {
+                auto value = config->getOr<float>("pruning_rate", 0.00001f);
+                NLM_LOG_INFO("  " + key + ": " + std::to_string(value));
+            } else {
+                NLM_LOG_INFO("  " + key + ": [value not displayed]");
+            }
+        } catch (const std::exception& e) {
+            NLM_LOG_ERROR("Configuration error for key '" + key + "': " + std::string(e.what()));
+            configErrors = true;
+        }
+    }
+    
+    if (configErrors) {
+        NLM_LOG_WARN("Configuration contains errors that may affect simulation stability");
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);

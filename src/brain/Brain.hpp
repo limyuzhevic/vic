@@ -52,7 +52,27 @@ struct InterRegionConnection {
 
 class Brain {
 public:
-    // Create brain with configuration
+    /**
+     * @brief Constructs a Brain instance with the specified configuration
+     * 
+     * This constructor creates a Brain object and initializes it with the
+     * given configuration. The Brain object is not yet functional and must
+     * be initialized using the initialize() method before any neural computation
+     * can occur.
+     * 
+     * @param config The configuration object containing simulation parameters
+     *               such as neuron_count, region_count, connection_probability,
+     *               simulation_timestep, and various plasticity and neuromodulation
+     *               parameters. See Config.hpp for available parameters.
+     * 
+     * @throws std::runtime_error if the configuration is invalid or if required
+     *              parameters are missing or have invalid values.
+     * 
+     * @note The Brain constructor only stores the configuration reference.
+     *       The actual neural network creation and system initialization
+     *       happens in the initialize() method. This separation allows for
+     *       delayed initialization and configuration changes before startup.
+     */
     explicit Brain(std::shared_ptr<Config> config);
     
     ~Brain();
@@ -63,7 +83,29 @@ public:
     Brain(Brain&&) noexcept;
     Brain& operator=(Brain&&) noexcept;
     
-    // Initialize brain with configuration
+    /**
+     * @brief Initializes the neural network and all subsystems
+     * 
+     * This method performs the complete initialization of the Brain object:
+     * 1. Creates neurons and synapses based on configuration parameters
+     * 2. Initializes all plasticity mechanisms (STDP, Hebbian, structural)
+     * 3. Sets up memory systems (working memory, episodic memory)
+     * 4. Configures neuromodulation systems (dopamine, curiosity, etc.)
+     * 5. Establishes cognitive systems (prediction, planning, attention)
+     * 6. Initializes development system for age-dependent plasticity
+     * 7. Connects all subsystems and establishes initial network connectivity
+     * 
+     * @return bool true if initialization was successful, false otherwise
+     * 
+     * @note This method should only be called once per Brain instance.
+     *       Calling it multiple times will result in undefined behavior as
+     *       neurons and synapses may be created multiple times.
+     * 
+     * @note The initialization process may fail if configuration parameters
+     *       are invalid, if memory allocation fails, or if system initialization
+     *       fails. In case of failure, the Brain object should be considered
+     *       non-functional and should not be used.
+     */
     bool initialize();
     
     // Main simulation step

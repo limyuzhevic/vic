@@ -80,6 +80,11 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/ExperimentLogger.cpp
+    src/experiments/NeuralExperiment.cpp
+    src/experiments/ExperimentResultAggregator.cpp
+    src/experiments/ExperimentConfig.cpp
+    src/experiments/ExperimentInfrastructure.hpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
@@ -107,30 +112,34 @@ target_link_libraries(nlm_world PUBLIC nlm_core nlm_agent)
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
+    src/experiments/ExperimentInfrastructure.hpp
 )
 target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world nlm_experiments)
 
 # Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
+    src/experiments/ExperimentInfrastructure.hpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_experiments)
 
 # Phase 5 experiments
 add_library(nlm_phase5 STATIC
     src/experiments/Phase5Experiment.cpp
+    src/experiments/ExperimentInfrastructure.hpp
 )
 target_include_directories(nlm_phase5 PUBLIC src)
-target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_experiments)
 
 # Phase 6 experiments
 add_library(nlm_phase6 STATIC
     src/experiments/Phase6IntegratedExperiment.cpp
+    src/experiments/ExperimentInfrastructure.hpp
 )
 target_include_directories(nlm_phase6 PUBLIC src)
-target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_experiments)
 
 # Main executable
 add_executable(nlm
@@ -142,13 +151,13 @@ target_link_libraries(nlm PUBLIC nlm_core)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_experiments)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_experiments)
 
 # Phase 5 demo executable (Phase 5, added here: pattern probe,
 # sandbox run, and checkpoint round-trip for the brain-personality
@@ -156,13 +165,13 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 add_executable(nlm_phase5_demo
     src/experiments/Phase5Demo.cpp
 )
-target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_experiments)
 
 # Phase 6 demo executable
 add_executable(nlm_phase6_demo
     src/experiments/Phase6Demo.cpp
 )
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6 nlm_experiments)
 
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
 # association probe, concept/social probes, and a sandbox run with
@@ -171,7 +180,7 @@ target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 add_executable(nlm_phase6_text_demo
     src/experiments/Phase6TextDemo.cpp
 )
-target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6 nlm_experiments)
 
 # Benchmark executable
 add_executable(nlm_benchmark
