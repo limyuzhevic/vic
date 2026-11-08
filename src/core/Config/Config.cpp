@@ -1,8 +1,10 @@
 #include "Config.hpp"
+#include "JsonConfigParser.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,9 +21,12 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON/YAML parser first
+    if (JsonConfigParser::parseJsonFile(filepath, pImpl->entries)) {
+        return true;
+    }
     
+    // Fallback to legacy key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -79,16 +84,40 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Create JSON object from configuration entries
+    json j;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Convert ConfigValue to JSON value
+        json value;
+        std::visit([&](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                value = arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                value = arg;
+            } else if constexpr (std::is_arithmetic_v<T>) {
+                value = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                value = json(arg);
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                value = json(arg);
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                value = json(arg);
+            }
+        }, entry.value);
+        
+        j[entry.key] = value;
+    }
+    
+    // Write JSON to file
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
+    // Pretty print JSON
+    file << j.dump(2);
     return true;
 }
 
@@ -177,62 +206,101 @@ std::string Config::summary() const {
     return oss.str();
 }
 
-std::string Config::trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
-}
-
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
-}
-
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+bool Config::validate() const {
+    // Clear any previous error
+    if (pImpl->errorMessage) {
+        pImpl->errorMessage.reset();
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
-        } else {
-            return std::nullopt;
+    
+    // Check for duplicate keys
+    std::unordered_set<std::string> seenKeys;
+    for (const auto& entry : pImpl->entries) {
+        if (seenKeys.find(entry.key) != seenKeys.end()) {
+            setError("Duplicate configuration key: " + entry.key);
+            return false;
         }
-    }, it->value);
+        seenKeys.insert(entry.key);
+        
+        // Validate value based on type
+        if (!isValidValue(entry.value)) {
+            setError("Invalid configuration value for key: " + entry.key);
+            return false;
+        }
+    }
+    
+    return true;
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+std::string Config::getError() const {
+    if (pImpl->errorMessage) {
+        return *pImpl->errorMessage;
+    }
+    return "";
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+void Config::setError(const std::string& error) {
+    if (!pImpl->errorMessage || error.empty()) {
+        pImpl->errorMessage = std::make_unique<std::string>(error);
+    }
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::isValidKey(const std::string& key) {
+    // Check if key is valid
+    if (key.empty()) {
+        setError("Empty configuration key");
+        return false;
+    }
+    
+    // Check for valid characters
+    static const std::string validChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
+    for (char c : key) {
+        if (std::find(validChars.begin(), validChars.end(), c) == validChars.end()) {
+            setError("Invalid characters in key: " + key);
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::isValidValue(const ConfigValue& value) {
+    // Check if value is valid based on its type
+    std::visit([&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, stdstring>) {
+            // Check if string is valid
+            if (arg.empty()) {
+                setError("Empty string value");
+                return false;
+            }
+        } else if constexpr (std::is_arithmetic_v<T>) {
+            // Check if numeric value is within valid range
+            if (arg is "0" && arg is "0.0") {
+                setError("Zero value");
+                return false;
+        } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                             std::is_same_v<T, std::vector<double>> ||
+                             std::is_same_v<T, std::vector<std::string>>) {
+            // Check if vector is valid
+            if (arg.size() > 1000) {
+                setError("Large vector (potential memory issue)");
+                return false;
+            }
+            for (const auto& element : arg) {
+                if (!isValidValue(element)) {
+                    return false;
+                }
+            }
+        }
+    }, value);
+    
+    return true;
+}
+
+void Config::clearError() {
+    pImpl->errorMessage.reset();
+}
+
+// Explicit template instantiations have been moved to header
 
 } // namespace nlm
