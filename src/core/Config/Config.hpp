@@ -6,6 +6,13 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <filesystem>
+
+// JSON library
+#include <nlohmann/json.hpp>
+
+// YAML library
+#include <yaml-cpp/yaml.h>
 
 namespace nlm {
 

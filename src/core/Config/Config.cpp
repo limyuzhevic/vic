@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "Logger.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -19,16 +20,98 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Determine file format based on extension
+    std::string ext = "." + std::filesystem::path(filepath).extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    if (ext == ".json") {
+        return loadFromJSON(file);
+    } else if (ext == ".yaml" || ext == ".yml") {
+        return loadFromYAML(file);
+    } else {
+        // Default to simple key=value format for backward compatibility
+        return loadFromSimpleFormat(file);
+    }
+}
+
+bool Config::loadFromJSON(std::istream& stream) {
+    try {
+        nlohmann::json jsonData;
+        stream >> jsonData;
+        
+        for (auto& [key, value] : jsonData.items()) {
+            // Convert JSON value to string representation
+            std::string valueStr;
+            if (value.is_string()) {
+                valueStr = value.get<std::string>();
+            } else if (value.is_number_integer()) {
+                valueStr = std::to_string(value.get<int64_t>());
+            } else if (value.is_number_float()) {
+                valueStr = std::to_string(value.get<double>());
+            } else if (value.is_boolean()) {
+                valueStr = value.get<bool>() ? "true" : "false";
+            } else if (value.is_array()) {
+                // Convert array to JSON string representation
+                valueStr = value.dump();
+            } else {
+                // For other types, use JSON string representation
+                valueStr = value.dump();
+            }
+            set(key, valueStr, ConfigSource::File);
+        }
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse JSON config: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromYAML(std::istream& stream) {
+    try {
+        YAML::Node yamlData = YAML::Load(stream);
+        
+        for (auto& yamlPair : yamlData) {
+            std::string key = yamlPair.first.as<std::string>();
+            YAML::Node value = yamlPair.second;
+            
+            // Convert YAML value to string representation
+            std::string valueStr;
+            if (value.IsScalar()) {
+                if (value.IsDouble()) {
+                    valueStr = std::to_string(value.as<double>());
+                } else if (value.IsInt()) {
+                    valueStr = std::to_string(value.as<int64_t>());
+                } else if (value.IsBoolean()) {
+                    valueStr = value.as<bool>() ? "true" : "false";
+                } else {
+                    valueStr = value.as<std::string>();
+                }
+            } else if (value.IsSequence()) {
+                // Convert sequence to YAML string representation
+                valueStr = value.as<std::string>();
+            } else if (value.IsMap()) {
+                // Convert mapping to YAML string representation
+                valueStr = value.as<std::string>();
+            } else {
+                valueStr = value.as<std::string>();
+            }
+            set(key, valueStr, ConfigSource::File);
+        }
+        return true;
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse YAML config: " + std::string(e.what()));
+        return false;
+    }
+}
+
+bool Config::loadFromSimpleFormat(std::istream& stream) {
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -51,7 +134,6 @@ bool Config::loadFromFile(const std::string& filepath) {
             set(key, value, ConfigSource::File);
         }
     }
-    
     return true;
 }
 

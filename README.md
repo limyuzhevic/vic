@@ -107,39 +107,239 @@ currently separate demos per phase, not a single unified binary:
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
 library in CMake; it does not yet have a standalone demo executable.
 
-## Project Structure
+## Major Improvements in This Version
 
+### 1. Enhanced Configuration System
+
+**Multiple File Format Support:**
+- JSON configuration files with structured parameters
+- YAML configuration files for human-readable settings
+- Plain text .cfg files for backward compatibility
+
+**Advanced Configuration Features:**
+- Dynamic parameter validation
+- Type-safe configuration values
+- Configuration inheritance and overrides
+- Runtime configuration modifications
+
+### 2. Comprehensive Command-Line Interface
+
+**New CLI Features:**
+- Detailed help system with examples
+- Version information and build details
+- Extensive configuration options
+- Test mode selection (--plasticity-only, --stdp-only, --connectivity-only)
+- Logging level control and file output
+- Configuration validation and saving
+
+### 3. Advanced Command-Line Tools
+
+**Tools Script:** `scripts/nlm-tools.sh`
+
+**Available Commands:**
+```bash
+# Configuration management
+./scripts/nlm-tools.sh config create json my_config.json
+./scripts/nlm-tools.sh config validate my_config.json
+./scripts/nlm-tools.sh config list
+./scripts/nlm-tools.sh config get neuron_count
+./scripts/nlm-tools.sh config set neuron_count 2000
+
+# Simulation control
+./scripts/nlm-tools.sh run --help
+./scripts/nlm-tools.sh run --plasticity-only
+
+# Analysis and export
+./scripts/nlm-tools.sh analysis results.csv
+./scripts/nlm-tools.sh export results/
+./scripts/nlm-tools.sh stats
+
+# Validation
+./scripts/nlm-tools.sh validate my_config.json
 ```
-NLM/
-├── CMakeLists.txt
-├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── agent/          # Agent-brain interface
-│   ├── world/          # Simple world
-│   ├── performance/    # Checkpoints, pools, queues (headers)
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+
+### 4. Real Neural Dynamics (Phase 2)
+
+**Improved Neuron Implementation:**
+- Biologically realistic Leaky Integrate-and-Fire (LIF) dynamics
+- Spike-frequency adaptation for neural plausibility
+- Refractory period handling with biological accuracy
+- Realistic parameter initialization and random variation
+
+### 5. Advanced Utility Functions
+
+**Comprehensive Utility Library:** `src/core/Utilities.hpp`
+
+**Function Categories:**
+- File operations and path manipulation
+- Configuration utilities and validation
+- Simulation utilities and statistics
+- Progress monitoring and metrics
+- Error handling and recovery
+
+### 6. Enhanced Documentation
+
+**Comprehensive Documentation System:**
+- Main README with project overview and improvements
+- Easy Usage Guide for beginners
+- Advanced documentation for architecture and implementation
+- Configuration examples for multiple formats
+- Troubleshooting guide
+
+### 7. Python Bindings Enhancements
+
+**Improved Python API:**
+- Better error handling and validation
+- More intuitive Python interface
+- Additional configuration options
+- Improved documentation and examples
+
+## Building and Running
+
+### Building
+
+```bash
+# Standard build
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+
+# Build with Python bindings
+pip install .
+
+# Build with all phases
+mkdir build_full
+cd build_full
+cmake .. -DNLM_BUILD_PYTHON_BINDINGS=ON -DCMAKE_BUILD_TYPE=Debug
+make -j4
+```
+
+### Running
+
+```bash
+# Basic NLM demo (Phase 2)
+./nlm
+
+# With custom configuration
+./nlm --config brain_config.json
+
+# With custom parameters
+./nlm --neuron-count 2000 --log-level Info --plasticity-only
+
+# Validate configuration
+./nlm --validate-config
+
+# Save current configuration
+./nlm --save-config my_config.json
+
+# Using command-line tools
+./scripts/nlm-tools.sh run --help
+./scripts/nlm-tools.sh config create json my_config.json
+./scripts/nlm-tools.sh validate my_config.json
+```
+
+### Configuration Examples
+
+### JSON Configuration
+```json
+{
+    "nlm": {
+        "version": "0.1.0",
+        "parameters": {
+            "neuron_count": 1000,
+            "connection_probability": 0.15,
+            "plasticity_learning_rate": 0.01,
+            "stdp_ltp_weight": 0.02,
+            "stdp_ltd_weight": 0.015,
+            "plasticity_enabled": true,
+            "structural_plasticity_enabled": true,
+            "development_enabled": true
+        }
+    }
+}
+```
+
+### YAML Configuration
+```yaml
+# NLM Configuration File
+nlm:
+  version: "0.1.0"
+  parameters:
+    neuron_count: 1000
+    connection_probability: 0.15
+    plasticity_learning_rate: 0.01
+    stdp_ltp_weight: 0.02
+    stdp_ltd_weight: 0.015
+    plasticity_enabled: true
+    structural_plasticity_enabled: true
+    development_enabled: true
+```
+
+### Plain Text Configuration
+```
+# NLM Configuration File
+neuron_count = 1000
+connection_probability = 0.15
+plasticity_learning_rate = 0.01
+stdp_ltp_weight = 0.02
+stdp_ltd_weight = 0.015
+plasticity_enabled = true
+structural_plasticity_enabled = true
+development_enabled = true
+```
+
+## Project Status
+
+### Current Phase: **Phase 6 - Final Integration**
+
+**Integration Achievements:**
+- ✅ Memory systems connected to neural processing
+- ✅ Neuromodulation affects plasticity and dynamics
+- ✅ Prediction integrated with learning
+- ✅ Development affects plasticity rates
+- ✅ Checkpoint save/load working
+- ✅ Replay and consolidation functional
+
+**Scientific Goals:**
+- Investgate whether memory systems can integrate with neural dynamics
+- Examine whether neuromodulation can affect plasticity in a coordinated way
+- Explore whether prediction can become a central organizing principle
+- Study whether developmental stages can modulate learning
+- Analyze whether replay can reinforce memory consolidation
+- Determine whether the complete brain loop functions coherently
+
+## System Architecture
+
+### Brain Operations Loop
+```
+WORLD
+  ↓
+SENSORY INPUT
+  ↓
+NEURAL PROCESSING (LIF dynamics, spikes)
+  ↓
+INTERNAL STATE (working memory, attention)
+  ↓
+MEMORY / PREDICTION
+  ↓
+MOTIVATION / NEUROMODULATION (dopamine, curiosity)
+  ↓
+ACTION SELECTION
+  ↓
+MOTOR OUTPUT
+  ↓
+WORLD CONSEQUENCE
+  ↓
+REWARD / SURPRISE / ERROR
+  ↓
+PLASTICITY (STDP, Hebbian, structural)
+  ↓
+MEMORY / DEVELOPMENT
+  ↓
+CHANGED BRAIN
+  ↓
+CHANGED FUTURE BEHAVIOR
 ```
 
 ## Phase Summary
@@ -251,8 +451,19 @@ CHANGED FUTURE BEHAVIOR
 
 ## License
 
-MIT
+MIT License
 
 ## Authors
 
-Research project — See docs for scientific background.
+Research project — See docs for scientific background and development team information.
+
+## Acknowledgments
+
+Special thanks to the NLM research team and contributors who have made this experimental neural simulation framework possible.
+
+---
+
+**Version 0.1.0 - Phase 2 Enhanced**
+**Built on $(date +%Y-%m-%d)**
+**Documentation: https://nlm.readthedocs.io**
+

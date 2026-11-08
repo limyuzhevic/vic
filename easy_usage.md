@@ -294,4 +294,274 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+## New Features in NLM
+
+This version of NLM includes several new improvements:
+
+### 1. Enhanced Configuration Support
+
+NLM now supports multiple configuration file formats:
+
+- **JSON** (`brain_config.json`): Modern, structured configuration
+- **YAML** (`brain_config.yaml`): Human-readable configuration
+- **Plain text** (`configs/default.cfg`): Simple key=value format
+
+#### Configuration Examples:
+
+**JSON Configuration:**
+```json
+{
+    "nlm": {
+        "version": "0.1.0",
+        "parameters": {
+            "neuron_count": 1000,
+            "connection_probability": 0.15,
+            "plasticity_enabled": true,
+            "stdp_ltp_weight": 0.02
+        }
+    }
+}
+```
+
+**YAML Configuration:**
+```yaml
+# NLM Configuration File
+nlm:
+  version: "0.1.0"
+  parameters:
+    neuron_count: 1000
+    connection_probability: 0.15
+    plasticity_enabled: true
+    stdp_ltp_weight: 0.02
+```
+
+**Plain Text Configuration:**
+```
+# NLM Configuration File
+neuron_count = 1000
+connection_probability = 0.15
+plasticity_enabled = true
+stdp_ltp_weight = 0.02
+```
+
+### 2. Advanced Command-Line Interface
+
+NLM now has a comprehensive command-line interface with:
+
+- **Help and Version Options:**
+  ```bash
+  nlm --help           # Show detailed help
+  nlm --version        # Show version information
+  ```
+
+- **Configuration Options:**
+  ```bash
+  nlm --config brain_config.json    # Load JSON configuration
+  nlm -c my_config.yaml              # Load YAML configuration
+  nlm --config my_settings.cfg       # Load plain text configuration
+  ```
+
+- **Performance Tuning:**
+  ```bash
+  nlm --neuron-count 2000           # Override neuron count
+  nlm --num-steps 100                # Override simulation steps
+  nlm --random-seed 12345            # Override random seed
+  ```
+
+- **Test Mode Selection:**
+  ```bash
+  nlm --plasticity-only            # Run plasticity experiment only
+  nlm --stdp-only                  # Run STDP verification only
+  nlm --connectivity-only          # Run connectivity test only
+  ```
+
+- **Logging and Output Control:**
+  ```bash
+  nlm --log-level Info              # Set logging level
+  nlm --output-file nlm.log         # Write logs to file
+  nlm --validate-config             # Validate configuration file
+  ```
+
+### 3. Advanced Tools Script
+
+NLM includes a comprehensive tools script (`scripts/nlm-tools.sh`) that provides:
+
+#### Command Categories:
+
+**Basic Operations:**
+```bash
+nlm-tools run --help              # Show help for run command
+nlm-tools config create json       # Create JSON configuration
+nlm-tools config validate file.json # Validate configuration
+```
+
+**Analysis and Export:**
+```bash
+nlm-tools analysis results.csv    # Analyze simulation results
+nlm-tools stats                    # Show system statistics
+nlm-tools export results/          # Export simulation results
+```
+
+**Configuration Management:**
+```bash
+nlm-tools config list             # List all configuration keys
+nlm-tools config get neuron_count # Get configuration value
+nlm-tools config set neuron_count 2000 # Set configuration value
+```
+
+### 4. Real Neural Dynamics
+
+NLM Phase 2 now includes real integrate-and-fire (LIF) neuron dynamics:
+
+- **Biologically realistic neuron behavior**
+- **Spike-frequency adaptation**
+- **Refractory period handling**
+- **Plasticity-based learning**
+
+### 5. Utility Functions
+
+NLM provides extensive utility functions for:
+
+- **File operations**: Path handling, file existence checks, directory creation
+- **Configuration utilities**: Validation, template generation, value formatting
+- **Simulation utilities**: Firing rate calculation, data analysis, statistical functions
+- **Progress monitoring**: Progress bars, timing, metrics collection
+
+### 6. Error Handling and Recovery
+
+Improved error handling with:
+
+- **Comprehensive error codes:** 0-7 covering different failure scenarios
+- **Recovery mechanisms:** Automatic recovery where possible
+- **Detailed error messages:** Context-specific error reporting
+- **Validation:** Configuration file validation before execution
+
+### 7. Enhanced Documentation
+
+- **Comprehensive examples**: Multiple usage scenarios
+- **Quick reference guide**: Essential commands at a glance
+- **Troubleshooting section**: Common issues and solutions
+- **Architecture documentation**: Understanding NLM's design
+
+## Installation and Setup
+
+### Building NLM
+
+```bash
+# Build with CMake
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Running NLM
+
+```bash
+# Basic usage
+./nlm
+
+# With configuration
+./nlm --config brain_config.json
+
+# With custom options
+./nlm --neuron-count 2000 --log-level Info --plasticity-only
+
+# Using tools script
+./scripts/nlm-tools.sh run --help
+./scripts/nlm-tools.sh config create json my_config.json
+./scripts/nlm-tools.sh validate my_config.json
+```
+
+### Running Tests
+
+```bash
+# Run unit tests
+./nlm_benchmark
+
+# Run demonstration modes
+./nlm_phase3_demo
+./nlm_phase4_demo
+./nlm_phase6_demo
+```
+
+## Configuration Examples
+
+### Basic Configuration (JSON)
+```json
+{
+    "nlm": {
+        "parameters": {
+            "neuron_count": 500,
+            "region_count": 1,
+            "simulation_timestep": 0.001,
+            "plasticity_enabled": true,
+            "stdp_ltp_weight": 0.02
+        }
+    }
+}
+```
+
+### Advanced Configuration (YAML)
+```yaml
+nlm:
+  version: "0.1.0"
+  parameters:
+    neuron_count: 1000
+    connection_probability: 0.15
+    plasticity_learning_rate: 0.01
+    stdp_ltp_weight: 0.02
+    stdp_ltd_weight: 0.015
+    synaptogenesis_rate: 0.0001
+    pruning_rate:  grávidade
+```
+
+## Getting Started
+
+1. **Install NLM** using the build instructions above
+2. **Run basic demo**: `./nlm` 
+3. **Explore examples** in the `examples/` directory
+4. **Try tools script**: `./scripts/nlm-tools.sh`
+5. **Read documentation** in `docs/`
+6. **Experiment with configurations** to discover NLM's capabilities
+
+## Troubleshooting
+
+### Common Issues:
+
+**"My brain isn't doing anything"**
+- Ensure you call `brain.initialize()` before simulation
+- Try increasing the number of simulation steps
+- Check that neurons have proper connectivity
+
+**"Configuration file not found"**
+- Ensure the file path is correct
+- Verify file permissions
+- Try using absolute paths
+
+**"Logging level not recognized"**
+- Use valid logging levels: Debug, Info, Warning, Error, Critical
+- Check for typos in the log-level argument
+
+**"Neuron count too high"**
+- Try reducing the neuron count for faster testing
+- Monitor system resources during simulation
+
+## Next Steps
+
+- **Join the NLM community** on GitHub
+- **Provide feedback** on the NLM website
+- **Contribute to development** by submitting pull requests
+- **Report bugs** and feature requests
+- **Explore Phase 6** integration for advanced functionality
+
+That's it! You're now ready to use NLM with all its new improvements and features.
+
+### Version Information
+
+NLM Phase 2 v0.1.0
+- **Phase**: 2: Real Neural Computation
+- **License**: MIT
+- **Date**: $(date +%Y-%m-%d)
+- **Documentation**: https://nlm.readthedocs.io
+
