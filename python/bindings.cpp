@@ -15,6 +15,13 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/core/Random/Random.hpp"
+#include "../src/core/SimulationClock/SimulationClock.hpp"
+#include "../src/core/Logger/Logger.hpp"
+#include "../src/brain/Neuron.hpp"
+#include "../src/brain/NeuralRegion.hpp"
+#include "../src/brain/NeuralPopulation.hpp"
+#include "../src/brain/Synapse.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -160,6 +167,40 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", &Config::get<int>, py::arg("key"),
+             "Get configuration value as int")
+        .def("get", &Config::get<double>, py::arg("key"),
+             "Get configuration value as double")
+        .def("get", &Config::get<bool>, py::arg("key"),
+             "Get configuration value as bool")
+        .def("get", &Config::get<std::string>, py::arg("key"),
+             "Get configuration value as string")
+        .def("getOr", &Config::getOr<int>, py::arg("key"), py::arg("default"),
+             "Get configuration value or default if not present (int)")
+        .def("getOr", &Config::getOr<double>, py::arg("key"), py::arg("default"),
+             "Get configuration value or default if not present (double)")
+        .def("getOr", &Config::getOr<bool>, py::arg("key"), py::arg("default"),
+             "Get configuration value or default if not present (bool)")
+        .def("getOr", &Config::getOr<std::string>, py::arg("key"), py::arg("default"),
+             "Get configuration value or default if not present (string)")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value as int")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value as double")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value as bool")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value as string")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -185,9 +226,14 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("setData", [](Vision& self, float* data, size_t size) {
+            self.setData(data, size);
+        }, py::arg("data"), py::arg("size"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("getData", &Vision::getData)
+        .def("getDimensions", &Vision::getDimensions);
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -197,12 +243,16 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("getData", &Audio::getData)
+        .def("getDimensions", &Audio::getDimensions);
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("clearSignals", &InternalSignals::clearSignals)
+        .def("getData", &InternalSignals::getData)
+        .def("getDimensions", &InternalSignals::getDimensions);
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -356,10 +406,70 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Neural system access methods
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+             py::return_value_policy::reference_internal,
+             "Get spike system")
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+             py::arg("signal"),
+             "Apply neuromodulatory signal")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity neuromodulator")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty neuromodulator")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error signal")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random generator")
+        .def("getLearnedPreference", &Brain::getLearnedPreference,
+             "Get learned preference trait")
+        .def("setLearnedPreference", &Brain::setLearnedPreference,
+             py::arg("preference"),
+             "Set learned preference trait")
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -407,6 +517,233 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Random number generator for reproducible experiments
+    py::class_<RandomGenerator>(m, "RandomGenerator", R"pbdoc(Deterministic random number generator for reproducible experiments)pbdoc")
+        .def(py::init<>())
+        .def(py::init<uint64_t>(), py::arg("seed"))
+        .def("seed", &RandomGenerator::seed, py::arg("seed"), "Set random seed for reproducibility")
+        .def("getSeed", &RandomGenerator::getSeed, "Get current random seed")
+        .def("uniformInt", static_cast<uint32_t (RandomGenerator::*)(uint32_t, uint32_t)>(&RandomGenerator::uniformInt), 
+             py::arg("min"), py::arg("max"), "Generate random integer in [min, max]")
+        .def("uniformReal", static_cast<double (RandomGenerator::*)(double, double)>(&RandomGenerator::uniformReal),
+             py::arg("min"), py::arg("max"), "Generate random float in [min, max]")
+        .def("normal", static_cast<double (RandomGenerator::*)(double, double)>(&RandomGenerator::normal),
+             py::arg("mean"), py::arg("stddev"), "Generate normally distributed random number")
+        .def("bernoulli", &RandomGenerator::bernoulli, py::arg("p") = 0.5, "Generate Bernoulli random variable")
+        .def("poisson", &RandomGenerator::poisson, py::arg("lambda"), "Generate Poisson random variable")
+        .def("exponential", &RandomGenerator::exponential, py::arg("lambda"), "Generate exponential random variable")
+        .def("randomBool", &RandomGenerator::randomBool, "Generate random boolean")
+        .def("randomBit", &RandomGenerator::randomBit, "Generate random bit")
+        .def("pickRandom", &RandomGenerator::pickRandom, py::arg("container"), 
+             "Pick random element from container")
+        .def("pickRandomIndex", &RandomGenerator::pickRandomIndex, py::arg("n"), 
+             "Pick random index from 0 to n-1")
+        .def("serializeState", &RandomGenerator::serializeState, "Serialize generator state")
+        .def("restoreState", &RandomGenerator::restoreState, py::arg("state"), 
+             "Restore generator state from serialized string");
+
+    // Simulation clock for deterministic time management
+    py::class_<SimulationClock>(m, "SimulationClock", R"pbdoc(Simulation clock for deterministic time management)pbdoc")
+        .def(py::init<TimestepDuration>(), py::arg("timestep") = 0.001)
+        .def("reset", &SimulationClock::reset, "Reset clock to initial state")
+        .def("advance", &SimulationClock::advance, "Advance clock by one timestep")
+        .def("getStep", &SimulationClock::getStep, "Get current simulation step")
+        .def("setStep", &SimulationClock::setStep, py::arg("step"), "Set simulation step")
+        .def("getTime", &SimulationClock::getTime, "Get current simulation time")
+        .def("setTime", &SimulationClock::setTime, py::arg("time"), "Set simulation time")
+        .def("getTimestep", &SimulationClock::getTimestep, "Get simulation timestep")
+        .def("setTimestep", &SimulationClock::setTimestep, py::arg("dt"), "Set simulation timestep")
+        .def("isFirstStep", &SimulationClock::isFirstStep, "Check if current step is first")
+        .def("isLastStep", &SimulationClock::isLastStep, py::arg("totalSteps"), "Check if current step is last")
+        .def("stepToTime", &SimulationClock::stepToTime, py::arg("step"), "Convert step to time")
+        .def("timeToStep", &SimulationClock::timeToStep, py::arg("time"), "Convert time to step")
+        .def("advanceBy", &SimulationClock::advanceBy, py::arg("steps"), "Advance by multiple steps")
+        .def("timeAtFutureStep", &SimulationClock::timeAtFutureStep, py::arg("stepsAhead"), 
+             "Get time at a future step from current time");
+
+    // Logger for debugging and monitoring
+    py::class_<Logger>(m, "Logger", R"pbdoc(Logging system for debugging and monitoring)pbdoc")
+        .def(py::init<>())
+        .def("setLevel", &Logger::setLevel, py::arg("level"), "Set minimum logging level")
+        .def("isEnabled", &Logger::isEnabled, py::arg("level"), "Check if logging level is enabled")
+        .def("log", &Logger::log, py::arg("level"), py::arg("message"), py::arg("file") = "", py::arg("line") = 0, py::arg("function") = "",
+             "Log message with file/line/function information")
+        .def("debug", &Logger::debug, py::arg("message"), py::arg("file") = "", py::arg("line") = <br>0, py::arg("function") = "",
+             "Log debug message")
+        .def("info", &Logger::info, py::arg("message"), py::arg("file") = "", py::arg("line") = 0, py::arg("function") = "",
+             "Log info message")
+        .def("warning", &Logger::warning, py::arg("message"), py::arg("file") = "", py::arg("line") = 0, py::arg("function") = "",
+             "Log warning message")
+        .def("error", &Logger::error, py::arg("message"), py::arg("file") = "", py::arg("line") = 0, py::arg("function") = "",
+             "Log error message")
+        .def("critical", &Logger::critical, py::arg("message"), py::arg("file") = "", py::arg("line") = 0, py::arg("function") = "",
+             "Log critical message");
+
+    // Neuron - single spiking neuron
+    py::class_<Neuron>(m, "Neuron", R"pbdoc(Single spiking neuron implementing Leaky Integrate-and-Fire dynamics)pbdoc")
+        .def(py::init<NeuronId>(), py::arg("id"), "Create neuron with ID")
+        .def("getId", &Neuron::getId, "Get neuron ID")
+        .def("getType", &Neuron::getType, "Get neuron type")
+        .def("setType", &Neuron::setType, py::arg("type"), "Set neuron type")
+        .def("getMembranePotential", &Neuron::getMembranePotential, "Get membrane potential (mV)")
+        .def("setMembranePotential", &Neuron::setMembranePotential, py::arg("potential"), "Set membrane potential (mV)")
+        .def("addToMembranePotential", &Neuron::addToMembranePotential, py::arg("delta"), "Add to membrane potential")
+        .def("getThreshold", &Neuron::getThreshold, "Get firing threshold (mV)")
+        .def("setThreshold", &Neuron::setThreshold, py::arg("threshold"), "Set firing threshold (mV)")
+        .def("isFiring", &Neuron::isFiring, "Check if neuron is firing")
+        .def("isRefractory", &Neuron::isRefractory, "Check if neuron is in refractory period")
+        .def("setFiringState", &Neuron::setFiringState, py::arg("state"), "Set firing state")
+        .def("setRefractoryPeriod", &Neuron::setRefractoryPeriod, py::arg("steps"), "Set refractory period")
+        .def("decrementRefractory", &Neuron::decrementRefractory, "Decrement refractory counter")
+        .def("getFiringRate", &Neuron::getFiringRate, "Get firing rate (Hz)")
+        .def("setFiringRate", &Neuron::setFiringRate, py::arg("rate"), "Set firing rate (Hz)")
+        .def("checkThreshold", &Neuron::checkThreshold, "Check if neuron has reached firing threshold")
+        .def("getLastSpikeTime", &Neuron::getLastSpikeTime, "Get timestamp of last spike (-1 if none)")
+        .def("stepLIF", &Neuron::stepLIF, py::arg("currentTime"), py::arg("dt") = 0.001, 
+             "Advance neuron state using LIF dynamics (returns true if fired)")
+        .def("receiveExcitatoryInput", &Neuron::receiveExcitatoryInput, py::arg("amplitude"), "Receive excitatory input")
+        .def("receiveInhibitoryInput", &Neuron::receiveInhibitoryInput, py::arg("amplitude"), "Receive inhibitory input")
+        .def("receiveModulatoryInput", &Neuron::receiveModulatoryInput, py::arg("amplitude"), "Receive modulatory input")
+        .def("injectCurrent", &Neuron::injectCurrent, py::arg("current"), "Inject current from external source")
+        .def("getTotalCurrent", &Neuron::getTotalCurrent, "Get total injected current")
+        .def("clearTotalCurrent", &Neuron::clearTotalCurrent, "Clear injected current")
+        .def("recordSpike", &Neuron::recordSpike, py::arg("timestamp"), "Record spike at given timestamp")
+        .def("getSpikeHistory", &Neuron::getSpikeHistory, "Get spike history vector")
+        .def("clearSpikeHistory", &Neuron::clearSpikeHistory, "Clear spike history")
+        .def("addIncomingSynapse", &Neuron::addIncomingSynapse, py::arg("handle"), "Add incoming synapse")
+        .def("addOutgoingSynapse", &Neuron::addOutgoingSynapse, py::arg("handle"), "Add outgoing synapse")
+        .def("getIncomingSynapses", &Neuron::getIncomingSynapses, "Get incoming synapse handles")
+        .def("getOutgoingSynapses", &Neuron::getOutgoingSynapses, "Get outgoing synapse handles")
+        .def("getState", &Neuron::getState, "Get neuron state (const)")
+        .def("getMutableState", &Neuron::getState, "Get mutable neuron state")
+        .def("setRegionId", &Neuron::setRegionId, py::arg("region"), "Set region ID")
+        .def("getRegionId", &Neuron::getRegionId, "Get region ID")
+        .def("setPopulationId", &Neuron::setPopulationId, py::arg("population"), "Set population ID")
+        .def("getPopulationId", &Neuron::getPopulationId, "Get population ID")
+        .def("step", &Neuron::step, py::arg("currentTime"), "Advance neuron for one simulation step")
+        .def("reset", &Neuron::reset, "Reset neuron to initial state")
+        .def("initializeRandom", &Neuron::initializeRandom, py::arg("rng"), "Initialize neuron with random parameters");
+
+    // NeuralRegion - brain region containing multiple populations
+    py::class_<NeuralRegion>(m, "NeuralRegion", R"pbdoc(Brain region containing multiple populations and local connectivity)pbdoc")
+        .def(py::init<RegionId>(), py::arg("id"), "Create region with ID")
+        .def(py::init<RegionId, std::string>(), py::arg("id"), py::arg("name"), "Create region with ID and name")
+        .def("getId", &NeuralRegion::getId, "Get region ID")
+        .def("getName", &NeuralRegion::getName, "Get region name")
+        .def("setName", &NeuralRegion::setName, py::arg("name"), "Set region name")
+        .def("setNextNeuronIndex", &NeuralRegion::setNextNeuronIndex, py::arg("next"), 
+             "Set next neuron ID to allocate (for global ID uniqueness)")
+        .def("addPopulation", &NeuralRegion::addPopulation, py::arg("size"), py::arg("type") = NeuronType::Internal,
+             "Add a new population with specified size and neuron type")
+        .def("getPopulation", &NeuralRegion::getPopulation, py::arg("id"), "Get population by ID")
+        .def("getPopulationCount", &NeuralRegion::getPopulationCount, "Get number of populations")
+        .def("getPopulations", &NeuralRegion::getPopulations, "Get all populations (const)")
+        .def("getAllPopulations", &NeuralRegion::getAllPopulations, "Get all populations (mutable)")
+        .def("addSynapse", &NeuralRegion::addSynapse, py::arg("source"), py::arg("destination"), 
+             py::arg("weight") = 0.0f, py::arg("delay") = 1, "Add local synapse within region")
+        .def("getSynapse", &NeuralRegion::getSynapse, py::arg("id"), "Get synapse by ID")
+        .def("getSynapseCount", &NeuralRegion::getSynapseCount, "Get number of synapses")
+        .def("getSynapses", &NeuralRegion::getSynapses, "Get all synapses (const)")
+        .def("getSynapsesFrom", &NeuralRegion::getSynapsesFrom, py::arg("neuron"), 
+             "Get all synapses originating from neuron")
+        .def("getSynapsesTo", &NeuralRegion::getSynapsesTo, py::arg("neuron"), 
+             "Get all synapses terminating at neuron")
+        .def("getTotalNeuronCount", &NeuralRegion::getTotalNeuronCount, "Get total neuron count")
+        .def("getActiveNeuronCount", &NeuralRegion::getActiveNeuronCount, "Get active neuron count")
+        .def("getFiringNeuronCount", &NeuralRegion::getFiringNeuronCount, "Get firing neuron count")
+        .def("getAverageFiringRate", &NeuralRegion::getAverageFiringRate, "Get average firing rate")
+        .def("getAverageSynapticWeight", &NeuralRegion::getAverageSynapticWeight, "Get average synaptic weight")
+        .def("getSynapticDensity", &NeuralRegion::getSynapticDensity, "Get synaptic density (fraction of possible connections)")
+        .def("step", &NeuralRegion::step, py::arg("currentTime"), "Step all populations and synapses")
+        .def("reset", &NeuralRegion::reset, "Reset all neurons and synapses")
+        .def("initializeRandomConnectivity", &NeuralRegion::initializeRandomConnectivity,
+             py::arg("rng"), py::arg("connectionProbability"), py::arg("meanWeight"), py::arg("weightVariance"),
+             "Initialize random connectivity")
+        .def("getAllNeurons", &NeuralRegion::getAllNeurons, "Get all neurons in region (mutable)")
+        .def("getAllNeuronsConst", &NeuralRegion::getAllNeurons, "Get all neurons in region (const)");
+
+    // NeuralPopulation - group of neurons with shared properties
+    py::class_<NeuralPopulation>(m, "NeuralPopulation", R"pbdoc(Group of neurons with shared properties)pbdoc")
+        .def(py::init<PopulationId, size_t>(), py::arg("id"), py::arg("size"), "Create population with ID and size")
+        .def("getId", &NeuralPopulation::getId, "Get population ID")
+        .def("getSize", &NeuralPopulation::getSize, "Get population size")
+        .def("isEmpty", &NeuralPopulation::isEmpty, "Check if population is empty")
+        .def("getNeuron", &NeuralPopulation::getNeuron, py::arg("index"), "Get neuron at index")
+        .def("getMutableNeuron", &NeuralPopulation::getNeuron, py::arg("index"), "Get mutable neuron at index")
+        .def("addNeuron", &NeuralPopulation::addNeuron, py::arg("neuron"), "Add neuron to population (caller retains ownership)")
+        .def("createNeurons", &NeuralPopulation::createNeurons, py::arg("startId"), 
+             "Create `size` neurons owned by this population with sequential IDs")
+        .def("getNeurons", &NeuralPopulation::getNeurons, "Get all neurons in population (const)")
+        .def("getNeuronType", &NeuralPopulation::getNeuronType, "Get neuron type for all neurons in population")
+        .def("setNeuronType", &NeuralPopulation::setNeuronType, py::arg("type"), "Set neuron type for all neurons")
+        .def("getActiveCount", &NeuralPopulation::getActiveCount, "Get number of active neurons")
+        .def("getFiringCount", &NeuralPopulation::getFiringCount, "Get number of firing neurons")
+        .def("getAverageFiringRate", &NeuralPopulation::getAverageFiringRate, "Get average firing rate")
+        .def("getActivityLevel", &NeuralPopulation::getActivityLevel, "Get activity level (fraction of active neurons)")
+        .def("initializeRandom", &NeuralPopulation::initializeRandom, py::arg("rng"), 
+             "Initialize all neurons randomly")
+        .def("step", &NeuralPopulation::step, py::arg("currentTime"), "Step all neurons")
+        .def("reset", &NeuralPopulation::reset, "Reset all neurons")
+        .def("getNeuronIds", &NeuralPopulation::getNeuronIds, "Get all neuron IDs in population")
+        .def("recordActivity", &NeuralPopulation::recordActivity, "Record current state for statistics")
+        .def("getMeanMembranePotential", &NeuralPopulation::getMeanMembranePotential, "Get mean membrane potential")
+        .def("getVarianceMembranePotential", &NeuralPopulation::getVarianceMembranePotential, "Get variance of membrane potentials");
+
+    // Synapse - connection between neurons
+    py::class_<Synapse>(m, "Synapse", R"pbdoc(Connection between neurons with transmission dynamics and plasticity)pbdoc")
+        .def(py::init<SynapseId, NeuronId, NeuronId>(), py::arg("id"), py::arg("source"), py::arg("destination"), 
+             "Create synapse with IDs")
+        .def("getId", &Synapse::getId, "Get synapse ID")
+        .def("getSourceNeuron", &Synapse::getSourceNeuron, "Get source neuron ID")
+        .def("getDestinationNeuron", &Synapse::getDestinationNeuron, "Get destination neuron ID")
+        .def("getWeight", &Synapse::getWeight, "Get synaptic weight")
+        .def("setWeight", &Synapse::setWeight, py::arg("weight"), "Set synaptic weight")
+        .def("addToWeight", &Synapse::addToWeight, py::arg("delta"), "Add to synaptic weight")
+        .def("getDelay", &Synapse::getDelay, "Get synaptic delay (in simulation steps)")
+        .def("setDelay", &Synapse::setDelay, py::arg("delay"), "Set synaptic delay (in simulation steps)")
+        .def("getType", &Synapse::getType, "Get synapse type")
+        .def("setType", &Synapse::setType, py::arg("type"), "Set synapse type")
+        .def("isExcitatory", &Synapse::isExcitatory, "Check if synapse is excitatory")
+        .def("isInhibitory", &Synapse::isInhibitory, "Check if synapse is inhibitory")
+        .def("recordPreSpike", &Synapse::recordPreSpike, py::arg("timestamp"), "Record presynaptic spike")
+        .def("recordPostSpike", &Synapse::recordPostSpike, py::arg("timestamp"), "Record postsynaptic spike")
+        .def("getPreSpikeHistory", &Synapse::getPreSpikeHistory, "Get presynaptic spike history")
+        .def("getPostSpikeHistory", &Synapse::getPostSpikeHistory, "Get postsynaptic spike history")
+        .def("clearHistory", &Synapse::clearHistory, "Clear spike history")
+        .def("setPreSpikeHistory", &Synapse::setPreSpikeHistory, py::arg("history"), 
+             "Restore presynaptic spike history (for checkpoint)")
+        .def("setPostSpikeHistory", &Synapse::setPostSpikeHistory, py::arg("history"), 
+             "Restore postsynaptic spike history (for checkpoint)")
+        .def("getPlasticityFlags", &Synapse::getPlasticityFlags, "Get plasticity flags (const)")
+        .def("getMutablePlasticityFlags", &Synapse::getPlasticityFlags, "Get mutable plasticity flags")
+        .def("enablePlasticity", &Synapse::enablePlasticity, py::arg("hebbian"), py::arg("stdp"), py::arg("rewardModulated"),
+             "Enable plasticity rules (Hebbian, STDP, reward-modulated)")
+        .def("getEligibilityTrace", &Synapse::getEligibilityTrace, "Get eligibility trace value")
+        .def("setEligibilityTrace", &Synapse::setEligibilityTrace, py::arg("trace"), "Set eligibility trace")
+        .def("decayEligibilityTrace", &Synapse::decayEligibilityTrace, py::arg("decayRate"), "Decay eligibility trace")
+        .def("getEfficacy", &Synapse::getEfficacy, "Get synaptic efficacy (use-dependent modulation)")
+        .def("setEfficacy", &Synapse::setEfficacy, py::arg("efficacy"), "Set synaptic efficacy")
+        .def("step", &Synapse::step, py::arg("currentTime"), "Update synapse for one simulation step")
+        .def("reset", &Synapse::reset, "Reset synapse to initial state")
+        .def("initializeRandom", &Synapse::initializeRandom, py::arg("rng"), 
+             "Initialize synapse with random parameters");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
