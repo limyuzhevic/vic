@@ -218,15 +218,13 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         }
     }
     
-    // Apply repeated input pattern to stimulate learning
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+// Apply repeated input pattern to stimulate learning
+    NLM_LOG_INFO("")
+    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...")
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // Stimulate 20 sensory neurons for selective learning (old code stimulated all 50)
+    // This prevents synchronous firing and weight saturation, allowing for
+    // more selective and meaningful learning patterns
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {

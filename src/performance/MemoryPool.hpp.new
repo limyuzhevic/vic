@@ -1,0 +1,188 @@
+#pragma once
+
+/**
+ * MemoryPool - Lock-free memory pool for neurons and synapses with performance monitoring
+ * 
+ * Provides pre-allocated object pools to reduce allocation overhead during simulation.
+ * Each pool manages objects of a single type with fixed size.
+ * 
+ * Enhanced with performance monitoring capabilities to track memory usage patterns.
+ * 
+ * Features:
+ * - Lock-free allocation and deallocation
+ * - Pre-allocated memory blocks
+ * - Memory-efficient slab allocation
+ * - Thread-safe operations
+ * - Performance metrics collection
+ * - Alert system for memory thresholds
+ * 
+ * Biological motivation:
+ * - Like biological neural systems that maintain fixed numbers of neurons/synapses
+ * - Reduces "allocation" overhead similar to how biological systems don't constantly create/destroy neurons
+ * 
+ * Performance monitoring integration:
+ * - Tracks allocation hits/misses ratios
+ * - Monitors memory usage trends
+ * - Provides alerts for memory pressure
+ * - Integrates with real-time monitoring system
+ */
+
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+#include <memory>
+#include <atomic>
+#include <array>
+#include <optional>
+#include "../performance/PerformanceMonitor.hpp"
+
+namespace nlm {
+
+/**
+ * Performance metrics for memory pool operations
+ */
+struct MemoryPoolMetrics {
+    size_t allocateCount;
+    size_t deallocateCount;
+    size_t hitCount;
+    size_t missCount;
+    double averageAllocationTime;
+    double peakMemoryUsage;
+    size_t currentAllocated;
+    size_t currentAvailable;
+};
+
+/**
+ * Lock-free stack node for memory pool free list
+ */
+struct MemPoolNode {
+    std::atomic<MemPoolNode*> next;
+    
+    MemPoolNode() : next(nullptr) {}
+};
+
+/**
+ * MemoryPool - Slab allocator for fixed-size objects with performance monitoring
+ * 
+ * Template parameter T specifies the object type to allocate.
+ * All objects have the same fixed size determined at construction.
+ * 
+ * Integrates with PerformanceMonitor for real-time metrics collection.
+ */
+template<typename T>
+class MemoryPool {
+public:
+    /**
+     * Create a memory pool with performance monitoring
+     * 
+     * @param blockSize Number of objects per memory block
+     * @param initialBlocks Number of blocks to pre-allocate
+     * @param monitor Reference to performance monitor (can be null)
+     * @param poolName Optional name for this pool (for logging)
+     */
+    explicit MemoryPool(size_t blockSize = 1024, size_t initialBlocks = 4,
+                       PerformanceMonitor* monitor = nullptr, const std::string& poolName = "");
+    
+    ~MemoryPool();
+    
+    // Disable copying
+    MemoryPool(const MemoryPool&) = delete;
+    MemoryPool& operator=(const MemoryPool&) = delete;
+    
+    /**
+     * Allocate an object from the pool
+     * Lock-free operation with performance monitoring
+     */
+    T* allocate();
+    
+    /**
+     * Return an object to the pool
+     * Lock-free operation with performance monitoring
+     */
+    void deallocate(T* obj);
+    
+    /**
+     * Check if pool is empty
+     */
+    bool empty() const { return freeList_.load(std::memory_order_relaxed) == nullptr; }
+    
+    /**
+     * Get number of allocated objects
+     */
+    size_t allocatedCount() const { return allocatedCount_.load(std::memory_order_relaxed); }
+    
+    /**
+     * Get number of available objects
+     */
+    size_t availableCount() const { return availableCount_.load(std::memory_order_relaxed); }
+    
+    /**
+     * Total memory used by pool (bytes)
+     */
+    size_t memoryUsage() const;
+    
+    /**
+     * Pre-allocate objects
+     */
+    void reserve(size_t count);
+    
+    /**
+     * Get performance metrics
+     */
+    MemoryPoolMetrics getMetrics() const;
+    
+    /**
+     * Get performance monitor reference
+     */
+    PerformanceMonitor* getMonitor() const { return monitor_; }
+    
+    /**
+     * Get pool name for logging
+     */
+    const std::string& getPoolName() const { return poolName_; }
+
+private:
+    // Performance monitoring integration
+    PerformanceMonitor* monitor_;
+    std::string poolName_;
+    mutable size_t totalAllocates;
+    mutable size_t totalDeallocates;
+    mutable double totalAllocationTime;
+    
+    // Memory block containing objects
+    struct Block {
+        std::vector<uint8_t> data;
+        Block* nextBlock;
+        
+        explicit Block(size_t objectSize, size_t count);
+        
+        T* getObject(size_t index, size_t objectSize) {
+            return reinterpret_cast<T*>(data.data() + index * objectSize);
+        }
+    };
+    
+    // Add a new block to the pool
+    void addBlock();
+    
+    // Slab size for each object (rounded up to alignment)
+    size_t slabSize_;
+    
+    // Number of objects per block
+    size_t blockSize_;
+    
+    // Head of free list (lock-free)
+    std::atomic<MemPoolNode*> freeList_;
+    
+    // List of memory blocks
+    std::vector<std::unique_ptr<Block>> blocks_;
+    
+    // Block we're currently allocating from
+    std::atomic<Block*> currentBlock_;
+    
+    // Index of next available object in current block
+    std::atomic<size_t> currentIndex_;
+    
+    // Statistics
+    std::atomic<size_t> allocatedCount_;
+    std::atomic<size_t> availableCount_;
+};

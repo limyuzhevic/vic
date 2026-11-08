@@ -85,7 +85,7 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## The Simplest Possible Example
+## The Simplest Possible Example with Performance Monitoring
 
 ```python
 import pynlm
@@ -104,7 +104,104 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ---
 
-## Common Patterns
+## Performance Monitoring Example
+
+### Basic Performance Tracking
+
+```python
+import pynlm
+import pynlm.performance
+
+# Create and initialize brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Enable performance monitoring
+perf_monitor = pynlm.performance.PerformanceMonitor()
+perf_monitor.start()
+
+# Run simulation
+for i in range(100):
+    brain.step(i)
+
+# Get performance metrics
+perf_monitor.update(0.1)
+metrics = perf_monitor.getMetrics()
+
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Avg firing rate: {brain.getAverageFiringRate()}")
+print(f"CPU usage: {metrics.cpu.cpuUsage}")
+print(f"Memory usage: {metrics.cpu.memoryUsage} MB")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+
+perf_monitor.stop()
+```
+
+### Advanced Performance Analysis
+
+```python
+import pynlm
+import pynlm.performance
+
+def run_monitored_simulation(brain, world, agent, num_steps):
+    """Run simulation with detailed performance monitoring"""
+    
+    # Start performance monitoring
+    perf_monitor = pynlm.performance.PerformanceMonitor()
+    perf_monitor.start()
+    
+    # Performance tracking variables
+    step_data = []
+    
+    for step in range(num_steps):
+        # Update world
+        world.update(0.1)
+        
+        # Get what the agent sees
+        percept = world.getSensoryPercept()
+        
+        # Tell the brain
+        agent.processSensoryInput(percept)
+        
+        # Brain thinks
+        brain.step(step)
+        
+        # Record performance metrics every 10 steps
+        if step % 10 == 0:
+            perf_monitor.update(0.1)
+            metrics = perf_monitor.getMetrics()
+            step_data.append({
+                'step': step,
+                'firing_rate': brain.getAverageFiringRate(),
+                'cpu_usage': metrics.cpu.cpuUsage,
+                'memory_usage': metrics.cpu.memoryUsage,
+                'spike_count': brain.getTotalSpikeCount()
+            })
+        
+        # Get action from brain
+        action = agent.decodeMotorCommand()
+        
+        # Do action in world
+        world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Stop monitoring and generate report
+    perf_monitor.stop()
+    report = perf_monitor.getReport()
+    
+    return {
+        'brain_stats': {
+            'neurons': brain.getTotalNeuronCount(),
+            'firing_neuron_count': brain.getFiringNeuronCount(),
+            'total_spikes': brain.getTotalSpikeCount(),
+            'avg_firing_rate': brain.getAverageFiringRate()
+        },
+        'performance_data': step_data,
+        'performance_report': report
+    }
+
+# Use it:
+# results = run_monitored_simulation(brain, world, agent, 1000)
+```
 
 ### Pattern 1: Run a Simulation
 
