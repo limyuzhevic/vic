@@ -109,12 +109,17 @@ private:
     std::unique_ptr<Impl> pImpl;
 };
 
-// Convenience macro for file/line/function info
+// Convenience macros for file/line/function info
 #define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
 #define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
+
+// Additional convenience macros for improved logging
+#define NLM_LOG_SUCCESS(msg) nlm::Logger::getGlobal().info("[SUCCESS] " + std::string(msg), __FILE__, __LINE__, __func__)
+#define NLM_LOG_STATUS(msg) nlm::Logger::getGlobal().info("[STATUS] " + std::string(msg), __FILE__, __LINE__, __func__)
+#define NLM_LOG_PROGRESS(msg) nlm::Logger::getGlobal().info("[PROGRESS] " + std::string(msg), __FILE__, __LINE__, __func__)
 
 // Stream-style logging helper
 class LogStream {

@@ -11,97 +11,109 @@ namespace nlm {
 
 // Forward declarations
 class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
-};
-
-// Main configuration class
-class Config {
+// Configuration schema validation
+class ConfigSchema {
 public:
-    Config();
-    ~Config();
+    enum class ValidationResult {
+        Valid,
+        InvalidType,
+        MissingRequired,
+        OutOfRange,
+        InvalidValue,
+        UnknownField
+    };
     
-    // Disable copying, enable moving
-    Config(const Config&) = delete;
-    Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    struct SchemaField {
+        std::string name;
+        std::string type;  // "int", "double", "string", "bool", "array"
+        bool required;
+        std::string description;
+        std::variant<int64_t, double, std::string, bool> defaultValue;
+        std::pair<double, double> range;  // for numeric types: min, max
+        std::vector<std::string> allowedValues;  // for string types
+        
+        SchemaField(const std::string& n, const std::string& t, bool r = false, const std::string& d = "")
+            : name(n), type(t), required(r), description(d) {}
+    };
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    ConfigSchema();
+    ~ConfigSchema();
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Add a field definition
+    void addField(const SchemaField& field);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Validate configuration against schema
+    ValidationResult validate(const Config& config) const;
     
-    // Get values (defined here so templates instantiate in every TU)
-template<typename T>
-    std::optional<T> get(const std::string& key) const;
-
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Get validation errors
+    std::vector<std::string> getValidationErrors(const Config& config) const;
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Check if field exists in schema
+    bool hasField(const std::string& name) const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Get field definition
+    SchemaField getField(const std::string& name) const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Get all field names
+    std::vector<std::string> getFieldNames() const;
     
-    // Clear all
+    // Clear schema
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    // Check if schema is empty
+    bool empty() const;
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
+
+// Configuration schema manager (singleton)
+class ConfigSchemaManager {
+public:
+    static ConfigSchemaManager& getInstance();
+    
+    // Register a schema for a configuration category
+    void registerSchema(const std::string& category, const ConfigSchema& schema);
+    
+    // Get schema for a category
+    ConfigSchema getSchema(const std::string& category) const;
+    
+    // Check if schema exists for category
+    bool hasSchema(const std::string& category) const;
+    
+    // Validate configuration against registered schema
+    bool validateConfiguration(const std::string& category, const Config& config) const;
+    
+    // Get all registered schema categories
+    std::vector<std::string> getSchemaCategories() const;
+    
+    // Clear all schemas
+    void clear();
+    
+private:
+    ConfigSchemaManager();
+    ~ConfigSchemaManager();
+    
+    struct Impl;
+    std::unique_ptr<Impl> pImpl;
+};
+
+// Schema convenience functions
+namespace config_schema {
+
+// Register common NLM configuration schemas
+void registerNMConfigurationSchema(ConfigSchemaManager& manager);
+
+// Validate configuration with common NLM defaults
+bool validateNMConfiguration(const Config& config);
+
+// Get validation error details for NLM configuration
+std::vector<std::string> getNMConfigurationValidationErrors(const Config& config);
+
+// Reset to default NLM configuration schema
+void resetNMConfigurationSchema(ConfigSchemaManager& manager);
+
+} // namespace config_schema
 
 } // namespace nlm
