@@ -22,7 +22,14 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , memoryNeurons_()
+    , memoryActivations_()
+    , memoryTimestamps_()
+    , activeTraces_()
+    , recurrentConnections_()
+    , winners_()
 {
+    NLM_LOG_INFO("NeuralWorkingMemory created with capacity " + std::to_string(capacity_));
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -69,46 +76,196 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
     }
 }
 
-void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
-    // Find or add this neuron to memory
-    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        memoryActivations_[idx] = activation;
-        memoryTimestamps_[idx] = 0;
-    } else if (memoryNeurons_.size() < capacity_) {
-        memoryNeurons_.push_back(neuron);
-        memoryActivations_.push_back(activation);
-        memoryTimestamps_.push_back(0);
-        it = memoryNeurons_.end() - 1;
-    }
-
-    // Phase 6: activeTraces_ is the trace list getActiveTraces()
-    // reports, and it was never populated — only cleared — so it
-    // always read 0 even when memory held 50 neurons. A stored
-    // neuron is an active trace; decayWeakTraces() below removes
-    // it again when its activation falls below threshold, and
-    // clear()/restoreSnapshot() reset the list with the content.
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
-        if (activation > 0.1f && !present) activeTraces_.push_back(idx);
-        if (activation <= 0.1f && present) {
-            activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
-                                activeTraces_.end());
-        }
-    }
-    
-    // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
-    }
-}
-
 std::vector<float> NeuralWorkingMemory::retrieve() const {
     std::vector<float> result;
     result.reserve(memoryActivations_.size());
+    
+    for (float activation : memoryActivations_) {
+        result.push_back(activation);
+    }
+    
+    return result;
+}
+
+bool NeuralWorkingMemory::contains(NeuronId neuron) const {
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    return it != memoryNeurons_.end();
+}
+
+float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
+    auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+    if (it == memoryNeurons_.end()) {
+        return 0.0f;
+    }
+    
+    size_t idx = std::distance(memoryNeurons_.begin(), it);
+    return memoryActivations_[idx];
+}
+
+void NeuralWorkingMemory::update(TimestepDuration dt) {
+    if (!brain_ || memoryNeurons_.empty()) {
+        return;
+    }
+    
+    // Apply decay to all memory traces
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        memoryActivations_[i] *= (1.0f - decayRate_ * dt);
+        memoryTimestamps_[i] += dt;
+    }
+    
+    // Update active traces based on current activation levels
+    activeTraces_.clear();
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) {
+            activeTraces_.push_back(i);
+        }
+    }
+    
+    // Inject current to maintain active traces
+    for (size_t idx : activeTraces_) {
+        NeuronId neuron = memoryNeurons_[idx];
+        float activation = memoryActivations_[idx];
+        brain_->injectCurrent(neuron, activation * 2.0f);  // Reduced from 5.0f
+    }
+    
+    // Run competition for limited capacity
+    if (memoryNeurons_.size() > capacity_) {
+        runCompetition();
+    }
+    
+    // Clean up weak traces
+    decayWeakTraces();
+}
+
+void NeuralWorkingMemory::clear() {
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    activeTraces_.clear();
+    recurrentConnections_.clear();
+    winners_.clear();
+    
+    // Clear all stored currents
+    for (NeuronId neuron : memoryNeurons_) {
+        brain_->injectCurrent(neuron, 0.0f);
+    }
+}
+
+float NeuralWorkingMemory::getMemoryActivity() const {
+    if (memoryActivations_.empty()) {
+        return 0.0f;
+    }
+    
+    float totalActivity = 0.0f;
+    for (float activation : memoryActivations_) {
+        totalActivity += activation;
+    }
+    
+    return totalActivity / static_cast<float>(memoryActivations_.size());
+}
+
+void NeuralWorkingMemory::runCompetition() {
+    if (memoryNeurons_.size() <= capacity_) {
+        return;
+    }
+    
+    // Select winners based on highest activation levels
+    std::vector<size_t> winnerIndices;
+    std::vector<float> winnerActivations;
+    
+    for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+        winnerIndices.push_back(i);
+        winnerActivations.push_back(memoryActivations_[i]);
+    }
+    
+    // Sort by activation (highest first)
+    std::sort(winnerIndices.begin(), winnerIndices.end(),
+              [&winnerActivations](size_t a, size_t b) {
+                  return winnerActivations[a] > winnerActivations[b];
+              });
+    
+    // Keep only top capacity_ neurons
+    size_t numToKeep = std::min(capacity_, memoryNeurons_.size());
+    
+    // Update memory with winners
+    std::vector<NeuronId> newNeurons;
+    std::vector<float> newActivations;
+    std::vector<SimulationStep> newTimestamps;
+    
+    for (size_t i = 0; i < numToKeep; ++i) {
+        size_t idx = winnerIndices[i];
+        newNeurons.push_back(memoryNeurons_[idx]);
+        newActivations.push_back(memoryActivations_[idx]);
+        newTimestamps.push_back(memoryTimestamps_[idx]);
+    }
+    
+    memoryNeurons_ = newNeurons;
+    memoryActivations_ = newActivations;
+    memoryTimestamps_ = newTimestamps;
+    
+    // Update active traces
+    activeTraces_.clear();
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) {
+            activeTraces_.push_back(i);
+        }
+    }
+    
+    // Clear recurrent connections
+    recurrentConnections_.clear();
+    
+    // Create new maintenance connections
+    for (size_t i = 1; i < memoryNeurons_.size(); ++i) {
+        createRecurrentConnection(memoryNeurons_[i-1], memoryNeurons_[i], 0.5f);
+    }
+}
+
+void NeuralWorkingMemory::strengthenMemory(float factor) {
+    for (float& activation : memoryActivations_) {
+        activation = std::min(1.0f, activation * factor);
+    }
+}
+
+bool NeuralWorkingMemory::isWinning(NeuronId neuron) const {
+    auto it = std::find(winners_.begin(), winners_.end(), neuron);
+    return it != winners_.end();
+}
+
+void NeuralWorkingMemory::decayWeakTraces() {
+    // Remove traces with very low activation
+    auto it = std::remove_if(memoryNeurons_.begin(), memoryNeurons_.end(),
+                             [this](const NeuronId& neuron) {
+                                 // Find the index of this neuron
+                                 auto actIt = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
+                                 if (actIt == memoryNeurons_.end()) return false;
+                                 size_t idx = std::distance(memoryNeurons_.begin(), actIt);
+                                 return memoryActivations_[idx] < 0.05f;
+                             });
+    
+    // Remove the neuron from all parallel vectors
+    if (it != memoryNeurons_.end()) {
+        size_t removedIdx = std::distance(memoryNeurons_.begin(), it);
+        memoryNeurons_.erase(it, memoryNeurons_.end());
+        
+        // Remove corresponding activations and timestamps
+        if (removedIdx < memoryActivations_.size()) {
+            memoryActivations_.erase(memoryActivations_.begin() + removedIdx,
+                                    memoryActivations_.end());
+            memoryTimestamps_.erase(memoryTimestamps_.begin() + removedIdx,
+                                    memoryTimestamps_.end());
+        }
+        
+        // Update active traces
+        activeTraces_.erase(std::remove_if(activeTraces_.begin(), activeTraces_.end(),
+                                           [removedIdx](size_t idx) { return idx == removedIdx; || idx > removedIdx; }),
+                            activeTraces_.end());
+        
+        // Rebuild indices in activeTraces_
+        for (size_t& idx : activeTraces_) {
+            if (idx > removedIdx) idx--;
+        }
+    }
+}
     
     for (float activation : memoryActivations_) {
         result.push_back(activation);

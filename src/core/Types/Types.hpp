@@ -130,6 +130,24 @@ struct PlasticityFlags {
     constexpr PlasticityFlags() : hebbian(false), stdp(false), 
                                   reward_modulated(false), structural(false), 
                                   eligible(false) {}
+    
+    constexpr uint8_t toUint8() const {
+        uint8_t result = 0;
+        if (hebbian) result |= 0x01;
+        if (stdp) result |= 0x02;
+        if (reward_modulated) result |= 0x04;
+        if (structural) result |= 0x08;
+        if (eligible) result |= 0x10;
+        return result;
+    }
+    
+    constexpr void fromUint8(uint8_t value) {
+        hebbian = (value & 0x01) != 0;
+        stdp = (value & 0x02) != 0;
+        reward_modulated = (value & 0x04) != 0;
+        structural = (value & 0x08) != 0;
+        eligible = (value & 0x10) != 0;
+    }
 };
 
 // Developmental state

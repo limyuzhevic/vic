@@ -64,7 +64,8 @@ int main(int argc, char* argv[]) {
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;
-    std::cout << "Total reward: " << result.totalReward << std::endl;
+    std::cout << "Total reward (sum): " << result.totalReward << std::endl;
+    std::cout << "Avg reward per step: " << result.totalReward / result.memoryEpisodesStored << std::endl;
     std::cout << "Avg firing rate: " << result.avgFiringRate << std::endl;
     std::cout << "Episodes stored: " << result.memoryEpisodesStored << std::endl;
     std::cout << "Dopamine level: " << result.dopamineLevel << std::endl;

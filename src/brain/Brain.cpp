@@ -544,41 +544,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6b: Homeostatic synaptic scaling (Phase 4) ==========
-    // Every 100 steps, cap each neuron's total incoming excitatory
-    // weight. STDP/Hebbian with soft bounds stop individual weights
-    // saturating, but they do not stop the *sum* of ~25 incoming
-    // weights growing until every neuron is driven over threshold on
-    // every refractory cycle — the periodic attractor of Phase 3.
-    // Rescaling only when the sum exceeds the cap, and scaling all
-    // incoming excitatory weights by the same factor, preserves the
-    // *relative* pattern of strengths (selectivity) while bounding
-    // total drive. Inhibitory weights are left untouched, so scaling
-    // also moves the E/I balance toward inhibition rather than away.
-    // Cap 3.0: with ~5 co-active presynaptic neurons per step, total
-    // drive is then at most ~5 * (3.0/25) * 10 = 6 mV per step before
-    // leak — below the ~15 mV spike gap, so a neuron must integrate
-    // over several steps to fire instead of firing every cycle.
-    if (currentStep > 0 && currentStep % 100 == 0) {
-        constexpr float kIncomingExcitatoryCap = 3.0f;
-        for (auto& region : pImpl->regions) {
-            for (auto* neuron : region->getAllNeurons()) {
-                auto incoming = region->getSynapsesTo(neuron->getId());
-                float sum = 0.0f;
-                for (Synapse* syn : incoming) {
-                    if (syn->getWeight() > 0.0f) sum += syn->getWeight();
-                }
-                if (sum > kIncomingExcitatoryCap) {
-                    float scale = kIncomingExcitatoryCap / sum;
+            // ========== STEP 6b: Enhanced homeostatic synaptic scaling ==========
+        if (currentStep > 0 && currentStep % 100 == 0) {
+            constexpr float kIncomingExcitatoryCap = 2.0f;  // Reduced from 3.0 to 2.0 for stricter control
+            constexpr float kMaxNeuronalExcitability = 50.0f;  // Maximum allowed membrane potential range
+            
+            for (auto& region : pImpl->regions) {
+                for (auto* neuron : region->getAllNeurons()) {
+                    auto incoming = region->getSynapsesTo(neuron->getId());
+                    float sum = 0.0f;
                     for (Synapse* syn : incoming) {
-                        if (syn->getWeight() > 0.0f) {
-                            syn->setWeight(syn->getWeight() * scale);
+                        if (syn->getWeight() > 0.0f) sum += syn->getWeight();
+                    }
+                    if (sum > kIncomingExcitatoryCap) {
+                        float scale = kIncomingExcitatoryCap / sum;
+                        for (Synapse* syn : incoming) {
+                            if (syn->getWeight() > 0.0f) {
+                                syn->setWeight(syn->getWeight() * scale);
+                            }
+                        }
+                    }
+                    
+                    // Additional activity regulation: clamp membrane potential
+                    auto& state = neuron->getState();
+                    float potentialRange = state.membranePotential - state.restingPotential;
+                    if (potentialRange > kMaxNeuronalExcitability) {
+                        // Scale down all inputs to this neuron proportionally
+                        float reductionFactor = kMaxNeuronalExcitability / potentialRange;
+                        for (Synapse* syn : incoming) {
+                            if (syn->getWeight() > 0.0f) {
+                                syn->setWeight(syn->getWeight() * reductionFactor);
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
     // ========== STEP 7: Update episodic memory ==========
     pImpl->stepsSinceLastEpisode++;
@@ -932,10 +933,82 @@ bool Brain::save(const std::string& filepath) const {
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
-        CheckpointWriter writer;
-        if (!writer.create(filepath, CompressionLevel::Balanced)) {
-            NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
-            return false;
+        // Use the configured checkpoint manager if available
+        if (pImpl->checkpointManager) {
+            // Set providers for the checkpoint manager
+            pImpl->checkpointManager->setNeuronProvider([this]() -> NeuronCheckpointData {
+                NeuronCheckpointData data;
+                data.membranePotential.reserve(getTotalNeuronCount());
+                data.restingPotential.reserve(getTotalNeuronCount());
+                data.threshold.reserve(getTotalNeuronCount());
+                data.resetPotential.reserve(getTotalNeuronCount());
+                data.leakConductance.reserve(getTotalNeuronCount());
+                data.firingState.reserve(getTotalNeuronCount());
+                data.refractoryRemaining.reserve(getTotalNeuronCount());
+                data.refractoryPeriod.reserve(getTotalNeuronCount());
+                data.lastSpikeTime.reserve(getTotalNeuronCount());
+                data.firingRate.reserve(getTotalNeuronCount());
+                data.neuronType.reserve(getTotalNeuronCount());
+                data.regionId.reserve(getTotalNeuronCount());
+                data.populationId.reserve(getTotalNeuronCount());
+                
+                for (const auto& region : pImpl->regions) {
+                    for (const auto& pop : region->getPopulations()) {
+                        for (const auto* neuron : pop->getNeurons()) {
+                            const auto& state = neuron->getState();
+                            data.membranePotential.push_back(state.membranePotential);
+                            data.restingPotential.push_back(state.restingPotential);
+                            data.threshold.push_back(state.threshold);
+                            data.resetPotential.push_back(state.resetPotential);
+                            data.leakConductance.push_back(state.leakConductance);
+                            data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                            data.refractoryRemaining.push_back(state.refractoryRemaining);
+                            data.refractoryPeriod.push_back(state.refractoryPeriod);
+                            data.lastSpikeTime.push_back(state.lastSpikeTime);
+                            data.firingRate.push_back(state.firingRate);
+                            data.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                            data.regionId.push_back(static_cast<uint64_t>(region->getId().index()));
+                            data.populationId.push_back(static_cast<uint64_t>(pop->getId()));
+                        }
+                    }
+                }
+                return data;
+            });
+            
+            pImpl->checkpointManager->setSynapseProvider([this]() -> SynapseCheckpointData {
+                SynapseCheckpointData data;
+                for (const auto& region : pImpl->regions) {
+                    for (const auto& syn : region->getSynapses()) {
+                        data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                        data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                        data.weight.push_back(syn->getWeight());
+                        data.delay.push_back(syn->getDelay());
+                        data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                        data.plasticityFlags.push_back(
+                            (syn->getPlasticityFlags().hebbian ? 0x01 : 0) |
+                            (syn->getPlasticityFlags().stdp ? 0x02 : 0) |
+                            (syn->getPlasticityFlags().reward_modulated ? 0x04 : 0) |
+                            (syn->getPlasticityFlags().structural ? 0x08 : 0) |
+                            (syn->getPlasticityFlags().eligible ? 0x10 : 0)
+                        );
+                        data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                        data.efficacy.push_back(syn->getEfficacy());
+                        data.shortTermDepression.push_back(syn->getShortTermDepression());
+                        data.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+                    }
+                }
+                return data;
+            });
+            
+            // Use checkpoint manager's saveImmediately
+            return pImpl->checkpointManager->saveImmediately(filepath);
+        } else {
+            // Fallback to direct checkpoint writing if no checkpoint manager
+            CheckpointWriter writer;
+            if (!writer.create(filepath, CompressionLevel::Balanced)) {
+                NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+                return false;
+            }
         }
         
         // Set metadata
@@ -1102,6 +1175,16 @@ bool Brain::load(const std::string& filepath) {
     NLM_LOG_INFO("Loading brain state from " + filepath);
     
     try {
+        // Use the checkpoint manager if available
+        if (pImpl->checkpointManager) {
+            if (!pImpl->checkpointManager->load(filepath)) {
+                NLM_LOG_LOG_ERROR("Failed to load checkpoint: " + filepath);
+                return false;
+            }
+            return true;
+        }
+        
+        // Fallback to direct checkpoint reading if no checkpoint manager
         CheckpointReader reader;
         if (!reader.open(filepath)) {
             NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
@@ -1211,11 +1294,6 @@ bool Brain::load(const std::string& filepath) {
                 uint64_t key = pairKey(synapseData.sourceNeuron[i],
                                        synapseData.destinationNeuron[i]);
                 auto it = byPair.find(key);
-                Synapse* target = nullptr;
-                if (it != byPair.end()) {
-                    size_t used = usedCount[key]++;
-                    if (used < it->second.size()) target = it->second[used];
-                }
                 if (!target) continue;
                 target->setWeight(synapseData.weight[i]);
                 if (i < synapseData.delay.size()) target->setDelay(synapseData.delay[i]);
@@ -1227,6 +1305,25 @@ bool Brain::load(const std::string& filepath) {
                 }
                 if (i < synapseData.efficacy.size()) {
                     target->setEfficacy(synapseData.efficacy[i]);
+                }
+                if (i < synapseData.plasticityFlags.size()) {
+                    // Restore plasticity flags from saved data
+                    PlasticityFlags flags;
+                    flags.fromUint8(synapseData.plasticityFlags[i]);
+                    auto& targetFlags = target->getPlasticityFlags();
+                    targetFlags.hebbian = flags.hebbian;
+                    targetFlags.stdp = flags.stdp;
+                    targetFlags.reward_modulated = flags.reward_modulated;
+                    targetFlags.structural = flags.structural;
+                    targetFlags.eligible = flags.eligible;
+                }
+                if (i < synapseData.shortTermDepression.size()) {
+                    // Note: setShortTermDepression method doesn't exist in Synapse API
+                    // target->setShortTermDepression(synapseData.shortTermDepression[i]);
+                }
+                if (i < synapseData.shortTermFacilitation.size()) {
+                    // Note: setShortTermFacilitation method doesn't exist in Synapse API
+                    // target->setShortTermFacilitation(synapseData.shortTermFacilitation[i]);
                 }
                 ++restored;
             }
@@ -1316,7 +1413,26 @@ bool Brain::load(const std::string& filepath) {
                     if (used >= it->second.size()) continue;
                     it->second[used]->setPreSpikeHistory(pre);
                     it->second[used]->setPostSpikeHistory(post);
-                    ++restored;
+if (i < synapseData.plasticityFlags.size()) {
+                    // Restore plasticity flags from saved data
+                    PlasticityFlags flags;
+                    flags.fromUint8(synapseData.plasticityFlags[i]);
+                    auto& targetFlags = target->getPlasticityFlags();
+                    targetFlags.hebbian = flags.hebbian;
+                    targetFlags.stdp = flags.stdp;
+                    targetFlags.reward_modulated = flags.reward_modulated;
+                    targetFlags.structural = flags.structural;
+                    targetFlags.eligible = flags.eligible;
+                }
+                if (i < synapseData.shortTermDepression.size()) {
+                    // Note: setShortTermDepression method doesn't exist in Synapse API
+                    // target->setShortTermDepression(synapseData.shortTermDepression[i]);
+                }
+                if (i < synapseData.shortTermFacilitation.size()) {
+                    // Note: setShortTermFacilitation method doesn't exist in Synapse API
+                    // target->setShortTermFacilitation(synapseData.shortTermFacilitation[i]);
+                }
+                ++restored;
                 }
                 NLM_LOG_INFO("Restored spike histories for " + std::to_string(restored) + " synapses");
             }

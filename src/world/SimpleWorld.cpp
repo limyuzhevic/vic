@@ -54,20 +54,18 @@ void SimpleWorld::reset() {
     agent_.energy = maxEnergy_;
     rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
     
-    objects_.clear();
-    
     // Place some resource objects (positive reward when touched)
     for (int i = 0; i < 5; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 50.0f, 0.4f);  // Increased from 10.0f to 50.0f
     }
     
     // Place some hazard objects (negative reward when touched)
     for (int i = 0; i < 3; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -30.0f, 0.3f);  // Increased from -15.0f to -30.0f
     }
     
     generateVision();
@@ -160,16 +158,17 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             float newX = agent_.x + dx * 0.1f;
             float newY = agent_.y + dy * 0.1f;
             
-            if (isValidPosition(newX, newY)) {
-                agent_.x = newX;
-                agent_.y = newY;
-                agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
-                result.success = true;
-            } else {
-                result.reward = -0.05f;  // Cost for hitting wall
-                result.success = false;
-            }
+                if (isValidPosition(newX, newY)) {
+                    agent_.x = newX;
+                    agent_.y = newY;
+                    agent_.isMoving = true;
+                    result.reward = -0.005f;  // Reduced cost for movement
+                    result.success = true;
+                } else {
+                    result.reward = -0.02f;  // Cost for hitting wall
+                    result.success = false;
+                }
+                break;
             break;
         }
         
@@ -198,14 +197,14 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
         case MotorCommand::TurnLeft:
             agent_.angularVelocity = -turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -0.002f;  // Reduced from -0.005f
             result.success = true;
             break;
             
         case MotorCommand::TurnRight:
             agent_.angularVelocity = turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = -0.002f;  // Reduced from -0.005f
             result.success = true;
             break;
             

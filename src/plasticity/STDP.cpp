@@ -12,7 +12,7 @@ struct STDP::Impl {
     float minWeight;      // Minimum synaptic weight
     float maxWeight;      // Maximum synaptic weight
     
-    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
+    Impl() : ltpWeight(0.005f), ltdWeight(0.006f), timeConstant(20.0f),
              minWeight(-1.0f), maxWeight(1.0f) {}
 };
 
@@ -66,9 +66,13 @@ void STDP::update(Synapse* synapse,
     // (Brain steps at 1ms), so convert to ms for the tau window.
     float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
     if (dtMs > 0) {
-        totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
+        // Shorten the time window for more selective learning
+        float effectiveTau = std::min(tau, 10.0f);  // Reduced from 20.0ms
+        totalDelta += pImpl->ltpWeight * std::exp(-dtMs / effectiveTau);
     } else if (dtMs < 0) {
-        totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+        // Shorten the time window for more selective learning
+        float effectiveTau = std::min(tau, 10.0f);  // Reduced from 20.0ms
+        totalDelta += -pImpl->ltdWeight * std::exp(dtMs / effectiveTau);
     }
     
     // Apply weight change with bounds

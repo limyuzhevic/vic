@@ -10,7 +10,7 @@ struct Hebbian::Impl {
     float minWeight;
     float covarianceThreshold;  // For covariance rule
     
-    Impl() : learningRate(0.01f), maxWeight(1.0f), minWeight(-1.0f),
+    Impl() : learningRate(0.005f), maxWeight(1.0f), minWeight(-1.0f),
              covarianceThreshold(0.0f) {}
 };
 
@@ -57,8 +57,9 @@ void Hebbian::update(Synapse* synapse,
     // with history length (up to 100x100 pairs) and saturated every weight
     // to its bound in one step. One correlated recent pair = one step.
     // Timestamps are in seconds, so the 100ms window is 0.1s.
+    // Shortened time window for more selective learning
     float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
-    float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
+    float delta = std::abs(dtSeconds) < 0.05f ? pImpl->learningRate : 0.0f;  // Reduced from 0.1s
     if (synapse->getType() == SynapseType::Inhibitory) {
         delta = -delta;  // strengthen inhibition, don't flip it to excitatory
     }

@@ -20,9 +20,9 @@ struct StructuralPlasticity::Impl {
     size_t totalSynapsesCreated;
     size_t totalSynapsesPruned;
     
-    Impl() : synaptogenesisRate(0.0001f), pruningRate(0.00001f),
-             minWeightThreshold(0.05f), activityThreshold(0.001f),
-             maxSynapsesPerNeuron(100), maxTotalSynapses(1000000),
+    Impl() : synaptogenesisRate(0.00005f), pruningRate(0.00005f),  // Equal rates for balance
+             minWeightThreshold(0.1f), activityThreshold(0.5f),     // Higher thresholds
+             maxSynapsesPerNeuron(50), maxTotalSynapses(100000),    // Stricter limits
              useActivityDependency(true),
              totalSynapsesCreated(0), totalSynapsesPruned(0) {}
 };
@@ -201,7 +201,8 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
                     NeuronId dst = activities[idx2].id;
                     
                     // Only create if both neurons are somewhat active
-                    if (activities[idx1].activity > 0.1f || activities[idx2].activity > 0.1f) {
+                    if (activities[idx1].activity > pImpl->activityThreshold &&
+                        activities[idx2].activity > pImpl->activityThreshold) {
                         // Initial weight based on activity
                         float weight = 0.1f + rng.uniformReal(0.0f, 0.2f);
                         createSynapse(brain, src, dst, weight);

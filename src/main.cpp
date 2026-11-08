@@ -235,9 +235,47 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             }
         }
     }
+    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
+    // each step. The old code injected 30.0f into *every* sensory neuron
+    // 20 times per step (600.0f), so the whole network fired synchronously
+    // and every weight saturated to 1.0 - learning was measurable but not
+    // selective at all.
+    std::vector<NeuronId> patternNeurons;
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (auto* neuron : region->getAllNeurons()) {
+            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+                patternNeurons.push_back(neuron->getId());
+            }
+        }
+    }
+    
+    // Activity-dependent input regulation: reduce current when network activity is too high
     for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+        // Calculate activity-based input scaling factor
+        float activityScaling = 1.0f;
+        if (brain->getFiringNeuronCount() > 0) {
+            // Scale down input based on firing rate to prevent runaway excitation
+            // If firing rate approaches saturation, reduce input
+            float firingRate = static_cast<float>(brain->getTotalSpikeCount()) / (step + 1);
+            if (firingRate > 50.0f) {  // If firing rate is very high, reduce input
+                activityScaling = std::max(0.1f, 1.0f - (firingRate - 50.0f) * 0.01f);
+            }
+        }
+        
+        // Use different current levels for different neurons to promote selectivity
+        float baseCurrent = 15.0f;  // Reduced from 30.0f
+        float currentStep = static_cast<float>(step % 100);
+        
+        for (size_t i = 0; i < patternNeurons.size(); ++i) {
+            NeuronId id = patternNeurons[i];
+            // Use a pattern: increase then decrease current to create selective pressure
+            float patternCurrent = baseCurrent * activityScaling;
+            if (currentStep < 30) {  // Ramp up
+                patternCurrent *= (currentStep / 30.0f);
+            } else if (currentStep > 70) {  // Ramp down
+                patternCurrent *= ((100.0f - currentStep) / 30.0f);
+            }
+            brain->injectCurrent(id, patternCurrent);
         }
         
         brain->step(step, step * 0.001);
@@ -246,7 +284,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                        " | Activity scale: " + std::to_string(activityScaling));
         }
     }
     
@@ -284,10 +323,30 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
 
     for (int trial = 0; trial < 50; ++trial) {
-        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
+        // Activity-dependent input regulation for STDP test
+        float activityScaling = 1.0f;
+        if (brain->getFiringNeuronCount() > 0) {
+            float firingRate = static_cast<float>(brain->getTotalSpikeCount()) / (trial * 2 + 1);
+            if (firingRate > 50.0f) {
+                activityScaling = std::max(0.3f, 1.0f - (firingRate - 50.0f) * 0.005f);
+            }
+        }
+        
+        // Use reduced current levels and activity scaling
+        float preCurrent = 20.0f * activityScaling;
+        float postCurrent = 20.0f * activityScaling;
+        
+        brain->injectCurrent(syn->getSourceNeuron(), preCurrent);
         brain->step(trial * 2, trial * 2 * 0.001);
-        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
+        brain->injectCurrent(syn->getDestinationNeuron(), postCurrent);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+        
+        // Log activity periodically
+        if (trial % 10 == 0) {
+            NLM_LOG_INFO("    Trial " + std::to_string(trial) + 
+                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                        " | Activity scale: " + std::to_string(activityScaling));
+        }
     }
 
     float delta = syn->getWeight() - beforeWeight;
@@ -349,15 +408,57 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
+            }
+    }
+    
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Add advanced command-line options
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Simulation mode options
+        if (arg == "--fast") {
+            config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::CommandLine);
+            config->set("max_simulation_steps", 100, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Fast mode enabled: Reduced neurons and steps");
+        } else if (arg == "--thorough") {
+            config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::CommandLine);
+            config->set("max_simulation_steps", 50000, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Thorough mode enabled: Increased neurons and steps");
+        } else if (arg == "--stable") {
+            // Enable conservative settings for stable learning
+            config->set("stdp_ltp_weight", 0.002f, ConfigSource::CommandLine);
+            config->set("stdp_ltd_weight", 0.0025f, ConfigSource::CommandLine);
+            config->set("plasticity_learning_rate", 0.002f, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Stable mode enabled: Conservative plasticity settings");
+        } else if (arg == "--selective") {
+            // Enable high selectivity settings
+            config->set("stdp_ltp_weight", 0.001f, ConfigSource::CommandLine);
+            config->set("stdp_ltd_weight", 0.0012f, ConfigSource::CommandLine);
+            config->set("plasticity_learning_rate", 0.001f, ConfigSource::CommandLine);
+            config->set("synaptogenesis_rate", 0.00001f, ConfigSource::CommandLine);
+            config->set("pruning_rate", 0.00005f, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Selective mode enabled: High selectivity settings");
+        } else if (arg == "--debug") {
+            config->set("log_level", 0, ConfigSource::CommandLine);  // DEBUG level
+            config->set("enable_step_logging", true, ConfigSource::CommandLine);
+            config->set("enable_spike_logging", true, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Debug mode enabled: Enhanced logging");
+        } else if (arg == "--monitor") {
+            config->set("performance_monitoring", true, ConfigSource::CommandLine);
+            config->set("enable_memory_logging", true, ConfigSource::CommandLine);
+            NLM_LOG_INFO("Monitoring mode enabled: Performance tracking");
+        } else if (arg == "--checkpoint") {
+            if (i + 1 < argc) {
+                config->set("checkpoint_interval", std::stoi(argv[++i]), ConfigSource::CommandLine);
+                NLM_LOG_INFO("Checkpoint interval set to: " + std::to_string(config->getOr<int64_t>("checkpoint_interval", 1000)));
+            }
+        } else if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return 0;
+        }
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
@@ -428,8 +529,35 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
     NLM_LOG_INFO("");
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
+    NLM_LOG_INFO("  ✓ STDP plasticity rule");
+    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
+    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
+    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
+    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+void printHelp() {
+    std::cout << "=== NLM Phase 2 Help ===" << std::endl;
+    std::cout << "Available command-line options:" << std::endl;
+    std::cout << "  --config=<file>     Load configuration from file" << std::endl;
+    std::cout << "  --config <file>     Load configuration from file" << std::endl;
+    std::cout << "  --fast              Fast mode: Reduced neurons (100) and steps (100)" << std::endl;
+    std::cout << "  --thorough          Thorough mode: Increased neurons (2000) and steps (50000)" << std::endl;
+    std::cout << "  --stable            Stable mode: Conservative plasticity settings" << std::endl;
+    std::cout << "  --selective         Selective mode: High selectivity settings" << std::endl;
+    std::cout << "  --debug             Debug mode: Enhanced logging" << std::endl;
+    std::cout << "  --monitor           Monitoring mode: Performance tracking" << std::endl;
+    std::cout << "  --checkpoint=<n>    Set checkpoint interval (default: 1000)" << std::endl;
+    std::cout << "  --help, -h          Show this help message" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  ./nlm --config=custom.cfg" << std::endl;
+    std::cout << "  ./nlm --thorough --debug" << std::endl;
+    std::cout << "  ./nlm --selective --monitor" << std::endl;
 }
