@@ -6,11 +6,11 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <stdexcept>
+#include <filesystem>
+#include <format>
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -44,7 +44,7 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
-// Main configuration class
+// Main configuration class with modern C++ features
 class Config {
 public:
     Config();
@@ -53,26 +53,32 @@ public:
     // Disable copying, enable moving
     Config(const Config&) = delete;
     Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    Config(Config&&) noexcept = default;
+    Config& operator=(Config&&) noexcept = default;
     
-    // Load from file (JSON format)
-    bool loadFromFile(const std::string& filepath);
+    // Load from file (JSON format - placeholder for Phase 2)
+    bool loadFromFile(const std::string& filepath) noexcept;
+    
+    // Load from YAML file (placeholder for Phase 2)
+    bool loadFromYAML(const std::string& filepath) noexcept;
     
     // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    bool loadFromArgs(int argc, char** argv) noexcept;
     
     // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    bool saveToFile(const std::string& filepath) const noexcept;
     
-    // Get values (defined here so templates instantiate in every TU)
-template<typename T>
-    std::optional<T> get(const std::string& key) const;
-
+    // Get values with error handling
     template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
+    std::optional<T> get(const std::string& key) const noexcept;
+    
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue) const noexcept {
+        auto val = get<T>(key);
+        return val.has_value() ? val.value() : defaultValue;
+    }
+    
+    // Set values with validation
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
@@ -81,27 +87,50 @@ template<typename T>
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
-    bool has(const std::string& key) const;
+    bool has(const std::string& key) const noexcept;
     
     // Remove key
-    void remove(const std::string& key);
+    void remove(const std::string& key) noexcept;
     
     // Get all keys
-    std::vector<std::string> getKeys() const;
+    std::vector<std::string> getKeys() const noexcept;
     
     // Clear all
-    void clear();
+    void clear() noexcept;
     
     // Get configuration summary
-    std::string summary() const;
+    std::string summary() const noexcept;
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    static std::string trim(const std::string& str) noexcept;
+    static std::string toLower(const std::string& str) noexcept;
 };
 
 } // namespace nlm
+
+// Template implementations will go in Config.cpp
+namespace nlm {
+    template<typename T>
+    std::optional<T> Config::get(const std::string& key) const noexcept {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        if (it == pImpl->entries.end()) {
+            return std::nullopt;
+        }
+        // Numeric values convert between int/int64/double/float/etc
+        return std::visit([](auto&& v) -> std::optional<T> {
+            using V = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<V, T>) {
+                return v;
+            } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
+                return static_cast<T>(v);
+            } else {
+                return std::nullopt;
+            }
+        }, it->value);
+    }
+}
