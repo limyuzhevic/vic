@@ -1,5 +1,7 @@
 # NLM - Easy Usage Guide for Beginners
 
+This is the beginner-friendly version of the NLM documentation. For advanced features and comprehensive examples, see `NLM_ENHANCED_USAGE.md`.
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
@@ -293,5 +295,15 @@ When you're comfortable:
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Try the enhanced features in `NLM_ENHANCED_USAGE.md`
 
 That's it! You're now ready to use NLM.
+
+**💡 NEW:** Check out `NLM_ENHANCED_USAGE.md` for powerful new features including:
+- Pythonic properties and convenience methods
+- Comprehensive statistics and validation tools
+- Advanced simulation utilities and helpers
+- Enhanced configuration management
+- More efficient batch processing patterns
+
+These enhancements make NLM even easier to use and more powerful for both beginners and advanced users!

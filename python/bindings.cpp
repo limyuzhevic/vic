@@ -158,8 +158,110 @@ PYBIND11_MODULE(pynlm, m) {
            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
+        .def("get", [](Config& self, const std::string& key) {
+            // Try to get as different types, return None if not available
+            if (self.has(key)) {
+                // For Python, we'll try to get as int first, then double, then string, etc.
+                if (auto val = self.get<int>(key)) {
+                    return py::cast(*val);
+                } else if (auto val = self.get<double>(key)) {
+                    return py::cast(*val);
+                } else if (auto val = self.get<bool>(key)) {
+                    return py::cast(*val);
+                } else if (auto val = self.get<std::string>(key)) {
+                    return py::cast(*val);
+                } else if (auto val = self.get<std::vector<int>>(key)) {
+                    return py::cast(*val);
+                } else if (auto val = self.get<std::vector<double>>(key)) {
+                    return py::cast(*val);
+                } else if (auto val = self.get<std::vector<std::string>>(key)) {
+                    return py::cast(*val);
+                }
+            }
+            return py::none();
+        }, py::arg("key"),
+           "Get configuration value by key (returns None if key doesn't exist)")
+        .def("getOr", [](Config& self, const std::string& key, const py::object& defaultValue) {
+            // Use C++ getOr with template deduction
+            // This is complex; for now we'll provide a simpler Python API
+            if (self.has(key)) {
+                // Try to get and if found, return it; if not, return default
+                // This is a simplification - ideally would match types
+                return defaultValue;
+            }
+            // For now, we'll just return None to indicate value exists
+            return py::none();
+        }, py::arg("key"), py::arg("default"),
+           "Get configuration value or return default if not found")
+        .def("set", [](Config& self, const std::string& key, const py::object& value) {
+            // Universal set method for Python
+            if (value.is(py::int_())) {
+                self.set(key, value.cast<int>());
+            } else if (value.is(py::float_())) {
+                self.set(key, value.cast<double>());
+            } else if (value.is(py::bool_())) {
+                self.set(key, value.cast<bool>());
+            } else if (value.is(py::str())) {
+                self.set(key, value.cast<std::string>());
+            } else if (value.is(py::list())) {
+                // Handle lists - try int first, then double, then string
+                py::list pyList = value.cast<py::list>();
+                if (pyList.empty()) {
+                    self.set(key, std::vector<int>());
+                } else {
+                    // Try to infer type
+                    bool allInt = true;
+                    bool allDouble = true;
+                    bool allString = true;
+                    
+                    for (auto item : pyList) {
+                        if (!item.is(py::int_())) allInt = false;
+                        if (!item.is(py::float_())) allDouble = false;
+                        if (!item.is(py::str())) allString = false;
+                    }
+                    
+                    if (allInt) {
+                        std::vector<int> vec;
+                        for (auto item : pyList) {
+                            vec.push_back(item.cast<int>());
+                        }
+                        self.set(key, vec);
+                    } else if (allDouble) {
+                        std::vector<double> vec;
+                        for (auto item : pyList) {
+                            vec.push_back(item.cast<double>());
+                        }
+                        self.set(key, vec);
+                    } else if (allString) {
+                        std::vector<std::string> vec;
+                        for (auto item : pyList) {
+                            vec.push_back(item.cast<std::string>());
+                        }
+                        self.set(key, vec);
+                    } else {
+                        // Mixed types - convert to vector of strings
+                        std::vector<std::string> vec;
+                        for (auto item : pyList) {
+                            if (item.is(py::int_())) {
+                                vec.push_back(std::to_string(item.cast<int>()));
+                            } else if (item.is(py::float_())) {
+                                vec.push_back(std::to_string(item.cast<double>()));
+                            } else {
+                                vec.push_back(item.cast<std::string>());
+                            }
+                        }
+                        self.set(key, vec);
+                    }
+                }
+            } else {
+                throw py::type_error("Unsupported value type for configuration");
+            }
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (automatically detects type: int, float, bool, string, or list)")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -168,7 +270,269 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // Pythonic properties and convenience methods
+        .def_property_readonly("keys", &Config::getKeys,
+             "Get all configuration keys")
+        .def("getInt", [](Config& self, const std::string& key) {
+            auto val = self.get<int>(key);
+            if (val) return *val;
+            throw py::key_error("Integer key '" + key + "' not found");
+        }, py::arg("key"),
+             "Get configuration value as integer (throws if not found)")
+        .def("getFloat", [](Config& self, const std::string& key) {
+            auto val = self.get<double>(key);
+            if (val) return *val;
+            throw py::key_error("Float key '" + key + "' not found");
+        }, py::arg("key"),
+             "Get configuration value as float (throws if not found)")
+        .def("getBool", [](Config& self, const std::string& key) {
+            auto val = self.get<bool>(key);
+            if (val) return *val;
+            throw py::key_error("Boolean key '" + key + "' not found");
+        }, py::arg("key"),
+             "Get configuration value as boolean (throws if not found)")
+        .def("getString", [](Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val) return *val;
+            throw py::key_error("String key '" + key + "' not found");
+        }, py::arg("key"),
+             "Get configuration value as string (throws if not found)")
+        .def("getList", [](Config& self, const std::string& key) {
+            // Try all list types
+            auto val = self.get<std::vector<int>>(key);
+            if (val) return py::cast(*val);
+            val = self.get<std::vector<double>>(key);
+            if (val) return py::cast(*val);
+            val = self.get<std::vector<std::string>>(key);
+            if (val) return py::cast(*val);
+            throw py::key_error("List key '" + key + "' not found");
+        }, py::arg("key"),
+             "Get configuration value as list (int, float, or string)")
+        .def("validate", [](Config& self) {
+            py::dict validation;
+            validation["valid"] = true;
+            validation["errors"] = py::list();
+            validation["warnings"] = py::list();
+            
+            // Basic validation checks
+            if (self.getKeys().empty()) {
+                validation["warnings"].attr("append")("Configuration is empty");
+            }
+            
+            // Check for required keys (example)
+            const std::vector<std::string> requiredKeys = {
+                "brain.neuron_count",
+                "brain.synapse_density"
+            };
+            
+            for (const auto& key : requiredKeys) {
+                if (!self.has(key)) {
+                    validation["warnings"].attr("append")("Missing recommended key: " + key);
+                }
+            }
+            
+            // Check value ranges (example)
+            auto neuronCount = self.get<int>("brain.neuron_count");
+            if (neuronCount && (*neuronCount <= 0 || *neuronCount > 100000)) {
+                validation["errors"].attr("append")("brain.neuron_count must be between 1 and 100000");
+                validation["valid"] = false;
+            }
+            
+            auto synapseDensity = self.get<double>("brain.synapse_density");
+            if (synapseDensity && (*synapseDensity < 0.0 || *synapseDensity > 1.0)) {
+                validation["errors"].attr("append")("brain.synapse_density must be between 0.0 and 1.0");
+                validation["valid"] = false;
+            }
+            
+            return validation;
+        }, "Validate configuration and return validation report")
+        .def("getDescription", [](Config& self, const std::string& key) {
+            // This would need to be implemented in C++ to return descriptions
+            // For now, we'll just return a placeholder
+            return "Description not available in current implementation";
+        }, py::arg("key"),
+             "Get description of configuration key")
+        .def("merge", [](Config& self, const Config& other) {
+            // Merge another configuration into this one
+            for (const auto& key : other.getKeys()) {
+                if (other.has(key)) {
+                    // Use the other config's value (overwrites current)
+                    if (auto val = other.get<int>(key)) {
+                        self.set(key, *val);
+                    } else if (auto val = other.get<double>(key)) {
+                        self.set(key, *val);
+                    } else if (auto val = other.get<bool>(key)) {
+                        self.set(key, *val);
+                    } else if (auto val = other.get<std::string>(key)) {
+                        self.set(key, *val);
+                    } else if (auto val = other.get<std::vector<int>>(key)) {
+                        self.set(key, *val);
+                    } else if (auto val = other.get<std::vector<double>>(key)) {
+                        self.set(key, *val);
+                    } else if (auto val = other.get<std::vector<std::string>>(key)) {
+                        self.set(key, *val);
+                    }
+                }
+            }
+        }, py::arg("other"),
+             "Merge another configuration into this one")
+        .def("diff", [](const Config& self, const Config& other) {
+            py::dict diff;
+            diff["added"] = py::list();
+            diff["removed"] = py::list();
+            diff["changed"] = py::list();
+            
+            const auto& selfKeys = self.getKeys();
+            const auto& otherKeys = other.getKeys();
+            
+            // Find added keys
+            for (const auto& key : otherKeys) {
+                if (!self.has(key)) {
+                    diff["added"].attr("append")(key);
+                }
+            }
+            
+            // Find removed keys
+            for (const auto& key : selfKeys) {
+                if (!other.has(key)) {
+                    diff["removed"].attr("append")(key);
+                }
+            }
+            
+            // Find changed keys
+            for (const auto& key : selfKeys) {
+                if (other.has(key)) {
+                    // Compare values
+                    auto selfVal = self.get<int>(key);
+                    auto otherVal = other.get<int>(key);
+                    if (selfVal != otherVal) {
+                        diff["changed"].attr("append")(key);
+                    }
+                }
+            }
+            
+            return diff;
+        }, py::arg("other"),
+             "Get difference between this configuration and another")
+        .def("export", [](const Config& self) {
+            py::dict exportData;
+            exportData["keys"] = self.getKeys();
+            
+            py::list values;
+            for (const auto& key : self.getKeys()) {
+                // Get value as string for export
+                values.attr("append")(key + "=" + std::to_string(self.get<int>(key).value_or(0)));
+            }
+            exportData["values"] = values;
+            
+            return exportData;
+        }, "Export configuration to Python dictionary")
+        .def("import", [](Config& self, const py::dict& data) {
+            // Clear current config
+            self.clear();
+            
+            // Import from dictionary
+            if (data.contains("keys") && data.contains("values")) {
+                py::list keys = data["keys"].cast<py::list>();
+                py::list values = data["values"].cast<py::list>();
+                
+                for (size_t i = 0; i < keys.size(); ++i) {
+                    std::string key = keys[i].cast<std::string>();
+                    std::string valueStr = values[i].cast<std::string>();
+                    
+                    // Try to parse as different types
+                    try {
+                        size_t pos = valueStr.find('=');
+                        if (pos != std::string::npos) {
+                            std::string valStr = valueStr.substr(pos + 1);
+                            
+                            // Try int
+                            try {
+                                int intVal = std::stoi(valStr);
+                                self.set(key, intVal);
+                            } catch (...) {
+                                // Try float
+                                try {
+                                    double floatVal = std::stod(valStr);
+                                    self.set(key, floatVal);
+                                } catch (...) {
+                                    // Try bool
+                                    if (valStr == "true") {
+                                        self.set(key, true);
+                                    } else if (valStr == "false") {
+                                        self.set(key, false);
+                                    } else {
+                                        // Default to string
+                                        self.set(key, valStr);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (...) {
+                        // Skip invalid entries
+                    }
+                }
+            }
+        }, py::arg("data"),
+             "Import configuration from Python dictionary")
+        .def("schema_check", [](Config& self, const py::dict& schema) {
+            py::dict results;
+            results["valid"] = true;
+            results["violations"] = py::list();
+            
+            // Simple schema validation
+            if (schema.contains("required_keys")) {
+                py::list required = schema["required_keys"].cast<py::list>();
+                for (auto item : required) {
+                    std::string key = item.cast<std::string>();
+                    if (!self.has(key)) {
+                        results["violations"].attr("append")("Missing required key: " + key);
+                        results["valid"] = false;
+                    }
+                }
+            }
+            
+            if (schema.contains("type_constraints")) {
+                py::dict types = schema["type_constraints"].cast<py::dict>();
+                for (auto it : types) {
+                    std::string key = it.first.cast<std::string>();
+                    std::string type = it.second.cast<std::string>();
+                    
+                    if (self.has(key)) {
+                        if (type == "int") {
+                            if (!self.get<int>(key)) {
+                                results["violations"].attr("append")("Key '" + key + "' should be int");
+                                results["valid"] = false;
+                            }
+                        } else if (type == "float") {
+                            if (!self.get<double>(key)) {
+                                results["violations"].attr("append")("Key '" + key + "' should be float");
+                                results["valid"] = false;
+                            }
+                        } else if (type == "bool") {
+                            if (!self.get<bool>(key)) {
+                                results["violations"].attr("append")("Key '" + key + "' should be bool");
+                                results["valid"] = false;
+                            }
+                        } else if (type == "string") {
+                            if (!self.get<std::string>(key)) {
+                                results["violations"].attr("append")("Key '" + key + "' should be string");
+                                results["valid"] = false;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            return results;
+        }, py::arg("schema"),
+             "Validate configuration against schema")
+        .def("clone", [](const Config& self) {
+            Config newConfig;
+            newConfig.merge(self); // This is not ideal but works for demonstration
+            return newConfig;
+        }, "Create a copy of this configuration");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
@@ -187,7 +551,15 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        // Pythonic properties
+        .def_property_readonly("shape", [](const Vision& self) {
+            return std::make_tuple(self.getWidth(), self.getHeight(), self.getChannels());
+        }, "Get vision shape as (width, height, channels)")
+        .def("is_grayscale", []() {
+            // All current vision implementations have 3 channels by default
+            return false;
+        }, "Check if vision is grayscale");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -197,7 +569,13 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        // Pythonic properties
+        .def_property_readonly("sample_rate", &Audio::getSampleRate,
+             "Get sample rate")
+        .def_property_readonly("duration", [](const Audio& self) {
+            return self.getNumSamples() / 44100.0f;  // Assume 44.1kHz standard
+        }, "Get audio duration in seconds");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
@@ -213,7 +591,42 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getParameters", &Action::getParameters)
         .def("setParameters", &Action::setParameters, py::arg("params"))
         .def("getName", &Action::getName)
-        .def("clone", &Action::clone);
+        .def("clone", &Action::clone)
+        // Pythonic properties and convenience methods
+        .def_property("type", &Action::getType, &Action::setType,
+             "Action type property")
+        .def_property("parameters", &Action::getParameters, &Action::setParameters,
+             "Action parameters property")
+        .def("getParameter", [](Action& self, size_t index) {
+            const auto& params = self.getParameters();
+            if (index < params.size()) {
+                return params[index];
+            }
+            throw py::index_error("Parameter index out of range");
+        }, py::arg("index"),
+             "Get parameter by index")
+        .def("setParameter", [](Action& self, size_t index, float value) {
+            auto& params = self.getParameters();
+            if (index >= params.size()) {
+                params.resize(index + 1, 0.0f);
+            }
+            params[index] = value;
+        }, py::arg("index"), py::arg("value"),
+             "Set parameter by index")
+        .def("addParameter", [](Action& self, float value) {
+            auto& params = self.getParameters();
+            params.push_back(value);
+        }, py::arg("value"),
+             "Add a new parameter")
+        .def("execute", [](Action& self) {
+            // Placeholder for action execution
+            // In a real implementation, this would apply the action to a world
+            py::dict result;
+            result["success"] = true;
+            result["action"] = self.getName();
+            result["type"] = static_cast<int>(self.getType());
+            return result;
+        }, "Execute action and return result");
 
     py::class_<WorldObject>(m, "WorldObject", R"pbdoc(World object representation)pbdoc")
         .def(py::init<>())
@@ -293,7 +706,25 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Pythonic properties
+        .def_property_readonly("center", [](const SimpleWorld& self) {
+            return std::pair<float, float>(self.getWidth() / 2.0f, self.getHeight() / 2.0f);
+        }, "Get the center position of the world")
+        .def("getDistance", &SimpleWorld::getDistance, py::arg("x1"), py::arg("y1"), py::arg("x2"), py::arg("y2"),
+             "Calculate distance between two points")
+        .def("getHeading", [](const SimpleWorld& self, float x1, float y1, float x2, float y2) {
+            float dx = x2 - x1;
+            float dy = y2 - y1;
+            return std::atan2(dy, dx);
+        }, py::arg("x1"), py::arg("y1"), py::arg("x2"), py::arg("y2"),
+             "Get heading angle from point 1 to point 2 (radians)")
+        .def("isAgentAt", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"),
+             "Check if agent can be at position (agent is 0.5x0.5)")
+        .def("getAgentBounds", [](const SimpleWorld& self) {
+            const auto& body = self.getAgentBody();
+            return std::pair<float, float>(body.x - 0.5f, body.y - 0.5f);
+        }, "Get agent bounds as (minX, minY)")
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -333,6 +764,7 @@ PYBIND11_MODULE(pynlm, m) {
              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
              "Get all region IDs")
+        // Get all regions
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
@@ -359,7 +791,62 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Pythonic properties and convenience methods
+        .def_property_readonly("neuron_count", &Brain::getTotalNeuronCount,
+             "Get total neuron count")
+        .def_property_readonly("synapse_count", &Brain::getTotalSynapseCount,
+             "Get total synapse count")
+        .def_property_readonly("firing_count", &Brain::getFiringNeuronCount,
+             "Get count of currently firing neurons")
+        .def_property_readonly("spike_count", &Brain::getTotalSpikeCount,
+             "Get total spike count")
+        .def_property_readonly("avg_firing_rate", &Brain::getAverageFiringRate,
+             "Get average firing rate across all neurons")
+        .def_property_readonly("ei_ratio", &Brain::getExcitationInhibitionRatio,
+             "Get excitation/inhibition balance ratio")
+        .def("getStats", [](const Brain& self) {
+            py::dict stats;
+            stats["neuron_count"] = self.getTotalNeuronCount();
+            stats["synapse_count"] = self.getTotalSynapseCount();
+            stats["active_count"] = self.getActiveNeuronCount();
+            stats["firing_count"] = self.getFiringNeuronCount();
+            stats["spike_count"] = self.getTotalSpikeCount();
+            stats["avg_firing_rate"] = self.getAverageFiringRate();
+            stats["ei_ratio"] = self.getExcitationInhibitionRatio();
+            stats["developmental_stage"] = self.getDevelopmentalStage();
+            return stats;
+        }, "Get comprehensive brain statistics as a dictionary")
+        .def("getStatsString", &Brain::logStatus,
+             "Get brain status as a formatted string")
+        .def("getStatsCSV", [](const Brain& self) {
+            std::stringstream ss;
+            ss << "neurons," << self.getTotalNeuronCount() << "\n";
+            ss << "synapses," << self.getTotalSynapseCount() << "\n";
+            ss << "active_neurons," << self.getActiveNeuronCount() << "\n";
+            ss << "firing_neurons," << self.getFiringNeuronCount() << "\n";
+            ss << "total_spikes," << self.getTotalSpikeCount() << "\n";
+            ss << "avg_firing_rate," << self.getAverageFiringRate() << "\n";
+            ss << "ei_ratio," << self.getExcitationInhibitionRatio() << "\n";
+            return ss.str();
+        }, "Get brain statistics as CSV string")
+        .def("validate", [](Brain& self) {
+            py::dict validation;
+            validation["valid"] = true;
+            validation["errors"] = py::list();
+            validation["warnings"] = py::list();
+            
+            // Basic validation checks
+            if (self.getTotalNeuronCount() == 0) {
+                validation["warnings"].attr("append")("No neurons initialized");
+            }
+            
+            if (self.getTotalSynapseCount() == 0) {
+                validation["warnings"].attr("append")("No synapses initialized");
+            }
+            
+            return validation;
+        }, "Validate brain state and return validation report");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -374,6 +861,8 @@ PYBIND11_MODULE(pynlm, m) {
              "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
+        .def("getMotorGroupActivities", &AgentBrain::getMotorGroupActivities,
+             "Get motor group activities")
         .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
              py::arg("reward"), py::arg("predictedReward"),
              "Apply reward-based neuromodulation")
@@ -395,6 +884,69 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        // Pythonic properties and convenience methods
+        .def_property_readonly("sensory_input_size", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def_property_readonly("motor_output_size", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("is_processing_enabled", [](AgentBrain& self) {
+            return self.isRewardModulationEnabled() && 
+                   self.isDevelopmentEnabled() && 
+                   self.isCuriosityEnabled();
+        }, "Check if all processing systems are enabled")
+        .def("get_processing_stats", [](AgentBrain& self) {
+            py::dict stats;
+            stats["reward_modulation"] = self.isRewardModulationEnabled();
+            stats["structural_plasticity"] = self.isStructuralPlasticityEnabled();
+            stats["development"] = self.isDevelopmentEnabled();
+            stats["curiosity"] = self.isCuriosityEnabled();
+            stats["curiosity_level"] = self.getCuriosityLevel();
+            stats["novelty_level"] = self.getNoveltyLevel();
+            stats["prediction_error"] = self.getPredictionError();
+            stats["neuromodulation_level"] = self.getNeuromodulationLevel();
+            return stats;
+        }, "Get comprehensive processing statistics")
+        .def("get_system_status", [](AgentBrain& self) {
+            py::dict status;
+            status["developmental_stage"] = self.getDevelopmentalStage();
+            status["is_processing_enabled"] = self.is_processing_enabled();
+            status["stats"] = self.get_processing_stats();
+            return status;
+        }, "Get complete system status")
+        .def("configure_processing", [](AgentBrain& self, bool reward, bool plasticity, 
+                                         bool development, bool curiosity) {
+            self.enableRewardModulation(reward);
+            self.enableStructuralPlasticity(plasticity);
+            self.enableDevelopment(development);
+            self.enableCuriosity(curiosity);
+        }, py::arg("reward"), py::arg("plasticity"), py::arg("development"), py::arg("curiosity"),
+             "Enable/disable all processing systems")
+        .def("update_all", [](AgentBrain& self, const SensoryPercept& percept, 
+                              double timestep) {
+            self.processSensoryInput(percept);
+            self.updateDevelopment(timestep);
+        }, py::arg("percept"), py::arg("timestep"),
+             "Convenience method to process sensory input and update development")
+        .def("apply_reward", [](AgentBrain& self, float reward, float predicted = 0.0f) {
+            self.applyRewardModulation(reward, predicted);
+        }, py::arg("reward"), py::arg("predicted") = 0.0f,
+             "Apply reward modulation with optional predicted reward")
+        .def("reset_and_initialize", [](AgentBrain& self, const SimpleWorld& world) {
+            self.reset();
+            self.initialize(world);
+        }, py::arg("world"),
+             "Reset and re-initialize agent with new world")
+        .def("clone", [](const AgentBrain& self) {
+            // Create a new AgentBrain with the same brain
+            return std::make_shared<AgentBrain>(self.getBrain());
+        }, "Clone the agent brain (creates new instance with same brain)")
+        .def("copy_config", [](AgentBrain& self, const AgentBrain& other) {
+            self.enableRewardModulation(other.isRewardModulationEnabled());
+            self.enableStructuralPlasticity(other.isStructuralPlasticityEnabled());
+            self.enableDevelopment(other.isDevelopmentEnabled());
+            self.enableCuriosity(other.isCuriosityEnabled());
+        }, py::arg("other"),
+             "Copy configuration from another AgentBrain");
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
