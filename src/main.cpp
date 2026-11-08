@@ -19,12 +19,7 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+#include <map>
 
 using namespace nlm;
 
@@ -307,10 +302,193 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
+bool showHelpAndExit() {
     printBanner();
+    std::cout << "Usage: nlm [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help, -h                          Show this help message and exit" << std::endl;
+    std::cout << "  --config=<file>, --config <file>     Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --random_seed=<value>               Set random seed (integer)" << std::endl;
+    std::cout << "  --simulation_timestep=<value>        Set simulation timestep in seconds (float)" << std::endl;
+    std::cout << "  --neuron_count=<value>              Set number of neurons (integer)" << std::endl;
+    std::cout << "  --region_count=<value>              Set number of regions (integer)" << std::endl;
+    std::cout << "  --connection_probability=<value>     Set connection probability (float 0.0-1.0)" << std::endl;
+    std::cout << "  --stdp_ltp_weight=<value>           Set STDP LTP weight (float)" << std::endl;
+    std::cout << "  --stdp_ltd_weight=<value>           Set STDP LTD weight (float)" << std::endl;
+    std::cout << "  --stdp_tau=<value>                  Set STDP time constant (float)" << std::endl;
+    std::cout << "  --synaptogenesis_rate=<value>        Set synaptogenesis rate (float)" << std::endl;
+    std::cout << "  --pruning_rate=<value>              Set pruning rate (float)" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Example:" << std::endl;
+    std::cout << "  ./nlm --config=myconfig.cfg --neuron_count=2000 --simulation_timestep=0.0005" << std::endl;
+    return true;
+}
+
+bool validateConfiguration(const std::shared_ptr<Config>& config) {
+    bool isValid = true;
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Validate simulation timestep
+    auto timestep = config->get<double>("simulation_timestep");
+    if (timestep.has_value()) {
+        if (timestep.value() <= 0.0) {
+            NLM_LOG_ERROR("Invalid simulation_timestep: " + std::to_string(timestep.value()) + ". Must be positive.");
+            isValid = false;
+        } else if (timestep.value() > 0.1) {
+            NLM_LOG_WARNING("simulation_timestep is large (" + std::to_string(timestep.value()) + "s). This may affect accuracy.");
+        }
+    }
+    
+    // Validate neuron count
+    auto neuronCount = config->get<int64_t>("neuron_count");
+    if (neuronCount.has_value()) {
+        if (neuronCount.value() < 10) {
+            NLM_LOG_ERROR("Invalid neuron_count: " + std::to_string(neuronCount.value()) + ". Must be at least 10.");
+            isValid = false;
+        }
+    }
+    
+    // Validate region count
+    auto regionCount = config->get<int64_t>("region_count");
+    if (regionCount.has_value()) {
+        if (regionCount.value() < 1) {
+            NLM_LOG_ERROR("Invalid region_count: " + std::to_string(regionCount.value()) + ". Must be at least 1.");
+            isValid = false;
+        }
+    }
+    
+    // Validate connection probability
+    auto connProb = config->get<double>("connection_probability");
+    if (connProb.has_value()) {
+        if (connProb.value() < 0.0 || connProb.value() > 1.0) {
+            NLM_LOG_ERROR("Invalid connection_probability: " + std::to_string(connProb.value()) + ". Must be between 0.0 and 1.0.");
+            isValid = false;
+        }
+    }
+    
+    // Validate STDP parameters
+    auto stdpLtp = config->get<double>("stdp_ltp_weight");
+    if (stdpLtp.has_value() && stdpLtp.value() < 0.0) {
+        NLM_LOG_ERROR("Invalid stdp_ltp_weight: " + std::to_string(stdpLtp.value()) + ". Must be non-negative.");
+        isValid = false;
+    }
+    
+    auto stdpLtd = config->get<double>("stdp_ltd_weight");
+    if (stdpLtd.has_value() && stdpLtd.value() < 0.0) {
+        NLM_LOG_ERROR("Invalid stdp_ltd_weight: " + std::to_string(stdpLtd.value()) + ". Must be non-negative.");
+        isValid = false;
+    }
+    
+    auto stdpTau = config->get<double>("stdp_tau");
+    if (stdpTau.has_value() && stdpTau.value() <= 0.0) {
+        NLM_LOG_ERROR("Invalid stdp_tau: " + std::to_string(stdpTau.value()) + ". Must be positive.");
+        isValid = false;
+    }
+    
+    // Validate plasticity rates
+    auto synaptogenesis = config->get<double>("synaptogenesis_rate");
+    if (synaptogenesis.has_value() && synaptogenesis.value() < 0.0) {
+        NLM_LOG_ERROR("Invalid synaptogenesis_rate: " + std::to_string(synaptogenesis.value()) + ". Must be non-negative.");
+        isValid = false;
+    }
+    
+    auto pruning = config->get<double>("pruning_rate");
+    if (pruning.has_value() && pruning.value() < 0.0) {
+        NLM_LOG_ERROR("Invalid pruning_rate: " + std::to_string(pruning.value()) + ". Must be non-negative.");
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+bool parseCommandLineArguments(int argc, char** argv,
+                                std::string& configFile,
+                                std::map<std::string, std::string>& commandLineArgs) {
+    bool showHelp = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --help and -h flags
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        }
+        // Handle --config argument
+        else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+        // Handle other command line arguments
+        else if (arg.find('=') != std::string::npos) {
+            // --key=value format
+            size_t pos = arg.find('=');
+            if (pos > 0 && arg[0] == '-') {
+                std::string key = arg.substr(1, pos - 1);
+                std::string value = arg.substr(pos + 1);
+                commandLineArgs[key] = value;
+            }
+        }
+        else if (arg[0] == '-') {
+            // -key value format (only for specific flags)
+            std::string key = arg.substr(1);
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                commandLineArgs[key] = argv[++i];
+            }
+        }
+        else {
+            NLM_LOG_WARNING("Unknown argument: " + arg + ". Ignoring.");
+        }
+    }
+    
+    return showHelp;
+}
+
+void applyCommandLineArguments(std::shared_ptr<Config>& config,
+                              const std::map<std::string, std::string>& commandLineArgs) {
+    // Convert string values to appropriate types based on key
+    for (const auto& pair : commandLineArgs) {
+        const std::string& key = pair.first;
+        const std::string& value = pair.second;
+        
+        try {
+            // Attempt to parse as different types based on the key
+            if (key == "random_seed") {
+                long long intVal = std::stoll(value);
+                config->set(key, intVal, ConfigSource::CommandLine);
+            }
+            else if (key == "neuron_count" || key == "region_count") {
+                long long intVal = std::stoll(value);
+                config->set(key, intVal, ConfigSource::CommandLine);
+            }
+            else if (key == "simulation_timestep" || 
+                     key == "stdp_tau" ||
+                     key == "synaptogenesis_rate" ||
+                     key == "pruning_rate" ||
+                     key == "connection_probability" ||
+                     key == "stdp_ltp_weight" ||
+                     key == "stdp_ltd_weight" ||
+                     key == "plasticity_learning_rate") {
+                
+                double doubleVal = std::stod(value);
+                config->set(key, doubleVal, ConfigSource::CommandLine);
+            }
+            else if (key == "log_to_file") {
+                bool boolVal = (value == "true" || value == "1" || value == "yes");
+                config->set(key, boolVal, ConfigSource::CommandLine);
+            }
+            else {
+                // For unknown keys, store as string
+                config->set(key, value, ConfigSource::CommandLine);
+            }
+        }
+        catch (const std::exception& e) {
+            NLM_LOG_ERROR("Failed to parse command line argument " + key + "=" + value + ": " + e.what());
+        }
+    }
+}
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();

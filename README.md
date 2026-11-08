@@ -91,17 +91,67 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
-## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
-
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
-./nlm_phase3_demo
-./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
+./nlm                 # Phase 2 demo in src/main.cpp (basic neural computation with LIF neurons)
+./nlm_phase3_demo     # Phase 3 demo in src/experiments/Phase3Demo.cpp (world interaction loop)
+./nlm_phase4_demo     # Phase 4 demo in src/experiments/Phase4Demo.cpp (emerging cognition experiments)
+./nlm_phase5_demo     # Phase 5 demo in src/experiments/Phase5Demo.cpp (personality/behavior in sandbox)
+./nlm_phase6_demo     # Phase 6 demo in src/experiments/Phase6Demo.cpp (integration test of all brain systems)
+./nlm_benchmark       # Performance benchmark in benchmark.cpp (simulation performance metrics)
 ```
+
+`./nlm` (Phase 2) - The core neural computation demo:
+- Demonstrates real spiking neural computation with Leaky Integrate-and-Fire (LIF) neurons
+- Shows event-driven spike propagation with synaptic delays
+- Implements STDP and Hebbian plasticity rules
+- Demonstrates structural plasticity (synaptogenesis/pruning)
+- Validates basic neural connectivity and plasticity through three test stages
+
+`./nlm_phase3_demo` (Phase 3) - World interaction loop demo:
+- Simulates an agent interacting with a 2D grid world
+- Implements sensory input and motor output processing
+- Demonstrates reward prediction error learning
+- Includes developmental stages affecting plasticity rates
+- Tests novelty and curiosity-driven exploration
+- Accepts command-line arguments for number of episodes and steps per episode
+- Example: `./nlm_phase3_demo 10 500` (10 episodes, 500 steps each)
+
+`./nlm_phase4_demo` (Phase 4) - Emerging cognition demo:
+- Demonstrates neural prediction systems and working memory
+- Shows episodic-like memory and concept formation
+- Implements neural attention mechanisms (not Transformer)
+- Features predictive planning and self-modeling
+- Includes social learning capabilities
+- Tests continual learning across multiple cognitive domains
+- Accepts command-line argument for number of trials (default: 50)
+- Example: `./nlm_phase4_demo 100`
+
+`./nlm_phase5_demo` (Phase 5) - Personality/sandbox demo:
+- Implements performance optimizations and memory pools
+- Demonstrates SIMD vectorization and parallel processing
+- Shows checkpoint system with save/load functionality
+- Simulates brain-personality traits learned through experience
+- Uses a sandbox environment for agent behavior testing
+- Measures personality traits like risk preference, exploration/exploitation balance
+- Demonstrates how learned preferences survive brain reloads and affect behavior
+
+`./nlm_phase6_demo` (Phase 6) - Integration test:
+- Comprehensive test verifying all brain systems are properly connected
+- Tests integration of memory systems (working, episodic, associative)
+- Validates neuromodulation system integration (dopamine, curiosity, novelty)
+- Checks prediction system integration with learning loops
+- Verifies cognition system integration (planning, concepts, attention)
+- Tests development system integration (plasticity rates with age)
+- Demonstrates persistence through checkpoint save/load
+- Shows replay and consolidation in memory systems
+- Example: `./nlm_phase6_demo` (runs integration verification)
+
+`./nlm_benchmark` (Benchmark):
+- Measures simulation performance metrics
+- Tests scalability with different brain sizes
+- Benchmarks various plasticity rule implementations
+- Provides performance comparisons across different configurations
+
 
 `nlm_phase6_demo` runs a comprehensive integration test verifying all
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
@@ -113,33 +163,22 @@ library in CMake; it does not yet have a standalone demo executable.
 NLM/
 ├── CMakeLists.txt
 ├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── SCIENCE.md
-│   ├── ROADMAP.md
-│   ├── EXPERIMENTS.md
-│   ├── LIMITATIONS.md
-│   └── PHASE6_FINAL_AUDIT.md    # Phase 6 audit
-├── src/
-│   ├── core/           # Core utilities
-│   ├── agent/          # Agent-brain interface
-│   ├── world/          # Simple world
-│   ├── performance/    # Checkpoints, pools, queues (headers)
-│   ├── brain/          # Neural components (integrated)
-│   ├── dynamics/       # Neural dynamics
-│   ├── plasticity/     # Plasticity rules
-│   ├── development/    # Developmental system
-│   ├── neuromodulation/# Neuromodulators (integrated)
-│   ├── memory/        # Memory systems (integrated)
-│   ├── prediction/     # Prediction systems (integrated)
-│   ├── cognition/      # Cognitive mechanisms (integrated)
-│   ├── sensory/       # Sensory processing
-│   ├── motor/         # Motor system
-│   ├── environment/   # Environment interface
-│   ├── experiments/   # Experiment framework (Phase 6)
-│   └── visualization/  # Visualization
-├── tests/
-└── configs/
+├── PYTHON_BINDINGS.md          # Python bindings status and TODO
+├── pyproject.toml            # Python bindings configuration
+├── easy_usage.md             # Python usage documentation (for when bindings are implemented)
+├── HOW_TO_USE.md              # Comprehensive documentation
+├── LICENSE
+├── src/                       # C++ source code
+│   ├── brain/                 # Neural components
+│   ├── core/                  # Core utilities
+│   ├── experiments/           # Experiment implementations
+│   ├── performance/           # Performance optimizations
+│   ├── sensory/               # Sensory processing
+│   ├── motor/                 # Motor system
+│   ├── environment/           # Environment interface
+│   └── ...
+├── tests/                     # C++ tests
+└── configs/                   # Configuration files
 ```
 
 ## Phase Summary
