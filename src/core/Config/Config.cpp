@@ -3,6 +3,139 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include <cassert>
+
+// Simple JSON parsing helper
+namespace {
+    std::string trim(const std::string& str) {
+        size_t start = str.find_first_not_of(" \t\r\n");
+        if (start == std::string::npos) return "";
+        size_t end = str.find_last_not_of(" \t\r\n");
+        return str.substr(start, end - start + 1);
+    }
+
+    std::string toLower(const std::string& str) {
+        std::string result = str;
+        std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+        return result;
+    }
+
+    // Simple JSON value parsing
+    ConfigValue parseJsonValue(const std::string& value) {
+        std::string val = trim(value);
+        if (val.empty()) {
+            return std::string();
+        }
+        
+        // Check for string (with quotes)
+        if ((val.front() == '"' && val.back() == '"') || 
+            (val.front() == '\'' && val.back() == '\'')) {
+            return val.substr(1, val.size() - 2);
+        }
+        
+        // Check for boolean
+        if (val == "true") return true;
+        if (val == "false") return false;
+        
+        // Check for null
+        if (val == "null") return std::string();
+        
+        // Check for numbers
+        try {
+            // Check if integer
+            size_t pos;
+            int64_t intVal = std::stoll(val, &pos);
+            if (pos == val.size()) return intVal;
+        } catch (...) {}
+        
+        try {
+            // Check if double
+            size_t pos;
+            double doubleVal = std::stod(val, &pos);
+            if (pos == val.size()) return doubleVal;
+        } catch (...) {}
+        
+        // Return as string if not a recognized type
+        return val;
+    }
+
+    // Simple JSON object parsing
+    bool parseJsonObject(const std::string& jsonStr, std::vector<ConfigEntry>& entries) {
+        entries.clear();
+        
+        // Skip whitespace
+        size_t pos = 0;
+        while (pos < jsonStr.size() && std::isspace(jsonStr[pos])) pos++;
+        
+        if (pos >= jsonStr.size() || jsonStr[pos] != '{') {
+            return false; // Not a JSON object
+        }
+        
+        pos++; // Skip {
+        bool first = true;
+        
+        while (pos < jsonStr.size()) {
+            // Skip whitespace
+            while (pos < jsonStr.size() && std::isspace(jsonStr[pos])) pos++;
+            
+            if (pos >= jsonStr.size()) break;
+            
+            // Check for closing brace
+            if (jsonStr[pos] == '}') {
+                pos++;
+                break;
+            }
+            
+            // Parse key
+            if (!first) {
+                if (jsonStr[pos] != ',') return false;
+                pos++; // Skip comma
+            }
+            first = false;
+            
+            size_t keyStart = pos;
+            while (pos < jsonStr.size() && jsonStr[pos] != ':' && !std::isspace(jsonStr[pos])) {
+                pos++;
+            }
+            
+            if (pos >= jsonStr.size() || jsonStr[pos] != ':') {
+                return false;
+            }
+            
+            std::string key = trim(jsonStr.substr(keyStart, pos - keyStart));
+            pos++; // Skip colon
+            
+            // Skip whitespace before value
+            while (pos < jsonStr.size() && std::isspace(jsonStr[pos])) pos++;
+            
+            // Parse value (find next comma or closing brace)
+            size_t valueEnd = pos;
+            while (valueEnd < jsonStr.size() && jsonStr[valueEnd]جا != ',' && jsonStr[valueEnd]جا != '}') {
+                valueEnd++;
+            }
+            
+            std::string valueStr = jsonStr.substr(pos, valueEnd - pos);
+            
+            // Skip trailing whitespace
+            while (valueEnd < jsonStr.size() && std::isspace(jsonStr[valueEnd])) valueEnd++;
+            
+            ConfigValue value = parseJsonValue(valueStr);
+            entries.emplace_back(key, value, ConfigSource::File);
+            
+            pos = valueEnd;
+        }
+        
+        return true;
+    }
+
+    // Simple YAML parsing (similar to JSON for basic key-value pairs)
+    bool parseYamlLike(const std::string& yamlStr, std::vector<ConfigEntry>& entries) {
+        return parseJsonObject(yamlStr, entries);
+    }
+}
 
 namespace nlm {
 
