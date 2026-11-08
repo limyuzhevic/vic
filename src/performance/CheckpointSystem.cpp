@@ -401,9 +401,38 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    if (!stream_.is_open()) return false;
+    CheckpointHeader header = header_;
+    header.totalSize = bytesWritten_;
+    header.checksum = ChecksumCalculator::crc32(
+        neuronPayload_.data(), neuronPayload_.size());
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream_) return false;
+    bytesWritten_ += sizeof(header);
+    return true;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    if (!stream_.is_open()) return false;
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream_) return false;
+    bytesWritten_ += sizeof(header);
+    return true;
+}
+
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    if (!stream_.is_open()) return false;
+    size_t currentPos = stream_.tellp();
+    size_t remainder = currentPos % alignment;
+    if (remainder != 0) {
+        std::vector<char> padding(alignment - remainder, 0);
+        stream_.write(padding.data(), padding.size());
+        if (!stream_) return false;
+        bytesWritten_ += padding.size();
+    }
+    return true;
+}
 
 // ---------------- CheckpointManager ----------------
 

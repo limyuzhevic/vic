@@ -936,10 +936,17 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
+    // Use the provided prediction, or our learned prediction if not provided
+    float actualPrediction = predictedReward;
+    if (predictedReward == 0.0f) {
+        // Use our learned expected reward as prediction
+        actualPrediction = expectedReward_;
+    }
     
-    // Update expected reward (exponential moving average)
+    // Compute prediction error using the actual prediction
+    predictionError_ = reward - actualPrediction;
+    
+    // Update expected reward (exponential moving average) for future predictions
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
     
     // Dopamine-like signal (based on prediction error)
@@ -967,15 +974,18 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
                 delta = std::clamp(delta, -0.1f, 0.1f);
                 syn->addToWeight(delta);
                 
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                // IMPROVED: Faster eligibility trace decay to prevent saturation
+                // Increased from 0.1f to 0.3f for better learning selectivity
+                syn->decayEligibilityTrace(0.3f);
             }
         }
     }
     
-    // Modulate plasticity based on dopamine
-    // Positive dopamine increases plasticity, negative decreases
-    float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
+    // IMPROVED: Better plasticity regulation based on developmental stage and reward
+    // Sigmoid curve provides more nuanced regulation than linear
+    float developmentFactor = 1.0f / (1.0f + std::exp(-2.0f * (developmentalAge_ - 450.0f) / 300.0f));
+    float rewardFactor = std::max(0.1f, std::abs(dopamineLevel_));  // Minimum plasticity for stability
+    float plasticityFactor = developmentFactor * rewardFactor;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
     // Apply to STDP
