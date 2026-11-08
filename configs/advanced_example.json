@@ -1,0 +1,102 @@
+// Configuration for NLM Advanced Features
+// This JSON file demonstrates the new advanced configuration options
+
+{
+  "config_version": "2.0",
+  "name": "Advanced NLM Configuration",
+  "description": "Configuration with all advanced features enabled for maximum learning capability",
+  
+  "basic": {
+    "brain.neuron_count": 5000,
+    "brain.region_count": 8,
+    "brain.connection_probability": 0.2,
+    "brain.v_thresh": -45.0,
+    "brain.v_rest": -60.0,
+    "brain.v_reset": -70.0,
+    "brain.tau_mem": 18.0,
+    "brain.tau_ref": 4.0
+  },
+  
+  "plasticity": {
+    "stdp.enable": true,
+    "stdp.learning_rate": 0.008,
+    "stdp.tau_plus": 30.0,
+    "stdp.tau_minus": 25.0,
+    "stdp.enable_eligibility_trace": true,
+    
+    "hebbian.enable": true,
+    "hebbian.threshold": 8.0,
+    "hebbian.anti_causality": false,
+    
+    "structural.enable": true,
+    "structural.synaptogenesis_rate": 0.001,
+    "structural.pruning_rate": 0.0001,
+    "structural.target_density": 0.15
+  },
+  
+  "neuromodulation": {
+    "dopamine.scale": 1.5,
+    "curiosity.enable": true,
+    "curiosity.base_rate": 0.02,
+    "curiosity.exploration_strength": 0.9,
+    "novelty.enable": true,
+    "novelty.decay_rate": 0.9,
+    "prediction.enable": true,
+    "prediction.horizon": 20
+  },
+  
+  "development": {
+    "enable": true,
+    "initial_plasticity": 1.2,
+    "critical_period_end": 500.0,
+    "adult_plasticity": 0.3,
+    "maturation_rate": 0.015
+  },
+  
+  "agent": {
+    "enable_reward_modulation": true,
+    "enable_structural_plasticity": true,
+    "enable_development": true,
+    "enable_curiosity": true,
+    "learning_rate": 0.15,
+    "task_type": "complex_problem_solving",
+    "difficulty": "hard"
+  },
+  
+  "advanced_features": {
+    "text_as_sense": true,
+    "concept_formation": true,
+    "self_model": true,
+    "social_learning": true,
+    "predictive_planning": true,
+    "working_memory_capacity": 100,
+    "episodic_memory_capacity": 200
+  },
+  
+  "validation": {
+    "min_neurons": 500,
+    "max_neurons": 50000,
+    "min_regions": 2,
+    "max_regions": 20,
+    "min_connection_probability": 0.05,
+    "max_connection_probability": 0.8
+  },
+  
+  "performance": {
+    "max_steps_per_episode": 2000,
+    "checkpoint_interval": 200,
+    "timestep": 0.0005,
+    "enable_simd": true,
+    "enable_multithreading": true
+  },
+  
+  "logging": {
+    "level": "DEBUG",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file": "advanced_nlm_simulation.log",
+    "max_file_size": "100MB",
+    "backup_count": 10,
+    "enable_console": true,
+    "enable_file": true
+  }
+}

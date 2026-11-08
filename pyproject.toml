@@ -5,17 +5,18 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "pynlm"
 version = "0.1.0"
-description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework"
+description = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework with advanced features and improved usability"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "NLM Authors"}
 ]
-keywords = ["neural", "simulation", "spiking", "brain", "learning"]
+keywords = ["neural", "simulation", "spiking", "brain", "learning", "AI", "neuroscience"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -25,20 +26,47 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Neuroscience",
+    "Topic :: Software Development :: Libraries"
 ]
 
-dependencies = []
+dependencies = [
+    "numpy>=1.20",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-cov>=4.0",
     "numpy>=1.20",
+    "scipy>=1.8",
+    "matplotlib>=3.5",
+]
+
+advanced = [
+    "torch>=1.13",  # For advanced neural network integration
+    "tensorflow>=2.10",  # For additional ML capabilities
+    "scikit-learn>=1.0",  # For machine learning utilities
+    "networkx>=2.8",  # For graph analysis
+]
+
+tools = [
+    "click>=8.0",  # For CLI tools
+    "rich>=10.0",  # For rich terminal output
+    "tqdm>=4.60",  # For progress bars
 ]
 
 [project.urls]
 Homepage = "https://github.com/nlm-project/nlm"
 Documentation = "https://nlm.readthedocs.io"
 Repository = "https://github.com/nlm-project/nlm.git"
+"Issues" = "https://github.com/nlm-project/nlm/issues"
+"Discussions" = "https://github.com/nlm-project/nlm/discussions"
+
+[project.scripts]
+nlm-explore = "pynlm.explore:main"
+nlm-learn = "pynlm.learning:main"
+nlm-visualize = "pynlm.visualization:main"
 
 [tool.scikit-build]
 # scikit-build-core >= 0.8 renamed minimum-version to version.
@@ -48,14 +76,89 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
-    # Phase 5: without this the root build produces no pynlm module
-    # at all (the option is OFF by default for plain C++ builds).
     "-DNLM_BUILD_PYTHON_BINDINGS=ON",
+    "-DNLM_ENABLE_ADVANCED_FEATURES=ON",
+    "-DNLM_ENABLE_PERFORMANCE_OPTIMIZATIONS=ON",
 ]
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_ENABLE_PYTHON_BINDINGS = true
+NLM_ENABLE_ADVANCED_FEATURES = true
+NLM_ENABLE_PERFORMANCE_OPTIMIZATIONS = true
+NLM_PYTHON_API_VERSION = "2.0"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["*Test"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--cov=pynlm",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+]
+
+[tool.coverage.run]
+source = ["pynlm"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == '__main__':",
+    "if typing.TYPE_CHECKING:",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+include = "\.pyi?$"
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+known_first_party = ["pynlm"]
+known_third_party = ["numpy", "scipy", "torch", "tensorflow"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = [
+    "tests/",
+    "examples/",
+    "demo/",
+]
+
+[build-system.requires]
+requires = ["scikit-build-core>=0.5.0", "pybind11>=2.11.0"]
+build-backend = "scikit_build_core.build"
