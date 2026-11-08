@@ -430,21 +430,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                     
                     // Store to working memory - neurons that fire become part of working memory
-                    // Phase 5 fix: the old activation was
-                    // |membrane - resting| / 10, but a neuron that just
-                    // spiked has membrane == reset, and reset == resting
-                    // for every neuron (Neuron::initializeRandom is never
-                    // called — only synaptic connectivity is randomized
-                    // — so all neurons keep the default -70/-70). The
-                    // stored activation was therefore always 0, and
-                    // decayWeakTraces removed every trace on the next
-                    // update, so working memory was permanently empty
-                    // (0 traces in every demo) despite hundreds of
-                    // spikes per step. A spike is itself the activation
-                    // event, so a just-fired neuron stores 1.0; the
-                    // existing decay then keeps it alive only while the
-                    // neuron keeps firing, which is the intended
-                    // working-memory behaviour.
+                    // (Phase 5 fix: the old activation was |membrane - resting| / 10, which was always 0
+                    // because neurons keep default -70mV. A spike is itself the activation event,
+                    // so a just-fired neuron stores 1.0; the existing decay keeps it alive while firing)
                     if (pImpl->workingMemory) {
                         pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
                     }
@@ -455,18 +443,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
-
-    // Phase 6, tried and reverted: global inhibitory feedback
-    // (inhibit every neuron when >10% of the population fired in
-    // a step). It lowered mean rate only slightly (80.8 -> 76.2 Hz
-    // in Phase 3) while making behaviour worse — a planner-driven
-    // Interact trap returned (115 empty interacts in one episode)
-    // and a hazard was consumed — because uniform inhibition
-    // flattens the motor pattern that the biases need to read, so
-    // the biases dominate more, not less. Population inhibition
-    // is the wrong lever here; see the drive-scaling change in
-    // AgentBrain/Neuron instead. This block is intentionally empty
-    // so the experiment and its result stay in the record.
 
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
@@ -870,12 +846,10 @@ void Brain::reset() {
 }
 
 namespace {
-// Phase 5 checkpoint payload helpers for the extra sections. Format is
-// deliberately simple and self-describing per value: a uint64 count
-// followed by raw elements, in a fixed order per section. All readers
-// bounds-check and fail the section (not the whole load) on truncation,
-// so a corrupt extra section degrades to the Phase 4 behaviour instead
-// of aborting a load that would otherwise succeed.
+// Phase 5 checkpoint payload helpers for the extra sections.
+// Format: simple per-value encoding (uint64 count + raw data).
+// Readers bounds-check and fail the section (not the whole load) on truncation.
+// So a corrupt extra section degrades to Phase 4 behaviour instead of aborting.
 void p5AppendU64(std::vector<uint8_t>& out, uint64_t v) {
     const uint8_t* b = reinterpret_cast<const uint8_t*>(&v);
     out.insert(out.end(), b, b + sizeof(v));
