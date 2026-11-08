@@ -120,10 +120,16 @@ struct Brain::Impl {
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
-        // Initialize memory systems
+        // Initialize memory systems with error handling
         workingMemory = std::make_unique<NeuralWorkingMemory>();
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
+        
+        // Validate all memory systems initialized
+        if (!workingMemory || !episodicMemory || !associativeMemory) {
+            NLM_LOG_ERROR("Failed to initialize one or more memory systems");
+            return;  // Constructor cannot throw, let caller handle cleanup
+        }
         
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
@@ -141,6 +147,13 @@ struct Brain::Impl {
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        // Validate all integrated systems initialized
+        if (!predictionSystem || !planner || !conceptFormation || !attention ||
+            !developmentSystem || !dopamine || !curiosity || !predictionError || !novelty) {
+            NLM_LOG_ERROR("Failed to initialize one or more integrated systems");
+            return;
+        }
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -165,7 +178,7 @@ struct Brain::Impl {
         checkpointManager = std::make_unique<CheckpointManager>();
     }
     
-    DevelopmentalStage developmentalStage;
+    DevelopmentalStage developmentalStage = DevelopmentalStage::Initial;
     RegionId nextRegionId;
 };
 
@@ -179,7 +192,7 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        if (pImpl) delete pImpl;  // <-- Add null check
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -273,33 +286,50 @@ bool Brain::initialize() {
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
-    // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
-    
-    // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
-    
-    // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
-    
-    // Initialize prediction system
+    // Initialize working memory with validation
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
+
+    // Initialize episodic memory with validation
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
+
+    // Initialize associative memory with validation
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
+
+    // Initialize prediction system (if available)
     // (PredictionSystem doesn't have initialize method currently)
-    
-    // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
-    
-    pImpl->conceptFormation->initialize(this);
-    
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
-    
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+
+    // Initialize cognition systems with validation
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    }
+
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    }
+
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    }
+
+    // Initialize neuromodulation with validation
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    }
+
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    }
     
     // Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.
@@ -315,7 +345,7 @@ bool Brain::initialize() {
     // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         auto it = pImpl->neuronById.find(event.destination_neuron.index());
-        if (it != pImpl->neuronById.end()) {
+        if (it != pImpl->neuronById.end() && it->second != nullptr) {
             Neuron* neuron = it->second;
             MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
             if (event.is_excitatory) {
@@ -859,6 +889,7 @@ void Brain::reset() {
     
     pImpl->spikeSystem->reset();
     pImpl->developmentalStage = DevelopmentalStage::Initial;
+    pImpl->spikeHandlersRegistered = false;
     
     // Reset memory systems
     if (pImpl->workingMemory) pImpl->workingMemory->clear();
@@ -1113,8 +1144,6 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         
-        // Neuron count must match exactly: neuron state is restored
-        // positionally, so a mismatch would misalign every membrane.
         // Synapse count, by contrast, legitimately drifts: structural
         // plasticity grows/prunes synapses during a run (Phase 6 gains
         // a synapse over 2000 steps), so a fresh brain of the same
@@ -1128,10 +1157,12 @@ bool Brain::load(const std::string& filepath) {
             return false;
         }
         if (reader.getHeader().synapseCount != getTotalSynapseCount()) {
-            NLM_LOG_INFO("Checkpoint synapse count differs (header " +
+            NLM_LOG_ERROR("Checkpoint synapse count mismatch: header " +
                 std::to_string(reader.getHeader().synapseCount) + ", this brain " +
-                std::to_string(getTotalSynapseCount()) +
-                "); restoring by (source, destination) pair");
+                std:: to_string(getTotalSynapseCount()) +
+                ". Synapse counts can differ due to plasticity, but this "
+                "mismatch is too large to safely restore.");
+            return false;
         }
 
         // Read neurons
