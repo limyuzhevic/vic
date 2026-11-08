@@ -16,7 +16,6 @@ public:
     ~PredictionSystem();
     
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
