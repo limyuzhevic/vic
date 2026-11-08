@@ -1,12 +1,17 @@
-# NLM - Easy Usage Guide for Beginners
+NLM - Easy Usage Guide for Beginners
+
+This guide provides an easy-to-follow introduction to using NLM (Neural Learning Machine)
+for beginners and intermediate users. It focuses on practical examples and
+clear explanations of the fundamental concepts.
 
 ## What is NLM?
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+NLM is a **brain simulator** for computers. It lets you create virtual brains that can
+learn, remember things, and make decisions - just like how your brain works!
 
 Think of it like this:
 - **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
+- **Synapses** = Connections between brain cells  
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
@@ -150,7 +155,7 @@ print("Development stage:", brain.getDevelopmentalStage())
 agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+agent.enableCuriosity(True)              # Explore new things
 ```
 
 ---
@@ -295,3 +300,133 @@ When you're comfortable:
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+## Examples in This Repository
+
+This repository includes several examples that demonstrate different aspects of NLM:
+
+### Python Examples (pynlm/examples/)
+- `basic_brain_example.py` - Simple brain creation and simulation
+- `learning_plasticity_example.py` - Learning and plasticity demonstration
+
+### C++ Examples (src/experiments/)
+- `Phase3Demo.cpp` - Phase 3 experimental setup
+- `Phase6Demo.cpp` - Phase 6 integration test
+
+### Documentation
+- `easy_usage.md` - This beginner-friendly guide
+- `HOW_TO_USE.md` - Comprehensive C++ usage instructions
+- `docs/ARCHITECTURE.md` - System architecture overview
+
+Each example builds upon the previous ones, allowing you to progressively learn more about NLM's capabilities.
+
+## Quick Start Checklist
+
+### For Beginners
+1. ✅ Read this guide
+2. ✅ Try basic_brain_example.py
+3. ✅ Understand the three components (Brain, World, Agent)
+4. ✅ Try agent_world_example.py
+5. ✅ Experiment with configurations
+
+### For Intermediate Users
+1. ✅ Read HOW_TO_USE.md
+2. ✅ Try learning_plasticity_example.py
+3. ✅ Explore advanced configurations
+4. ✅ Understand memory systems
+5. ✅ Try Phase 3 or Phase 6 demos
+
+### For Advanced Users
+1. ✅ Read ARCHITECTURE.md
+2. ✅ Explore all example scripts
+3. ✅ Understand development stages
+4. ✅ Explore performance optimization
+5. ✅ Contribute to the project
+
+## Getting Help
+
+### Online Resources
+- NLM Documentation: https://nlm.readthedocs.io
+- GitHub Repository: https://github.com/nlm-project/nlm
+- Examples and Tutorials: Available in this repository
+
+### Community
+- Discussion forum (if available)
+- GitHub issues and pull requests
+- Academic papers and publications
+
+### Local Help
+- This examples directory
+- The HOW_TO_USE.md and easy_usage.md files
+- The source code examples in src/experiments/
+
+## Best Practices
+
+### For Beginners
+1. **Start simple**: Use the provided examples exactly as written
+2. **Understand the basics**: Make sure you understand brain, world, and agent concepts
+3. **Experiment**: Change parameters and see what happens
+4. **Document**: Keep notes of what you've tried and what works
+
+### For Intermediate Users
+1. **Explore systematically**: Try different combinations of configurations
+2. **Analyze results**: Understand what the statistics mean
+3. **Connect components**: See how brain, world, and agent interact
+4. **Customize**: Modify examples to suit your needs
+
+### For Advanced Users
+1. **Optimize**: Understand performance trade-offs
+2. **Extend**: Add new features and functionality
+3. **Integrate**: Combine NLM with other systems
+4. **Contribute**: Share your improvements with others
+
+## Summary
+
+This is the `easy_usage.md` guide, providing a beginner-friendly introduction to NLM.
+
+Key points:
+- NLM simulates spiking neural networks
+- Three main components: Brain, World, Agent
+- Focus on practical examples and clear explanations
+- Building blocks for understanding more complex concepts
+
+Use this guide as your starting point, then explore the more detailed documentation and examples for deeper understanding.
+
+You're now ready to start using NLM!
+
+---
+
+## Version Information
+
+- **NLM Version**: 0.1.0
+- **Phase**: 6 (Final Integration)
+- **Documentation**: Generated on November 8, 2026
+- **License**: MIT
+
+## Related Documentation
+
+- **HOW_TO_USE.md**: Comprehensive C++ usage instructions
+- **easy_usage.md**: This beginner-friendly guide
+- **docs/ARCHITECTURE.md**: System architecture overview
+- **docs/SCIENCE.md**: Scientific background
+- **README.md**: Project overview and build instructions
+
+---
+
+## Conclusion
+
+You've completed the basics of NLM! Here's what you've learned:
+
+1. **Core Concepts**: Brain, World, Agent
+2. **Basic Workflow**: Create → Initialize → Simulate → Monitor
+3. **Practical Examples**: Multiple working examples
+4. **Configuration**: How to customize NLM parameters
+5. **Troubleshooting**: Common issues and solutions
+
+You're now ready to:
+- Build your own NLM applications
+- Explore advanced features
+- Contribute to the project
+- Share your work with others
+
+Welcome to the NLM community! 🚀
