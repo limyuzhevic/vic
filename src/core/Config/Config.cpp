@@ -3,14 +3,35 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+#include <string>
+#include <unordered_map>
+#include <stdexcept>
+
+// Forward declaration for JSON parsing
+namespace {
+    // Helper to convert ConfigValue to JSON
+    nlohmann::json configValueToJson(const nlm::ConfigValue& value);
+    
+    // Helper to convert JSON to ConfigValue
+    nlm::ConfigValue jsonToConfigValue(const nlohmann::json& j);
+}
+
+// Add nlohmann/json.hpp usage namespace
+using json = nlohmann::json;
 
 namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Configuration schema for validation
+    std::unordered_map<std::string, std::string> schema;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize with default schema
+    initializeSchema();
+}
 
 Config::~Config() = default;
 
@@ -18,41 +39,83 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+void Config::initializeSchema() {
+    // Common configuration options with descriptions
+    pImpl->schema = {
+        {"neuron_count", "Total number of neurons in the brain"},
+        {"region_count", "Number of brain regions"},
+        {"connection_probability", "Connection probability for random connectivity"},
+        {"simulation_timestep", "Simulation timestep in seconds"},
+        {"random_seed", "Random seed for reproducible experiments"},
+        {"stdp_ltp_weight", "STDP long-term potentiation weight"},
+        {"stdp_ltd_weight", "STDP long-term depression weight"},
+        {"stdp_tau", "STDP time constant"},
+        {"synaptogenesis_rate", "Rate of new synapse formation"},
+        {"pruning_rate", "Rate of synapse elimination"},
+        {"replay_interval", "Steps between memory replay"},
+        {"consolidation_interval", "Steps between memory consolidation"},
+        {"checkpoint_dir", "Directory for checkpoint files"},
+        {"log_level", "Logging level (DEBUG, INFO, WARN, ERROR)"},
+        {"visualization_enabled", "Enable visualization"},
+        {"max_simulation_steps", "Maximum simulation steps"},
+        {"reward_discount_factor", "Reward discount factor"},
+        {"dopamine_baseline", "Baseline dopamine level"},
+        {"environment_name", "Environment name"},
+        {"environment_width", "Environment width"},
+        {"environment_height", "Environment height"}
+    };
+}
+
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        // Parse JSON file
+        json j;
+        file >> j;
+        
+        // Clear existing entries
+        pImpl->entries.clear();
+        
+        // Process JSON object
+        if (j.is_object()) {
+            for (auto& [key, value] : j.items()) {
+                // Validate key format (alphanumeric with dots and underscores)
+                if (!isValidKey(key)) {
+                    NLM_LOG_WARN("Invalid config key format: " + key);
+                    continue;
+                }
+                
+                // Validate value against schema if available
+                if (pImpl->schema.find(key) != pImpl->schema.end()) {
+                    if (!isValidValue(key, value)) {
+                        NLM_LOG_WARN("Invalid value for key " + key + ", using default");
+                        continue;
+                    }
+                }
+                
+                // Convert JSON value to ConfigValue and store
+                ConfigValue configValue = jsonToConfigValue(value);
+                set(key, configValue, ConfigSource::File);
+                
+                NLM_LOG_DEBUG("Loaded config: " + key + " = " + toString(value));
+            }
+        } else {
+            NLM_LOG_ERROR("Invalid JSON format in config file: " + filepath);
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        NLM_LOG_INFO("Successfully loaded configuration from: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error parsing config file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -66,6 +129,8 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_LOG_WARN("Invalid command line argument format: " + arg);
             }
         }
         // Handle -key value format
@@ -81,15 +146,30 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        json j;
+        
+        // Convert all entries to JSON
+        for (const auto& entry : pImpl->entries) {
+            // Convert ConfigValue to JSON
+            nlohmann::json valueJson = configValueToJson(entry.value);
+            j[entry.key] = valueJson;
+        }
+        
+        // Write JSON with pretty formatting
+        file << j.dump(2);
+        
+        NLM_LOG_INFO("Successfully saved configuration to: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error saving config file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

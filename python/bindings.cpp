@@ -155,7 +155,7 @@ PYBIND11_MODULE(pynlm, m) {
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -166,6 +166,63 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // New convenience methods for Python users
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set a string configuration value")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set an integer configuration value")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set a floating-point configuration value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, nlm::ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+            "Set a boolean configuration value")
+        .def("get", [](Config& self, const std::string& key) -> py::optional<double> {
+            auto val = self.get<double>(key);
+            return val.has_value() ? py::optional<double>(val.value()) : py::nullopt;
+        }, py::arg("key"),
+            "Get a configuration value as a double (convenience method)")
+        .def("get", [](Config& self, const std::string& key) -> py::optional<int> {
+            auto val = self.get<int>(key);
+            return val.has_value() ? py::optional<int>(val.value()) : py::nullopt;
+        }, py::arg("key"),
+            "Get a configuration value as an int (convenience method)")
+        .def("get", [](Config& self, const std::string& key) -> py::optional<std::string> {
+            auto val = self.get<std::string>(key);
+            return val.has_value() ? py::optional<std::string>(val.value()) : py::nullopt;
+        }, py::arg("key"),
+            "Get a configuration value as a string (convenience method)")
+        .def("getBool", [](Config& self, const std::string& key) -> py::optional<bool> {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? py::optional<bool>(val.value()) : py::nullopt;
+        }, py::arg("key"),
+            "Get a configuration value as a boolean (convenience method)")
+        .def("get", [](Config& self, const std::string& key, const std::string& defaultValue) -> std::string {
+            auto val = self.get<std::string>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get a configuration value with a default (convenience method)")
+        .def("getInt", [](Config& self, const std::string& key, int defaultValue) -> int {
+            auto val = self.get<int>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get a configuration value as int with a default (convenience method)")
+        .def("getDouble", [](Config& self, const std::string& key, double defaultValue) -> double {
+            auto val = self.get<double>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get a configuration value as double with a default (convenience method)")
+        .def("getBool", [](Config& self, const std::string& key, bool defaultValue) -> bool {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+            "Get a configuration value as boolean with a default (convenience method)")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -350,6 +407,60 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        // New convenience methods for Brain
+        .def("runSimulation", [](Brain& self, const std::vector<double>& sensoryInput, int steps) {
+            if (auto* region = self.getRegion(nlm::RegionId(1))) {
+                for (size_t i = 0; i < steps; ++i) {
+                    if (i < sensoryInput.size()) {
+                        nlm::SensoryInput input;
+                        input.addSignal(sensoryInput[i]);
+                        self.receiveSensoryInput(input);
+                    }
+                    self.step(i);
+                }
+            }
+            return self.getTotalSpikeCount();
+        }, py::arg("sensoryInput"), py::arg("steps"),
+            "Run a simulation with sensory input and return total spikes")
+        .def("createSimpleSensoryInput", [](const std::vector<float>& data) {
+            nlm::SensoryInput input;
+            for (float value : data) {
+                input.addSignal(value);
+            }
+            return input;
+        }, py::arg("data"),
+            "Create a simple SensoryInput from a vector of signals")
+        .def("createAction", [](nlm::ActionType type, std::vector<float> parameters) {
+            return std::make_unique<nlm::Action>(type, parameters);
+        }, py::arg("type"), py::arg("parameters") = std::vector<float>(),
+            "Create an Action with specified type and parameters")
+        .def("getLearningProgress", [](Brain& self, int windowSteps) {
+            size_t totalSpikes = self.getTotalSpikeCount();
+            size_t firingNeurons = self.getFiringNeuronCount();
+            float firingRate = self.getAverageFiringRate();
+            float eir = self.getExcitationInhibitionRatio();
+            
+            // Calculate learning progress based on various metrics
+            float learningScore = 0.0f;
+            if (totalSpikes > 0) learningScore += 0.3f; // Spike activity
+            if (firingNeurons > 0) learningScore += 0.3f; // Active neurons
+            if (firingRate > 0.0f) learningScore += 0.2f; // Non-zero firing rate
+            if (eir > 0.0f && !std::isinf(eir)) learningScore += 0.2f; // Balanced E/I
+            
+            return learningScore;
+        }, py::arg("windowSteps") = 100,
+            "Get a learning progress score based on various brain metrics")
+        .def("getStatus", [](Brain& self) {
+            std::ostringstream oss;
+            oss << "Brain Status:" << std::endl;
+            oss << "  Total Neurons: " << self.getTotalNeuronCount() << std::endl;
+            oss << "  Total Synapses: " << self.getTotalSynapseCount() << std::endl;
+            oss << "  Firing Neurons: " << self.getFiringNeuronCount() << std::endl;
+            oss << "  Average Firing Rate: " << self.getAverageFiringRate() << " Hz" << std::endl;
+            oss << "  Total Spikes: " << self.getTotalSpikeCount() << std::endl;
+            oss << "  E/I Ratio: " << self.getExcitationInhibitionRatio() << std::endl;
+            return oss.str();
+        }, "Get a detailed status string of the brain state")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
