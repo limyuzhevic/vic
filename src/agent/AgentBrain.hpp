@@ -136,6 +136,53 @@ public:
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
+    // Advanced neural dynamics configuration
+    void setNeuralTimeConstant(float tau);
+    void setNeuralMembraneCapacitance(float capacitance);
+    void setNeuralThreshold(float threshold);
+    void setRefractoryPeriod(uint32_t steps);
+    
+    // Advanced plasticity configuration
+    void setSTDPParameters(float ltp, float ltd, float tau);
+    void setLearningRate(float rate);
+    void enablePlasticity(bool hebbian, bool stdp, bool reward);
+    
+    // Advanced neuromodulation configuration
+    void setDopamineInfluence(float scale);
+    void setCuriosityInfluence(float scale);
+    void setNoveltyDetection(bool enabled);
+    
+    // Advanced environment configuration
+    void setEnvironmentParameters(float width, float height, float maxEnergy, float energyDecay);
+    
+    // Diagnostic reporting
+    std::string getDiagnosticReport() const;
+    std::string getStatistics() const;
+    std::vector<std::string> listConfigurationParameters() const;
+    
+    // Analysis and control methods
+    std::string runAnalysis(const std::string& analysisType) const;
+    std::string setParameter(const std::string& key, const std::string& value);
+    std::string getParameter(const std::string& key) const;
+    
+    // Brain state management
+    bool saveBrainState(const std::string& filepath) const;
+    bool loadBrainState(const std::string& filepath);
+    
+    // Advanced user interface commands
+    std::string getHelp() const;
+    std::string configureSimulation(const std::string& param, float value);
+    
+    // Testing and experimentation methods
+    void forceNeuronType(NeuronType type);
+    void injectExternalCurrent(float current);
+    void resetDevelopment();
+    
+    // Advanced monitoring
+    std::string getActivityReport() const;
+    std::string getLearningReport() const;
+    std::string getMemoryReport() const;
+    
 private:
     // Motor decoding: convert neural activity to motor command
     MotorCommand decodeFromMotorNeurons();

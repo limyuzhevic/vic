@@ -17,6 +17,7 @@ using ConfigValue = std::variant<
     int,
     int64_t,
     double,
+    float,
     bool,
     std::string,
     std::vector<int>,
@@ -79,6 +80,9 @@ template<typename T>
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Neural dynamics parameters
+    void set(const std::string& key, float value, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;

@@ -18,9 +18,9 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
-    // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
+    // LIF parameters - more conservative for stability
+    static constexpr float MEMBRANE_CAPACITANCE = 2.0f;  // nF
+    static constexpr float TIME_CONSTANT = 30.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
@@ -205,7 +205,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
+    // LIF dynamics: Leaky Integrate-and-Fire with improved stability
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
     
@@ -213,30 +213,40 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    
+    // Use configurable parameters with improved defaults for stability
+    float tau = Impl::TIME_CONSTANT;  // ms - can be increased to reduce firing rate
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF - can be increased to reduce firing rate
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution with improved stability
     float leakContribution = (V_rest - V) / tau;
     
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Update membrane potential using improved Euler integration
+    // Add spike-frequency adaptation to reduce excessive firing
+    float adaptationBoost = pImpl->state.adaptationVariable * 0.005f;  // Reduced from 0.01f
+    float totalChange = static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution - adaptationBoost);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
-    }
+    // Improved stability: use exponential integration for the leak term
+    // This is more biologically realistic and reduces instability
+    float alpha = static_cast<float>(dt) * 1000.0f / tau;
+    float beta = 1.0f - std::exp(-alpha);
+    float newV = V * (1.0f - beta) + V_rest * beta + static_cast<float>(dt) * 1000.0f * synapticContribution / C;
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    newV = std::clamp(newV, -100.0f, 50.0f);
+    
+    // Apply spike-frequency adaptation
+    if (pImpl->state.adaptationVariable > 0.0f) {
+        newV -= pImpl->state.adaptationVariable * 0.005f;  // Reduced from 0.01f
+        pImpl->state.adaptationVariable *= 0.98f;  // Slower decay
+    }
+    
+    V = newV;
     
     // Update the firing-rate metric from counted spikes, in Hz.
-    // Previously setFiringRate() was never called anywhere, so
-    // getAverageFiringRate() summed zeros even with thousands of spikes.
     // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
     // dt is in seconds (0.001 in the demos), so a neuron firing every
     // step would approach 1000 Hz, and refractory periods cap it well
@@ -244,7 +254,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (dt > 0.0) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
-
+    
     // Check for spike
     if (V >= threshold) {
         fired = true;
@@ -290,20 +300,20 @@ void Neuron::reset() {
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
     // Real random initialization with biological constraints
-    // Membrane potential starts near resting potential
-    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
+    // Membrane potential starts near resting potential (reduced range for stability)
+    pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-1.0f, 1.0f);
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Threshold is more conservative (-58mV typical, further from resting)
+    pImpl->state.threshold = -58.0f + rng.uniformReal(-1.0f, 1.0f);
     
-    // Resting potential typically -70mV
-    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Resting potential typically -70mV (reduced variation)
+    pImpl->state.restingPotential = -70.0f + rng.uniformReal(-1.0f, 1.0f);
     
-    // Reset potential is usually close to resting
-    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
+    // Reset potential is very close to resting (aggressive reset)
+    pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(-1.0f, 2.0f);
     
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(uint32_t(2), uint32_t(10)));
+    // Refractory period: extended for better stability (8-12ms typical)
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(uint32_t(8), uint32_t(12)));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
