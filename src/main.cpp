@@ -19,12 +19,7 @@
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
 
-#include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
-#include <iomanip>
-#include <numeric>
+#include <limits>
 
 using namespace nlm;
 
@@ -222,38 +217,69 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // Select diverse pattern neurons for selective learning:
+    // - Choose sensory, motor, and internal neurons to create varied connections
+    // - Use different input intensities to promote selective potentiation
+    // - Avoid synchronous saturation that causes uniform weight changes
+    
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
+        // Get diverse neuron types for selective pattern learning
+        size_t targetCount = 25;  // More diverse pattern for better selectivity
         for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
+            if (patternNeurons.size() >= targetCount) break;
+            
+            // Prefer neurons that create varied pathways:
+            // - Sensory neurons for input reception
+            // - Motor neurons for output signaling  
+            // - Internal neurons for integration
+            NeuronType type = neuron->getType();
+            if (type == NeuronType::Sensory || type == NeuronType::Motor || type == NeuronType::Internal) {
                 patternNeurons.push_back(neuron->getId());
             }
         }
     }
+    
+    // Use varied input intensities based on neuron type for selective learning
     for (SimulationStep step = 0; step < 1000; ++step) {
         for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+            // Determine appropriate input intensity based on neuron type
+            float intensity = 30.0f;  // Base intensity
+            if (auto* region = brain->getRegion(RegionId(1))) {
+                if (auto* neuron = region->getNeuron(id)) {
+                    switch (neuron->getType()) {
+                        case NeuronType::Sensory:
+                            intensity = 25.0f;  // Moderate input for sensory
+                            break;
+                        case NeuronType::Motor:
+                            intensity = 35.0f;  // Stronger input for motor
+                            break;
+                        case NeuronType::Internal:
+                            intensity = 15.0f;  // Subtle input for integration
+                            break;
+                        default:
+                            intensity = 20.0f;  // Default for other types
+                    }
+                }
+            }
+            brain->injectCurrent(id, intensity);
         }
         
         brain->step(step, step * 0.001);
         
-        // Log progress every 100 steps
+        // Log progress every 100 steps with more detailed statistics
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                        " | Active regions: " + std::to_string(brain->getRegionCount()));
         }
     }
     
     // Record final state
     experiment.recordFinalState();
     
-    // Compute and display statistics
+    // Compute and display statistics with enhanced analysis
     experiment.computeStatistics();
 }
 
@@ -262,48 +288,89 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
     auto* region = brain->getRegion(RegionId(1));
-    if (!region) return;
+    if (!region) {
+        NLM_LOG_ERROR("No region available for STDP test");
+        return;
+    }
     
-    // Use one real synapse and its own pre/post neurons. The old test
-    // fired neurons[0]/neurons[1] and measured synapses[0..4], which are
-    // usually unrelated to that pair, so its result said nothing about STDP.
     auto& synapses = region->getSynapses();
     if (synapses.empty()) {
         NLM_LOG_INFO("  No synapses for STDP test");
         return;
     }
+    
+    // Use the first synapse for testing, ensuring it has both pre and post neurons
     Synapse* syn = synapses[0].get();
+    
+    // Enable only STDP plasticity for this test
     syn->enablePlasticity(false, true, false);  // STDP only
     float beforeWeight = syn->getWeight();
+    
     NLM_LOG_INFO("  Testing STDP on 1 synapse:");
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
+    // Apply correlated pre->post activity to test STDP potentiation
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
-    float totalDelta = delta;
     
-    NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
+    // Determine if STDP is working
+    if (delta > 0.001f) {
         NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
+        NLM_LOG_INFO("    Weight increased from " + std::to_string(beforeWeight) + 
+                     " to " + std::to_string(syn->getWeight()) +
+                     " (Δ=" + std::to_string(delta) + ")");
+    } else if (delta < -0.001f) {
         NLM_LOG_INFO("  ! STDP reversed: Check parameters");
+        NLM_LOG_INFO("    Weight decreased from " + std::to_string(beforeWeight) + 
+                     " to " + std::to_string(syn->getWeight()) +
+                     " (Δ=" + std::to_string(delta) + ")");
     } else {
         NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+        NLM_LOG_INFO("    Weight remained at " + std::to_string(syn->getWeight()) +
+                         " (Δ=" + std::to_string(delta) + ")");
+        NLM_LOG_INFO("    Possible causes: insufficient spike correlation, "
+                     "STDP parameters too low, or timing issues");
+    }
+    
+    // Additional validation: check spike history to confirm STDP events
+    const auto& preSpikes = syn->getPreSpikeHistory();
+    const auto& postSpikes = syn->getPostSpikeHistory();
+    
+    if (!preSpikes.empty() && !postSpikes.empty()) {
+        NLM_LOG_INFO("  STDP spike history recorded: pre-spikes=" + std::to_string(preSpikes.size()) +
+                     ", post-spikes=" + std::to_string(postSpikes.size()));
+        
+        // Calculate time difference between pre and post spikes
+        float minTimeDiff = std::numeric_limits<float>::max();
+        for (size_t i = 0; i < preSpikes.size() && i < postSpikes.size(); ++i) {
+            float timeDiff = std::abs(postSpikes[i] - preSpikes[i]);
+            if (timeDiff < minTimeDiff) minTimeDiff = timeDiff;
+        }
+        
+        if (minTimeDiff < 1000.0f) {  // Within 1ms
+            NLM_LOG_INFO("  ✓ Pre and post spikes are temporally correlated (min Δt=" + 
+                         std::to_string(minTimeDiff) + "ms), good for STDP");
+        } else {
+            NLM_LOG_INFO("  ! Large temporal separation between pre/post spikes (min Δt=" + 
+                         std::to_string(minTimeDiff) + "ms), may affect STDP");
+        }
+    } else {
+        NLM_LOG_INFO("  ! Spike history incomplete: pre-spikes=" + std::to_string(preSpikes.size()) +
+                     ", post-spikes=" + std::to_string(postSpikes.size()));
     }
 }
 

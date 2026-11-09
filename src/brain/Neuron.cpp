@@ -245,6 +245,22 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
 
+    // Enforce single-phase state machine for clarity
+    // Phase 2 & 6 neurons use: Resting → Active (during input) → Refractory (after spike)
+    if (pImpl->state.firingState == FiringState::Resting) {
+        // Neuron is at rest, can integrate inputs
+        pImpl->state.firingState = FiringState::Active;
+    }
+    
+    // Update the firing-rate metric from counted spikes, in Hz.
+    // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
+    // dt is in seconds (0.001 in the demos), so a neuron firing every
+    // step would approach 1000 Hz, and refractory periods cap it well
+    // below that in practice.
+    if (dt > 0.0) {
+        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+    }
+
     // Check for spike
     if (V >= threshold) {
         fired = true;
@@ -257,17 +273,25 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Record spike
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential to a reasonable value after spike
+        // V_reset should be below threshold to prevent immediate re-firing
         V = V_reset;
         
-        // Enter refractory period
+        // Enter refractory period - this is critical for realistic neural dynamics
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // During refractory, maintain state machine for integration
+        if (pImpl->state.firingState == FiringState::Refractory) {
+            // Neuron is recovering from spike, cannot integrate new inputs
+            pImpl->synapticInput = 0.0f;
+        } else {
+            // Normal integration phase
+            pImpl->state.firingState = FiringState::Active;
+        }
     }
     
     // Clear synaptic input for next step

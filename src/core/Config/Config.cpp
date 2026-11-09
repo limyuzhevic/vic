@@ -19,8 +19,8 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Enhanced configuration file parser with better error handling
+    // Supports key=value format with quoted values and improved validation
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -28,27 +28,45 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with enhanced validation
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
+        if (pos == std::string::npos) {
+            // Malformed line: missing '='
+            continue;  // Skip but continue processing other lines
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Enhanced quote handling for both single and double quotes
+        if (value.size() >= 2) {
+            char quote = value.front();
+            if ((quote == '"' || quote == '\'') && value.back() == quote) {
                 value = value.substr(1, value.size() - 2);
             }
-            
+        }
+        
+        // Validate key contains only valid characters
+        if (key.empty() || !std::isalnum(key[0]) && key[0] != '_' && key[0] != '-') {
+            continue;  // Skip invalid keys
+        }
+        
+        try {
             set(key, value, ConfigSource::File);
+        } catch (const std::exception& e) {
+            // Log error but continue processing
+            continue;
         }
     }
     
@@ -56,25 +74,56 @@ bool Config::loadFromFile(const std::string& filepath) {
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
+    if (argc <= 1) return true;  // No arguments to process
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
+        // Handle --key=value format (most common)
+        if (arg.rfind("--", 0) == 0) {  // More robust check for starts with "--"
             size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
+            if (pos != std::string::npos && pos > 2) {  // Ensure key is not empty
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                key = trim(key);
+                value = trim(value);
+                
+                // Remove surrounding quotes from value if present
+                if (value.size() >= 2) {
+                    char quote = value.front();
+                    if ((quote == '"' || quote == '\'') && value.back() == quote) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+            } else if (pos == 2) {
+                // Handle --key (with no value)
+                std::string key = trim(arg.substr(2));
+                if (!key.empty()) {
+                    set(key, "true", ConfigSource::CommandLine);  // Boolean flag
+                }
             }
-        }
-        // Handle -key value format
+        } 
+        // Handle -key value format (alternative convention)
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
-            std::string value = argv[++i];
+            std::string value = argv[++i];  // Advance to next argument
+            key = trim(key);
+            value = trim(value);
+            
+            // Remove surrounding quotes from value if present
+            if (value.size() >= 2) {
+                char quote = value.front();
+                if ((quote == '"' || quote == '\'') && value.back() == quote) {
+                    value = value.substr(1, value.size() - 2);
+                }
+            }
+            
             set(key, value, ConfigSource::CommandLine);
         }
     }
+    
     return true;
 }
 
@@ -84,9 +133,34 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Enhanced save format: proper key=value with quotes for strings
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format value based on its type for better readability
+        file << entry.key << " = ";
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << arg[i] << "\"";
+                    } else {
+                        file << arg[i];
+                    }
+                }
+                file << "]";
+            } else {
+                file << arg;
+            }
+        }, entry.value);
+        file << "\n\n";
     }
     
     return true;

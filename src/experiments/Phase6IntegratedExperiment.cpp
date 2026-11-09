@@ -325,32 +325,43 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
+    cfg->set("region_count", 1);
+    cfg->set("random_seed", 42);
     
-    // Create and initialize brain
+    // Create and initialize brain with proper connectivity
     auto brain1 = std::make_shared<Brain>(cfg);
-    brain1->initialize();
+    if (!brain1->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize first brain");
+        return false;
+    }
     
-    // Run some steps
+    // Inject some activity to create meaningful state to save
     for (int i = 0; i < 100; ++i) {
+        brain1->injectCurrentToNeurons(NeuronType::Sensory, 20.0f);
         brain1->step(i, i * 0.001);
     }
     
     float avgFiring1 = brain1->getAverageFiringRate();
     size_t totalSpikes1 = brain1->getTotalSpikeCount();
+    size_t pendingSpikes1 = brain1->getPendingSpikeEventCount();
     
     NLM_LOG_INFO("Brain1 avg firing: " + std::to_string(avgFiring1));
     NLM_LOG_INFO("Brain1 total spikes: " + std::to_string(totalSpikes1));
+    NLM_LOG_INFO("Brain1 pending spikes: " + std::to_string(pendingSpikes1));
     
-    // Save checkpoint
-    std::string path = "/tmp/nlm_checkpoint_test.bin";
+    // Save checkpoint to a dedicated temporary path
+    std::string path = "/tmp/nlm_checkpoint_test_" + std::to_string(std::time(nullptr)) + ".bin";
     if (!brain1->save(path)) {
         NLM_LOG_ERROR("Failed to save checkpoint");
         return false;
     }
     
-    // Create new brain and load
+    // Create new brain with same configuration and load
     auto brain2 = std::make_shared<Brain>(cfg);
-    brain2->initialize();
+    if (!brain2->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize second brain");
+        return false;
+    }
     
     if (!brain2->load(path)) {
         NLM_LOG_ERROR("Failed to load checkpoint");
@@ -358,12 +369,34 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     }
     
     size_t totalSpikes2 = brain2->getTotalSpikeCount();
+    size_t pendingSpikes2 = brain2->getPendingSpikeEventCount();
     NLM_LOG_INFO("Brain2 total spikes after load: " + std::to_string(totalSpikes2));
+    NLM_LOG_INFO("Brain2 pending spikes after load: " + std::to_string(pendingSpikes2));
     
-    // Note: Due to the nature of neural simulation, exact state restoration
-    // is complex. The load should restore the structure at minimum.
+    // Validate checkpoint restoration
+    if (totalSpikes2 != totalSpikes1) {
+        NLM_LOG_ERROR("Spike count mismatch after checkpoint: " + 
+                     std::to_string(totalSpikes1) + " vs " + std::to_string(totalSpikes2));
+        return false;
+    }
     
-    NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
+    if (pendingSpikes2 != pendingSpikes1) {
+        NLM_LOG_ERROR("Pending spike count mismatch after checkpoint: " +
+                     std::to_string(pendingSpikes1) + " vs " + std::to_string(pendingSpikes2));
+        return false;
+    }
+    
+    // Additional validation: compare some neural properties
+    float avgFiring2 = brain2->getAverageFiringRate();
+    NLM_LOG_INFO("Firing rates: " + std::to_string(avgFiring1) + " vs " + std::to_string(avgFiring2));
+    
+    if (std::abs(avgFiring1 - avgFiring2) > 0.1f) {
+        NLM_LOG_ERROR("Firing rate mismatch exceeds tolerance: " +
+                     std::to_string(avgFiring1) + " vs " + std::to_string(avgFiring2));
+        return false;
+    }
+    
+    NLM_LOG_INFO("[PASS] Checkpoint save/load completed successfully");
     return true;
 }
 
@@ -372,9 +405,15 @@ bool Phase6IntegratedExperiment::testReplay() {
     
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
+    cfg->set("region_count", 1);
+    cfg->set("random_seed", 42);
+    cfg->set("connection_probability", 0.1f);
     
     auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain for replay test");
+        return false;
+    }
     
     auto* em = brain->getEpisodicMemory();
     if (!em) {
@@ -382,26 +421,86 @@ bool Phase6IntegratedExperiment::testReplay() {
         return false;
     }
     
-    // Run some steps
-    for (int i = 0; i < 200; ++i) {
+    // Run simulation with sufficient activity to create episodes
+    // Need to trigger working memory storage and episodic memory capture
+    size_t episodesCreated = 0;
+    for (int i = 0; i < 300; ++i) {
+        // Inject sensory input to drive neural activity
+        brain->injectCurrentToNeurons(NeuronType::Sensory, 15.0f);
+        
+        // Process the step
         brain->step(i, i * 0.001);
+        
+        // Every 50 steps, check if episodic memory captured an episode
+        if (i % 50 == 49) {
+            size_t currentEpisodes = em->getEpisodeCount();
+            if (currentEpisodes > episodesCreated) {
+                episodesCreated = currentEpisodes;
+                NLM_LOG_INFO("Step " + std::to_string(i) + ": Created new episode (total: " + 
+                           std::to_string(episodesCreated) + ")");
+            }
+        }
     }
     
     // Check if episodes exist for replay
     size_t episodeCount = em->getEpisodeCount();
-    if (episodeCount > 0) {
-        NLM_LOG_INFO("[PASS] Episodes available for replay: " + std::to_string(episodeCount));
+    if (episodeCount == 0) {
+        NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal with current settings)");
         
-        // Get episodes for replay
-        auto episodes = em->getEpisodesForReplay(3);
-        if (!episodes.empty()) {
-            NLM_LOG_INFO("[PASS] Replay system can retrieve episodes");
-            return true;
-        }
+        // Try to force an episode by manually triggering episodic memory
+        // This tests the episodic memory system even if the simulation
+        // didn't naturally create episodes
+        EpisodicMemoryItem testEpisode;
+        testEpisode.timestamp = 100;
+        testEpisode.positionX = 5.0f;
+        testEpisode.positionY = 5.0f;
+        testEpisode.orientation = 0.0f;
+        testEpisode.action = ActionType::MoveForward;
+        testEpisode.reward = 0.5f;
+        testEpisode.energy = 100.0f;
+        testEpisode.novelty = 0.3f;
+        testEpisode.resultingReward = 0.5f;
+        testEpisode.age = 1;
+        
+        em->storeEpisode(testEpisode);
+        episodeCount = em->getEpisodeCount();
+        NLM_LOG_INFO("[PASS] Manually created test episode for replay testing (total: " + 
+                   std::to_string(episodeCount) + ")");
     }
     
-    NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
-    return true;
+    // Get episodes for replay
+    NLM_LOG_INFO("Attempting to retrieve " + std::to_string(std::min(size_t(3), episodeCount)) + 
+                " episodes for replay...");
+    auto episodes = em->getEpisodesForReplay(3);
+    
+    if (!episodes.empty()) {
+        NLM_LOG_INFO("[PASS] Replay system can retrieve episodes successfully");
+        NLM_LOG_INFO("Retrieved " + std::to_string(episodes.size()) + " episodes for replay");
+        
+        // Verify episode structure
+        for (size_t i = 0; i < episodes.size() && i < 3; ++i) {
+            const auto* episode = episodes[i];
+            if (!episode) {
+                NLM_LOG_ERROR("Failed to retrieve episode " + std::to_string(i));
+                return false;
+            }
+            
+            // Basic validation of episode data
+            if (episode->timestamp == 0) {
+                NLM_LOG_ERROR("Episode " + std::to_string(i) + " has invalid timestamp");
+                return false;
+            }
+            
+            NLM_LOG_INFO("Episode " + std::to_string(i) + ": timestamp=" + std::to_string(episode->timestamp) +
+                        ", reward=" + std::to_string(episode->reward) +
+                        ", energy=" + std::to_string(episode->energy));
+        }
+        
+        return true;
+    }
+    
+    NLM_LOG_ERROR("Replay system failed to retrieve episodes");
+    return false;
 }
 
 } // namespace nlm
