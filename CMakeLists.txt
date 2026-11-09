@@ -11,11 +11,18 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Enable warnings
+# Enable warnings and enhance them
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /WX)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Wcpp11-compat -Wextra-ctor-dtor -Wshadow -Werror=assertion-error -Wfatal-errors)
+endif()
+
+# Add compiler optimizations
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-O0 -g -DDEBUG -DCPP11")
+else()
+    add_compile_options(-O3 -DNDEBUG -DCPP11")
 endif()
 
 # Source directory
@@ -132,52 +139,33 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
+# Add new core modules
+add_library(nlm_core_enhanced STATIC
+    src/core/CLI/CLIFramework.cpp
+    src/core/Demos/AdvancedDemoBase.cpp
+    src/core/Runner/UnifiedDemoRunner.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_include_directories(nlm_core_enhanced PUBLIC src)
+target_link_libraries(nlm_core_enhanced PUBLIC nlm_core)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
+# Enhanced main executable
+add_executable(nlm_enhanced
+    src/experiments/EnhancedPhase2Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_enhanced PUBLIC nlm_core nlm_core_enhanced)
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
-
-# Phase 5 demo executable (Phase 5, added here: pattern probe,
-# sandbox run, and checkpoint round-trip for the brain-personality
-# step — previously Phase 5 was library-only with no demo).
-add_executable(nlm_phase5_demo
-    src/experiments/Phase5Demo.cpp
-)
-target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
-
-# Phase 6 demo executable
-add_executable(nlm_phase6_demo
+# Enhanced Phase 6 demo
+add_executable(nlm_phase6_enhanced
     src/experiments/Phase6Demo.cpp
+    src/experiments/AdvancedPhase6Demo.cpp
 )
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+target_link_libraries(nlm_phase6_enhanced PUBLIC nlm_core nlm_core_enhanced nlm_agent nlm_world nlm_phase6)
 
-# Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
-# association probe, concept/social probes, and a sandbox run with
-# a teacher, planner overrides, and a checkpoint round-trip. The old
-# nlm_phase6_demo integration demo is left unchanged.
-add_executable(nlm_phase6_text_demo
-    src/experiments/Phase6TextDemo.cpp
-)
-target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
-
-# Benchmark executable
-add_executable(nlm_benchmark
+# Benchmark with enhanced features
+add_executable(nlm_benchmark_enhanced
     src/benchmark.cpp
 )
-target_link_libraries(nlm_benchmark PUBLIC nlm_core)
+target_link_libraries(nlm_benchmark_enhanced PUBLIC nlm_core)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
 # Previously pyproject.toml claimed scikit-build-core would build pynlm,
