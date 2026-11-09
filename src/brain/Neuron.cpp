@@ -314,6 +314,9 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    
+    // Initialize firing rate to 0 Hz (will be updated during simulation)
+    setFiringRate(0.0f);
 }
 
 NeuronId Neuron::getId() const { return pImpl->id; }

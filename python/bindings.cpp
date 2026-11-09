@@ -144,22 +144,123 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
-            std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
-        }, py::arg("args"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
+        // Enhanced configuration methods with validation and error handling
+        .def("loadFromFile", [](Config& self, const std::string& filepath) -> bool {
+            try {
+                return self.loadFromFile(filepath);
+            } catch (const std::exception& e) {
+                py::print("Error loading config from file '" + filepath + "': " + std::string(e.what()));
+                return false;
+            }
+        }, py::arg("filepath"), "Load configuration from a JSON file. Returns True on success, False on error.")
+        
+        // Load from command line arguments with improved error handling
+        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) -> bool {
+            try {
+                std::vector<char*> argv;
+                argv.reserve(args.size());
+                for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+                return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
+            } catch (const std::exception& e) {
+                py::print("Error loading config from args: " + std::string(e.what()));
+                return false;
+            }
+        }, py::arg("args"), "Load configuration from command line arguments. Returns True on success, False on error.")
+        
+        // Save to file with validation
+        .def("saveToFile", [](Config& self, const std::string& filepath) -> bool {
+            try {
+                return self.saveToFile(filepath);
+            } catch (const std::exception& e) {
+                py::print("Error saving config to file '" + filepath + "': " + std::string(e.what()));
+                return false;
+            }
+        }, py::arg("filepath"), "Save configuration to a JSON file. Returns True on success, False on error.")
+        
+        // Enhanced configuration access methods
+        .def("get", [](Config& self, const std::string& key, const std::string& defaultValue = "") {
+            if (self.has(key)) {
+                // Try to get as float, int, or string based on type
+                try {
+                    double floatVal = self.getOr<double>(key, 0.0);
+                    return py::float_(floatVal);
+                } catch (...) {
+                    try {
+                        int64_t intVal = self.getOr<int64_t>(key, 0);
+                        return py::int_(intVal);
+                    } catch (...) {
+                        return py::str(self.getOr<std::string>(key, defaultValue));
+                    }
+                }
+            }
+            return py::str(defaultValue);
+        }, py::arg("key"), py::arg("defaultValue") = "", "Get configuration value. Automatically converts to appropriate Python type. Returns defaultValue if key doesn't exist.")
+        
+        // Set configuration values with validation
+        .def("set", [](Config& self, const std::string& key, const py::object& value) -> bool {
+            try {
+                if (py::isinstance<py::float_>(value)) {
+                    float fval = value.cast<float>();
+                    self.set(key, fval, ConfigSource::User);
+                } else if (py::isinstance<py::int_>(value)) {
+                    int64_t ival = value.cast<int64_t>();
+                    self.set(key, ival, ConfigSource::User);
+                } else if (py::isinstance<py::str>(value)) {
+                    std::string sval = value.cast<std::string>();
+                    self.set(key, sval, ConfigSource::User);
+                } else if (py::isinstance<py::bool_>(value)) {
+                    bool bval = value.cast<bool>();
+                    self.set(key, bval, ConfigSource::User);
+                } else {
+                    py::print("Warning: Config.set() does not support value type: " + std::string(value.get_type().name()));
+                    return false;
+                }
+                return true;
+            } catch (const std::exception& e) {
+                py::print("Error setting config key '" + key + "': " + std::string(e.what()));
+                return false;
+            }
+        }, py::arg("key"), py::arg("value"), "Set configuration value. Automatically handles Python float, int, string, and bool types.")
+        
+        // Convenience methods for common configuration tasks
+        .def("enableFeature", [](Config& self, const std::string& featureName, bool enable = true) {
+            // Common feature enable/disable shortcuts
+            if (featureName == "reward_modulation") {
+                self.set("enable_reward_modulation", enable, ConfigSource::User);
+            } else if (featureName == "structural_plasticity") {
+                self.set("enable_structural_plasticity", enable, ConfigSource::User);
+            } else if (featureName == "development") {
+                self.set("enable_development", enable, ConfigSource::User);
+            } else if (featureName == "curiosity") {
+                self.set("enable_curiosity", enable, ConfigSource::User);
+            } else {
+                py::print("Warning: Unknown feature name '" + featureName + "'. Available: reward_modulation, structural_plasticity, development, curiosity");
+            }
+        }, py::arg("featureName"), py::arg("enable") = true, "Enable or disable a specific NLM feature. Available features: reward_modulation, structural_plasticity, development, curiosity")
+        
+        .def("validateConfig", [](Config& self) {
+            // Validate configuration by checking for required keys and valid ranges
+            std::vector<std::string> warnings;
+            
+            if (self.has("neuron_count") && self.getOr<int64_t>("neuron_count", 500) <= 0) {
+                warnings.push_back("neuron_count must be positive");
+            }
+            
+            if (self.has("simulation_timestep") && self.getOr<double>("simulation_timestep", 0.001) <= 0.0) {
+                warnings.push_back("simulation_timestep must be positive");
+            }
+            
+            if (self.has("connection_probability") && (self.getOr<float>("connection_probability", 0.15f) < 0.0f || self.getOr<float>("connection_probability", 0.15f) > 1.0f)) {
+                warnings.push_back("connection_probability must be between 0.0 and 1.0");
+            }
+            
+            if (warnings.empty()) {
+                return std::vector<std::string>();
+            } else {
+                return warnings;
+            }
+        }, "Validate the current configuration. Returns a list of warning messages, empty if configuration is valid.")
+        
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
