@@ -73,15 +73,134 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
-## Simple Analogy
+## Advanced Usage Examples
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+### Example 3: Complete Learning Agent
+
+```python
+import pynlm
+import time
+
+class LearningAgent:
+    def __init__(self, width=20, height=20):
+        # Create brain with custom configuration
+        config = pynlm.createDefaultConfig()
+        config.set("brain.neuron_count", 1000)  # More neurons for learning
+        
+        self.brain = pynlm.createBrain(config)
+        self.brain.initialize()
+        
+        self.world = pynlm.createSimpleWorld()
+        self.world.configure(width, height, 16, 16)
+        self.world.reset()
+        
+        self.agent = pynlm.createAgentBrain(self.brain)
+        self.agent.initialize(self.world)
+        
+        # Enable advanced learning features
+        self.agent.enableRewardModulation(True)
+        self.agent.enableStructuralPlasticity(True)
+        self.agent.enableDevelopment(True)
+        self.agent.enableCuriosity(True)
+        
+    def run_episode(self, steps=500, random_seed=42):
+        """Run a complete learning episode"""
+        self.world.setRandomSeed(random_seed)
+        
+        episode_data = {
+            'steps': [],
+            'rewards': [],
+            'curiosity': [],
+            'firing_rates': [],
+            'novelty': []
+        }
+        
+        for step in range(steps):
+            # Update world and get sensory input
+            self.world.update(0.1)
+            percept = self.world.getSensoryPercept()
+            
+            # Process sensory input
+            self.agent.processSensoryInput(percept)
+            
+            # Brain processes and produces action
+            self.brain.step(step)
+            action = self.agent.decodeMotorCommand()
+            
+            # Apply action in world
+            self.world.applyMotorCommand(action, self.world.getSimulationTime())
+            
+            # Get reward and apply learning
+            reward = self._get_reward(percept)
+            predicted_reward = self.agent.getNeuromodulationLevel()
+            
+            self.agent.applyRewardModulation(reward, predicted_reward)
+            self.agent.updateDevelopment(0.1)
+            
+            # Collect metrics
+            episode_data['steps'].append(step)
+            episode_data['rewards'].append(reward)
+            episode_data['curiosity'].append(self.agent.getCuriosityLevel())
+            episode_data['firing_rates'].append(self.brain.getAverageFiringRate())
+            episode_data['novelty'].append(self.agent.getNoveltyLevel())
+            
+            # Log progress every 50 steps
+            if step % 50 == 0:
+                print(f"Step {step}: "
+                      f"Reward: {reward:.3f}, "
+                      f"Curiosity: {self.agent.getCuriosityLevel():.3f}, "
+                      f"Firing: {self.brain.getFiringNeuronCount()}, "
+                      f"Dev Stage: {self.brain.getDevelopmentalStage()}")
+        
+        return episode_data
+    
+    def _get_reward(self, percept):
+        """Calculate reward based on sensory input"""
+        # Simple reward based on internal signals (energy, health, etc.)
+        internal = percept.getInternal()
+        if not internal.getData().empty():
+            # Energy is typically in first slot
+            energy = internal.getData()[0]
+            return (energy / 100.0) - 0.5  # Normalize to range [-0.5, 0.5]
+        return 0.0
+
+# Usage
+if __name__ == "__main__":
+    print("=== NLM Learning Agent Example ===")
+    
+    agent = LearningAgent(width=30, height=30)
+    
+    print("\nRunning learning episode...")
+    start_time = time.time()
+    
+    episode = agent.run_episode(steps=1000, random_seed=123)
+    
+    end_time = time.time()
+    
+    # Analyze results
+    total_reward = sum(episode['rewards'])
+    avg_reward = total_reward / len(episode['rewards'])
+    max_curiosity = max(episode['curiosity'])
+    final_firing_rate = episode['firing_rates'][-1]
+    
+    print(f"\n=== Episode Results ===")
+    print(f"Total reward: {total_reward:.3f}")
+    print(f"Average reward per step: {avg_reward:.3f}")
+    print(f"Maximum curiosity level: {max_curiosity:.3f}")
+    print(f"Final firing rate: {final_firing_rate:.3f}")
+    print(f"Episode duration: {end_time - start_time:.2f} seconds")
+    
+    # Check for learning indicators
+    if len(episode['rewards']) > 10:
+        first_half = sum(episode['rewards'][:len(episode['rewards'])//2])
+        second_half = sum(episode['rewards'][len(episode['rewards'])//2:])
+        if second_half > first_half * 1.1:  # 10% improvement
+            print("✓ Learning detected: Performance improved over time!")
+        else:
+            print("⚠ Limited learning observed")
+    
+    print("\n=== Agent Complete ===")
+```
 
 ---
 

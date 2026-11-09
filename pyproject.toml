@@ -57,5 +57,17 @@ cmake.args = [
 NLM_SOURCE_DIR = "src"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
+testpaths = [".", "python"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["test_", "Test"]
+python_functions = ["test_", "run_test"]
+
+[tool.pytest.options]
+python_files = true
+python_classes = true
+python_functions = true
+addopts = [
+    "-v",
+    "--tb=short",
+    "--timeout=300",
+]
