@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/CircularBuffer.hpp"
 #include <vector>
 #include <array>
 

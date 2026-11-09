@@ -15,9 +15,9 @@ struct Synapse::Impl {
     // Synapse type
     SynapseType type;
     
-    // Spike history for STDP
-    std::vector<Timestamp> preSpikeHistory;
-    std::vector<Timestamp> postSpikeHistory;
+    // Spike history for STDP - using circular buffers for efficiency
+    TimestampSpikeHistory preSpikeHistory;
+    TimestampSpikeHistory postSpikeHistory;
     
     // Plasticity state
     PlasticityFlags plasticityFlags;
@@ -128,25 +128,21 @@ bool Synapse::isInhibitory() const {
 }
 
 void Synapse::recordPreSpike(Timestamp timestamp) {
-    pImpl->preSpikeHistory.push_back(timestamp);
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
-    }
+    pImpl->preSpikeHistory.push(timestamp);
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
-    pImpl->postSpikeHistory.push_back(timestamp);
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
-    }
+    pImpl->postSpikeHistory.push(timestamp);
 }
 
-const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
-    return pImpl->preSpikeHistory;
+const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const { 
+    // Convert circular buffer to vector for backward compatibility
+    return cb::toVector(pImpl->preSpikeHistory);
 }
 
-const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const {
-    return pImpl->postSpikeHistory;
+const std::vector<Timestamp>& Synapse::getPostSpikeHistory() const { 
+    // Convert circular buffer to vector for backward compatibility
+    return cb::toVector(pImpl->postSpikeHistory);
 }
 
 void Synapse::clearHistory() {
@@ -155,25 +151,11 @@ void Synapse::clearHistory() {
 }
 
 void Synapse::setPreSpikeHistory(const std::vector<Timestamp>& history) {
-    pImpl->preSpikeHistory = history;
-    if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(
-            pImpl->preSpikeHistory.begin(),
-            pImpl->preSpikeHistory.begin() +
-                static_cast<std::ptrdiff_t>(pImpl->preSpikeHistory.size() -
-                                            Impl::MAX_SPIKE_HISTORY));
-    }
+    cb::fromVector(pImpl->preSpikeHistory, history);
 }
 
 void Synapse::setPostSpikeHistory(const std::vector<Timestamp>& history) {
-    pImpl->postSpikeHistory = history;
-    if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(
-            pImpl->postSpikeHistory.begin(),
-            pImpl->postSpikeHistory.begin() +
-                static_cast<std::ptrdiff_t>(pImpl->postSpikeHistory.size() -
-                                            Impl::MAX_SPIKE_HISTORY));
-    }
+    cb::fromVector(pImpl->postSpikeHistory, history);
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {

@@ -1,5 +1,6 @@
 #include "Neuron.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/CircularBuffer.hpp"
 #include <cmath>
 #include <algorithm>
 
@@ -13,7 +14,7 @@ struct Neuron::Impl {
     PopulationId populationId;
     MembranePotential totalCurrent;  // Total synaptic current input this step
     MembranePotential synapticInput;  // Accumulated synaptic input
-    std::vector<Timestamp> spikeHistory;
+    TimestampSpikeHistory spikeHistory;
     std::vector<SynapseHandle> incomingSynapses;
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
@@ -148,10 +149,7 @@ void Neuron::clearTotalCurrent() {
 }
 
 void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
+    pImpl->spikeHistory.push(timestamp);
 }
 
 void Neuron::clearSpikeHistory() {
@@ -325,7 +323,10 @@ bool Neuron::isFiring() const { return pImpl->state.firingState == FiringState::
 bool Neuron::isRefractory() const { return pImpl->state.refractoryRemaining > 0; }
 FiringRate Neuron::getFiringRate() const { return pImpl->state.firingRate; }
 MembranePotential Neuron::getTotalCurrent() const { return pImpl->totalCurrent; }
-const std::vector<Timestamp>& Neuron::getSpikeHistory() const { return pImpl->spikeHistory; }
+const std::vector<Timestamp>& Neuron::getSpikeHistory() const { 
+    // Convert circular buffer to vector for backward compatibility
+    return cb::toVector(pImpl->spikeHistory);
+}
 const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const { return pImpl->incomingSynapses; }
 const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const { return pImpl->outgoingSynapses; }
 const PlasticityFlags& Neuron::getPlasticityFlags() const { return pImpl->plasticityFlags; }
