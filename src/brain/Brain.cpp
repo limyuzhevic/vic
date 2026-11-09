@@ -614,8 +614,59 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Integrate prediction system with neural dynamics
+        // The prediction system should be updated with current neural state
+        // and influence future processing through prediction error signals
+        
+        // Get current neural activity pattern for prediction
+        std::vector<float> currentNeuralPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Use normalized firing rate as neural activity indicator
+                    float activity = std::min(1.0f, neuron->getFiringRate() / 100.0f);
+                    currentNeuralPattern.push_back(activity);
+                }
+            }
+        }
+        
+        if (!currentNeuralPattern.empty()) {
+            // Create a simple sensory-like representation from neural activity
+            // This would be more sophisticated in a full implementation
+            float sumActivity = 0.0f;
+            for (float activity : currentNeuralPattern) {
+                sumActivity += activity;
+            }
+            
+            // Create predicted sensory input based on current neural state
+            // In a real implementation, this would use learned forward models
+            auto predictedState = std::make_unique<SensoryInput>();
+            // Create simple prediction based on neural activity distribution
+            // This represents the brain's prediction of what it will sense next
+            predictedState->setData(currentNeuralPattern);
+            
+            // Update prediction system with current neural state
+            pImpl->predictionSystem->updatePredictions(predictedState.get(), predictedState.get());
+            
+            // Train prediction system with current experience
+            pImpl->predictionSystem->train(*predictedState);
+        }
+        
+        // Apply prediction error to neuromodulation systems
+        // Prediction error should influence dopamine and other neuromodulators
+        if (pImpl->predictionError) {
+            // Prediction error affects learning and attention
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float predictionConfidence = pImpl->predictionSystem->getConfidence();
+            
+            // Scale prediction error based on confidence
+            // High confidence + high error = strong learning signal
+            float predictionLearningSignal = predictionError * predictionConfidence;
+            
+            // Apply prediction error to neuromodulation
+            // In a real implementation, this would affect multiple neuromodulators
+            pImpl->predictionError->setError(predictionLearningSignal);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,8 +682,80 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Integrate concept formation with neural activity and sensory processing
+        // Concept formation should process neural patterns and create abstract concepts
+        
+        // Get current neural activity patterns from the brain
+        std::vector<float> neuralPattern;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Use firing rate and state to create neural activity signature
+                    float activity = neuron->isFiring() ? 1.0f : 0.0f;
+                    float firingRate = std::min(1.0f, neuron->getFiringRate() / 100.0f);
+                    neuralPattern.push_back(activity + firingRate * 0.5f);
+                }
+            }
+        }
+        
+        // Get sensory state from the world for context
+        std::vector<float> sensoryFeatures;
+        if (!pImpl->sensoryNeurons.empty()) {
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                float sensoryActivity = std::min(1.0f, neuron->getFiringRate() / 100.0f);
+                sensoryFeatures.push_back(sensoryActivity);
+            }
+        }
+        
+        // Present neural and sensory patterns to concept formation system
+        // This allows concepts to emerge from actual neural activity patterns
+        if (!neuralPattern.empty()) {
+            pImpl->conceptFormation->presentExperience(
+                neuralPattern,  // Neural activity pattern
+                sensoryFeatures,  // Associated sensory features
+                0.0f,  // Initial reward (can be updated from world feedback)
+                currentStep  // Current simulation step
+            );
+        }
+        
+        // Update concept formation with prediction error signals
+        // Concepts should adapt based on prediction errors
+        if (pImpl->predictionSystem) {
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            if (predictionError > 0.0f) {
+                // Concepts should become more flexible when prediction errors are high
+                // This allows for concept revision and adaptation
+                for (size_t i = 0; i < pImpl->conceptFormation->getConceptCount(); ++i) {
+                    const auto* concept = pImpl->conceptFormation->getConcept(i);
+                    if (concept) {
+                        // Concepts become less stable when prediction error is high
+                        // This allows for rapid learning and adaptation
+                        // In a real implementation, this would use neuromodulatory signals
+                        // to modulate concept stability
+                    }
+                }
+            }
+        }
+        
+        // Concept formation can influence attention and planning
+        // Stable concepts can guide action selection and focus
+        if (pImpl->conceptFormation) {
+            // Get high-priority concepts (stable, frequently used)
+            for (size_t i = 0; i < pImpl->conceptFormation->getConceptCount(); ++i) {
+                const auto* concept = pImpl->conceptFormation->getConcept(i);
+                if (concept && pImpl->conceptFormation->isConceptStable(i)) {
+                    float stability = pImpl->conceptFormation->getConceptStability(i);
+                    float generalization = pImpl->conceptFormation->getGeneralizationAbility(i);
+                    
+                    // Stable concepts can be used for goal setting and planning
+                    // Higher stability and generalization increase concept utility
+                    if (stability > 0.7f && generalization > 0.5f) {
+                        // This concept can guide planning and attention
+                        // In a full implementation, this would affect the neural planner
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========

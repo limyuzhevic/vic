@@ -26,7 +26,7 @@ ConceptFormation::~ConceptFormation() = default;
 
 void ConceptFormation::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // Removed redundant brain_ pointer to eliminate duplication
     NLM_LOG_INFO("ConceptFormation initialized");
 }
 
@@ -329,7 +329,7 @@ SpatialRepresentation::~SpatialRepresentation() = default;
 
 void SpatialRepresentation::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // Removed redundant brain_ pointer to eliminate duplication
     NLM_LOG_INFO("SpatialRepresentation initialized");
 }
 
@@ -429,7 +429,7 @@ TemporalRelation::~TemporalRelation() = default;
 
 void TemporalRelation::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
+    // Removed redundant brain_ pointer to eliminate duplication
 }
 
 void TemporalRelation::recordSequence(const std::vector<float>& eventA,
