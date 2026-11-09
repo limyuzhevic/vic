@@ -1,11 +1,5 @@
-#include "Logger.hpp"
-#include <iostream>
-#include <fstream>
-#include <iomanip>
-#include <sstream>
-#include <mutex>
-
-namespace nlm {
+// Global mutex for thread-safe time conversion
+static std::mutex globalTimeMutex;
 
 struct ConsoleLogger::Impl {
     LogLevel level = LogLevel::Info;
@@ -32,9 +26,19 @@ void ConsoleLogger::log(const LogEntry& entry) {
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
+    // Add timestamp (thread-safe)
     auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    std::tm tm_buf;
+    std::tm* tm_ptr = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(globalTimeMutex);
+        tm_ptr = std::localtime_r(&time, &tm_buf);
+    }
+    if (tm_ptr) {
+        oss << std::put_time(tm_ptr, "%Y-%m-%d %H:%M:%S");
+    } else {
+        oss << "INVALID_TIME";
+    }
     
     oss << " " << entry.message;
     

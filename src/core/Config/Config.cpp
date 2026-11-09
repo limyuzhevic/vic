@@ -1,8 +1,4 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
-#include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -19,40 +15,54 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        // Try to parse as JSON first
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        nlohmann::json jsonData;
+        file >> jsonData;
+        
+        // Flatten JSON structure into key-value pairs
+        flattenJson(jsonData, "", ConfigSource::File);
+        
+        return true;
+    } catch (const std::exception& e) {
+        // If JSON parsing fails, try legacy format
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        std::string line;
+        while (std::getline(file, line)) {
+            // Skip empty lines and comments
+            line = trim(line);
+            if (line.empty() || line[0] == '#' || line[0] == '/') {
+                continue;
             }
             
-            set(key, value, ConfigSource::File);
+            // Parse simple key=value pairs
+            size_t pos = line.find('=');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            }
         }
+        
+        return true;
     }
-    
-    return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -79,17 +89,68 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    try {
+        nlohmann::json jsonData;
+        
+        // Convert all config entries to JSON structure
+        for (const auto& entry : pImpl->entries) {
+            // Split key by dots to create nested structure
+            std::string key = entry.key;
+            nlohmann::json current = jsonData;
+            
+            size_t dotPos = key.find('.');
+            std::string currentKey = key;
+            while (dotPos != std::string::npos && dotPos < key.length() - 1) {
+                std::string parentKey = key.substr(0, dotPos);
+                currentKey = key.substr(dotPos + 1);
+                
+                if (!current.contains(parentKey)) {
+                    current[parentKey] = nlohmann::json::object();
+                }
+                current = current[parentKey];
+                dotPos = currentKey.find('.');
+                key = currentKey;
+            }
+            
+            // Set the value
+            setJsonValue(current, key, entry.value);
+        }
+        
+        // Write JSON to file
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        
+        file << jsonData.dump(2); // Pretty print with 2-space indentation
+        return true;
+    } catch (const std::exception& e) {
         return false;
     }
-    
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
-    }
-    
-    return true;
+}
+
+// Helper method to set JSON value based on ConfigValue type
+void Config::setJsonValue(nlohmann::json& json, const std::string& key, const ConfigValue& value) {
+    std::visit([&](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        if constexpr (std::is_same_v<T, int>) {
+            json[key] = arg;
+        } else if constexpr (std::is_same_v<T, int64_t>) {
+            json[key] = arg;
+        } else if constexpr (std::is_same_v<T, double>) {
+            json[key] = arg;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            json[key] = arg;
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            json[key] = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+            json[key] = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            json[key] = arg;
+        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            json[key] = arg;
+        }
+    }, value);
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
@@ -184,10 +245,35 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
-std::string Config::toLower(const std::string& str) {
-    std::string result = str;
-    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
-    return result;
+// Helper method to flatten JSON structure into key-value pairs
+void Config::flattenJson(const nlohmann::json& json, const std::string& prefix, ConfigSource source) {
+    if (json.is_object()) {
+        for (const auto& item : json.items()) {
+            std::string key = prefix.empty() ? item.key() : (prefix + "." + item.key());
+            flattenJson(item.value(), key, source);
+        }
+    } else if (json.is_array()) {
+        // For arrays, create key with index
+        for (size_t i = 0; i < json.size(); ++i) {
+            std::string key = prefix + "[" + std::to_string(i) + "]";
+            flattenJson(json[i], key, source);
+        }
+    } else {
+        // Leaf value - convert to string representation
+        std::string valueStr;
+        if (json.is_string()) {
+            valueStr = json.get<std::string>();
+        } else if (json.is_number_integer()) {
+            valueStr = std::to_string(json.get<int64_t>());
+        } else if (json.is_number_float()) {
+            valueStr = std::to_string(json.get<double>());
+        } else if (json.is_boolean()) {
+            valueStr = json.get<bool>() ? "true" : "false";
+        } else if (json.is_null()) {
+            valueStr = "";
+        }
+        set(prefix, valueStr, source);
+    }
 }
 
 template<typename T>

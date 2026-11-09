@@ -307,7 +307,79 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void printAdvancedHelp() {
+    std::cout << "\n=== Advanced Command Line Options ===\n" << std::endl;
+    std::cout << "Debug and Profiling:\n" << std::endl;
+    std::cout << "  --debug                    Enable debug mode with detailed logging\n" << std::endl;
+    std::cout << "  --profile                  Enable performance profiling\n" << std::endl;
+    std::cout << "  --trace-spikes             Trace spike events (detailed)\n" << std::endl;
+    std::cout << "  --neuron-trace[neuron_id]  Trace specific neuron activity\n" << std::endl;
+    
+    std::cout << "\nConfiguration Management:\n" << std::endl;
+    std::cout << "  --save-config <file>        Save current config to file\n" << std::endl;
+    std::cout << "  --save-checkpoint <file>    Save brain checkpoint to file\n" << std::endl;
+    std::cout << "  --load-checkpoint <file>    Load brain checkpoint from file\n" << std::endl;
+    std::cout << "  --export-config             Show current configuration as JSON\n" << std::endl;
+    std::cout << "  --validate-config          Validate configuration values\n" << std::endl;
+    
+    std::cout << "\nPerformance Control:\n" << std::endl;
+    std::cout << "  --neuron-count <N>         Set neuron count (overrides config)\n" << std::endl;
+    std::cout << "  --connection-prob <p>      Set connection probability\n" << std::endl;
+    std::cout << "  --timestep <t>             Set simulation timestep\n" << std::endl;
+    std::cout << "  --runs <N>                 Number of test runs\n" << std::endl;
+    
+    std::cout << "\nLearning Control:\n" << std::endl;
+    std::cout << "  --learning-rate <r>         Set Hebbian/STDP learning rate\n" << std::endl;
+    std::cout << "  --enable-plasticity        Enable all plasticity mechanisms\n" << std::endl;
+    std::cout << "  --plasticity-off           Disable all plasticity (stable network)\n" << std::endl;
+    std::cout << "  --stdp-only                Only STDP plasticity\n" << std::endl;
+    std::cout << "  --hebbian-only            Only Hebbian plasticity\n" << std::endl;
+    
+    std::cout << "\nNetwork Exploration:\n" << std::endl;
+    std::cout << "  --analyze-network          Analyze network properties\n" << std::endl;
+    std::cout << "  --stat-history             Show statistical history\n" << std::endl;
+    std::cout << "  --visualize-connections    Visualize connection patterns\n" << std::endl;
+    
+    std::cout << "\nData Export:\n" << std::endl;
+    std::cout << "  --export-spikes <file>     Export spike history to file\n" << std::endl;
+    std::cout << "  --export-synapses <file>   Export synapse weights to file\n" << std::endl;
+    std::cout << "  --export-neurons <file>    Export neuron states to file\n" << std::endl;
+    std::cout << "  --export-full <dir>        Export complete brain state to directory\n" << std::endl;
+}
+
 int main(int argc, char** argv) {
+    // Check for help requests
+    bool showAdvancedHelp = false;
+    bool showBasicHelp = false;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            showBasicHelp = true;
+        } else if (arg == "--advanced-help") {
+            showAdvancedHelp = true;
+        }
+    }
+    
+    // Show help and exit
+    if (showAdvancedHelp) {
+        printBanner();
+        printAdvancedHelp();
+        return 0;
+    }
+    
+    if (showBasicHelp) {
+        printBanner();
+        std::cout << "\nUsage: ./nlm [options]\n\n";
+        std::cout << "Basic Options:\n" << std::endl;
+        std::cout << "  --config=<file>     Load configuration from file\n" << std::endl;
+        std::cout << "  -c <file>           Load configuration from file (short)\n" << std::endl;
+        std::cout << "  --help, -h          Show this help message\n" << std::endl;
+        std::cout << "  --advanced-help     Show advanced options for power users\n" << std::endl;
+        std::cout << "\nFor advanced options, see --advanced-help\n" << std::endl;
+        return 0;
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;

@@ -165,7 +165,6 @@ struct Brain::Impl {
         checkpointManager = std::make_unique<CheckpointManager>();
     }
     
-    DevelopmentalStage developmentalStage;
     RegionId nextRegionId;
 };
 
