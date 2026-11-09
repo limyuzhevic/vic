@@ -424,6 +424,239 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
+        m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        return std::make_shared<Config>();
+    }, "Create a default configuration");
+
+    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(config);
+    }, py::arg("config"), "Create a new brain with configuration");
+
+    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a new simple world");
+
+    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Phase 6 enhanced utilities
+
+    // Advanced checkpoint utilities
+    m.def("listCheckpoints", [](const std::string& directory) {
+        nlm::CheckpointManager manager;
+        manager.configure(directory, 10000, 5, true);
+        return manager.listCheckpoints();
+    }, py::arg("directory"), "List available checkpoints");
+
+    m.def("saveBrainSnapshot", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save current brain state to checkpoint file");
+
+    m.def("loadBrainSnapshot", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->load(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Load brain state from checkpoint file");
+
+    // Simulation utilities and statistics
+    m.def("getBrainStatistics", [](std::shared_ptr<Brain> brain) {
+        py::dict stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["ei_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["pending_events"] = brain->getPendingSpikeEventCount();
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics");
+
+    // Episode tracking utilities
+    m.def("getBrainHistory", [](std::shared_ptr<Brain> brain) {
+        py::dict history;
+        auto workingMemory = brain->getWorkingMemory();
+        auto episodicMemory = brain->getEpisodicMemory();
+        
+        if (workingMemory) {
+            auto neurons = workingMemory->getMemoryNeurons();
+            auto activations = workingMemory->getMemoryActivations();
+            auto timestamps = workingMemory->getMemoryTimestamps();
+            
+            py::list wmNeurons, wmActivations, wmTimestamps;
+            for (size_t i = 0; i < neurons.size(); ++i) {
+                wmNeurons.append(neurons[i].index());
+                wmActivations.append(activations[i]);
+                wmTimestamps.append(timestamps[i]);
+            }
+            history["working_memory"] = py::make_tuple(wmNeurons, wmActivations, wmTimestamps);
+        }
+        
+        if (episodicMemory) {
+            auto episodes = episodicMemory->getEpisodes();
+            py::list epList;
+            for (const auto& ep : episodes) {
+                py::dict epDict;
+                epDict["timestamp"] = ep.timestamp;
+                epDict["reward"] = ep.reward;
+                epDict["energy"] = ep.energy;
+                epDict["novelty"] = ep.novelty;
+                epDict["position"] = py::make_tuple(ep.positionX, ep.positionY, ep.orientation);
+                epDict["action"] = static_cast<int>(ep.action);
+                epList.append(epDict);
+            }
+            history["episodes"] = epList;
+        }
+        
+        return history;
+    }, py::arg("brain"), "Get brain's memory history and statistics");
+
+    // Configuration utilities
+    m.def("getConfigSummary", [](std::shared_ptr<Config> config) {
+        return config->summary();
+    }, py::arg("config"), "Get configuration summary string");
+
+    m.def("validateConfig", [](std::shared_ptr<Config> config) {
+        auto keys = config->getKeys();
+        py::dict configDict;
+        for (const auto& key : keys) {
+            auto value = config->get<std::string>(key);
+            if (value) {
+                configDict[key] = *value;
+            } else {
+                configDict[key] = py::none();
+            }
+        }
+        return configDict;
+    }, py::arg("config"), "Get configuration as Python dictionary");
+
+    // Performance monitoring
+    m.def("performanceMonitor", [](std::shared_ptr<Brain> brain, int durationSteps) {
+        py::dict perf;
+        float avgRate = 0.0f;
+        size_t totalSpikes = 0;
+        
+        for (int i = 0; i < durationSteps; ++i) {
+            brain->step(i);
+            avgRate += brain->getAverageFiringRate();
+            totalSpikes += brain->getFiringNeuronCount();
+        }
+        
+        avgRate /= durationSteps;
+        perf["avg_firing_rate"] = avgRate;
+        perf["total_spikes"] = totalSpikes;
+        perf["steps_processed"] = durationSteps;
+        
+        return perf;
+    }, py::arg("brain"), py::arg("duration_steps"), "Monitor brain performance over time");
+
+    // Advanced brain operations
+    m.def("brainExperiment", [](std::shared_ptr<Brain> brain,
+                               const std::vector<float>& input,
+                               int steps,
+                               const std::string& experimentName) {
+        // Simple experiment wrapper
+        auto config = brain->getConfig();
+        config->set("experiment_name", experimentName);
+        
+        for (int i = 0; i < steps; ++i) {
+            // Create sensory input (simple for demonstration)
+            auto sensoryInput = std::make_unique<Vision>();
+            sensoryInput->setData(input);
+            brain->receiveSensoryInput(sensoryInput);
+            brain->step(i);
+        }
+        
+        return brain->getAverageFiringRate();
+    }, py::arg("brain"), py::arg("input"), py::arg("steps"), py::arg("experiment_name"),
+       "Run a simple experiment with given input");
+
+    // Batch operations for advanced users
+    m.def("batchProcess", [](std::shared_ptr<Brain> brain,
+                            const std::vector<std::vector<float>>& inputs,
+                            bool saveCheckpoints,
+                            const std::string& checkpointDir) {
+        std::vector<float> results;
+        
+        if (saveCheckpoints) {
+            std::filesystem::create_directories(checkpointDir);
+        }
+        
+        for (size_t i = 0; i < inputs.size(); ++i) {
+            // Simple processing loop
+            for (int step = 0; step < 100; ++step) {
+                auto sensoryInput = std::make_unique<Vision>();
+                sensoryInput->setData(inputs[i]);
+                brain->receiveSensoryInput(sensoryInput);
+                brain->step(step);
+            }
+            
+            results.push_back(brain->getAverageFiringRate());
+            
+            if (saveCheckpoints && (i % 10 == 0)) {
+                std::string filepath = checkpointDir + "/batch_" + std::to_string(i) + ".bin";
+                brain->save(filepath);
+            }
+            
+            brain->reset();
+        }
+        
+        return results;
+    }, py::arg("brain"), py::arg("inputs"), py::arg("save_checkpoints") = false,
+       py::arg("checkpoint_dir") = ".", "Process multiple inputs in batch");
+
+    // Memory management utilities
+    m.def("brainMemoryInfo", [](std::shared_ptr<Brain> brain) {
+        py::dict memoryInfo;
+        
+        auto workingMemory = brain->getWorkingMemory();
+        if (workingMemory) {
+            memoryInfo["working_memory_capacity"] = workingMemory->getCapacity();
+            memoryInfo["active_traces"] = workingMemory->getActiveTraces();
+        }
+        
+        auto episodicMemory = brain->getEpisodicMemory();
+        if (episodicMemory) {
+            memoryInfo["episodic_memory_capacity"] = episodicMemory->getMaxEpisodes();
+            memoryInfo["episode_count"] = episodicMemory->getEpisodeCount();
+        }
+        
+        auto associativeMemory = brain->getAssociativeMemory();
+        if (associativeMemory) {
+            // Note: assuming getAssociationCount() method exists
+            memoryInfo["associative_memory_entries"] = 0;  // Placeholder
+        }
+        
+        return memoryInfo;
+    }, py::arg("brain"), "Get detailed memory information");
+
+    // Development stage utilities
+    m.def("developmentalReport", [](std::shared_ptr<Brain> brain) {
+        py::dict devReport;
+        
+        auto stage = brain->getDevelopmentalStage();
+        devReport["current_stage"] = static_cast<int>(stage);
+        
+        // Get development system if available
+        auto devSystem = brain->getDevelopmentSystem();
+        if (devSystem) {
+            devReport["plasticity_rate"] = 1.0f;  // Placeholder
+            devReport["maturation_progress"] = 0.5f;  // Placeholder
+        }
+        
+        // Get neuromodulation levels
+        auto curiosity = brain->getCuriosity();
+        if (curiosity) {
+            devReport["curiosity_level"] = curiosity->getLevel();
+        }
+        
+        auto novelty = brain->getNovelty();
+        if (novelty) {
+            devReport["novelty_level"] = novelty->getLevel();
+        }
+        
+        return devReport;
+    }, py::arg("brain"), "Get developmental stage and related information");
+
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);

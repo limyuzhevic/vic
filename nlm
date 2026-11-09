@@ -1,0 +1,651 @@
+#!/usr/bin/env bash
+# NLM (Neural Learning Machine) Command-Line Interface
+
+# This CLI provides tools for working with NLM simulations, including:
+# - Brain simulation management
+# - Checkpoint operations
+# - Configuration utilities
+# - Simulation monitoring
+# - Debugging tools
+
+# ANSI color codes for output formatting
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Default configuration
+DEFAULT_BRAIN_FILE="brain_config.ini"
+DEFAULT_CHECKPOINT_DIR="./checkpoints"
+DEFAULT_LOG_FILE="nlm_simulation.log"
+
+# Function to print usage information
+print_usage() {
+    cat << EOF
+NLM - Neural Learning Machine Command-Line Interface
+
+USAGE:
+  nlm <command> [options]
+
+COMMANDS:
+  run                    Run NLM simulation
+  checkpoint             Checkpoint management
+  config                 Configuration utilities
+  monitor                Real-time monitoring
+  debug                  Debugging tools
+  help                   Show help information
+
+EXAMPLES:
+  nlm run --brain-config mybrain.ini --steps 1000
+  nlm checkpoint save --name snapshot1
+  nlm checkpoint list
+  nlm config show
+  nlm config validate
+  nlm monitor --interval 1.0
+
+For detailed help on a specific command, use:
+  nlm help <command>
+EOF
+}
+
+# Function to show command-specific help
+print_command_help() {
+    local command=$1
+    case $command in
+        run)
+            cat << EOF
+RUN NLM SIMULATION
+
+Usage: nlm run [options]
+
+Options:
+  --brain-config FILE    Brain configuration file (default: brain_config.ini)
+  --steps N              Number of simulation steps (required)
+  --checkpoint-dir DIR   Directory for checkpoints (default: ./checkpoints)
+  --checkpoint-interval N Checkpoint interval in steps (default: 1000)
+  --max-checkpoints N     Maximum number of checkpoints to keep (default: 5)
+  --log-file FILE        Log file path (default: nlm_simulation.log)
+  --verbose              Enable verbose output
+  --help                 Show this help message
+
+Examples:
+  nlm run --steps 1000
+  nlm run --brain-config config.ini --checkpoint-dir ./data/checkpoints --steps 5000
+EOF
+            ;;
+        checkpoint)
+            cat << EOF
+CHECKPOINT MANAGEMENT
+
+Usage: nlm checkpoint <subcommand> [options]
+
+Subcommands:
+  save <name>            Save current brain state
+  load <name>            Load brain state
+  list                   List available checkpoints
+  delete <name>          Delete checkpoint
+  clear                  Delete all checkpoints
+  info <name>            Show checkpoint information
+  export <name> FILE     Export checkpoint to file
+  import FILE NAME        Import checkpoint from file
+
+Options:
+  --checkpoint-dir DIR   Checkpoint directory (default: ./checkpoints)
+  --help                 Show this help message
+
+Examples:
+  nlm checkpoint save snapshot1
+  nlm checkpoint load snapshot1
+  nlm checkpoint list
+  nlm checkpoint info checkpoint-1000.bin
+EOF
+            ;;
+        config)
+            cat << EOF
+CONFIGURATION UTILITIES
+
+Usage: nlm config <subcommand> [options]
+
+Subcommands:
+  show                   Show current configuration
+  set KEY VALUE          Set configuration value
+  get KEY                Get configuration value
+  validate               Validate configuration
+  reset                  Reset to defaults
+  load FILE              Load configuration from file
+  save FILE              Save configuration to file
+  list                   List all configuration keys
+  export                 Export configuration to file (JSON/YAML)
+  import                 Import configuration from file
+
+Options:
+  --config-file FILE     Configuration file path (default: brain_config.ini)
+  --help                 Show this help message
+
+Examples:
+  nlm config show
+  nlm config set neuron_count 1000
+  nlm config get neuron_count
+  nlm config validate
+  nlm config load myconfig.ini
+  nlm config save myconfig.ini
+EOF
+            ;;
+        monitor)
+            cat << EOF
+REAL-TIME MONITORING
+
+Usage: nlm monitor [options]
+
+Options:
+  --interval SECONDS    Monitoring interval (default: 1.0)
+  --duration SECONDS    Monitoring duration (default: 0 for continuous)
+  --output-file FILE    Output file for monitoring data
+  --csv                 Export data in CSV format
+  --json                JSON output format
+  --help                Show this help message
+
+Examples:
+  nlm monitor --interval 2.0
+  nlm monitor --duration 60 --csv monitoring.csv
+EOF
+            ;;
+        debug)
+            cat << EOF
+DEBUGGING TOOLS
+
+Usage: nlm debug [options]
+
+Options:
+  --log-level LEVEL      Set log level (debug, info, warning, error)
+  --profile              Enable performance profiling
+  --trace               Enable detailed tracing
+  --export TRACE_FILE   Export debug trace to file
+  --help                Show this help message
+
+Examples:
+  nlm debug --log-level debug
+  nlm debug --profile --export debug_profile.txt
+EOF
+            ;;
+        help)
+            cat << EOF
+GENERAL HELP
+
+Shows this general help information.
+See specific command help for detailed options.
+EOF
+            ;;
+        *)
+            cat << EOF
+Unknown command. Show this help message.
+EOF
+            ;;
+    esac
+}
+
+# Function to run NLM simulation
+run_simulation() {
+    local brain_config=${DEFAULT_BRAIN_FILE}
+    local steps=0
+    local checkpoint_dir=${DEFAULT_CHECKPOINT_DIR}
+    local checkpoint_interval=1000
+    local max_checkpoints=5
+    local log_file=${DEFAULT_LOG_FILE}
+    local verbose=false
+
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        local key="$1"
+        if [[ $# -gt 1 ]]; then
+            local value="$2"
+        else
+            local value=""
+        fi
+
+        case $key in
+            --brain-config)
+                brain_config="$value"
+                shift 2
+                ;;
+            --steps)
+                steps="$value"
+                shift 2
+                ;;
+            --checkpoint-dir)
+                checkpoint_dir="$value"
+                shift 2
+                ;;
+            --checkpoint-interval)
+                checkpoint_interval="$value"
+                shift 2
+                ;;
+            --max-checkpoints)
+                max_checkpoints="$value"
+                shift 2
+                ;;
+            --log-file)
+                log_file="$value"
+                shift  фаминение 2
+                ;;
+            --verbose)
+                verbose=true
+                shift
+                ;;
+            --help)
+                print_command_help run
+                return
+                ;;
+            *)
+                echo "Unknown option: $key"
+                print_command_help run
+                return 1
+                ;;
+        esac
+    done
+
+    # Validate required arguments
+    if [[ -z "$steps" ]]; then
+        echo "Error: --steps is required" >&2
+        print_command_help run
+        return 1
+    fi
+
+    # Check if brain binary exists
+    if [[ ! -f "./nlm" ]]; then
+        echo "Error: NLM binary not found. Please build the project first." >&2
+        return 1
+    fi
+
+    # Create checkpoint directory
+    mkdir -p "$checkpoint_dir" || {
+        echo "Error: Cannot create checkpoint directory: $checkpoint_dir" >&2
+        return 1
+    }
+
+    # Run the simulation
+    echo "Starting NLM simulation with ${steps} steps..."
+    echo "Checkpoint directory: $checkpoint_dir"
+    echo "Log file: $log_file"
+
+    # Run the binary with appropriate arguments
+    if [[ "$verbose" == "true" ]]; then
+        ./nlm --steps "$steps" --checkpoint-dir "$checkpoint_dir" --checkpoint-interval "$checkpoint_interval" --max-checkpoints "$max_checkpoints" 2>&1 | tee "$log_file"
+    else
+        ./nlm --steps "$steps" --checkpoint-dir "$checkpoint_dir" --checkpoint-interval "$checkpoint_interval" --max-checkpoints "$max_checkpoints" 2>&1 | tee "$log_file"
+    fi
+
+    local result=$?
+
+    if [[ $result -eq 0 ]]; then
+        echo "✓ Simulation completed successfully"
+        echo "  Results saved to: $log_file"
+        echo "  Checkpoints saved to: $checkpoint_dir"
+    else
+        echo "✗ Simulation failed"
+        echo "  See $log_file for details"
+    fi
+
+    return $result
+}
+
+# Function to handle checkpoint commands
+checkpoint_command() {
+    local subcommand=$1
+    shift
+
+    case $subcommand in
+        save)
+            local name="$1"
+            if [[ -z "$name" ]]; then
+                echo "Error: Checkpoint name is required" >&2
+                return 1
+            fi
+            shift
+
+            # Parse options
+            local checkpoint_dir=${DEFAULT_CHECKPOINT_DIR}
+            while [[ $# -gt 0 ]]; do
+                case $1 in
+                    --checkpoint-dir)
+                        checkpoint_dir="$2"
+                        shift 2
+                        ;;
+                    *)
+                        break
+                        ;;
+                esac
+            done
+
+            echo "Saving checkpoint: $name"
+            # This would call the checkpoint functionality
+            # ./nlm checkpoint save "$name" --checkpoint-dir "$checkpoint_dir"
+            echo "✓ Checkpoint saved (not implemented yet)"
+            ;;
+        load)
+            local name="$1"
+            if [[ -z "$name" ]]; then
+                echo "Error: Checkpoint name is required" >&2
+                return 1
+            fi
+            shift
+
+            echo "Loading checkpoint: $name"
+            # This would call the checkpoint functionality
+            # ./nlm checkpoint load "$name"
+            echo "✓ Checkpoint loaded (not implemented yet)"
+            ;;
+        list)
+            # Parse options
+            local checkpoint_dir=${DEFAULT_CHECKPOINT_DIR}
+            while [[ $# -gt 0 ]]; do
+                case $1 in
+                    --checkpoint-dir)
+                        checkpoint_dir="$2"
+                        shift 2
+                        ;;
+                    *)
+                        break
+                        ;;
+                esac
+            done
+
+            echo "Available checkpoints in $checkpoint_dir:" >&2
+            # List checkpoints
+            ls -la "${checkpoint_dir}/*.bin" 2>/dev/null | head -10 || {
+                echo "No checkpoints found"
+            }
+            ;;
+        delete|del)
+            local name="$1"
+            if [[ -z "$name" ]]; then
+                echo "Error: Checkpoint name is required" >&2
+                return 1
+            fi
+            echo "Deleting checkpoint: $name"
+            # This would delete the checkpoint
+            # rm "${checkpoint_dir}/$name"
+            echo "✓ Checkpoint deleted (not implemented yet)"
+            ;;
+        clear)
+            # Parse options
+            local checkpoint_dir=${DEFAULT_CHECKPOINT_DIR}
+            while [[ $# -gt 0 ]]; do
+                case $1 in
+                    --checkpoint-dir)
+                        checkpoint_dir="$2"
+                        shift 2
+                        ;;
+                    *)
+                        break
+                        ;;
+                esac
+            done
+
+            echo "Deleting all checkpoints in $checkpoint_dir"
+            # This would clear all checkpoints
+            # rm -f "${checkpoint_dir}/*.bin"
+            echo "✓ All checkpoints deleted (not implemented yet)"
+            ;;
+        info)
+            local name="$1"
+            if [[ -z "$name" ]]; then
+                echo "Error: Checkpoint name is required" >&2
+                return 1
+            fi
+            echo "Checkpoint info for $name (not implemented yet)"
+            ;;
+        export)
+            local name="$1"
+            local output_file="$2"
+            if [[ -z "$name" || -z "$output_file" ]]; then
+                echo "Error: Checkpoint name and output file are required" >&2
+                return 1
+            fi
+            echo "Exporting checkpoint $name to $output_file (not implemented yet)"
+            ;;
+        import)
+            local input_file="$1"
+            local name="$2"
+            if [[ -z "$input_file" || -z "$name" ]]; then
+                echo "Error: Input file and checkpoint name are required" >&2
+                return 1
+            fi
+            echo "Importing checkpoint $name from $input_file (not implemented yet)"
+            ;;
+        *)
+            echo "Unknown checkpoint subcommand: $subcommand" >&2
+            return 1
+            ;;
+    esac
+}
+
+# Function to handle configuration commands
+config_command() {
+    local subcommand=$1
+    shift
+
+    case $subcommand in
+        show|list)
+            # Parse options
+            local config_file=${DEFAULT_BRAIN_FILE}
+            while [[ $# -gt 0 ]]; do
+                case $1 in
+                    --config-file)
+                        config_file="$2"
+                        shift 2
+                        ;;
+                    *)
+                        break
+                        ;;
+                esac
+            done
+
+            echo "Configuration file: $config_file"
+            if [[ -f "$config_file" ]]; then
+                echo "Configuration content:"
+                cat "$config_file"
+            else
+                echo "Configuration file not found"
+            fi
+            ;;
+        get)
+            local key="$1"
+            if [[ -z "$key" ]]; then
+                echo "Error: Configuration key is required" >&2
+                return 1
+            fi
+            shift
+
+            echo "Getting configuration key: $key (not implemented yet)"
+            ;;
+        set)
+            local key="$1"
+            local value="$2"
+            if [[ -z "$key" || -z "$value" ]]; then
+                echo "Error: Configuration key and value are required" >&2
+                return 1
+            fi
+            shift 2
+
+            echo "Setting configuration $key = $value (not implemented yet)"
+            ;;
+        validate)
+            echo "Validating configuration (not implemented yet)"
+            ;;
+        reset)
+            echo "Resetting configuration to defaults (not implemented yet)"
+            ;;
+        load)
+            local input_file="$1"
+            if [[ -z "$input_file" ]]; then
+                echo "Error: Input file is required" >&2
+                return 1
+            fi
+            shift
+
+            echo "Loading configuration from $input_file (not implemented yet)"
+            ;;
+        save)
+            local output_file="$1"
+            if [[ -z "$output_file" ]]; then
+                echo "Error: Output file is required" >&2
+                return 1
+            fi
+            shift
+
+            echo "Saving configuration to $output_file (not implemented yet)"
+            ;;
+        export)
+            echo "Exporting configuration (not implemented yet)"
+            ;;
+        import)
+            echo "Importing configuration (not implemented yet)"
+            ;;
+        *)
+            echo "Unknown configuration subcommand: $subcommand" >&2
+            return 1
+            ;;
+    esac
+}
+
+# Function to handle monitoring commands
+monitor_command() {
+    # Parse options
+    local interval=1.0
+    local duration=0
+    local output_file=""
+    local format=""
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --interval)
+                interval="$2"
+                shift 2
+                ;;
+            --duration)
+                duration="$2"
+                shift 2
+                ;;
+            --output-file)
+                output_file="$2"
+                shift 2
+                ;;
+            --csv)
+                format="csv"
+                shift
+                ;;
+            --json)
+                format="json"
+                shift
+                ;;
+            --help)
+                print_command_help monitor
+                return
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    echo "Monitoring NLM simulation..."
+    echo "Interval: $interval seconds"
+    echo "Duration: ${duration} seconds"
+    echo "Output: ${output_file:-stdout}"
+    echo "Format: ${format:-console}"
+
+    # This would start monitoring
+    echo "Monitoring started (not implemented yet)"
+}
+
+# Function to handle debugging commands
+debug_command() {
+    # Parse options
+    local log_level="info"
+    local profile=false
+    local trace=false
+    local export_file=""
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --log-level)
+                log_level="$2"
+                shift 2
+                ;;
+            --profile)
+                profile=true
+                shift
+                ;;
+            --trace)
+                trace=true
+                shift
+                ;;
+            --export)
+                export_file="$2"
+                shift 2
+                ;;
+            --help)
+                print_command_help debug
+                return
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
+    echo "Debug tools:"
+    echo "  Log level: $log_level"
+    echo "  Profile: $profile"
+    echo "  Trace: $trace"
+    echo "  Export: ${export_file:-none}"
+
+    # This would start debugging
+    echo "Debug tools activated (not implemented yet)"
+}
+
+# Main function
+main() {
+    if [[ $# -eq 0 ]]; then
+        print_usage
+        return 1
+    fi
+
+    local command=$1
+    shift
+
+    case $command in
+        run)
+            run_simulation "$@"
+            ;;
+        checkpoint)
+            checkpoint_command "$@"
+            ;;
+        config)
+            config_command "$@"
+            ;;
+        monitor)
+            monitor_command "$@"
+            ;;
+        debug)
+            debug_command "$@"
+            ;;
+        help)
+            if [[ $# -eq 0 ]]; then
+                print_usage
+            else
+                print_command_help "$1"
+            fi
+            ;;
+        *)
+            echo "Unknown command: $command" >&2
+            print_usage
+            return 1
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@"

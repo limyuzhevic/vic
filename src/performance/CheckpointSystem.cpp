@@ -31,8 +31,15 @@ namespace {
 template <typename T>
 void appendVec(std::vector<uint8_t>& out, const std::vector<T>& v) {
     uint64_t count = static_cast<uint64_t>(v.size());
+    
+    // Validate count to prevent overflow
+    if (count > 1000000000) {  // Reasonable limit
+        return;
+    }
+    
     const uint8_t* countBytes = reinterpret_cast<const uint8_t*>(&count);
     out.insert(out.end(), countBytes, countBytes + sizeof(count));
+    
     if (!v.empty()) {
         const uint8_t* data = reinterpret_cast<const uint8_t*>(v.data());
         out.insert(out.end(), data, data + v.size() * sizeof(T));
@@ -41,14 +48,31 @@ void appendVec(std::vector<uint8_t>& out, const std::vector<T>& v) {
 
 template <typename T>
 bool readVec(const uint8_t*& p, const uint8_t* end, std::vector<T>& v) {
-    if (static_cast<size_t>(end - p) < sizeof(uint64_t)) return false;
+    // Check if we have enough space for the count
+    if (static_cast<size_t>(end - p) < sizeof(uint64_t)) {
+        return false;
+    }
+    
     uint64_t count = 0;
     std::memcpy(&count, p, sizeof(count));
     p += sizeof(uint64_t);
+    
+    // Validate count to prevent overflow
+    if (count > 1000000000) {  // Reasonable limit
+        return false;
+    }
+    
     size_t bytes = static_cast<size_t>(count) * sizeof(T);
-    if (static_cast<size_t>(end - p) < bytes) return false;
+    
+    // Check if we have enough space for the data
+    if (static_cast<size_t>(end - p) < bytes) {
+        return false;
+    }
+    
     v.resize(static_cast<size_t>(count));
-    if (bytes > 0) std::memcpy(v.data(), p, bytes);
+    if (bytes > 0) {
+        std::memcpy(v.data(), p, bytes);
+    }
     p += bytes;
     return true;
 }
@@ -197,25 +221,68 @@ void CheckpointReader::close() {
 
 bool CheckpointReader::validate() const {
     if (!header_.validate()) return false;
+    
+    // Track which critical sections are present
     bool hasNeurons = false, hasSynapses = false;
+    bool hasSimulationState = false, hasRandomState = false;
+    bool hasPlasticity = false, hasMemory = false;
+    
     for (const auto& s : sections_) {
-        if (s.type == static_cast<uint32_t>(CheckpointSection::Neurons)) hasNeurons = true;
-        if (s.type == static_cast<uint32_t>(CheckpointSection::Synapses)) hasSynapses = true;
+        switch (static_cast<CheckpointSection>(s.type)) {
+            case CheckpointSection::Neurons:
+                hasNeurons = true;
+                break;
+            case CheckpointSection::Synapses:
+                hasSynapses = true;
+                break;
+            case CheckpointSection::SimulationState:
+                hasSimulationState = true;
+                break;
+            case CheckpointSection::RandomState:
+                hasRandomState = true;
+                break;
+            case CheckpointSection::Plasticity:
+                hasPlasticity = true;
+                break;
+            case CheckpointSection::Memory:
+                hasMemory = true;
+                break;
+            default:
+                // Other sections are optional
+                break;
+        }
     }
+    
+    // Critical sections for a valid checkpoint
     return hasNeurons && hasSynapses;
 }
 
 std::vector<uint8_t> CheckpointReader::readSection(CheckpointSection sectionType) {
     for (const auto& s : sections_) {
         if (s.type != static_cast<uint32_t>(sectionType)) continue;
+        
+        // Validate section size to prevent overflow
+        if (s.size > SIZE_MAX) {
+            error_ = "section size too large";
+            return {};
+        }
+        
         stream_.clear();
         stream_.seekg(static_cast<std::streamoff>(s.offset), std::ios::beg);
         if (!stream_) return {};
-        std::vector<uint8_t> payload(static_cast<size_t>(s.size));
+        
+        std::vector<uint8_t> payload;
+        payload.reserve(static_cast<size_t>(s.size));
+        
         if (s.size > 0) {
+            payload.resize(static_cast<size_t>(s.size));
             stream_.read(reinterpret_cast<char*>(payload.data()), static_cast<std::streamsize>(s.size));
-            if (!stream_) return {};
+            if (!stream_) {
+                error_ = "failed to read section data from file";
+                return {};
+            }
         }
+        
         streamPos_ = static_cast<size_t>(s.offset + s.size);
         uint32_t actual = payload.empty() ? 0 : ChecksumCalculator::crc32(payload.data(), payload.size());
         if (actual != s.checksum) {
@@ -384,7 +451,16 @@ bool CheckpointWriter::finalize() {
     bytesWritten_ += sizeof(endHeader);
     // Patch the real header in place.
     header_.totalSize = bytesWritten_;
-    header_.checksum = ChecksumCalculator::crc32(neuronPayload_.data(), neuronPayload_.size());
+    // Checksum the entire checkpoint data for integrity validation
+    // Collect all payload data for checksum calculation
+    std::vector<uint8_t> allData;
+    allData.insert(allData.end(), neuronPayload_.begin(), neuronPayload_.end());
+    allData.insert(allData.end(), synapsePayload_.begin(), synapsePayload_.end());
+    allData.insert(allData.end(), delayedSpikePayload_.begin(), delayedSpikePayload_.end());
+    for (const auto& entry : extraPayloads_) {
+        allData.insert(allData.end(), entry.second.begin(), entry.second.end());
+    }
+    header_.checksum = ChecksumCalculator::crc32(allData.data(), allData.size());
     stream_.seekp(0, std::ios::beg);
     stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
     stream_.flush();
