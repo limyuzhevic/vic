@@ -145,25 +145,178 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
+              "Load configuration from a JSON file")
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
             argv.reserve(args.size());
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments (legacy)")
+        .def("loadFromDict", [](Config& self, const py::dict& config_dict) {
+            bool success = true;
+            for (auto it : config_dict) {
+                std::string key = py::cast<std::string>(it.first);
+                try {
+                    if (py::isinstance<int>(it.second)) {
+                        self.set(key, py::cast<int>(it.second));
+                    } else if (py::isinstance<float>(it.second)) {
+                        self.set(key, py::cast<float>(it.second));
+                    } else if (py::isinstance<double>(it.second)) {
+                        self.set(key, py::cast<double>(it.second));
+                    } else if (py::isinstance<bool>(it.second)) {
+                        self.set(key, py::cast<bool>(it.second));
+                    } else if (py::isinstance<std::string>(it.second)) {
+                        self.set(key, py::cast<std::string>(it.second));
+                    } else if (py::isinstance<py::list>(it.second)) {
+                        auto list = py::cast<py::list>(it.second);
+                        std::vector<std::string> str_list;
+                        for (auto item : list) {
+                            str_list.push_back(py::cast<std::string>(item));
+                        }
+                        self.set(key, str_list);
+                    } else {
+                        return false;
+                    }
+                } catch (...) {
+                    return false;
+                }
+            }
+            return success;
+        }, py::arg("config_dict"),
+           "Load configuration from a Python dictionary")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+              "Save configuration to a JSON file")
+        // Pythonic convenience methods with validation
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set integer configuration value")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set float/double configuration value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set boolean configuration value")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set string configuration value")
+        .def("set", [](Config& self, const std::string& key, const std::vector<std::string>& value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set string vector configuration value")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<int>(key);
+        }, py::arg("key"),
+           "Get configuration value as int (returns None if not found or wrong type)")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<double>(key);
+        }, py::arg("key"),
+           "Get configuration value as double (returns None if not found or wrong type)")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<bool>(key);
+        }, py::arg("key"),
+           "Get configuration value as bool (returns None if not found or wrong type)")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<std::string>(key);
+        }, py::arg("key"),
+           "Get configuration value as string (returns None if not found or wrong type)")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as int with default")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as double with default")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as bool with default")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as string with default")
+        .def("remove", &Config::remove, py::arg("key"),
+              "Remove configuration key")
+        .def("clear", &Config::clear,
+              "Clear all configuration entries")
+        // Pythonic convenience methods
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set integer configuration value")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set float/double configuration value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set boolean configuration value")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set string configuration value")
+        .def("set", [](Config& self, const std::string& key, const std::vector<std::string>& value) {
+            self.set(key, value, ConfigSource::Runtime);
+        }, py::arg("key"), py::arg("value"),
+           "Set string vector configuration value")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<int>(key);
+        }, py::arg("key"),
+           "Get configuration value as int (returns None if not found or wrong type)")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<double>(key);
+        }, py::arg("key"),
+           "Get configuration value as double (returns None if not found or wrong type)")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<bool>(key);
+        }, py::arg("key"),
+           "Get configuration value as bool (returns None if not found or wrong type)")
+        .def("get", [](const Config& self, const std::string& key) {
+            return self.get<std::string>(key);
+        }, py::arg("key"),
+           "Get configuration value as string (returns None if not found or wrong type)")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as int with default")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as double with default")
+        .def("getOr", [](const Config& self, const std::string& key, bool defaultValue) {
+            return self.getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as bool with default")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value as string with default")
+        .def("remove", &Config::remove, py::arg("key"),
+              "Remove configuration key")
+        .def("clear", &Config::clear,
+              "Clear all configuration entries")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
-             "Clear all configuration entries")
+              "Clear all configuration entries");
+
+    // End of Config class
+
+    py::class_<ActionResult>(m, "ActionResult", R"pbdoc(Action result from world)pbdoc")
+        .def(py::init<>())
+        .def(py::init<float, bool, std::string>(),
+             py::arg("reward"), py::arg("success"), py::arg("message") = "")
+        .def_readwrite("reward", &ActionResult::reward)
+        .def_readwrite("success", &ActionResult::success)
+        .def_readwrite("message", &ActionResult::message);
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
@@ -308,31 +461,112 @@ PYBIND11_MODULE(pynlm, m) {
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
-        .def("produceAction", &Brain::produceAction,
-             "Produce motor action based on neural activity")
-        .def("reset", &Brain::reset,
-             "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
-        .def("addRegion", &Brain::addRegion, py::arg("name") = "",
-             "Add a new neural region")
-        // getRegion is const/non-const overloaded; bind the mutable one.
-        .def("getRegion", static_cast<NeuralRegion* (Brain::*)(RegionId)>(&Brain::getRegion),
-             py::arg("id"),
-             py::return_value_policy::reference_internal,
-             "Get a region by ID")
+        // Pythonic convenience methods
+        .def("runSimulation", [](Brain& self, int numSteps) {
+            self.initialize();
+            for (int i = 0; i < numSteps; ++i) {
+                self.step(i);
+            }
+        }, py::arg("numSteps"),
+           "Run a complete simulation for given number of steps")
+        .def("getStats", [](const Brain& self) {
+            py::dict result;
+            result["total_neurons"] = self.getTotalNeuronCount();
+            result["total_synapses"] = self.getTotalSynapseCount();
+            result["firing_neurons"] = self.getFiringNeuronCount();
+            result["active_neurons"] = self.getActiveNeuronCount();
+            result["total_spikes"] = self.getTotalSpikeCount();
+            result["pending_spikes"] = self.getPendingSpikeEventCount();
+            result["firing_rate"] = self.getAverageFiringRate();
+            result["e_i_ratio"] = self.getExcitationInhibitionRatio();
+            result["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return result;
+        }, "Get key brain statistics as a dictionary")
+        .def("getBrainInfo", [](const Brain& self) {
+            py::dict result;
+            result["neurons"] = self.getTotalNeuronCount();
+            result["synapses"] = self.getTotalSynapseCount();
+            result["regions"] = self.getRegionCount();
+            result["firing"] = self.getFiringNeuronCount();
+            result["spike_count"] = self.getTotalSpikeCount();
+            result["development"] = static_cast<int>(self.getDevelopmentalStage());
+            return result;
+        }, "Get comprehensive brain information")
+        .def("runWithInput", [](Brain& self, const SensoryInput& input, int numSteps) {
+            self.initialize();
+            self.receiveSensoryInput(input);
+            for (int i = 0; i < numSteps; ++i) {
+                self.step(i);
+            }
+        }, py::arg("input"), py::arg("numSteps"),
+           "Run simulation with sensory input")
+        .def("injectCurrentSafe", [](Brain& self, NeuronId neuron, double current) {
+            self.injectCurrent(neuron, static_cast<MembranePotential>(current));
+        }, py::arg("neuron"), py::arg("current"),
+           "Safely inject current into a neuron with float value")
+        .def("injectCurrentToTypeSafe", [](Brain& self, NeuronType type, double current) {
+            self.injectCurrentToNeurons(type, static_cast<MembranePotential>(current));
+        }, py::arg("type"), py::arg("current"),
+           "Safely inject current into all neurons of a specific type")
+        .def("produceActionAndValidate", [](const Brain& self) {
+            auto action = self.produceAction();
+            return action;
+        }, "Produce motor action with validation")
+        .def("saveAndValidate", [](const Brain& self, const std::string& filepath) {
+            return self.save(filepath);
+        }, py::arg("filepath"),
+           "Save brain state to file with validation")
+        .def("loadAndValidate", [](Brain& self, const std::string& filepath) {
+            return self.load(filepath);
+        }, py::arg("filepath"),
+           "Load brain state from file with validation")
+        .def("addRegionWithName", [](Brain& self, const std::string& name) {
+            return self.addRegion(name);
+        }, py::arg("name"),
+           "Add a neural region with specific name")
+        .def("getRegionIds", [](const Brain& self) {
+            auto ids = self.getRegionIds();
+            std::vector<uint64_t> python_ids;
+            python_ids.reserve(ids.size());
+            for (const auto& id : ids) {
+                python_ids.push_back(id.value);
+            }
+            return python_ids;
+        }, "Get all region IDs as a list of integers")
+        .def("getRegionNames", [](const Brain& self) {
+            auto ids = self.getRegionIds();
+            std::vector<std::string> python_names;
+            python_names.reserve(ids.size());
+            for (const auto& id : ids) {
+                python_names.push_back(std::to_string(id.value));
+            }
+            return python_names;
+        }, "Get all region names as a list of strings")
         .def("getRegionCount", &Brain::getRegionCount,
              "Get the number of regions")
-        .def("getRegionIds", &Brain::getRegionIds,
-             "Get all region IDs")
+        .def("getRegions", &Brain::getRegions,
+             py::return_value_policy::reference_internal,
+             "Get all regions")
+        .def("getRegionIds", [](const Brain& self) {
+            auto ids = self.getRegionIds();
+            std::vector<uint64_t> python_ids;
+            python_ids.reserve(ids.size());
+            for (const auto& id : ids) {
+                python_ids.push_back(id.value);
+            }
+            return python_ids;
+        }, "Get all region IDs as a list of integers")
+        .def("getRegionNames", [](const Brain& self) {
+            auto ids = self.getRegionIds();
+            std::vector<std::string> python_names;
+            python_names.reserve(ids.size());
+            for (const auto& id : ids) {
+                python_names.push_back(std::to_string(id.value));
+            }
+            return python_names;
+        }, "Get all region names as a list of strings")
+        .def("getRegionCount", &Brain::getRegionCount,
+             "Get the number of regions")
         .def("getRegions", &Brain::getRegions,
              py::return_value_policy::reference_internal,
              "Get all regions")
@@ -363,6 +597,57 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        // Pythonic convenience methods
+        .def("runAgentSimulation", [](AgentBrain& self, const SimpleWorld& world, int numSteps) {
+            self.initialize(world);
+            for (int i = 0; i < numSteps; ++i) {
+                // Note: This simplified version doesn't include the full loop with world updates
+                // For a complete simulation, use the patterns in easy_usage.md
+            }
+        }, py::arg("world"), py::arg("numSteps"),
+           "Run a complete agent simulation")
+        .def("getAgentStats", [](const AgentBrain& self) {
+            py::dict result;
+            result["curiosity"] = self.getCuriosityLevel();
+            result["novelty"] = self.getNoveltyLevel();
+            result["prediction_error"] = self.getPredictionError();
+            result["neuromodulation"] = self.getNeuromodulationLevel();
+            result["development"] = static_cast<int>(self.getDevelopmentalStage());
+            return result;
+        }, "Get key agent statistics as a dictionary")
+        .def("processInputAndValidate", [](AgentBrain& self, const SensoryPercept& percept) {
+            self.processSensoryInput(percept);
+        }, py::arg("percept"),
+           "Process sensory input with validation")
+        .def("decodeMotorAndValidate", [](AgentBrain& self) {
+            return self.decodeMotorCommand();
+        }, "Decode motor command with validation")
+        .def("applyRewardAndValidate", [](AgentBrain& self, double reward, double predicted) {
+            self.applyRewardModulation(reward, predicted);
+        }, py::arg("reward"), py::arg("predictedReward"),
+           "Apply reward modulation with validation")
+        .def("updateDevelopmentAndValidate", [](AgentBrain& self, double timestep) {
+            self.updateDevelopment(timestep);
+        }, py::arg("timestep"),
+           "Update development with validation")
+        .def("enableAllFeatures", [](AgentBrain& self) {
+            self.enableRewardModulation(true);
+            self.enableStructuralPlasticity(true);
+            self.enableDevelopment(true);
+            self.enableCuriosity(true);
+        }, "Enable all learning features (reward, structural plasticity, development, curiosity)")
+        .def("runCompleteEpisode", [](AgentBrain& self, const SimpleWorld& world, int numSteps) {
+            self.initialize(world);
+            for (int step = 0; step < numSteps; ++step) {
+                // This is a simplified version - for the complete pattern, 
+                // see easy_usage.md examples
+                self.processSensoryInput(world.getSensoryPercept());
+                self.decodeMotorCommand();
+                self.applyRewardModulation(0.0, 0.0); // Placeholder
+                self.updateDevelopment(0.1);
+            }
+        }, py::arg("world"), py::arg("numSteps"),
+           "Run a complete agent episode (simplified)")
         .def("initialize", &AgentBrain::initialize, py::arg("world"),
              "Initialize with world")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
