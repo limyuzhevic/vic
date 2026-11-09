@@ -19,9 +19,42 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement proper JSON/YAML parser using popular C++ libraries
+    // Try JSON first, fall back to YAML, then fallback to simple key=value for compatibility
     
+    // Try JSON parser
+    try {
+        #include <nlohmann/json.hpp>
+        nlohmann::json j;
+        std::ifstream file(filepath);
+        if (!file.is_open()) {
+            return false;
+        }
+        file >> j;
+        
+        // Convert JSON to Config entries
+        for (auto it = j.begin(); it != j.end(); ++it) {
+            std::string key = it.key();
+            setConfigValueFromJson(key, *it);
+        }
+        return true;
+    } catch (const std::exception&) {
+        // JSON parsing failed, try YAML
+    }
+    
+    // Try YAML parser
+    try {
+        #include <yaml-cpp/yaml.h>
+        YAML::Node doc = YAML::LoadFile(filepath);
+        
+        // Convert YAML to Config entries
+        convertYamlToConfig(doc);
+        return true;
+    } catch (const std::exception&) {
+        // YAML parsing failed, fall back to simple key=value format
+    }
+    
+    // Fallback to simple key=value format (original implementation)
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
