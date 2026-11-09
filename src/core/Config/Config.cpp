@@ -3,8 +3,44 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cstring>  // For strcmp
+#include <unordered_map>  // For std::unordered_map
 
+// Forward declarations for JSON/YAML parsing
 namespace nlm {
+    struct JsonValue;
+    struct JsonObject;
+    struct JsonArray;
+}
+
+// Simplified JSON/YAML parser for configuration files
+class SimpleJsonParser {
+public:
+    bool parse(const std::string& content, nlm::JsonValue& output);
+    std::string serialize(const nlm::JsonValue& value);
+    
+private:
+    bool parseToken(const std::string& content, size_t& pos, nlm::JsonValue& output);
+    bool parseString(const std::string& content, size_t& pos, std::string& output);
+    bool parseNumber(const std::string& content, size_t& pos, double& output);
+    bool parseBool(const std::string& content, size_t& pos, bool& output);
+    bool parseNull(const std::string& content, size_t& pos, bool& output);
+    bool parseObject(const std::string& content, size_t& pos, nlm::JsonObject& output);
+    bool parseArray(const std::string& content, size_t& pos, nlm::JsonArray& output);
+};
+
+// Enhanced JSON/YAML parser with better error handling
+class EnhancedConfigParser {
+public:
+    EnhancedConfigParser();
+    bool parse(const std::string& content, nlm::JsonValue& output);
+    bool validate(const nlm::JsonObject& config, const std::string& filepath);
+    
+private:
+    std::unordered_map<std::string, std::string> getDefaultPaths;
+    bool validateRequiredKeys(const nlm::JsonObject& config);
+    bool validateTypes(const nlm::JsonObject& config);
+};
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;

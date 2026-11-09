@@ -24,9 +24,7 @@
 #include <string>
 #include <vector>
 #include <iomanip>
-#include <numeric>
-
-using namespace nlm;
+#include <algorithm>  // For std::transform
 
 void printBanner() {
     std::cout << R"(
@@ -307,14 +305,133 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
+}
+
+void printHelp() {
+    printBanner();
+    std::cout << R"(
+Usage: ./nlm [OPTIONS]
+
+Options:
+  --help                  Show this help message and exit
+  --config <file>         Load configuration from file (default: configs/default.cfg)
+  --neuron-count <count>  Override number of neurons
+  --region-count <count>  Override number of brain regions
+  --connection-prob <prob> Override connection probability (0.0-1.0)
+  --simulation-timestep <sec> Override simulation timestep in seconds
+  --random-seed <seed>    Set random seed for reproducible experiments
+  --log-level <level>     Set logging level (Debug, Info, Warning, Error, Critical)
+
+Configuration File Format:
+  The configuration file should contain key=value pairs, for example:
+    random_seed = 42
+    simulation_timestep = 0.001
+    neuron_count = 1000
+    region_count = 2
+    connection_probability = 0.1
+
+  Available keys can be found in configs/default.cfg
+
+Examples:
+  ./nlm                          Run with default configuration
+  ./nlm --help                   Show help and exit
+  ./nlm --config myconfig.cfg    Use custom configuration
+  ./nlm --neuron-count 2000 --region-count 4  Override config values
+  ./nlm --log-level Debug        Enable debug logging
+
+File paths relative to current working directory unless absolute path is provided.
+  )" << std::endl;
+}
+
+void parseCommandLineArgs(int argc, char** argv, std::string& configFile, int64_t& randomSeed, double& simulationTimestep, 
+                           int64_t& neuronCount, int64_t& regionCount, float& connectionProb, std::string& logLevel) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        toLower(arg);
+        
+        if (arg == "--help") {
+            printHelp();
+            exit(0);
+        }
+        else if (arg.find("--config") != std::string::npos) {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+        else if (arg.find("--neuron-count") != std::string::npos) {
+            if (arg.find('=') != std::string::npos) {
+                neuronCount = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                neuronCount = std::stoll(argv[++i]);
+            }
+        }
+        else if (arg.find("--region-count") != std::string::npos) {
+            if (arg.find('=') != std::string::npos) {
+                regionCount = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                regionCount = std::stoll(argv[++i]);
+            }
+        }
+        else if (arg.find("--connection-prob") != std::string::npos) {
+            if (arg.find('=') != std::string::npos) {
+                connectionProb = std::stof(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                connectionProb = std::stof(argv[++i]);
+            }
+        }
+        else if (arg.find("--simulation-timestep") != std::string::npos) {
+            if (arg.find('=') != std::string::npos) {
+                simulationTimestep = std::stod(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                simulationTimestep = std::stod(argv[++i]);
+            }
+        }
+        else if (arg.find("--random-seed") != std::string::npos) {
+            if (arg.find('=') != std::string::npos) {
+                randomSeed = std::stoll(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                randomSeed = std::stoll(argv[++i]);
+            }
+        }
+        else if (arg.find("--log-level") != std::string::npos) {
+            if (arg.find('=') != std::string::npos) {
+                logLevel = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logLevel = argv[++i];
+            }
+        }
+    }
+}
+// Parse command line arguments
+    std::string configFile = "configs/default.cfg";
+    int64_t randomSeed = 42;
+    double simulationTimestep = 0.001;
+    int64_t neuronCount = 500;
+    int64_t regionCount = 1;
+    float connectionProb = 0.15f;
+    std::string logLevel = "INFO";
+    
+    parseCommandLineArgs(argc, argv, configFile, randomSeed, simulationTimestep, neuronCount, regionCount, connectionProb, logLevel);
+    
+    parseCommandLineArgs(argc, argv, configFile, randomSeed, simulationTimestep, neuronCount, regionCount, connectionProb, logLevel);
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
+    // Convert log level to LogLevel enum
+    LogLevel level = LogLevel::Info;
+    toLower(logLevel);
+    if (logLevel == "debug") level = LogLevel::Debug;
+    else if (logLevel == "warning") level = LogLevel::Warning;
+    else if (logLevel == "error") level = LogLevel::Error;
+    else if (logLevel == "critical") level = LogLevel::Critical;
+    
     // Initialize logger
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    auto consoleLogger = std::make_shared<ConsoleLogger>(level);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -329,19 +446,6 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
-    
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
@@ -349,15 +453,12 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
-    
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 (overridden by config file and command line)
+    config->set("random_seed", randomSeed, ConfigSource::Default);
+    config->set("simulation_timestep", simulationTimestep, ConfigSource::Default);
+    config->set("neuron_count", neuronCount, ConfigSource::Default);  // From command line override
+    config->set("region_count", regionCount, ConfigSource::Default);  // From command line override
+    config->set("connection_probability", connectionProb, ConfigSource::Default);  // From command line override
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);

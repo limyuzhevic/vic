@@ -35,7 +35,7 @@
 namespace nlm {
 
 // Number of threads (can be configured)
-#ifndef NLM_NUM_THREADS
+#if defined(NLM_THREAD_COUNT)
     #include <thread>
     static constexpr size_t DEFAULT_NUM_THREADS = std::thread::hardware_concurrency();
 #else

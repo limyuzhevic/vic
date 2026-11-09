@@ -6,8 +6,54 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <unordered_map>
+#include <functional>
 
 namespace nlm {
+
+// JSON/YAML value structure for configuration parsing
+struct JsonValue {
+    enum class Type {
+        Null,
+        Bool,
+        Number,
+        String,
+        Array,
+        Object
+    };
+    
+    JsonValue() : type(Type::Null) {}
+    explicit JsonValue(bool b) : type(Type::Bool), boolValue(b) {}
+    explicit JsonValue(double n) : type(Type::Number), numberValue(n) {}
+    explicit JsonValue(const std::string& s) : type(Type::String), stringValue(s) {}
+    explicit JsonValue(const std::vector<JsonValue>& arr) : type(Type::Array), arrayValue(arr) {}
+    explicit JsonValue(const std::unordered_map<std::string, JsonValue>& obj) : type(Type::Object), objectValue(obj) {}
+    
+    Type type;
+    union {
+        bool boolValue;
+        double numberValue;
+        std::string stringValue;
+        std::vector<JsonValue> arrayValue;
+        std::unordered_map<std::string, JsonValue> objectValue;
+    };
+    
+    ~JsonValue() {
+        switch (type) {
+            case Type::String:
+                stringValue.~basic_string();
+                break;
+            case Type::Array:
+                arrayValue.~vector();
+                break;
+            case Type::Object:
+                objectValue.~unordered_map();
+                break;
+            default:
+                break;
+        }
+    }
+};
 
 // Forward declarations
 class Config;
@@ -56,7 +102,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -66,12 +112,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +141,10 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Validation methods
+    bool validateRequiredKeys() const;
+    static bool validateTypes(const std::unordered_map<std::string, JsonValue>& config);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +152,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::optional<ConfigValue> jsonToConfigValue(const JsonValue& jsonValue);
+    static JsonValue configValueToJson(const ConfigValue& configValue);
 };
 
 } // namespace nlm
