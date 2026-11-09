@@ -59,19 +59,44 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from file (JSON format)
+    bool loadFromJSONFile(const std::string& filepath);
+    
+    // Load from file (YAML format)
+    bool loadFromYAMLFile(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
+    // Save as JSON
+    bool saveToJSONFile(const std::string& filepath) const;
+    
+    // Save as YAML
+    bool saveToYAMLFile(const std::string& filepath) const;
+    
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
+    // Get with validation
+    template<typename T>
+    std::optional<T> getValidated(const std::string& key, 
+                                const std::function<bool(const T&)>& validator = nullptr,
+                                const std::string& errorMsg = "") const;
+    
+    // Set values with validation
+    template<typename T>
+    bool setValidated(const std::string& key, const T& value, 
+                     ConfigSource source = ConfigSource::Runtime,
+                     const std::function<bool(const T&)>& validator = nullptr,
+                     const std::string& errorMsg = "");
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -89,11 +114,20 @@ template<typename T>
     // Get all keys
     std::vector<std::string> getKeys() const;
     
+    // Get entries
+    const std::vector<ConfigEntry>& getEntries() const;
+    
     // Clear all
     void clear();
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validate configuration key format
+    static bool isValidKey(const std::string& key);
+    
+    // Convert config value to string
+    static std::string configValueToString(const ConfigValue& value);
     
 private:
     struct Impl;
@@ -102,6 +136,11 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML parser helpers
+    static bool parseSimpleKeyValue(const std::string& line, std::string& key, std::string& value);
+    static std::string escapeJSON(const std::string& str);
+    static std::string escapeYAML(const std::string& str);
 };
 
 } // namespace nlm

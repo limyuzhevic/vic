@@ -19,16 +19,25 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to load as JSON first, then as simple key=value format for backward compatibility
+    if (loadFromJSONFile(filepath)) {
+        NLM_LOG_INFO("Loaded configuration from JSON file: " + filepath);
+        return true;
+    }
     
+    // Try simple key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Configuration file not found: " + filepath);
         return false;
     }
     
+    NLM_LOG_INFO("Loaded configuration from simple key=value file: " + filepath);
+    
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -36,28 +45,143 @@ bool Config::loadFromFile(const std::string& filepath) {
         }
         
         // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
+        if (!parseSimpleKeyValue(line, lineNumber)) {
+            NLM_LOG_WARNING("Invalid configuration format in " + filepath + ": line " + std::to_string(lineNumber) + ": " + line);
+            continue;
         }
     }
     
     return true;
 }
 
+bool Config::loadFromJSONFile(const std::string& filepath) {
+    // Try to parse as JSON using a simple approach
+    // In a real implementation, you would use a proper JSON parser like nlohmann/json
+    // For now, we'll implement a basic JSON parser for common patterns
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // Read entire file
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    file.close();
+    
+    // Basic JSON parsing - look for key: value patterns
+    // This is a simplified implementation - for production, use proper JSON parser
+    size_t pos = 0;
+    while (pos < content.length()) {
+        // Find key
+        size_t colonPos = content.find(':', pos);
+        if (colonPos == std::string::npos) break;
+        
+        // Find key name (could be "key" or 'key')
+        size_t quoteStart = content.find_last_of('"', colonPos - 1);
+        if (quoteStart == std::string::npos) quoteStart = content.find_last_of(\"'\", colonPos - 1);
+        
+        if (quoteStart == std::string::npos) {
+            pos = colonPos + 1;
+            continue;
+        }
+        
+        size_t quoteEnd = content.find_first_of('\"\'', quoteStart + 1);
+        if (quoteEnd == std::string::npos) {
+            pos = colonPos + 1;
+            continue;
+        }
+        
+        std::string key = content.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
+        key = trim(key);
+        
+        // Find value (skip whitespace)
+        size_t valueStart = content.find_first_not_of("\t \n\r", colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+// String value
+            size_t valueEnd = content.find_first_of('\"\'', valueStart + 1);
+            if (valueEnd == std::string::npos) break;
+            valueStr = content.substr(valueStart + 1, valueEnd - valueStart - 1);
+        } else if (content[valueStart] == 't' || content[valueStart] == 'f' || content[valueStart] == 'n') {
+            // boolean or null - parse entire value
+            size_t valueEnd = content.find_first_of",\n\t ", valueStart);
+            if (valueEnd == std::string::npos) {
+                valueEnd = content.length();
+            }
+            valueStr = content.substr(valueStart, valueEnd - valueStart);
+        } else {
+            // Number or other value - parse until comma or end of object
+            size_t valueEnd = content.find_first_of",}\]\t \n", valueStart);
+            if (valueEnd == std::string::npos) {
+                valueEnd = content.length();
+            }
+            valueStr = content.substr(valueStart, valueEnd - valueStart);
+        }
+        
+        // Set the value
+        set(key, valueStr, ConfigSource::File);
+        
+        // Move position past this entry
+        pos = valueEnd;
+        while (pos < content.length() && (content[pos] == ',' || content[pos] == '\t' || content[pos] == '\n' || content[pos] == '\r' || content[pos] == ' ')) {
+            pos++;
+        }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromYAMLFile(const std::string& filepath) {
+    // TODO: Implement YAML parsing
+    // For now, return false to indicate YAML support is not implemented
+    NLM_LOG_WARNING("YAML configuration file loading not yet implemented: " + filepath);
+    return false;
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
+    // Enhanced command-line argument parsing with validation
+    // Build a list of valid configuration keys
+    std::vector<std::string> validKeys = {
+        "random_seed", "simulation_timestep", "neuron_count", "region_count",
+        "connection_probability", "stdp_ltp_weight", "stdp_ltd_weight", "stdp_tau",
+        "synaptogenesis_rate", "pruning_rate"
+    };
+    
+    bool hasHelp = false;
+    bool hasVersion = false;
+    
+    // Check for help/version flags before processing other args
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            hasHelp = true;
+        } else if (arg == "--version") {
+            hasVersion = true;
+        }
+    }
+    
+    if (hasHelp) {
+        printHelp();
+        return true;
+    }
+    
+    if (hasVersion) {
+        printVersion();
+        return true;
+    }
+    
+    // Process configuration arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle help/version flags
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            continue;
+        } else if (arg == "--version") {
+            printVersion();
+            continue;
+        }
         
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
@@ -65,30 +189,124 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                
+                // Validate key
+                if (!isValidKey(key)) {
+                    NLM_LOG_ERROR("Unknown configuration key: " + key);
+                    NLM_LOG_INFO("Use --help to see available configuration options");
+                    return false;
+                }
+                
+                // Set the value with validation
+                if (!setValidated(key, value, ConfigSource::CommandLine)) {
+                    NLM_LOG_ERROR("Failed to set configuration key: " + key);
+                    return false;
+                }
+            } else {
+                NLM_LOG_ERROR("Invalid configuration argument format: " + arg);
+                NLM_LOG_INFO("Use --help to see available configuration options");
+                return false;
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            
+            // Validate key
+            if (!isValidKey(key)) {
+                NLM_LOG_ERROR("Unknown configuration key: " + key);
+                NLM_LOG_INFO("Use --help to see available configuration options");
+                return false;
+            }
+            
+            // Set the value with validation
+            if (!setValidated(key, value, ConfigSource::CommandLine)) {
+                NLM_LOG_ERROR("Failed to set configuration key: " + key);
+                return false;
+            }
+        } else {
+            NLM_LOG_WARNING("Unknown argument: " + arg);
         }
     }
+    
     return true;
+}
+
+void Config::printHelp() const {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("NLM (熙然) - Neural Learning Machine Configuration Options");
+    NLM_LOG_INFO("================================");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Usage:");
+    NLM_LOG_INFO("  nlm [OPTIONS] [CONFIG_FILE]");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration Options:");
+    NLM_LOG_INFO("  --help, -h              Show this help message");
+    NLM_LOG_INFO("  --version               Show version information");
+    NLM_LOG_INFO("  --config=FILE           Load configuration from file");
+    NLM_LOG_INFO("  --key=value             Set configuration key=value (string)");
+    NLM_LOG_INFO("  -key value              Set configuration key=value (string)");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Available Configuration Keys:");
+    NLM_LOG_INFO("  random_seed             Random seed (int64_t)");
+    NLM_LOG_INFO("  simulation_timestep     Simulation timestep in seconds (double)");
+    NLM_LOG_INFO("  neuron_count            Number of neurons (int64_t)");
+    NLM_LOG_INFO("  region_count            Number of brain regions (int64_t)");
+    NLM_LOG_INFO("  connection_probability  Connection probability between neurons (float)");
+    NLM_LOG_INFO("  stdp_ltp_weight         STDP long-term potentiation weight (float)");
+    NLM_LOG_INFO("  stdp_ltd_weight         STDP long-term depression weight (float)");
+    NLM_LOG_INFO("  stdp_tau                STDP time constant (float)");
+    NLM_LOG_INFO("  synaptogenesis_rate     Structural plasticity synaptogenesis rate (float)");
+    NLM_LOG_INFO("  pruning_rate            Structural plasticity pruning rate (float)");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Type Conversion:");
+    NLM_LOG_INFO("  String values will be automatically converted based on the key name");
+    NLM_LOG_INFO("  Numeric strings will be converted to appropriate numeric types");
+    NLM_LOG_INFO("  Boolean strings: 'true'/'false', '1'/'0', 'yes'/'no'");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Examples:");
+    NLM_LOG_INFO("  nlm --config=myconfig.json");
+    NLM_LOG_INFO("  nlm --neuron_count=1000 --simulation_timestep=0.0001");
+    NLM_LOG_INFO("  nlm -random_seed 12345");
+    NLM_LOG_INFO("  nlm --help");
+    NLM_LOG_INFO("");
+}
+
+void Config::printVersion() const {
+    NLM_LOG_INFO("NLM (熙然) - Neural Learning Machine v0.1.0");
+    NLM_LOG_INFO("Phase 2: Real Neural Computation");
+    NLM_LOG_INFO("An experimental artificial developmental brain.");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Copyright (c) 2026 NLM Authors");
+    NLM_LOG_INFO("License: MIT");
+    NLM_LOG_INFO("");
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot save configuration to file: " + filepath);
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated by NLM Configuration System\n";
+    file << "# Format: key = value\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# " << entry.key << ": " << entry.description << "\n";
+        file << "# Source: " << static_cast<int>(entry.source) << "\n";
+        
+        // Convert value back to string representation
+        file << entry.key << " = ";
+        
+        // Use the configValueToString helper
+        file << configValueToString(entry.value);
+        file << "\n\n";
     }
     
+    NLM_LOG_INFO("Configuration saved to: " + filepath);
     return true;
 }
 
@@ -234,5 +452,96 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
+template std::optional<float> Config::get<float>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
+template float Config::getOr<float>(const std::string&, const float&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Helper function implementations
+
+bool Config::parseSimpleKeyValue(const std::string& line, size_t lineNumber) {
+    size_t pos = line.find('=');
+    if (pos == std::string::npos) {
+        return false;
+    }
+    
+    std::string key = trim(line.substr(0, pos));
+    std::string value = trim(line.substr(pos + 1));
+    
+    // Remove quotes if present
+    if (value.size() >= 2 && 
+        ((value.front() == '"' && value.back() == '"') ||
+         (value.front() == '\'' && value.back() == '\''))) {
+        value = value.substr(1, value.size() - 2);
+    }
+    
+    set(key, value, ConfigSource::File);
+    return true;
+}
+
+std::string Config::escapeJSON(const std::string& str) {
+    std::string result;
+    result.reserve(str.size() * 2); // Worst case: all chars escaped
+    
+    for (char c : str) {
+        switch (c) {
+            case '\\': result += "\\\\"; break;
+            case '\"': result += "\\\""; break;
+            case '\/': result += "\\/"; break;
+            case '\b': result += "\\b"; break;
+            case '\f': result += "\\f"; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            default:
+                if (c < 32 || c == 127) {
+                    // Control character
+                    result += "\\u";
+                    // Simple unicode escape for control chars
+                    char hex[5];
+                    snprintf(hex, sizeof(hex), "%04x", static_cast<unsigned int>(c));
+                    result += hex;
+                } else {
+                    result += c;
+                }
+                break;
+        }
+    }
+    
+    return result;
+}
+
+std::string Config::escapeYAML(const std::string& str) {
+    std::string result = str;
+    
+    // Check if YAML special characters are present
+    bool needsQuoting = false;
+    for (char c : str) {
+        if (c == ':' || c == '{' || c == '}' || c == '[' || c == ']' || 
+            c == ',' || c == '#' || c == '|' || c == '>' || c == '-' ||
+            c == '?' || c == '@' || c == '`') {
+            needsQuoting = true;
+            break;
+        }
+    }
+    
+    if (needsQuoting) {
+        result = "\"" + str + "\"";
+    }
+    
+    return result;
+}
 
 } // namespace nlm
