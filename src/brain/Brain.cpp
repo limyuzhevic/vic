@@ -929,6 +929,11 @@ struct P5Reader {
 }  // namespace
 
 bool Brain::save(const std::string& filepath) const {
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Cannot save brain: empty filepath provided");
+        return false;
+    }
+    
     NLM_LOG_INFO("Saving brain state to " + filepath);
     
     try {
@@ -973,6 +978,11 @@ bool Brain::save(const std::string& filepath) const {
             }
         }
         
+if (neuronData.membranePotential.empty()) {
+            NLM_LOG_ERROR("Failed to collect neuron data for checkpoint");
+            return false;
+        }
+
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
             return false;
@@ -991,7 +1001,7 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.efficacy.push_back(syn->getEfficacy());
             }
         }
-        
+
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
             return false;
@@ -1082,7 +1092,7 @@ bool Brain::save(const std::string& filepath) const {
             }
             writer.bufferSection(CheckpointSection::Memory, payload);
         }
-        
+
         // Finalize
         if (!writer.finalize()) {
             NLM_LOG_ERROR("Failed to finalize checkpoint");
@@ -1137,7 +1147,7 @@ bool Brain::load(const std::string& filepath) {
         // Read neurons
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
-            NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+            NLM_LOG_ERROR("Failed to read neurons from checkpoint: " + reader.getError());
             return false;
         }
 
@@ -1150,35 +1160,46 @@ bool Brain::load(const std::string& filepath) {
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    if (idx < neuronData.membranePotential.size()) {
-                        neuron->setMembranePotential(neuronData.membranePotential[idx]);
-                        neuron->setRestingPotential(neuronData.restingPotential[idx]);
-                        neuron->setThreshold(neuronData.threshold[idx]);
-                        neuron->setResetPotential(neuronData.resetPotential[idx]);
-                        neuron->setLeakConductance(neuronData.leakConductance[idx]);
-                        auto& state = neuron->getState();
-                        if (idx < neuronData.firingState.size()) {
-                            state.firingState = static_cast<FiringState>(neuronData.firingState[idx]);
-                        }
-                        if (idx < neuronData.refractoryRemaining.size()) {
-                            state.refractoryRemaining = neuronData.refractoryRemaining[idx];
-                        }
-                        if (idx < neuronData.refractoryPeriod.size()) {
-                            state.refractoryPeriod = neuronData.refractoryPeriod[idx];
-                        }
-                        if (idx < neuronData.lastSpikeTime.size()) {
-                            state.lastSpikeTime = neuronData.lastSpikeTime[idx];
-                        }
-                        // Firing rate is the decode signal, so a
-                        // reloaded brain must resume with the saved
-                        // rates, not restart its EMA from zero.
-                        if (idx < neuronData.firingRate.size()) {
-                            state.firingRate = neuronData.firingRate[idx];
-                        }
+                    if (idx >= neuronData.membranePotential.size()) {
+                        NLM_LOG_ERROR("Neuron data truncation during load - checkpoint inconsistent");
+                        return false;
+                    }
+                    
+                    neuron->setMembranePotential(neuronData.membranePotential[idx]);
+                    neuron->setRestingPotential(neuronData.restingPotential[idx]);
+                    neuron->setThreshold(neuronData.threshold[idx]);
+                    neuron->setResetPotential(neuronData.resetPotential[idx]);
+                    neuron->setLeakConductance(neuronData.leakConductance[idx]);
+                    
+                    auto& state = neuron->getState();
+                    if (idx < neuronData.firingState.size()) {
+                        state.firingState = static_cast<FiringState>(neuronData.firingState[idx]);
+                    }
+                    if (idx < neuronData.refractoryRemaining.size()) {
+                        state.refractoryRemaining = neuronData.refractoryRemaining[idx];
+                    }
+                    if (idx < neuronData.refractoryPeriod.size()) {
+                        state.refractoryPeriod = neuronData.refractoryPeriod[idx];
+                    }
+                    if (idx < neuronData.lastSpikeTime.size()) {
+                        state.lastSpikeTime = neuronData.lastSpikeTime[idx];
+                    }
+                    // Firing rate is the decode signal, so a
+                    // reloaded brain must resume with the saved
+                    // rates, not restart its EMA from zero.
+                    if (idx < neuronData.firingRate.size()) {
+                        state.firingRate = neuronData.firingRate[idx];
                     }
                     idx++;
                 }
             }
+        }
+        
+        if (idx != getTotalNeuronCount()) {
+            NLM_LOG_ERROR("Neuron count mismatch during load - expected " + 
+                         std::to_string(getTotalNeuronCount()) + " but processed " + 
+                         std::to_string(idx) + " neurons");
+            return false;
         }
 
         // Read synapses
@@ -1278,6 +1299,8 @@ bool Brain::load(const std::string& filepath) {
                 } else {
                     NLM_LOG_INFO("SimulationState section unreadable; counters/preference not restored");
                 }
+            } else if (reader.hasSection(CheckpointSection::SimulationState)) {
+                NLM_LOG_INFO("SimulationState section present but empty; using defaults");
             }
         }
         {
@@ -1287,6 +1310,8 @@ bool Brain::load(const std::string& filepath) {
                 if (!pImpl->rng->restoreState(state)) {
                     NLM_LOG_INFO("RandomState section unreadable; RNG not restored");
                 }
+            } else if (payload.empty() && pImpl->rng) {
+                NLM_LOG_INFO("RandomState section missing; RNG will use default seed");
             }
         }
         {
@@ -1318,7 +1343,13 @@ bool Brain::load(const std::string& filepath) {
                     it->second[used]->setPostSpikeHistory(post);
                     ++restored;
                 }
-                NLM_LOG_INFO("Restored spike histories for " + std::to_string(restored) + " synapses");
+                if (restored > 0) {
+                    NLM_LOG_INFO("Restored spike histories for " + std::to_string(restored) + " synapses");
+                } else if (payload.size() > 0) {
+                    NLM_LOG_INFO("No spike histories could be matched during load");
+                }
+            } else if (reader.hasSection(CheckpointSection::Plasticity)) {
+                NLM_LOG_INFO("Plasticity section present but empty; spike histories not restored");
             }
         }
         {
@@ -1334,6 +1365,8 @@ bool Brain::load(const std::string& filepath) {
                     neurons.reserve(wmIds.size());
                     for (uint64_t id : wmIds) neurons.emplace_back(id);
                     pImpl->workingMemory->restoreSnapshot(neurons, wmActs, wmTimes);
+                } else {
+                    NLM_LOG_INFO("WorkingMemory section unreadable or missing; not restored");
                 }
                 uint64_t epCount = 0;
                 if (r.u64(epCount) && r.ok && pImpl->episodicMemory) {
@@ -1349,6 +1382,7 @@ bool Brain::load(const std::string& filepath) {
                             !r.f32(ep.resultingReward) || !r.u64(age) ||
                             !r.vec(ep.sensoryState) || !r.vec(ep.resultingSensoryState) ||
                             !r.vec(activeIds) || !r.vec(ep.neuronActivations)) {
+                            NLM_LOG_INFO("Episode " + std::to_string(i) + " corrupted, skipping");
                             break;
                         }
                         ep.timestamp = ts;
@@ -1358,10 +1392,15 @@ bool Brain::load(const std::string& filepath) {
                         for (uint64_t id : activeIds) ep.activeNeurons.emplace_back(id);
                         eps.push_back(std::move(ep));
                     }
-                    if (r.ok) {
+                    if (eps.size() > 0 && pImpl->episodicMemory) {
                         pImpl->episodicMemory->restoreEpisodes(eps);
+                        NLM_LOG_INFO("Restored " + std::to_string(eps.size()) + " episodic memories");
+                    } else {
+                        NLM_LOG_INFO("No episodic memories could be restored");
                     }
                 }
+            } else if (reader.hasSection(CheckpointSection::Memory)) {
+                NLM_LOG_INFO("Memory section present but empty; nothing to restore");
             }
         }
 
