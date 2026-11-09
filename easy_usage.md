@@ -9,6 +9,10 @@ Think of it like this:
 - **Synapses** = Connections between brain cells
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
+- **Prediction** = The brain anticipating what will happen next
+- **Attention** = The brain focusing on what's important
+- **Development** = The brain maturing over time
+- **Neuromodulation** = The brain using signals like dopamine to guide learning
 
 That's it! NLM simulates all of this.
 
@@ -69,6 +73,336 @@ for step in range(50):
 
 print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+### Example 3: Using Memory Systems
+
+```python
+import pynlm
+
+# Create brain with memory systems
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Access working memory
+working_memory = brain.getWorkingMemory()
+if working_memory:
+    print(f"Working memory has {working_memory.getActiveTraces()} active traces")
+    print(f"Working memory capacity: {working_memory.getCapacity()}")
+    print(f"Working memory decay rate: {working_memory.getDecayRate()}")
+    
+    # Store some information
+    test_pattern = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    working_memory.store(test_pattern, 1.0)
+    
+    # Retrieve information
+    retrieved = working_memory.retrieve()
+    print(f"Retrieved {len(retrieved)} values")
+
+# Access episodic memory
+episodic_memory = brain.getEpisodicMemory()
+if episodic_memory:
+    print(f"Episodic memory has {episodic_memory.getEpisodeCount()} episodes")
+    print(f"Replay enabled: {episodic_memory.isReplayEnabled()}")
+    
+    # Store an experience
+    from datetime import datetime
+    current_time = datetime.now().timestamp()
+    
+    episode = nlm.EpisodicMemoryItem()
+    episode.timestamp = current_time
+    episode.sensoryState = test_pattern
+    episode.positionX = 5.0
+    episode.positionY = 5.0
+    episode.action = nlm.ActionType.MoveForward
+    episode.reward = 1.0
+    
+    episodic_memory.storeEpisode(episode)
+
+# Access associative memory
+associative_memory = brain.getAssociativeMemory()
+if associative_memory:
+    print(f"Associative memory has {associative_memory.getAssociationCount()} associations")
+    
+    # Create association between two patterns
+    pattern_a = [0.1, 0.2, 0.3, 0.4]
+    pattern_b = [0.5, 0.6, 0.7, 0.8]
+    
+    associative_memory.associate(pattern_a, pattern_b, 0.8)
+    strength = associative_memory.getAssociationStrength(pattern_a, pattern_b)
+    print(f"Association strength: {strength}")
+
+print("Memory systems test completed!")
+```
+
+### Example 4: Using Prediction System
+
+```python
+import pynlm
+
+# Create brain with prediction system
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Access prediction system
+prediction_system = brain.getPredictionSystem()
+if prediction_system:
+    print("Prediction system available")
+    # Can add prediction-related functionality here
+    pass
+
+print("Prediction system test completed!")
+```
+
+### Example 5: Using Cognition Systems
+
+```python
+import pynlm
+
+# Create brain with cognition systems
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Access neural planner
+planner = brain.getPlanner()
+if planner:
+    print("Neural planner available")
+    # Can add planning functionality here
+    pass
+
+# Access concept formation
+concept_formation = brain.getConceptFormation()
+if concept_formation:
+    print("Concept formation system available")
+    # Can add concept formation functionality here
+    pass
+
+# Access attentional selection
+attention = brain.getAttention()
+if attention:
+    print("Attentional selection system available")
+    # Can add attention functionality here
+    pass
+
+# Access development system
+development_system = brain.getDevelopmentSystem()
+if development_system:
+    print(f"Development system at stage: {brain.getDevelopmentalStage()}")
+
+print("Cognition systems test completed!")
+```
+
+### Example 6: Using Neuromodulation Systems
+
+```python
+import pynlm
+
+# Create brain with neuromodulation systems
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Access dopamine system
+dopamine = brain.getDopamine()
+if dopamine:
+    print("Dopamine neuromodulator available")
+    # Can add dopamine-related functionality here
+    pass
+
+# Access curiosity system
+curiosity = brain.getCuriosity()
+if curiosity:
+    print(f"Curiosity level: {curiosity.getCuriosityLevel():.3f}")
+    # Can add curiosity functionality here
+    pass
+
+# Access novelty system
+novelty = brain.getNovelty()
+if novelty:
+    print("Novelty detection system available")
+    # Can add novelty functionality here
+    pass
+
+# Access prediction error signal
+prediction_error = brain.getPredictionErrorSignal()
+if prediction_error:
+    print(f"Prediction error: {prediction_error.getPredictionError():.3f}")
+    # Can add prediction error functionality here
+    pass
+
+print("Neuromodulation systems test completed!")
+```
+
+### Example 7: Using Spike and Plasticity Systems
+
+```python
+import pynlm
+
+# Create brain with spike and plasticity systems
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Access spike system
+spike_system = brain.getSpikeSystem()
+if spike_system:
+    print(f"Spike system has {spike_system.getPendingSpikeEventCount()} pending events")
+    # Can add spike system functionality here
+    pass
+
+# Access STDP plasticity system
+stdp = brain.getSTDP()
+if stdp:
+    print("STDP plasticity system available")
+    # Can add STDP functionality here
+    pass
+
+# Access Hebbian plasticity system
+hebbian = brain.getHebbian()
+if hebbian:
+    print("Hebbian plasticity system available")
+    # Can add Hebbian functionality here
+    pass
+
+# Access structural plasticity system
+structural = brain.getStructuralPlasticity()
+if structural:
+    print("Structural plasticity system available")
+    # Can add structural plasticity functionality here
+    pass
+
+print("Spike and plasticity systems test completed!")
+```
+
+### Example 8: Using AgentBrain Advanced Features
+
+```python
+import pynlm
+
+# Create brain and agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable advanced features
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
+
+# Access advanced AgentBrain functionality
+if hasattr(agent, 'getThoughtTrace'):
+    thought_trace = agent.getThoughtTrace()
+    print(f"Thought trace available: {len(thought_trace)} chars")
+    # Can add thought trace functionality here
+    pass
+
+if hasattr(agent, 'getMotorGroupActivities'):
+    activities = agent.getMotorGroupActivities()
+    print(f"Motor group activities: {len(activities)} groups")
+    # Can add motor group analysis functionality here
+    pass
+
+if hasattr(agent, 'encodeText'):
+    text_pattern = agent.encodeText("hello world")
+    print(f"Text encoding successful, pattern length: {len(text_pattern)}")
+    # Can add text-as-a-sense functionality here
+    pass
+
+if hasattr(agent, 'getInternalFiringRates'):
+    internal_rates = agent.getInternalFiringRates()
+    print(f"Internal firing rates: {len(internal_rates)} neurons")
+    # Can add internal firing rate analysis functionality here
+    pass
+
+print("AgentBrain advanced features test completed!")
+```
+
+### Example 9: Enhanced Configuration
+
+```python
+import pynlm
+
+# Create configuration
+config = pynlm.createDefaultConfig()
+
+# Set configuration values
+config.set("test.int", 42)
+config.set("test.double", 3.14)
+config.set("test.bool", True)
+config.set("test.string", "hello")
+config.set("test.vector.int", [1, 2, 3, 4, 5])
+config.set("test.vector.double", [1.1, 2.2, 3.3])
+
+# Get configuration values
+int_value = config.getOr("test.int", 0)
+double_value = config.getOr("test.double", 0.0)
+bool_value = config.getOr("test.bool", False)
+string_value = config.getOr("test.string", "")
+
+# Check if configuration key exists
+if config.has("test.int"):
+    print("test.int exists")
+
+# Get all keys
+all_keys = config.getKeys()
+print(f"All keys: {all_keys}")
+
+# Remove configuration key
+config.remove("test.int")
+
+print("Configuration test completed!")
+```
+
+### Example 10: Enhanced Clone functionality
+
+```python
+import pynlm
+
+# Test clone functionality
+vision = pynlm.Vision(8, 8, 3)
+cloned_vision = vision.clone()
+print(f"Vision cloned: {vision.getWidth()}x{vision.getHeight()}")
+
+# Create some vision data
+test_data = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 
+             0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0,
+             0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+             0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
+vision.setData(test_data)
+
+# Clone with data
+cloned_vision2 = vision.clone()
+print(f"Vision with data cloned: {cloned_vision2.getWidth()}x{cloned_vision2.getHeight()}")
+
+# Test Audio clone
+audio = pynlm.Audio(44100, 1024)
+cloned_audio = audio.clone()
+print(f"Audio cloned: {audio.getSampleRate()} Hz, {audio.getNumSamples()} samples")
+
+# Test InternalSignals clone
+internal = pynlm.InternalSignals()
+internal.addSignal(0.5)
+internal.addSignal(0.7)
+cloned_internal = internal.clone()
+print(f"InternalSignals cloned with {len(internal.getData())} signals")
+
+# Test Action clone
+action = pynlm.Action(pynlm.ActionType.MoveForward)
+cloned_action = action.clone()
+print(f"Action cloned: type {action.getType()}")
+
+print("Clone functionality test completed!")
 ```
 
 ---

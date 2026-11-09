@@ -15,6 +15,29 @@
 #include "../src/motor/Action.hpp"
 #include "../src/agent/AgentBody.hpp"
 #include "../src/agent/SensoryPercept.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/Memory.hpp"
+#include "../src/prediction/PredictionSystem.hpp"
+#include "../src/prediction/NeuralPrediction.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "src/cognition/ConceptFormation.hpp"
+#include "../src/cognition/AttentionalSelection.hpp"
+#include "../src/cognition/NeuralPlanner.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/development/Maturation.hpp"
+#include "../src/development/Synaptogenesis.hpp"
+#include "../src/development/Pruning.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
+#include "../src/dynamics/SpikeSystem.hpp"
+#include "../src/plasticity/STDP.hpp"
+#include "../src/plasticity/Hebbian.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/plasticity/PlasticityRule.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -162,8 +185,54 @@ PYBIND11_MODULE(pynlm, m) {
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove a configuration key")
         .def("clear", &Config::clear,
              "Clear all configuration entries")
+        // Generic type-safe getters
+        .def("get", static_cast<std::optional<int> (Config::*)(const std::string&) const>(&Config::get<int>),
+             py::arg("key"),
+             "Get integer value by key (returns None if key doesn't exist or type mismatch)")
+        .def("get", static_cast<std::optional<double> (Config::*)(const std::string&) const>(&Config::get<double>),
+             py::arg("key"),
+             "Get double value by key (returns None if key doesn't exist or type mismatch)")
+        .def("get", static_cast<std::optional<bool> (Config::*)(const std::string&) const>(&Config::get<bool>),
+             py::arg("key"),
+             "Get boolean value by key (returns None if key doesn't exist or type mismatch)")
+        .def("get", static_cast<std::optional<std::string> (Config::*)(const std::string&) const>(&Config::get<std::string>),
+             py::arg("key"),
+             "Get string value by key (returns None if key doesn't exist or type mismatch)")
+        .def("get", static_cast<std::optional<std::vector<int>> (Config::*)(const std::string&) const>(&Config::get<std::vector<int>>),
+             py::arg("key"),
+             "Get int vector value by key (returns None if key doesn't exist or type mismatch)")
+        .def("get", static_cast<std::optional<std::vector<double>> (Config::*)(const std::string&) const>(&Config::get<std::vector<double>>),
+             py::arg("key"),
+             "Get double vector value by key (returns None if key doesn't exist or type mismatch)")
+        .def("get", static_cast<std::optional<std::vector<std::string>> (Config::*)(const std::string&) const>(&Config::get<std::vector<std::string>>),
+             py::arg("key"),
+             "Get string vector value by key (returns None if key doesn't exist or type mismatch)")
+        // Generic getters with defaults
+        .def("getOr", static_cast<int (Config::*)(const std::string&, const int&) const>(&Config::getOr<int>),
+             py::arg("key"), py::arg("defaultValue"),
+             "Get integer value by key, returns default if key doesn't exist or type mismatch")
+        .def("getOr", static_cast<double (Config::*)(const std::string&, const double&) const>(&Config::getOr<double>),
+             py::arg("key"), py::arg("defaultValue"),
+             "Get double value by key, returns default if key doesn't exist or type mismatch")
+        .def("getOr", static_cast<bool (Config::*)(const std::string&, const bool&) const>(&Config::getOr<bool>),
+             py::arg("key"), py::arg("defaultValue"),
+             "Get boolean value by key, returns default if key doesn't exist or type mismatch")
+        .def("getOr", static_cast<std::string (Config::*)(const std::string&, const std::string&) const>(&Config::getOr<std::string>),
+             py::arg("key"), py::arg("defaultValue"),
+             "Get string value by key, returns default if key doesn't exist or type mismatch")
+        .def("getOr", static_cast<std::vector<int> (Config::*)(const std::string&, const std::vector<int>&) const>(&Config::getOr<std::vector<int>>),
+             py::arg("key"), py::arg("defaultValue"),
+             "Get int vector value by key, returns default if key doesn't exist or type mismatch")
+        .def("getOr", static_cast<std::vector<double> (Config::*)(const std::string&, const std::vector<double>&) const>(&Config::getOr<std::vector<double>>),
+             py::arg("key"), py::arg("defaultValue"),
+             "Get double vector value by key, returns default if key doesn't exist or type mismatch")
+        .def("getOr", static_cast<std::vector<std::string> (Config::*)(const std::string&, const std::vector<std::string>&) const>(&Config::getOr<std::vector<std::string>>),
+             py::arg("key"), py::arg("defaultValue"),
+             "Get string vector value by key, returns default if key doesn't exist or type mismatch")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
@@ -187,7 +256,8 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        .def("getChannels", &Vision::getChannels)
+        .def("clone", &Vision::clone);
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
@@ -197,12 +267,16 @@ PYBIND11_MODULE(pynlm, m) {
         }, py::arg("data"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        .def("getNumSamples", &Audio::getNumSamples)
+        .def("clone", &Audio::clone);
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
         .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("clearSignals", &InternalSignals::clearSignals)
+        .def("clone", [](InternalSignals& self) {
+            return self.clone();
+        });
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -356,10 +430,49 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+              "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+              "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+              "Get associative memory system")
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+              "Get prediction system")
+        .def("getPlanner", &Brain::getPlanner,
+              "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+              "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+              "Get attentional selection system")
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+              "Get development system")
+        .def("getDopamine", &Brain::getDopamine,
+              "Get dopamine neuromodulator")
+        .def("getCuriosity", &Brain::getCuriosity,
+              "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+              "Get novelty system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+              "Get prediction error signal")
+        .def("getSpikeSystem", &Brain::getSpikeSystem,
+              "Get spike system")
+        .def("getSTDP", &Brain::getSTDP,
+              "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+              "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+              "Get structural plasticity system")
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+              "Get random generator")
+        .def("getLearnedPreference", &Brain::getLearnedPreference,
+              "Get learned preference trait")
+        .def("setLearnedPreference", &Brain::setLearnedPreference,
+              py::arg("preference"),
+              "Set learned preference trait")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -403,6 +516,50 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("getThoughtTrace", &AgentBrain::getThoughtTrace,
+              "Get cognitive thought trace")
+        .def("getMotorGroupActivities", &AgentBrain::getMotorGroupActivities,
+              "Get motor group activity details")
+        .def("encodeText", &AgentBrain::encodeText, py::arg("text"),
+              "Encode text into neural pattern for text-as-a-sense")
+        .def("getInternalFiringRates", &AgentBrain::getInternalFiringRates,
+              "Get internal neuron firing rates")
+        .def("getPlannerOverrideCount", &AgentBrain::getPlannerOverrideCount,
+              "Get number of planner overrides")
+        .def("getPlannerAgreementCount", &AgentBrain::getPlannerAgreementCount,
+              "Get number of planner agreements")
+        .def("getPlannerDecisionCount", &AgentBrain::getPlannerDecisionCount,
+              "Get number of planner decisions")
+        .def("getConceptBiasCount", &AgentBrain::getConceptBiasCount,
+              "Get concept bias count")
+        .def("getSelfBiasCount", &AgentBrain::getSelfBiasCount,
+              "Get self-bias count")
+        .def("getSocialBiasCount", &AgentBrain::getSocialBiasCount,
+              "Get social bias count")
+        .def("getConceptCount", &AgentBrain::getConceptCount,
+              "Get number of concepts")
+        .def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence,
+              "Get self-model confidence")
+        .def("getSocialObservationCount", &AgentBrain::getSocialObservationCount,
+              "Get social observation count")
+        .def("observeOtherAgent", &AgentBrain::observeOtherAgent,
+              py::arg("observed"), py::arg("beforeVision"), py::arg("afterVision"),
+              "Observe another agent's behavior")
+        .def("getBrain", &AgentBrain::getBrain,
+              py::return_value_policy::reference_internal,
+              "Get the underlying brain")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+              py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+              py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+              py::arg("enable"))
+        .def("enableCuriosity", &AgentBrain::enableCuriosity,
+              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
