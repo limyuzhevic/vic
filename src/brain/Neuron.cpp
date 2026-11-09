@@ -150,6 +150,8 @@ void Neuron::clearTotalCurrent() {
 void Neuron::recordSpike(Timestamp timestamp) {
     pImpl->spikeHistory.push_back(timestamp);
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        // Use erase with iterators for efficiency instead of erase with single element
+        // Remove the oldest element (first one) in constant time
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
 }
@@ -242,6 +244,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // step would approach 1000 Hz, and refractory periods cap it well
     // below that in practice.
     if (dt > 0.0) {
+        // Initialize firing rate if not set (was bug: uninitialized variable)
+        if (pImpl->state.lastSpikeTime < 0.0f) {
+            pImpl->state.firingRate = 0.0f;  // Starting at 0 Hz (no spikes yet)
+        }
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
 

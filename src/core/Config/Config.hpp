@@ -44,6 +44,33 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration validation types
+struct ValidationError {
+    std::string key;
+    std::string message;
+    std::string expectedType;
+    std::string actualType;
+    
+    ValidationError() : key(), message(), expectedType(), actualType() {}
+    ValidationError(const std::string& k, const std::string& msg, 
+                   const std::string& expected, const std::string& actual)
+        : key(k), message(msg), expectedType(expected), actualType(actual) {}
+};
+
+struct ConfigSchema {
+    std::string key;
+    std::string type;  // "int", "double", "string", "bool", "vector"
+    std::optional<std::string> description;
+    std::optional<double> minValue;  // For numeric types
+    std::optional<double> maxValue;  // For numeric types
+    std::optional<size_t> minSize;    // For vector types
+    std::optional<size_t> maxSize;    // For vector types
+    bool required;
+    
+    ConfigSchema() : key(), type(), description(), minValue(), maxValue(), 
+                     minSize(), maxSize(), required(false) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -94,6 +121,17 @@ template<typename T>
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation
+    std::vector<ValidationError> validate() const;
+    bool validate(const std::vector<ConfigSchema>& schema) const;
+    bool addSchema(const ConfigSchema& schema);
+    std::vector<ConfigSchema> getSchemas() const;
+    void clearSchemas();
+    
+    // Type checking helpers
+    static bool isTypeCompatible(const ConfigValue& value, const std::string& type);
+    static std::string getValueTypeName(const ConfigValue& value);
     
 private:
     struct Impl;
