@@ -8,6 +8,7 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    mutable std::mutex entriesMutex;  // Mutex for thread-safe access to entries
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -86,13 +87,37 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Format the value properly based on its type
+        std::visit([&file](auto&& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << v << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (v ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = ["; 
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << v[i] << "\"";
+                    } else {
+                        file << v[i];
+                    }
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << v << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    std::lock_guard<std::mutex> lock(pImpl->entriesMutex);
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -105,22 +130,27 @@ void Config::set(const std::string& key, const ConfigValue& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
+    std::lock_guard<std::mutex> lock(pImpl->entriesMutex);
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    std::lock_guard<std::mutex> lock(pImpl->entriesMutex);
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, int64_t value, ConfigSource source) {
+    std::lock_guard<std::mutex> lock(pImpl->entriesMutex);
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, double value, ConfigSource source) {
+    std::lock_guard<std::mutex> lock(pImpl->entriesMutex);
     set(key, ConfigValue(value), source);
 }
 
 void Config::set(const std::string& key, bool value, ConfigSource source) {
+    std::lock_guard<std::mutex> lock(pImpl->entriesMutex);
     set(key, ConfigValue(value), source);
 }
 
