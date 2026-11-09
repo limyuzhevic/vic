@@ -326,8 +326,15 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+// Load configuration
     auto config = std::make_shared<Config>();
+    
+    // Add default schema
+    config->addSchemaEntry(nlm::ConfigSchemaEntry("random_seed", nlm::ConfigDataType::Integer, "Random seed for reproducible experiments"));
+    config->addSchemaEntry(nlm::ConfigSchemaEntry("simulation_timestep", nlm::ConfigDataType::Float, "Simulation timestep in seconds"));
+    config->addSchemaEntry(nlm::ConfigSchemaEntry("neuron_count", nlm::ConfigDataType::Integer, "Number of neurons in the brain"));
+    config->addSchemaEntry(nlm::ConfigSchemaEntry("region_count", nlm::ConfigDataType::Integer, "Number of brain regions"));
+    config->addSchemaEntry(nlm::ConfigSchemaEntry("connection_probability", nlm::ConfigDataType::Float, "Connection probability for random connectivity"));
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
@@ -342,14 +349,14 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file (ignore if not found) with format detection
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Override with command line args (enhanced parsing)
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
@@ -362,13 +369,57 @@ int main(int argc, char** argv) {
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_time_constant", 20.0f, ConfigSource::Default);
     
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Enhanced configuration with new features
+    // Support list arguments
+    if (config->has("neurons")) {
+        auto neurons = config->get<std::vector<int>>("neurons");
+        if (neurons.has_value()) {
+            config->set("neuron_count", neurons.value()[0], ConfigSource::CommandLine);
+        }
+    }
+    if (config->has("regions")) {
+        auto regions = config->get<std::vector<int>>("regions");
+        if (regions.has_value()) {
+            config->set("region_count", regions.value()[0], ConfigSource::CommandLine);
+        }
+    }
+    
+    // Support boolean flags
+    if (config->has("enable_plasticity")) {
+        auto plasticity = config->get<bool>("enable_plasticity");
+        if (plasticity.has_value() && plasticity.value()) {
+            config->set("plasticity_learning_rate", 0.1f, ConfigSource::CommandLine);
+        }
+    }
+    
+    // Validate configuration against schema
+    auto schemaEntries = config->getSchemaEntries();
+    if (!config->validateAll(schemaEntries)) {
+        NLM_LOG_WARNING("Configuration validation failed");
+    }
+    
+    // Generate help if requested
+    if (config->has("--help")) {
+        NLM_LOG_INFO("Configuration Help:");
+        NLM_LOG_INFO(config->generateHelp(schemaEntries));
+    }
+    
     // Log configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration Summary:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));

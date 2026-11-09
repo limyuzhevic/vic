@@ -1,0 +1,66 @@
+# NLM CLI Configuration
+[cli]
+name = "nlm"
+version = "0.1.0"
+author = "NLM Team"
+description = "Enhanced Command Line Interface for NLM (Neural Learning Machine)"
+
+[cli.commands]
+config = "Configuration management commands"
+brain = "Brain control commands"
+experiment = "Experiment management"
+world = "World/environment commands"
+monitor = "Real-time monitoring"
+help = "Show help information"
+version = "Show version information"
+exit = "Exit the CLI"
+quit = "Quit the CLI"
+run = "Run simulation"
+script = "Execute a command script"
+
+[cli.output]
+format = "text"
+verbose = false
+debug = false
+quiet = false
+progress = true
+
+[cli.history]
+enabled = true
+max_entries = 1000
+persistent = false
+filepath = ".nlm_history"
+
+[cli.completion]
+enabled = true
+shell = "bash"
+
+[cli.scripting]
+syntax = "simple"
+extension = ".nlm"
+encoding = "utf-8"
+
+[cli.api]
+enabled = true
+endpoint = "http://localhost:8080"
+auth_token = ""
+
+[cli.plugins]
+enabled = true
+directory = ".nlm_plugins"
+auto_load = true
+
+[cli.logging]
+level = "info"
+file = "nlm.log"
+format = "%(asctime)s - %(levelname)s - %(message)s"
+max_size = 10485760
+backup_count = 5
+
+[cli.validation]
+strict = false
+custom_validators = []
+
+[cli.experimental]
+features = []
+enabled = false
