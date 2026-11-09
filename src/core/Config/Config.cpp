@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iostream>
+#include <chrono>
+#include <iomanip>
 
 namespace nlm {
 
@@ -18,17 +21,25 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Load from JSON file (Phase 5)
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try JSON first (Phase 5)
+    if (loadFromJSON(filepath)) {
+        NLM_LOG_DEBUG("Loaded configuration from JSON: " + filepath);
+        return true;
+    }
     
+    // Fall back to simple key=value format (Phase 1)
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_DEBUG("Config file not found, using defaults: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,13 +60,51 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": " + line);
         }
     }
     
+    NLM_LOG_DEBUG("Loaded configuration from simple format: " + filepath);
     return true;
 }
 
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Try to parse as JSON (Phase 5)
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    try {
+        // Simple JSON parser - could use nlohmann::json in Phase 5
+        // For now, implement a minimal JSON parser for common types
+        
+        // Remove whitespace
+        std::string json = content;
+        json.erase(std::remove_if(json.begin(), json.end(), ::isspace), json.end());
+        
+        if (json.empty() || json[0] != '{') {
+            return false;
+        }
+        
+        // Simple parsing - just handle basic key=value structure for now
+        // In a full implementation, would use proper JSON library
+        NLM_LOG_WARNING("Simple JSON parser for config - using advanced version in Phase 5");
+        
+        return false;  // Placeholder for proper JSON parsing
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Failed to parse JSON config: " + std::string(e.what()));
+        return false;
+    }
+}
+
 bool Config::loadFromArgs(int argc, char** argv) {
+    bool hasChanges = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
@@ -66,6 +115,7 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+                hasChanges = true;
             }
         }
         // Handle -key value format
@@ -73,22 +123,80 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
+            hasChanges = true;
+        }
+        // Handle boolean flags (--verbose)
+        else if (arg[0] == '-' && arg.find('=') == std::string::npos) {
+            std::string key = arg.substr(1);
+            set(key, true, ConfigSource::CommandLine);
+            hasChanges = true;
         }
     }
-    return true;
+    
+    return hasChanges;
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath);
         return false;
     }
     
+    // Write header
+    file << "# NLM Configuration File (Phase 6)" << std::endl;
+    file << "# Generated: " << getTimestamp() << std::endl;
+    file << "# This file can be edited and reloaded with -c/--config options" << std::endl;
+    file << std::endl;
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Write comment with description
+        if (!entry.description.empty()) {
+            file << "# " << entry.description << std::endl;
+        }
+        
+        // Write key=value pair
+        file << entry.key << " = ";
+        
+        // Write value based on type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << std::setprecision(6) << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    file << "\"" << arg[i] << "\"";
+                }
+                file << "]";
+            } else {
+                // Numeric types
+                file << arg;
+            }
+        }, entry.value);
+        
+        file << "  # " << static_cast<int>(entry.source) << std::endl;
+        file << std::endl;
     }
     
+    NLM_LOG_INFO("Configuration saved to: " + filepath);
     return true;
 }
 
