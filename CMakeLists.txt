@@ -136,7 +136,14 @@ target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world)
+
+# Create config file if not exists
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/configs/default.cfg
+    ${CMAKE_CURRENT_BINARY_DIR}/configs/default.cfg
+    COPYONLY
+)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
@@ -205,9 +212,51 @@ endif()
 enable_testing()
 add_subdirectory(tests)
 
+# Documentation targets
+add_custom_target(documentation ALL
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+        ${CMAKE_CURRENT_BINARY_DIR}/README.md
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        ${CMAKE_CURRENT_SOURCE_DIR}/docs
+        ${CMAKE_CURRENT_BINARY_DIR}/docs
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        ${CMAKE_CURRENT_SOURCE_DIR}/easy_usage.md
+        ${CMAKE_CURRENT_BINARY_DIR}/easy_usage.md
+    COMMENT "Create documentation symlinks"
+)
+
+# Examples documentation
+add_custom_target(examples ALL
+    COMMAND ${CMAKE_COMMAND} -E echo "Examples available in examples/ directory"
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples
+        ${CMAKE_CURRENT_BINARY_DIR}/examples
+    COMMENT "Create examples directory link"
+)
+
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
 )
+
+# Print build summary
+message(STATUS "=== NLM Build Summary ===")
+message(STATUS "Phase 2 Main executable: ./nlm")
+message(STATUS "Phase 3 Demo executable: ./nlm_phase3_demo")
+message(STATUS "Phase 4 Demo executable: ./nlm_phase4_demo")
+message(STATUS "Phase 5 Demo executable: ./nlm_phase5_demo")
+message(STATUS "Phase 6 Demo executable: ./nlm_phase6_demo")
+message(STATUS "Phase 6 Text Demo executable: ./nlm_phase6_text_demo")
+message(STATUS "Benchmark executable: ./nlm_benchmark")
+message(STATUS "")
+message(STATUS "Documentation:")
+message(STATUS "  Main documentation: README.md")
+message(STATUS "  Quick start guide: easy_usage.md")
+message(STATUS "  Technical docs: docs/")
+message(STATUS "  Examples: examples/")
+message(STATUS "  Configuration files: configs/")
+message(STATUS "")
+message(STATUS "=== Build Complete ===")
