@@ -73,6 +73,74 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
+## NEW: Unified Command-Line Interface
+
+NLM now includes a powerful unified CLI that replaces multiple separate executables:
+
+### Quick Command Line Usage
+
+```bash
+# Show help and all available demos
+nlm --help
+
+# Show all available demos
+nlm --demos
+
+# Show version information
+nlm --version
+
+# Run Phase 6 integration demo with custom settings
+nlm phase6 --config my_config.json --neurons 2000 --steps 5000
+
+# Run Phase 6 text demo at advanced level
+nlm phase6-text --level advanced
+
+# Run performance benchmark
+nlm benchmark --neurons 500 --steps 2000
+
+# Generate default configuration file
+nlm config generate config.json
+
+# Validate configuration file
+nlm config validate config.json
+```
+
+### CLI Command Structure:
+
+**Main Command:** `nlm [OPTIONS] [DEMO] [ARGS]`
+
+**Available Demos:**
+- `phase2` - Basic neural computation (LIF neurons)
+- `phase3` - World interaction and learning  
+- `phase4` - Advanced cognitive capabilities
+- `phase5` - Performance optimizations and sandbox
+- `phase6` - Full integration demo
+- `phase6-text` - Text-based demo
+- `phase6-integrated` - Comprehensive integration test
+- `benchmark` - Performance benchmark
+
+**Common Options:**
+- `--config FILE` - Configuration file (default: configs/default.cfg)
+- `--neurons N` - Number of neurons (default: 1000)
+- `--steps N` - Number of simulation steps (default: 1000)
+- `--output FILE` - Output file for checkpoints (default: none)
+- `--level LEVEL` - Demo level: basic/intermediate/advanced/expert
+
+### Advanced CLI Usage:
+
+```bash
+# Run from configuration script
+nlm run my_script.json
+
+# List all available demos
+nlm --demos
+
+# Get help for specific demo
+nlm phase6 --help
+```
+
+---
+
 ## Simple Analogy
 
 | Real World | NLM Code |
@@ -294,4 +362,9 @@ When you're comfortable:
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+**NEW:** Try the unified command-line interface:
+- `nlm --demos` to see all available demos
+- `nlm phase6 --help` for demo-specific help
+- `nlm config generate config.json` to create configurations
+
+That's it! You're now ready to use NLM with both Python and the new unified CLI.

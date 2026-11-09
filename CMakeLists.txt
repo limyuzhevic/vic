@@ -132,42 +132,37 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable - unified CLI
 add_executable(nlm
-    src/main.cpp
+    src/NLMUnifiedCLI.cpp
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
+# Phase 3 demo executable (keep for backward compatibility)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
 target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 4 demo executable
+# Phase 4 demo executable (keep for backward compatibility)
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
 target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
 
-# Phase 5 demo executable (Phase 5, added here: pattern probe,
-# sandbox run, and checkpoint round-trip for the brain-personality
-# step — previously Phase 5 was library-only with no demo).
+# Phase 5 demo executable (keep for backward compatibility)
 add_executable(nlm_phase5_demo
     src/experiments/Phase5Demo.cpp
 )
 target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
 
-# Phase 6 demo executable
+# Phase 6 demo executable (keep for backward compatibility)
 add_executable(nlm_phase6_demo
     src/experiments/Phase6Demo.cpp
 )
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
-# Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
-# association probe, concept/social probes, and a sandbox run with
-# a teacher, planner overrides, and a checkpoint round-trip. The old
-# nlm_phase6_demo integration demo is left unchanged.
+# Phase 6 text demo executable
 add_executable(nlm_phase6_text_demo
     src/experiments/Phase6TextDemo.cpp
 )
