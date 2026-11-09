@@ -54,6 +54,7 @@
 namespace nlm {
 namespace {
 
+// Helper functions for Phase 6 demos
 const char* cmdName(MotorCommand cmd) {
     switch (cmd) {
         case MotorCommand::MoveForward: return "MoveForward";
@@ -67,7 +68,7 @@ const char* cmdName(MotorCommand cmd) {
     }
 }
 
-std::shared_ptr<Config> makeConfig() {
+std::shared_ptr<Config> makeDefaultConfig() {
     auto config = std::make_shared<Config>();
     config->set("neuron_count", 500);
     config->set("region_count", 2);
@@ -82,7 +83,7 @@ std::shared_ptr<Config> makeConfig() {
     return config;
 }
 
-SensoryPercept makePercept(const std::vector<float>& vision,
+SensoryPercept createPercept(const std::vector<float>& vision,
                            const std::vector<float>& touch,
                            const std::string& text = "") {
     SensoryPercept p;
@@ -97,9 +98,9 @@ SensoryPercept makePercept(const std::vector<float>& vision,
 
 // Present a percept for `actions` loop turns (10 brain steps each),
 // exactly as the closed loop does, and return internal firing rates.
-std::vector<float> presentAndRead(AgentBrain& agent, const std::shared_ptr<Brain>& brain,
-                                  const SensoryPercept& percept, int actions,
-                                  uint64_t& step) {
+std::vector<float> presentPercept(AgentBrain& agent, const std::shared_ptr<Brain>& brain,
+                                   const SensoryPercept& percept, int actions,
+                                   uint64_t& step) {
     for (int a = 0; a < actions; ++a) {
         agent.processSensoryInput(percept);
         for (int i = 0; i < 10; ++i) brain->step(step++);
@@ -107,7 +108,7 @@ std::vector<float> presentAndRead(AgentBrain& agent, const std::shared_ptr<Brain
     return agent.getInternalFiringRates();
 }
 
-std::vector<float> subtract(const std::vector<float>& a, const std::vector<float>& b) {
+std::vector<float> vectorSubtract(const std::vector<float>& a, const std::vector<float>& b) {
     std::vector<float> out;
     size_t n = std::min(a.size(), b.size());
     out.reserve(n);
@@ -115,7 +116,7 @@ std::vector<float> subtract(const std::vector<float>& a, const std::vector<float
     return out;
 }
 
-float cosine(const std::vector<float>& a, const std::vector<float>& b) {
+float cosineSimilarity(const std::vector<float>& a, const std::vector<float>& b) {
     size_t n = std::min(a.size(), b.size());
     float dot = 0.0f, na = 0.0f, nb = 0.0f;
     for (size_t i = 0; i < n; ++i) {
@@ -168,13 +169,13 @@ int main() {
     // only the word's own neurons can evoke anything, and the
     // baseline subtracted is dark silence, not empty vision.
     std::vector<float> darkVision(16, 0.0f);
-    auto emptyPat = presentAndRead(agent, brain, makePercept(emptyVision, noTouch), 50, step);
-    auto darkPat = presentAndRead(agent, brain, makePercept(darkVision, noTouch), 50, step);
-    auto visualBefore = presentAndRead(agent, brain, makePercept(brightVision, fwdTouch), 50, step);
-    auto textBefore = presentAndRead(agent, brain, makePercept(darkVision, noTouch, "apple"), 50, step);
-    auto controlBefore = presentAndRead(agent, brain, makePercept(darkVision, noTouch, "zebra"), 50, step);
-    float simTextBefore = cosine(subtract(textBefore, darkPat), subtract(visualBefore, emptyPat));
-    float simControlBefore = cosine(subtract(controlBefore, darkPat), subtract(visualBefore, emptyPat));
+    auto emptyPat = presentPercept(agent, brain, createPercept(emptyVision, noTouch), 50, step);
+    auto darkPat = presentPercept(agent, brain, createPercept(darkVision, noTouch), 50, step);
+    auto visualBefore = presentPercept(agent, brain, createPercept(brightVision, fwdTouch), 50, step);
+    auto textBefore = presentPercept(agent, brain, createPercept(darkVision, noTouch, "apple"), 50, step);
+    auto controlBefore = presentPercept(agent, brain, createPercept(darkVision, noTouch, "zebra"), 50, step);
+    float simTextBefore = cosineSimilarity(vectorSubtract(textBefore, darkPat), vectorSubtract(visualBefore, emptyPat));
+    float simControlBefore = cosineSimilarity(vectorSubtract(controlBefore, darkPat), vectorSubtract(visualBefore, emptyPat));
     std::cout << "  before teaching: text~visual=" << simTextBefore
               << " control~visual=" << simControlBefore << "\n";
     std::cout << "  encoder: apple ->";
@@ -186,14 +187,14 @@ int main() {
     // Paired teaching: the word and the scene, together, repeatedly.
     // No reward, no label, no string matching — only co-presentation.
     for (int a = 0; a < 300; ++a) {
-        agent.processSensoryInput(makePercept(brightVision, fwdTouch, "apple"));
+agent.processSensoryInput(createPercept(brightVision, fwdTouch, "apple"));
         for (int i = 0; i < 10; ++i) brain->step(step++);
     }
-    auto visualAfter = presentAndRead(agent, brain, makePercept(brightVision, fwdTouch), 50, step);
-    auto textAfter = presentAndRead(agent, brain, makePercept(darkVision, noTouch, "apple"), 50, step);
-    auto controlAfter = presentAndRead(agent, brain, makePercept(darkVision, noTouch, "zebra"), 50, step);
-    float simTextAfter = cosine(subtract(textAfter, darkPat), subtract(visualAfter, emptyPat));
-    float simControlAfter = cosine(subtract(controlAfter, darkPat), subtract(visualAfter, emptyPat));
+    auto visualAfter = presentPercept(agent, brain, createPercept(brightVision, fwdTouch), 50, step);
+    auto textAfter = presentPercept(agent, brain, createPercept(darkVision, noTouch, "apple"), 50, step);
+    auto controlAfter = presentPercept(agent, brain, createPercept(darkVision, noTouch, "zebra"), 50, step);
+    float simTextAfter = cosineSimilarity(vectorSubtract(textAfter, darkPat), vectorSubtract(visualAfter, emptyPat));
+    float simControlAfter = cosineSimilarity(vectorSubtract(controlAfter, darkPat), vectorSubtract(visualAfter, emptyPat));
     std::cout << "  after 300 paired presentations: text~visual=" << simTextAfter
               << " control~visual=" << simControlAfter << "\n";
     bool textLearned = (simTextAfter > simTextBefore + 0.05f) &&
@@ -218,21 +219,21 @@ int main() {
         std::vector<float> darkVision2(16, 0.0f);
         std::vector<float> hazardVision(16, 1.0f);
         for (int i = 5; i <= 10; ++i) hazardVision[i] = 0.25f;
-        auto emptyDiff = presentAndRead(aDiff, bDiff, makePercept(emptyVision, noTouch), 50, ds);
+        presentPercept(aDiff, bDiff, createPercept(emptyVision, noTouch), 50, ds);
         for (int round = 0; round < 300; ++round) {
-            aDiff.processSensoryInput(makePercept(brightVision, fwdTouch, "apple"));
+            aDiff.processSensoryInput(createPercept(brightVision, fwdTouch, "apple"));
             for (int i = 0; i < 10; ++i) bDiff->step(ds++);
-            aDiff.processSensoryInput(makePercept(hazardVision, fwdTouch, "zebra"));
+            aDiff.processSensoryInput(createPercept(hazardVision, fwdTouch, "zebra"));
             for (int i = 0; i < 10; ++i) bDiff->step(ds++);
         }
-        auto resPat = presentAndRead(aDiff, bDiff, makePercept(brightVision, fwdTouch), 50, ds);
-        auto hazPat = presentAndRead(aDiff, bDiff, makePercept(hazardVision, fwdTouch), 50, ds);
-        auto applePat = presentAndRead(aDiff, bDiff, makePercept(darkVision2, noTouch, "apple"), 50, ds);
-        auto zebraPat = presentAndRead(aDiff, bDiff, makePercept(darkVision2, noTouch, "zebra"), 50, ds);
-        float aR = cosine(subtract(applePat, emptyDiff), subtract(resPat, emptyDiff));
-        float aH = cosine(subtract(applePat, emptyDiff), subtract(hazPat, emptyDiff));
-        float zH = cosine(subtract(zebraPat, emptyDiff), subtract(hazPat, emptyDiff));
-        float zR = cosine(subtract(zebraPat, emptyDiff), subtract(resPat, emptyDiff));
+        presentPercept(aDiff, bDiff, createPercept(brightVision, fwdTouch), 50, ds);
+        presentPercept(aDiff, bDiff, createPercept(hazardVision, fwdTouch), 50, ds);
+        presentPercept(aDiff, bDiff, createPercept(darkVision2, noTouch, "apple"), 50, ds);
+        presentPercept(aDiff, bDiff, createPercept(darkVision2, noTouch, "zebra"), 50, ds);
+        cosineSimilarity(vectorSubtract(applePat, emptyDiff), vectorSubtract(resPat, emptyDiff));
+        cosineSimilarity(vectorSubtract(applePat, emptyDiff), vectorSubtract(hazPat, emptyDiff));
+        cosineSimilarity(vectorSubtract(zebraPat, emptyDiff), vectorSubtract(hazPat, emptyDiff));
+        cosineSimilarity(vectorSubtract(zebraPat, emptyDiff), vectorSubtract(resPat, emptyDiff));
         std::cout << "  apple~resource=" << aR << " apple~hazard=" << aH
                   << " ; zebra~hazard=" << zH << " zebra~resource=" << zR << "\n";
         bool specific = (aR > aH + 0.05f) && (zH > zR + 0.05f);
@@ -249,12 +250,12 @@ int main() {
             decAgent.enableCuriosity(false);
             MotorCommand appleCmd = MotorCommand::Wait, zebraCmd = MotorCommand::Wait;
             for (int i = 0; i < 50; ++i) {
-                decAgent.processSensoryInput(makePercept(darkVision2, noTouch, "apple"));
+                decAgent.processSensoryInput(createPercept(darkVision2, noTouch, "apple"));
                 for (int j = 0; j < 10; ++j) bDiff->step(ds++);
             }
             appleCmd = decAgent.decodeMotorCommand();
             for (int i = 0; i < 50; ++i) {
-                decAgent.processSensoryInput(makePercept(darkVision2, noTouch, "zebra"));
+                decAgent.processSensoryInput(createPercept(darkVision2, noTouch, "zebra"));
                 for (int j = 0; j < 10; ++j) bDiff->step(ds++);
             }
             zebraCmd = decAgent.decodeMotorCommand();
@@ -273,7 +274,7 @@ int main() {
         // Note: a second AgentBrain over the same brain shares its
         // neurons; this only reads the decode for the taught pattern.
         for (int a = 0; a < 50; ++a) {
-            probeAgent.processSensoryInput(makePercept(darkVision, noTouch, "apple"));
+            probeAgent.processSensoryInput(createPercept(darkVision, noTouch, "apple"));
             for (int i = 0; i < 10; ++i) brain->step(step++);
         }
         std::cout << "  text-alone (in the dark) decode after teaching: " << cmdName(probeAgent.decodeMotorCommand()) << "\n";
@@ -408,7 +409,7 @@ int main() {
             a3.initialize(w2);
             a3.enableCuriosity(false);
             for (int i = 0; i < 50; ++i) {
-                a3.processSensoryInput(makePercept(brightVision, fwdTouch));
+                a3.processSensoryInput(createPercept(brightVision, fwdTouch));
                 for (int j = 0; j < 10; ++j) b3->step(bs++);
             }
             std::cout << " continuedCmd=" << cmdName(a3.decodeMotorCommand());

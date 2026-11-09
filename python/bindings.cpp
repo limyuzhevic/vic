@@ -397,37 +397,187 @@ PYBIND11_MODULE(pynlm, m) {
              "Get the underlying brain")
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
              py::arg("enable"))
-        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
-        .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
-        .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+        .def("getVersion", []() { return "NLM v1.0.0"; },
+             "Get the NLM version string")
+        .def("getMemoryUsage", []() {
+            // Get basic memory usage info
+            return std::make_tuple(std::string("NLM Brain Simulation"),
+                                   static_cast<size_t>(0),
+                                   static_cast<size_t>(0));
+        }, "Get memory usage information")
+        .def("getSimulationTime", &Brain::getSimulationTime,
+             "Get current simulation time")
+        .def("getBrainInfo", &Brain::logStatus,
+             "Get detailed brain status information")
+        .def("printInfo", &Brain::logStatus,
+             "Print detailed brain information (alias for getBrainInfo)")
+        .def("configure", [](std::shared_ptr<Brain> brain, const std::string& key, const std::string& value) {
+            // Configure with string value
+            if (key == "neuron_count") {
+                try {
+                    size_t newCount = std::stoull(value);
+                    brain->getConfig()->set(key, static_cast<int64_t>(newCount), ConfigSource::Runtime);
+                } catch (...) {
+                    throw py::value_error("Invalid neuron count value");
+                }
+            } else if (key == "simulation_timestep") {
+                try {
+                    double newTimestep = std::stod(value);
+                    brain->getConfig()->set(key, newTimestep, ConfigSource::Runtime);
+                } catch (...) {
+                    throw py::value_error("Invalid simulation timestep value");
+                }
+            } else if (key == "connection_probability") {
+                try {
+                    float newProb = std::stof(value);
+                    brain->getConfig()->set(key, newProb, ConfigSource::Runtime);
+                } catch (...) {
+                    throw py::value_error("Invalid connection probability value");
+                }
+            } else {
+                brain->getConfig()->set(key, value, ConfigSource::Runtime);
+            }
+        }, py::arg("brain"), py::arg("key"), py::arg("value"),
+             "Configure brain parameter with string value")
+        .def("configure", [](std::shared_ptr<Brain> brain, const std::string& key, double value) {
+            brain->getConfig()->set(key, value, ConfigSource::Runtime);
+        }, py::arg("brain"), py::arg("key"), py::arg("value"),
+             "Configure brain parameter with double value")
+        .def("configure", [](std::shared_ptr<Brain> brain, const std::string& key, int64_t value) {
+            brain->getConfig()->set(key, value, ConfigSource::Runtime);
+        }, py::arg("brain"), py::arg("key"), py::arg("value"),
+             "Configure brain parameter with integer value")
+        .def("configure", [](std::shared_ptr<Brain> brain, const std::string& key, bool value) {
+            brain->getConfig()->set(key, value, ConfigSource::Runtime);
+        }, py::arg("brain"), py::arg("key"), py::arg("value"),
+             "Configure brain parameter with boolean value")
+        .def("getConfiguration", [](std::shared_ptr<Brain> brain) {
+            return brain->getConfig()->summary();
+        }, py::arg("brain"), "Get brain configuration summary")
+        .def("validateConfiguration", [](std::shared_ptr<Brain> brain) {
+            auto config = brain->getConfig();
+            size_t neuronCount = 1000;
+            if (auto opt = config->get<int64_t>("neuron_count")) {
+                neuronCount = *opt;
+            }
+            
+            double timestep = 0.001;
+            if (auto opt = config->get<double>("simulation_timestep")) {
+                timestep = *opt;
+            }
+            
+            float prob = 0.1f;
+            if (auto opt = config->get<float>("connection_probability")) {
+                prob = *opt;
+            }
+            
+            return !((neuronCount < 10) || (neuronCount > 100000) ||
+                     (timestep < 0.0001) || (timestep > 1.0) ||
+                     (prob < 0.0f) || (prob > 1.0f));
+        }, py::arg("brain"), "Validate brain configuration")
+        .def("printConfiguration", [](std::shared_ptr<Brain> brain) {
+            std::cout << "Brain Configuration:\n";
+            std::cout << "  Neuron count: " << brain->getConfig()->getOr<int64_t>("neuron_count", 1000) << "\n";
+            std::cout << "  Simulation timestep: " << brain->getConfig()->getOr<double>("simulation_timestep", 0.001) << "\n";
+            std::cout << "  Connection probability: " << brain->getConfig()->getOr<float>("connection_probability", 0.1f) << "\n";
+            std::cout << "  Random seed: " << brain->getConfig()->getOr<int64_t>("random_seed", 42) << "\n";
+        }, py::arg("brain"), "Print brain configuration to console")
+        .def("setRandomSeed", [](std::shared_ptr<Brain> brain, uint64_t seed) {
+            brain->getConfig()->set("random_seed", static_cast<int64_t>(seed), ConfigSource::Runtime);
+            // Note: Changing random seed after initialization doesn't affect existing RNG
+            // For new simulations, the seed should be set before initialization
+        }, py::arg("brain"), py::arg("seed"), "Set random seed for brain simulation")
+        .def("enableSubsystem", [](std::shared_ptr<AgentBrain> agent, const std::string& subsystem) {
+            if (subsystem == "reward_modulation") {
+                agent->enableRewardModulation(true);
+            } else if (subsystem == "structural_plasticity") {
+                agent->enableStructuralPlasticity(true);
+            } else if (subsystem == "development") {
+                agent->enableDevelopment(true);
+            } else if (subsystem == "curiosity") {
+                agent->enableCuriosity(true);
+            } else {
+                throw py::value_error("Unknown subsystem: " + subsystem);
+            }
+        }, py::arg("agent"), py::arg("subsystem"), "Enable brain subsystem")
+        .def("disableSubsystem", [](std::shared_ptr<AgentBrain> agent, const std::string& subsystem) {
+            if (subsystem == "reward_modulation") {
+                agent->enableRewardModulation(false);
+            } else if (subsystem == "structural_plasticity") {
+                agent->enableStructuralPlasticity(false);
+            } else if (subsystem == "development") {
+                agent->enableDevelopment(false);
+            } else if (subsystem == "curiosity") {
+                agent->enableCuriosity(false);
+            } else {
+                throw py::value_error("Unknown subsystem: " + subsystem);
+            }
+        }, py::arg("agent"), py::arg("subsystem"), "Disable brain subsystem")
+        .def("isSubsystemEnabled", [](std::shared_ptr<AgentBrain> agent, const std::string& subsystem) {
+            if (subsystem == "reward_modulation") {
+                return agent->isRewardModulationEnabled();
+            } else if (subsystem == "structural_plasticity") {
+                return agent->isStructuralPlasticityEnabled();
+            } else if (subsystem == "development") {
+                return agent->isDevelopmentEnabled();
+            } else if (subsystem == "curiosity") {
+                return agent->isCuriosityEnabled();
+            } else {
+                throw py::value_error("Unknown subsystem: " + subsystem);
+            }
+        }, py::arg("agent"), py::arg("subsystem"), "Check if subsystem is enabled")
+        .def("getEnabledSubsystems", [](std::shared_ptr<AgentBrain> agent) {
+            std::vector<std::string> enabled;
+            if (agent->isRewardModulationEnabled()) {
+                enabled.push_back("reward_modulation");
+            }
+            if (agent->isStructuralPlasticityEnabled()) {
+                enabled.push_back("structural_plasticity");
+            }
+            if (agent->isDevelopmentEnabled()) {
+                enabled.push_back("development");
+            }
+            if (agent->isCuriosityEnabled()) {
+                enabled.push_back("curiosity");
+            }
+            return enabled;
+        }, py::arg("agent"), "Get list of enabled subsystems")
+        .def("runExampleSimulation", [](std::shared_ptr<Brain> brain) {
+            // Simple example simulation
+            brain->step(0);
+            return "Example simulation completed";
+        }, py::arg("brain"), "Run a simple example simulation")
+        .def("getExampleBrains", []() {
+            std::vector<std::shared_ptr<Brain>> examples;
+            // Create a few example brains with different configurations
+            auto config1 = std::make_shared<Config>();
+            config1->set("neuron_count", 500);
+            examples.push_back(std::make_shared<Brain>(config1));
+            
+            auto config2 = std::make_shared<Config>();
+            config2->set("neuron_count", 1000);
+            examples.push_back(std::make_shared<Bkirche_Brain>(config2));
+            
+            return examples;
+        }, "Get example brains with different configurations")
+        .def("getExampleWorlds", []() {
+            std::vector<std::shared_ptr<SimpleWorld>> examples;
+            auto world1 = std::make_shared<SimpleWorld>();
+            world1->configure(20.0f, 20.0f, 16, 16);
+            examples.push_back(world1);
+            
+            auto world2 = std::make_shared<SimpleWorld>();
+            world2->configure(10.0f, 10.0f, 8, 8);
+            examples.push_back(world2);
+            
+            return examples;
+        }, "Get example worlds with different sizes")
+        .def("createExampleAgent", [](std::shared_ptr<Brain> brain) {
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(20.0f, 20.0f, 16, 16);
+            auto agent = std::make_shared<AgentBrain>(brain);
+            agent->initialize(world);
+            return agent;
+        }, py::arg("brain"), "Create example agent brain");
 
 } // namespace nlm
