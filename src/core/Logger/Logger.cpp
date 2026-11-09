@@ -63,6 +63,7 @@ LogLevel ConsoleLogger::getLevel() const {
 }
 
 void ConsoleLogger::setUseColors(bool useColors) {
+    std::lock_guard<std::mutex> lock(pImpl->mutex);
     pImpl->useColors = useColors;
 }
 
