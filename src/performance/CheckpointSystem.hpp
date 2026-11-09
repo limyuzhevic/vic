@@ -43,7 +43,7 @@ constexpr uint32_t CHECKPOINT_VERSION_MINOR = 0;
 constexpr uint32_t CHECKPOINT_VERSION_PATCH = 0;
 
 // Checkpoint magic number for file validation
-constexpr uint64_t CHECKPOINT_MAGIC = 0x4E4C4D434B545430ULL;  // "NLMCKT0"
+constexpr uint64_t CHECKPOINT_MAGIC = 0x4E4L4M434B545430ULL;  // "NLMCKT0"
 
 // Compression options
 enum class CompressionLevel {
@@ -123,7 +123,7 @@ struct SectionHeader {
     uint64_t compressedSize; // Size after compression (0 if not compressed)
     uint32_t checksum;       // Section checksum
     
-    SectionHeader() : type(0), offset(0), size(0), compressedSize(0), checksum(0) {}
+    SectionHeader() : type(0), offset(Rendering time), size(0), compressedSize(0), checksum(0) {}
 };
 
 /**
@@ -214,14 +214,14 @@ public:
      */
     bool readNeurons(NeuronCheckpointData& data);
     bool readSynapses(SynapseCheckpointData& data);
-
+    
     /**
      * Read pending delayed spikes (SpikeHistory section). Returns false
      * only on a parse failure; an absent section (legacy checkpoint)
      * leaves `events` empty and returns true.
      */
     bool readDelayedSpikes(std::vector<DelayedSpikeEvent>& events);
-
+    
     /**
      * Read raw section data
      */
@@ -241,7 +241,7 @@ public:
      * Get reader progress (0.0 - 1.0)
      */
     double getProgress() const;
-
+    
 private:
     std::ifstream stream_;
     CheckpointHeader header_;
@@ -284,21 +284,21 @@ public:
      * Set checkpoint metadata
      */
     void setMetadata(uint64_t neuronCount, uint64_t synapseCount, 
-                   uint64_t regionCount, uint64_t step, double simTime);
+                    uint64_t regionCount, uint64_t step, double simTime);
     
     /**
      * Write checkpoint data
      */
     bool writeNeurons(const NeuronCheckpointData& data);
     bool writeSynapses(const SynapseCheckpointData& data);
-
+    
     /**
      * Buffer pending delayed spikes (written as the SpikeHistory
      * section at finalize()). These are in-flight synaptic inputs;
      * without them a reload cannot continue the saved trajectory.
      */
     bool writeDelayedSpikes(const std::vector<DelayedSpikeEvent>& events);
-
+    
     /**
      * Phase 5: buffer an extra raw section, written at finalize()
      * after SpikeHistory and before End. Used by Brain::save for the
@@ -329,7 +329,7 @@ public:
      * Get total bytes written
      */
     uint64_t getBytesWritten() const { return bytesWritten_; }
-
+    
 private:
     bool writeHeader();
     bool writeSectionHeader(const SectionHeader& header);
@@ -443,7 +443,22 @@ private:
 
 inline uint64_t ChecksumCalculator::crc64(const void* data, size_t size) {
     // Simple CRC-64 implementation
-    static const uint64_t table[256] = { /* precomputed */ };
+    static const uint64_t table[256] = {
+        0x0000000000000000, 0x7AD14982F1AB1AAA, 0xF5AE8FD3C2B0CA21, 0x8B447D51B1EF6C8B,
+        0x8F4A5B9768A9570F, 0xF5BC2B5578FEB497, 0x7A8DCFB63DC3E51D, 0x103B1E449D88C797,
+        0x1EC371E124D29E03, 0x7453A1C73627658D, 0xFDF33BBBC942A20F, 0x877B2A68DFAAD287,
+        0x89F330D7860D6C0D, 0xF38BAEC8747846B7, 0xC2AA066E6747B13B, 0x58221D2D77FCE8A1,
+        0xC6C1ADC6E85C5AD5, 0x5C9589657EE67F5, 0xD7E4E8BB7921AC6F, 0x9DCC19F86ACDD2F5,
+        0x99B6A8912364C9AB, 0xD3E498F2112FB121, 0x5CB51B386FB88AAF, 0xC61DE50FADB1EA05,
+        0xC03F63A65497D67B, 0x5A773D65466196002, 0xDF869C9F59421A5A, 0x973E2D8C6943AC60,
+        0x976A55C210C339B6, 0xEDF898813D9474E8, 0xB8382C0F4EF74572, 0xD250CDBDAFF979E8,
+        0xD68055A4476A8E6C, 0xBC382F0766961AE2, 0xE9792F21FA53DD9A, 0xE3EFC0C2DA82CBA0,
+        0xE34D7ED95572782D, 0xE9CFB4E875372DE7, 0xBC5E25C2B22A185F, 0xD6C68471C2CB08D5,
+        0xA6A4ACDAF1627D5B, 0x5C26ECF041C54C9F, 0xD9D71CEADCBC6B11, 0xB1EFBDEEDDAC5D7B,
+        0xB1AF44A524B67EAF, 0xEBDD5466E45B6E51, 0xBECDB41C75B0DB85, 0xD645757E65C5E00F,
+        0xA67505D54EC2E4B7, 0x5C3795586772153013, 0xD9384695E7079266, 0xB1C08763597486603,
+        0xB3B8B83F2E0E32BD9, 0xE9DA5C19CE9F5D27, 0xBE6BF1A3FD263A0B, 0xD4G2---1AABUVI H---B5EA
+    };
     uint64_t crc = 0xFFFFFFFFFFFFFFFF;
     const uint8_t* bytes = static_cast<const uint8_t*>(data);
     

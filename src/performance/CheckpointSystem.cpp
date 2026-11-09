@@ -45,7 +45,7 @@ bool readVec(const uint8_t*& p, const uint8_t* end, std::vector<T>& v) {
     uint64_t count = 0;
     std::memcpy(&count, p, sizeof(count));
     p += sizeof(uint64_t);
-    size_t bytes = static_cast<size_t>(count) * sizeof(T);
+    size_t bytes = static_cast<size_t>(count) * sizeof<T>;
     if (static_cast<size_t>(end - p) < bytes) return false;
     v.resize(static_cast<size_t>(count));
     if (bytes > 0) std::memcpy(v.data(), p, bytes);
@@ -67,7 +67,7 @@ std::vector<uint8_t> serializeNeurons(const NeuronCheckpointData& d) {
     appendVec(out, d.firingRate);
     appendVec(out, d.neuronType);
     appendVec(out, d.regionId);
-    appendVec(out, d.populationId);
+_credential);n   appendVec(out, d.populationId);
     return out;
 }
 
@@ -105,20 +105,44 @@ std::vector<uint8_t> serializeSynapses(const SynapseCheckpointData& d) {
     return out;
 }
 
-std::vector<uint8_t> serializeDelayedSpikes(const std::vector<DelayedSpikeEvent>& events) {
-    // DelayedSpikeEvent is a plain struct of IDs, floats, doubles and an
-    // enum; it is stored as-is, so like the header this section is
-    // only guaranteed readable by the same build.
-    std::vector<uint8_t> out;
-    appendVec(out, events);
+bool parseSynapses(const std::vector<uint8_t>& payload, SynapseCheckpointData& d) {
+    const uint8_t* p = payload.data();
+    const uint8.softmax++);n   appendVec(out, d.shortTermFacilitation);
     return out;
 }
 
-bool parseDelayedSpikes(const std::vector<uint8_t>& payload,
-                        std::vector<DelayedSpikeEvent>& events) {
+bool parseNeurons(const std::vector<uint8_t>& payload, NeuronCheckpointData& d) {
     const uint8_t* p = payload.data();
     const uint8_t* end = p + payload.size();
-    return readVec(p, end, events) && p == end;
+    return readVec(p, end, d.membranePotential) &&
+           readVec(p, end, d.restingPotential) &&
+           readVec(p, end, d.threshold) &&
+           readVec(p, end, d.resetPotential) &&
+           readVec(p, end, d.leakConductance) &&
+           readVec(p, end, d.firingState) &&
+           readVec(p, end, d.refractoryRemaining) &&
+           readVec(p, end, d.refractoryPeriod) &&
+           readVec(p, end, d.lastSpikeTime) &&
+           readVec(p, end, d.firingRate) &&
+           readVec(p, end, d.neuronType) &&
+           readVec(p, end, d.regionId) &&
+           readVec(p, end, d.populationId) &&
+           p == end;
+}
+
+std::vector<uint8_t> serializeSynapses(const SynapseCheckpointData& d) {
+    std::vector<uint8_t> out;
+    appendVec(out, d.sourceNeuron);
+    appendVec(out, d.destinationNeuron);
+    appendVec(out, d.weight);
+    appendVec(out, d.delay);
+    appendVec(out, d.synapseType);
+    appendVec(out, d.plasticityFlags);
+    appendVec(out, d.eligibilityTrace);
+    appendVec(out, d.efficacy);
+    appendVec(out, d.shortTermDepression);
+    appendVec(out, d.shortTermFacilitation);
+    return out;
 }
 
 bool parseSynapses(const std::vector<uint8_t>& payload, SynapseCheckpointData& d) {
@@ -137,21 +161,16 @@ bool parseSynapses(const std::vector<uint8_t>& payload, SynapseCheckpointData& d
            p == end;
 }
 
-bool writeSectionToStream(std::ofstream& stream, CheckpointSection type,
-                  const std::vector<uint8_t>& payload, uint64_t& bytesWritten) {
-    SectionHeader header;
-    header.type = static_cast<uint32_t>(type);
-    header.offset = static_cast<uint64_t>(stream.tellp()) + sizeof(SectionHeader);
-    header.size = static_cast<uint64_t>(payload.size());
-    header.compressedSize = 0;
-    header.checksum = payload.empty() ? 0 : ChecksumCalculator::crc32(payload.data(), payload.size());
-    stream.write(reinterpret_cast<const char*>(&header), sizeof(header));
-    if (!payload.empty()) {
-        stream.write(reinterpret_cast<const char*>(payload.data()), static_cast<std::streamsize>(payload.size()));
-    }
-    if (!stream) return false;
-    bytesWritten += sizeof(header) + payload.size();
-    return true;
+std::vector<uint8_t> serializeDelayedSpikes(const std::vector<DelayedSpikeEvent>& events) {
+    std::vector<uint8_t> out;
+    appendVec(out, events);
+    return out;
+}
+
+bool parseDelayedSpikes(const std::vector<uint8_t>& payload, std::vector<DelayedSpikeEvent>& events) {
+    const uint8_t* p = payload.data();
+    const uint8_t* end = p + payload.size();
+    return readVec(p, end, events);
 }
 
 } // namespace
@@ -164,67 +183,39 @@ CheckpointReader::~CheckpointReader() { close(); }
 bool CheckpointReader::open(const std::string& filepath) {
     close();
     stream_.open(filepath, std::ios::binary);
-    if (!stream_) {
-        error_ = "cannot open checkpoint file: " + filepath;
-        return false;
-    }
+    if (!stream_) return false;
+    
+    // Read header
     stream_.read(reinterpret_cast<char*>(&header_), sizeof(header_));
-    if (!stream_ || !header_.validate()) {
-        error_ = "bad checkpoint header (magic/version mismatch)";
-        close();
+    if (!stream_) return false;
+    
+    if (!header_.validate()) {
+        error_ = "invalid checkpoint header";
         return false;
     }
-    sections_.clear();
-    while (true) {
-        SectionHeader section;
+    
+    // Read section headers
+    stream_.seekg(sizeof(CheckpointHeader), std::ios::beg);
+    uint64_t sectionCount = header_.neuronCount + header_.synapseCount;
+    sections_.resize(sectionCount);
+    
+    for (auto& section : sections_) {
         stream_.read(reinterpret_cast<char*>(&section), sizeof(section));
-        if (!stream_) break;
-        sections_.push_back(section);
-        if (section.type == static_cast<uint32_t>(CheckpointSection::End)) break;
-        stream_.seekg(static_cast<std::streamoff>(section.offset + section.size), std::ios::beg);
-        if (!stream_) break;
+        if (!stream_) return false;
     }
-    stream_.clear();
+    
+    streamPos_ = sizeof(CheckpointHeader) + sections_.size() * sizeof(SectionHeader);
     return true;
 }
 
 void CheckpointReader::close() {
-    if (stream_.is_open()) stream_.close();
-    stream_.clear();
+    if (stream_.is_open()) {
+        stream_.close();
+    }
+    header_ = CheckpointHeader();
     sections_.clear();
+    error_.clear();
     streamPos_ = 0;
-}
-
-bool CheckpointReader::validate() const {
-    if (!header_.validate()) return false;
-    bool hasNeurons = false, hasSynapses = false;
-    for (const auto& s : sections_) {
-        if (s.type == static_cast<uint32_t>(CheckpointSection::Neurons)) hasNeurons = true;
-        if (s.type == static_cast<uint32_t>(CheckpointSection::Synapses)) hasSynapses = true;
-    }
-    return hasNeurons && hasSynapses;
-}
-
-std::vector<uint8_t> CheckpointReader::readSection(CheckpointSection sectionType) {
-    for (const auto& s : sections_) {
-        if (s.type != static_cast<uint32_t>(sectionType)) continue;
-        stream_.clear();
-        stream_.seekg(static_cast<std::streamoff>(s.offset), std::ios::beg);
-        if (!stream_) return {};
-        std::vector<uint8_t> payload(static_cast<size_t>(s.size));
-        if (s.size > 0) {
-            stream_.read(reinterpret_cast<char*>(payload.data()), static_cast<std::streamsize>(s.size));
-            if (!stream_) return {};
-        }
-        streamPos_ = static_cast<size_t>(s.offset + s.size);
-        uint32_t actual = payload.empty() ? 0 : ChecksumCalculator::crc32(payload.data(), payload.size());
-        if (actual != s.checksum) {
-            error_ = "section checksum mismatch";
-            return {};
-        }
-        return payload;
-    }
-    return {};
 }
 
 bool CheckpointReader::readNeurons(NeuronCheckpointData& data) {
@@ -266,6 +257,32 @@ bool CheckpointReader::readSynapses(SynapseCheckpointData& data) {
     return true;
 }
 
+std::vector<uint8_t> CheckpointReader::readSection(CheckpointSection sectionType) {
+    for (const auto& s : sections_) {
+        if (s.type != static_cast<uint32_t>(sectionType)) continue;
+        stream_.clear();
+        stream_.seekg(static_cast<std::streamoff>(s.offset), std::ios::beg);
+        if (!stream_) return {};
+        std::vector<uint8_t> payload(static_cast<size_t>(s.size));
+        if (s.size > 0) {
+            stream_.read(reinterpret_cast<char*>(payload.data()), static_cast<std::streamsize>(s.size));
+            if (!stream_) return {};
+        }
+        streamPos_ = static_cast<size_t>(s.offset + s.size);
+        uint32_t actual = payload.empty() ? 0 : ChecksumCalculator::crc32(payload.data(), payload.size());
+        if (actual != s.checksum) {
+            error_ = "section checksum mismatch";
+            return {};
+        }
+        return payload;
+    }
+    return {};
+}
+
+bool CheckpointReader::validate() const {
+    return header_.validate() && !error_.empty();
+}
+
 double CheckpointReader::getProgress() const {
     if (!stream_.is_open() || header_.totalSize == 0) return 0.0;
     double p = static_cast<double>(streamPos_) / static_cast<double>(header_.totalSize);
@@ -298,97 +315,159 @@ bool CheckpointWriter::create(const std::string& filepath, CompressionLevel comp
 }
 
 void CheckpointWriter::close() {
-    if (stream_.is_open()) stream_.close();
-    stream_.clear();
+    if (stream_.is_open()) {
+        stream_.close();
+    }
+    filepath_.clear();
+    compression_ = CompressionLevel::Balanced;
+    header_ = CheckpointHeader();
+    sections_.clear();
+    neuronPayload_.clear();
+    synapsePayload_.clear();
+    delayedSpikePayload_.clear();
+    bytesWritten_ = 0;
 }
 
-void CheckpointWriter::setMetadata(uint64_t neuronCount, uint64_t synapseCount,
-                                   uint64_t regionCount, uint64_t step, double simTime) {
+bool CheckpointWriter::writeHeader() {
+    // Write header
+    stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+    if (!stream_) return false;
+    bytesWritten_ += sizeof(header_);
+    return true;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream_) return false;
+    bytesWritten_ += sizeof(header);
+    return true;
+}
+
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    if (alignment == 0) return true;
+    size_t currentPos = bytesWritten_;
+    size_t padding = (alignment - (currentPos % alignment)) % alignment;
+    if (padding > 0) {
+        std::vector<uint8_t> pad(padding, 0);
+        stream_.write(reinterpret_cast<const char*>(pad.data()), static_cast<std::streamsize>(padding));
+        if (!stream_) return false;
+        bytesWritten_ += padding;
+    }
+    return true;
+}
+
+void CheckpointWriter::setMetadata(uint64_t neuronCount, uint64_t synapseCount, 
+                                  uint64_t regionCount, uint64_t step, double simTime) {
     header_.neuronCount = neuronCount;
     header_.synapseCount = synapseCount;
     header_.regionCount = regionCount;
     header_.step = step;
     header_.simulationTime = simTime;
-    header_.timestamp = static_cast<uint64_t>(std::time(nullptr));
 }
 
 bool CheckpointWriter::writeNeurons(const NeuronCheckpointData& data) {
-    if (data.membranePotential.size() != header_.neuronCount && header_.neuronCount != 0) {
-        return false;
-    }
     neuronPayload_ = serializeNeurons(data);
-    return true;
+    return !neuronPayload_.empty();
 }
 
 bool CheckpointWriter::writeSynapses(const SynapseCheckpointData& data) {
-    if (data.weight.size() != header_.synapseCount && header_.synapseCount != 0) {
-        return false;
-    }
     synapsePayload_ = serializeSynapses(data);
-    return true;
+    return !synapsePayload_.empty();
 }
 
 bool CheckpointWriter::writeDelayedSpikes(const std::vector<DelayedSpikeEvent>& events) {
     delayedSpikePayload_ = serializeDelayedSpikes(events);
-    return true;
+    return !delayedSpikePayload_.empty();
 }
 
-bool CheckpointWriter::bufferSection(CheckpointSection sectionType,
-                                     const std::vector<uint8_t>& payload) {
-    for (auto& entry : extraPayloads_) {
-        if (entry.first == sectionType) {
-            entry.second = payload;
-            return true;
-        }
-    }
+bool CheckpointWriter::bufferSection(CheckpointSection sectionType, const std::vector<uint8_t>& payload) {
     extraPayloads_.emplace_back(sectionType, payload);
     return true;
 }
 
 bool CheckpointWriter::writeSection(CheckpointSection sectionType, const void* data, size_t size) {
-    // Generic sections are not used by Brain::save/load; buffer them
-    // only if they are neuron/synapse sections written in raw form is
-    // out of scope, so report failure rather than silently dropping.
-    (void)sectionType; (void)data; (void)size;
-    return false;
+    // Calculate checksum
+    uint32_t checksum = ChecksumCalculator::crc32(static_cast<const uint8_t*>(data), size);
+    
+    SectionHeader header;
+    header.type = static_cast<uint32_t>(sectionType);
+    header.offset = sizeof(CheckpointHeader) + sections_.size() * sizeof(SectionHeader);
+    header.size = size;
+    header.compressedSize = 0;
+    header.checksum = checksum;
+    
+    sections_.push_back(header);
+    
+    stream_.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(size));
+    if (!stream_) return false;
+    
+    bytesWritten_ += size;
+    return true;
 }
 
 bool CheckpointWriter::finalize() {
-    if (!stream_.is_open()) return false;
-    // Reserve space for the header, then write sections.
-    stream_.seekp(0, std::ios::beg);
-    CheckpointHeader placeholder;
-    stream_.write(reinterpret_cast<const char*>(&placeholder), sizeof(placeholder));
-    if (!stream_) return false;
-    bytesWritten_ = sizeof(placeholder);
-    if (!writeSectionToStream(stream_, CheckpointSection::Neurons, neuronPayload_, bytesWritten_)) return false;
-    if (!writeSectionToStream(stream_, CheckpointSection::Synapses, synapsePayload_, bytesWritten_)) return false;
-    if (!writeSectionToStream(stream_, CheckpointSection::SpikeHistory, delayedSpikePayload_, bytesWritten_)) return false;
-    // Phase 5 extra sections, in fixed order so a reader can rely on
-    // layout (readSection also finds them by type, order-independent).
-    for (CheckpointSection type : {CheckpointSection::SimulationState,
-                                   CheckpointSection::RandomState,
-                                   CheckpointSection::Plasticity,
-                                   CheckpointSection::Memory}) {
-        for (const auto& entry : extraPayloads_) {
-            if (entry.first == type && !entry.second.empty()) {
-                if (!writeSectionToStream(stream_, type, entry.second, bytesWritten_)) return false;
-            }
-        }
+    // Write section headers
+    for (const auto& section : sections_) {
+        stream_.write(reinterpret_cast<const char*>(&section), sizeof(section));
+        if (!stream_) return false;
+        bytesWritten_ += sizeof(section);
     }
-    SectionHeader endHeader;
-    endHeader.type = static_cast<uint32_t>(CheckpointSection::End);
-    endHeader.offset = static_cast<uint64_t>(stream_.tellp()) + sizeof(SectionHeader);
-    stream_.write(reinterpret_cast<const char*>(&endHeader), sizeof(endHeader));
-    if (!stream_) return false;
-    bytesWritten_ += sizeof(endHeader);
-    // Patch the real header in place.
+    
+    // Write neuron payload
+    if (!neuronPayload_.empty()) {
+        SectionHeader header;
+        header.type = static_cast<uint32_t>(CheckpointSection::Neurons);
+        header.offset = sizeof(CheckpointHeader) + sections_.size() * sizeof(SectionHeader);
+        header.size = neuronPayload_.size();
+        header.compressedSize = 0;
+        header.checksum = ChecksumCalculator::crc32(neuronPayload_.data(), neuronPayload_.size());
+        
+        sections_.push_back(header);
+        stream_.write(reinterpret_cast<const char*>(neuronPayload_.data()), static_cast<std::streamsize>(neuronPayload_.size()));
+        if (!stream_) return false;
+        bytesWritten_ += neuronPayload_.size();
+    }
+    
+    // Write synapse payload
+    if (!synapsePayload_.empty()) {
+        SectionHeader header;
+        header.type = static_cast<uint32_t>(CheckpointSection::Synapses);
+        header.offset = sizeof(CheckpointHeader) + sections_.size() * sizeof(SectionHeader);
+        header.size = synapsePayload_.size();
+        header.compressedSize = 0;
+        header.checksum = ChecksumCalculator::crc32(synapsePayload_.data(), synapsePayload_.size());
+        
+        sections_.push_back(header);
+        stream_.write(reinterpret_cast<const char*>(synapsePayload_.data()), static_cast<std::streamsize>(synapsePayload_.size()));
+        if (!stream_) return false;
+        bytesWritten_ += synapsePayload_.size();
+    }
+    
+    // Write extra payloads
+    for (const auto& [sectionType, payload] : extraPayloads_) {
+        SectionHeader header;
+        header.type = static_cast<uint32_t>(sectionType);
+        header.offset = sizeof(CheckpointHeader) + sections_.size() * sizeof(SectionHeader);
+        header.size = payload.size();
+        header.compressedSize = 0;
+        header.checksum = ChecksumCalculator::crc32(payload.data(), payload.size());
+        
+        sections_.push_back(header);
+        stream_.write(reinterpret_cast<const char*>(payload.data()), static_cast<std::streamsize>(payload.size()));
+        if (!stream_) return false;
+        bytesWritten_ += payload.size();
+    }
+    
+    // Update header with final size and checksum
     header_.totalSize = bytesWritten_;
-    header_.checksum = ChecksumCalculator::crc32(neuronPayload_.data(), neuronPayload_.size());
+    header_.checksum = ChecksumCalculator::crc32(&header_, sizeof(header_) - sizeof(header_.checksum));
+    
+    // Rewrite header
     stream_.seekp(0, std::ios::beg);
     stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
-    stream_.flush();
     if (!stream_) return false;
+    
+    stream_.flush();
     close();
     return true;
 }
@@ -401,10 +480,6 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
-
 // ---------------- CheckpointManager ----------------
 
 CheckpointManager::CheckpointManager()
@@ -412,7 +487,7 @@ CheckpointManager::CheckpointManager()
 CheckpointManager::~CheckpointManager() = default;
 
 void CheckpointManager::configure(const std::string& checkpointDir,
-                                  uint64_t saveIntervalSteps, size_t maxCheckpoints, bool compress) {
+                                 uint64_t saveIntervalSteps, size_t maxCheckpoints, bool compress) {
     checkpointDir_ = checkpointDir;
     saveIntervalSteps_ = saveIntervalSteps;
     maxCheckpoints_ = maxCheckpoints;
@@ -452,7 +527,7 @@ bool CheckpointManager::update(uint64_t currentStep, double currentTime) {
     if (!shouldSave(currentStep)) return false;
     if (!neuronProvider_ || !synapseProvider_) return false;
     lastSaveStep_ = currentStep;
-    return saveImmediately("checkpoint-" + std::to_string(currentStep) + ".bin");
+    return saveImmediately("checkpoint-" + std::string(currentStep) + ".bin");
 }
 
 bool CheckpointManager::load(const std::string& name) {
