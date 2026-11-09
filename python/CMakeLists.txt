@@ -106,3 +106,18 @@ install(TARGETS pynlm
     ARCHIVE DESTINATION pynlm
     RUNTIME DESTINATION pynlm
 )
+
+# Improved Python bindings
+pybind11_add_module(pynlm_improved bindings_improved.cpp)
+target_link_libraries(pynlm_improved PRIVATE nlm_core nlm_agent nlm_world)
+target_include_directories(pynlm_improved PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+
+if(MSVC)
+    target_compile_options(pynlm_improved PRIVATE /permissive-)
+endif()
+
+install(TARGETS pynlm_improved
+    LIBRARY DESTINATION pynlm
+    ARCHIVE DESTINATION pynlm
+    RUNTIME DESTINATION pynlm
+)
