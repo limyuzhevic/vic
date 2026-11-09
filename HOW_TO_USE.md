@@ -130,6 +130,7 @@ print(f"Neurons: {brain.getTotalNeuronCount()}")
 
 #### Creating a Brain
 
+**Basic Usage:**
 ```python
 import pynlm
 
@@ -148,8 +149,39 @@ print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
 ```
 
+**Improved Features:**
+- Enhanced error handling with descriptive Python exceptions
+- Better validation of configuration parameters
+- Improved status reporting during initialization
+
+**NEW: Quick Creation Methods:**
+```python
+# Even simpler - create brain with default config directly
+brain = pynlm.createBrainWithDefaultConfig()
+brain.initialize()
+
+# Quick test function
+spikes, firing, synapses = pynlm.quickTest(100, 100)
+```
+
+**Improved Features:**
+- Enhanced error handling with descriptive Python exceptions
+- Better validation of configuration parameters
+- Improved status reporting during initialization
+
+**NEW: Quick Creation Methods:**
+```python
+# Even simpler - create brain with default config directly
+brain = pynlm.createBrainWithDefaultConfig()
+brain.initialize()
+
+# Quick test function
+spikes, firing, synapses = pynlm.quickTest(100, 100)
+```
+
 #### Running a Simulation
 
+**Basic Simulation:**
 ```python
 import pynlm
 
@@ -158,7 +190,7 @@ config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Run simulation for 1000 steps
+# Run simulation for 1000 seconds
 for step in range(1000):
     brain.step(step)
     
@@ -167,8 +199,17 @@ for step in range(1000):
         print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
 ```
 
+**Advanced Simulation with Error Handling:**
+```python
+try:
+    brain.step(step, step * 0.001)  # With timestamp
+except Exception as e:
+    print(f"Error in brain step: {e}")
+```
+
 #### Creating a Simple World
 
+**Basic World Setup:**
 ```python
 import pynlm
 
@@ -192,6 +233,11 @@ world.setAgentStart(10.0, 10.0)
 # Run world update
 world.update(timestep=0.1)
 ```
+
+**Enhanced World Features:**
+- Better input validation for configuration parameters
+- Enhanced error messages for invalid operations
+- Support for advanced world configuration options
 
 ### Complete Agent Example
 

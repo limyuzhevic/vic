@@ -95,13 +95,42 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Error handling and validation
+    void addError(const std::string& message);
+    const std::vector<std::string>& getErrors() const;
+    void clearErrors();
+    bool hasErrors() const;
+    bool validateAndNormalize();
+    std::string getErrorSummary() const;
+    bool tryLoadFromFile(const std::string& filepath);
+    
+    // Configuration loading methods
+    bool loadFromFile(const std::string& filepath);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Error log
+    std::vector<std::string> errors_;
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON parsing helpers
+    void parseJSON(const std::string& jsonContent);
+    ConfigValue parseJSONValue(const std::string& content, size_t& pos);
+    std::string parseJSONString(const std::string& content, size_t& pos);
+    ConfigValue parseJSONNumber(const std::string& content, size_t& pos);
+    ConfigValue parseJSONBoolean(const std::string& content, size_t& pos);
+    ConfigValue parseJSONArray(const std::string& content, size_t& pos);
+    void skipWhitespace(const std::string& content, size_t& pos);
+    
+    // Validation helpers
+    void validateConfiguration();
+    void validateEntry(const ConfigEntry& entry);
+    void validateValueType(const ConfigValue& value);
 };
 
 } // namespace nlm

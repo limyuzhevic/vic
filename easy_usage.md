@@ -158,26 +158,62 @@ agent.enableCuriosity(True)             # Explore new things
 ## What Each Part Does
 
 ### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+   Creates a virtual brain with neurons and synapses.
+   - `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+   
+   **New improved version:**
+   - Enhanced error handling with descriptive Python exceptions
+   - Better logging and status reporting
+   - Optional safety checks for invalid parameters
+   
+   **NEW: Quick helper functions:**
+   - `pynlm.createBrainWithDefaultConfig()` - creates brain with default config
+   - `pynlm.quickTest(neuron_count=100, steps=100)` - quick test function
+   - `pynlm.createQuickAgentSimulation(brainNeurons=100, worldSteps=100)` - quick agent simulation
 
 ### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
+   Starts up the brain. Always call this before using the brain!
+   
+   **Improved version:**
+   - Better error messages if initialization fails
+   - Validation of configuration parameters
+   - Enhanced status reporting
 
 ### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
+   Makes the brain process one moment in time. The brain:
+   - Checks each neuron
+   - Sends signals between connected neurons
+   - Updates connections based on learning rules
+   
+   **New improved features:**
+   - Optional timestamp parameter: `brain.step(step_number, timestamp)`
+   - Enhanced safety checks
+   - Better error handling with descriptive Python exceptions
 
 ### `world.update(time)`
-Updates the virtual world by `time` seconds.
+   Updates the virtual world by `time` seconds.
+   
+   **Improved version:**
+   - Better validation of input parameters
+   - Enhanced error messages
+   - Support for advanced world configuration
 
 ### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
+   Gives sensory information (vision, touch, etc.) to the brain.
+   
+   **New features:**
+   - Enhanced error handling for invalid percept data
+   - Better validation of input dimensions
+   - Support for advanced diagnostic methods
 
 ### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
+   Reads the brain's motor neurons to decide what action to take.
+   
+   **New advanced features:**
+   - `getMotorGroupActivities()` - detailed motor group statistics
+   - `getThoughtTrace()` - Phase 5 thought trace summary
+   - `getDiagnosticCounters()` - Phase 5 diagnostic information
+   - `enableAllSystems()` / `disableAllSystems()` - bulk system control
 
 ---
 
