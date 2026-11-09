@@ -19,29 +19,40 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Phase 6: Config now supports both simple key=value format and JSON
+    // for backward compatibility while providing modern parsing options
+    
+    // Use modern filesystem operations
+    std::filesystem::path configPath(filepath);
+    
+    // Check if file exists and is readable using modern filesystem functions
+    if (!std::filesystem::exists(configPath) || 
+        !std::filesystem::is_regular_file(configPath) ||
+        !(std::filesystem::status(configPath).permissions() & std::filesystem::perms::owner_read)) {
+        return false;
+    }
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Use modern string processing with range-based for loops
     std::string line;
     while (std::getline(file, line)) {
-        // Skip empty lines and comments
+        // Skip empty lines and comments using modern predicates
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs using modern string operations
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
-            // Remove quotes if present
+            // Modern string handling with bounds checking
             if (value.size() >= 2 && 
                 ((value.front() == '"' && value.back() == '"') ||
                  (value.front() == '\'' && value.back() == '\''))) {

@@ -142,33 +142,241 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
-            std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
-        }, py::arg("args"),
-           "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
-             "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
-        .def("__repr__", [](const Config& cfg) {
-            return "<Config: " + cfg.summary() + ">";
-        });
+    // Add developmental stage convenience functions
+    m.def("getDevelopmentalStageName", [](DevelopmentalStage stage) -> std::string {
+        switch (stage) {
+            case DevelopmentalStage::Initial: return "Initial";
+            case DevelopmentalStage::CriticalPeriod: return "CriticalPeriod";
+            case DevelopmentalStage::Maturation: return "Maturation";
+            case DevelopmentalStage::Adult: return "Adult";
+            case DevelopmentalStage::Aging: return "Aging";
+            default: return "Unknown";
+        }
+    }, "Get human-readable name for developmental stage");
+
+    m.def("getNeuronTypeName", [](NeuronType type) -> std::string {
+        switch (type) {
+            case NeuronType::Excitatory: return "Excitatory";
+            case NeuronType::Inhibitory: return "Inhibitory";
+            case NeuronType::Modulatory: return "Modulatory";
+            case NeuronType::Sensory: return "Sensory";
+            case NeuronType::Motor: return "Motor";
+            case NeuronType::Internal: return "Internal";
+            default: return "Unknown";
+        }
+    }, "Get human-readable name for neuron type");
+
+    m.def("getSynapseTypeName", [](SynapseType type) -> std::string {
+        switch (type) {
+            case SynapseType::Excitatory: return "Excitatory";
+            case SynapseType::Inhibitory: return "Inhibitory";
+            case SynapseType::Modulatory: return "Modulatory";
+            case SynapseType::Electrical: return "Electrical";
+            case SynapseType::GapJunction: return "GapJunction";
+            default: return "Unknown";
+        }
+    }, "Get human-readable name for synapse type");
+
+    m.def("getActionTypeName", [](ActionType type) -> std::string {
+        switch (type) {
+            case ActionType::MoveForward: return "MoveForward";
+            case ActionType::MoveBackward: return "MoveBackward";
+            case ActionType::MoveLeft: return "MoveLeft";
+            case ActionType::MoveRight: return "MoveRight";
+            case ActionType::TurnLeft: return "TurnLeft";
+            case ActionType::TurnRight: return "TurnRight";
+            case ActionType::Look: return "Look";
+            case ActionType::LookUp: return "LookUp";
+            case ActionType::LookDown: return "LookDown";
+            case ActionType::Interact: return "Interact";
+            case ActionType::Eat: return "Eat";
+            case ActionType::Drink: return "Drink";
+            case ActionType::Rest: return "Rest";
+            case ActionType::Wait: return "Wait";
+            case ActionType::Custom: return "Custom";
+            default: return "Unknown";
+        }
+    }, "Get human-readable name for action type");
+
+    // Add convenience functions for common operations
+    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set some sensible defaults for Phase 6
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        return config;
+    }, "Create a default NLM configuration with sensible Phase 6 settings");
+
+    m.def("createDefaultWorld", []() -> std::shared_ptr<SimpleWorld> {
+        return std::make_shared<SimpleWorld>();
+    }, "Create a default simple world");
+
+    m.def("createDefaultAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
+        return std::make_shared<AgentBrain>(brain);
+    }, "Create an agent brain interface for a brain", py::arg("brain"));
+
+    m.def("formatNeuronId", [](NeuronId id) -> std::string {
+        return "Neuron(" + std::to_string(id.index()) + ")";
+    }, "Format neuron ID as human-readable string");
+
+    m.def("formatSynapseId", [](SynapseId id) -> std::string {
+        return "Synapse(" + std::to_string(id.index()) + ")";
+    }, "Format synapse ID as human-readable string");
+
+    m.def("formatRegionId", [](RegionId id) -> std::string {
+        return "Region(" + std::to_string(id.index()) + ")";
+    }, "Format region ID as human-readable string");
+
+    m.def("validateBrainConfiguration", [](std::shared_ptr<Config> config) -> std::string {
+        std::vector<std::string> warnings;
+        
+        auto neuronCount = config->getOr<int64_t>("neuron_count", 1000);
+        if (neuronCount < 10) {
+            warnings.push_back("Neuron count is very small - may result in limited behavior");
+        } else if (neuronCount > 10000) {
+            warnings.push_back("Neuron count is very large - may require significant computational resources");
+        }
+        
+        auto regionCount = config->getOr<int64_t>("region_count", 2);
+        if (regionCount < 1) {
+            warnings.push_back("Region count is 0 - may cause errors");
+        }
+        
+        auto connectionProb = config->getOr<float>("connection_probability", 0.1f);
+        if (connectionProb < 0.0f || connectionProb > 1.0f) {
+            warnings.push_back("Connection probability is outside valid range [0, 1]");
+        }
+        
+        if (warnings.empty()) {
+            return "Configuration valid";
+        } else {
+            std::string result = "Configuration issues:\n";
+            for (const auto& warning : warnings) {
+                result += "  - " + warning + "\n";
+            }
+            return result;
+        }
+    }, "Validate configuration and return warnings", py::arg("config"));
+
+    m.def("getBrainStatistics", [](std::shared_ptr<Brain> brain) -> std::string {
+        if (!brain) {
+            return "Invalid brain (null pointer)";
+        }
+        
+        std::string stats = "Brain Statistics:\n";
+        stats += "  Total neurons: " + std::to_string(brain->getTotalNeuronCount()) + "\n";
+        stats += "  Total synapses: " + std::to_string(brain->getTotalSynapseCount()) + "\n";
+        stats += "  Active neurons: " + std::to_string(brain->getActiveNeuronCount()) + "\n";
+        stats += "  Firing neurons: " + std::to_string(brain->getFiringNeuronCount()) + "\n";
+        stats += "  Average firing rate: " + std::to_string(brain->getAverageFiringRate()) + " Hz\n";
+        stats += "  Excitation/Inhibition ratio: " + std::to_string(brain->getExcitationInhibitionRatio()) + "\n";
+        stats += "  Total spike count: " + std::to_string(brain->getTotalSpikeCount()) + "\n";
+        stats += "  Developmental stage: " + brain->getDevelopmentalStageName() + "\n";
+        
+        return stats;
+    }, "Get formatted statistics for a brain", py::arg("brain"));
+
+    m.def("createSensoryPercept", []() -> SensoryPercept {
+        return SensoryPercept();
+    }, "Create an empty sensory percept");
+
+    m.def("createVision", [](size_t width, size_t height, size_t channels) -> Vision {
+        return Vision(width, height, channels);
+    }, "Create vision sensory input", py::arg("width"), py::arg("height"), py::arg("channels") = 3);
+
+    m.def("createAudio", [](size_t sampleRate, size_t numSamples) -> Audio {
+        return Audio(sampleRate, numSamples);
+    }, "Create audio sensory input", py::arg("sampleRate"), py::arg("numSamples"));
+
+    m.def("createInternalSignals", []() -> InternalSignals {
+        return InternalSignals();
+    }, "Create internal signals sensory input");
+
+    m.def("createAction", [](ActionType type) -> Action {
+        return Action(type);
+    }, "Create action with specified type", py::arg("type"));
+
+    m.def("createActionWithParams", [](ActionType type, std::vector<float> parameters) -> Action {
+        Action action(type, parameters);
+        return action;
+    }, "Create action with type and parameters", py::arg("type"), py::arg("parameters"));
+
+    m.def("getSystemVersion", []() -> std::string {
+        return "NLM Phase 6 Final Integration - Version 0.1.0";
+    }, "Get system version information");
+
+    m.def("getFeatureList", []() -> std::vector<std::string> {
+        return std::vector<std::string>{
+            "Real LIF neuron dynamics",
+            "Event-driven spike propagation",
+            "STDP and Hebbian plasticity",
+            "Structural plasticity",
+            "Working memory",
+            "Episodic memory",
+            "Associative memory",
+            "Neuromodulation (dopamine, curiosity, novelty)",
+            "Neural prediction",
+            "Cognition (planning, attention)",
+            "Development and maturation",
+            "Checkpoint persistence",
+            "Replay and consolidation",
+            "Python bindings with enhanced API"
+        };
+    }, "Get list of NLM features");
+
+    m.def("getDevelopmentStageEnum", []() -> py::dict {
+        py::dict result;
+        result["Initial"] = static_cast<int>(DevelopmentalStage::Initial);
+        result["CriticalPeriod"] = static_cast<int>(DevelopmentalStage::CriticalPeriod);
+        result["Maturation"] = static_cast<int>(DevelopmentalStage::Maturation);
+        result["Adult"] = static_cast<int>(DevelopmentalStage::Adult);
+        result["Aging"] = static_cast<int>(DevelopmentalStage::Aging);
+        return result;
+    }, "Get developmental stage enum values");
+
+    m.def("getNeuronTypeEnum", []() -> py::dict {
+        py::dict result;
+        result["Excitatory"] = static_cast<int>(NeuronType::Excitatory);
+        result["Inhibitory"] = static_cast<int>(NeuronType::Inhibitory);
+        result["Modulatory"] = static_cast<int>(NeuronType::Modulatory);
+        result["Sensory"] = static_cast<int>(NeuronType::Sensory);
+        result["Motor"] = static_cast<int>(NeuronType::Motor);
+        result["Internal"] = static_cast<int>(NeuronType::Internal);
+        return result;
+    }, "Get neuron type enum values");
+
+    m.def("getActionTypeEnum", []() -> py::dict {
+        py::dict result;
+        result["MoveForward"] = static_cast<int>(ActionType::MoveForward);
+        result["MoveBackward"] = static_cast<int>(ActionType::MoveBackward);
+        result["MoveLeft"] = static_cast<int>(ActionType::MoveLeft);
+        result["MoveRight"] = static_cast<int>(ActionType::MoveRight);
+        result["TurnLeft"] = static_cast<int>(ActionType::TurnLeft);
+        result["TurnRight"] = static_cast<int>(ActionType::TurnRight);
+        result["Look"] = static_cast<int>(ActionType::Look);
+        result["LookUp"] = static_cast<int>(ActionType::LookUp);
+        result["LookDown"] = static_cast<int>(ActionType::LookDown);
+        result["Interact"] = static_cast<int>(ActionType::Interact);
+        result["Eat"] = static_cast<int>(ActionType::Eat);
+        result["Drink"] = static_cast<int>(ActionType::Drink);
+        result["Rest"] = static_cast<int>(ActionType::Rest);
+        result["Wait"] = static_cast<int>(ActionType::Wait);
+        result["Custom"] = static_cast<int>(ActionType::Custom);
+        return result;
+    }, "Get action type enum values");
+
+    m.def("getWorldObjectTypeEnum", []() -> py::dict {
+        py::dict result;
+        result["Empty"] = static_cast<int>(WorldObjectType::Empty);
+        result["Resource"] = static_cast<int>(WorldObjectType::Resource);
+        result["Hazard"] = static_cast<int>(WorldObjectType::Hazard);
+        result["Wall"] = static_cast<int>(WorldObjectType::Wall);
+        result["Marker"] = static_cast<int>(WorldObjectType::Marker);
+        return result;
+    }, "Get world object type enum values");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")

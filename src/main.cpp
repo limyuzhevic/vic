@@ -310,12 +310,134 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Parse command-line arguments
+    bool helpRequested = false;
+    std::string configFile = "configs/default.cfg";
+    int numTrials = 5;
+    int stepsPerTrial = 200;
+    bool enablePlasticity = true;
+    bool enableSTDP = true;
+    bool enableDevelopment = false;
+    std::string logLevel = "INFO";
+    
+    // Parse arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        if (arg == "--help" || arg == "-?") {
+            helpRequested = true;
+        } else if (arg.find("--config") != std::string::npos) {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg.find("--trials") != std::string::npos) {
+            if (arg.find('=') != std::string::npos) {
+                numTrials = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                numTrials = std::stoi(argv[++i]);
+            }
+        } else if (arg.find("--steps") != std::string::npos) {
+            if (arg.find('=') != std::string::npos) {
+                stepsPerTrial = std::stoi(arg.substr(arg.find('=') + 1));
+            } else if (i + 1 < argc) {
+                stepsPerTrial = std::stoi(argv[++i]);
+            }
+        } else if (arg.find("--plastic") != std::string::npos) {
+            enablePlasticity = (arg.find("=0") == std::string::npos && arg.find("=false") == std::string::npos);
+        } else if (arg.find("--stdp") != std::string::npos) {
+            enableSTDP = (arg.find("=0") == std::string::npos && arg.find("=false") == std::string::npos);
+        } else if (arg.find("--development") != std::string::npos) {
+            enableDevelopment = (arg.find("=0") == std::string::npos && arg.find("=false") == std::string::npos);
+        } else if (arg.find("--log-file") != std::string::npos) {
+            enableFileLogging = true;
+            if (arg.find('=') != std::string::npos) {
+                logFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logFile = argv[++i];
+            }
+        } else if (arg == "--version") {
+            std::cout << "NLM Phase 2 - Version 0.1.0\n";
+            return 0;
+        }
+    }
+    
+    // Show help if requested
+    if (helpRequested) {
+        std::cout << "=== NLM Phase 2 Help ===\n";
+        std::cout << "Usage: ./nlm [options]\n\n";
+        std::cout << "Options:\n";
+        std::cout << "  --help, -?              Show this help message\n";
+        std::cout << "  --version               Show version information\n";
+        std::cout << "  --config=file           Load configuration from file\n";
+        std::cout << "  --trials=number         Number of trials (default: 5)\n";
+        std::cout << "  --steps=number          Steps per trial (default: 200)\n";
+        std::cout << "  --plastic[=0|false]    Disable/enable plasticity (default: enabled)\n";
+        std::cout << "  --stdp[=0|false]       Disable/enable STDP (default: enabled)\n";
+        std::cout << "  --development[=0|false] Enable/disable development (default: disabled)\n";
+        std::cout << "  --log-level=level      Set log level (DEBUG, INFO, WARN, ERROR)\n\n";
+        std::cout << "Example: ./nlm --trials=3 --steps=100 --plastic=0\n";
+        return 0;
+    }
+    
+    // Set log level
+    if (logLevel == "DEBUG") {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (logLevel == "WARN") {
+        consoleLogger->setLevel(LogLevel::Warning);
+    } else if (logLevel == "ERROR") {
+        consoleLogger->setLevel(LogLevel::Error);
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with comprehensive configuration
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    
+    // Configure console logging based on user preference
+    consoleLogger->setUseColors(logLevel != "QUIET");
+    
+    // Set log level
+    if (logLevel == "DEBUG") {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (logLevel == "WARN") {
+        consoleLogger->setLevel(LogLevel::Warning);
+    } else if (logLevel == "ERROR") {
+        consoleLogger->setLevel(LogLevel::Error);
+    } else {
+        consoleLogger->setLevel(LogLevel::Info);
+    }
+    
     logger->addLogger(consoleLogger);
+    
+    // Add file logging if requested (Phase 6 feature)
+    std::string logFile = "nlm_simulation.log";
+    bool enableFileLogging = false;
+    
+    // Check for file logging option
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.find("--log-file") != std::string::npos) {
+            enableFileLogging = true;
+            if (arg.find('=') != std::string::npos) {
+                logFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logFile = argv[++i];
+            }
+            break;
+        }
+    }
+    
+    if (enableFileLogging) {
+        auto fileLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+        fileLogger->setOutputFile(logFile);
+        logger->addLogger(fileLogger);
+        NLM_LOG_INFO("File logging enabled: " + logFile);
+    }
+    
+    // Set global logger
     Logger::setGlobal(logger);
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
@@ -359,23 +481,33 @@ int main(int argc, char** argv) {
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Plasticity parameters
+    if (enablePlasticity) {
+        config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+        config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+        config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    }
     
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (enableDevelopment) {
+        config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    }
     
-    // Log configuration summary
+    // Log configuration summary with user settings
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("Configuration (Phase 2 Demo):");
     NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
     NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  trials: " + std::to_string(numTrials));
+    NLM_LOG_INFO("  steps_per_trial: " + std::to_string(stepsPerTrial));
+    NLM_LOG_INFO("  enable_plasticity: " + std::string(enablePlasticity ? "true" : "false"));
+    NLM_LOG_INFO("  enable_stdp: " + std::string(enableSTDP ? "true" : "false"));
+    NLM_LOG_INFO("  enable_development: " + std::string(enableDevelopment ? "true" : "false"));
+    NLM_LOG_INFO("  log_level: " + logLevel);
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
