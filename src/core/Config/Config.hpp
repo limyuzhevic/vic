@@ -56,8 +56,12 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON/YAML format supported)
     bool loadFromFile(const std::string& filepath);
+    
+    // Internal JSON/YAML loading methods
+    bool loadFromJSONFile(const std::string& filepath);
+    bool loadFromYAMLFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
@@ -71,7 +75,7 @@ template<typename T>
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +99,13 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Get last loaded file path
+    std::string getLastLoadedFile() const;
+    
+    // Configuration validation
+    bool validate() const;
+    std::string validateErrors() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +113,10 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper methods for value conversion and validation
+    static std::string valueToString(const ConfigValue& value) const;
+    static bool isValueCompatible(const ConfigValue& value, const std::type_info& typeInfo) const;
 };
 
 } // namespace nlm
