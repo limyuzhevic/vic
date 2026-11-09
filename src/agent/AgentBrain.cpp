@@ -1107,4 +1107,156 @@ void AgentBrain::reset() {
     hasThoughtOutcome_ = false;
 }
 
+// Advanced simulation control methods implementations
+void AgentBrain::runSimulation(size_t numSteps, bool logProgress, size_t logInterval) {
+    if (!brain_) {
+        NLM_LOG_ERROR("Cannot run simulation: brain is not initialized");
+        return;
+    }
+    
+    NLM_LOG_INFO("Starting simulation with " + std::to_string(numSteps) + " steps");
+    
+    for (size_t step = 0; step < numSteps; ++step) {
+        // In a real implementation, this would integrate with the world
+        // For now, we just advance the brain
+        brain_->step(static_cast<SimulationStep>(step));
+        
+        if (logProgress && (step % logInterval == 0)) {
+            NLM_LOG_INFO("Step " + std::to_string(step) + 
+                        ", Spikes: " + std::to_string(brain_->getTotalSpikeCount()) +
+                        ", Firing: " + std::to_string(brain_->getFiringNeuronCount()));
+        }
+    }
+    
+    NLM_LOG_INFO("Simulation completed: " + std::to_string(numSteps) + " steps processed");
+}
+
+AgentBrain::SimulationStats AgentBrain::getSimulationStats() const {
+    SimulationStats stats;
+    
+    if (brain_) {
+        stats.totalSteps = 0; // This would need to be tracked
+        stats.totalSpikes = brain_->getTotalSpikeCount();
+        stats.activeNeurons = brain_->getActiveNeuronCount();
+        stats.averageFiringRate = brain_->getAverageFiringRate();
+        // These would need to be calculated from the system
+        stats.energyUsage = 0.0f;
+        stats.learningProgress = getNeuromodulationLevel();
+        stats.simulationTime = 0.0; // This would need to be tracked
+    }
+    
+    return stats;
+}
+
+void AgentBrain::enableAllSubsystems(bool enable) {
+    enableRewardModulation(enable);
+    enableStructuralPlasticity(enable);
+    enableDevelopment(enable);
+    enableCuriosity(enable);
+}
+
+std::vector<std::string> AgentBrain::getEnabledSubsystems() const {
+    std::vector<std::string> subsystems;
+    
+    if (rewardModulationEnabled_) subsystems.push_back("reward_modulation");
+    if (structuralPlasticityEnabled_) subsystems.push_back("structural_plasticity");
+    if (developmentEnabled_) subsystems.push_back("development");
+    if (curiosityEnabled_) subsystems.push_back("curiosity");
+    
+    return subsystems;
+}
+
+std::tuple<std::shared_ptr<Brain>, std::shared_ptr<AgentBrain>, std::shared_ptr<SimpleWorld>> 
+AgentBrain::createSimulationSetup(const std::string& preset) {
+    auto config = std::make_shared<Config>();
+    auto world = std::make_shared<SimpleWorld>();
+    
+    if (preset == "balanced") {
+        // Balanced configuration for general use
+        config->set("brain.neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        world->configure(20.0f, 20.0f, 8, 8);
+    } else if (preset == "exploratory") {
+        // Optimized for exploration and learning
+        config->set("brain.neuron_count", static_cast<int64_t>(800), ConfigSource::Default);
+        config->set("neuromod.curiosity.exploration_bonus", 1.0f, ConfigSource::Default);
+        config->set("neuromod.novelty.sensitivity", 0.5f, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        world->configure(30.0f, 30.0f, 12, 12);
+    } else if (preset == "efficient") {
+        // Optimized for computational efficiency
+        config->set("brain.neuron_count", static_cast<int64_t>(300), ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        world->configure(15.0f, 15.0f, 6, 6);
+    } else {
+        throw std::invalid_argument("Unknown preset: " + preset);
+    }
+    
+    auto brain = std::make_shared<Brain>(config);
+    auto agent = std::make_shared<AgentBrain>(brain);
+    
+    if (brain->initialize()) {
+        agent->initialize(*world);
+        return {brain, agent, world};
+    } else {
+        throw std::runtime_error("Failed to initialize brain");
+    }
+}
+
+bool AgentBrain::saveWithMetadata(const std::string& filepath, const std::string& description) {
+    if (!brain_) {
+        return false;
+    }
+    
+    // Add metadata to config
+    auto config = brain_->getConfig();
+    config->set("metadata.description", description, ConfigSource::Runtime);
+    config->set("metadata.save_timestamp", std::to_string(std::time(nullptr)), ConfigSource::Runtime);
+    
+    return brain_->save(filepath);
+}
+
+bool AgentBrain::loadWithMetadata(const std::string& filepath, std::string& outDescription) {
+    if (!brain_) {
+        return false;
+    }
+    
+    if (brain_->load(filepath)) {
+        auto config = brain_->getConfig();
+        if (config->has("metadata.description")) {
+            outDescription = config->getOr<std::string>("metadata.description", "");
+        } else {
+            outDescription = "Unknown";
+        }
+        return true;
+    }
+    
+    return false;
+}
+
+std::string AgentBrain::getSimulationMetadata() const {
+    std::stringstream metadata;
+    metadata << "NLM Simulation Metadata\n";
+    metadata << "======================\n";
+    
+    if (brain_) {
+        metadata << "Brain: " << brain_->getTotalNeuronCount() << " neurons, " 
+                  << brain_->getTotalSynapseCount() << " synapses\n";
+        metadata << "Firing rate: " << brain_->getAverageFiringRate() << " Hz\n";
+        metadata << "Developmental stage: " << static_cast<int>(brain_->getDevelopmentalStage()) << "\n";
+        metadata << "Enabled subsystems: ";
+        auto subsystems = getEnabledSubsystems();
+        for (size_t i = 0; i < subsystems.size(); ++i) {
+            if (i > 0) metadata << ", ";
+            metadata << subsystems[i];
+        }
+        metadata << "\n";
+    }
+    
+    return metadata.str();
+}
+
 } // namespace nlm
+
+#include "../core/Logger/Logger.hpp"

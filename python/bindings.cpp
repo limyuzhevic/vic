@@ -406,19 +406,170 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        
+        // Advanced simulation control methods
+        .def("enableAllSubsystems", &AgentBrain::enableAllSubsystems,
+             py::arg("enable") = true)
+        
+        // Get list of enabled subsystems
+        .def("getEnabledSubsystems", &AgentBrain::getEnabledSubsystems)
+        
+        // Create a complete simulation setup
+        .def("createSimulationSetup", &AgentBrain::createSimulationSetup,
+             py::arg("preset") = "balanced")
+        
+        // Save/load simulation with metadata
+        .def("saveWithMetadata", &AgentBrain::saveWithMetadata,
+             py::arg("filepath"), py::arg("description") = "")
+        .def("loadWithMetadata", &AgentBrain::loadWithMetadata,
+             py::arg("filepath"), py::arg("outDescription"))
+        
+        // Get simulation metadata
+        .def("getSimulationMetadata", &AgentBrain::getSimulationMetadata)
+        
+        // Advanced simulation methods
+        .def("runSimulation", &AgentBrain::runSimulation,
+             py::arg("numSteps"), py::arg("logProgress") = false, py::arg("logInterval") = 100,
+             "Run simulation for specified number of steps with progress tracking")
+        
+        // Get comprehensive simulation statistics
+        .def("getSimulationStats", &AgentBrain::getSimulationStats,
+             "Get comprehensive simulation statistics")
+        
+        // Additional convenience methods for advanced users
+        .def("setAllNeuromodulation", &AgentBrain::setAllNeuromodulation,
+             py::arg("dopamine"), py::arg("curiosity"), py::arg("novelty") = 0.0f)
+        .def("setCuriosityMode", &AgentBrain::setCuriosityMode,
+             py::arg("enabled"), py::arg("explorationBonus") = 1.0f)
+        .def("setNoveltyMode", &AgentBrain::setNoveltyMode,
+             py::arg("enabled"), py::arg("sensitivity") = 0.5f)
+        .def("setDevelopmentMode", &AgentBrain::setDevelopmentMode,
+             py::arg("enabled"), py::arg("criticalPeriodLength") = 500.0)
+        .def("setStructuralPlasticityMode", &AgentBrain::setStructuralPlasticityMode,
+             py::arg("enabled"), py::arg("synaptogenesisRate") = 0.0002,
+             py::arg("pruningRate") = 0.00002)
+        
+        // Pattern-based learning methods
+        .def("recordExperiencePattern", &AgentBrain::recordExperiencePattern,
+             py::arg("perception"), py::arg("action"), py::arg("reward"),
+             "Record an experience pattern for learning")
+        .def("getPatternMemory", &AgentBrain::getPatternMemory,
+             "Get learned pattern memory")
+        .def("clearPatternMemory", &AgentBrain::clearPatternMemory,
+             "Clear learned pattern memory")
+        
+        // Social learning methods
+        .def("observeOtherAgent", &AgentBrain::observeOtherAgent,
+             py::arg("observedCommand"), py::arg("beforeVision"),
+             py::arg("afterVision"), "Observe another agent's behavior")
+        .def("getSocialLearningStats", &AgentBrain::getSocialLearningStats,
+             "Get social learning statistics")
+        
+        // Self-model methods
+        .def("updateSelfModel", &AgentBrain::updateSelfModel,
+             py::arg("percept"), py::arg("action"), py::arg("reward"),
+             "Update self-model based on experience")
+        .def("getSelfModelConfidence", &AgentBrain::getSelfModelConfidence,
+             "Get self-model confidence level")
+        .def("resetSelfModel", &AgentBrain::resetSelfModel,
+             "Reset self-model to initial state")
+        
+        // Advanced configuration methods
+        .def("configureForTask", &AgentBrain::configureForTask,
+             py::arg("taskType"), "Configure agent for specific task type")
+        .def("getTaskStats", &AgentBrain::getTaskStats,
+             "Get task performance statistics")
+        .def("resetTaskStats", &AgentBrain::resetTaskStats,
+             "Reset task performance statistics");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
+    // Advanced configuration creation with preset scenarios
+    m.def("createConfigFromDefaults", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Set up optimal defaults for typical use
+        config->set("brain.neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+        config->set("brain.synapse_density", 0.1f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        return config;
+    }, "Create a configuration with optimized defaults for typical simulations");
+
+    // Advanced configuration creation for research/experiment setup
+    m.def("createConfigForResearch", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Research-grade configuration with higher complexity
+        config->set("brain.neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+        config->set("brain.synapse_density", 0.15f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.0001, ConfigSource::Default);
+        config->set("random_seed", static_cast<int64_t>(12345), ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.001f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.learning_rate", 0.0005f, ConfigSource::Default);
+        config->set("plasticity.structural.enable", true, ConfigSource::Default);
+        config->set("plasticity.synaptogenesis_rate", 0.0002f, ConfigSource::Default);
+        config->set("plasticity.pruning_rate", 0.00002f, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 2.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.exploration_bonus", 0.5f, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.sensitivity", 0.3f, ConfigSource::Default);
+        config->set("development.enabled", true, ConfigSource::Default);
+        config->set("development.critical_period_length", 500.0, ConfigSource::Default);
+        return config;
+    }, "Create a research-grade configuration with higher complexity and advanced features");
+
     m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
+    // Advanced brain creation with preset behaviors
+    m.def("createBrainWithPresets", [](const std::string& presetName) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        
+        if (presetName == "fast") {
+            // Optimized for speed/quickness
+            config->set("brain.neuron_count", static_cast<int64_t>(300), ConfigSource::Default);
+            config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        } else if (presetName == "precise") {
+            // Optimized for precision/simulations
+            config->set("brain.neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+            config->set("simulation_timestep", 0.0005, ConfigSource::Default);
+            config->set("plasticity.stdp.learning_rate", 0.0001f, ConfigSource::Default);
+        } else if (presetName == "creative") {
+            // Optimized for exploration and creativity
+            config->set("brain.neuron_count", static_cast<int64_t>(800), ConfigSource::Default);
+            config->set("neuromod.curiosity.exploration_bonus", 1.0f, ConfigSource::Default);
+            config->set("neuromod.novelty.sensitivity", 0.5f, ConfigSource::Default);
+        } else {
+            throw std::invalid_argument("Unknown preset: " + presetName);
+        }
+        
+        return std::make_shared<Brain>(config);
+    }, py::arg("presetName"), "Create a brain with predefined preset configuration");
+
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
+
+    // Advanced world creation with custom environment
+    m.def("createCustomWorld", [](float width, float height, size_t visionWidth, size_t visionHeight) -> std::shared_ptr<SimpleWorld> {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(width, height, visionWidth, visionHeight);
+        return world;
+    }, py::arg("width").nocomma(), py::arg("height").nocomma(), 
+          py::arg("visionWidth").nocomma(), py::arg("visionHeight").nocomma(),
+          "Create a world with custom dimensions and vision parameters");
 
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);

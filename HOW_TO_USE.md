@@ -89,8 +89,8 @@ pip install -e .
 > Phase 5 note: `pip install .` now genuinely builds `pynlm` (verified:
 > fresh venv, `pip install .`, then `import pynlm` and the easy_usage
 > Example 1 flow run). Previously the root CMakeLists never built the
-> module, so `pip install .` succeeded yet `import pynlm` failed. A
-> plain C++ `cmake` build still does NOT include pynlm unless you pass
+> module at all (the option is OFF by default for plain C++ builds).
+> A plain C++ `cmake` build still does NOT include pynlm unless you pass
 > `-DNLM_BUILD_PYTHON_BINDINGS=ON` (and have pybind11 installed); the
 > standalone `cmake -S python -B build` route also still works.
 
@@ -265,6 +265,73 @@ def run_agent_simulation(num_steps=1000):
 run_agent_simulation(1000)
 ```
 
+### Advanced Configuration Examples
+
+#### Using Presets
+
+```python
+import pynlm
+
+# Create brain with different presets
+fast_brain = pynlm.createBrainWithPresets("fast")  # Optimized for speed
+precise_brain = pynlm.createBrainWithPresets("precise")  # Optimized for precision
+creative_brain = pynlm.createBrainWithPresets("creative")  # Optimized for exploration
+
+# Create configuration for research
+research_config = pynlm.createConfigForResearch()
+research_brain = pynlm.createBrain(research_config)
+```
+
+#### Advanced World Configuration
+
+```python
+import pynlm
+
+# Create world with custom dimensions
+world = pynlm.createCustomWorld(30.0, 30.0, 12, 12)
+```
+
+#### Complete Simulation Setup
+
+```python
+import pynlm
+
+# Create a complete simulation setup
+brain, agent, world = pynlm.createAgentBrain.createSimulationSetup("balanced")
+
+# Run advanced simulation
+agent.runSimulation(1000, logProgress=True, logInterval=100)
+
+# Get simulation statistics
+stats = agent.getSimulationStats()
+print(f"Total spikes: {stats.totalSpikes}")
+print(f"Average firing rate: {stats.averageFiringRate:.3f} Hz")
+
+# Get metadata
+metadata = agent.getSimulationMetadata()
+print(metadata)
+```
+
+#### Save/Load with Metadata
+
+```python
+import pynlm
+
+# Create and configure simulation
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(pynlm.createSimpleWorld())
+
+# Save with metadata
+agent.saveWithMetadata("simulation.pkl", "Agent exploring resource gathering")
+
+# Later, load with metadata
+description = ""
+agent.loadWithMetadata("simulation.pkl", description)
+print(f"Loaded simulation: {description}")
+```
+
 ### Key Classes and Methods
 
 #### Brain Class
@@ -278,23 +345,23 @@ brain.initialize()
 
 # Simulation
 brain.step(step_number)           # Run one simulation step
-brain.step(step_number, time)    # Run step with timestamp
-brain.reset()                     # Reset brain state
+brain.step(step_number, time)     # Run step with timestamp
+brain.reset()                      # Reset brain state
 
 # Input/Output
-brain.receiveSensoryInput(sensory_input)  # Inject sensory data
-action = brain.produceAction()             # Get motor action
+brain.receiveSensoryInput(input)  # Inject sensory data
+action = brain.produceAction()    # Get motor action
 
 # Statistics
 brain.getTotalNeuronCount()       # Total neurons
 brain.getTotalSynapseCount()      # Total synapses
-brain.getFiringNeuronCount()     # Currently firing
+brain.getFiringNeuronCount()      # Currently firing
 brain.getAverageFiringRate()      # Average firing rate
 brain.getExcitationInhibitionRatio()  # E/I balance
 
 # State
-brain.save("checkpoint.bin")       # Save state
-brain.load("checkpoint.bin")       # Load state
+brain.save("checkpoint.bin")      # Save state
+brain.load("checkpoint.bin")      # Load state
 
 # Regions
 region_id = brain.addRegion("cortex")
@@ -353,6 +420,12 @@ agent.getCuriosityLevel()
 agent.getNoveltyLevel()
 agent.getPredictionError()
 agent.getNeuromodulationLevel()
+
+# Advanced methods
+agent.enableAllSubsystems()
+subsystems = agent.getEnabledSubsystems()
+brain, agent, world = agent.createSimulationSetup("balanced")
+metadata = agent.getSimulationMetadata()
 ```
 
 #### SimpleWorld Class
@@ -385,7 +458,6 @@ world.isValidPosition(x, y)
 # Properties
 world.getWidth()
 world.getHeight()
-world.getSimulationTime()
 world.getMaxEnergy()
 world.setMaxEnergy(100.0)
 ```
@@ -396,9 +468,9 @@ world.setMaxEnergy(100.0)
 # Neuron types
 pynlm.NeuronType.Excitatory
 pynlm.NeuronType.Inhibitory
+pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Sensory
 pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Internal
 
 # Developmental stages
@@ -410,7 +482,9 @@ pynlm.DevelopmentalStage.Aging
 
 # Action types
 pynlm.ActionType.MoveForward
+pynlm.ActionType.MoveBackward
 pynlm.ActionType.TurnLeft
+pynlm.ActionType.TurnRight
 pynlm.ActionType.Interact
 pynlm.ActionType.Eat
 # ... and more
@@ -423,9 +497,7 @@ pynlm.WorldObjectType.Wall
 pynlm.WorldObjectType.Marker
 ```
 
----
-
-## Part 4: Configuration Options
+### Part 4: Configuration Options
 
 ### Brain Configuration
 
@@ -461,9 +533,7 @@ pynlm.WorldObjectType.Marker
 | `neuromod.curiosity.enable` | bool | true | Enable curiosity-driven exploration |
 | `neuromod.novelty.enable` | bool | true | Enable novelty detection |
 
----
-
-## Part 5: Example Scripts
+### Part 5: Example Scripts
 
 ### Minimal Example
 
@@ -505,9 +575,7 @@ for _ in range(500):
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
 ```
 
----
-
-## Troubleshooting
+### Part 6: Troubleshooting
 
 ### Build Issues
 
@@ -533,9 +601,7 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
----
-
-## Further Reading
+### Part 7: Further Reading
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background

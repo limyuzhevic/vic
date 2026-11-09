@@ -125,6 +125,40 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
+    // Advanced simulation control methods
+    // Run simulation for specified number of steps with progress tracking
+    void runSimulation(size_t numSteps, bool logProgress = false, size_t logInterval = 100);
+    
+    // Get comprehensive simulation statistics
+    struct SimulationStats {
+        size_t totalSteps;
+        size_t totalSpikes;
+        size_t activeNeurons;
+        float averageFiringRate;
+        float energyUsage;
+        float learningProgress;
+        double simulationTime;
+    };
+    
+    SimulationStats getSimulationStats() const;
+    
+    // Enable/disable all subsystems at once
+    void enableAllSubsystems(bool enable = true);
+    
+    // Get list of enabled subsystems
+    std::vector<std::string> getEnabledSubsystems() const;
+    
+    // Create a complete simulation setup (brain + agent + world)
+    static std::tuple<std::shared_ptr<Brain>, std::shared_ptr<AgentBrain>, std::shared_ptr<SimpleWorld>> createSimulationSetup(
+        const std::string& preset = "balanced");
+    
+    // Save/load simulation with metadata
+    bool saveWithMetadata(const std::string& filepath, const std::string& description = "");
+    bool loadWithMetadata(const std::string& filepath, std::string& outDescription);
+    
+    // Get simulation metadata
+    std::string getSimulationMetadata() const;
+    
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
