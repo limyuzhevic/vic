@@ -33,9 +33,17 @@ Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
     pImpl->regionId = INVALID_REGION_ID;
     pImpl->populationId = INVALID_POPULATION_ID;
     pImpl->totalCurrent = 0.0f;
+    
+    // Ensure all neuron state variables are properly initialized
+    pImpl->state = NeuronState();
+    pImpl->synapticInput = 0.0f;
+    pImpl->spikeHistory.clear();
+    pImpl->plasticityFlags = PlasticityFlags();
 }
 
-Neuron::~Neuron() = default;
+Neuron::~Neuron() {
+    delete pImpl;
+}
 
 Neuron::Neuron(Neuron&& other) noexcept : pImpl(other.pImpl) {
     other.pImpl = nullptr;
@@ -267,7 +275,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        pImpl->state.firingState = FiringState::Resting;
     }
     
     // Clear synaptic input for next step
