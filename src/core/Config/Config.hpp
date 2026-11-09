@@ -3,9 +3,11 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <unordered_map>
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <cstdint>
 
 namespace nlm {
 
@@ -44,6 +46,28 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Exception class for configuration errors
+class ConfigError : public std::runtime_error {
+public:
+    explicit ConfigError(const std::string& message) : std::runtime_error(message) {}
+    
+    static ConfigError invalidKey(const std::string& key, const std::string& reason) {
+        return ConfigError("Invalid configuration key '" + key + "': " + reason);
+    }
+    
+    static ConfigError invalidValue(const std::string& key, const std::string& reason) {
+        return ConfigError("Invalid configuration value for key '" + key + "': " + reason);
+    }
+    
+    static ConfigError missingRequiredKey(const std::string& key) {
+        return ConfigError("Missing required configuration key: '" + key + "'");
+    }
+    
+    static ConfigError inconsistentConfiguration(const std::string& reason) {
+        return ConfigError("Inconsistent configuration: " + reason);
+    }
+};
+
 // Main configuration class
 class Config {
 public:
@@ -71,7 +95,7 @@ template<typename T>
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +119,39 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Enhanced validation and error handling
+    bool validate() const;
+    std::vector<std::string> validateWithDetails() const;
+    bool validateValue(const ConfigEntry& entry, std::vector<std::string>& errors) const;
+    void validateNumericValue(const std::string& key, const auto& value, std::vector<std::string>& errors) const;
+    void validateBooleanValue(const std::string& key, const auto& value, std::vector<std::string>& errors) const;
+    void validateStringValue(const std::string& key, const auto& value, std::vector<std::string>& errors) const;
+    void validateArrayValue(const std::string& key, const auto& value, std::vector<std::string>& errors) const;
+    void checkConfigurationConsistency(std::vector<std::string>& errors) const;
+    
+    // Schema and file validation
+    bool validateSchema(const std::string& schemaFile) const;
+    bool validateFilePath(const std::string& filepath) const;
+    
+    // Recovery and backup
+    bool loadFromFileWithBackup(const std::string& filepath, const std::string& backupDir = "backups");
+    bool recoverConfiguration(const std::string& backupPath);
+    
+    // Error handling
+    void handleConfigurationError(const std::string& error);
+    
+    // Configuration management
+    void setDefaultConfiguration();
+    
+    // Advanced configuration queries
+    std::vector<std::string> getKeysByPrefix(const std::string& prefix) const;
+    std::vector<std::string> getKeysBySuffix(const std::string& suffix) const;
+    std::unordered_map<std::string, ConfigValue> getSection(const std::string& prefix) const;
+    bool hasSection(const std::string& prefix) const;
+    void removeSection(const std::string& prefix);
+    std::string toJSON() const;
+    std::string getSummary() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +159,16 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static std::string escapeJSONString(const std::string& str);
+    std::string getTimestamp() const;
+    
+    // Safe file loading
+    bool loadFromFileImpl(const std::string& filepath);
+    
+    // Enhanced validation methods
+    void validateEnhanced() const;
+    void validateForSimulation() const;
+    void validateForPerformance() const;
 };
 
 } // namespace nlm

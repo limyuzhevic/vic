@@ -211,6 +211,483 @@ std::optional<T> Config::get(const std::string& key) const {
     }, it->value);
 }
 
+// Configuration validation and helper methods
+bool Config::validate() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        // Validate key
+        if (entry.key.empty()) {
+            errors.push_back("Empty configuration key found");
+        }
+        
+        if (entry.key.find('=') != std::string::npos) {
+            errors.push_back("Configuration key cannot contain '=' character: '" + entry.key + "'");
+        }
+        
+        if (entry.key.find('\n') != std::string::npos || entry.key.find('\r') != std::string::npos) {
+            errors.push_back("Configuration key cannot contain newline characters: '" + entry.key + "'");
+        }
+        
+        // Validate value based on type
+        validateValue(entry, errors);
+    }
+    
+    // Check for duplicate keys (should be impossible with current implementation, but good to check)
+    std::unordered_set<std::string> seenKeys;
+    for (const auto& entry : pImpl->entries) {
+        if (seenKeys.count(entry.key) > 0) {
+            errors.push_back("Duplicate configuration key: '" + entry.key + "'");
+        }
+        seenKeys.insert(entry.key);
+    }
+    
+    // Check configuration consistency
+    checkConfigurationConsistency(errors);
+    
+    // Print validation errors
+    if (!errors.empty()) {
+        NLM_LOG_ERROR("Configuration validation failed:");
+        for (const auto& error : errors) {
+            NLM_LOG_ERROR("  - " + error);
+        }
+        return false;
+    }
+    
+    return true;
+}
+
+void Config::validateValue(const ConfigEntry& entry, std::vector<std::string>& errors) const {
+    std::visit([&errors, &entry](auto&& v) {
+        using T = std::decay_t<decltype(v)>;
+        
+        if constexpr (std::is_same<T, int> || std::is_same<T, int64_t> || 
+                      std::is_same<T, float> || std::is_same<T, double>) {
+            validateNumericValue(entry.key, v, errors);
+        } else if constexpr (std::is_same<T, bool>) {
+            validateBooleanValue(entry.key, v, errors);
+        } else if constexpr (std::is_same<T, std::string>) {
+            validateStringValue(entry.key, v, errors);
+        } else if constexpr (std::is_same<T, std::vector<int>> ||
+                           std::is_same<T, std::vector<double>> ||
+                           std::is_same<T, std::vector<std::string>>) {
+            validateArrayValue(entry.key, v, errors);
+        }
+    }, entry.value);
+}
+
+void Config::validateNumericValue(const std::string& key, const auto& value, std::vector<std::string>& errors) const {
+    if constexpr (std::is_same<decltype(value), int>) {
+        if (value < -1000000 || value > 1000000) {
+            errors.push_back("Value out of range for " + key + ": " + std::to_string(value));
+        }
+    } else if constexpr (std::is_same<decltype(value), int64_t>) {
+        if (value < -1000000000000 || value > 1000000000000) {
+            errors.push_back("Value out of range for " + key + ": " + std::to_string(value));
+        }
+    } else if constexpr (std::is_same<decltype(value), float> ||
+                       std::is_same<decltype(value), double>) {
+        if (std::isinf(value) || std::isnan(value)) {
+            errors.push_back("Invalid value (NaN or infinity) for " + key + ": " + std::to_string(value));
+        }
+        if (value < -1e9 || value > 1e9) {
+            errors.push_back("Value out of range for " + key + ": " + std::to_string(value));
+        }
+    }
+}
+
+void Config::validateBooleanValue(const std::string& key, const auto& value, std::vector<std::string>& errors) const {
+    // Boolean values are always valid, but we could add constraints here
+    // For example, certain keys might be expected to have specific boolean values
+}
+
+void Config::validateStringValue(const std::string& key, const auto& value, std::vector<std::string>& errors) const {
+    // Check string length
+    if (value.length() > 1000) {
+        errors.push_back("String value too long for " + key + ": " + std::to_string(value.length()) + " characters (max 1000)");
+    }
+    
+    // Check for problematic characters
+    if (value.find('\x00') != std::string::npos) {
+        errors.push_back("String value contains null character for " + key);
+    }
+}
+
+void Config::validateArrayValue(const std::string& key, const auto& value, std::vector<std::string>& errors) const {
+    if constexpr (std::is_same<decltype(value), std::vector<int>> ||
+                  std::is_same<decltype(value), std::vector<double>>) {
+        if (value.size() > 10000) {
+            errors.push_back("Array value too large for " + key + ": " + std::to_string(value.size()) + " elements (max 10000)");
+        }
+        
+        for (size_t i = 0; i < value.size(); ++i) {
+            if constexpr (std::is_same<decltype(value), std::vector<int>>) {
+                if (value[i] < -1000000 || value[i] > 1000000) {
+                    errors.push_back("Array element " + std::to_string(i) + " out of range for " + key + ": " + std::to_string(value[i]));
+                }
+            } else {
+                if (std::isinf(value[i]) || std::isnan(value[i])) {
+                    errors.push_back("Array element " + std::to_string(i) + " invalid (NaN or infinity) for " + key);
+                }
+            }
+        }
+    } else if constexpr (std::is_same<decltype(value), std::vector<std::string>>) {
+        for (size_t i = 0; i < value.size(); ++i) {
+            if (value[i].length() > 100) {
+                errors.push_back("Array element " + std::to_string(i) + " too long for " + key + ": " + std::to_string(value[i].length()) + " characters (max 100)");
+            }
+        }
+    }
+}
+
+void Config::checkConfigurationConsistency(std::vector<std::string>& errors) const {
+    // Check for required configuration keys
+    std::unordered_set<std::string> requiredKeys = {
+        "neuron_count",
+        "region_count",
+        "connection_probability"
+    };
+    
+    for (const auto& requiredKey : requiredKeys) {
+        if (!has(requiredKey)) {
+            errors.push_back("Missing required configuration key: '" + requiredKey + "'");
+        }
+    }
+    
+    // Check consistency between related keys
+    if (has("neuron_count") && has("region_count")) {
+        auto neuronCountOpt = get<int64_t>("neuron_count");
+        auto regionCountOpt = get<int64_t>("region_count");
+        
+        if (neuronCountOpt && regionCountOpt) {
+            size_t neuronCount = static_cast<size_t>(neuronCountOpt.value());
+            size_t regionCount = static_cast<size_t>(regionCountOpt.value());
+            
+            if (neuronCount > 0 && regionCount > neuronCount) {
+                errors.push_back("region_count (" + std::to_string(regionCount) + ") cannot be greater than neuron_count (" + std::to_string(neuronCount) + ")");
+            }
+            
+            if (neuronCount < 100 && regionCount > 10) {
+                errors.push_back("region_count too high for small network: " + std::to_string(regionCount) + ". Consider increasing neuron_count or decreasing region_count");
+            }
+        }
+    }
+    
+    // Check plasticity configuration consistency
+    if (has("plasticity.stdp.enable") && has("plasticity.hebbian.enable")) {
+        auto stdpOpt = get<bool>("plasticity.stdp.enable");
+        auto hebbianOpt = get<bool>("plasticity.hebbian.enable");
+        
+        if (stdpOpt && hebbianOpt) {
+            if (!stdpOpt.value() && !hebbianOpt.value()) {
+                errors.push_back("Both STDP and Hebbian plasticity are disabled. At least one plasticity rule should be enabled.");
+            }
+        }
+    }
+    
+    // Check memory configuration consistency
+    if (has("performance.memory_pools.enable") && has("neuron_count")) {
+        auto memoryPoolsOpt = get<bool>("performance.memory_pools.enable");
+        auto neuronCountOpt = get<int64_t>("neuron_count");
+        
+        if (memoryPoolsOpt && neuronCountOpt) {
+            if (memoryPoolsOpt.value() && neuronCountOpt.value() > 10000) {
+                errors.push_back("Memory pools should be disabled for large networks (>10,000 neurons) due to memory constraints.");
+            }
+        }
+    }
+}
+
+// Exception handling for configuration errors
+void Config::handleConfigurationError(const std::string& error) {
+    // This method would be called when configuration operations fail
+    // It could log errors, throw exceptions, or take other appropriate actions
+    NLM_LOG_ERROR("Configuration error: " + error);
+    
+    // In a more complete implementation, we could:
+    // - Store error state
+    // - Attempt recovery
+    // - Notify error handlers
+    // - Retry operations
+    // - Auto-correction of invalid values
+}
+
+// Configuration schema validation
+bool Config::validateSchema(const std::string& schemaFile) const {
+    // This would validate the configuration against a schema file
+    // For now, we'll return true (schema validation is a future enhancement)
+    NLM_LOG_INFO("Schema validation not yet implemented (future enhancement)");
+    return true;
+}
+
+// Safe configuration loading with validation
+safe Config::loadFromFile(const std::string& filepath) {
+    // Load configuration from file with validation
+    if (!Config::validateFilePath(filepath)) {
+        NLM_LOG_ERROR("Invalid configuration file path: " + filepath);
+        return false;
+    }
+    
+    bool success = Config::loadFromFileImpl(filepath);
+    
+    if (success) {
+        if (!validate()) {
+            NLM_LOG_ERROR("Configuration validation failed after loading from file: " + filepath);
+            // Attempt to revert to previous state or use default configuration
+            return false;
+        }
+    }
+    
+    return success;
+}
+
+// Safe configuration loading with backup and validation
+safe bool Config::loadFromFileWithBackup(const std::string& filepath, const std::string& backupDir) {
+    // Load configuration with backup and validation
+    std::string backupPath = backupDir + "/backup_" + getTimestamp() + ".cfg";
+    
+    // Create backup of current configuration
+    if (!saveToFile(backupPath)) {
+        NLM_LOG_WARNING("Failed to create backup of current configuration");
+    }
+    
+    bool success = loadFromFile(filepath);
+    
+ánoreturn success;
+}
+
+std::string Config::getTimestamp() const {
+    // Generate timestamp for backup files
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y%m%d_%H%M%S");
+    return ss.str();
+}
+
+bool Config::validateFilePath(const std::string& filepath) const {
+    // Validate file path
+    if (filepath.empty() || filepath.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./-") != std::string::npos) {
+        return false;
+    }
+    
+    // Check if file exists (read-only check)
+    std::ifstream file(filepath);
+    return file.good();
+}
+
+// Configuration recovery and rollback
+bool Config::recoverConfiguration(const std::string& backupPath) {
+    // Attempt to recover configuration from backup
+    if (!validateFilePath(backupPath)) {
+        return false;
+    }
+    
+    // Create backup of current configuration
+    std::string currentBackup = "backup_before_recovery_" + getTimestamp() + ".cfg";
+    if (!saveToFile(currentBackup)) {
+        NLM_LOG_ERROR("Failed to create backup before recovery");
+    }
+    
+    // Load backup configuration
+    bool success = loadFromFile(backupPath);
+    
+    if (success && !validate()) {
+        NLM_LOG_ERROR("Recovered configuration is invalid. Attempting to restore defaults.");
+        clear();
+        // Restore to a safe default state
+        setDefaultConfiguration();
+        return true;
+    }
+    
+    return success;
+}
+
+void Config::setDefaultConfiguration() {
+    // Set configuration to safe defaults
+    clear();
+    set("neuron_count", static_cast<int64_t>(100), ConfigSource::Default);
+    set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    set("connection_probability", 0.1f, ConfigSource::Default);
+    set("simulation_timestep", 0.001, ConfigSource::Default);
+    set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    
+    // Enable basic plasticity
+    set("plasticity.stdp.enable", true, ConfigSource::Default);
+    set("plasticity.hebbian.enable", true, ConfigSource::Default);
+    
+    // Enable basic performance optimizations
+    set("performance.memory_pools.enable", true, ConfigSource::Default);
+    set("performance.simd.enable", true, ConfigSource::Default);
+}
+
+std::vector<std::string> Config::getKeysByPrefix(const std::string& prefix) const {
+    std::vector<std::string> keys;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.size() >= prefix.size() && 
+            entry.key.compare(0, prefix.size(), prefix) == 0) {
+            keys.push_back(entry.key);
+        }
+    }
+    return keys;
+}
+
+std::vector<std::string> Config::getKeysBySuffix(const std::string& suffix) const {
+    std::vector<std::string> keys;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.size() >= suffix.size() &&
+            entry.key.compare(entry.key.size() - suffix.size(), suffix.size(), suffix) == 0) {
+            keys.push_back(entry.key);
+        }
+    }
+    return keys;
+}
+
+std::unordered_map<std::string, ConfigValue> Config::getSection(const std::string& prefix) const {
+    std::unordered_map<std::string, ConfigValue> section;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key.size() >= prefix.size() &&
+            entry.key.compare(0, prefix.size(), prefix) == 0) {
+            // Remove prefix from key
+            std::string sectionKey = entry.key.substr(prefix.size());
+            if (!sectionKey.empty() && sectionKey[0] == '.') {
+                sectionKey = sectionKey.substr(1); // Remove leading dot
+            }
+            section[sectionKey] = entry.value;
+        }
+    }
+    return section;
+}
+
+bool Config::hasSection(const std::string& prefix) const {
+    return !getSection(prefix).empty();
+}
+
+void Config::removeSection(const std::string& prefix) {
+    auto section = getSection(prefix);
+    for (const auto& key : section) {
+        remove(key.first);
+    }
+}
+
+std::string Config::toJSON() const {
+    std::ostringstream json;
+    json << "{";
+    bool first = true;
+    for (const auto& entry : pImpl->entries) {
+        if (!first) json << ",\n";
+        first = false;
+        json << "\"" << entry.key << "\": ";
+        
+        // Convert value to JSON
+        std::visit([&json](auto&& v) {
+            if constexpr (std::is_same_v<decltype(v), int>) {
+                json << v;
+            } else if constexpr (std::is_same_v<decltype(v), int64_t>) {
+                json << v;
+            } else if constexpr (std::is_same_v<decltype(v), double>) {
+                json << v;
+            } else if constexpr (std::is_same_v<decltype(v), bool>) {
+                json << (v ? "true" : "false");
+            } else if constexpr (std::is_same_v<decltype(v), std::string>) {
+                json << "\"" << escapeJSONString(v) << "\"";
+            } else if constexpr (std::is_same_v<decltype(v), std::vector<int>>) {
+                json << "[";
+                bool vecFirst = true;
+                for (const auto& item : v) {
+                    if (!vecFirst) json << ", ";
+                    vecFirst = false;
+                    json << item;
+                }
+                json << "]";
+            } else if constexpr (std::is_same_v<decltype(v), std::vector<double>>) {
+                json << "[";
+                bool vecFirst = true;
+                for (const auto& item : v) {
+                    if (!vecFirst) json << ", ";
+                    vecFirst = false;
+                    json << item;
+                }
+                json << "]";
+            } else if constexpr (std::is_same_v<decltype(v), std::vector<std::string>>) {
+                json << "[";
+                bool vecFirst = true;
+                for (const auto& item : v) {
+                    if (!vecFirst) json << ", ";
+                    vecFirst = false;
+                    json << "\"" << escapeJSONString(item) << "\"";
+                }
+                json << "]";
+            } else {
+                json << "null";
+            }
+        }, entry.value);
+    }
+    json << "\n}";
+    return json.str();
+}
+
+std::string Config::escapeJSONString(const std::string& str) const {
+    std::string result;
+    for (char c : str) {
+        switch (c) {
+            case '\\': result += "\\\\"; break;
+            case '\"': result += "\\\""; break;
+            case '\b': result += "\\b"; break;
+            case '\f': result += "\\f"; break;
+            case '\n': result += "\\n"; break;
+            case '\r': result += "\\r"; break;
+            case '\t': result += "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 32) {
+                    result += "\\u" + std::to_string(static_cast<int>(c));
+                } else {
+                    result += c;
+                }
+                break;
+        }
+    }
+    return result;
+}
+
+std::string Config::getSummary() const {
+    std::ostringstream summary;
+    summary << "Configuration Summary:" << std::endl;
+    summary << "Total entries: " << pImpl->entries.size() << std::endl;
+    
+    // Group by source
+    std::unordered_map<ConfigSource, size_t> sourceCount;
+    for (const auto& entry : pImpl->entries) {
+        sourceCount[entry.source]++;
+    }
+    
+    summary << "By source:" << std::endl;
+    for (const auto& pair : sourceCount) {
+        summary << "  " << static_cast<int>(pair.first) << ": " << pair.second << std::endl;
+    }
+    
+    // Sample of key values
+    summary << "Sample entries:" << std::endl;
+    size_t count = 0;
+    for (const auto& entry : pImpl->entries) {
+        if (count >= 5) break;
+        summary << "  " << entry.key << " = ";
+        
+        std::visit([&summary](auto&& v) {
+            if constexpr (std::is_same_v<decltype(v), std::string>) {
+                summary << "\"" << v << "\"";
+            } else {
+                summary << v;
+            }
+        }, entry.value);
+        summary << " (" << static_cast<int>(entry.source) << ")" << std::endl;
+        count++;
+    }
+    
+    return summary.str();
+}
+
 template<typename T>
 T Config::getOr(const std::string& key, const T& defaultValue) const {
     auto val = get<T>(key);
