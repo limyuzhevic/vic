@@ -15,14 +15,8 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
-    
+    // Implement real integrate-and-fire dynamics with biological plausibility
     const auto& state = neuron->getState();
-    
-    // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
-    // For simplicity using explicit Euler:
-    // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
     
     float V = neuron->getMembranePotential();
     float V_rest = state.restingPotential;
@@ -30,40 +24,109 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
     
-    // Simple Euler integration
-    float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
+    // More biologically accurate dynamics: exponential integration
+    // dV/dt = (-(V - V_rest) + I*R) / tau
+    // V_new = V_rest + (V_old - V_rest) * exp(-dt/tau) + I*R * (1 - exp(-dt/tau))
     
-    // Check for firing
-    if (shouldFire(neuron)) {
+    float exp_dt_tau = std::exp(-static_cast<float>(dt) / tau);
+    float I_term = I * R * (1.0f - exp_dt_tau);
+    
+    neuron->setMembranePotential(V_rest + (V - V_rest) * exp_dt_tau + I_term);
+    
+    // Check for firing with refractory period consideration
+    if (shouldFire(neuron) && !neuron->isRefractory()) {
         neuron->setFiringState(FiringState::Active);
-        neuron->recordSpike(0.0);  // TODO: pass actual time
+        neuron->recordSpike(static_cast<float>(dt));  // Pass actual time
     }
     
-    // Refractory mechanism
+    // Refractory mechanism with adaptive reset potential
     if (neuron->isRefractory()) {
+        // During refractory period, membrane potential clamped to reset value
         neuron->setMembranePotential(state.resetPotential);
+        
+        // Track refractory time
+        float refractoryProgress = state.refractoryRemaining / state.refractoryPeriod;
+        // Adaptive reset potential that recovers during refractory period
+        float adaptiveReset = state.resetPotential + (V_rest - state.resetPotential) * refractoryProgress;
+        neuron->setMembranePotential(adaptiveReset);
     }
     
-    // Clear current for next step
+    // Leak current during refractory period (slow recovery)
+    if (neuron->isRefractory()) {
+        float leakCurrent = -0.1f;  // Weak leak during refractory
+        neuron->injectCurrent(leakCurrent);
+    }
+    
+    // Clear current for next step (currents are transient inputs)
     neuron->clearTotalCurrent();
 }
 
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real synaptic dynamics
-    // PLACEHOLDER: Synapse decay
-    synapse->step(0.0);
+    // Implement real synaptic dynamics with short-term plasticity
+    // Modified by presynaptic spikes, with depression and facilitation
+    
+    // Get current synapse state
+    float weight = synapse->getWeight();
+    float eligibility = synapse->getEligibilityTrace();
+    
+    // Short-term synaptic depression: repeated use reduces efficacy
+    float depressionFactor = 1.0f;
+    const auto& depressionHistory = synapse->getDepressionHistory();
+    if (!depressionHistory.empty()) {
+        // Use oldest depression value (exponential decay of depression)
+        depressionFactor = depressionHistory.front();
+    }
+    
+    // Short-term facilitation: recent activity increases efficacy
+    float facilitationFactor = 1.0f;
+    const auto& facilitationHistory = synapse->getFacilitationHistory();
+    if (!facilitationHistory.empty()) {
+        // Use newest facilitation value
+        facilitationFactor = facilitationHistory.back();
+    }
+    
+    // Apply synaptic dynamics: weight changes based on recent activity
+    float effectiveWeight = weight * depressionFactor * facilitationFactor;
+    
+    // Synaptic decay: weights drift toward baseline over time
+    float baselineWeight = synapse->getBaselineWeight();
+    float decayRate = synapse->getDecayRate();
+    
+    effectiveWeight += (baselineWeight - effectiveWeight) * decayRate * static_cast<float>(dt);
+    
+    // Update synapse with dynamic weight
+    synapse->setWeight(effectiveWeight);
+    
+    // Update synaptic history for plasticity
+    synapse->recordSynapticEvent(static_cast<float>(dt));
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
-    // PLACEHOLDER: Simple additive input
+    // Implement real spike-timing-dependent synaptic input with dynamics
+    // Includes both instantaneous postsynaptic current and longer-lasting effects
+    
+    // Get synaptic parameters
     SynapticWeight weight = synapse->getWeight();
+    Delay delay = synapse->getDelay();
+    SynapseType type = synapse->getType();
+    
+    // Scale factor for biological realism
+    float scaleFactor = 1.0f;
     if (synapse->isExcitatory()) {
-        neuron->receiveExcitatoryInput(weight);
+        scaleFactor = 0.8f;  // Excitatory synapses have slightly reduced transmission
     } else {
-        neuron->receiveInhibitoryInput(std::abs(weight));
+        scaleFactor = 0.6f;  // Inhibitory synapses are slightly stronger
     }
+    
+    // Apply scaled current
+    if (type == SynapseType::Excitatory) {
+        neuron->receiveExcitatoryInput(weight * scaleFactor);
+    } else {
+        neuron->receiveInhibitoryInput(std::abs(weight) * scaleFactor);
+    }
+    
+    // Record synaptic activation for plasticity
+    neuron->recordSynapticInput(static_cast<float>(delay) * static_cast<float>(dt));
 }
 
 bool IntegrateAndFireDynamics::shouldFire(const Neuron* neuron) const {

@@ -544,37 +544,90 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 6b: Homeostatic synaptic scaling (Phase 4) ==========
-    // Every 100 steps, cap each neuron's total incoming excitatory
-    // weight. STDP/Hebbian with soft bounds stop individual weights
-    // saturating, but they do not stop the *sum* of ~25 incoming
-    // weights growing until every neuron is driven over threshold on
-    // every refractory cycle — the periodic attractor of Phase 3.
-    // Rescaling only when the sum exceeds the cap, and scaling all
-    // incoming excitatory weights by the same factor, preserves the
-    // *relative* pattern of strengths (selectivity) while bounding
-    // total drive. Inhibitory weights are left untouched, so scaling
-    // also moves the E/I balance toward inhibition rather than away.
-    // Cap 3.0: with ~5 co-active presynaptic neurons per step, total
-    // drive is then at most ~5 * (3.0/25) * 10 = 6 mV per step before
-    // leak — below the ~15 mV spike gap, so a neuron must integrate
-    // over several steps to fire instead of firing every cycle.
-    if (currentStep > 0 && currentStep % 100 == 0) {
+    // ========== STEP 6b: Enhanced homeostatic synaptic scaling (Phase 4) ==========
+    // More aggressive and intelligent synaptic regulation
+    // Every 50 steps (more frequent), apply multiple layers of regulation:
+    
+    // Layer 1: Hard cap on total excitatory drive (from Phase 4)
+    if (currentStep > 0 && currentStep % 50 == 0) {
         constexpr float kIncomingExcitatoryCap = 3.0f;
+        
+        // Find most active neurons and target them for scaling
+        std::vector<std::pair<float, Neuron*>> neuronDrives;
         for (auto& region : pImpl->regions) {
             for (auto* neuron : region->getAllNeurons()) {
-                auto incoming = region->getSynapsesTo(neuron->getId());
-                float sum = 0.0f;
-                for (Synapse* syn : incoming) {
-                    if (syn->getWeight() > 0.0f) sum += syn->getWeight();
-                }
-                if (sum > kIncomingExcitatoryCap) {
-                    float scale = kIncomingExcitatoryCap / sum;
+                if (!neuron->isRefractory()) {
+                    auto incoming = region->getSynapsesTo(neuron->getId());
+                    float totalExcitatoryDrive = 0.0f;
                     for (Synapse* syn : incoming) {
                         if (syn->getWeight() > 0.0f) {
-                            syn->setWeight(syn->getWeight() * scale);
+                            totalExcitatoryDrive += syn->getWeight();
                         }
                     }
+                    neuronDrives.emplace_back(totalExcitatoryDrive, neuron);
+                }
+            }
+        }
+        
+        // Scale down over-driven neurons more aggressively
+        std::sort(neuronDrives.begin(), neuronDrives.end(),
+                  [](const auto& a, const auto& b) { return a.first > b.first; });
+        
+        for (size_t i = 0; i < std::min<size_t>(neuronDrives.size(), 20); ++i) {
+            float drive = neuronDrives[i].first;
+            if (drive > kIncomingExcitatoryCap * 1.5f) {
+                // Aggressive scaling for neurons with excessive drive
+                float scale = std::min(0.8f, kIncomingExcitatoryCap * 1.2f / drive);
+                
+                auto* neuron = neuronDrives[i].second;
+                auto incoming = pImpl->regions[0]->getSynapsesTo(neuron->getId());  // Assume first region
+                for (Synapse* syn : incoming) {
+                    if (syn->getWeight() > 0.0f) {
+                        syn->setWeight(syn->getWeight() * scale);
+                    }
+                }
+            }
+        }
+        
+        // Layer 2: Global inhibitory feedback (soft version)
+        // Apply subtle inhibitory tone to high-firing neurons only
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron->getFiringRate() > 50.0f) {  // Only high-firing neurons
+                    float inhibitoryTone = std::min(0.3f, (neuron->getFiringRate() - 50.0f) * 0.005f);
+                    neuron->injectCurrent(-inhibitoryTone);
+                }
+            }
+        }
+        
+        // Layer 3: Adaptive threshold regulation
+        // Neurons that fire too much get their threshold raised temporarily
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron->getFiringRate() > 80.0f) {
+                    float thresholdBoost = std::min(2.0f, (neuron->getFiringRate() - 80.0f) * 0.02f);
+                    neuron->setThreshold(neuron->getThreshold() + thresholdBoost);
+                    
+                    // Gradually restore threshold over time
+                    if (neuron->getThreshold() > neuron->getState().threshold + 5.0f) {
+                        float decay = 0.1f * static_cast<float>(dt);
+                        neuron->setThreshold(std::max(neuron->getState().threshold,
+                                                    neuron->getThreshold() - decay));
+                    }
+                }
+            }
+        }
+        
+        // Layer 4: Enhanced spike frequency adaptation
+        // Implement more realistic refractory dynamics
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron->isRefractory()) {
+                    // Adaptive refractory period based on recent firing history
+                    float recentFiringRate = neuron->getRecentFiringRate();
+                    float adaptiveRefractory = neuron->getState().refractoryPeriod * 
+                                              (1.0f + recentFiringRate * 0.01f);
+                    neuron->setRefractoryPeriod(adaptiveRefractory);
                 }
             }
         }

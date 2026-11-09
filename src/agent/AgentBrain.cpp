@@ -890,6 +890,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
     thoughtReward_ = reward;
     hasThoughtOutcome_ = true;
+    
     // Phase 6 concept formation, wired into the loop: the pattern
     // that led to this action, paired with this action's reward.
     // Concepts therefore emerge from experienced pattern/reward
@@ -906,6 +907,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
         }
     }
+    
     // Phase 5 learning for the thought/preference systems, from the
     // same reward the synaptic modulation below uses:
     //  - Planner action quality: EMA toward reward/10 for the action
@@ -936,6 +938,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
+    // ========== CRITICAL FIX: CONNECT AGENT REWARD TO BRAIN'S NEUROMODULATION ==========
     // Compute prediction error
     predictionError_ = reward - predictedReward;
     
@@ -948,6 +951,20 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     // Clamp to reasonable range
     dopamineLevel_ = std::clamp(dopamineLevel_, -1.0f, 1.0f);
     
+    // ==================== SIGNAL BRAINS ACTUAL DOPAMINE SYSTEM ===================
+    // CRITICAL: Signal the brain's actual dopamine system with reward prediction error
+    // This connects the agent's reward processing to the brain's neuromodulation
+    if (brain_->getDopamine()) {
+        brain_->getDopamine()->signalRewardPredictionError(predictionError_);
+        brain_->getDopamine()->update(0.001f);  // Update dopamine dynamics
+    }
+    
+    // Also signal actual reward to brain's dopamine system (for non-prediction error rewards)
+    if (std::abs(predictionError_) < 0.01f) {  // If prediction error is small, signal actual reward
+        brain_->getDopamine()->signalReward(reward);
+    }
+    
+    // ==================== CONTINUE WITH LOCAL NEUROMODULATION FOR COMPATIBILITY ===================
     // Apply to all synapses with eligibility traces
     for (const auto& region : brain_->getRegions()) {
         for (const auto& syn : region->getSynapses()) {
@@ -983,6 +1000,18 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+    
+    // ========== ENHANCED REWARD COMPUTATION ==========
+    // Use brain's reward system if available for more sophisticated reward computation
+    if (brain_->getReward()) {
+        // Get observation from brain's sensory system
+        // This requires accessing brain's current sensory state
+        // For now, use the reward signal directly
+        float computedReward = reward; // TODO: Get proper observation from brain
+        
+        // Apply to brain's reward system for learning
+        brain_->getReward()->add(computedReward);
     }
 }
 

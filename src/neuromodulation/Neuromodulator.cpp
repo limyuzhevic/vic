@@ -36,21 +36,33 @@ float Dopamine::getPlasticityFactor() const {
 }
 
 void Dopamine::update(TimestepDuration dt) {
-    // TODO PHASE 2: Implement real dopamine dynamics
-    // PLACEHOLDER: Decay towards baseline
-    pImpl->level = std::max(pImpl->baseline, pImpl->level - pImpl->decayRate * static_cast<float>(dt));
+    // Implement real dopamine dynamics: exponential decay toward baseline
+    float decay = pImpl->decayRate * static_cast<float>(dt);
+    pImpl->level = pImpl->baseline + (pImpl->level - pImpl->baseline) * std::exp(-decay);
 }
 
 void Dopamine::signalReward(float reward) {
-    // TODO PHASE 2: Implement real reward signaling
-    // PLACEHOLDER: Burst of dopamine on reward
-    pImpl->level = std::min(pImpl->peak, pImpl->level + reward * pImpl->releaseRate);
+    // Implement real reward signaling: dopamine burst proportional to reward magnitude
+    float burst = reward * pImpl->releaseRate;
+    float newLevel = std::min(pImpl->peak, pImpl->level + burst);
+    
+    // Add time-varying dynamics: reward bursts have sustained component
+    pImpl->level = newLevel;
 }
 
 void Dopamine::signalRewardPredictionError(float error) {
-    // TODO PHASE 2: Implement reward prediction error signaling
-    // PLACEHOLDER: Dopamine responds to prediction error
-    pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
+    // Implement real reward prediction error signaling (David Servan-Schreiber's model):
+    // Positive prediction error (better than expected) increases dopamine
+    // Negative prediction error (worse than expected) decreases dopamine toward baseline
+    float delta = error * pImpl->releaseRate;
+    
+    // Adaptive response: larger errors produce stronger responses
+    if (std::abs(error) > 0.01f) {
+        delta *= std::min(1.0f, std::abs(error) * 10.0f);
+    }
+    
+    // Integrate prediction error into dopamine level with bounded response
+    pImpl->level = std::clamp(pImpl->level + delta, pImpl->baseline, pImpl->peak);
 }
 
 } // namespace nlm
