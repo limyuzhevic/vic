@@ -496,6 +496,13 @@ std::vector<AgentBrain::MotorGroupActivity> AgentBrain::getMotorGroupActivities(
         float sum = 0.0f;
         float rateSum = 0.0f;
         for (const Neuron* n : neurons) {
+            // Apply attention modulation to motor neuron activity
+            float attentionMod = 1.0f;
+            if (brain_ && brain_->getAttention()) {
+                float inhibition = brain_->getAttention()->getInhibitionFor(n->getId());
+                float excitation = brain_->getAttention()->getExcitationFor(n->getId());
+                attentionMod = std::max(0.0f, 1.0f - inhibition + excitation);
+            }
             // Use membrane potential deviation from rest as activity measure
             sum += std::abs(n->getState().membranePotential - n->getState().restingPotential);
             if (n->getState().firingState == FiringState::Refractory) ++out.refractoryCount;
@@ -517,6 +524,7 @@ std::vector<AgentBrain::MotorGroupActivity> AgentBrain::getMotorGroupActivities(
 
 MotorCommand AgentBrain::decodeFromMotorNeurons() {
     auto activities = getMotorGroupActivities();
+    
     // Phase 6 silent-brain guard: if no motor neuron is actually
     // firing, no bias (planner, concept, reflex) may invent an
     // action from nothing. This was found by the reverted drive-
@@ -530,6 +538,38 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
         }
         if (maxRaw <= 0.1f) return MotorCommand::Wait;
     }
+    
+    // Phase 6 attention integration: apply attention modulation before biases
+    // This allows the brain to focus motor output on currently attended patterns
+    if (brain_ && brain_->getAttention()) {
+        // Process competition among working memory traces to determine attentional focus
+        if (!brain_->getWorkingMemory()->getMemoryNeurons().empty()) {
+            std::vector<NeuronId> competitors = brain_->getWorkingMemory()->getMemoryNeurons();
+            brain_->getAttention()->processCompetition(competitors);
+            
+            // Apply attention-based modulation to motor groups
+            // This is a simplified integration: attention winners get excitation boost
+            // In a full implementation, we would map working memory patterns to motor patterns
+            // and apply appropriate attentional weights
+            for (size_t i = 0; i < 5 && i < activities.size(); ++i) {
+                // Apply attention modulation based on current attentional state
+                float attentionMod = 1.0f;
+                if (brain_->getAttention()) {
+                    // Get inhibition/excitation for motor neurons (simplified)
+                    // This would be more sophisticated in a full implementation
+                    float inhibition = brain_->getAttention()->getInhibitionFor(
+                        motorForward_[i % motorForward_.size()]->getId());
+                    float excitation = brain_->getAttention()->getExcitationFor(
+                        motorForward_[i % motorForward_.size()]->getId());
+                    attentionMod = std::max(0.0f, 1.0f - inhibition + excitation);
+                    
+                    // Apply attention modulation to activity
+                    activities[i].activity *= attentionMod;
+                    activities[i].firingRate *= attentionMod;
+                }
+            }
+        }
+    }
     // Order matches getMotorGroupActivities(): fwd, bwd, left, right, interact, wait
     // Phase 4: innate proximity reflex for Interact. Interact never won
     // because its rate sat ~5 Hz below forward/backward in the saturated
@@ -539,7 +579,7 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
     // (1.0 + object radius ~0.4), so maxTouch > 0.05 means something is
     // within interact range. When that holds, Interact gets a flat
     // +12 Hz bonus: enough to overcome the usual few-Hz deficit, not
-    // enough to override a decisively winning movement pattern. This is
+    // enough to override a decisive winning movement pattern. This is
     // a reflex, not learned behaviour — the +10 reward that follows is
     // what reward-modulated plasticity can then learn from. It is
     // type-blind (touch cannot tell resource from hazard), so it can
@@ -855,27 +895,93 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action, with probability
-    // proportional to curiosity. Phase 4: the old 0.5 hard gate meant
-    // exploration never fired once novelty fell below 0.25 (which was
-    // every step after step 0, given the novelty bug). Now a typical
-    // moving curiosity of ~0.14 gives ~4% random actions, a novel scene
-    // at curiosity ~0.85 gives ~25%, and a fully familiar, stationary
-    // scene (curiosity ~0) gives none — exploration scales with novelty
-    // instead of being on/off behind an unreachable threshold.
+    // Enhanced curiosity exploration with attention integration
+    // Phase 4: the old 0.5 hard gate meant exploration never fired once
+    // novelty fell below 0.25, which was every step after step 0,
+    // given the novelty bug. Now a typical moving curiosity of ~0.14
+    // gives ~4% random actions, a novel scene at curiosity ~0.85 gives
+    // ~25%, and a fully familiar, stationary scene (curiosity ~0) gives
+    // none — exploration scales with novelty instead of being on/off
+    // behind an unreachable threshold.
+    
+    // Phase 6 attention-enhanced curiosity: exploration is guided by
+    // attentional focus. High attention to a pattern means we're actively
+    // processing it, so random exploration should be reduced. Low attention
+    // means we're not focusing, so exploration can help us discover new patterns.
+    
+    // Calculate base exploration probability
+    float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+    
+    // Apply attention modulation to exploration probability
+    if (brain_ && brain_->getAttention() && brain_->getWorkingMemory()) {
+        // Get attentional focus from working memory
+        auto& mem = *brain_->getWorkingMemory();
+        auto& memoryNeurons = mem.getMemoryNeurons();
+        
+        if (!memoryNeurons.empty()) {
+            // High attention to patterns reduces exploration
+            // This is because attention means we're already processing
+            // those patterns, so random exploration would be wasteful
+            // lowAttention = 1.0 - (attention effectiveness)
+            // For now, use working memory size as a proxy for attentional load
+            float attentionalLoad = std::min(1.0f, static_cast<float>(memoryNeurons.size()) / 50.0f);
+            
+            // Attention reduces exploration probability
+            exploreChance *= (1.0f - attentionalLoad * 0.5f);
+        }
+    }
+    
+    // Also consider concept formation as a source of attentional guidance
+    if (brain_ && brain_->getConceptFormation()) {
+        auto pat = conceptPattern();
+        float norm = 0.0f;
+        for (float v : pat) norm += v * v;
+        if (norm > 0.01f) {
+            size_t cid = brain_->getConceptFormation()->getMatchingConcept(pat);
+            const auto* foundConcept = cid ? brain_->getConceptFormation()->getConcept(cid) : nullptr;
+            if (foundConcept && !foundConcept->instances.empty()) {
+                float avgReward = 0.0f;
+                for (const auto& inst : foundConcept->instances) avgReward += inst.avgReward;
+                avgReward /= static_cast<float>(foundConcept->instances.size());
+                
+                // High-reward concepts focus us, reducing random exploration
+                // Strong positive concepts mean we're likely on the right track
+                if (avgReward > 0.1f) {
+                    exploreChance *= 0.7f;
+                } 
+                // Strong negative concepts mean we should explore more to find better alternatives
+                else if (avgReward < -0.1f) {
+                    exploreChance *= 1.3f;
+                }
+            }
+        }
+    }
+    
+    // Ensure exploreChance stays within reasonable bounds
+    exploreChance = std::max(0.0f, std::min(0.3f, exploreChance));
+    
     {
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-
         float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
         if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(uint32_t(0), uint32_t(7));
+            // Enhanced random motor command selection
+            // Use attention to bias the random choice toward currently attended patterns
+            int choice = 0;
+            if (brain_ && brain_->getAttention() && !memoryNeurons.empty() && !brain_->getWorkingMemory()->getMemoryNeurons().empty()) {
+                // If we have attentional focus, bias random choices toward
+                // motor patterns that might match the attentional state
+                choice = brain_->getRandomGenerator()->uniformInt(uint32_t(0), uint32_t(7));
+                // Note: in a full implementation, we would map attentional patterns
+                // to motor patterns and bias the random selection
+            } else {
+                choice = brain_->getRandomGenerator()->uniformInt(uint32_t(0), uint32_t(7));
+            }
+            
             switch (choice) {
                 case 0: return MotorCommand::MoveForward;
                 case 1: return MotorCommand::MoveBackward;
                 case 2: return MotorCommand::TurnLeft;
                 case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
+                case 4: return MotorCommand::LookLeft;  // These might not be actual motor commands
                 case 5: return MotorCommand::LookRight;
                 case 6: return MotorCommand::Interact;
                 default: return MotorCommand::Wait;

@@ -614,8 +614,60 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Integrate prediction with current brain state for predictive coding
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Get current sensory pattern from working memory
+            auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Create a simplified sensory input from current neural activity
+            // This is a placeholder - in a full implementation, we would
+            // extract actual sensory data or use a proxy for current state
+            SensoryInput currentInput;
+            
+            // For now, just pass a dummy input - the real integration
+            // would involve actual sensory encoding or neural pattern extraction
+            currentInput.setData(std::vector<float>(16, 0.0f));
+            
+            // Make prediction based on current state
+            auto predictedState = pImpl->predictionSystem->predictNextState(currentInput);
+            
+            // Update prediction system with actual brain state
+            // In a full implementation, this would use actual sensory input
+            pImpl->predictionSystem->updatePredictions(*predictedState, currentInput);
+        }
+        
+        // Apply prediction-based modulation to neural activity
+        // Predictions can influence attention and action selection
+        float predictionError = pImpl->predictionSystem->getPredictionError();
+        float predictionConfidence = pImpl->predictionSystem->getConfidence();
+        
+        // High prediction error can trigger exploration or reorganization
+        if (predictionError > 0.1f) {
+            // Increase novelty detection to support exploration
+            if (pImpl->novelty) {
+                pImpl->novelty->update(pImpl->timestep);
+            }
+            // Boost curiosity to encourage exploration
+            if (pImpl->curiosity) {
+                pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, 
+                                       pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, 
+                                       pImpl->timestep);
+            }
+        }
+        
+        // High confidence can increase focus and reduce exploration
+        if (predictionConfidence > 0.8f) {
+            // Apply attention focus based on predictions
+            if (pImpl->attention) {
+                // Prediction-based attentional focus
+                // Patterns with high prediction confidence get attentional priority
+                if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+                    // This would be more sophisticated in a full implementation
+                    // For now, just log the confidence
+                    NLM_LOG_DEBUG("High prediction confidence: " + std::to_string(predictionConfidence));
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
