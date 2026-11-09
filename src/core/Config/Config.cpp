@@ -18,10 +18,126 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// Helper function to convert string value to ConfigValue
+// Improved with better error handling and validation
+ConfigValue stringToConfigValue(const std::string& str) {
+    if (str.empty()) {
+        return std::string();
+    }
     
+    // Check if it's a boolean
+    if (str == "true") {
+        return true;
+    } else if (str == "false") {
+        return false;
+    }
+    
+    // Check if it's an array (simple format: [val1,val2,val3])
+    if (str.size() >= 2 && str[0] == '[' && str[str.size() - 1] == ']') {
+        std::vector<double> arrayValues;
+        std::string content = str.substr(1, str.size() - 2); // Remove brackets
+        
+        if (content.empty()) {
+            return arrayValues; // Empty array
+        }
+        
+        size_t pos = 0;
+        while (pos < content.size()) {
+            // Find next comma or end
+            size_t endPos = content.find(',', pos);
+            if (endPos == std::string::npos) {
+                endPos = content.size();
+            }
+            
+            // Extract token
+            std::string token = content.substr(pos, endPos - pos);
+            
+            // Trim whitespace
+            size_t start = token.find_first_not_of(" \t\n\r");
+            size_t end = token.find_last_not_of(" \t\n\r");
+            if (start != std::string::npos && end != std::string::npos) {
+                token = token.substr(start, end - start + 1);
+            }
+            
+            // Skip empty tokens
+            if (token.empty()) {
+                pos = endPos + 1;
+                continue;
+            }
+            
+            // Parse the token as a number
+            try {
+                // Try to parse as integer first
+                size_t intPos;
+                long long intVal = std::stoll(token, &intPos);
+                
+                // Check if entire string was consumed (not "123abc")
+                if (intPos == token.size()) {
+                    // Valid integer
+                    arrayValues.push_back(static_cast<double>(intVal));
+                } else {
+                    // Not a pure integer, try as double
+                    size_t doublePos;
+                    double doubleVal = std::stod(token, &doublePos);
+                    if (doublePos == token.size()) {
+                        arrayValues.push_back(doubleVal);
+                    } else {
+                        // Invalid number format
+                        // Skip invalid entries
+                        NLM_LOG_WARNING("Invalid array element in config: " + token);
+                    }
+                }
+            } catch (const std::exception&) {
+                // Skip invalid elements
+                NLM_LOG_WARNING("Invalid array element in config: " + token);
+            }
+            
+            // Move to next position
+            pos = endPos + 1;
+            while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' || content[pos] == ',')) {
+                pos++;
+            }
+        }
+        
+        return arrayValues;
+    }
+    
+    // Check if it's a number (integer or float)
+    try {
+        // Try integer first
+        size_t pos;
+        long long intVal = std::stoll(str, &pos);
+        
+        // Validate integer range for neural simulation parameters
+        if (pos == str.size() && intVal >= std::numeric_limits<long long>::min() && 
+            intVal <= std::numeric_limits<long long>::max()) {
+            // Check if this is a reasonable value for neural parameters
+            if (str == "0" || str == "1" || (std::abs(intVal) < 1000000)) {
+                return intVal;
+            }
+        }
+        
+        // Not a valid integer, try as double
+        size_t doublePos;
+        double doubleVal = std::stod(str, &doublePos);
+        if (doublePos == str.size() && 
+            std::isfinite(doubleVal) && 
+            (std::abs(doubleVal) < 1e6 || doubleVal == 0.0)) {
+            return doubleVal;
+        } else {
+            NLM_LOG_WARNING("Invalid numeric value in config: " + str);
+            return std::string();
+        }
+        
+    } catch (const std::exception&) {
+        // Not a valid number
+    }
+    
+    // Default to string
+    return str;
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -48,7 +164,9 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Convert string to appropriate ConfigValue type
+            ConfigValue configValue = stringToConfigValue(value);
+            set(key, configValue, ConfigSource::File);
         }
     }
     
@@ -86,7 +204,40 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format the value based on its type
+        file << entry.key << " = ";
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                // Quote strings with special characters
+                if (value.find(' ') != std::string::npos || 
+                    value.find('"') != std::string::npos ||
+                    value.find('"') != std::string::npos) {
+                    file << "\"" << value << "\"";
+                } else {
+                    file << value;
+                }
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << value[i] << "\"";
+                    } else {
+                        file << value[i];
+                    }
+                }
+                file << "]";
+            } else {
+                // Numeric types and bool
+                file << value;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;

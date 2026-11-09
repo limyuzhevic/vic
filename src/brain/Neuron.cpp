@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <numeric>
 
 namespace nlm {
 
@@ -111,81 +112,24 @@ void Neuron::setResetPotential(MembranePotential potential) {
     pImpl->state.resetPotential = potential;
 }
 
+MembranePotential Neuron::getRestingPotential() const {
+    return pImpl->state.restingPotential;
+}
+
+void Neuron::setResetPotential(MembranePotential potential) {
+    pImpl->state.resetPotential = potential;
+}
+
+MembranePotential Neuron::getResetPotential() const {
+    return pImpl->state.resetPotential;
+}
+
 bool Neuron::checkThreshold() const {
     return pImpl->state.membranePotential >= pImpl->state.threshold;
 }
 
 float Neuron::getLastSpikeTime() const {
     return pImpl->state.lastSpikeTime;
-}
-
-void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
-    // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
-}
-
-void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
-    // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
-}
-
-void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
-    // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
-}
-
-void Neuron::injectCurrent(MembranePotential current) {
-    // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
-    pImpl->synapticInput += current;
-}
-
-void Neuron::clearTotalCurrent() {
-    pImpl->synapticInput = 0.0f;
-}
-
-void Neuron::recordSpike(Timestamp timestamp) {
-    pImpl->spikeHistory.push_back(timestamp);
-    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
-    }
-}
-
-void Neuron::clearSpikeHistory() {
-    pImpl->spikeHistory.clear();
-}
-
-void Neuron::addIncomingSynapse(SynapseHandle handle) {
-    pImpl->incomingSynapses.push_back(handle);
-}
-
-void Neuron::addOutgoingSynapse(SynapseHandle handle) {
-    pImpl->outgoingSynapses.push_back(handle);
-}
-
-NeuronState& Neuron::getState() {
-    return pImpl->state;
-}
-
-PlasticityFlags& Neuron::getPlasticityFlags() {
-    return pImpl->plasticityFlags;
-}
-
-void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
-    pImpl->plasticityFlags.hebbian = hebbian;
-    pImpl->plasticityFlags.stdp = stdp;
-    pImpl->plasticityFlags.reward_modulated = rewardModulated;
-}
-
-void Neuron::setRegionId(RegionId region) {
-    pImpl->regionId = region;
-}
-
-void Neuron::setPopulationId(PopulationId population) {
-    pImpl->populationId = population;
 }
 
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
@@ -244,7 +188,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (dt > 0.0) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
-
+    
     // Check for spike
     if (V >= threshold) {
         fired = true;
@@ -274,6 +218,135 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     pImpl->synapticInput = 0.0f;
     
     return fired;
+}
+
+void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
+    // Real synaptic input: excitatory currents add to total current
+    // amplitude represents synaptic conductance * reversal potential contribution
+    pImpl->synapticInput += amplitude;
+}
+
+void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
+    // Real inhibitory input: subtract from total current
+    // Inhibitory synaptic currents hyperpolarize the neuron
+    pImpl->synapticInput -= amplitude;
+}
+
+void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
+    // Modulatory input affects plasticity but not directly integrated
+    // Used for neuromodulation (e.g., dopamine, acetylcholine)
+    pImpl->state.adaptationVariable += amplitude * 0.1f;
+}
+
+void Neuron::injectCurrent(MembranePotential current) {
+    // Direct current injection (e.g., from sensory input or external source)
+    // Add to synaptic input for LIF integration
+    pImpl->synapticInput += current;
+}
+
+void Neuron::clearTotalCurrent() {
+    pImpl->synapticInput = 0.0f;
+    pImpl->totalCurrent = 0.0f;
+}
+
+void Neuron::recordSpike(Timestamp timestamp) {
+    pImpl->spikeHistory.push_back(timestamp);
+    if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
+        pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
+    }
+}
+
+const Timestamp* Neuron::getSpikeHistory() const {
+    return pImpl->spikeHistory.data();
+}
+
+size_t Neuron::getSpikeHistorySize() const {
+    return pImpl->spikeHistory.size();
+}
+
+void Neuron::clearSpikeHistory() {
+    pImpl->spikeHistory.clear();
+}
+
+void Neuron::addIncomingSynapse(SynapseHandle handle) {
+    pImpl->incomingSynapses.push_back(handle);
+}
+
+void Neuron::addOutgoingSynapse(SynapseHandle handle) {
+    pImpl->outgoingSynapses.push_back(handle);
+}
+
+const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const {
+    return pImpl->incomingSynapses;
+}
+
+const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const {
+    return pImpl->outgoingSynapses;
+}
+
+const NeuronState& Neuron::getState() const {
+    return pImpl->state;
+}
+
+NeuronState& Neuron::getState() {
+    return pImpl->state;
+}
+
+MembranePotential Neuron::getMembranePotential() const {
+    return pImpl->state.membranePotential;
+}
+
+MembranePotential Neuron::getThreshold() const {
+    return pImpl->state.threshold;
+}
+
+bool Neuron::isFiring() const {
+    return pImpl->state.firingState == FiringState::Active;
+}
+
+bool Neuron::isRefractory() const {
+    return pImpl->state.refractoryRemaining > 0;
+}
+
+FiringRate Neuron::getFiringRate() const {
+    return pImpl->state.firingRate;
+}
+
+MembranePotential Neuron::getTotalCurrent() const {
+    // For backward compatibility, return synaptic input
+    // Note: The original design had totalCurrent but was never used
+    // We maintain both for compatibility
+    return pImpl->synapticInput;
+}
+
+const PlasticityFlags& Neuron::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
+}
+
+PlasticityFlags& Neuron::getPlasticityFlags() {
+    return pImpl->plasticityFlags;
+}
+
+void Neuron::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
+    pImpl->plasticityFlags.hebbian = hebbian;
+    pImpl->plasticityFlags.stdp = stdp;
+    pImpl->plasticityFlags.reward_modulated = rewardModulated;
+}
+
+void Neuron::setRegionId(RegionId region) {
+    pImpl->regionId = region;
+}
+
+RegionId Neuron::getRegionId() const {
+    return pImpl->regionId;
+}
+
+void Neuron::setPopulationId(PopulationId population) {
+    pImpl->populationId = population;
+}
+
+PopulationId Neuron::getPopulationId() const {
+    return pImpl->populationId;
 }
 
 void Neuron::step(Timestamp currentTime) {
@@ -316,20 +389,26 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     pImpl->spikeHistory.clear();
 }
 
-NeuronId Neuron::getId() const { return pImpl->id; }
-NeuronType Neuron::getType() const { return pImpl->type; }
-const NeuronState& Neuron::getState() const { return pImpl->state; }
-MembranePotential Neuron::getMembranePotential() const { return pImpl->state.membranePotential; }
-MembranePotential Neuron::getThreshold() const { return pImpl->state.threshold; }
-bool Neuron::isFiring() const { return pImpl->state.firingState == FiringState::Active; }
-bool Neuron::isRefractory() const { return pImpl->state.refractoryRemaining > 0; }
-FiringRate Neuron::getFiringRate() const { return pImpl->state.firingRate; }
-MembranePotential Neuron::getTotalCurrent() const { return pImpl->totalCurrent; }
-const std::vector<Timestamp>& Neuron::getSpikeHistory() const { return pImpl->spikeHistory; }
-const std::vector<SynapseHandle>& Neuron::getIncomingSynapses() const { return pImpl->incomingSynapses; }
-const std::vector<SynapseHandle>& Neuron::getOutgoingSynapses() const { return pImpl->outgoingSynapses; }
-const PlasticityFlags& Neuron::getPlasticityFlags() const { return pImpl->plasticityFlags; }
-RegionId Neuron::getRegionId() const { return pImpl->regionId; }
-PopulationId Neuron::getPopulationId() const { return pImpl->populationId; }
+void Neuron::batchAddIncomingSynapses(const std::vector<SynapseHandle>& handles) {
+    pImpl->incomingSynapses.reserve(pImpl->incomingSynapses.size() + handles.size());
+    for (const auto& handle : handles) {
+        pImpl->incomingSynapses.push_back(handle);
+    }
+}
+
+void Neuron::batchAddOutgoingSynapses(const std::vector<SynapseHandle>& handles) {
+    pImpl->outgoingSynapses.reserve(pImpl->outgoingSynapses.size() + handles.size());
+    for (const auto& handle : handles) {
+        pImpl->outgoingSynapses.push_back(handle);
+    }
+}
+
+NeuronId Neuron::getId() const {
+    return pImpl->id;
+}
+
+NeuronType Neuron::getType() const {
+    return pImpl->type;
+}
 
 } // namespace nlm

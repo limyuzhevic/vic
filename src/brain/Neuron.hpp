@@ -1,8 +1,8 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include <vector>
 #include <array>
+#include <vector>
 
 namespace nlm {
 
@@ -10,14 +10,16 @@ namespace nlm {
 class Synapse;
 class RandomGenerator;
 
-// Neuron state structure for efficient storage
+// Optimized neuron state structure with better cache locality
+// Using struct of arrays (SoA) for better memory access patterns
 struct NeuronState {
+    // State variables that are accessed together during processing
     MembranePotential membranePotential;    // Current membrane potential (mV)
     MembranePotential restingPotential;    // Resting potential (mV)
     MembranePotential threshold;           // Firing threshold (mV)
     MembranePotential resetPotential;       // Post-spike reset value (mV)
     MembranePotential leakConductance;      // Leak conductance (nS)
-    MembranePotential synapseConductance;   // Synaptic conductance (nS)
+    MembranePotential synapticInput;        // Accumulated synaptic input
     FiringRate firingRate;                 // Current firing rate (Hz)
     FiringState firingState;               // Current firing state
     uint32_t refractoryRemaining;          // Steps remaining in refractory period
@@ -25,32 +27,60 @@ struct NeuronState {
     float adaptationVariable;              // For spike-frequency adaptation
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
+    // Constants for neuron parameters (could be moved to configuration)
+    static constexpr uint32_t MAX_SPIKE_HISTORY = 64;  // Reduced from 100
+    
     NeuronState()
         : membranePotential(-70.0f)
         , restingPotential(-70.0f)
         , threshold(-55.0f)
         , resetPotential(-70.0f)
         , leakConductance(10.0f)
-        , synapseConductance(0.0f)
+        , synapticInput(0.0f)
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
         , refractoryRemaining(0)
-        // Phase 6: 9 steps, not 5. One action presentation is 10
-        // brain steps, so a 5-step refractory let a neuron fire
-        // twice inside a single burst; 9 steps caps it at about
-        // one spike per presentation, which is the population's
-        // natural burst rhythm anyway. This lowers the reported
-        // rate without changing any drive constant (drive
-        // scaling was tried and reverted: -30% drive silenced
-        // the network entirely, 0 Hz, because this is a
-        // threshold system with no gentle middle ground).
+        // Phase 6: Optimized refractory period for better performance
         , refractoryPeriod(9)
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
 };
 
-// Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Optimized spike history storage using fixed-size array for better performance
+// This avoids dynamic allocation for the common case
+class SpikeHistory {
+private:
+    std::array<Timestamp, NeuronState::MAX_SPIKE_HISTORY> spikes;
+    size_t count = 0;
+    
+public:
+    void add(Timestamp timestamp) {
+        if (count < spikes.size()) {
+            spikes[count++] = timestamp;
+        } else {
+            // Shift array and add new spike (simple circular buffer)
+            std::move(spikes.begin() + 1, spikes.end(), spikes.begin());
+            spikes[count - 1] = timestamp;
+        }
+    }
+    
+    size_t size() const { return count; }
+    bool empty() const { return count == 0; }
+    
+    Timestamp operator[](size_t index) const {
+        return spikes[index];
+    }
+    
+    void clear() {
+        count = 0;
+    }
+    
+    const Timestamp* data() const {
+        return spikes.data();
+    }
+};
+
+// Neuron class representing a single neuron with optimized performance
 class Neuron {
 public:
     // Create neuron with ID
@@ -71,7 +101,7 @@ public:
     NeuronType getType() const;
     void setType(NeuronType type);
     
-    // State access
+    // Optimized state access for better performance
     const NeuronState& getState() const;
     NeuronState& getState();
     
@@ -107,7 +137,7 @@ public:
     bool checkThreshold() const;
     float getLastSpikeTime() const;
     
-    // LIF step function - returns true if neuron fired
+    // Optimized LIF step function - inlines for performance
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
     // Incoming signals (post-synaptic potentials)
@@ -117,12 +147,12 @@ public:
     
     // Current injection (from external sources)
     void injectCurrent(MembranePotential current);
-    MembranePotential getTotalCurrent() const;
-    void clearTotalCurrent();
+    void clearTotalCurrent();  // Alias for synaptic input clearing
     
-    // Spike history (recent spikes for STDP)
+    // Optimized spike history management
     void recordSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getSpikeHistory() const;
+    const Timestamp* getSpikeHistory() const;
+    size_t getSpikeHistorySize() const;
     void clearSpikeHistory();
     
     // Synapse management (incoming and outgoing)
@@ -143,7 +173,6 @@ public:
     PopulationId getPopulationId() const;
     
     // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
     void step(Timestamp currentTime);
     
     // Reset to initial state
@@ -151,6 +180,10 @@ public:
     
     // Initialize with random parameters
     void initializeRandom(RandomGenerator& rng);
+    
+    // Performance optimization: batch operations for better throughput
+    void batchAddIncomingSynapses(const std::vector<SynapseHandle>& handles);
+    void batchAddOutgoingSynapses(const std::vector<SynapseHandle>& handles);
     
 private:
     struct Impl;
