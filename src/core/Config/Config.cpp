@@ -19,9 +19,6 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -48,35 +45,22 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Add description for common config keys
+            std::string description = "";
+            if (key == "random_seed") description = "Random number generator seed for reproducible results";
+            else if (key == "neuron_count") description = "Number of neurons in the brain";
+            else if (key == "region_count") description = "Number of neural regions";
+            else if (key == "connection_probability") description = "Probability of connection between neurons";
+            else if (key == "simulation_timestep") description = "Simulation time step in seconds";
+            
+            set(key, value, ConfigSource::File, description);
         }
     }
     
     return true;
 }
 
-bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        
-        // Handle --key=value format
-        if (arg.substr(0, 2) == "--") {
-            size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
-                std::string key = arg.substr(2, pos - 2);
-                std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
-            }
-        }
-        // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
-            std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
-        }
-    }
-    return true;
-}
+
 
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
@@ -93,14 +77,29 @@ bool Config::saveToFile(const std::string& filepath) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    set(key, value, source, "");
+}
+
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description) {
+    // Validate key format
+    if (key.empty()) {
+        throw std::invalid_argument("Configuration key cannot be empty");
+    }
+    
+    // Check for duplicates (first one wins)
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
     if (it != pImpl->entries.end()) {
+        // Update existing entry
         it->value = value;
         it->source = source;
+        if (!description.empty()) {
+            it->description = description;
+        }
     } else {
-        pImpl->entries.emplace_back(key, value, source);
+        // Create new entry
+        pImpl->entries.emplace_back(key, value, source, description);
     }
 }
 

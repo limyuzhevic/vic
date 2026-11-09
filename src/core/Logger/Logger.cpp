@@ -196,6 +196,11 @@ LogStream::LogStream(LogLevel level, const std::string& file, int line, const st
     : level_(level), file_(file), line_(line), function_(function) {}
 
 LogStream::~LogStream() {
+    // Filter by level
+    if (level_ < Logger::getGlobal().getLevel()) {
+        return;
+    }
+    
     Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
 }
 

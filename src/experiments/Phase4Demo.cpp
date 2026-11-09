@@ -39,10 +39,35 @@ int main(int argc, char* argv[]) {
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
     
-    // Parse command line arguments
+    // Parse command line arguments with better error handling
     size_t numTrials = 50;
+    
+    // Check for help argument
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--help" || std::string(argv[i]) == "-h") {
+            std::cout << "Usage: " << argv[0] << " [num_trials]\n";
+            std::cout << "  num_trials: Number of trials to run (default: 50)\n";
+            std::cout << "Example: " << argv[0] << " 100\n";
+            return 0;
+        }
+    }
+    
+    // Parse number of trials with validation
     if (argc > 1) {
-        numTrials = std::stoi(argv[1]);
+        try {
+            numTrials = std::stoull(argv[1]);
+            if (numTrials < 1) {
+                std::cerr << "Error: Number of trials must be at least 1\n";
+                return 1;
+            }
+            if (numTrials > 1000) {
+                std::cout << "Warning: High number of trials (" << numTrials << ") may take a long time\n";
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: Invalid number of trials: " << argv[1] << "\n";
+            std::cerr << "Reason: " << e.what() << "\n";
+            return 1;
+        }
     }
     
     // Create configuration
@@ -186,39 +211,91 @@ int main(int argc, char* argv[]) {
         printResult("Transfer Performance", results.transferPerformance);
     }
     
-    // Run Integrated Experiment
-    printSection("10. Integrated Phase 4");
-    {
-        Phase4IntegratedExperiment experiment;
-        Phase4Results results = experiment.run(brain.get(), 10, 50);
-        
-        printResult("Total Reward", results.totalReward);
-        printResult("Episodes Stored", results.episodesStored);
-        printResult("Concepts Formed", results.conceptsFormed);
-        printResult("Planning Confidence", results.planningConfidence);
-        printResult("Body Awareness", results.bodyAwareness);
+        // Run all experiments with comprehensive error handling
+    std::cout << "\n=== RUNNING ALL EXPERIMENTS ===\n";
+    
+    std::vector<std::pair<std::string, std::function<void()>>> experiments = {
+        {"Temporal Prediction", [&]() {
+            TemporalPredictionExperiment experiment;
+            auto results = experiment.run(brain.get(), numTrials);
+            printExperimentResults("1. Temporal Prediction Learning", results);
+        }},
+        {"Working Memory", [&]() {
+            WorkingMemoryExperiment experiment;
+            auto results = experiment.run(brain.get(), numTrials);
+            printExperimentResults("2. Working Memory", results);
+        }},
+        {"Episodic Memory", [&]() {
+            EpisodicRecallExperiment experiment;
+            auto results = experiment.run(brain.get(), numTrials);
+            printExperimentResults("3. Episodic Memory", results);
+        }},
+        {"Concept Formation", [&]() {
+            ConceptFormationExperiment experiment;
+            auto results = experiment.run(brain.get(), numTrials);
+            printExperimentResults("4. Concept Formation", results);
+            if (results.conceptsFormed > 0) {
+                std::cout << "  [SUCCESS] Concepts emerged from repeated experience!\n";
+            }
+        }},
+        {"Neural Attention", [&]() {
+            AttentionExperiment experiment;
+            auto results = experiment.run(brain.get(), numTrials);
+            printExperimentResults("5. Neural Attention", results);
+            if (results.attentionSelectivity > 0.5f) {
+                std::cout << "  [SUCCESS] Selective attention emerged!\n";
+            }
+        }},
+        {"Multi-Step Planning", [&]() {
+            PlanningExperiment experiment;
+            auto results = experiment.run(brain.get(), numTrials / 2);
+            printExperimentResults("6. Multi-Step Planning", results);
+            if (results.planningAccuracy > 0.4f) {
+                std::cout << "  [SUCCESS] Planning ability demonstrated!\n";
+            }
+        }},
+        {"Self-Model", [&]() {
+            SelfModelExperiment experiment;
+            auto results = experiment.run(brain.get(), numTrials);
+            printExperimentResults("7. Self-Model", results);
+            if (results.selfPredictionAccuracy > 0.3f) {
+                std::cout << "  [SUCCESS] Self-model developing!\n";
+            }
+        }},
+        {"Social Learning", [&]() {
+            SocialLearningExperiment experiment;
+            auto results = experiment.run(brain.get(), numTrials / 2);
+            printExperimentResults("8. Social Learning", results);
+            if (results.imitationAccuracy > 0.2f) {
+                std::cout << "  [SUCCESS] Social learning observed!\n";
+            }
+        }},
+        {"Continual Learning", [&]() {
+            ContinualLearningExperiment experiment;
+            auto results = experiment.run(brain.get(), numTrials);
+            printExperimentResults("9. Continual Learning", results);
+        }},
+        {"Integrated Phase 4", [&]() {
+            Phase4IntegratedExperiment experiment;
+            auto results = experiment.run(brain.get(), 10, 50);
+            printExperimentResults("10. Integrated Phase 4", results);
+        }}
+    };
+    
+    // Run experiments with error handling
+    for (size_t i = 0; i < experiments.size(); ++i) {
+        try {
+            std::cout << "\n" << experiments[i].first << " experiment (" << (i + 1) << "/" << experiments.size() << ")...";
+            experiments[i].second();
+            std::cout << " ✓ Complete" << std::endl;
+        } catch (const std::exception& e) {
+            std::cerr << " ✗ Failed: " << e.what() << std::endl;
+            // Continue with other experiments
+        } catch (...) {
+            std::cerr << " ✗ Failed: Unknown error" << std::endl;
+            // Continue with other experiments
+        }
     }
-    
-    // Final summary
-    printHeader("PHASE 4 SUMMARY");
-    
-    std::cout << "\nPhase 4 demonstrates:\n";
-    std::cout << "  - Temporal prediction: Learning relationships between events\n";
-    std::cout << "  - Working memory: Maintaining information across delays\n";
-    std::cout << "  - Episodic memory: Storing and recalling experiences\n";
-    std::cout << "  - Concept formation: Discovering patterns without labels\n";
-    std::cout << "  - Neural attention: Selective processing through competition\n";
-    std::cout << "  - Multi-step planning: Using predictions to select actions\n";
-    std::cout << "  - Self-model: Learning body schema and action consequences\n";
-    std::cout << "  - Social learning: Observing and imitating others\n";
-    std::cout << "  - Continual learning: Adapting to new tasks\n";
-    
-    std::cout << "\nAll mechanisms emerge from neural dynamics and plasticity.\n";
-    std::cout << "No predefined concepts, rules, or symbolic AI were used.\n";
-    
-    std::cout << "\n" << std::string(60, '=') << "\n";
-    std::cout << "Phase 4 Complete!\n";
-    std::cout << std::string(60, '=') << "\n";
     
     return 0;
 }
