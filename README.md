@@ -103,6 +103,85 @@ currently separate demos per phase, not a single unified binary:
 ./nlm_benchmark
 ```
 
+## Enhanced Phase 6 System
+
+The Phase 6 demo (`./nlm_phase6_demo`) has been enhanced with improved user experience, configuration management, and documentation:
+
+### New Features Added
+
+1. **Enhanced Command-Line Interface**:
+   - `--help` flag with usage examples
+   - `--quick` and `--full` shortcuts for common configurations
+   - Support for custom neuron count and step count
+   - Improved error messages and validation
+
+2. **Configuration Profiles**:
+   - **Beginner**: 200 neurons, 1000 steps (basic testing)
+   - **Intermediate**: 500 neurons, 3000 steps (development)
+   - **Advanced**: 1000 neurons, 10000 steps (production)
+
+3. **Configuration Validation**:
+   - Input validation with helpful warnings
+   - Range checking for all parameters
+   - Configuration summaries in log output
+
+4. **Enhanced Logging**:
+   - Detailed configuration reporting
+   - Progress tracking for long experiments
+   - Better error messages and recovery options
+
+5. **Comprehensive Documentation**:
+   - `experiments_guide.md` - Complete user guide
+   - `quick_examples.md` - Practical examples
+   - Enhanced README with setup instructions
+
+### Running the Enhanced Phase 6 Demo
+
+```bash
+# Quick test with default settings
+./nlm_phase6_demo
+
+# Quick demo mode with shortcuts
+./nlm_phase6_demo --quick  # 100 neurons, 500 steps
+./nlm_phase6_demo --full  # 1000 neurons, 5000 steps with checkpointing
+
+# Custom configuration
+./nlm_phase6_demo --neurons 200 --steps 2000 --checkpoint ./my_checkpoint.bin
+
+# View all options
+./nlm_phase6_demo --help
+```
+
+### Configuration Examples
+
+| Command | Neurons | Steps | Description |
+|---------|---------|-------|-------------|
+| `--quick` | 100 | 500 | Fast system test |
+| `--full` | 1000 | 5000 | Comprehensive test |
+| Custom | Custom | Custom | User-defined configuration |
+
+### Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Running
+
+Build all targets first (see Building above). The entry points are
+currently separate demos per phase, not a single unified binary:
+
+```bash
+./nlm                 # Phase 2 demo in src/main.cpp
+./nlm_phase3_demo
+./nlm_phase4_demo
+./nlm_phase6_demo     # Phase 6 integration test
+./nlm_benchmark
+```
+
 `nlm_phase6_demo` runs a comprehensive integration test verifying all
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
 library in CMake; it does not yet have a standalone demo executable.

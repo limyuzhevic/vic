@@ -23,10 +23,52 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
-                 std::to_string(config.maxSteps) + " steps");
+                 std::to_string(config.maxSteps) + " steps, " +
+                 std::to_string(config.regionCount) + " regions, " +
+                 std::to_string(config.connectionProbability * 100) + "% connection probability");
     
-    // Create configuration
+    // Show configuration summary
+    NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
+                 std::to_string(config.maxSteps) + " steps, " +
+                 std::to_string(config.regionCount) + " regions, " +
+                 std::to_string(config.connectionProbability * 100) + "% connection probability");
+    
+    // Show configuration summary
+    NLM_LOG_INFO("  Checkpointing: " + std::string(config.enableCheckpointing ? "ENABLED" : "DISABLED"));
+    NLM_LOG_INFO("  Replay: " + std::string(config.enableReplay ? "ENABLED" : "DISABLED"));
+    NLM_LOG_INFO("  Development: " + std::string(config.enableDevelopment ? "ENABLED" : "DISABLED"));
+    if (!config.checkpointPath.empty()) {
+        NLM_LOG_INFO("  Checkpoint path: " + config.checkpointPath);
+    }
+    
+    // Show configuration summary
+    if (config.enableProfiling) {
+        NLM_LOG_INFO("  Profiling: ENABLED - Detailed performance analysis will be collected");
+    }
+    if (config.enableMetricsExport) {
+        NLM_LOG_INFO("  Metrics export: ENABLED - Results will be saved to " + config.metricsOutputPath);
+    }
+    if (config.enableVisualization) {
+        NLM_LOG_INFO("  Visualization: ENABLED - Visualization will be generated in " + config.visualizationOutputPath);
+    }
+    
+    // Create configuration with advanced validation
     auto cfg = std::make_shared<Config>();
+    
+    // Validate and set configuration with user feedback
+    bool configValid = true;
+    std::vector<std::string> warnings;
+    
+    // Validate neuron count (reasonable bounds)
+    if (config.neuronCount < 10) {
+        warnings.push_back("Neuron count very low (" + std::to_string(config.neuronCount) + ". Consider increasing to 100+ for meaningful results");
+        configValid = false;
+    }
+    
+    if (config.neuronCount > 5000) {
+        warnings.push_back("High neuron count may require more simulation time");
+    }
+    
     cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount));
     cfg->set("region_count", static_cast<int64_t>(config.regionCount));
     cfg->set("connection_probability", config.connectionProbability);

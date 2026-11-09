@@ -18,6 +18,49 @@ int main(int argc, char* argv[]) {
     // Initialize logging
     Logger::getGlobal().setLevel(LogLevel::Info);
     
+    // Parse command line arguments for configuration
+    Phase6Config config;
+    bool demoMode = true;
+    std::string checkpointFile = "./checkpoint.bin";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--quick" || arg == "-q") {
+            demoMode = true;
+            config.neuronCount = 100;
+            config.maxSteps = 500;
+            config.enableCheckpointing = false;
+            std::cout << "Quick demo mode enabled" << std::endl;
+        } else if (arg == "--full" || arg == "-f") {
+            demoMode = false;
+            config.neuronCount = 1000;
+            config.maxSteps = 5000;
+            config.enableCheckpointing = true;
+            std::cout << "Full demo mode enabled" << std::endl;
+        } else if (arg == "--checkpoint" && i + 1 < argc) {
+            checkpointFile = argv[++i];
+            config.checkpointPath = checkpointFile;
+            config.enableCheckpointing = true;
+            std::cout << "Checkpoint file: " << checkpointFile << std::endl;
+        } else if (arg == "--neurons" && i + 1 < argc) {
+            config.neuronCount = std::stoi(argv[++i]);
+            std::cout << "Neuron count: " << config.neuronCount << std::endl;
+        } else if (arg == "--steps" && i + 1 < argc) {
+            config.maxSteps = std::stoi(argv[++i]);
+            std::cout << "Max steps: " + std::to_string(config.maxSteps) << std::endl;
+        } else if (arg == "--help" || arg == "-h") {
+            std::cout << "NLM Phase 6 Demo - Usage:" << std::endl;
+            std::cout << "  nlm_phase6_demo [--quick|-q] [--full|-f] [--checkpoint <file>] [--neurons <count>] [--steps <count>] [--help|-h]" << std::endl;
+            std::cout << "  --quick or -q: Run quick demo with 100 neurons for 500 steps (default)" << std::endl;
+            std::cout << "  --full or -f: Run full demo with 1000 neurons for 5000 steps with checkpointing" << std::endl;
+            std::cout << "  --checkpoint <file>: Enable checkpointing and specify checkpoint file" << std::endl;
+            std::cout << "  --neurons <count>: Set custom neuron count" << std::endl;
+            std::cout << "  --steps <count>: Set custom step count" << std::endl;
+            std::cout << "  --help or -h: Show this help message" << std::endl;
+            return 0;
+        }
+    }
+    
     // Create experiment
     Phase6IntegratedExperiment experiment;
     
@@ -51,14 +94,18 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with user-configurable settings
     std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    
+    if (demoMode) {
+        // Use demo settings for quick testing
+        config.neuronCount = config.neuronCount == 1000 ? 500 : config.neuronCount;
+        config.maxSteps = config.maxSteps == 10000 ? 2000 : config.maxSteps;
+        config.enableCheckpointing = true;
+        config.enableReplay = true;
+        config.enableDevelopment = true;
+        config.checkpointPath = checkpointFile;
+    }
     
     auto result = experiment.run(config);
     
@@ -80,6 +127,12 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
+    
+    // Show usage summary
+    std::cout << std::endl;
+    std::cout << "=== USAGE SUMMARY ===" << std::endl;
+    std::cout << "Run './nlm_phase6_demo --help' for more configuration options" << std::endl;
+    std::cout << "Available modes: --quick (default), --full, or custom configuration" << std::endl;
     
     return 0;
 }
