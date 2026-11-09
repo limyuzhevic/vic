@@ -18,6 +18,12 @@ public:
     // TODO PHASE 2: Implement real action selection
     std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
     
+    // Calculate activity level for a specific action type
+    float calculateActionActivity(const class NeuralRegion& motorRegion, ActionType action) const;
+    
+    // Get action weight based on action type and learned preferences
+    float getActionWeight(ActionType action) const;
+    
     // Get available actions
     const std::vector<ActionType>& getAvailableActions() const;
     

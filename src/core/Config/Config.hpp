@@ -59,6 +59,12 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from JSON file
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML file
+    bool loadFromYAML(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
@@ -94,6 +100,28 @@ template<typename T>
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Serialize configuration value to string
+    std::string serializeValue(const ConfigValue& value) const;
+    
+    // Parse string to configuration value
+    ConfigValue parseValue(const std::string& valueStr, const std::string& key = "") const;
+    
+    // Convert string to boolean
+    static bool stringToBool(const std::string& str);
+    
+    // Convert string to number
+    template<typename T>
+    static std::optional<T> stringToNumber(const std::string& str);
+    
+    // Convert string to vector
+    static std::optional<std::vector<int>> stringToVectorInt(const std::string& str);
+    static std::optional<std::vector<double>> stringToVectorDouble(const std::string& str);
+    static std::optional<std::vector<std::string>> stringToVectorString(const std::string& str);
+    
+    // File format detection
+    static std::string getFileExtension(const std::string& filepath);
+    static bool isTextFile(const std::string& filepath);
     
 private:
     struct Impl;

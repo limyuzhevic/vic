@@ -297,9 +297,33 @@ bool Brain::initialize() {
     pImpl->attention->setInhibitionStrength(0.5f);
     pImpl->attention->setExcitationStrength(1.5f);
     
-    // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    // Initialize memory systems with brain reference
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+    }
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+    }
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->initialize(this);
+    }
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+    }
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    }
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+    }
+    
+    // Initialize development system with brain reference
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->initialize(this);
+    }
     
     // Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.
@@ -580,10 +604,26 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
 
-    // ========== STEP 7: Update episodic memory ==========
-    pImpl->stepsSinceLastEpisode++;
-    if (pImpl->stepsSinceLastEpisode >= 10) {  // Store episode every 10 steps
-        pImpl->stepsSinceLastEpisode = 0;
+    // ========== STEP 7b: Update working memory with sensory input ==========
+    if (pImpl->workingMemory) {
+        // Update working memory with neural activity patterns
+        pImpl->workingMemory->update(pImpl->timestep);
+        
+        // Connect working memory to sensory processing
+        if (pImpl->sensoryNeurons.empty()) {
+            // If no sensory neurons, create them
+            createSensoryNeurons();
+        }
+        
+        // Store active sensory neural patterns in working memory
+        for (NeuronId sensoryId : pImpl->sensoryNeurons) {
+            Neuron* neuron = pImpl->neuronById[sensoryId];
+            if (neuron) {
+                float activity = neuron->getActivityLevel();
+                pImpl->workingMemory->storeToNeuron(sensoryId, activity);
+            }
+        }
+    }
         
         if (pImpl->episodicMemory) {
             // Capture current brain state as an episode
@@ -613,12 +653,50 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && !pImpl->sensoryNeurons.empty()) {
+        // Prepare sensory observation from active sensory neurons
+        std::vector<float> sensoryObservation;
+        for (NeuronId sensoryId : pImpl->sensoryNeurons) {
+            Neuron* neuron = pImpl->neuronById[sensoryId];
+            if (neuron) {
+                sensoryObservation.push_back(neuron->getActivityLevel());
+            }
+        }
+        
+        // Update prediction system with sensory observation
+        pImpl->predictionSystem->updateObservation(sensoryObservation);
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // ========== STEP 9: Update neural planner and concept formation ==========
+    if (pImpl->planner) {
+        // Update neural planner with working memory content
+        if (pImpl->workingMemory) {
+            std::vector<float> memoryContent = pImpl->workingMemory->retrieve();
+            pImpl->planner->updateMemory(memoryContent);
+        }
+        
+        // Neural planner generates action preferences and strategies
+        // This integrates higher-level cognition with action selection
+    }
+    
+    if (pImpl->conceptFormation) {
+        // Update concept formation with current neural activity patterns
+        if (!pImpl->sensoryNeurons.empty()) {
+            // Prepare sensory observation for concept formation
+            std::vector<float> sensoryObservation;
+            for (NeuronId sensoryId : pImpl->sensoryNeurons) {
+                Neuron* neuron = pImpl->neuronById[sensoryId];
+                if (neuron) {
+                    sensoryObservation.push_back(neuron->getActivityLevel());
+                }
+            }
+            
+            // Concept formation processes experiences to form abstract concepts
+            pImpl->conceptFormation->processExperience(sensoryObservation, currentStep);
+        }
+    }
+    
+    // ========== STEP 10: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -627,12 +705,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
             pImpl->attention->processCompetition(competitors);
         }
-    }
-    
-    // ========== STEP 10: Update concept formation ==========
-    if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
