@@ -631,8 +631,56 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract current neural activity patterns for concept formation
+        std::vector<float> neuralPattern;
+        
+        // Collect neural activities
+        for (auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    float activity = neuron->isFiring() ? 1.0f : 0.0f;
+                    neuralPattern.push_back(activity);
+                }
+            }
+        }
+        
+        // Process patterns for concept formation if we have data
+        if (!neuralPattern.empty()) {
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                neuralPattern, neuralPattern, pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f,
+                pImpl->currentStep);
+        }
+    }
+    
+    // ========== STEP 11: Update neural planner ==========
+    if (pImpl->planner) {
+        // Update planner based on prediction error
+        if (pImpl->predictionError) {
+            float predictionError = pImpl->predictionError->getError();
+            pImpl->planner->updatePlanQuality(
+                std::vector<ActionType>{ActionType::MoveForward, ActionType::Wait},
+                std::vector<ActionType>{ActionType::MoveForward, ActionType::Wait},
+                predictionError);
+        }
+    }
+    
+    // ========== STEP 12: Update prediction system ==========
+    if (pImpl->predictionSystem) {
+        // Update prediction system with current neural activity
+        std::vector<float> currentActivity;
+        
+        for (auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    float activity = neuron->isFiring() ? 1.0f : 0.0f;
+                    currentActivity.push_back(activity);
+                }
+            }
+        }
+        
+        if (!currentActivity.empty()) {
+            pImpl->predictionSystem->updatePredictions(currentActivity);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
