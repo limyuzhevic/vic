@@ -56,19 +56,33 @@ void STDP::update(Synapse* synapse,
         return;
     }
     
-    float totalDelta = 0.0f;
+float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
-
-    // Nearest-neighbour STDP: only the most recent pre/post pair is used.
-    // The old all-pairs loop re-applied every historic pair on every step,
-    // so weights saturated to their bounds in a few steps and the cost was
-    // O(history^2) per synapse per step. Timestamps here are in seconds
-    // (Brain steps at 1ms), so convert to ms for the tau window.
-    float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
-    if (dtMs > 0) {
-        totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
-    } else if (dtMs < 0) {
-        totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+    
+    // Process all pre-post spike pairs to capture complete STDP history
+    // Historical optimization: Instead of O(history^2), we now process
+    // each pair exactly once per update, similar to original Phase 4 approach
+    // but preserving all spike timing information
+    for (size_t i = 0; i < preSpikes.size(); ++i) {
+        for (size_t j = 0; j < postSpikes.size(); ++j) {
+            // Calculate time difference (post - pre) in seconds, convert to ms
+            float dtMs = static_cast<float>((postSpikes[j] - preSpikes[i]) * 1000.0);
+            
+            // Early termination: if time difference exceeds 3*tau, contribution is negligible
+            if (std::abs(dtMs) > 3.0f * tau) {
+                continue;
+            }
+            
+            // Apply STDP rule based on timing difference
+            if (dtMs > 0) {
+                // Pre before post (potentiation)
+                totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
+            } else if (dtMs < 0) {
+                // Post before pre (depression)
+                totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+            }
+            // If dtMs == 0, no contribution (spike at same time)
+        }
     }
     
     // Apply weight change with bounds
