@@ -398,16 +398,37 @@ int main(int argc, char** argv) {
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
-    // Reset brain for plasticity experiment
+    // Reset brain for plasticity experiment - preserve weights
+    // Instead of reset()+initialize() which zeros weights, we do a proper
+    // reset that preserves synaptic weights while clearing recent activity state
+    NLM_LOG_INFO("Resetting brain for plasticity experiment (preserving synaptic weights)...");
+    
+    // Store current weights before reset
+    std::vector<float> prePlasticityWeights;
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (const auto& syn : region->getSynapses()) {
+            prePlasticityWeights.push_back(syn->getWeight());
+        }
+    }
+    
+    // Proper reset that preserves long-term synaptic weights
     brain->reset();
+    
+    // Re-initialize the brain structure but preserve existing weights
+    // This is a workaround for the reset/reinitialize issue
     brain->initialize();
+    
+    // Restore synapse weights that were cleared by the reinitialize
+    restoreSynapseWeightsAfterReset(brain, prePlasticityWeights);
+    
+    NLM_LOG_INFO("Brain reset complete, preserved " + std::to_string(prePlasticityWeights.size()) + " synapse weights");
     
     // Run Test 2: Plasticity learning experiment
     runPlasticityExperiment(brain);
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
+    // Reset for STDP verification - need clean state but preserve structural connectivity
+    NLM_LOG_INFO("Resetting for STDP verification (preserving connectivity, clearing plasticity state)...");
+    brain->resetPlasticityStateOnly();
     runStdpVerification(brain);
     
     // Final brain status
