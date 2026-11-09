@@ -138,4 +138,8 @@ private:
 
 #define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
 
+// Utility functions
+std::string escapeJSON(const std::string& input);
+LogLevel stringToLogLevel(const std::string& levelStr);
+
 } // namespace nlm

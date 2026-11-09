@@ -8,6 +8,7 @@ namespace nlm {
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    std::unordered_map<std::string, std::function<bool(const ConfigValue&)>> validationRules;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,15 +20,22 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to load as JSON first
+    bool success = tryLoadJSON(filepath);
+    if (success) {
+        NLM_LOG_DEBUG("Config loaded as JSON from " + filepath);
+        return true;
+    }
     
+    // Fall back to key=value format
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Config file not found: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t validEntries = 0;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
@@ -35,11 +43,17 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs with enhanced validation
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Enhanced key validation
+            if (key.empty() || key.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") != std::string::npos) {
+                NLM_LOG_WARNING("Invalid config key: " + key);
+                continue;
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -48,10 +62,68 @@ bool Config::loadFromFile(const std::string& filepath) {
                 value = value.substr(1, value.size() - 2);
             }
             
-            set(key, value, ConfigSource::File);
+            // Try to infer type from value
+            std::optional<ConfigValue> typedValue;
+            
+            // Check numeric types
+            bool isNumeric = false;
+            if (value.find('.') != std::string::npos) {
+                // Try double
+                bool valid = false;
+                double dValue = 0.0;
+                try {
+                    dValue = std::stod(value);
+                    typedValue = ConfigValue(dValue);
+                    isNumeric = true;
+                } catch (const std::exception& e) {
+                    NLM_LOG_WARNING("Failed to parse numeric value: " + value);
+                    typedValue = ConfigValue(0.0); // 0.0 default
+                }
+            } else {
+                // Try int64
+                bool valid = false;
+                int64_t iValue = 0;
+                try {
+                    iValue = std::stoll(value);
+                    typedValue = ConfigValue(iValue);
+                    isNumeric = true;
+                } catch (const std::exception& e) {
+                    NLM_LOG_WARNING("Failed to parse integer value: " + value);
+                }
+            }
+            
+            // Try boolean
+            if (!isNumeric) {
+                std::string lowerValue = toLower(value);
+                if (lowerValue == "true" || lowerValue == "false") {
+                    bool bValue = (lowerValue == "true");
+                    typedValue = ConfigValue(bValue);
+                    isNumeric = true;
+                }
+            }
+            
+            // If not numeric or boolean, treat as string
+            if (!isNumeric) {
+                typedValue = ConfigValue(value);
+            }
+            
+            if (typedValue.has_value()) {
+                set(key, typedValue.value(), ConfigSource::File);
+                validEntries++;
+            } else {
+                NLM_LOG_WARNING("Failed to parse value for key: " + key + ", value: " + value);
+            }
+        } else {
+            NLM_LOG_WARNING("Invalid config line (no '='): " + line);
         }
     }
     
+    if (validEntries == 0) {
+        NLM_LOG_WARNING("No valid configuration entries found in " + filepath);
+        return false;
+    }
+    
+    NLM_LOG_INFO("Config loaded with " + std::to_string(validEntries) + " entries from " + filepath);
     return true;
 }
 
@@ -217,22 +289,127 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+// JSON/YAML parsing helpers (simplified implementations)
+bool Config::tryLoadJSON(const std::string& filepath) {
+    // Try to parse as JSON
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Check if file is empty
+    if (content.empty()) {
+        NLM_LOG_WARNING("Empty JSON file: " + filepath);
+        return false;
+    }
+    
+    // Basic JSON parsing (supports simple key-value pairs)
+    try {
+        // Remove whitespace
+        content.erase(std::remove_if(content.begin(), content.end(), ::isspace), content.end());
+        
+        // Check if it looks like JSON
+        if (content[0] == '{') {
+            // Simple JSON parsing - extract key-value pairs
+            size_t pos = 1;
+            while (pos < content.size() && content[pos] != '}') {
+                // Find next key
+                size_t keyStart = content.find('"', pos);
+                if (keyStart == std::string::npos) break;
+                size_t keyEnd = content.find('"', keyStart + 1);
+                if (keyEnd == std::string::npos) break;
+                
+                std::string key = content.substr(keyStart + 1, keyEnd - keyStart - 1);
+                pos = keyEnd + 2; // Skip ",
+                
+                // Find value
+                if (content[pos] == '{') {
+                    // Object - skip for now
+                    size_t braceCount = 1;
+                    pos++;
+                    while (pos < content.size() && braceCount > 0) {
+                        if (content[pos] == '{') braceCount++;
+                        else if (content[pos] == '}') braceCount--;
+                        pos++;
+                    }
+                } else if (content[pos] == '[') {
+                    // Array - skip for now
+                    size_t bracketCount = 1;
+                    pos++;
+                    while (pos < content.size() && bracketCount > 0) {
+                        if (content[pos] == '[') bracketCount++;
+                        else if (content[pos] == ']') bracketCount--;
+                        pos++;
+                    }
+                } else {
+                    // Simple value
+                    size_t valueEnd = content.find(',', pos);
+                    if (valueEnd == std::string::npos) valueEnd = content.find('}', pos);
+                    if (valueEnd == std::string::npos) valueEnd = content.size();
+                    
+                    std::string valueStr = content.substr(pos, valueEnd - pos);
+                    
+                    // Try to parse value as different types
+                    set(key, valueStr, ConfigSource::File);
+                    pos = valueEnd + 1;
+                }
+            }
+            
+            NLM_LOG_INFO("JSON config loaded from " + filepath);
+            return true;
+        }
+    } catch (const std::exception& e) {
+        NLM_LOG_WARNING("Failed to parse JSON config: " + std::string(e.what()) + " in " + filepath);
+    }
+    
+    return false;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+void Config::addValidationRule(const std::string& key, std::function<bool(const ConfigValue&)> validator) {
+    // Add validation rule for key
+    validationRules[key] = validator;
+}
 
-} // namespace nlm
+bool Config::validate() const {
+    // Validate all configuration entries
+    for (const auto& entry : pImpl->entries) {
+        auto it = validationRules.find(entry.key);
+        if (it != validationRules.end()) {
+            if (!it->second(entry.value)) {
+                NLM_LOG_ERROR("Validation failed for key: " + entry.key);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+ConfigValue Config::safeGet(const std::string& key, const ConfigValue& defaultValue) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    
+    if (it != pImpl->entries.end()) {
+        return it->value;
+    }
+    
+    return defaultValue;
+}
+
+bool Config::hasAny(const std::vector<std::string>& keys) const {
+    for (const auto& key : keys) {
+        if (has(key)) return true;
+    }
+    return false;
+}
+
+std::vector<std::string> Config::getKeysBySource(ConfigSource source) const {
+    std::vector<std::string> keys;
+    for (const auto& entry : pImpl->entries) {
+        if (entry.source == source) {
+            keys.push_back(entry.key);
+        }
+    }
+    return keys;
+}

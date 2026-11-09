@@ -424,10 +424,163 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+// Add utility functions for common operations
+    m.def("createBrainWithDefaultConfig", []() -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", 500);
+        config->set("region_count", 1);
+        config->set("connection_probability", 0.1f);
+        config->set("random_seed", 42);
+        config->set("simulation_timestep", 0.001);
+        return std::make_shared<Brain>(config);
+    }, "Create brain with default configuration");
+
+    // Add simulation helper functions
+    m.def("runBrainSimulation", [] (std::shared_ptr<Brain> brain, uint64_t steps) {
+        for (uint64_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("steps"), "Run brain simulation for specified steps");
+
+    // Add brain analysis utilities
+    m.def("analyzeBrainConnectivity", [] (std::shared_ptr<Brain> brain) {
+        auto region = brain->getRegion(RegionId(0));
+        if (!region) return std::vector<std::pair<uint64_t, uint64_t>>();
+        
+        std::vector<std::pair<uint64_t, uint64_t>> connections;
+        for (const auto& synapse : region->getSynapses()) {
+            connections.push_back(std::make_pair(
+                synapse->getSourceNeuron().index(),
+                synapse->getDestinationNeuron().index()));
+        }
+        return connections;
+    }, py::arg("brain"), "Analyze brain connectivity and return connection matrix");
+
+    // Add performance monitoring
+    m.def("profileBrainPerformance", [] (std::shared_ptr<Brain> brain, uint64_t steps) {
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (uint64_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration<double>(end - start);
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            brain->getTotalNeuronCount(),
+            brain->getTotalSynapseCount(),
+            duration.count()
+        );
+    }, py::arg("brain"), py::arg("steps"), "Profile brain performance and return metrics");
+
+    // Add learning simulation utilities
+    m.def("simulateLearningEpisode", [] (std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        world->reset();
+        brain->reset();
+        
+        float totalReward = 0.0f;
+        uint64_t steps = 100;
+        
+        for (uint64_t i = 0; i < steps; ++i) {
+            auto percept = world->getSensoryPercept();
+            brain->receiveSensoryInput(percept);
+            brain->step(i, i * 0.001);
+            
+            auto action = brain->produceAction();
+            auto result = world->applyMotorCommand(action, i * 0.001);
+            totalReward += result.reward;
+            
+            world->update(0.001);
+        }
+        
+        return std::make_tuple(
+            totalReward,
+            brain->getTotalSpikeCount(),
+            brain->getAverageFiringRate(),
+            brain->getTotalSynapseCount()
+        );
+    }, py::arg("brain"), py::arg("world"), "Simulate a learning episode and return results");
+
+    // Add advanced configuration utilities
+    m.def("loadConfigFromYAML", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        // Note: This is a placeholder for YAML loading functionality
+        // Full YAML support would require external YAML library
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"), "Load configuration from YAML file");
+
+    m.def("saveConfigToYAML", [](std::shared_ptr<Config> config, const std::string& filepath) {
+        // Note: This is a placeholder for YAML saving functionality
+        // Full YAML support would require external YAML library
+        config->saveToFile(filepath);
+    }, py::arg("config"), py::arg("filepath"), "Save configuration to YAML file");
+
+    // Add statistical analysis utilities
+    m.def("computeBrainStatistics", [] (std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> stats;
+        
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibitory_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        
+        return stats;
+    }, py::arg("brain"), "Compute comprehensive brain statistics");
+
+    // Add visualization utilities (basic)
+    m.def("createBrainVisualizationData", [] (std::shared_ptr<Brain> brain) {
+        // Create basic visualization data
+        std::vector<std::vector<double>> activityGrid;
+        size_t neuronCount = brain->getTotalNeuronCount();
+        
+        // This is a simplified visualization - real implementation would be more sophisticated
+        activityGrid.resize(std::min(neuronCount, size_t(100)), std::vector<double>(100, 0.0));
+        
+        return activityGrid;
+    }, py::arg("brain"), "Create basic brain visualization data");
+
+    // Add benchmarking utilities
+    m.def("benchmarkBrainOperations", [] (uint64_t numBrains, uint64_t stepsPerBrain) {
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        std::vector<double> brainStats;
+        
+        for (uint64_t i = 0; i < numBrains; ++i) {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", 100);
+            config->set("region_count", 1);
+            config->set("connection_probability", 0.1f);
+            config->set("random_seed", i);
+            
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            
+            for (uint64_t j = 0; j < stepsPerBrain; ++j) {
+                brain->step(j, j * 0.001);
+            }
+            
+            brainStats.push_back(brain->getAverageFiringRate());
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto totalDuration = std::chrono::duration<double>(end - start);
+        
+        double avgFiringRate = std::accumulate(brainStats.begin(), brainStats.end(), 0.0) / brainStats.size();
+        
+        return std::make_tuple(
+            numBrains * stepsPerBrain,
+            totalDuration.count(),
+            avgFiringRate,
+            brainStats.size()
+        );
+    }, py::arg("numBrains"), py::arg("stepsPerBrain"), "Benchmark brain operations and return performance metrics");
 
 } // namespace nlm

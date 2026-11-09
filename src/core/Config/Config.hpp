@@ -6,6 +6,8 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <functional>
+#include <unordered_map>
 
 namespace nlm {
 
@@ -95,6 +97,13 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Enhanced configuration methods
+    void addValidationRule(const std::string& key, std::function<bool(const ConfigValue&)> validator);
+    bool validate() const;
+    ConfigValue safeGet(const std::string& key, const ConfigValue& defaultValue) const;
+    bool hasAny(const std::vector<std::string>& keys) const;
+    std::vector<std::string> getKeysBySource(ConfigSource source) const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +111,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML loading helpers
+    bool tryLoadJSON(const std::string& filepath);
 };
 
 } // namespace nlm

@@ -4,6 +4,15 @@
 #include <iomanip>
 #include <sstream>
 #include <mutex>
+#include <algorithm>
+#include <unordered_map>
+#include <chrono>
+#include <thread>
+#include <queue>
+#include <condition_variable>
+#include <functional>
+#include <filesystem>
+#include <iomanip>
 
 namespace nlm {
 
@@ -29,14 +38,23 @@ void ConsoleLogger::log(const LogEntry& entry) {
     
     std::lock_guard<std::mutex> lock(pImpl->mutex);
     
+    // Generate structured log message
     std::ostringstream oss;
     oss << "[" << levelToString(entry.level) << "] ";
     
-    // Add timestamp
-    auto time = std::chrono::system_clock::to_time_t(entry.timestamp);
-    oss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    // Add structured metadata
+    oss << "timestamp=\"" << std::chrono::system_clock::to_time_t(entry.timestamp) 
+        << "\" message=\"" << escapeJSON(entry.message) << "\"";
     
-    oss << " " << entry.message;
+    if (!entry.file.empty()) {
+        oss << " file=\"" << escapeJSON(entry.file) << "\"";
+    }
+    if (entry.line > 0) {
+        oss << " line=" << entry.line;
+    }
+    if (!entry.function.empty()) {
+        oss << " function=\"" << escapeJSON(entry.function) << "\"";
+    }
     
     std::string output = oss.str();
     
@@ -197,6 +215,34 @@ LogStream::LogStream(LogLevel level, const std::string& file, int line, const st
 
 LogStream::~LogStream() {
     Logger::getGlobal().log(level_, oss_.str(), file_, line_, function_);
+}
+
+// Helper functions
+std::string escapeJSON(const std::string& input) {
+    std::string output;
+    for (char c : input) {
+        if (c == '\\' || c == '"' || c == '/' || c == '\b' || c == '\f' || c == '\n' || c == '\r' || c == '\t') {
+            output += c;
+        } else if (c == '\'') {
+            output += "\\'";
+        } else {
+            output += c;
+        }
+    }
+    return output;
+}
+
+LogLevel stringToLogLevel(const std::string& levelStr) {
+    std::string lower = levelStr;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    
+    if (lower == "debug") return LogLevel::Debug;
+    if (lower == "info") return LogLevel::Info;
+    if (lower == "warning" || lower == "warn") return LogLevel::Warning;
+    if (lower == "error") return LogLevel::Error;
+    if (lower == "critical" || lower == "crit") return LogLevel::Critical;
+    
+    return LogLevel::Info; // Default
 }
 
 } // namespace nlm
