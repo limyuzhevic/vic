@@ -138,7 +138,7 @@ bool parseSynapses(const std::vector<uint8_t>& payload, SynapseCheckpointData& d
 }
 
 bool writeSectionToStream(std::ofstream& stream, CheckpointSection type,
-                  const std::vector<uint8_t>& payload, uint64_t& bytesWritten) {
+                   const std::vector<uint8_t>& payload, uint64_t& bytesWritten) {
     SectionHeader header;
     header.type = static_cast<uint32_t>(type);
     header.offset = static_cast<uint64_t>(stream.tellp()) + sizeof(SectionHeader);
@@ -146,10 +146,15 @@ bool writeSectionToStream(std::ofstream& stream, CheckpointSection type,
     header.compressedSize = 0;
     header.checksum = payload.empty() ? 0 : ChecksumCalculator::crc32(payload.data(), payload.size());
     stream.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream) {
+        return false;
+    }
     if (!payload.empty()) {
         stream.write(reinterpret_cast<const char*>(payload.data()), static_cast<std::streamsize>(payload.size()));
+        if (!stream) {
+            return false;
+        }
     }
-    if (!stream) return false;
     bytesWritten += sizeof(header) + payload.size();
     return true;
 }
@@ -196,13 +201,23 @@ void CheckpointReader::close() {
 }
 
 bool CheckpointReader::validate() const {
-    if (!header_.validate()) return false;
+    if (!header_.validate()) {
+        error_ = "invalid checkpoint header";
+        return false;
+    }
+    
     bool hasNeurons = false, hasSynapses = false;
     for (const auto& s : sections_) {
         if (s.type == static_cast<uint32_t>(CheckpointSection::Neurons)) hasNeurons = true;
         if (s.type == static_cast<uint32_t>(CheckpointSection::Synapses)) hasSynapses = true;
     }
-    return hasNeurons && hasSynapses;
+    
+    if (!hasNeurons || !hasSynapses) {
+        error_ = "checkpoint missing required sections (neurons or synapses)";
+        return false;
+    }
+    
+    return true;
 }
 
 std::vector<uint8_t> CheckpointReader::readSection(CheckpointSection sectionType) {
@@ -210,11 +225,17 @@ std::vector<uint8_t> CheckpointReader::readSection(CheckpointSection sectionType
         if (s.type != static_cast<uint32_t>(sectionType)) continue;
         stream_.clear();
         stream_.seekg(static_cast<std::streamoff>(s.offset), std::ios::beg);
-        if (!stream_) return {};
+        if (!stream_) {
+            error_ = "cannot seek to section in checkpoint file";
+            return {};
+        }
         std::vector<uint8_t> payload(static_cast<size_t>(s.size));
         if (s.size > 0) {
             stream_.read(reinterpret_cast<char*>(payload.data()), static_cast<std::streamsize>(s.size));
-            if (!stream_) return {};
+            if (!stream_) {
+                error_ = "failed to read section data from checkpoint file";
+                return {};
+            }
         }
         streamPos_ = static_cast<size_t>(s.offset + s.size);
         uint32_t actual = payload.empty() ? 0 : ChecksumCalculator::crc32(payload.data(), payload.size());
@@ -224,20 +245,32 @@ std::vector<uint8_t> CheckpointReader::readSection(CheckpointSection sectionType
         }
         return payload;
     }
+    
+    error_ = "section not found in checkpoint file";
     return {};
 }
 
 bool CheckpointReader::readNeurons(NeuronCheckpointData& data) {
     auto payload = readSection(CheckpointSection::Neurons);
-    if (payload.empty() && header_.neuronCount > 0) return false;
+    if (payload.empty()) {
+        if (header_.neuronCount > 0) {
+            error_ = "neuron section missing from checkpoint but header indicates neurons present";
+            return false;
+        }
+        // Empty payload is acceptable if header indicates no neurons
+        return true;
+    }
+    
     if (!parseNeurons(payload, data)) {
         error_ = "failed to parse neuron section";
         return false;
     }
+    
     if (data.membranePotential.size() != header_.neuronCount) {
         error_ = "neuron count in payload does not match header";
         return false;
     }
+    
     return true;
 }
 
@@ -245,24 +278,36 @@ bool CheckpointReader::readDelayedSpikes(std::vector<DelayedSpikeEvent>& events)
     events.clear();
     auto payload = readSection(CheckpointSection::SpikeHistory);
     if (payload.empty()) return true;  // Absent section: legacy checkpoint, no pending spikes.
+    
     if (!parseDelayedSpikes(payload, events)) {
         error_ = "failed to parse delayed spike section";
         return false;
     }
+    
     return true;
 }
 
 bool CheckpointReader::readSynapses(SynapseCheckpointData& data) {
     auto payload = readSection(CheckpointSection::Synapses);
-    if (payload.empty() && header_.synapseCount > 0) return false;
+    if (payload.empty()) {
+        if (header_.synapseCount > 0) {
+            error_ = "synapse section missing from checkpoint but header indicates synapses present";
+            return false;
+        }
+        // Empty payload is acceptable if header indicates no synapses
+        return true;
+    }
+    
     if (!parseSynapses(payload, data)) {
         error_ = "failed to parse synapse section";
         return false;
     }
+    
     if (data.weight.size() != header_.synapseCount) {
         error_ = "synapse count in payload does not match header";
         return false;
     }
+    
     return true;
 }
 
@@ -293,7 +338,10 @@ bool CheckpointWriter::create(const std::string& filepath, CompressionLevel comp
     // here, not silently at finalize(). Payloads are buffered and only
     // written at finalize(), when the header is complete.
     stream_.open(filepath, std::ios::binary | std::ios::trunc);
-    if (!stream_) return false;
+    if (!stream_) {
+        error_ = "failed to create checkpoint file: " + filepath;
+        return false;
+    }
     return true;
 }
 
@@ -314,6 +362,7 @@ void CheckpointWriter::setMetadata(uint64_t neuronCount, uint64_t synapseCount,
 
 bool CheckpointWriter::writeNeurons(const NeuronCheckpointData& data) {
     if (data.membranePotential.size() != header_.neuronCount && header_.neuronCount != 0) {
+        error_ = "neuron count mismatch in checkpoint data";
         return false;
     }
     neuronPayload_ = serializeNeurons(data);
@@ -322,6 +371,7 @@ bool CheckpointWriter::writeNeurons(const NeuronCheckpointData& data) {
 
 bool CheckpointWriter::writeSynapses(const SynapseCheckpointData& data) {
     if (data.weight.size() != header_.synapseCount && header_.synapseCount != 0) {
+        error_ = "synapse count mismatch in checkpoint data";
         return false;
     }
     synapsePayload_ = serializeSynapses(data);
@@ -350,20 +400,42 @@ bool CheckpointWriter::writeSection(CheckpointSection sectionType, const void* d
     // only if they are neuron/synapse sections written in raw form is
     // out of scope, so report failure rather than silently dropping.
     (void)sectionType; (void)data; (void)size;
+    error_ = "generic checkpoint sections not supported";
     return false;
 }
 
 bool CheckpointWriter::finalize() {
-    if (!stream_.is_open()) return false;
+    if (!stream_.is_open()) {
+        error_ = "checkpoint file not open";
+        return false;
+    }
+    
     // Reserve space for the header, then write sections.
     stream_.seekp(0, std::ios::beg);
     CheckpointHeader placeholder;
     stream_.write(reinterpret_cast<const char*>(&placeholder), sizeof(placeholder));
-    if (!stream_) return false;
+    if (!stream_) {
+        error_ = "failed to write placeholder header to checkpoint file";
+        return false;
+    }
+    
     bytesWritten_ = sizeof(placeholder);
-    if (!writeSectionToStream(stream_, CheckpointSection::Neurons, neuronPayload_, bytesWritten_)) return false;
-    if (!writeSectionToStream(stream_, CheckpointSection::Synapses, synapsePayload_, bytesWritten_)) return false;
-    if (!writeSectionToStream(stream_, CheckpointSection::SpikeHistory, delayedSpikePayload_, bytesWritten_)) return false;
+    
+    if (!writeSectionToStream(stream_, CheckpointSection::Neurons, neuronPayload_, bytesWritten_)) {
+        error_ = "failed to write neurons section to checkpoint file";
+        return false;
+    }
+    
+    if (!writeSectionToStream(stream_, CheckpointSection::Synapses, synapsePayload_, bytesWritten_)) {
+        error_ = "failed to write synapses section to checkpoint file";
+        return false;
+    }
+    
+    if (!writeSectionToStream(stream_, CheckpointSection::SpikeHistory, delayedSpikePayload_, bytesWritten_)) {
+        error_ = "failed to write spike history section to checkpoint file";
+        return false;
+    }
+    
     // Phase 5 extra sections, in fixed order so a reader can rely on
     // layout (readSection also finds them by type, order-independent).
     for (CheckpointSection type : {CheckpointSection::SimulationState,
@@ -372,23 +444,38 @@ bool CheckpointWriter::finalize() {
                                    CheckpointSection::Memory}) {
         for (const auto& entry : extraPayloads_) {
             if (entry.first == type && !entry.second.empty()) {
-                if (!writeSectionToStream(stream_, type, entry.second, bytesWritten_)) return false;
+                if (!writeSectionToStream(stream_, type, entry.second, bytesWritten_)) {
+                    error_ = "failed to write extra section to checkpoint file";
+                    return false;
+                }
             }
         }
     }
+    
     SectionHeader endHeader;
     endHeader.type = static_cast<uint32_t>(CheckpointSection::End);
     endHeader.offset = static_cast<uint64_t>(stream_.tellp()) + sizeof(SectionHeader);
     stream_.write(reinterpret_cast<const char*>(&endHeader), sizeof(endHeader));
-    if (!stream_) return false;
+    if (!stream_) {
+        error_ = "failed to write end section to checkpoint file";
+        return false;
+    }
+    
     bytesWritten_ += sizeof(endHeader);
+    
     // Patch the real header in place.
     header_.totalSize = bytesWritten_;
     header_.checksum = ChecksumCalculator::crc32(neuronPayload_.data(), neuronPayload_.size());
+    
     stream_.seekp(0, std::ios::beg);
     stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
     stream_.flush();
-    if (!stream_) return false;
+    
+    if (!stream_) {
+        error_ = "failed to finalize checkpoint file";
+        return false;
+    }
+    
     close();
     return true;
 }
@@ -401,9 +488,17 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    return true;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader&) {
+    return true;
+}
+
+bool CheckpointWriter::padToAlignment(size_t) {
+    return true;
+}
 
 // ---------------- CheckpointManager ----------------
 
@@ -412,7 +507,7 @@ CheckpointManager::CheckpointManager()
 CheckpointManager::~CheckpointManager() = default;
 
 void CheckpointManager::configure(const std::string& checkpointDir,
-                                  uint64_t saveIntervalSteps, size_t maxCheckpoints, bool compress) {
+                                 uint64_t saveIntervalSteps, size_t maxCheckpoints, bool compress) {
     checkpointDir_ = checkpointDir;
     saveIntervalSteps_ = saveIntervalSteps;
     maxCheckpoints_ = maxCheckpoints;
@@ -428,20 +523,41 @@ bool CheckpointManager::shouldSave(uint64_t currentStep) const {
 }
 
 bool CheckpointManager::saveImmediately(const std::string& name) {
-    if (!neuronProvider_ || !synapseProvider_) return false;
+    if (!neuronProvider_ || !synapseProvider_) {
+        error_ = "checkpoint manager missing neuron or synapse providers";
+        return false;
+    }
     NeuronCheckpointData neurons;
     SynapseCheckpointData synapses;
-    if (!neuronProvider_(neurons) || !synapseProvider_(synapses)) return false;
+    if (!neuronProvider_(neurons)) {
+        error_ = "failed to get neuron data for checkpoint";
+        return false;
+    }
+    if (!synapseProvider_(synapses)) {
+        error_ = "failed to get synapse data for checkpoint";
+        return false;
+    }
+    
     std::string filename = name.empty() ? "checkpoint.bin" : name;
     std::string path = (std::filesystem::path(checkpointDir_) / filename).string();
     CheckpointWriter writer;
-    if (!writer.create(path, compress_ ? CompressionLevel::Balanced : CompressionLevel::None)) return false;
+    if (!writer.create(path, compress_ ? CompressionLevel::Balanced : CompressionLevel::None)) {
+        error_ = "failed to create checkpoint file: " + writer.getError();
+        return false;
+    }
+    
     writer.setMetadata(neurons.membranePotential.size(), synapses.weight.size(), 0, lastSaveStep_, 0.0);
     if (!writer.writeNeurons(neurons) || !writer.writeSynapses(synapses)) {
+        error_ = "failed to write checkpoint data: " + writer.getError();
         writer.abort();
         return false;
     }
-    if (!writer.finalize()) return false;
+    
+    if (!writer.finalize()) {
+        error_ = "failed to finalize checkpoint: " + writer.getError();
+        return false;
+    }
+    
     lastCheckpointPath_ = path;
     pruneOldCheckpoints(maxCheckpoints_);
     return true;
@@ -450,7 +566,10 @@ bool CheckpointManager::saveImmediately(const std::string& name) {
 bool CheckpointManager::update(uint64_t currentStep, double currentTime) {
     (void)currentTime;
     if (!shouldSave(currentStep)) return false;
-    if (!neuronProvider_ || !synapseProvider_) return false;
+    if (!neuronProvider_ || !synapseProvider_) {
+        error_ = "checkpoint manager missing neuron or synapse providers";
+        return false;
+    }
     lastSaveStep_ = currentStep;
     return saveImmediately("checkpoint-" + std::to_string(currentStep) + ".bin");
 }
@@ -458,8 +577,15 @@ bool CheckpointManager::update(uint64_t currentStep, double currentTime) {
 bool CheckpointManager::load(const std::string& name) {
     std::string path = (std::filesystem::path(checkpointDir_) / name).string();
     CheckpointReader reader;
-    if (!reader.open(path)) return false;
-    return reader.validate();
+    if (!reader.open(path)) {
+        error_ = "failed to open checkpoint file: " + reader.getError();
+        return false;
+    }
+    if (!reader.validate()) {
+        error_ = "checkpoint validation failed: " + reader.getError();
+        return false;
+    }
+    return true;
 }
 
 std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoints() const {

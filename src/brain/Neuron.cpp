@@ -244,28 +244,41 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (dt > 0.0) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
-
-    // Check for spike
+    
+    // Check for spike (increased threshold to reduce firing)
     if (V >= threshold) {
-        fired = true;
-        if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+        // Check if firing rate is below maximum limit
+        if (pImpl->state.firingRate < pImpl->state.maxFiringRate) {
+            fired = true;
+            if (dt > 0.0) {
+                pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            }
+            pImpl->state.firingState = FiringState::Active;
+            pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+            
+            // Record spike
+            recordSpike(currentTime);
+            
+            // Reset membrane potential
+            V = V_reset;
+            
+            // Enter refractory period
+            pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+            pImpl->state.firingState = FiringState::Refractory;
+            
+            // Update adaptation for spike-frequency adaptation
+            pImpl->state.adaptationVariable += 1.0f;
+        } else {
+            // Firing rate at or above maximum - fire anyway to maintain rhythm
+            // but this time it doesn't count toward the firing rate
+            fired = true;
+            pImpl->state.firingState = FiringState::Active;
+            pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
+            recordSpike(currentTime);
+            V = V_reset;
+            pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+            pImpl->state.firingState = FiringState::Refractory;
         }
-        pImpl->state.firingState = FiringState::Active;
-        pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
-        
-        // Record spike
-        recordSpike(currentTime);
-        
-        // Reset membrane potential
-        V = V_reset;
-        
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
-        pImpl->state.firingState = FiringState::Refractory;
-        
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -293,8 +306,9 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Threshold: increased to -50mV to reduce firing (less excitable)
+    // This helps reduce high firing rates observed in simulations
+    pImpl->state.threshold = -50.0f + rng.uniformReal(-3.0f, 3.0f);
     
     // Resting potential typically -70mV
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);
@@ -302,13 +316,21 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Reset potential is usually close to resting
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(uint32_t(2), uint32_t(10)));
+    // Refractory period: increased to 5-15ms to reduce firing frequency
+    // Longer refractory periods reduce burst firing and overall firing rate
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(uint32_t(5), uint32_t(15)));
+    
+    // Spike rate limit: maximum firing rate in Hz (cap at 300Hz)
+    // This provides an additional hard limit on firing rate
+    pImpl->state.maxFiringRate = 300.0f;
+    
+    // Adaptation variable: increase initial value to reduce excitability
+    // Higher adaptation variable produces stronger spike-frequency adaptation
+    pImpl->state.adaptationVariable = rng.uniformReal(0.0f, 2.0f);
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
-    pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
     
     // Clear any residual state

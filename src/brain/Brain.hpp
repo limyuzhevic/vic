@@ -10,10 +10,13 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include "BrainStepLoop.hpp"
+#include "BrainRegionManager.hpp"
+#include "BrainIOSystem.hpp"
 
 namespace nlm {
 
-// Forward declarations
+// Forward declarations for all brain subsystems
 class Config;
 class RandomGenerator;
 class SimulationClock;
@@ -191,7 +194,7 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
-
+    
     // Learned preference trait (Phase 5): a single scalar, -1..1,
     // updated only by sandbox reward through AgentBrain, saved in the
     // checkpoint (SimulationState section) and used as a small bias in
@@ -210,4 +213,8 @@ private:
     Impl* pImpl;
 };
 
-} // namespace nlm
+// External forward declarations for BrainUtils namespace functions
+namespace BrainUtils {
+    size_t getTotalNeuronCountFromRegions(const std::vector<std::unique_ptr<NeuralRegion>>& regions);
+    size_t getTotalSynapseCountFromRegions(const std::vector<std::unique_ptr<NeuralRegion>>& regions);
+}
