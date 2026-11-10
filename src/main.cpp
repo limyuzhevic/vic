@@ -28,24 +28,35 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printUsage() {
+    printBanner();
+    std::cout << "\nUsage: nlm [options]\n\n";
+    std::cout << "Basic Options:\n";
+    std::cout << "  --help                  Show this help message\n";
+    std::cout << "  --config file           Load configuration from file\n";
+    std::cout << "  --quick-test           Run a quick demonstration (50 neurons, 100 steps)\n";
+    std::cout << "\nSystem Integration Options:\n";
+    std::cout << "  --mode MODES           Set operation mode (comprehensive|performance|minimal)\n";
+    std::cout << "  --enable-checkpointing  Enable checkpoint save/load functionality\n";
+    std::cout << "  --disable-memory       Disable memory systems\n";
+    std::cout << "  --disable-prediction   Disable prediction system\n";
+    std::cout << "  --disable-cognition    Disable cognitive systems\n";
+    std::cout << "  --disable-neuromodulation Disable neuromodulation\n";
+    std::cout << "  --disable-development  Disable development system\n";
+    std::cout << "\nAdvanced Configuration:\n";
+    std::cout << "  --neuron-count N       Set number of neurons (default: 500)\n";
+    std::cout << "  --region-count R       Set number of regions (default: 1)\n";
+    std::cout << "  --connection-prob P    Set connection probability (0.0-1.0, default: 0.15)\n";
+    std::cout << "  --working-memory-capacity C   Set working memory capacity (default: 100)\n";
+    std::cout << "  --attention-strength S  Set attention excitation strength (default: 1.5)\n";
+    std::cout << "  --dopamine-level L     Set dopamine level (0.0-1.0, default: 0.5)\n";
+    std::cout << "  --developmental-stage T Set developmental stage (0=Initial,1=Critical,2=Maturation,3=Adult)\n";
+    std::cout << "\nOutput Options:\n";
+    std::cout << "  --verbose              Enable verbose logging\n";
+    std::cout << "  --quiet                Suppress most output (errors only)\n";
+    std::cout << "\nExample:\n";
+    std::cout << "  ./nlm --mode comprehensive --neuron-count 1000 --enable-checkpointing\n";
+    std::cout << "\nNLM (熙然) - Neural Learning Machine (Phase 6: Integrated Artificial Brain)\n";
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -307,14 +318,45 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
+void printUsage();
+
 int main(int argc, char** argv) {
+    // Parse global options
+    bool showHelp = false;
+    std::string logLevel = "info";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help") {
+            showHelp = true;
+        } else if (arg == "--verbose") {
+            logLevel = "verbose";
+        } else if (arg == "--quiet") {
+            logLevel = "quiet";
+        }
+    }
+    
+    if (showHelp) {
+        printUsage();
+        return 0;
+    }
+    
+    // Set log level based on user preference
+    if (logLevel == "verbose") {
+        ConsoleLogger::setLevel(LogLevel::Debug);
+    } else if (logLevel == "quiet") {
+        ConsoleLogger::setLevel(LogLevel::Warning);
+    } else {
+        ConsoleLogger::setLevel(LogLevel::Info);
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    auto consoleLogger = std::make_shared<ConsoleLogger>(ConsoleLogger::getLevel());
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
@@ -349,34 +391,122 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Parse advanced command-line options
+    bool enableMemory = true;
+    bool enablePrediction = true;
+    bool enableCognition = true;
+    bool enableNeuromodulation = true;
+    bool enableDevelopment = true;
+    bool enableCheckpointing = false;
+    std::string mode = "comprehensive";
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--mode") {
+            if (i + 1 < argc) {
+                mode = argv[++i];
+            }
+        } else if (arg == "--disable-memory") {
+            enableMemory = false;
+        } else if (arg == "--disable-prediction") {
+            enablePrediction = false;
+        } else if (arg == "--disable-cognition") {
+            enableCognition = false;
+        } else if (arg == "--disable-neuromodulation") {
+            enableNeuromodulation = false;
+        } else if (arg == "--disable-development") {
+            enableDevelopment = false;
+        } else if (arg == "--enable-checkpointing") {
+            enableCheckpointing = true;
+        } else if (arg == "--quick-test") {
+            config->set("neuron_count", static_cast<int64_t>(50), ConfigSource::Default);
+            config->set("max_steps", 100, ConfigSource::Default);
+        }
+    }
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    NLM_LOG_INFO("Mode: " + mode + " (working memory: " + std::string(enableMemory ? "ON" : "OFF") +
+                ", prediction: " + std::string(enablePrediction ? "ON" : "OFF") +
+                ", cognition: " + std::string(enableCognition ? "ON" : "OFF") +
+                ", neuromodulation: " + std::string(enableNeuromodulation ? "ON" : "OFF") +
+                ", development: " + std::string(enableDevelopment ? "ON" : "OFF") +
+                ", checkpointing: " + std::string(enableCheckpointing ? "ON" : "OFF") + ")");
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Configure memory systems
+    if (enableMemory) {
+        if (auto wmCapacity = config->getOr<int64_t>("working_memory_capacity", 100)) {
+            pImpl->workingMemory->setCapacity(static_cast<size_t>(*wmCapacity));
+        }
+        if (auto wmDecay = config->getOr<float>("working_memory_decay", 0.1f)) {
+            pImpl->workingMemory->setDecayRate(*wmDecay);
+        }
+    }
     
-    // Log configuration summary
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Configuration:");
-    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
-    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
-    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
-    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
-    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
-    NLM_LOG_INFO("");
+    if (enablePrediction) {
+        if (auto predictionLearningRate = config->getOr<float>("prediction_learning_rate", 0.01f)) {
+            pImpl->predictionSystem->setLearningRate(*predictionLearningRate);
+        }
+    }
+    
+    if (enableCognition) {
+        if (auto attentionStrength = config->getOr<float>("attention_strength", 1.5f)) {
+            pImpl->attention->setExcitationStrength(*attentionStrength);
+        }
+        if (auto attentionInhibition = config->getOr<float>("attention_inhibition", 0.5f)) {
+            pImpl->attention->setInhibitionStrength(*attentionInhibition);
+        }
+    }
+    
+    if (enableNeuromodulation) {
+        if (auto dopamineLevel = config->getOr<float>("dopamine_level", 0.5f)) {
+            pImpl->dopamine->setLevel(*dopamineLevel);
+        }
+    }
+    
+    if (enableDevelopment) {
+        if (auto devStage = config->getOr<int64_t>("developmental_stage", 4)) {
+            pImpl->developmentalStage = static_cast<DevelopmentalStage>(std::clamp(*devStage, 0LL, 3LL));
+        }
+    }
+    
+    // Configure working memory
+    if (auto wmCapacity = config->getOr<int64_t>("working_memory_capacity", 100)) {
+        pImpl->workingMemory->setCapacity(static_cast<size_t>(*wmCapacity));
+    }
+    if (auto wmDecay = config->getOr<float>("working_memory_decay", 0.1f)) {
+        pImpl->workingMemory->setDecayRate(*wmDecay);
+    }
+    
+    // Configure episodic memory
+    if (auto maxEpisodes = config->getOr<int64_t>("max_episodes", 1000)) {
+        pImpl->episodicMemory->setMaxEpisodes(static_cast<size_t>(*maxEpisodes));
+    }
+    
+    // Configure prediction system
+    if (auto predictionLearningRate = config->getOr<float>("prediction_learning_rate", 0.01f)) {
+        pImpl->predictionSystem->setLearningRate(*predictionLearningRate);
+    }
+    
+    // Configure attention system
+    if (auto attentionStrength = config->getOr<float>("attention_strength", 1.5f)) {
+        pImpl->attention->setExcitationStrength(*attentionStrength);
+    }
+    if (auto attentionInhibition = config->getOr<float>("attention_inhibition", 0.5f)) {
+        pImpl->attention->setInhibitionStrength(*attentionInhibition);
+    }
+    
+    // Configure development
+    if (auto devStage = config->getOr<int64_t>("developmental_stage", 4)) {
+        pImpl->developmentalStage = static_cast<DevelopmentalStage>(std::clamp(*devStage, 0LL, 3LL));
+    }
+    
+    NLM_LOG_INFO("Phase 6 systems configured and integrated");
+    NLM_LOG_INFO("  Working memory capacity: " + std::to_string(pImpl->workingMemory ? pImpl->workingMemory->getCapacity() : 0));
+    NLM_LOG_INFO("  Episodic memory max episodes: " + std::to_string(pImpl->episodicMemory ? pImpl->episodicMemory->getMaxEpisodes() : 0));
+    NLM_LOG_INFO("  Prediction learning rate: " + std::to_string(pImpl->predictionSystem ? pImpl->predictionSystem->getLearningRate() : 0.0f));
+    NLM_LOG_INFO("  Attention strength: " + std::to_string(pImpl->attention ? pImpl->attention->getExcitationStrength() : 0.0f));
+    NLM_LOG_INFO("  Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    
+    return true;;
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
