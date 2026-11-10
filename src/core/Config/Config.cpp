@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include "Logger.hpp"
 
 namespace nlm {
 
@@ -22,34 +23,77 @@ bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
+    // Validate filepath
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Config file path is empty");
         return false;
     }
     
+    // Check if file exists before attempting to open
+    if (!std::filesystem::exists(filepath)) {
+        NLM_LOG_ERROR("Config file does not exist: " + filepath);
+        return false;
+    }
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
+        return false;
+    }
+    
+    // Check file size to avoid processing empty files
+    file.seekg(0, std::ios::end);
+    size_t fileSize = file.tellg();
+    if (fileSize == 0) {
+        NLM_LOG_ERROR("Config file is empty: " + filepath);
+        return false;
+    }
+    
+    file.seekg(0, std::ios::beg);
+    
     std::string line;
+    size_t lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse simple key=value pairs with error checking
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
+            if (pos == 0 || pos == line.length() - 1) {
+                NLM_LOG_ERROR("Malformed line in config file at line " + std::to_string(lineNumber) + ": " + line);
+                continue;
+            }
+            
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
             
+            // Validate key
+            if (key.empty()) {
+                NLM_LOG_ERROR("Empty key found in config file at line " + std::to_string(lineNumber));
+                continue;
+            }
+            
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("No '=' found in config line " + std::to_string(lineNumber) + ": " + line);
         }
+    }
+    
+    if (lineNumber == 0) {
+        NLM_LOG_WARNING("Config file contains no valid key=value pairs: " + filepath);
     }
     
     return true;
@@ -79,16 +123,61 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
-    std::ofstream file(filepath);
-    if (!file.is_open()) {
+    if (filepath.empty()) {
+        NLM_LOG_ERROR("Config file path is empty");
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Ensure directory exists
+    std::filesystem::path filePath(filepath);
+    std::filesystem::path parentDir = filePath.parent_path();
+    
+    if (!parentDir.empty() && !std::filesystem::exists(parentDir)) {
+        NLM_LOG_ERROR("Config directory does not exist: " + parentDir.string());
+        return false;
     }
     
+    std::ofstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to create config file: " + filepath);
+        return false;
+    }
+    
+    file << "# NLM Configuration File\n";
+    file << "# Generated automatically by NLM Brain Simulator\n\n";
+    
+    for (const auto& entry : pImpl->entries) {
+        file << "# " << entry.description << "\n";
+        file << entry.key << " = ";
+        
+        std::visit([&file](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << val << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i) file << ", ";
+                    file << val[i];
+                }
+                file << "]";
+            } else {
+                file << val;
+            }
+        }, entry.value);
+        file << "\n\n";
+    }
+    
+    file.flush();
+    
+    if (!file.good()) {
+        NLM_LOG_ERROR("Failed to write complete config to file: " + filepath);
+        return false;
+    }
+    
+    NLM_LOG_INFO("Config saved successfully to: " + filepath);
     return true;
 }
 
@@ -130,11 +219,29 @@ bool Config::has(const std::string& key) const {
 }
 
 void Config::remove(const std::string& key) {
+    if (key.empty()) {
+        NLM_LOG_WARNING("Attempted to remove config entry with empty key");
+        return;
+    }
+    
+    bool found = false;
     pImpl->entries.erase(
         std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
+            [&key, &found](const ConfigEntry& e) {
+                if (e.key == key) {
+                    found = true;
+                    return true;
+                }
+                return false;
+            }),
         pImpl->entries.end()
     );
+    
+    if (found) {
+        NLM_LOG_INFO("Removed config entry: " + key);
+    } else {
+        NLM_LOG_DEBUG("Config entry not found for removal: " + key);
+    }
 }
 
 std::vector<std::string> Config::getKeys() const {

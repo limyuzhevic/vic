@@ -205,9 +205,8 @@ public:
     // Logging
     void logStatus() const;
     
-private:
-    struct Impl;
-    Impl* pImpl;
+struct Impl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

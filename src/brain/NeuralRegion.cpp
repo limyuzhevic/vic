@@ -25,20 +25,9 @@ NeuralRegion::NeuralRegion(RegionId id, const std::string& name) : pImpl(new Imp
     pImpl->name = name;
 }
 
-NeuralRegion::~NeuralRegion() = default;
+NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept = default;
 
-NeuralRegion::NeuralRegion(NeuralRegion&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
-
-NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
+NeuralRegion& NeuralRegion::operator=(NeuralRegion&& other) noexcept = default;
 
 RegionId NeuralRegion::getId() const {
     return pImpl->id;

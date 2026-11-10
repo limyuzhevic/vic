@@ -12,6 +12,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "../memory/NeuralAssociativeMemory.hpp"
 #include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
@@ -22,6 +23,7 @@
 #include <cmath>
 #include <cstring>
 #include <sstream>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -169,25 +171,22 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) : pImpl(std::make_unique<Impl>(config)) {}
 
 Brain::~Brain() = default;
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
-}
+Brain::Brain(Brain&& other) noexcept = default;
 
-Brain& Brain::operator=(Brain&& other) noexcept {
-    if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
-    }
-    return *this;
-}
+Brain& Brain::operator=(Brain&& other) noexcept = default;
 
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+
+    // Validate configuration exists
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Brain initialization failed: No configuration provided");
+        return false;
+    }
 
     // Re-initialising must rebuild, not append: a previous run left
     // reset()+initialize() reporting 1000 neurons for a 500-neuron brain.
@@ -201,13 +200,52 @@ bool Brain::initialize() {
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     
-    // Get configuration values
-    size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000));
-    size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", 1));
-    float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    // Get configuration values with error checking
+    auto neuronCountOpt = pImpl->config->get<int64_t>("neuron_count");
+    auto regionCountOpt = pImpl->config->get<int64_t>("region_count");
+    auto connectionProbabilityOpt = pImpl->config->get<float>("connection_probability");
+    
+    if (!neuronCountOpt) {
+        NLM_LOG_ERROR("Missing required config 'neuron_count'");
+        return false;
+    }
+    if (!regionCountOpt) {
+        NLM_LOG_ERROR("Missing required config 'region_count'");
+        return false;
+    }
+    if (!connectionProbabilityOpt) {
+        NLM_LOG_ERROR("Missing required config 'connection_probability'");
+        return false;
+    }
+    
+    if (*neuronCountOpt <= 0) {
+        NLM_LOG_ERROR("Invalid neuron_count value: " + std::to_string(*neuronCountOpt));
+        return false;
+    }
+    if (*regionCountOpt <= 0) {
+        NLM_LOG_ERROR("Invalid region_count value: " + std::to_string(*regionCountOpt));
+        return false;
+    }
+    if (*connectionProbabilityOpt < 0.0f || *connectionProbabilityOpt > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability value: " + std::to_string(*connectionProbabilityOpt));
+        return false;
+    }
+    
+    size_t neuronCount = static_cast<size_t>(*neuronCountOpt);
+    size_t regionCount = static_cast<size_t>(*regionCountOpt);
+    float connectionProbability = *connectionProbabilityOpt;
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
+    
+    // Validate region count is reasonable
+    if (regionCount == 0) {
+        NLM_LOG_ERROR("Region count cannot be zero");
+        return false;
+    }
+    if (neuronCount < regionCount) {
+        NLM_LOG_WARNING("Fewer neurons than regions - some regions will be empty");
+    }
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
@@ -226,13 +264,13 @@ bool Brain::initialize() {
             // initializeRandomConnectivity), so any input caused runaway
             // excitation and every weight saturated. Split the internal
             // population 80/20 into excitatory and inhibitory neurons.
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
+            auto sensoryPopId = region->addPopulation(std::max(size_t(1), neuronsPerRegion / 4), NeuronType::Sensory);
             size_t internalCount = neuronsPerRegion / 2;
             size_t internalExcitatory = internalCount * 4 / 5;
             auto internalPopId = region->addPopulation(internalExcitatory, NeuronType::Internal);
             auto inhibitoryPopId = region->addPopulation(internalCount - internalExcitatory, NeuronType::Inhibitory);
             (void)internalPopId; (void)inhibitoryPopId;
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+            auto motorPopId = region->addPopulation(std::max(size_t(1), neuronsPerRegion / 4), NeuronType::Motor);
             
             // Collect sensory and motor neurons for I/O
             auto* sensoryPop = region->getPopulation(sensoryPopId);
@@ -248,10 +286,11 @@ bool Brain::initialize() {
                 }
             }
             
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) +
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
+            NLM_LOG_INFO("Created populations in region " + std::to_string(i +  výro + ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                         std::to_string(region->getTotalNeuronCount()) + " neurons");
             nextNeuronIndex += region->getTotalNeuronCount();
+        } else {
+            NLM_LOG_ERROR("Failed to create region " + std::to_string(i + 1));
         }
     }
     
@@ -261,7 +300,18 @@ bool Brain::initialize() {
             pImpl->neuronById[neuron->getId().index()] = neuron;
         }
     }
-
+    
+    // Validate we have neurons
+    size_t totalNeurons = 0;
+    for (auto& region : pImpl->regions) {
+        totalNeurons += region->getTotalNeuronCount();
+    }
+    
+    if (totalNeurons == 0) {
+        NLM_LOG_ERROR("Brain initialization failed: No neurons were created");
+        return false;
+    }
+    
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
@@ -274,32 +324,49 @@ bool Brain::initialize() {
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========
     
     // Initialize working memory
-    pImpl->workingMemory->initialize(this);
-    pImpl->workingMemory->setCapacity(neuronCount / 10);
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->initialize(this);
+        pImpl->workingMemory->setCapacity(neuronCount / 10);
+    }
     
     // Initialize episodic memory
-    pImpl->episodicMemory->initialize(this);
-    pImpl->episodicMemory->setMaxEpisodes(1000);
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->initialize(this);
+        pImpl->episodicMemory->setMaxEpisodes(1000);
+    }
     
     // Initialize associative memory
-    pImpl->associativeMemory->initialize(this);
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->initialize(this);
+    }
     
     // Initialize prediction system
     // (PredictionSystem doesn't have initialize method currently)
     
     // Initialize cognition systems
-    pImpl->planner->initialize(this);
-    pImpl->planner->setPlanningDepth(5);
+    if (pImpl->planner) {
+        pImpl->planner->initialize(this);
+        pImpl->planner->setPlanningDepth(5);
+    }
     
-    pImpl->conceptFormation->initialize(this);
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->initialize(this);
+    }
     
-    pImpl->attention->initialize(this);
-    pImpl->attention->setInhibitionStrength(0.5f);
-    pImpl->attention->setExcitationStrength(1.5f);
+    if (pImpl->attention) {
+        pImpl->attention->initialize(this);
+        pImpl->attention->setInhibitionStrength(0.5f);
+        pImpl->attention->setExcitationStrength(1.5f);
+    }
     
     // Initialize neuromodulation
-    pImpl->novelty->initialize(this);
-    pImpl->curiosity->initialize(this);
+    if (pImpl->novelty) {
+        pImpl->novelty->initialize(this);
+    }
+    
+    if (pImpl->curiosity) {
+        pImpl->curiosity->initialize(this);
+    }
     
     // Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.
@@ -328,7 +395,8 @@ bool Brain::initialize() {
     }  // spikeHandlersRegistered
     
     // Configure checkpoint manager
-    std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
+    auto checkpointDirOpt = pImpl->config->get<std::string>("checkpoint_dir");
+    std::string checkpointDir = checkpointDirOpt ? *checkpointDirOpt : "./checkpoints";
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");

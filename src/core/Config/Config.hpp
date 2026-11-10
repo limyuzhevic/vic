@@ -48,13 +48,13 @@ struct ConfigEntry {
 class Config {
 public:
     Config();
-    ~Config();
+    ~Config() = default;
     
     // Disable copying, enable moving
     Config(const Config&) = delete;
     Config& operator=(const Config&) = delete;
-    Config(Config&&) noexcept;
-    Config& operator=(Config&&) noexcept;
+    Config(Config&&) noexcept = default;
+    Config& operator=(Config&&) noexcept = default;
     
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
