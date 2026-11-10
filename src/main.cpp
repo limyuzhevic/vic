@@ -235,18 +235,26 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             }
         }
     }
+    
+    // OPTIMIZATION: Use more selective, lower-intensity pattern to prevent saturation
+    // and allow for more selective pattern learning. Distribute current more evenly
+    // across neurons and use lower intensity to prevent runaway excitation.
+    NLM_LOG_INFO("  Using optimized pattern: stimulating " + std::to_string(patternNeurons.size()) + 
+                 " neurons at lower intensity (3.0f vs 30.0f) for better selectivity");
+    
     for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
-        }
+        // Cycle through the pattern neurons to distribute input more evenly
+        // This prevents all neurons receiving maximum input simultaneously
+        NeuronId neuronToStimulate = patternNeurons[step % patternNeurons.size()];
+        brain->injectCurrent(neuronToStimulate, 3.0f);  // Reduced from 30.0f to 3.0f
         
         brain->step(step, step * 0.001);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
+                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
         }
     }
     

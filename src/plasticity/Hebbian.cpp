@@ -57,8 +57,17 @@ void Hebbian::update(Synapse* synapse,
     // with history length (up to 100x100 pairs) and saturated every weight
     // to its bound in one step. One correlated recent pair = one step.
     // Timestamps are in seconds, so the 100ms window is 0.1s.
-    float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
-    float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
+    // Find the closest pre/post spike pair for correlation
+    float minTimeDiff = 0.1f;  // Initialize with threshold
+    for (Timestamp pre : preSpikes) {
+        for (Timestamp post : postSpikes) {
+            float timeDiff = std::abs(static_cast<float>(post - pre));
+            if (timeDiff < minTimeDiff) {
+                minTimeDiff = timeDiff;
+            }
+        }
+    }
+    float delta = minTimeDiff < 0.1f ? pImpl->learningRate : 0.0f;
     if (synapse->getType() == SynapseType::Inhibitory) {
         delta = -delta;  // strengthen inhibition, don't flip it to excitatory
     }
