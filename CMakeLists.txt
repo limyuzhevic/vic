@@ -205,9 +205,82 @@ endif()
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
+# Command Line Interface Tools
+# Advanced tools for NLM brain simulation and analysis
+
+# nlm_cli - Main Command Line Interface
+add_executable(nlm_cli
+    src/cli/NLMCli.cpp
+    src/cli/BrainCli.cpp
+    src/cli/ProfileCli.cpp
+    src/cli/ConfigCli.cpp
+    src/cli/AnalysisCli.cpp
+    src/cli/ExperimentCli.cpp
+    src/cli/MemoryCli.cpp
+    src/cli/SystemCli.cpp
+    src/cli/BenchmarkCli.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core nlm_agent nlm_world)
+
+# nlm_brain - Brain Simulation and Debugging Tools
+add_executable(nlm_brain
+    src/cli/BrainCli.cpp
+)
+target_link_libraries(nlm_brain PUBLIC nlm_core)
+
+# nlm_profile - Performance Profiling Tools
+add_executable(nlm_profile
+    src/cli/ProfileCli.cpp
+)
+target_link_libraries(nlm_profile PUBLIC nlm_core)
+
+# nlm_config - Configuration Management Tools
+add_executable(nlm_config
+    src/cli/ConfigCli.cpp
+)
+target_link_libraries(nlm_config PUBLIC nlm_core)
+
+# nlm_analysis - Data Analysis Tools
+add_executable(nlm_analysis
+    src/cli/AnalysisCli.cpp
+)
+target_link_libraries(nlm_analysis PUBLIC nlm_core nlm_agent nlm_world)
+
+# nlm_experiment - Research Experiment Tools
+add_executable(nlm_experiment
+    src/cli/ExperimentCli.cpp
+)
+target_link_libraries(nlm_experiment PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+
+# nlm_memory - Memory Management Tools
+add_executable(nlm_memory
+    src/cli/MemoryCli.cpp
+)
+target_link_libraries(nlm_memory PUBLIC nlm_core)
+
+# nlm_system - System Resource Tools
+add_executable(nlm_system
+    src/cli/SystemCli.cpp
+)
+target_link_libraries(nlm_system PUBLIC nlm_core)
+
+# nlm_benchmark - Performance Benchmarking Tools
+add_executable(nlm_benchmark_cli
+    src/cli/BenchmarkCli.cpp
+)
+target_link_libraries(nlm_benchmark_cli PUBLIC nlm_core)
+
+# Install CLI tools
+install(TARGETS nlm_cli nlm_brain nlm_profile nlm_config nlm_analysis nlm_experiment nlm_memory nlm_system nlm_benchmark_cli
     RUNTIME DESTINATION bin
 )
+
+# Generate CLI documentation
+add_custom_target(generate_cli_docs
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/GenerateCLIDoc.cmake
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Generating NLM CLI documentation"
+)
+
+# Add CLI tools to all target
+add_custom_target(nlm_cli_all DEPENDS generate_cli_docs)
