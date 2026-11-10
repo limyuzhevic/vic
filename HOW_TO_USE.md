@@ -113,8 +113,9 @@ pip install dist/*.whl
 ```python
 import pynlm
 
-# Check version
-print(pynlm.__version__)
+# Check version and system information
+print(pynlm.version())
+print(pynlm.buildInfo())
 
 # Create a simple brain
 config = pynlm.createDefaultConfig()
@@ -136,9 +137,17 @@ import pynlm
 # Create a default configuration
 config = pynlm.createDefaultConfig()
 
-# Optionally configure specific parameters
-# config.set("brain.neuron_count", 1000)
-# config.set("brain.synapse_density", 0.1)
+# Optionally configure specific parameters using the improved API
+# Method 1: Direct setting
+config.set("neuron_count", 1000)
+
+# Method 2: Dictionary (new!)
+config.setBatch({
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+    "stdp_ltp_weight": 0.01,
+})
 
 # Create and initialize the brain
 brain = pynlm.createBrain(config)
@@ -146,6 +155,10 @@ brain.initialize()
 
 print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
+
+# Get brain statistics (new!)
+stats = brain.getBrainStats()
+print(f"Brain initialized: {stats['totalNeurons']} neurons, {stats['totalSynapses']} synapses")
 ```
 
 #### Running a Simulation
@@ -158,13 +171,18 @@ config = pynlm.createDefaultConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
 
-# Run simulation for 1000 steps
-for step in range(1000):
-    brain.step(step)
-    
-    # Log statistics periodically
-    if step % 100 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+# Enhanced error handling
+try:
+    # Run simulation for 1000 steps
+    for step in range(1000):
+        brain.step(step)
+        
+        # Log statistics periodically
+        if step % 100 == 0:
+            print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+            
+except Exception as e:
+    print(f"Simulation error at step {step}: {e}")
 ```
 
 #### Creating a Simple World
@@ -193,20 +211,37 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+#### Complete Agent Example
 
 ```python
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
+# Enhanced agent example with new features
+
+def run_agent_simulation_enhanced(num_steps=1000):
+    """Enhanced complete agent simulation with brain and world."""
     
-    # 1. Create configuration
+    # 1. Create configuration with improved API
     config = pynlm.createDefaultConfig()
+    config.setBatch({
+        "neuron_count": 1000,
+        "region_count": 2,
+        "connection_probability": 0.15,
+        "stdp_ltp_weight": 0.01,
+        "stdp_ltd_weight": 0.012,
+        "plasticity.stdp.enable": True,
+        "neuromod.curiosity.enable": True,
+        "neuromod.novelty.enable": True,
+    })
     
-    # 2. Create brain and initialize
+    # 2. Create brain and initialize with error handling
     brain = pynlm.createBrain(config)
-    brain.initialize()
+    try:
+        brain.initialize()
+        print(f"Brain initialized: {brain.getTotalNeuronCount()} neurons")
+    except Exception as e:
+        print(f"Brain initialization failed: {e}")
+        return
     
     # 3. Create agent brain interface
     agent = pynlm.createAgentBrain(brain)
@@ -220,49 +255,115 @@ def run_agent_simulation(num_steps=1000):
     # 5. Initialize agent with world
     agent.initialize(world)
     
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
+    # 6. Enable advanced subsystems (new API!)
+    agent.enableAllSystems()  # Enables reward modulation, structural plasticity, development, curiosity
     
-    # 7. Run simulation loop
+    # 7. Enhanced simulation loop with monitoring and error handling
+    print(f"Starting enhanced simulation for {num_steps} steps...")
     for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+        try:
+            # Update world
+            world.update(timestep=0.1)
+            
+            # Get sensory input from world
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input in brain
+            agent.processSensoryInput(percept)
+            
+            # Run brain step
+            brain.step(step)
+            
+            # Decode motor command from brain activity
+            motor_cmd = agent.decodeMotorCommand()
+            
+            # Apply motor command to world
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+            
+            # Apply reward modulation if agent is enabled
+            if agent.isRewardModulationEnabled():
+                # Get reward from world (in real experiment, this would be from actions)
+                percept = world.getSensoryPercept()
+                reward = 0.0  # Simplified reward system
+                agent.applyRewardModulation(reward, 0.0)
+            
+            # Update development system
+            if agent.isDevelopmentEnabled():
+                agent.updateDevelopment(0.1)
+            
+            # Print progress every 100 steps with new diagnostics
+            if step % 100 == 0:
+                # Get enhanced diagnostics
+                brain_stats = brain.getBrainStats()
+                agent_stats = agent.getAgentStats()
+                
+                print(f"Step {step}:")
+                print(f"  Firing neurons: {brain_stats['firingNeurons']}")
+                print(f"  Curiosity: {agent_stats['curiosity']:.3f}")
+                print(f"  Novelty: {agent_stats['novelty']:.3f}")
+                print(f"  Prediction error: {agent_stats['predictionError']:.3f}")
+                print(f"  Developmental stage: {brain.getDevelopmentalStage()}")
+                
+        except Exception as e:
+            print(f"Error at step {step}: {e}")
+            break
+    
+    # Final status report with enhanced diagnostics
+    print(f"\n=== Enhanced Simulation Complete ===")
+    print(f"Total steps completed: {step + 1}")
+    
+    # Get final diagnostics
+    brain_stats = brain.getBrainStats()
+    agent_stats = agent.getAgentStats()
+    
+    print(f"Total spikes: {brain.getTotalSpikeCount()}")
+    print(f"Final curiosity level: {agent.getCuriosityLevel():.3f}")
+    print(f"Final novelty level: {agent.getNoveltyLevel():.3f}")
+    print(f"Final developmental stage: {agent.getDevelopmentalStage()}")
+    
+    # Get detailed diagnostics
+    print(f"\n=== Final Diagnostics ===")
+    print(f"Motor system: {agent_stats['visionNeurons']} vision neurons, "
+          f"{agent_stats['touchNeurons']} touch neurons, "
+          f"{agent_stats['internalNeurons']} internal neurons")
+    print(f"Brain regions: {len(brain.getRegionIds())}")
+    print(f"Planner decisions: {agent.getPlannerDecisionCount()}")
+    print(f"Planner agreements: {agent.getPlannerAgreementCount()}")
+    print(f"Planner overrides: {agent.getPlannerOverrideCount()}")
+    print(f"Concept biases: {agent.getConceptBiasCount()}")
+    print(f"Self biases: {agent.getSelfBiasCount()}")
+    print(f"Social biases: {agent.getSocialBiasCount()}")
+    
+    # Save brain state with error handling
+    try:
+        brain.save("enhanced_agent_brain_checkpoint.bin")
+        print(f"Brain state saved successfully!")
+    except Exception as e:
+        print(f"Brain save failed: {e}")
+    
+    return {
+        'steps_completed': step + 1,
+        'total_spikes': brain.getTotalSpikeCount(),
+        'final_curiosity': agent.getCuriosityLevel(),
+        'final_novelty': agent.getNoveltyLevel(),
+        'diagnostics': {
+            'brain': brain_stats,
+            'agent': agent_stats,
+            'region_count': len(brain.getRegionIds()),
+            'planner_decisions': agent.getPlannerDecisionCount(),
+            'planner_agreements': agent.getPlannerAgreementCount(),
+            'planner_overrides': agent.getPlannerOverrideCount(),
+        }
+    }
 
-# Run the simulation
-run_agent_simulation(1000)
+# Run the enhanced simulation
+results = run_agent_simulation_enhanced(1000)
+print(f"\n=== Simulation Results ===")
+print(f"Success: {results is not None}")
+if results:
+    print(f"Steps completed: {results['steps_completed']}")
+    print(f"Final curiosity: {results['final_curiosity']:.3f}")
+    print(f"Final novelty: {results['final_novelty']:.3f}")
 ```
 
 ### Key Classes and Methods
@@ -301,119 +402,227 @@ region_id = brain.addRegion("cortex")
 region = brain.getRegion(region_id)
 ```
 
-#### Config Class
+#### Config Class (Enhanced)
 
 ```python
 # Create
 config = pynlm.createDefaultConfig()
 
-# Query
-if config.has("brain.neuron_count"):
-    keys = config.getKeys()
+# Enhanced query methods
+if config.hasKey("neuron_count"):
+    print(f"Neuron count: {config.getInt('neuron_count', 1000)}")
 
-# Modify
-config.set("brain.neuron_count", 1000)
-config.set("learning.rate", 0.001)
+keys = config.getKeys()
+
+# Enhanced batch operations
+config.setBatch({
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.1,
+})
+
+# Enhanced command-line loading (simplified)
+args = ["--neuron-count", "500", "--connection-probability", "0.15"]
+config.loadFromArgs(args)
+
+# Load from dictionary (new!)
+config.loadFromDict({
+    "neuron_count": 1000,
+    "plasticity.stdp.enable": True,
+    "neuromod.curiosity.enable": True,
+})
 
 # File I/O
 config.loadFromFile("config.json")
 config.saveToFile("config.json")
 ```
 
-#### AgentBrain Class
+#### AgentBrain Class (Enhanced)
 
 ```python
 # Creation
 agent = pynlm.createAgentBrain(brain)
 
-# Initialization
+# Enhanced initialization
 agent.initialize(world)
 
-# Sensory processing
+# Enhanced sensory processing with better error handling
+percept = world.getSensoryPercept()
 agent.processSensoryInput(percept)
 
-# Motor decoding
+# Enhanced motor decoding with diagnostics
 motor_cmd = agent.decodeMotorCommand()
 
-# Neuromodulation
-agent.applyRewardModulation(reward, predicted_reward)
+# Enhanced neuromodulation with error handling
+reward = 0.0  # Get from world in real experiment
+agent.applyRewardModulation(reward, 0.0)
 
-# Development
-agent.updateDevelopment(timestep)
+# Enhanced development
+agent.updateDevelopment(0.1)
+
+# Get developmental stage
 agent.getDevelopmentalStage()
 
-# Subsystem enable/disable
-agent.enableRewardModulation(True/False)
-agent.enableStructuralPlasticity(True/False)
-agent.enableDevelopment(True/False)
-agent.enableCuriosity(True/False)
+# Enhanced subsystem management (new API!)
+agent.enableAllSystems()  # Enables all neuromodulation and plasticity
+# or individually:
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+agent.enableStructuralPlasticity(True)
 
-# Statistics
-agent.getCuriosityLevel()
-agent.getNoveltyLevel()
-agent.getPredictionError()
-agent.getNeuromodulationLevel()
+# Enhanced diagnostics (new API!)
+agent_stats = agent.getAgentStats()
+print(f"Vision neurons: {agent_stats['visionNeurons']}")
+print(f"Touch neurons: {agent_stats['touchNeurons']}")
+print(f"Curiosity: {agent_stats['curiosity']:.3f}")
+print(f"Novelty: {agent_stats['novelty']:.3f}")
+
+# Get enhanced thought trace
+thought_trace = agent.getThoughtTrace()
+print(f"Thought trace: {thought_trace}")
+
+# Get advanced diagnostics
+counters = {
+    'reflex_bonus_count': agent.getReflexBonusCount(),
+    'reflex_suppress_count': agent.getReflexSuppressCount(),
+    'wta_pulse_count': agent.getWtaPulseCount(),
+    'planner_override_count': agent.getPlannerOverrideCount(),
+    'planner_agreement_count': agent.getPlannerAgreementCount(),
+    'planner_decision_count': agent.getPlannerDecisionCount(),
+    'concept_bias_count': agent.getConceptBiasCount(),
+    'self_bias_count': agent.getSelfBiasCount(),
+    'social_bias_count': agent.getSocialBiasCount(),
+}
+
+# Reset agent
+agent.reset()
+
+# Get brain pointer
+brain_ptr = agent.getBrain()
 ```
 
-#### SimpleWorld Class
+#### SimpleWorld Class (Enhanced)
 
 ```python
 # Creation
 world = pynlm.createSimpleWorld()
 
-# Configuration
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+# Enhanced configuration
+world.configure(
+    width=20,
+    height=20,
+    visionWidth=8,
+    visionHeight=8
+)
 
-# Control
+# Enhanced control
 world.reset()
-world.update(timestep)
-world.setRandomSeed(42)
 
-# Agent interaction
-world.setAgentStart(x, y)
-world.applyMotorCommand(motor_cmd, current_time)
+# Enhanced agent interaction
+world.setAgentStart(x=10.0, y=10.0)
+motor_cmd = agent.decodeMotorCommand()
+world.applyMotorCommand(motor_cmd, current_time=0.0)
 
-# State access
+# Enhanced state access
 percept = world.getSensoryPercept()
+agent_body = world.getAgentBody()
+
+# Enhanced diagnostics
+world_stats = world.getWorldStats()
+print(f"World size: {world_stats['width']}x{world_stats['height']}")
+print(f"Simulation time: {world_stats['simulationTime']}")
+
+# Enhanced agent body state
 body = world.getAgentBody()
+body_stats = {
+    'x': body.x,
+    'y': body.y,
+    'orientation': body.orientation,
+    'energy': body.energy,
+    'health': body.health,
+    'age': body.age,
+    'isMoving': body.isMoving,
+    'isTurning': body.isTurning,
+}
 
-# World objects
-world.addObject(pynlm.WorldObject(x, y, pynlm.WorldObjectType.Resource, value=1.0))
-world.removeObject(x, y)
-world.isValidPosition(x, y)
+# Enhanced world objects
+pynlm.WorldObject(
+    x=5.0,
+    y=5.0,
+    type=pynlm.WorldObjectType.Resource,
+    value=1.0,
+    radius=0.5
+)
 
-# Properties
-world.getWidth()
-world.getHeight()
-world.getSimulationTime()
-world.getMaxEnergy()
-world.setMaxEnergy(100.0)
+# Enhanced world interaction
+if world.isValidPosition(x, y):
+    print("Position is valid")
+
+# Enhanced sensory percept
+percept = world.getSensoryPercept()
+percept_stats = {
+    'vision': percept.getVision(),
+    'touch': percept.getTouch(),
+    'internal': percept.getInternal(),
+    'proprioception': percept.getProprioception(),
+}
+
+# Enhanced update with error handling
+try:
+    world.update(timestep=0.1)
+    print("World updated successfully")
+except Exception as e:
+    print(f"World update failed: {e}")
+
+# Enhanced random seed
+world.setRandomSeed(42)
 ```
 
-### Enumerations
+#### Enumerations
 
 ```python
-# Neuron types
+# Neuron types (same in both)
 pynlm.NeuronType.Excitatory
 pynlm.NeuronType.Inhibitory
+pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Sensory
 pynlm.NeuronType.Motor
-pynlm.NeuronType.Modulatory
 pynlm.NeuronType.Internal
 
-# Developmental stages
+# Developmental stages (same in both)
 pynlm.DevelopmentalStage.Initial
 pynlm.DevelopmentalStage.CriticalPeriod
 pynlm.DevelopmentalStage.Maturation
 pynlm.DevelopmentalStage.Adult
 pynlm.DevelopmentalStage.Aging
 
-# Action types
+# Action types (used by brain's cognition/planner systems)
 pynlm.ActionType.MoveForward
+pynlm.ActionType.MoveBackward
+pynlm.ActionType.MoveLeft
+pynlm.ActionType.MoveRight
 pynlm.ActionType.TurnLeft
+pynlm.ActionType.TurnRight
+pynlm.ActionType.Look
+pynlm.ActionType.LookUp
+pynlm.ActionType.LookDown
 pynlm.ActionType.Interact
 pynlm.ActionType.Eat
-# ... and more
+pynlm.ActionType.Drink
+pynlm.ActionType.Rest
+pynlm.ActionType.Wait
+pynlm.ActionType.Custom
+
+# Motor commands (used by agent's motor output interface - more restricted)
+pynlm.MotorCommand.MoveForward    # Propel forward
+pynlm.MotorCommand.MoveBackward   # Propel backward  
+pynlm.MotorCommand.TurnLeft       # Rotate left
+pynlm.MotorCommand.TurnRight      # Rotate right
+pynlm.MotorCommand.LookLeft       # Pan sensor left
+pynlm.MotorCommand.LookRight      # Pan sensor right
+pynlm.MotorCommand.Interact       # Interact with nearby object
+pynlm.MotorCommand.Wait           # No movement
 
 # World object types
 pynlm.WorldObjectType.Empty

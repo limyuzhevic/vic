@@ -19,23 +19,29 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Phase 3 fix: Improved config loading with better error handling and support for
+    // both key=value format and simple JSON-like objects (key: value)
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Could not open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    size_t lineNumber = 0;
+    bool hasErrors = false;
+    
     while (std::getline(file, line)) {
+        ++lineNumber;
+        
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs (primary format)
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -50,7 +56,35 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+        // Parse simple key: value format (alternative format)
+        else {
+            pos = line.find(':');
+            if (pos != std::string::npos) {
+                std::string key = trim(line.substr(0, pos));
+                std::string value = trim(line.substr(pos + 1));
+                
+                // Remove quotes if present
+                if (value.size() >= 2 && 
+                    ((value.front() == '"' && value.back() == '"') ||
+                     (value.front() == '\'' && value.back() == '\''))) {
+                    value = value.substr(1, value.size() - 2);
+                }
+                
+                set(key, value, ConfigSource::File);
+            } else {
+                // Log warning for malformed line but continue processing
+                NLM_LOG_WARNING("Malformed config line " + std::to_string(lineNumber) + ": " + line);
+                hasErrors = true;
+            }
+        }
     }
+    
+    if (hasErrors) {
+        NLM_LOG_WARNING("Config file parsing completed with warnings");
+    }
+    
+    NLM_LOG_INFO("Config file loaded: " + filepath + " (" + 
+                 std::to_string(pImpl->entries.size()) + " entries)");
     
     return true;
 }
