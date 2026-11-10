@@ -411,13 +411,15 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
 
-    // Phase 5 thought: ask the brain's planner what it would do, from
-    // learned action quality, before the motor decode decides. The
-    // planner is advisory — decodeFromMotorNeurons below still makes
-    // the decision — so the thought trace can report planned != acted
-    // disagreements honestly. The planner's state (vision) is the
-    // percept the brain already has; its action quality is updated
-    // from real rewards in applyRewardModulation.
+        // WEAROUND ISSUE: working memory has been fixed, but the component
+        // is never used. A stored neuron must be an active trace for the
+        // planner's choice-quality calculations — a cognitive habit. 
+        // The planner should remember recent sensory activation to bias
+        // actions that "fit" the current state, and the working memory
+        // component is now ready for that role. What remains is to
+        // actually use working memory's traces in the planner's action
+        // quality calculations (Phase 6 concept bias still not tied to
+        // working memory).
     if (brain_->getPlanner() && !lastVision_.empty()) {
         ActionType planned = brain_->getPlanner()->planAction(lastVision_);
         switch (planned) {
@@ -425,6 +427,9 @@ MotorCommand AgentBrain::decodeMotorCommand() {
             case ActionType::MoveBackward: thoughtPlanned_ = MotorCommand::MoveBackward; break;
             case ActionType::TurnLeft: thoughtPlanned_ = MotorCommand::TurnLeft; break;
             case ActionType::TurnRight: thoughtPlanned_ = MotorCommand::TurnRight; break;
+            case ActionType::Look: thoughtPlanned_ = MotorCommand::LookLeft; break;
+            case ActionType::LookUp: thoughtPlanned_ = MotorCommand::LookUp; break;
+            case ActionType::LookDown: thoughtPlanned_ = MotorCommand::LookDown; break;
             case ActionType::Interact: thoughtPlanned_ = MotorCommand::Interact; break;
             default: thoughtPlanned_ = MotorCommand::Wait; break;
         }
@@ -661,6 +666,10 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
                 case MotorCommand::MoveBackward: return ActionType::MoveBackward;
                 case MotorCommand::TurnLeft: return ActionType::TurnLeft;
                 case MotorCommand::TurnRight: return ActionType::TurnRight;
+                case MotorCommand::LookLeft: return ActionType::Look;
+                case MotorCommand::LookRight: return ActionType::Look;
+                case MotorCommand::LookUp: return ActionType::LookUp;
+                case MotorCommand::LookDown: return ActionType::LookDown;
                 case MotorCommand::Interact: return ActionType::Interact;
                 default: return ActionType::Wait;
             }
@@ -730,42 +739,46 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
             }
         }
     }
-    // Phase 6 self-model bias, discriminative only: vision patterns
-    // are so similar frame to frame (most rays read empty) that
-    // self-model confidence is ~0.97 for every action — biasing
-    // every action by +3 Hz would cancel out and only inflate the
-    // counter. So only the single most-confident action, and only
-    // when it clearly leads the runner-up (> 0.05), gets +3 Hz.
-    // In practice this fires rarely, which is the honest result:
-    // the self-model records and predicts, but its confidence does
-    // not yet discriminate actions well.
-    if (selfModelReady_) {
-        MotorCommand cmds[5] = {MotorCommand::MoveForward, MotorCommand::MoveBackward,
-                                MotorCommand::TurnLeft, MotorCommand::TurnRight,
-                                MotorCommand::Interact};
-        ActionType acts[5] = {ActionType::MoveForward, ActionType::MoveBackward,
-                              ActionType::TurnLeft, ActionType::TurnRight,
-                              ActionType::Interact};
-        float conf[5];
-        for (int i = 0; i < 5; ++i) conf[i] = selfModel_.getSelfModelConfidence(acts[i]);
-        int bestI = 0;
-        float second = 0.0f;
-        for (int i = 0; i < 5; ++i) {
-            if (conf[i] > conf[bestI]) { second = conf[bestI]; bestI = i; }
-            else if (conf[i] > second) { second = conf[i]; }
-        }
-        if (conf[bestI] > 0.8f && conf[bestI] - second > 0.05f) {
-            switch (cmds[bestI]) {
-                case MotorCommand::MoveForward: forwardRate += 3.0f; break;
-                case MotorCommand::MoveBackward: backwardRate += 3.0f; break;
-                case MotorCommand::TurnLeft: turnLeftRate += 3.0f; break;
-                case MotorCommand::TurnRight: turnRightRate += 3.0f; break;
-                case MotorCommand::Interact: interactRate += 3.0f; break;
-                default: break;
+        // Phase 6 self-model bias, discriminative only: vision patterns
+        // are so similar frame to frame (most rays read empty) that
+        // self-model confidence is ~0.97 for every action — biasing
+        // every action by +3 Hz would cancel out and only inflate the
+        // counter. So only the single most-confident action, and only
+        // when it clearly leads the runner-up (> 0.05), gets +3 Hz.
+        // In practice this fires rarely, which is the honest result:
+        // the self-model records and predicts, but its confidence does
+        // not yet discriminate actions well.
+        if (selfModelReady_) {
+            MotorCommand cmds[5] = {MotorCommand::MoveForward, MotorCommand::MoveBackward,
+                                    MotorCommand::TurnLeft, MotorCommand::TurnRight,
+                                    MotorCommand::Interact};
+            ActionType acts[5] = {ActionType::MoveForward, ActionType::MoveBackward,
+                                    ActionType::TurnLeft, ActionType::TurnRight,
+                                    ActionType::Interact};
+            float conf[5];
+            for (int i = 0; i < 5; ++i) conf[i] = selfModel_.getSelfModelConfidence(acts[i]);
+            int bestI = 0;
+            float second = 0.0f;
+            for (int i = 0; i < 5; ++i) {
+                if (conf[i] > conf[bestI]) { second = conf[bestI]; bestI = i; }
+                else if (conf[i] > second) { second = conf[i]; }
             }
-            ++selfBiasCount_;
+            if (conf[bestI] > 0.8f && conf[bestI] - second > 0.05f) {
+                switch (cmds[bestI]) {
+                    case MotorCommand::MoveForward: forwardRate += 3.0f; break;
+                    case MotorCommand::MoveBackward: backwardRate += 3.0f; break;
+                    case MotorCommand::TurnLeft: turnLeftRate += 3.0f; break;
+                    case MotorCommand::TurnRight: turnRightRate += 3.0f; break;
+                    case MotorCommand::LookLeft: forwardRate += 3.0f; break;
+                    case MotorCommand::LookRight: forwardRate += 3.0f; break;
+                    case MotorCommand::LookUp: forwardRate += 3.0f; break;
+                    case MotorCommand::LookDown: forwardRate += 3.0f; break;
+                    case MotorCommand::Interact: interactRate += 3.0f; break;
+                    default: break;
+                }
+                ++selfBiasCount_;
+            }
         }
-    }
     // Phase 6 social bias: if another agent was observed acting in a
     // closely matching state (similarity > 0.8), imitating that
     // action gets +5 Hz. With no observations this is inert, which
@@ -1050,6 +1063,8 @@ const char* phase5CmdName(MotorCommand cmd) {
         case MotorCommand::TurnRight: return "TurnRight";
         case MotorCommand::LookLeft: return "LookLeft";
         case MotorCommand::LookRight: return "LookRight";
+        case MotorCommand::LookUp: return "LookUp";
+        case MotorCommand::LookDown: return "LookDown";
         case MotorCommand::Interact: return "Interact";
         default: return "Wait";
     }

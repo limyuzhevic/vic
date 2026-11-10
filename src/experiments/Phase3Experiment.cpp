@@ -112,6 +112,8 @@ void ExperimentMetrics::reset() {
     waitCount = 0;
     lookLeftCount = 0;
     lookRightCount = 0;
+    lookUpCount = 0;
+    lookDownCount = 0;
 }
 
 std::string ExperimentMetrics::toCSV() const {
@@ -137,7 +139,9 @@ std::string ExperimentMetrics::toCSV() const {
         << interactCount << ","
         << waitCount << ","
         << lookLeftCount << ","
-        << lookRightCount;
+        << lookRightCount << ","
+        << lookUpCount << ","
+        << lookDownCount;
     return oss.str();
 }
 

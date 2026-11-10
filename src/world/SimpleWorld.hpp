@@ -116,6 +116,9 @@ private:
     float maxEnergy_;
     float energyDecayRate_;
     float resourceEnergyGain_;
+    float maxTouch_;
+    float defaultMovementCost_;
+    float maxTurnCost_;
     
     // Simulation time
     double simTime_;

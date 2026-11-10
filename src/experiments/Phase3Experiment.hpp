@@ -61,6 +61,8 @@ struct ExperimentMetrics {
     // case, which understated non-Wait share. Count them separately.
     int lookLeftCount;
     int lookRightCount;
+    int lookUpCount;
+    int lookDownCount;
     
     ExperimentMetrics();
     void reset();

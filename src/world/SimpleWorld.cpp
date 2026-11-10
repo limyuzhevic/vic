@@ -28,6 +28,12 @@ SimpleWorld::SimpleWorld()
     , simTime_(0.0)
     , rngSeed_(42)
     , rngState_(42)
+    , maxTouch_(1.5f)
+    , defaultMovementCost_(0.01f)
+    , maxTurnCost_(0.005f)
+    , explorationBonusThreshold_(0.3f)
+    , explorationBonusValue_(0.5f)
+    , restReward_(0.02f)
 {
     agent_.reset();
 }
@@ -39,6 +45,21 @@ void SimpleWorld::configure(float width, float height, size_t visionWidth, size_
     height_ = height;
     visionWidth_ = visionWidth;
     visionHeight_ = visionHeight;
+    
+    // Additional configuration parameters
+    maxEnergy_ = 100.0f;
+    energyDecayRate_ = 0.01f;
+    resourceEnergyGain_ = 30.0f;
+    maxTouch_ = 1.5f;
+    defaultMovementCost_ = 0.01f;
+    maxTurnCost_ = 0.005f;
+    
+    // Add exploration bonus parameters
+    explorationBonusThreshold_ = 0.3f;  // Minimum novelty to get bonus
+    explorationBonusValue_ = 0.5f;     // Bonus reward for exploring
+    
+    // Add rest reward
+    restReward_ = 0.02f;
 }
 
 void SimpleWorld::setRandomSeed(uint64_t seed) {
@@ -208,6 +229,35 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             result.reward = -0.005f;
             result.success = true;
             break;
+        
+        // Phase 6: exploration bonus for novel interactions
+        // When the agent explores new areas or encounters novel situations,
+        // it gets additional rewards to encourage exploration behavior.
+        // This is implemented after all movement cases so it applies to any action.
+        bool hasExploredNewArea = false;
+        for (const auto& obj : objects_) {
+            if (obj.active && obj.type == WorldObjectType::Resource && obj.radius > 0.0f) {
+                float dx = obj.x - agent_.x;
+                float dy = obj.y - agent_.y;
+                float dist = std::sqrt(dx * dx + dy * dy);
+                if (dist < obj.radius && dist < 1.0f) {
+                    hasExploredNewArea = true;
+                    break;
+                }
+            }
+        }
+        
+        if (hasExploredNewArea) {
+            // Exploration bonus for discovering and consuming resources
+            result.reward += explorationBonusValue_;
+        }
+        
+        // Phase 6: rest reward - giving incentives for taking breaks
+        // After moving, the agent can rest to recover energy, which is
+        // beneficial for long-term survival and learning.
+        if (cmd == MotorCommand::Wait) {
+            result.reward += restReward_;
+        }
             
         case MotorCommand::LookLeft:
             // Pan sensor (no movement)
@@ -218,6 +268,16 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
             break;
 
         case MotorCommand::LookRight:
+            agent_.angularVelocity = 0.0f;
+            agent_.isTurning = false;
+            result.reward = 0.0f;
+            result.success = true;
+            break;
+
+        case MotorCommand::LookUp:
+        case MotorCommand::LookDown:
+            // Vertical looking: changes agent orientation for vertical exploration
+            // No movement cost, but enables vertical exploration of the 2D world
             agent_.angularVelocity = 0.0f;
             agent_.isTurning = false;
             result.reward = 0.0f;

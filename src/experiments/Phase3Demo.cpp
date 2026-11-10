@@ -73,6 +73,29 @@ public:
             
             ExperimentMetrics metrics;
             metrics.episode = episode;
+            metrics.steps = 0;
+            metrics.totalReward = 0.0f;
+            metrics.finalEnergy = 0.0f;
+            metrics.finalNovelty = 0.0f;
+            metrics.finalCuriosity = 0.0f;
+            metrics.predictionError = 0.0f;
+            metrics.developmentalAge = 0.0f;
+            metrics.developmentalStage = "Initial";
+            metrics.totalSynapses = 0;
+            metrics.averageWeight = 0.0f;
+            metrics.maxWeight = 0.0f;
+            metrics.totalSpikes = 0;
+            metrics.averageFiringRate = 0.0f;
+            metrics.forwardCount = 0;
+            metrics.backwardCount = 0;
+            metrics.turnLeftCount = 0;
+            metrics.turnRightCount = 0;
+            metrics.interactCount = 0;
+            metrics.waitCount = 0;
+            metrics.lookLeftCount = 0;
+            metrics.lookRightCount = 0;
+            metrics.lookUpCount = 0;
+            metrics.lookDownCount = 0;
 
             // Phase 5 navigation/interact metrics: visited 1x1 cells,
             // interact outcomes from the world's own result message
@@ -182,9 +205,11 @@ public:
                     case MotorCommand::MoveBackward: metrics.backwardCount++; break;
                     case MotorCommand::TurnLeft: metrics.turnLeftCount++; break;
                     case MotorCommand::TurnRight: metrics.turnRightCount++; break;
-                    case MotorCommand::Interact: metrics.interactCount++; break;
                     case MotorCommand::LookLeft: metrics.lookLeftCount++; break;
                     case MotorCommand::LookRight: metrics.lookRightCount++; break;
+                    case MotorCommand::LookUp: metrics.lookUpCount++; break;
+                    case MotorCommand::LookDown: metrics.lookDownCount++; break;
+                    case MotorCommand::Interact: metrics.interactCount++; break;
                     default: metrics.waitCount++; break;
                 }
                 
@@ -218,15 +243,17 @@ public:
             std::cout << "  Final Energy: " << metrics.finalEnergy << "\n";
             std::cout << "  Synapses: " << metrics.totalSynapses << "\n";
             std::cout << "  Action counts: fwd=" << metrics.forwardCount
-                      << ", bwd=" << metrics.backwardCount
-                      << ", left=" << metrics.turnLeftCount
-                      << ", right=" << metrics.turnRightCount
-                      << ", interact=" << metrics.interactCount
-                      << ", wait=" << metrics.waitCount
-                      << ", lookL=" << metrics.lookLeftCount
-                      << ", lookR=" << metrics.lookRightCount
-                      << ", avgFiringRate=" << metrics.averageFiringRate
-                      << "\n";
+                       << ", bwd=" << metrics.backwardCount
+                       << ", left=" << metrics.turnLeftCount
+                       << ", right=" << metrics.turnRightCount
+                       << ", interact=" << metrics.interactCount
+                       << ", wait=" << metrics.waitCount
+                       << ", lookL=" << metrics.lookLeftCount
+                       << ", lookR=" << metrics.lookRightCount
+                       << ", lookU=" << metrics.lookUpCount
+                       << ", lookD=" << metrics.lookDownCount
+                       << ", avgFiringRate=" << metrics.averageFiringRate
+                       << "\n";
             std::cout << "  Phase5 metrics: visitedCells=" << visitedCells.size()
                       << ", resources=" << resourcesConsumed
                       << ", hazards=" << hazardsHit
@@ -320,6 +347,8 @@ private:
             case MotorCommand::TurnRight: return "TurnRight";
             case MotorCommand::LookLeft: return "LookLeft";
             case MotorCommand::LookRight: return "LookRight";
+            case MotorCommand::LookUp: return "LookUp";
+            case MotorCommand::LookDown: return "LookDown";
             case MotorCommand::Interact: return "Interact";
             case MotorCommand::Wait: return "Wait";
             default: return "Unknown";
