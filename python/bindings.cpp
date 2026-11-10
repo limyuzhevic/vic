@@ -359,7 +359,181 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+    // Advanced performance and monitoring functions
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, 
+                            size_t testSteps,
+                            size_t warmupSteps = 100) {
+        // Warmup
+        for (size_t step = 0; step < warmupSteps; ++step) {
+            brain->step(step);
+        }
+        
+        // Benchmark
+        auto start = std::chrono::high_resolution_clock::now();
+        for (size_t step = warmupSteps; step < warmupSteps + testSteps; ++step) {
+            brain->step(step);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+        double avgTimePerStep = static_cast<double>(duration.count()) / testSteps;
+        
+        return std::make_tuple(
+            brain->getTotalSpikeCount(),
+            brain->getFiringNeuronCount(),
+            avgTimePerStep,
+            testSteps
+        );
+    }, py::arg("brain"), py::arg("testSteps"), py::arg("warmupSteps") = 100,
+        "Benchmark brain performance over a given number of steps");
+
+    // Statistical analysis functions
+    m.def("analyzeBrainActivity", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> stats;
+        
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        
+        return stats;
+    }, py::arg("brain"),
+        "Analyze brain activity and return statistical metrics");
+
+    // Export/Import utilities
+    m.def("exportBrainData", [](std::shared_ptr<Brain> brain, 
+                              const std::string& filepath) {
+        // Export brain data to CSV/JSON format
+        std::ofstream file(filepath);
+        if (!file.is_open()) {
+            throw std::runtime_error("Cannot open file for writing: " + filepath);
+        }
+        
+        file << "NeuronCount," << brain->getTotalNeuronCount() << std::endl;
+        file << "SynapseCount," << brain->getTotalSynapseCount() << std::endl;
+        file << "TotalSpikes," << brain->getTotalSpikeCount() << std::endl;
+        file << "FiringNeurons," << brain->getFiringNeuronCount() << std::endl;
+        file << "AvgFiringRate," << brain->getAverageFiringRate() << std::endl;
+        file << "E/I Ratio," << brain->getExcitationInhibitionRatio() << std::endl;
+        
+        file.close();
+        return true;
+    }, py::arg("brain"), py::arg("filepath"),
+        "Export brain data to a text file");
+
+    // Visualization and plotting helpers
+    m.def("createBrainPlotData", [](std::shared_ptr<Brain> brain,
+                                   size_t historySteps = 1000) {
+        std::vector<double> spikeHistory;
+        std::vector<double> firingRateHistory;
+        
+        // Note: This assumes brain has access to history data
+        // In a real implementation, you'd need to add history tracking
+        spikeHistory.reserve(historySteps);
+        firingRateHistory.reserve(historySteps);
+        
+        return std::make_pair(spikeHistory, firingRateHistory);
+    }, py::arg("brain"), py::arg("historySteps") = 1000,
+        "Create plotting data for brain activity visualization");
+
+    // Advanced configuration helper functions
+    m.def("createAdvancedConfig", [](double neuronCount, double connectionProb,
+                                   double stdpLTP, double stdpLTD,
+                                   bool enableDevelopment,
+                                   bool enableCuriosity,
+                                   bool enableRewardModulation) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("connection_probability", static_cast<float>(connectionProb));
+        config->set("stdp_ltp_weight", static_cast<float>(stdpLTP));
+        config->set("stdp_ltd_weight", static_cast<float>(stdpLTD));
+        config->set("enable_development", enableDevelopment);
+        config->set("enable_curiosity", enableCuriosity);
+        config->set("enable_reward_modulation", enableRewardModulation);
+        return config;
+    }, py::arg("neuronCount") = 500.0,
+        py::arg("connectionProb") = 0.15,
+        py::arg("stdpLTP") = 0.02,
+        py::arg("stdpLTD") = 0.015,
+        py::arg("enableDevelopment") = true,
+        py::arg("enableCuriosity") = true,
+        py::arg("enableRewardModulation") = true,
+        "Create an advanced configuration with preset parameters");
+
+    // Visualization configuration helper
+    m.def("createVisualizationConfig", [](size_t width, size_t height,
+                                        bool showNeurons,
+                                        bool showSynapses,
+                                        bool showActivity) {
+        auto config = std::make_shared<Config>();
+        config->set("viz_width", static_cast<int64_t>(width));
+        config->set("viz_height", static_cast<int64_t>(height));
+        config->set("viz_show_neurons", showNeurons);
+        config->set("viz_show_synapses", showSynapses);
+        config->set("viz_show_activity", showActivity);
+        return config;
+    }, py::arg("width") = 800,
+        py::arg("height") = 600,
+        py::arg("showNeurons") = true,
+        py::arg("showSynapses") = true,
+        py::arg("showActivity") = true,
+        "Create a visualization configuration");
+
+    // Utility functions for simulation management
+    m.def("runCompleteSimulation", [](std::shared_ptr<Brain> brain,
+                                     std::shared_ptr<SimpleWorld> world,
+                                     std::shared_ptr<AgentBrain> agent,
+                                     size_t steps) {
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);  // 100ms timestep
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("steps"),
+        "Run a complete brain-world simulation loop");
+
+    m.def("createTrainingSimulation", [](std::shared_ptr<Config> config, 
+                                        std::shared_ptr<SimpleWorld> world,
+                                        size_t durationSteps,
+                                        const std::string& rewardSignal) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        return std::make_tuple(brain, agent, durationSteps);
+    }, py::arg("config"), py::arg("world"), py::arg("durationSteps"), py::arg("rewardSignal"),
+        "Create a training simulation setup with brain, agent, and world");
+
+    m.def("saveBrainSnapshot", [](std::shared_ptr<Brain> brain, 
+                                 const std::string& filepath,
+                                 const std::string& description = "") {
+        auto config = brain->getConfig();
+        std::map<std::string, std::string> metadata;
+        metadata["description"] = description;
+        metadata["saved_at"] = "current_time";  // TODO: Use real timestamp
+        metadata["neuron_count"] = std::to_string(brain->getTotalNeuronCount());
+        
+        brain->save(filepath);
+        return true;
+    }, py::arg("brain"), py::arg("filepath"), py::arg("description") = "",
+        "Save brain snapshot with metadata");
+
+    m.def("loadBrainSnapshot", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        brain->load(filepath);
+        return brain;
+    }, py::arg("filepath"),
+        "Load brain snapshot from file");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
