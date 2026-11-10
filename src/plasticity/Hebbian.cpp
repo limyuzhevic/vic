@@ -68,7 +68,7 @@ void Hebbian::update(Synapse* synapse,
     // without this, Hebbian alone added a fixed 0.01 per co-active step
     // and saturated every weight together with STDP.
     if (std::abs(delta) > 1e-6f) {
-        delta *= (1.0f - std::abs(synapse->getWeight()));
+        delta *= (1.0f - std::abs(synapse->getWeight())) * 0.5f;  // Additional scaling for selective learning
         applyWeightChange(synapse, delta);
         if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
             synapse->setWeight(-0.01f);

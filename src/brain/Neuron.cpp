@@ -217,12 +217,14 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
     // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Scale input to realistic values (prevent runaway excitation)
+    float synapticContribution = pImpl->synapticInput / (C * 10.0f);  // Scale factor of 10
     
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
+    // Convert dt from seconds to milliseconds
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
@@ -232,11 +234,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     }
     
     // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Reduce the clamping range to prevent runaway excitation
+    V = std::clamp(V, -80.0f, 35.0f);
     
     // Update the firing-rate metric from counted spikes, in Hz.
-    // Previously setFiringRate() was never called anywhere, so
-    // getAverageFiringRate() summed zeros even with thousands of spikes.
     // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
     // dt is in seconds (0.001 in the demos), so a neuron firing every
     // step would approach 1000 Hz, and refractory periods cap it well

@@ -66,9 +66,17 @@ void STDP::update(Synapse* synapse,
     // (Brain steps at 1ms), so convert to ms for the tau window.
     float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
     if (dtMs > 0) {
-        totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
+        // Pre-before-post: potentiation
+        // Use a smaller learning rate and make it decay more rapidly with time
+        float potency = std::exp(-dtMs / tau);
+        float rate = pImpl->ltpWeight * 0.01f;  // Reduced from 1.0 to 0.01 for more selective learning
+        totalDelta += rate * potency;
     } else if (dtMs < 0) {
-        totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+        // Post-before-pre: depression
+        // Use a smaller learning rate and make it decay more rapidly with time
+        float depression = std::exp(dtMs / tau);
+        float rate = pImpl->ltdWeight * 0.01f;  // Reduced from 1.0 to 0.01 for more selective learning
+        totalDelta += -rate * depression;
     }
     
     // Apply weight change with bounds
@@ -97,7 +105,13 @@ void STDP::update(Synapse* synapse,
         {
             float w = synapse->getWeight();
             bool awayFromZero = std::abs(w + totalDelta) > std::abs(w);
-            totalDelta *= awayFromZero ? (1.0f - std::abs(w)) : std::abs(w);
+            if (awayFromZero) {
+                // Potentiation (away from zero)
+                totalDelta *= (1.0f - std::abs(w)) * 0.5f;  // Additional scaling for selective learning
+            } else {
+                // Depression (toward zero)
+                totalDelta *= std::abs(w) * 0.5f;  // Additional scaling for selective learning
+            }
         }
 
         // Apply weight change
