@@ -59,41 +59,68 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
-    // Load from command line arguments
-    bool loadFromArgs(int argc, char** argv);
+    // Load from command line arguments with advanced parsing
+    bool loadFromArgsAdvanced(int argc, char** argv);
     
-    // Save to file
-    bool saveToFile(const std::string& filepath) const;
+    // Configuration validation
+    bool validate() const;
+    std::string validateSummary() const;
     
-    // Get values (defined here so templates instantiate in every TU)
-template<typename T>
-    std::optional<T> get(const std::string& key) const;
-
-    template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Preset configurations
+    static std::shared_ptr<Config> createDefaultConfig();
+    static std::shared_ptr<Config> createPhase2Config();
+    static std::shared_ptr<Config> createPhase6Config();
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Configuration command processing
+    bool processConfigCommands(const std::string& commandLine);
     
-    // Remove key
-    void remove(const std::string& key);
+    // Get configuration statistics
+    size_t getEntryCount() const;
+    size_t getSourceCount(ConfigSource source) const;
+    std::vector<std::string> getKeysBySource(ConfigSource source) const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Configuration search and filtering
+    std::vector<std::string> searchKeys(const std::string& pattern) const;
+    std::vector<std::string> getNumericKeys() const;
+    std::vector<std::string> getStringKeys() const;
+    std::vector<std::string> getBooleanKeys() const;
     
-    // Clear all
-    void clear();
+    // Configuration backup and restore
+    bool saveToFileWithTimestamp(const std::string& filepath) const;
+    bool loadFromFileWithFallback(const std::string& primaryPath, const std::string& fallbackPath);
     
-    // Get configuration summary
-    std::string summary() const;
+    // Configuration comparison
+    bool hasSameValues(const Config& other) const;
+    
+    // Configuration help and documentation
+    std::string getConfigHelp() const;
+    static std::string getAvailableConfigKeys();
+    
+    // Configuration validation rules
+    bool setValidationRule(const std::string& key, const std::string& rule);
+    bool removeValidationRule(const std::string& key);
+    std::string getValidationRules() const;
+    
+    // Configuration export/import for advanced use
+    std::string exportToJSON() const;
+    bool importFromJSON(const std::string& json);
+    
+    // Configuration monitoring
+    class ConfigChangeListener {
+    public:
+        virtual ~ConfigChangeListener() = default;
+        virtual void onConfigChanged(const std::string& key, const ConfigValue& newValue) = 0;
+    };
+    
+    void addConfigChangeListener(ConfigChangeListener* listener);
+    void removeConfigChangeListener(ConfigChangeListener* listener);
+    
+    // Configuration diff between two configs
+    std::vector<std::string> diffKeys(const Config& other) const;
+    
+    // Configuration bulk operations
+    void mergeConfigs(const Config& source);
+    void clearUnusedDefaults();
     
 private:
     struct Impl;

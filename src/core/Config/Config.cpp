@@ -84,9 +84,47 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    file << "# Configuration saved by NLM\n";
+    file << "# Format: key = value (value type depends on content)\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Save the actual value based on its type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t> || 
+                         std::is_same_v<T, float> || std::is_same_v<T, double> || 
+                         std::is_same_v<T, bool>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                file << '"' << arg << '"';
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) file << ", ";
+                    file << arg[i];
+                }
+                file << "]";
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) file << ", ";
+                    file << '"' << arg[i] << '"';
+                }
+                file << "]";
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
     return true;
@@ -234,5 +272,125 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Add advanced configuration implementation here
+
+std::shared_ptr<Config> Config::createDefaultConfig() {
+    auto config = std::make_shared<Config>();
+    
+    // Core simulation parameters
+    config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.1f, ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    
+    // Plasticity parameters
+    config->set("stdp_ltp_weight", 0.01f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.012f, ConfigSource::Default);
+    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Development parameters
+    config->set("developmental_level", 0, ConfigSource::Default);
+    config->set("plasticity_rate", 1.0f, ConfigSource::Default);
+    
+    // Memory parameters
+    config->set("working_memory_capacity", 100, ConfigSource::Default);
+    config->set("episodic_memory_max_episodes", 1000, ConfigSource::Default);
+    config->set("replay_interval", 100, ConfigSource::Default);
+    config->set("consolidation_interval", 1000, ConfigSource::Default);
+    
+    // Neuromodulation parameters
+    config->set("dopamine_initial_level", 0.5f, ConfigSource::Default);
+    config->set("curiosity_initial_level", 0.5f, ConfigSource::Default);
+    config->set("novelty_sensitivity", 0.5f, ConfigSource::Default);
+    
+    // Cognitive parameters
+    config->set("planning_depth", 5, ConfigSource::Default);
+    config->set("attention_strength", 0.5f, ConfigSource::Default);
+    
+    // Environment parameters
+    config->set("action_space_size", 4, ConfigSource::Default);
+    config->set("reward_function", "cumulative", ConfigSource::Default);
+    
+    return config;
+}
+
+std::shared_ptr<Config> Config::createPhase2Config() {
+    auto config = createDefaultConfig();
+    
+    // Phase 2 specific overrides
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    
+    return config;
+}
+
+std::shared_ptr<Config> Config::createPhase6Config() {
+    auto config = createDefaultConfig();
+    
+    // Phase 6 integration overrides
+    config->set("neuron_count", static_cast<int64_t>(2000), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(2), ConfigSource::Default);
+    config->set("connection_probability", 0.08f, ConfigSource::Default);
+    config->set("stdp_ltp_weight", 0.015f, ConfigSource::Default);
+    config->set("stdp_ltd_weight", 0.01f, ConfigSource::Default);
+    config->set("synaptogenesis_rate", 0.0002f, ConfigSource::Default);
+    config->set("pruning_rate", 0.00005f, ConfigSource::Default);
+    
+    // Enable Phase 6 specific features
+    config->set("enable_checkpointing", true, ConfigSource::Default);
+    config->set("enable_replay", true, ConfigSource::Default);
+    config->set("enable_development", true, ConfigSource::Default);
+    
+    return config;
+}
+
+std::string Config::getAvailableConfigKeys() {
+    std::string keys = "Available configuration keys:\n";
+    keys += "Core simulation:\n";
+    keys += "  neuron_count, region_count, connection_probability, simulation_timestep, random_seed\n";
+    keys += "Plasticity:\n";
+    keys += "  stdp_ltp_weight, stdp_ltd_weight, stdp_tau, synaptogenesis_rate, pruning_rate\n";
+    keys += "Development:\n";
+    keys += "  developmental_level, plasticity_rate\n";
+    keys += "Memory:\n";
+    keys += "  working_memory_capacity, episodic_memory_max_episodes, replay_interval, consolidation_interval\n";
+    keys += "Neuromodulation:\n";
+    keys += "  dopamine_initial_level, curiosity_initial_level, novelty_sensitivity\n";
+    keys += "Cognition:\n";
+    keys += "  planning_depth, attention_strength\n";
+    keys += "Environment:\n";
+    keys += "  action_space_size, reward_function\n";
+    keys += "\nUse --help for more details on command-line arguments.\n";
+    return keys;
+}
+
+std::string Config::getConfigHelp() const {
+    std::string help = "NLM Configuration Help:\n";
+    help += "===================\n\n";
+    help += "The NLM framework uses a key=value configuration format.\n\n";
+    help += "Basic format:\n";
+    help += "  --key=value        Command line argument\n";
+    help += "  config file:\n";
+    help += "    key = value      Configuration file line\n\n";
+    help += "Data types:\n";
+    help += "  int, int64, float, double, bool, string\n";
+    help += "  vectors: [1,2,3], \"value1\", \"value2\", ...\n\n";
+    help += "Common keys:\n";
+    help += "  --neuron_count=N    Number of neurons (default: 1000)\n";
+    help += "  --region_count=N    Number of brain regions (default: 1)\n";
+    help += "  --config=file.cfg   Load configuration from file\n";
+    help += "  --help              Show this help\n\n";
+    help += "Examples:\n";
+    help += "  --neuron_count=500 --region_count=2\n";
+    help += "  --stdp_ltp_weight=0.02 --stdp_ltd_weight= veterinarian\n\n";
+    help += "To see all available keys, use --keys.\n";
+    return help;
+}
 
 } // namespace nlm
