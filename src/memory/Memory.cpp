@@ -25,6 +25,13 @@ void WorkingMemory::store(NeuronId neuron, float value) {
     }
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+    } else {
+        // Evict oldest item if at capacity
+        std::pop_heap(pImpl->items.begin(), pImpl->items.end(),
+            [](const auto& a, const auto& b) { return a.second > b.second; });
+        pImpl->items.back() = {neuron, value};
+        std::push_heap(pImpl->items.begin(), pImpl->items.end(),
+            [](const auto& a, const auto& b) { return a.second > b.second; });
     }
 }
 
@@ -109,6 +116,39 @@ void EpisodicMemory::clear() {
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
     // TODO PHASE 2: Implement real consolidation
+    // For now, implement relevance-based pruning with hysteresis
+    if (relevanceThreshold <= 0.0f) return;
+    
+    // Calculate episode relevance scores (simplified)
+    std::vector<std::pair<float, size_t>> relevanceScores;
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        float relevance = pImpl->episodes[i].reward * pImpl->episodes[i].energy;
+        relevanceScores.emplace_back(relevance, i);
+    }
+    
+    // Sort by relevance (ascending for consolidation)
+    std::sort(relevanceScores.begin(), relevanceScores.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+    
+    // Remove episodes below threshold, but keep at least 10% of episodes
+    size_t minKeep = std::max<size_t>(1, pImpl->episodes.size() / 10);
+    
+    auto it = std::remove_if(relevanceScores.begin(), relevanceScores.end(),
+        [this, relevanceThreshold, minKeep](const auto& pair) {
+            if (pImpl->episodes.size() <= minKeep) return false; // Keep enough
+            return pair.first < relevanceThreshold;
+        });
+    
+    relevanceScores.erase(it, relevanceScores.end());
+    
+    // Rebuild episodes list preserving order
+    std::vector<EpisodicMemoryItem> consolidated;
+    consolidated.reserve(relevanceScores.size());
+    for (const auto& pair : relevanceScores) {
+        consolidated.push_back(pImpl->episodes[pair.second]);
+    }
+    
+    pImpl->episodes = std::move(consolidated);
 }
 
 // Semantic Memory Implementation

@@ -401,9 +401,50 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    // Implement actual header writing
+    if (!file_.is_open()) return false;
+    
+    // Write version magic number
+    uint32_t version = 2;
+    file_.write(reinterpret_cast<const char*>(&version), sizeof(version));
+    
+    // Write header checksum placeholder
+    uint32_t checksum = 0;
+    file_.write(reinterpret_cast<const char*>(&checksum), sizeof(checksum));
+    
+    return !file_.fail();
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    // Implement actual section header writing
+    if (!file_.is_open()) return false;
+    
+    // Write section type
+    file_.write(reinterpret_cast<const char*>(&header.type), sizeof(header.type));
+    
+    // Write section size
+    file_.write(reinterpret_cast<const char*>(&header.size), sizeof(header.size));
+    
+    // Write section checksum
+    file_.write(reinterpret_cast<const char*>(&header.checksum), sizeof(header.checksum));
+    
+    return !file_.fail();
+}
+
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    if (!file_.is_open()) return true; // Not an error
+    
+    size_t currentPos = file_.tellp();
+    size_t paddingNeeded = (alignment - (currentPos % alignment)) % alignment;
+    
+    if (paddingNeeded > 0) {
+        std::vector<char> padding(paddingNeeded, 0);
+        file_.write(padding.data(), padding.size());
+    }
+    
+    return !file_.fail();
+}
 
 // ---------------- CheckpointManager ----------------
 

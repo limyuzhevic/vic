@@ -41,7 +41,10 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     
     // Create episode neuron for pattern completion
     if (brain_ && !episode.sensoryState.empty()) {
-        NeuronId epNeuron(episodes_.size() + 20000);
+        // Use deterministic neuron ID based on episode index to avoid fragmentation
+        // Ensure unique IDs across the entire brain (max neurons ~50000)
+        uint64_t neuronOffset = 30000; // Leave space for other neuron types
+        NeuronId epNeuron(static_cast<uint64_t>(episodes_.size() - 1) + neuronOffset);
         pImpl->episodeNeurons.push_back(epNeuron);
         
         // Store episode index in the neuron
@@ -80,7 +83,8 @@ std::vector<const EpisodicMemoryItem*> NeuralEpisodicMemory::retrieveSimilar(
     // Return top results
     std::vector<const EpisodicMemoryItem*> results;
     for (size_t i = 0; i < std::min(maxResults, scores.size()); ++i) {
-        if (scores[i].first > 0.3f) {  // Threshold
+        // Safety check: ensure score index is valid
+        if (scores[i].second < episodes_.size() && scores[i].first > 0.3f) {  // Threshold
             results.push_back(&episodes_[scores[i].second]);
         }
     }

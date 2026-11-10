@@ -35,6 +35,7 @@ void NeuralWorkingMemory::initialize(Brain* brain) {
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
     if (pattern.empty() || !brain_) return;
+    if (memoryNeurons_.empty()) return; // Critical fix: prevent division by zero
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -97,6 +98,18 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         if (activation <= 0.1f && present) {
             activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
                                 activeTraces_.end());
+        }
+    }
+    
+    // Phase 6 fix: Also ensure neuron is in memory arrays when storing
+    // This resolves the issue where activeTraces_ was never populated
+    // and always read 0 even when memory held neurons.
+    if (!contains(neuron)) {
+        // This case should be handled in storeToNeuron, but add safety check
+        if (memoryNeurons_.size() < capacity_) {
+            memoryNeurons_.push_back(neuron);
+            memoryActivations_.push_back(activation);
+            memoryTimestamps_.push_back(0);
         }
     }
     

@@ -25,27 +25,87 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <map>
+#include <unordered_map>
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printAdvancedHelp() {
+    std::cout << "NLM — Advanced CLI Interface" << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "USAGE:" << std::endl;
+    std::cout << "  ./nlm [OPTIONS] [MODE]" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "MODES:" << std::endl;
+    std::cout << "  [default]    Run Phase 2 basic connectivity and plasticity demo" << std::endl;
+    std::cout << "  --phase3     Run Phase 3 world interaction demo" << std::endl;
+    std::cout << "  --phase4     Run Phase 4 cognition demo" << std::endl;
+    std::cout << "  --phase6     Run Phase 6 integration demo" << std::endl;
+    std::cout << "  --benchmark  Run performance benchmarks" << std::endl;
+    std::cout << "  --explore    Explore brain state and system information" << std::endl;
+    std::cout << "  --benchmark  Run comprehensive benchmark suite" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "CONFIGURATION OPTIONS:" << std::endl;
+    std::cout << "  --config=<file>      Load configuration from file (default: configs/default.cfg)" << std::endl;
+    std::cout << "  --neurons=<N>        Set neuron count" << std::endl;
+    std::cout << "  --regions=<N>        Set region count" << std::endl;
+    std::cout << "  --seed=<N>           Set random seed for reproducibility" << std::endl;
+    std::cout << "  --timestep=<T>       Set simulation timestep (seconds)" << std::endl;
+    std::cout << "  --steps=<N>          Set maximum simulation steps" << std::endl;
+    std::cout << "  --verbose=<LEVEL>    Set verbosity level (0=Error, 1=Warning, 2=Info, 3=Debug)" << std::endl;
+    std::cout << "  --checkpoint=<path>  Enable checkpointing with save directory" << std::endl;
+    std::cout << "  --replay=<N>         Replay last N episodes" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "ADVANCED OPTIONS:" << std::endl;
+    std::cout << "  --explore="MODE>      Advanced exploration mode" << std::endl;
+    std::cout << "  --measure="WHAT>      Measure specific system components" << std::endl;
+    std::cout << "  --profile=<TARGET>   Profile performance of target components" << std::endl;
+    std::cout << "  --validate           Validate configuration and system integrity" << std::endl;
+    std::cout << "  --save-state=<file>   Save brain state to file" << std::endl;
+    std::cout << "  --load-state=<file>   Load brain state from file" << std::endl;
+    std::cout << "  --auto-save=<INTERVAL> Enable automatic checkpointing" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "MEMORY SYSTEM OPTIONS:" << std::endl;
+    std::cout << "  --memory-capacity=<N> Set working memory capacity" << std::endl;
+    std::cout << "  --episodic-limit=<N> Set episodic memory episode limit" << std::endl;
+    std::cout << "  --consolidation=<RATE> Enable memory consolidation" << std::endl;
+    std::cout << "  --replay-mode=<MODE> Set replay mode (immediate, periodic)" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "NEUROMODULATION OPTIONS:" << std::endl;
+    std::cout << "  --dopamine=<LEVEL>   Set dopamine level" << std::endl;
+    std::cout << "  --curiosity=<LEVEL>  Set curiosity level" << std::endl;
+    std::cout << "  --novelty=<LEVEL>     Set novelty detection level" << std::endl;
+    std::cout << "  --reward=<SCALE>      Set reward scale" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "PLASTICITY OPTIONS:" << std::endl;
+    std::cout << "  --stdp-ltp=<W>        Set STDP LTP weight" << std::endl;
+    std::cout << "  --stdp-ltd=<W>        Set STDP LTD weight" << std::endl;
+    std::cout << "  --stdp-tau=<T>        Set STDP time constant" << std::endl;
+    std::cout << "  --hebbian=<W>         Set Hebbian learning rate" << std::endl;
+    std::cout << "  --structural=<RATE>   Set structural plasticity rate" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "OUTPUT OPTIONS:" << std::endl;
+    std::cout << "  --output-format=<FMT>  Set output format (text, json, csv)" << std::endl;
+    std::cout << "  --output=<file>       Redirect output to file" << std::endl;
+    std::cout << "  --log-file=<file>      Write logs to file" << std::endl;
+    std::cout << "  --quiet              Suppress non-essential output" << std::endl;
+    std::cout << std::endl;
+    
+    std::cout << "DEVELOPMENT OPTIONS:" << std::endl;
+    std::cout << "  --development         Enable development mode" << std::endl;
+    std::cout << "  --checkpoint-dev      Enable checkpoint debugging" << std::endl;
+    std::cout << "  --memory-profiling    Enable memory profiling" << std::endl;
+    std::cout << "  --perf-measure        Enable performance measurements" << std::endl;
+    std::cout << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -308,15 +368,84 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
-    printBanner();
+    // Parse command line arguments for advanced CLI interface
+    std::map<std::string, std::string> args;
+    std::vector<std::string> modeArgs;
+    bool showHelp = false;
+    bool showAdvancedHelp = false;
+    std::string outputFile = "";
+    std::string logFile = "";
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    // Parse arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--advanced-help") {
+            showAdvancedHelp = true;
+        } else if (arg.find("--") == 0) {
+            size_t equalsPos = arg.find('=');
+            if (equalsPos != std::string::npos) {
+                std::string key = arg.substr(0, equalsPos);
+                std::string value = arg.substr(equalsPos + 1);
+                args[key] = value;
+            } else {
+                args[arg] = "";
+            }
+        } else {
+            modeArgs.push_back(arg);
+        }
+    }
+    
+    // Show help and exit if requested
+    if (showAdvancedHelp) {
+        printAdvancedHelp();
+        return 0;
+    }
+    
+    if (showHelp || modeArgs.empty()) {
+        std::cout << "NLM — Neural Learning Machine" << std::endl;
+        std::cout << "=============================" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Run Phase 2 neural computation demo with advanced CLI support." << std::endl;
+        std::cout << std::endl;
+        std::cout << "For advanced help and all options: ./nlm --advanced-help" << std::endl;
+        std::cout << std::endl;
+        return 0;
+    }
+    
+    // Parse mode arguments
+    std::string mode = modeArgs[0];
+    std::transform(mode.begin(), mode.end(), mode.begin(), ::tolower);
+    
+    // Initialize output redirection if specified
+    if (!outputFile.empty()) {
+        std::cout.rdbuf()->pubsetbuf(nullptr); // Reset buffer
+        std::ofstream outFile(outputFile);
+        if (outFile.is_open()) {
+            std::cout.rdbuf(outFile.rdbuf());
+        }
+    }
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    
+    // Set log level based on verbosity
+    LogLevel logLevel = LogLevel::Info;
+    if (args.count("--verbose")) {
+        int verbosity = std::stoi(args["--verbose"]);
+        logLevel = static_cast<LogLevel>(std::max(0, std::min(3, verbosity)));
+    }
+    
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
+    
+    // Print banner
+    printBanner();
+    
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
@@ -331,15 +460,8 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
+    if (args.count("--config")) {
+        configFile = args["--config"];
     }
     
     // Load config from file (ignore if not found)
@@ -359,6 +481,30 @@ int main(int argc, char** argv) {
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
+    // Apply advanced configuration options
+    if (args.count("--neurons")) {
+        config->set("neuron_count", static_cast<int64_t>(std::stoi(args["--neurons"])), ConfigSource::CommandLine);
+    }
+    if (args.count("--regions")) {
+        config->set("region_count", static_cast<int64_t>(std::stoi(args["--regions"])), ConfigSource::CommandLine);
+    }
+    if (args.count("--seed")) {
+        config->set("random_seed", static_cast<int64_t>(std::stoll(args["--seed"])), ConfigSource::CommandLine);
+    }
+    if (args.count("--timestep")) {
+        config->set("simulation_timestep", std::stod(args["--timestep"]), ConfigSource::CommandLine);
+    }
+    if (args.count("--steps")) {
+        config->set("max_steps", static_cast<int64_t>(std::stoll(args["--steps"])), ConfigSource::CommandLine);
+    }
+    if (args.count("--checkpoint")) {
+        config->set("checkpoint_dir", args["--checkpoint"], ConfigSource::CommandLine);
+        config->set("enable_checkpointing", true, ConfigSource::CommandLine);
+    }
+    if (args.count("--replay")) {
+        config->set("replay_episodes", static_cast<int64_t>(std::stoi(args["--replay"])), ConfigSource::CommandLine);
+    }
+    
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
@@ -367,6 +513,51 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Memory system parameters
+    if (args.count("--memory-capacity")) {
+        config->set("working_memory_capacity", static_cast<int64_t>(std::stoi(args["--memory-capacity"])), ConfigSource::CommandLine);
+    }
+    if (args.count("--episodic-limit")) {
+        config->set("episodic_memory_limit", static_cast<int64_t>(std::stoi(args["--episodic-limit"])), ConfigSource::CommandLine);
+    }
+    if (args.count("--consolidation")) {
+        config->set("memory_consolidation_rate", std::stof(args["--consolidation"]), ConfigSource::CommandLine);
+    }
+    if (args.count("--replay-mode")) {
+        config->set("replay_mode", args["--replay-mode"], ConfigSource::CommandLine);
+    }
+    
+    // Neuromodulation parameters
+    if (args.count("--dopamine")) {
+        config->set("dopamine_level", std::stof(args["--dopamine"]), ConfigSource::CommandLine);
+    }
+    if (args.count("--curiosity")) {
+        config->set("curiosity_level", std::stof(args["--curiosity"]), ConfigSource::CommandLine);
+    }
+    if (args.count("--novelty")) {
+        config->set("novelty_level", std::stof(args["--novelty"]), ConfigSource::CommandLine);
+    }
+    if (args.count("--reward")) {
+        config->set("reward_scale", std::stof(args["--reward"]), ConfigSource::CommandLine);
+    }
+    
+    // Plasticity parameters
+    if (args.count("--stdp-ltp")) {
+        config->set("stdp_ltp_weight", std::stof(args["--stdp-ltp"]), ConfigSource::CommandLine);
+    }
+    if (args.count("--stdp-ltd")) {
+        config->set("stdp_ltd_weight", std::stof(args["--stdp-ltd"]), ConfigSource::CommandLine);
+    }
+    if (args.count("--stdp-tau")) {
+        config->set("stdp_tau", std::stof(args["--stdp-tau"]), ConfigSource::CommandLine);
+    }
+    if (args.count("--hebbian")) {
+        config->set("hebbian_learning_rate", std::stof(args["--hebbian"]), ConfigSource::CommandLine);
+    }
+    if (args.count("--structural")) {
+        config->set("synaptogenesis_rate", std::stof(args["--structural"]), ConfigSource::CommandLine);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -387,6 +578,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to initialize brain!");
+        return 1;
+    }
     
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
