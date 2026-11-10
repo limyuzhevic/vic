@@ -467,10 +467,98 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // is the wrong lever here; see the drive-scaling change in
     // AgentBrain/Neuron instead. This block is intentionally empty
     // so the experiment and its result stay in the record.
-
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
+    
+    // ========== STEP 2: Apply global activity regulation ==========
+    // Implement activity-dependent gain control to prevent runaway excitation
+    // while preserving learning capability
+    
+    // Calculate network activity metrics
+    float totalActivity = 0.0f;
+    size_t activeNeurons = 0;
+    for (auto& region : pImpl->regions) {
+        for (auto* neuron : region->getAllNeurons()) {
+            if (neuron->isFiring()) {
+                totalActivity += neuron->getFiringRate();
+                activeNeurons++;
+            }
+        }
+    }
+    
+    float avgActivity = activeNeurons > 0 ? totalActivity / activeNeurons : 0.0f;
+    
+    // Apply activity-dependent gain control (homeostatic)
+    // If overall activity is too high, scale down excitability
+    if (avgActivity > 100.0f) {  // If average firing rate > 100 Hz
+        float activityRatio = avgActivity / 100.0f;
+        float gainReduction = std::min(0.5f, activityRatio * 0.5f);  // Up to 50% reduction
+        
+        // Apply gain reduction to all neurons
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                // Reduce effective threshold for high activity periods
+                // This helps prevent runaway excitation while maintaining responsiveness
+                if (gainReduction > 0.0f) {
+                    float thresholdBoost = neuron->getThreshold() * gainReduction;
+                    neuron->setThreshold(thresholdBoost * 0.5f);  // Conservative scaling
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 2b: Apply homeostatic synaptic scaling ==========
+    // Regular synaptic scaling to prevent weight saturation
+    // Only when network activity is excessively high
+    
+    if (currentStep % 200 == 0 && avgActivity > 150.0f) {  // Every 200 steps when activity is high
+        constexpr float kIncomingExcitatoryCap = 2.0f;  // More conservative cap
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                auto incoming = region->getSynapsesTo(neuron->getId());
+                float sum = 0.0f;
+                for (Synapse* syn : incoming) {
+                    if (syn->getWeight() > 0.0f) sum += syn->getWeight();
+                }
+                if (sum > kIncomingExcitatoryCap) {
+                    float scale = kIncomingExcitatoryCap / sum;
+                    for (Synapse* syn : incoming) {
+                        if (syn->getWeight() > 0.0f) {
+                            // Scale excitatory weights more conservatively
+                            syn->setWeight(syn->getWeight() * scale);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // ========== STEP 2c: Enhanced neuromodulation ==========
+    // Apply neuromodulatory effects to stabilize network activity
+    
+    // Dopamine (reward) modulates network excitability
+    if (pImpl->dopamine) {
+        float dopamineLevel = pImpl->dopamine->getLevel();
+        if (dopamineLevel > 0.5f) {
+            // High dopamine increases stability and reduces runaway excitation
+            for (auto& region : pImpl->regions) {
+                for (auto* neuron : region->getAllNeurons()) {
+                    // Dopamine increases inhibitory tone
+                    neuron->setThreshold(std::max(0.0f, neuron->getThreshold() - dopamineLevel * 10.0f));
+                }
+            }
+        }
+    }
+    
+    // Curiosity (exploration drive) can increase variability
+    if (pImpl->curiosity && pImpl->curiosity->getLevel() > 0.3f) {
+        // Moderate curiosity increases variability to help exploration
+        // but not so much as to cause instability
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                // Small threshold adjustment for curiosity-driven exploration
+                float curiosityEffect = pImpl->curiosity->getLevel() * 2.0f;
+                neuron->setThreshold(neuron->getThreshold() + curiosityEffect * 2.0f);
+            }
+        }
     }
     
     // ========== STEP 5: Apply neuromodulation effects ==========

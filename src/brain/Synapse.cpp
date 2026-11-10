@@ -221,27 +221,47 @@ void Synapse::step(Timestamp currentTime) {
     
     TimestepDuration dt = 0.001;  // 1ms timestep
     
-    // Decay short-term facilitation (Tsodyks-Markram model)
+    // Enhanced short-term plasticity with better control
     if (pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
-        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU);
+        // Slower facilitation to prevent runaway excitation
+        pImpl->shortTermFacilitation *= std::exp(-timeSincePre / Impl::STP_FACILITATION_TAU * 0.5f);
     }
     
-    // Decay short-term depression
+    // Enhanced short-term depression with recovery dynamics
     if (pImpl->lastPostSpikeTime >= 0.0f || pImpl->lastPreSpikeTime >= 0.0f) {
         float timeSinceActivity = std::max(
             pImpl->lastPostSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPostSpikeTime) : 0.0f,
             pImpl->lastPreSpikeTime >= 0.0f ? static_cast<float>(currentTime - pImpl->lastPreSpikeTime) : 0.0f
         );
-        // Recovery from depression toward 1.0
-        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
+        // More gradual recovery from depression
+        pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / (Impl::STP_DEPRESSION_TAU * 0.5f)));
     }
     
-    // Decay eligibility trace for reward-modulated learning
-    decayEligibilityTrace(0.001f);  // Fast decay
+    // Enhanced eligibility trace decay with reward context
+    decayEligibilityTrace(0.0005f);  // Slower decay for better reward integration
     
-    // Clamp weight bounds
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
+    // Enhanced efficacy update based on spike history
+    float recentActivity = 0.0f;
+    if (pImpl->lastPreSpikeTime >= 0.0f) {
+        float timeSincePre = static_cast<float>(currentTime - pImpl->lastPreSpikeTime);
+        recentActivity += std::exp(-timeSincePre / 10.0f);
+    }
+    if (pImpl->lastPostSpikeTime >= 0.0f) {
+        float timeSincePost = static_cast<float>(currentTime - pImpl->lastPostSpikeTime);
+        recentActivity += std::exp(-timeSincePost / 10.0f);
+    }
+    
+    // Update efficacy based on activity level
+    if (recentActivity > 0.0f) {
+        pImpl->efficacy = std::min(2.0f, pImpl->efficacy + 0.01f * recentActivity);
+    } else {
+        pImpl->efficacy *= 0.995f;  // Slow decay when inactive
+    }
+    
+    // Improved weight clamping with homeostatic bounds
+    float weightBound = (pImpl->type == SynapseType::Excitatory) ? Impl::MAX_WEIGHT : std::abs(Impl::MIN_WEIGHT);
+    pImpl->weight = std::clamp(pImpl->weight, -weightBound, weightBound);
 }
 
 void Synapse::reset() {

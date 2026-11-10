@@ -5,7 +5,7 @@
 namespace nlm {
 
 // Reward signal for reinforcement learning
-// PLACEHOLDER - Phase 2 will implement real reward computation
+// Computes meaningful rewards based on environment observations and agent behavior
 
 class Reward {
 public:
@@ -23,12 +23,21 @@ public:
     void reset();
     
     // Compute reward from environment state
-    // TODO PHASE 2: Implement real reward computation
-    float computeReward(const class Observation& observation) const;
+    // Integrates with brain state, action outcomes, and prediction errors
+    float computeReward(const class Observation& observation,
+                        const class Brain& brain,
+                        const class Action& action,
+                        float predictionError) const;
     
-    // Reward history
+    // Reward history and statistics
     const std::vector<float>& getHistory() const;
     void clearHistory();
+    float getAverageReward() const;
+    float getMaxReward() const;
+    float getMinReward() const;
+    
+    // Reward modulation
+    void applyRewardToPlasticity(float reward, Neuromodulator& neuromodulator) const;
     
 private:
     struct Impl;

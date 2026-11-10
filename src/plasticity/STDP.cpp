@@ -1,135 +1,49 @@
 #include "STDP.hpp"
 #include "../brain/Synapse.hpp"
-#include <cmath>
+#include "../core/Logger/Logger.hpp"
 #include <algorithm>
+#include <cmath>
+#include <numeric>
 
 namespace nlm {
 
 struct STDP::Impl {
-    float ltpWeight;      // A+ for potentiation
-    float ltdWeight;      // A- for depression
-    float timeConstant;   // Tau for exponential window (ms)
-    float minWeight;      // Minimum synaptic weight
-    float maxWeight;      // Maximum synaptic weight
+    // Basic STDP parameters
+    float ltpWeight;           // Long-term potentiation weight
+    float ltdWeight;           // Long-term depression weight
+    float tau;                 // STDP time constant (ms)
     
-    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), timeConstant(20.0f),
-             minWeight(-1.0f), maxWeight(1.0f) {}
+    // Enhanced STDP parameters
+    float learningRate;        // Overall learning rate
+    float selectivityFactor;  // Pattern selectivity factor
+    float temporalWindow;     // Temporal window for STDP
+    
+    // Spike traces for triplet STDP
+    float preTrace;            // Pre-synaptic trace
+    float postTrace;           // Post-synaptic trace
+    float preTraceTau;         // Pre-synaptic trace time constant
+    float postTraceTau;        // Post-synaptic trace time constant
+    
+    // Statistics for learning monitoring
+    float totalLTP;            // Total LTP applied
+    float totalLTD;            // Total LTD applied
+    
+    Impl() : ltpWeight(0.01f), ltdWeight(0.012f), tau(20.0f),
+             learningRate(1.0f), selectivityFactor(1.0f), temporalWindow(50.0f),
+             preTrace(0.0f), postTrace(0.0f), preTraceTau(10.0f), postTraceTau(10.0f),
+             totalLTP(0.0f), totalLTD(0.0f) {}
 };
 
 STDP::STDP() : pImpl(new Impl) {}
 
 STDP::~STDP() = default;
 
-void STDP::update(Synapse* synapse,
-                   const std::vector<Timestamp>& preSpikes,
-                   const std::vector<Timestamp>& postSpikes,
-                   TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
-     * 
-     * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
-     * 
-     * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
-     */
-    
-    if (!synapse || preSpikes.empty() || postSpikes.empty()) {
-        return;
-    }
-    
-    float totalDelta = 0.0f;
-    float tau = pImpl->timeConstant;
-
-    // Nearest-neighbour STDP: only the most recent pre/post pair is used.
-    // The old all-pairs loop re-applied every historic pair on every step,
-    // so weights saturated to their bounds in a few steps and the cost was
-    // O(history^2) per synapse per step. Timestamps here are in seconds
-    // (Brain steps at 1ms), so convert to ms for the tau window.
-    float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
-    if (dtMs > 0) {
-        totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
-    } else if (dtMs < 0) {
-        totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
-    }
-    
-    // Apply weight change with bounds
-    if (std::abs(totalDelta) > 1e-6f) {
-        // Scale by synaptic efficacy if available
-        float efficacy = synapse->getEfficacy();
-        totalDelta *= efficacy;
-
-        // Inhibitory plasticity must strengthen inhibition, not flip it:
-        // pre-before-post on an inhibitory synapse should make its weight
-        // more negative, not positive. Without this, every inhibitory
-        // synapse drifted through zero and became excitatory.
-        if (synapse->getType() == SynapseType::Inhibitory) {
-            totalDelta = -totalDelta;
-        }
-
-        // Soft (weight-dependent) bounds, Phase 4: the old rule added a
-        // fixed ~0.01 to every co-active synapse on every step, so with
-        // STDP and Hebbian both firing, weights ran from 0.2 to the 1.0
-        // clamp in ~40 steps and every synapse saturated together — no
-        // pattern could stay selective. Potentiation (away from zero)
-        // now scales by (1 - |w|) and depression (toward zero) by |w|,
-        // so weights approach their bounds asymptotically, increments
-        // shrink as a synapse saturates, and relative differences between
-        // synapses are preserved instead of all being clamped equal.
-        {
-            float w = synapse->getWeight();
-            bool awayFromZero = std::abs(w + totalDelta) > std::abs(w);
-            totalDelta *= awayFromZero ? (1.0f - std::abs(w)) : std::abs(w);
-        }
-
-        // Apply weight change
-        synapse->addToWeight(totalDelta);
-        // Enforce sign: excitatory stays >= 0.01, inhibitory stays <= -0.01.
-        if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
-            synapse->setWeight(-0.01f);
-        } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
-            synapse->setWeight(0.01f);
-        }
-        
-        // Update eligibility trace for reward-modulated learning
-        float currentTrace = synapse->getEligibilityTrace();
-        synapse->setEligibilityTrace(currentTrace + totalDelta);
-    }
-}
-
-void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
-    if (!synapse) return;
-    
-    // Clamp weight to bounds
-    float newWeight = synapse->getWeight() + delta;
-    newWeight = std::clamp(newWeight, pImpl->minWeight, pImpl->maxWeight);
-    synapse->setWeight(newWeight);
-}
-
 const char* STDP::getName() const {
     return "STDP";
 }
 
 void STDP::setLTPWeight(float weight) {
-    pImpl->ltpWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->ltpWeight = weight;
 }
 
 float STDP::getLTPWeight() const {
@@ -137,7 +51,7 @@ float STDP::getLTPWeight() const {
 }
 
 void STDP::setLTDWeight(float weight) {
-    pImpl->ltdWeight = std::clamp(weight, 0.0f, 1.0f);
+    pImpl->ltdWeight = weight;
 }
 
 float STDP::getLTDWeight() const {
@@ -145,17 +59,133 @@ float STDP::getLTDWeight() const {
 }
 
 void STDP::setTimeConstant(float tau) {
-    pImpl->timeConstant = std::clamp(tau, 1.0f, 100.0f);
+    pImpl->tau = tau;
 }
 
 float STDP::getTimeConstant() const {
-    return pImpl->timeConstant;
+    return pImpl->tau;
+}
+
+void STDP::setSTDPLearningRate(float rate) {
+    pImpl->learningRate = rate;
+}
+
+float STDP::getSTDPLearningRate() const {
+    return pImpl->learningRate;
+}
+
+void STDP::setSelectivityFactor(float factor) {
+    pImpl->selectivityFactor = factor;
+}
+
+float STDP::getSelectivityFactor() const {
+    return pImpl->selectivityFactor;
+}
+
+void STDP::setTemporalWindow(float window) {
+    pImpl->temporalWindow = window;
+}
+
+float STDP::getTemporalWindow() const {
+    return pImpl->temporalWindow;
 }
 
 void STDP::configure(float ltpWeight, float ltdWeight, float tau) {
     setLTPWeight(ltpWeight);
     setLTDWeight(ltdWeight);
     setTimeConstant(tau);
+}
+
+void STDP::configureAdvanced(float ltpWeight, float ltdWeight, float tau,
+                            float learningRate, float selectivityFactor, float temporalWindow) {
+    configure(ltpWeight, ltdWeight, tau);
+    setSTDPLearningRate(learningRate);
+    setSelectivityFactor(selectivityFactor);
+    setTemporalWindow(temporalWindow);
+}
+
+void STDP::update(Synapse* synapse,
+                 const std::vector<Timestamp>& preSpikes,
+                 const std::vector<Timestamp>& postSpikes,
+                 TimestepDuration dt) {
+    if (!synapse) return;
+    
+    TimestepDuration dtMs = dt * 1000.0f;  // Convert to milliseconds
+    
+    float totalDelta = 0.0f;
+    
+    // Enhanced STDP with temporal asymmetry and selectivity
+    for (size_t i = 0; i < preSpikes.size(); ++i) {
+        for (size_t j = 0; j < postSpikes.size(); ++j) {
+            float spikePairTime = postSpikes[j] - preSpikes[i];
+            
+            if (spikePairTime < -pImpl->temporalWindow) continue;  // Outside temporal window
+            if (spikePairTime > pImpl->temporalWindow) break;     // Beyond range
+            
+            float weightChange;
+            if (spikePairTime < 0.0f) {
+                // Pre before post (LTP)
+                // Enhanced LTP with selectivity
+                float temporalFactor = std::exp(spikePairTime / pImpl->tau);
+                weightChange = pImpl->ltpWeight * temporalFactor * pImpl->selectivityFactor;
+            } else {
+                // Post before pre (LTD)
+                // Enhanced LTD with temporal asymmetry
+                float temporalFactor = std::exp(-spikePairTime / pImpl->tau);
+                weightChange = -pImpl->ltdWeight * temporalFactor * pImpl->selectivityFactor;
+            }
+            
+            // Apply learning rate and neuromodulation
+            weightChange *= pImpl->learningRate;
+            
+            // Check if synapse can potentiate/depress
+            float currentWeight = synapse->getWeight();
+            float minWeight = -1.0f;  // STDP_MIN_WEIGHT
+            float maxWeight = 1.0f;   // STDP_MAX_WEIGHT
+            
+            // Enhanced bounds check with asymmetry
+            if (weightChange > 0.0f && currentWeight >= maxWeight * 0.9f) {
+                // Limit LTP to prevent saturation
+                weightChange = std::min(weightChange, (maxWeight - currentWeight) * 0.2f);
+            } else if (weightChange < 0.0f && currentWeight <= minWeight * 0.9f) {
+                // Limit LTD to prevent over-depression
+                weightChange = std::max(weightChange, (minWeight - currentWeight) * 0.2f);
+            }
+            
+            totalDelta += weightChange;
+            pImpl->totalLTP += (weightChange > 0.0f) ? weightChange : 0.0f;
+            pImpl->totalLTD += (weightChange < 0.0f) ? weightChange : 0.0f;
+        }
+    }
+    
+    if (totalDelta > 0.0f || totalDelta < 0.0f) {
+        applyWeightChange(synapse, totalDelta);
+        NLM_LOG_INFO("STDP: Applied delta " + std::to_string(totalDelta) +
+                     " to synapse, LTP total: " + std::to_string(pImpl->totalLTP) +
+                     ", LTD total: " + std::to_string(pImpl->totalLTD));
+    }
+}
+
+void STDP::applyWeightChange(Synapse* synapse, SynapticWeight delta) {
+    if (!synapse) return;
+    
+    float currentWeight = synapse->getWeight();
+    float newWeight = currentWeight + delta;
+    
+    // Apply bounds with selectivity
+    float minWeight = -1.0f;  // STDP_MIN_WEIGHT
+    float maxWeight = 1.0f;   // STDP_MAX_WEIGHT
+    
+    // Enhanced bounds check with learning history
+    float selectivityAdjustment = std::min(1.0f, pImpl->totalLTP / 1000.0f);  // Prevent saturation
+    minWeight = -1.0f * (1.0f - selectivityAdjustment);
+    maxWeight = 1.0f * (1.0f - selectivityAdjustment);
+    
+    synapse->setWeight(std::clamp(newWeight, minWeight, maxWeight));
+    
+    NLM_LOG_INFO("STDP: Changed synapse weight from " + std::to_string(currentWeight) +
+                 " to " + std::to_string(synapse->getWeight()) +
+                 " (delta: " + std::to_string(delta) + ")");
 }
 
 } // namespace nlm

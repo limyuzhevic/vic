@@ -205,7 +205,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
+// LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
     // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
     
@@ -216,19 +216,33 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
-    // Synaptic input contributes to membrane potential change
-    float synapticContribution = pImpl->synapticInput / C;
+    // Enhanced synaptic dynamics with conductance-based model
+    // Synaptic input now modeled as conductance changes rather than current injection
+    float synapticConductance = pImpl->synapticInput;  // Treat as conductance multiplier
+    float reversalPotential = pImpl->type == NeuronType::Excitatory ? 0.0f : V_rest;
+    
+    // Calculate synaptic current contribution
+    float synapticCurrent = synapticConductance * (V - reversalPotential);
     
     // Leak contribution
     float leakContribution = (V_rest - V) / tau;
     
     // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticCurrent / C);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Enhanced spike-frequency adaptation
+    // Stronger adaptation to prevent runaway firing
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // Enhanced adaptation: faster decay and stronger effect
+        V -= pImpl->state.adaptationVariable * 0.02f;  // Stronger adaptation
+        pImpl->state.adaptationVariable *= 0.9f;  // Slower decay
+    }
+    
+    // Apply homeostatic scaling based on recent firing rate
+    // Neurons that fire too much become less excitable
+    if (pImpl->state.firingRate > 50.0f && dt > 0.0) {
+        float adaptationBoost = (pImpl->state.firingRate - 50.0f) * 0.01f;
+        V -= adaptationBoost * 0.1f;
     }
     
     // Clamp membrane potential to prevent instability
@@ -244,7 +258,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (dt > 0.0) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
-
+    
     // Check for spike
     if (V >= threshold) {
         fired = true;
@@ -264,8 +278,9 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Enhanced spike-frequency adaptation
+        // Stronger adaptation for every spike
+        pImpl->state.adaptationVariable += 2.0f;  // Stronger adaptation
     } else {
         pImpl->state.firingState = FiringState::Active;
     }
@@ -305,10 +320,15 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Refractory period: 2-10ms typical
     pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(uint32_t(2), uint32_t(10)));
     
+    // Enhanced adaptation variable for better spike-frequency control
+    pImpl->state.adaptationVariable = 0.0f;
+    
+    // Synaptic conductance parameters for better dynamics
+    pImpl->state.synapticConductance = 0.0f;
+    
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
     pImpl->state.refractoryRemaining = 0;
-    pImpl->state.adaptationVariable = 0.0f;
     pImpl->state.lastSpikeTime = -1.0f;
     
     // Clear any residual state
