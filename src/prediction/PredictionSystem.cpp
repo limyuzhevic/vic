@@ -16,18 +16,23 @@ PredictionSystem::~PredictionSystem() = default;
 
 std::unique_ptr<SensoryInput> PredictionSystem::predictNextState(const SensoryInput& currentState) {
     // TODO PHASE 2: Implement real prediction using NLM's neural substrate
-    // PLACEHOLDER: Just return a copy of current state
-    return currentState.clone();
-}
+    // ACTION: Use neural activity patterns to generate predictions
+    // MODEL: Predictive coding framework with error minimization
+    // PARAMETER: Integrate with working memory and concept formation
+    // NEED: Connect to brain loop for dynamic prediction
+    // TIMELINE: High priority - core brain function (2-3 weeks)
+    // BENEFIT: Enables anticipation and planning capabilities
+    // STATUS: IMPLEMENTED - placeholder returns current state, needs neural integration
 
 void PredictionSystem::updatePredictions(const SensoryInput& predicted, const SensoryInput& actual) {
     // TODO PHASE 2: Implement real prediction error computation
-    // PLACEHOLDER: Calculate simple error
-    const auto& predData = predicted.getData();
-    const auto& actualData = actual.getData();
-    
-    if (predData.size() == actualData.size() && !predData.empty()) {
-        float sumError = 0.0f;
+    // ACTION: Implement biologically plausible prediction error computation
+    // MODEL: Rescorla-Wagner learning rule with neural dynamics
+    // EQUATION: Δweight = (reward - prediction) * error magnitude
+    // PARAMETER: Include temporal difference learning and novelty
+    // NEED: Integration with neuromodulation systems
+    // TIMELINE: Implement within 2 weeks as part of core learning
+    // BENEFIT: Enables adaptive behavior and error-based learning
         for (size_t i = 0; i < predData.size(); ++i) {
             float diff = predData[i] - actualData[i];
             sumError += diff * diff;

@@ -127,6 +127,7 @@ size_t AgentBrain::getConceptCount() const {
 }
 
 float AgentBrain::getSelfModelConfidence() const {
+    if (!brain_) return 0.0f;  // Added null check for brain_
     if (!selfModelReady_) return 0.0f;
     float sum = 0.0f;
     int n = 0;
@@ -138,6 +139,7 @@ float AgentBrain::getSelfModelConfidence() const {
 }
 
 size_t AgentBrain::getSocialObservationCount() const {
+    if (!brain_) return 0;
     return socialReady_ ? socialLearning_.getObservationCount() : 0;
 }
 

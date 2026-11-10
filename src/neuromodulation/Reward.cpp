@@ -34,9 +34,13 @@ void Reward::reset() {
 
 float Reward::computeReward(const Observation& observation) const {
     // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
-    return 0.0f;
-}
+    // ACTION: Implement reward computation from sensory observations
+    // MODEL: State-dependent reward functions with exploration bonuses
+    // PARAMETER: Include resource value, hazard avoidance, and novelty rewards
+    // NEED: Integration with environment perception and world knowledge
+    // TIMELINE: Implement within 2 weeks for exploration systems
+    // BENEFIT: Enables adaptive goal-directed behavior
+    // PRIORITY: HIGH - Essential for learning and decision-making
 
 const std::vector<float>& Reward::getHistory() const {
     return pImpl->history;

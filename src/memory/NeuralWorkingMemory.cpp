@@ -98,6 +98,19 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
             activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
                                 activeTraces_.end());
         }
+        
+        // Update active traces - consolidate all active indices to avoid stale entries
+        // This ensures activeTraces_ always contains exactly the active memory indices
+        std::vector<size_t> updatedActiveTraces;
+        updatedActiveTraces.reserve(memoryActivations_.size());
+        
+        for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+            if (memoryActivations_[i] > 0.1f) {
+                updatedActiveTraces.push_back(i);
+            }
+        }
+        
+        activeTraces_ = updatedActiveTraces;
     }
     
     // Inject current to maintain activation

@@ -24,7 +24,14 @@ public:
     
     // Compute reward from environment state
     // TODO PHASE 2: Implement real reward computation
-    float computeReward(const class Observation& observation) const;
+    // ACTION: Implement biologically plausible reward computation
+    // MODEL: Reinforcement learning with shaping and generalization
+    // FORMULA: reward = utility + exploration bonus - penalty
+    // PARAMETER: Include reward prediction error components
+    // NEED: Integration with environment and neuromodulation
+    // TIMELINE: Implement within 3 weeks for learning systems
+    // BENEFIT: Enables adaptive decision-making and learning
+    // PRIORITY: HIGH - Core reinforcement learning component
     
     // Reward history
     const std::vector<float>& getHistory() const;

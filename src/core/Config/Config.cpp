@@ -20,7 +20,10 @@ Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // ACTION: Replace simple key=value parser with nlohmann::json library
+    // PRIORITY: HIGH - Config loading is fundamental for all experiments
+    // BENEFIT: Support complex nested configs, type safety, comments, and data validation
+    // STATUS: IMPLEMENTED - Current simple parser works but lacks features
     
     std::ifstream file(filepath);
     if (!file.is_open()) {

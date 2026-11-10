@@ -25,7 +25,15 @@ void HebbianRule::update(Synapse* synapse,
                           const std::vector<Timestamp>& postSpikes,
                           TimestepDuration dt) {
     // TODO PHASE 2: Implement real Hebbian learning
-    // PLACEHOLDER: Simple correlated firing increases weight
+    // ACTION: Implement spike-timing dependent Hebbian plasticity
+    // MODEL: Spike timing-dependent plasticity (STDP) framework
+    // TIMING: Δt = t_post - t_pre (time between pre and post spikes)
+    // FORMULA: w_new = w_old + η * f(Δt) * pre * post
+    // PARAMETER: Include LTP and LTD mechanisms
+    // NEED: Integration with spike system for spike recording
+    // TIMELINE: Implement within 2 weeks for core plasticity
+    // REFERENCE: Bi & Poo (1998), Abbott et al. (1997)
+    // STATUS: PARTIALLY IMPLEMENTED - basic structure exists, needs biology
     
     if (preSpikes.empty() || postSpikes.empty()) {
         return;
