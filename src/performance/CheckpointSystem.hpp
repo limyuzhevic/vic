@@ -366,15 +366,26 @@ public:
                    size_t maxCheckpoints = 10,
                    bool compress = true);
     
-    /**
-     * Set checkpoint data providers
+        /**
+     * Set checkpoint data restorers
      */
-    void setNeuronProvider(std::function<bool(NeuronCheckpointData&)> provider) {
-        neuronProvider_ = provider;
+    void setNeuronRestorer(std::function<bool(const NeuronCheckpointData&)> restorer) {
+        neuronRestorer_ = restorer;
     }
     
-    void setSynapseProvider(std::function<bool(SynapseCheckpointData&)> provider) {
-        synapseProvider_ = provider;
+    void setSynapseRestorer(std::function<bool(const SynapseCheckpointData&)> restorer) {
+        synapseRestorer_ = restorer;
+    }
+    
+    /**
+     * Set checkpoint data restorers
+     */
+    void setNeuronRestorer(std::function<bool(const NeuronCheckpointData&)> restorer) {
+        neuronRestorer_ = restorer;
+    }
+    
+    void setSynapseRestorer(std::function<bool(const SynapseCheckpointData&)> restorer) {
+        synapseRestorer_ = restorer;
     }
     
     /**
@@ -437,6 +448,11 @@ private:
     
     std::function<bool(NeuronCheckpointData&)> neuronProvider_;
     std::function<bool(SynapseCheckpointData&)> synapseProvider_;
+    std::function<bool(const NeuronCheckpointData&)> neuronRestorer_;
+    std::function<bool(const SynapseCheckpointData&)> synapseRestorer_;
+    
+    // For backward compatibility - main checkpoint filename
+    std::string mainCheckpointPath_;
 };
 
 // Checksum implementation

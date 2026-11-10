@@ -117,6 +117,9 @@ public:
     // Load brain state from file
     bool load(const std::string& filepath);
     
+    // Get checkpoint manager for external use
+    CheckpointManager* getCheckpointManager() { return pImpl->checkpointManager.get(); }
+    
     // Region management
     RegionId addRegion(const std::string& name = "");
     NeuralRegion* getRegion(RegionId id);

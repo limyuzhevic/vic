@@ -59,6 +59,7 @@ int main(int argc, char* argv[]) {
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
+    config.checkpointPath = "./demo_checkpoint.bin";
     
     auto result = experiment.run(config);
     

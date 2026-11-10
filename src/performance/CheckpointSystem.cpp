@@ -406,18 +406,19 @@ bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; 
 bool CheckpointWriter::padToAlignment(size_t) { return true; }
 
 // ---------------- CheckpointManager ----------------
-
 CheckpointManager::CheckpointManager()
-    : saveIntervalSteps_(10000), maxCheckpoints_(10), compress_(true), lastSaveStep_(0) {}
+    : saveIntervalSteps_(10000), maxCheckpoints_(10), compress_(true), lastSaveStep_(0), mainCheckpointPath_("") {}
+
 CheckpointManager::~CheckpointManager() = default;
 
 void CheckpointManager::configure(const std::string& checkpointDir,
-                                  uint64_t saveIntervalSteps, size_t maxCheckpoints, bool compress) {
+                                 uint64_t saveIntervalSteps, size_t maxCheckpoints, bool compress) {
     checkpointDir_ = checkpointDir;
     saveIntervalSteps_ = saveIntervalSteps;
     maxCheckpoints_ = maxCheckpoints;
     compress_ = compress;
     lastSaveStep_ = 0;
+    mainCheckpointPath_ = "";
     std::error_code ec;
     std::filesystem::create_directories(checkpointDir_, ec);
 }
@@ -443,6 +444,7 @@ bool CheckpointManager::saveImmediately(const std::string& name) {
     }
     if (!writer.finalize()) return false;
     lastCheckpointPath_ = path;
+    mainCheckpointPath_ = path;  // Track the main checkpoint file
     pruneOldCheckpoints(maxCheckpoints_);
     return true;
 }
@@ -459,7 +461,35 @@ bool CheckpointManager::load(const std::string& name) {
     std::string path = (std::filesystem::path(checkpointDir_) / name).string();
     CheckpointReader reader;
     if (!reader.open(path)) return false;
-    return reader.validate();
+    if (!reader.validate()) {
+        NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
+        return false;
+    }
+    
+    // Restore neurons
+    NeuronCheckpointData neuronData;
+    if (!reader.readNeurons(neuronData)) {
+        NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+        return false;
+    }
+    if (neuronRestorer_ && !neuronRestorer_(neuronData)) {
+        NLM_LOG_ERROR("Failed to restore neurons from checkpoint");
+        return false;
+    }
+    
+    // Restore synapses
+    SynapseCheckpointData synapseData;
+    if (!reader.readSynapses(synapseData)) {
+        NLM_LOG_ERROR("Failed to read synapses from checkpoint");
+        return false;
+    }
+    if (synapseRestorer_ && !synapseRestorer_(synapseData)) {
+        NLM_LOG_ERROR("Failed to restore synapses from checkpoint");
+        return false;
+    }
+    
+    NLM_LOG_INFO("Checkpoint loaded successfully");
+    return true;
 }
 
 std::vector<CheckpointManager::CheckpointInfo> CheckpointManager::listCheckpoints() const {
@@ -500,7 +530,7 @@ void CheckpointManager::pruneOldCheckpoints(size_t keepCount) {
 }
 
 std::string CheckpointManager::getLastCheckpointPath() const {
-    return lastCheckpointPath_;
+    return mainCheckpointPath_.empty() ? lastCheckpointPath_ : mainCheckpointPath_;
 }
 
 } // namespace nlm
