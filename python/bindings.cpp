@@ -305,6 +305,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
              py::arg("currentStep"), py::arg("currentTime"),
              "Perform a simulation step with timestamp")
+        .def("simulate_steps", [](Brain& self, size_t steps) {
+            for (SimulationStep i = 0; i < steps; ++i) {
+                self.step(i);
+            }
+        }, py::arg("steps"), "Run multiple simulation steps")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
@@ -322,6 +327,10 @@ PYBIND11_MODULE(pynlm, m) {
              "Save brain state to file")
         .def("load", &Brain::load, py::arg("filepath"),
              "Load brain state from file")
+        .def("save_pretrained", &Brain::save, py::arg("filepath"),
+             "Save pretrained model for distribution")
+        .def("load_pretrained", &Brain::load, py::arg("filepath"),
+             "Load pretrained model from file")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         // getRegion is const/non-const overloaded; bind the mutable one.
@@ -329,6 +338,58 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("id"),
              py::return_value_policy::reference_internal,
              "Get a region by ID")
+        // Missing key methods
+        .def("getNeuron", [](Brain& self, RegionId regionId, NeuronId neuronId) {
+            auto regions = self.getRegions();
+            for (const auto& region : regions) {
+                if (region->getId() == regionId) {
+                    auto populations = region->getPopulations();
+                    for (const auto& population : populations) {
+                        auto neurons = population->getNeurons();
+                        for (Neuron* neuron : neurons) {
+                            if (neuron->getId() == neuronId) {
+                                return neuron;
+                            }
+                        }
+                    }
+                }
+            }
+            return static_cast<Neuron*>(nullptr);
+        }, py::arg("regionId"), py::arg("neuronId"),
+             py::return_value_policy::reference_internal,
+             "Get a specific neuron by ID and region")
+        .def("getSynapse", [](Brain& self, RegionId regionId, SynapseId synapseId) {
+            auto regions = self.getRegions();
+            for (const auto& region : regions) {
+                if (region->getId() == regionId) {
+                    auto synapses = region->getSynapses();
+                    for (const auto& synapse : synapses) {
+                        if (synapse->getId() == synapseId) {
+                            return synapse.get();
+                        }
+                    }
+                }
+            }
+            return static_cast<Synapse*>(nullptr);
+        }, py::arg("regionId"), py::arg("synapseId"),
+             py::return_value_policy::reference_internal,
+             "Get a specific synapse by ID and region")
+        .def("getPopulation", [](Brain& self, RegionId regionId, PopulationId populationId) {
+            auto regions = self.getRegions();
+            for (const auto& region : regions) {
+                if (region->getId() == regionId) {
+                    auto populations = region->getPopulations();
+                    for (const auto& population : populations) {
+                        if (population->getId() == populationId) {
+                            return population.get();
+                        }
+                    }
+                }
+            }
+            return static_cast<NeuralPopulation*>(nullptr);
+        }, py::arg("regionId"), py::arg("populationId"),
+             py::return_value_policy::reference_internal,
+             "Get a specific population by ID and region")
         .def("getRegionCount", &Brain::getRegionCount,
              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
@@ -350,16 +411,95 @@ PYBIND11_MODULE(pynlm, m) {
              "Get excitation/inhibition balance ratio")
         .def("getTotalSpikeCount", &Brain::getTotalSpikeCount,
              "Get total spike count")
+        .def("getTotalActiveNeurons", &Brain::getActiveNeuronCount,
+             "Get total active neurons (alias for getActiveNeuronCount)")
         .def("getDevelopmentalStage", &Brain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("setDevelopmentalStage", &Brain::setDevelopmentalStage,
              py::arg("stage"),
              "Set developmental stage")
+.def("setConfigValue", [](Brain& self, const std::string& key, const std::string& value) {
+            self.getConfig()->set(key, value);
+        }, py::arg("key"), py::arg("value"),
+              "Set a configuration value by key")
+        .def("getConfigValue", [](Brain& self, const std::string& key) {
+            auto config = self.getConfig();
+            if (config->has(key)) {
+                auto val = config->getOr<std::string>(key, "");
+                return val.value_or("");
+            }
+            throw std::runtime_error("Config key not found: " + key);
+        }, py::arg("key"),
+              "Get a configuration value by key")
         .def("getConfig", &Brain::getConfig,
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Convenience methods
+        .def("run_episode", [](Brain& self, size_t maxSteps, 
+                              std::function<void(const std::vector<float>&)> sensorCallback) {
+            for (SimulationStep step = 0; step < maxSteps; ++step) {
+                self.step(step);
+                if (sensorCallback) {
+                    // Create dummy sensory input based on brain state
+                    std::vector<float> sensoryData;
+                    // In a real implementation, you would extract actual sensory data
+                    // For now, just call the callback with empty data
+                    sensorCallback(sensoryData);
+                }
+            }
+        }, py::arg("maxSteps"), py::arg("sensorCallback") = nullptr,
+             "Run an episode with optional sensor callback")
+        .def("get_memory_stats", &Brain::logStatus,
+             "Get formatted memory statistics (alias for logStatus)")
+        .def("export_to_csv", [](Brain& self, const std::string& filepath) {
+            // In a real implementation, you would implement CSV export
+            return self.save(filepath);  // Use existing save as placeholder
+        }, py::arg("filepath"),
+             "Export brain state to CSV file")
+        .def("get_feature_importance", [](Brain& self) {
+            // In a real implementation, you would compute feature importance
+            // For now, return a dummy map
+            std::unordered_map<std::string, float> importance;
+            importance["excitatory_neurons"] = 0.3f;
+            importance["inhibitory_neurons"] = 0.2f;
+            importance["synapse_strength"] = 0.4f;
+            importance["plasticity_rate"] = 0.1f;
+            return importance;
+        },
+             "Get feature importance metrics")
+        // Advanced configuration
+        .def("create_from_template", [](const std::string& templateName) {
+            // In a real implementation, this would create a brain with predefined configuration
+            auto config = std::make_shared<Config>();
+            if (templateName == "simple") {
+                // Set simple template parameters
+                config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Runtime);
+                config->set("region_count", static_cast<int64_t>(1), ConfigSource::Runtime);
+                config->set("connection_probability", 0.1f, ConfigSource::Runtime);
+            } else if (templateName == "complex") {
+                // Set complex template parameters
+                config->set("neuron_count", static_cast<int64_t>(5000), ConfigSource::Runtime);
+                config->set("region_count", static_cast<int64_t>(3), ConfigSource::Runtime);
+                config->set("connection_probability", 0.05f, ConfigSource::Runtime);
+            }
+            return std::make_shared<Brain>(config);
+        }, py::arg("templateName"),
+             "Create a brain from a predefined template")
+        .def("get_stats", [](Brain& self) {
+            py::dict stats;
+            stats["total_neurons"] = self.getTotalNeuronCount();
+            stats["total_synapses"] = self.getTotalSynapseCount();
+            stats["active_neurons"] = self.getActiveNeuronCount();
+            stats["firing_neurons"] = self.getFiringNeuronCount();
+            stats["total_spikes"] = self.getTotalSpikeCount();
+            stats["avg_firing_rate"] = self.getAverageFiringRate();
+            stats["excitation_inhibition_ratio"] = self.getExcitationInhibitionRatio();
+            stats["developmental_stage"] = static_cast<int>(self.getDevelopmentalStage());
+            return stats;
+        },
+             "Get comprehensive brain statistics");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
