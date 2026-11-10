@@ -1,35 +1,74 @@
 #pragma once
 
-#include "../core/Types/Types.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
-#include <memory>
-#include <string>
-
-namespace nlm {
-
-// Forward declarations
-class Config;
-class RandomGenerator;
-class SimulationClock;
-class Logger;
-class NeuralWorkingMemory;
-class NeuralEpisodicMemory;
-class NeuralAssociativeMemory;
-class PredictionSystem;
-class NeuralPlanner;
-class ConceptFormation;
-class AttentionalSelection;
-class DevelopmentSystem;
-class Dopamine;
-class Curiosity;
-class Novelty;
-class PredictionError;
+// Brain.hpp - NLM Brain Header File
+//
+// Copyright: 2020-2026 NLM Research Team
+// License: MIT License
+//
+// Description:
+// Brain.hpp - NLM Brain Header File
+//
+// Overview:
+// =========
+// This header file provides the public interface for the NLM Brain class, which serves
+// as the central coordinator of a complete artificial neural simulation system. The Brain
+// class implements an integrated computational brain that:
+// - Implements Leaky Integrate-and-Fire (LIF) neuron dynamics
+// - Manages event-driven spike propagation with precise synaptic delays
+// - Applies multiple plasticity mechanisms (STDP, Hebbian, structural)
+// - Integrates memory systems (working memory, episodic memory, associative memory)
+// - Implements neuromodulation systems (dopamine, curiosity, novelty, prediction error)
+// - Provides cognitive capabilities (planning, concept formation, attention)
+// - Supports developmental stages that affect plasticity rates
+// - Includes checkpointing for persistent learning state
+// - Implements memory replay and consolidation mechanisms
+//
+// Key Design Patterns:
+// ============
+// - PIMPL idiom: Implementation details hidden behind pImpl for binary compatibility
+// - Event-driven architecture for spike propagation
+// - Composite pattern for managing neural regions
+// - Observer pattern for spike system handlers
+// - Strategy pattern for multiple plasticity mechanisms
+// - Facade pattern providing unified brain interface
+//
+// Integration Architecture:
+// =====================
+// The brain operates as a closed-loop control system:
+//
+// WORLD
+//   ↓
+// SENSORY INPUT
+//   ↓
+// NEURAL PROCESSING (LIF dynamics, spikes)
+//   ↓
+// INTERNAL STATE (working memory, attention)
+//   ↓
+// MEMORY / PREDICTION (storing and predicting)
+//   ↓
+// MOTIVATION / NEUROMODULATION (driving behavior)
+//   ↓
+// ACTION SELECTION (choosing what to do)
+//   ↓
+// MOTOR OUTPUT
+//   ↓
+// WORLD CONSEQUENCE
+//   ↓
+// REWARD / SURPRISE / ERROR
+//   ↓
+// PLASTICITY (STDP, Hebbian, structural)
+//   ↓
+// MEMORY / DEVELOPMENT
+//   ↓
+// CHANGED BRAIN
+//   ↓
+// CHANGED FUTURE BEHAVIOR
+//
+// Phase Information:
+// ============
+// This header represents Phase 2 (Real Neural Computation) through Phase 6
+// (Final Integration). The header is designed to support both low-level neural
+// components and high-level integration systems.
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {

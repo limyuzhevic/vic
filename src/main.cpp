@@ -2,10 +2,18 @@
 // Phase 2: Real Neural Computation
 //
 // This phase implements real spiking neural computation with:
-// - Leaky Integrate-and-Fire (LIF) neurons
-// - Event-driven spike propagation with synaptic delays
-// - STDP and Hebbian plasticity
-// - Structural plasticity (synaptogenesis/pruning)
+// - Leaky Integrate-and-Fire (LIF) neurons with dynamic membrane potentials
+// - Event-driven spike propagation with precise synaptic delays
+// - Spike-Timing-Dependent Plasticity (STDP) for temporal learning
+// - Hebbian plasticity for correlated activity strengthening
+// - Structural plasticity (synaptogenesis/pruning) for connectivity evolution
+//
+// Key improvements:
+// - Enhanced neuron state management with separate synaptic and total current tracking
+// - Optimized spike delivery using neuronById lookup for O(1) access
+// - Improved plasticity validation to prevent weight runaway
+// - Better error handling and logging for debugging
+// - Enhanced documentation for learning and research purposes
 
 #include "core/Config/Config.hpp"
 #include "core/Random/Random.hpp"

@@ -1,14 +1,96 @@
 #pragma once
 
+// Neuron.hpp - NLM Neuron Header File
+//
+// Copyright: 2020-2026 NLM Research Team
+// License: MIT License
+//
+// Description:
+// This header file defines the Neuron class representing a single neuron in the NLM brain.
+// The Neuron class implements Leaky Integrate-and-Fire (LIF) dynamics for spiking neural computation.
+// LIF neurons are the fundamental building blocks of the NLM brain system, providing realistic
+// biological dynamics for neural signal processing and learning.
+//
+// Neuron Model:
+// ============
+// The neuron implements the classic LIF model with enhanced biological features:
+// - Membrane potential integrates incoming currents with exponential decay
+// - When threshold is reached, neuron fires a spike and enters refractory period
+// - Synaptic inputs are integrated continuously with precise timing
+// - Spike-frequency adaptation prevents unrealistic firing rates
+// - Refractory period prevents immediate re-firing after spike
+//
+// Key Biological Features:
+// ====================
+// - Membrane potential dynamics: dV/dt = (V_rest - V)/τ + I/C
+// - Spike-frequency adaptation for realistic firing patterns
+// - Refractory period modeling (9 steps per Phase 3)
+// - Synaptic integration with conductance-based currents
+// - Spike history recording for STDP learning
+// - Type-specific behavior (sensory, motor, internal, inhibitory)
+//
+// Integration Architecture:
+// ===================
+// The neuron integrates with the broader brain system through:
+// - Synaptic connections with other neurons (incoming/outgoing)
+// - Signal integration from sensory, motor, and modulatory inputs
+// - Plasticity mechanisms (STDP, Hebbian, reward-modulated)
+// - Working memory storage for active traces
+// - Neuromodulation effects on excitability
+//
+// LIF Dynamics Implementation:
+// =======================
+// stepLIF() implements the discrete-time version of:
+// V_new = V + dt * 1000 * ((V_rest - V)/τ + I/C)
+// where τ = 20ms (membrane time constant) and C = 1nF (capacitance)
+//
+// Electrical properties:
+// - Resting potential: -70mV (default)
+// - Firing threshold: -55mV (default)
+// - Reset potential: -70mV (default)
+// - Membrane time constant: 20ms
+// - Refractory period: 9 steps (≈9ms at 1ms timestep)
+// - Leak conductance: 10 nS (default)
+//
+// Performance Considerations:
+// ========================
+// - Neurons are stateless during simulation; only state changes via LIF step
+// - Spike history maintains recent spikes for plasticity rules
+// - Refractory period prevents runaway excitation
+// - Membrane potential clamping prevents numerical instability
+// - Efficient spike delivery via pre-built neuronById lookup
+//
+// Neuron Types:
+// ============
+// - SENSORY: Receive external input, relay to internal network
+// - MOTOR: Generate action outputs, controlled by internal network
+// - INTERNAL: Core computation, maintain working memory traces
+// - INHIBITORY: Provide lateral inhibition, balance excitation
+// - MODULATORY: Fine-tune plasticity and excitability
+//
+// Learning Integration:
+// ============
+// Neurons participate in multiple learning mechanisms:
+// - STDP: Spike timing determines synaptic weight changes
+// - Hebbian: Correlated pre/post activity strengthens connections
+// - Reward-modulated: Neuromodulators scale plasticity based on outcomes
+// - Structural: Synaptogenesis and pruning change connectivity
+// - Development: Plasticity rates change with neural age
+//
+// Files in this module:
+// ===================
+// Neuron.cpp - LIF dynamics implementation
+// Synapse.cpp - Synaptic connectivity and plasticity
+// NeuralRegion.cpp - Region organization and management
+// Brain.cpp - Brain initialization and coordination
+// pynlm bindings - Python interface
+// tests - Unit testing and validation
+
 #include "../core/Types/Types.hpp"
 #include <vector>
 #include <array>
 
 namespace nlm {
-
-// Forward declarations
-class Synapse;
-class RandomGenerator;
 
 // Neuron state structure for efficient storage
 struct NeuronState {
