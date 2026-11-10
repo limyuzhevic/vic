@@ -408,6 +408,13 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Version information
+    m.attr("__version__") = "0.1.0";
+    m.attr("__version_major__") = 0;
+    m.attr("__version_minor__") = 1;
+    m.attr("__version_patch__") = 0;
+    
+    // Factory functions
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -416,6 +423,18 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Brain>(config);
     }, py::arg("config"), "Create a new brain with configuration");
 
+    m.def("createBrainWithNeurons", [](size_t neuronCount, float connectionProbability) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+        config->set("brain.connection_probability", connectionProbability, ConfigSource::Default);
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->initialize()) {
+            throw std::runtime_error("Brain initialization failed");
+        }
+        return brain;
+    }, py::arg("neuronCount"), py::arg("connectionProbability"),
+        "Create a brain with specified neuron count and connection probability");
+
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
@@ -423,6 +442,188 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Advanced agent setup with multiple subsystems
+    m.def("createCompleteAgent", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) -> std::shared_ptr<AgentBrain> {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        return agent;
+    }, py::arg("brain"), py::arg("world"),
+        "Create and initialize a complete agent brain with world connection");
+
+    // Utility functions for complex scenarios
+    m.def("createLearningEnvironment", [](size_t worldSize, size_t visionRange, bool enableCuriosity, bool enableRewardModulation) -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        // Create brain with appropriate configuration
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(worldSize * 2), ConfigSource::Default);
+        config->set("brain.connection_probability", 0.15f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Create and configure world
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(worldSize, worldSize, visionRange, visionRange);
+        world->reset();
+        world->setAgentStart(worldSize / 2.0f, worldSize / 2.0f);
+        
+        // Create agent and enable subsystems
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(world);
+        
+        if (enableCuriosity) agent->enableCuriosity(true);
+        if (enableRewardModulation) agent->enableRewardModulation(true);
+        agent->enableStructuralPlasticity(true);
+        agent->enableDevelopment(true);
+        
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("worldSize"), py::arg("visionRange") = 8,
+       py::arg("enableCuriosity") = true, py::arg("enableRewardModulation") = true,
+        "Create a complete learning environment with agent and world");
+
+    // Memory and persistence utilities
+    m.def("saveBrainState", [](const std::shared_ptr<Brain>& brain, const std::string& filepath) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to file");
+
+    m.def("loadBrainState", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        auto brain = std::make_shared<Brain>(config);
+        if (!brain->load(filepath)) {
+            throw std::runtime_error("Failed to load brain state from " + filepath);
+        }
+        return brain;
+    }, py::arg("filepath"), "Load brain state from file and return brain");
+
+    // Configuration utilities
+    m.def("getAvailableConfigKeys", []() -> std::vector<std::string> {
+        auto config = std::make_shared<Config>();
+        return config->getKeys();
+    }, "Get all available configuration keys");
+
+    m.def("getConfigSummary", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::runtime_error("Config is null");
+        }
+        return config->summary();
+    }, py::arg("config"), "Get configuration summary string");
+
+    // Configuration creation utilities
+    m.def("createConfigWithDefaults", [](size_t neuronCount, size_t regionCount) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", static_cast<int64_t>(neuronCount), ConfigSource::Default);
+        config->set("brain.region_count", static_cast<int64_t>(regionCount), ConfigSource::Default);
+        config->set("brain.connection_probability", 0.15f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.001f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("development.enable", true, ConfigSource::Default);
+        config->set("development.synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("development.pruning_rate", 0.00001f, ConfigSource::Default);
+        return config;
+    }, py::arg("neuronCount"), py::arg("regionCount"),
+        "Create a configuration with commonly used defaults");
+
+    // Brain configuration helpers
+    m.def("configureForDevelopment", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::runtime_error("Config is null");
+        }
+        config->set("development.enable", true, ConfigSource::Default);
+        config->set("development.synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+        config->set("development.pruning_rate", 0.00001f, ConfigSource::Default);
+        config->set("development.maturation_rate", 0.001f, ConfigSource::Default);
+        return config;
+    }, py::arg("config"), "Configure brain for developmental learning");
+
+    m.def("configureForStability", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::runtime_error("Config is null");
+        }
+        config->set("brain.connection_probability", 0.05f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.stdp.learning_rate", 0.0005f, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", false, ConfigSource::Default);
+        return config;
+    }, py::arg("config"), "Configure brain for stable, incremental learning");
+
+    m.def("configureForExploration", [](std::shared_ptr<Config> config) {
+        if (!config) {
+            throw std::runtime_error("Config is null");
+        }
+        config->set("brain.connection_probability", 0.20f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        config->set("neuromod.dopamine.scale", 2.0f, ConfigSource::Default);
+        return config;
+    }, py::arg("config"), "Configure brain for exploration and discovery");
+
+    // Specialized configuration presets
+    m.def("createStandardConfig", []() -> std::shared_ptr<Config> {
+        return createConfigWithDefaults(500, 1);
+    }, "Create a standard configuration (500 neurons, 1 region)");
+
+    m.def("createSmallConfig", []() -> std::shared_ptr<Config> {
+        return createConfigWithDefaults(200, 1);
+    }, "Create a small configuration (200 neurons, 1 region)");
+
+    m.def("createLargeConfig", []() -> std::shared_ptr<Config> {
+        return createConfigWithDefaults(2000, 3);
+    }, "Create a large configuration (2000 neurons, 3 regions)");
+
+    m.def("createResearchConfig", []() -> std::shared_ptr<Config> {
+        return createConfigWithDefaults(1000, 2);
+    }, "Create a research configuration (1000 neurons, 2 regions, optimized for research)");
+
+    // Configuration validation
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::runtime_error("Config is null");
+        }
+        std::string errors;
+        if (!config->has("brain.neuron_count")) {
+            errors += "Missing brain.neuron_count; ";
+        }
+        if (!config->has("brain.region_count")) {
+            errors += "Missing brain.region_count; ";
+        }
+        if (config->getOr<float>("brain.connection_probability", -1.0f) <= 0.0f) {
+            errors += "Invalid brain.connection_probability; ";
+        }
+        if (!errors.empty()) {
+            throw std::runtime_error("Configuration validation failed: " + errors);
+        }
+        return true;
+    }, py::arg("config"), "Validate configuration and return true if valid");
+
+    // Quick preset configurations
+    m.def("createQuickTestConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 100, ConfigSource::Default);
+        config->set("brain.region_count", 1, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.15f, ConfigSource::Default);
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+        return config;
+    }, "Create a quick test configuration");
+
+    m.def("createQuickDemoConfig", []() -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("brain.neuron_count", 500, ConfigSource::Default);
+        config->set("brain.region_count", 1, ConfigSource::Default);
+        config->set("brain.connection_probability", 0.1f, ConfigSource::Default);
+        config->set("plasticity.stdp.enable", true, ConfigSource::Default);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::Default);
+        config->set("neuromod.novelty.enable", true, ConfigSource::Default);
+        return config;
+    }, "Create a quick demo configuration with all systems enabled");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
