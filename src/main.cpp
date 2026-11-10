@@ -307,24 +307,57 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
+// Add more simulation control variables
+bool runMode = "full";  // "full", "step", "brief", "silent"
+size_t maxSteps = 0;  // 0 = unlimited
+size_t stepsPerOutput = 100;  // Output statistics every N steps
+size_t stepStart = 0;  // Start simulation from this step
+sype_t stepEnd = 0;  // End simulation at this step (0 = unlimited)
+bool runBriefTest = false;
+bool runFullTest = false;
+
+if (showHelp) {
     printBanner();
+    std::cout << "Usage: nlm [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  -h, --help            Show this help message" << std::endl;
+    std::cout << "  --test, --tests       Run tests and exit" << std::endl;
+    std::cout << "  --save, --save-state  Save brain state to file (default: brain_state.bin)" << std::endl;
+    std::cout << "  --config PATH         Load configuration from PATH (default: configs/default.cfg)" << std::endl;
+    std::cout << "  -v, --verbose, --debug Enable verbose/debug logging" << std::endl;
+    std::cout << "  --help                Show this help message" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Advanced options:" << std::endl;
+    std::cout << "  --mode MODE          Run mode: full, brief, silent (default: full)" << std::endl;
+    std::cout << "  --max-steps N        Maximum number of simulation steps (0 = unlimited)" << std::endl;
+    std::cout << "  --steps-per-output N Output statistics every N steps (default: 100)" << std::endl;
+    std::cout << "  --start-step N       Start simulation from step N" << std::endl;
+    std::cout << "  --end-step N         End simulation at step N (0 = unlimited)" << std::endl;
+    std::cout << "  --brief-test         Run quick sanity test" << std::endl;
+    std::cout << "  --full-test          Run comprehensive tests" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  nlm --save brain_state.bin  Run and save brain state" << std::endl;
+    std::cout << "  nlm --config custom.cfg      Load custom configuration" << std::endl;
+    std::cout << "  nlm --verbose                Enable detailed logging" << std::endl;
+    std::cout << "  nlm --brief-test             Run quick test (faster)" << std::endl;
+    std::cout << "  nlm --max-steps 1000         Limit to 1000 simulation steps" << std::endl;
+    std::cout << std::endl;
+    return 0;
+}
+
+if (runTests) {
+    printBanner();
+    std::cout << "Running NLM tests..." << std::endl;
+    // Run tests - this would need to be linked properly
+    std::cout << "Note: Test runner needs to be properly linked in CMakeLists.txt" << std::endl;
+    return 0;
+}
+
+printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
     
     // Load configuration
     auto config = std::make_shared<Config>();

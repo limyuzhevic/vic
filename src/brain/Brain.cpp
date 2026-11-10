@@ -335,7 +335,7 @@ bool Brain::initialize() {
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
     NLM_LOG_INFO("Sensory neurons: " + std::to_string(pImpl->sensoryNeurons.size()));
-    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeurons.size()));
+    NLM_LOG_INFO("Motor neurons: " + std::to_string(pImpl->motorNeWlBERS.size()));
     
     return true;
 }
@@ -869,14 +869,213 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
-namespace {
-// Phase 5 checkpoint payload helpers for the extra sections. Format is
-// deliberately simple and self-describing per value: a uint64 count
-// followed by raw elements, in a fixed order per section. All readers
-// bounds-check and fail the section (not the whole load) on truncation,
-// so a corrupt extra section degrades to the Phase 4 behaviour instead
-// of aborting a load that would otherwise succeed.
-void p5AppendU64(std::vector<uint8_t>& out, uint64_t v) {
+void Brain::reset() {
+    NLM_LOG_INFO("Resetting NLM Brain...");
+    
+    pImpl->currentStep = 0;
+    pImpl->currentTime = 0.0;
+    pImpl->totalSpikesThisStep = 0;
+    pImpl->totalSpikesTotal = 0;
+    pImpl->isResting = false;
+    pImpl->stepsSinceLastEpisode = 0;
+    
+    for (auto& region : pImpl->regions) {
+        region->reset();
+    }
+    
+    pImpl->spikeSystem->reset();
+    pImpl->developmentalStage = DevelopmentalStage::Initial;
+    
+    // Reset memory systems
+    if (pImpl->workingMemory) pImpl->workingMemory->clear();
+    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    if (pImpl->attention) pImpl->attention->reset();
+    
+    NLM_LOG_INFO("NLM Brain reset complete");
+}
+
+// Phase 7: Enhanced Simulation Statistics and Progress Reporting
+struct SimulationStatistics {
+    size_t totalSteps;
+    size_t totalSpikes;
+    size_t activeNeurons;
+    size_t firingNeurons;
+    float averageFiringRate;
+    float excitationInhibitionRatio;
+    float meanSynapticWeight;
+    float varianceSynapticWeight;
+    size_t sensoryInputsApplied;
+    size_t motorOutputsGenerated;
+    size_t plasticityEvents;
+    size_t structuralChanges;
+    float learningProgress;
+    float noveltyLevel;
+    float dopamineLevel;
+    float curiosityLevel;
+    size_t episodesStored;
+    float memoryUtilization;
+    size_t checkpointSaves;
+    std::chrono::duration<double> simulationTime;
+};
+
+struct ProgressReport {
+    size_t currentStep;
+    size_t totalSteps;
+    double progressPercent;
+    size_t spikesGenerated;
+    size_t firingNeurons;
+    float learningProgress;
+    float noveltyLevel;
+    float dopamineLevel;
+    size_t episodesSinceLastReport;
+    std::chrono::duration<double> elapsedTime;
+};
+
+// Get comprehensive simulation statistics
+SimulationStatistics Brain::getSimulationStatistics() const {
+    SimulationStatistics stats;
+    
+    // Basic brain statistics
+    stats.totalSteps = pImpl->currentStep;
+    stats.totalSpikes = pImpl->totalSpikesTotal;
+    stats.activeNeurons = getTotalNeuronCount();
+    stats.firingNeurons = getFiringNeuronCount();
+    stats.averageFiringRate = getAverageFiringRate();
+    stats.excitationInhibitionRatio = getExcitationInhibitionRatio();
+    
+    // Synaptic statistics
+    size_t totalSynapses = getTotalSynapseCount();
+    stats.meanSynapticWeight = 0.0f;
+    stats.varianceSynapticWeight = 0.0f;
+    if (totalSynapses > 0) {
+        double sum = 0.0, varianceSum = 0.0;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                sum += syn->getWeight();
+                varianceSum += syn->getWeight() * syn->getWeight();
+            }
+        }
+        stats.meanSynapticWeight = static_cast<float>(sum / totalSynapses);
+        double variance = (varianceSum / totalSynapses) - (stats.meanSynapticWeight * stats.meanSynapticWeight);
+        stats.varianceSynapticWeight = static_cast<float>(variance);
+    }
+    
+    // Integration system statistics
+    stats.sensoryInputsApplied = pImpl->sensoryNeurons.size();
+    stats.motorOutputsGenerated = pImpl->motorNeurons.size();
+    stats.plasticityEvents = 0;  // Would need to track from plasticity systems
+    stats.structuralChanges = 0;  // Would need to track from structural plasticity
+    
+    // Neuromodulation statistics
+    stats.learningProgress = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+    stats.noveltyLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+    stats.dopamineLevel = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+    stats.curiosityLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+    
+    // Memory statistics
+    stats.episodesStored = pImpl->episodicMemory ? pImpl->episodicMemory->getEpisodeCount() : 0;
+    stats.memoryUtilization = 0.0f;  // Would need to calculate
+    
+    // System statistics
+    stats.checkpointSaves = 0;  // Would need to track from checkpoint system
+    stats.simulationTime = std::chrono::duration<double>(pImpl->currentTime);
+    
+    return stats;
+}
+
+// Get progress report for current simulation
+ProgressReport Brain::getProgressReport() const {
+    ProgressReport report;
+    
+    report.currentStep = pImpl->currentStep;
+    report.totalSteps = pImpl->config->getOr<int64_t>("max_simulation_steps", 10000);
+    report.progressPercent = report.totalSteps > 0 ? 
+        static_cast<double>(report.currentStep) / report.totalSteps * 100.0 : 0.0;
+    
+    report.spikesGenerated = pImpl->totalSpikesThisStep;
+    report.firingNeurons = getFiringNeuronCount();
+    report.learningProgress = pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f;
+    report.noveltyLevel = pImpl->curiosity ? pImpl->curiosity->getLevel() : 0.0f;
+    report.dopamineLevel = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+    
+    // Calculate episodes since last report (simplified)
+    report.episodesSinceLastReport = pImpl->stepsSinceLastEpisode / 10;  // Every 10 steps
+    
+    // Calculate elapsed time
+    report.elapsedTime = std::chrono::duration<double>(pImpl->currentTime);
+    
+    return report;
+}
+
+// Get performance metrics
+struct PerformanceMetrics {
+    double stepsPerSecond;
+    double neuronsPerSecond;
+    double synapsesPerSecond;
+    double spikeRate;
+    double plasticityEfficiency;
+    double memoryEfficiency;
+    double energyEfficiency;
+    float stabilityScore;
+};
+
+PerformanceMetrics Brain::getPerformanceMetrics() const {
+    PerformanceMetrics metrics;
+    
+    if (pImpl->currentStep > 0) {
+        metrics.stepsPerSecond = static_cast<double>(pImpl->totalSpikesTotal) / pImpl->currentTime;
+        metrics.neuronsPerSecond = static_cast<double>(getTotalNeuronCount()) / pImpl->currentTime;
+        metrics.synapsesPerSecond = static_cast<double>(getTotalSynapseCount()) / pImpl->currentTime;
+        metrics.spikeRate = static_cast<double>(pImpl->totalSpikesTotal) / pImpl->currentStep;
+    }
+    
+    // Calculate plasticity efficiency (simplified)
+    metrics.plasticityEfficiency = 0.0f;  // Would need to track from plasticity systems
+    metrics.memoryEfficiency = 0.0f;      // Would need to calculate
+    metrics.energyEfficiency = 0.0f;      // Would need to track from energy models
+    metrics.stabilityScore = getExcitationInhibitionRatio() / (getExcitationInhibitionRatio() + 1.0f);
+    
+    return metrics;
+}
+
+// Enhanced logging with simulation statistics
+void Brain::logStatus() const {
+    NLM_LOG_INFO("=== NLM Brain Status ===");
+    
+    // Basic statistics
+    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_INFO("Total spikes: " + std::to_string(pImpl->totalSpikesTotal));
+    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
+    NLM_LOG_INFO("Firing neurons: " + std::to_string(getFiringNeuronCount()));
+    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()) + " Hz");
+    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    
+    // Progress information
+    ProgressReport progress = getProgressReport();
+    NLM_LOG_INFO("Simulation progress: " + std::to_string(progress.currentStep) + "/" + 
+                 std::to_string(progress.totalSteps) + " (" + 
+                 std::to_string(progress.progressPercent) + "%)");
+    
+    // Learning indicators
+    NLM_LOG_INFO("Learning progress: " + std::to_string(progress.learningProgress));
+    NLM_LOG_INFO("Novelty level: " + std::to_string(progress.noveltyLevel));
+    NLM_LOG_INFO("Dopamine level: " + std::to_string(progress.dopamineLevel));
+    NLM_LOG_INFO("Curiosity level: " + std::to_string(progress.noveltyLevel));
+    
+    // Memory status
+    NLM_LOG_INFO("Episodes stored: " + std::to_string(pImpl->episodicMemory ? 
+        pImpl->episodicMemory->getEpisodeCount() : 0));
+    
+    // System health
+    NLM_LOG_INFO("Simulation time: " + std::to_string(pImpl->currentTime) + "s");
+    NLM_LOG_INFO("Development stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    NLM_LOG_INFO("Working memory size: " + std::to_string(pImpl->workingMemory ? 
+        pImpl->workingMemory->getMemoryNeurons().size() : 0));
+    
+    NLM_LOG_INFO("=== End NLM Brain Status ===");
+}
     const uint8_t* b = reinterpret_cast<const uint8_t*>(&v);
     out.insert(out.end(), b, b + sizeof(v));
 }
