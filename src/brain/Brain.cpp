@@ -179,7 +179,8 @@ Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
 
 Brain& Brain::operator=(Brain&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
+        // Clean up existing resources before taking ownership
+        if (pImpl) delete pImpl;
         pImpl = other.pImpl;
         other.pImpl = nullptr;
     }
@@ -260,6 +261,12 @@ bool Brain::initialize() {
         for (auto* neuron : region->getAllNeurons()) {
             pImpl->neuronById[neuron->getId().index()] = neuron;
         }
+    }
+    
+    // Initialize memory systems and validate configuration
+    if (!validateConfiguration()) {
+        NLM_LOG_ERROR("Configuration validation failed during brain initialization");
+        return false;
     }
 
     // Initialize connectivity with random weights
@@ -853,6 +860,7 @@ void Brain::reset() {
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
     
+    // Reset all regions to ensure clean state
     for (auto& region : pImpl->regions) {
         region->reset();
     }
@@ -861,10 +869,26 @@ void Brain::reset() {
     pImpl->developmentalStage = DevelopmentalStage::Initial;
     
     // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+    }
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->clear();
+    }
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->clear();
+    }
+    if (pImpl->attention) {
+        pImpl->attention->reset();
+    }
+    
+    // Clear neuron lookup to prevent dangling pointers
+    pImpl->neuronById.clear();
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
+    
+    // Reset spike handler registration
+    pImpl->spikeHandlersRegistered = false;
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }
@@ -1588,4 +1612,58 @@ void Brain::logStatus() const {
     }
 }
 
-} // namespace nlm
+bool Brain::Impl::validateConfiguration() const {
+    bool isValid = true;
+    
+    // Validate neuron count
+    if (!config) {
+        NLM_LOG_ERROR("Configuration pointer is null");
+        return false;
+    }
+    
+    int64_t neuronCount = config->getOr<int64_t>("neuron_count", 0);
+    if (neuronCount <= 0 || neuronCount > 10000) {
+        NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(neuronCount));
+        isValid = false;
+    }
+    
+    // Validate region count
+    int64_t regionCount = config->getOr<int64_t>("region_count", 1);
+    if (regionCount <= 0 || regionCount > 100) {
+        NLM_LOG_ERROR("Invalid region count: " + std::to_string(regionCount));
+        isValid = false;
+    }
+    
+    // Validate connection probability
+    float connProb = config->getOr<float>("connection_probability", 0.1f);
+    if (connProb < 0.0f || connProb > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(connProb));
+        isValid = false;
+    }
+    
+    // Validate STDP parameters
+    float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+    float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+    if (ltpWeight < 0.0f || ltdWeight < 0.0f) {
+        NLM_LOG_ERROR("Invalid STDP weights: LTP=" + std::to_string(ltpWeight) + 
+                      ", LTD=" + std::to_string(ltdWeight));
+        isValid = false;
+    }
+    
+    // Validate structural plasticity parameters
+    float synapRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
+    float pruneRate = config->getOr<float>("pruning_rate", 0.00001f);
+    if (synapRate < 0.0f || pruneRate < 0.0f) {
+        NLM_LOG_ERROR("Invalid structural plasticity rates: synaptogenesis=" + 
+                      std::to_string(synapRate) + ", pruning=" + std::to_string(pruneRate));
+        isValid = false;
+    }
+    
+    if (!isValid) {
+        NLM_LOG_ERROR("Configuration validation failed");
+        NLM_LOG_INFO("Configuration validation completed with " + std::to_string(config->getAllKeys().size()) + 
+                     " parameters found");
+    }
+    
+    return isValid;
+}
