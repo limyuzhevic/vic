@@ -1,4 +1,8 @@
 #include "Reward.hpp"
+#include "../environment/Observation.hpp"
+#include "../core/Types/Types.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -7,7 +11,15 @@ struct Reward::Impl {
     float accumulatedReward;
     std::vector<float> history;
     
-    Impl() : currentValue(0.0f), accumulatedReward(0.0f) {}
+    // Parameters for reward computation
+    float movementReward;
+    float reachingGoalReward;
+    float negativeStepPenalty;
+    float noveltyRewardFactor;
+    
+    Impl() : currentValue(0.0f), accumulatedReward(0.0f), 
+             movementReward(0.1f), reachingGoalReward(1.0f),
+             negativeStepPenalty(-0.01f), noveltyRewardFactor(0.5f) {}
 };
 
 Reward::Reward() : pImpl(new Impl) {}
@@ -25,16 +37,18 @@ void Reward::setValue(float value) {
 void Reward::add(float delta) {
     pImpl->accumulatedReward += delta;
     pImpl->currentValue += delta;
+    pImpl->history.push_back(pImpl->currentValue);
 }
 
 void Reward::reset() {
     pImpl->currentValue = 0.0f;
     pImpl->accumulatedReward = 0.0f;
+    pImpl->history.clear();
 }
 
 float Reward::computeReward(const Observation& observation) const {
-    // TODO PHASE 2: Implement real reward computation from observation
-    // PLACEHOLDER: Returns 0
+    // TODO PHASE 2: This is a placeholder implementation
+    // For now, return a small default reward
     return 0.0f;
 }
 
