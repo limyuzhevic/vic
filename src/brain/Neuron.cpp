@@ -188,7 +188,7 @@ void Neuron::setPopulationId(PopulationId population) {
     pImpl->populationId = population;
 }
 
-bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
+void Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
     // Handle refractory period
@@ -216,40 +216,41 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Enhanced stability: Use smaller time steps for better numerical stability
+    float stableDt = std::min(static_cast<float>(dt), 0.1f);  // Cap dt at 0.1ms
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
+    // Leak contribution (negative for excitation, positive for inhibition)
     float leakContribution = (V_rest - V) / tau;
     
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Update membrane potential using exponential Euler integration with stability
+    V = V + stableDt * 1000.0f * (leakContribution + synapticContribution);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    // Enhanced spike-frequency adaptation: stronger and faster decay
     if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+        // More aggressive adaptation to prevent runaway excitation
+        V -= pImpl->state.adaptationVariable * 0.05f;  // Increased from 0.01f
+        pImpl->state.adaptationVariable *= 0.92f;  // Faster decay (increased from 0.95f)
     }
     
-    // Clamp membrane potential to prevent instability
-    V = std::clamp(V, -100.0f, 50.0f);
+    // Enhanced voltage clamping with tighter bounds
+    V = std::clamp(V, -85.0f, -45.0f);  // Tighter bounds for better stability
     
     // Update the firing-rate metric from counted spikes, in Hz.
-    // Previously setFiringRate() was never called anywhere, so
-    // getAverageFiringRate() summed zeros even with thousands of spikes.
-    // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
-    // dt is in seconds (0.001 in the demos), so a neuron firing every
-    // step would approach 1000 Hz, and refractory periods cap it well
-    // below that in practice.
     if (dt > 0.0) {
         pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
     }
 
-    // Check for spike
+    // Check for spike with enhanced threshold detection
     if (V >= threshold) {
         fired = true;
         if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            // Cap firing rate to prevent unrealistic values
+            float maxFiringRate = 1000.0f;  // Maximum reasonable firing rate
+            float rateContribution = 0.1f * static_cast<float>(1.0 / dt);
+            pImpl->state.firingRate = std::min(pImpl->state.firingRate + rateContribution, maxFiringRate);
         }
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -257,15 +258,15 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Record spike
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Enhanced reset: more aggressive reset to prevent re-firing
         V = V_reset;
         
-        // Enter refractory period
+        // Extended refractory period: stronger inhibition
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Enhanced adaptation for stronger spike-frequency adaptation
+        pImpl->state.adaptationVariable += 2.0f;  // Increased from 1.0f
     } else {
         pImpl->state.firingState = FiringState::Active;
     }

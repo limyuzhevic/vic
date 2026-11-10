@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PlasticityRule.hpp"
+#include "../brain/Synapse.hpp"
 
 namespace nlm {
 
@@ -22,6 +23,21 @@ public:
     
     void setMaxWeight(float maxWeight);
     float getMaxWeight() const;
+    
+    // Enhanced helper methods for improved plasticity
+    private:
+    float getAverageFiringRateEstimate(const std::vector<Timestamp>& preSpikes,
+                                       const std::vector<Timestamp>& postSpikes) const;
+    
+    float getActivityDependentLearningRate(float activity) const;
+    
+    float getSynapticNormalizationFactor(float weight) const;
+    
+    float getActivityDependentBoundsFactor(float activity, float weight) const;
+    
+    float getSynapticCompetitionFactor(Synapse* synapse) const;
+    
+    float getMetaplasticityFactor(Synapse* synapse) const;
     
 private:
     struct Impl;
