@@ -17,22 +17,29 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
+    // Constructor with error checking
     AgentBrain(std::shared_ptr<Brain> brain);
     ~AgentBrain();
     
-    // Initialize with world
+    // Disable copying, enable moving
+    AgentBrain(const AgentBrain&) = delete;
+    AgentBrain& operator=(const AgentBrain&) = delete;
+    AgentBrain(AgentBrain&&) noexcept;
+    AgentBrain& operator=(AgentBrain&&) noexcept;
+    
+    // Initialize with world - validates input and sets up neural groups
     void initialize(const SimpleWorld& world);
     
     // Get sensory input size expected by brain
-    size_t getSensoryInputSize() const;
+    [[nodiscard]] size_t getSensoryInputSize() const noexcept;
     
     // Get motor output size expected
-    size_t getMotorOutputSize() const;
+    [[nodiscard]] size_t getMotorOutputSize() const noexcept;
     
-    // Process sensory percept and inject into brain
+    // Process sensory percept and inject into brain with error handling
     void processSensoryInput(const SensoryPercept& percept);
     
-    // Decode brain motor activity into motor command
+    // Decode brain motor activity into motor command with enhanced safety
     MotorCommand decodeMotorCommand();
 
     // Diagnostic: per motor group, in decode order. `activity` is mean
@@ -48,7 +55,8 @@ public:
         size_t size = 0;
         float firingRate = 0.0f;
     };
-    std::vector<MotorGroupActivity> getMotorGroupActivities() const;
+    
+    [[nodiscard]] std::vector<MotorGroupActivity> getMotorGroupActivities() const noexcept;
     
     // Apply neuromodulation based on reward
     void applyRewardModulation(float reward, float predictedReward);
