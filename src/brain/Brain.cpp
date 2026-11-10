@@ -484,20 +484,32 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
+    // ========== STEP 5: Apply neuromodulation effects ==========
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
         // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
+        // Enhanced: dopamine modulates both tonic and phasic firing patterns
         float dopamineLevel = pImpl->dopamine->getLevel();
+        float explorationDrive = pImpl->dopamine->getExplorationDrive();
+        float novelty = pImpl->dopamine->getNovelty();
+        
+        // Dopamine modulates neural excitability by adjusting effective current injection
+        // Enhanced: more sophisticated modulation based on dopamine dynamics
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
+                    // Base excitability modulation
                     float excitabilityMod = dopamineLevel * 0.5f;
+                    
+                    // Enhance excitability for novel or surprising experiences
+                    if (novelty > 0.5f) {
+                        excitabilityMod *= (1.0f + (novelty - 0.5f) * 2.0f);
+                    }
+                    
+                    // Exploration drive further enhances excitability
+                    excitabilityMod *= (1.0f + explorationDrive * 0.3f);
+                    
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
                     }
@@ -511,6 +523,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+        
+        // Integrate prediction error for learning credit assignment
+        float predictionError = pImpl->dopamine->getPredictionError();
+        if (std::abs(predictionError) > 0.01f) {
+            // Strong prediction error enhances plasticity
+            plasticityMod *= (1.0f + std::abs(predictionError) * 0.5f);
+        }
     }
     
     for (auto& region : pImpl->regions) {
@@ -629,10 +648,56 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // ========== STEP 10: Update concept formation ==========
+        // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
         // Would process current neural activity patterns to form concepts
         // This requires sensory state encoding
+    }
+    
+    // ========== STEP 10b: Update neural planner ==========
+    if (pImpl->planner) {
+        // Neural planner processes current neural state and generates action plans
+        // It considers working memory, attention, and sensory input
+        
+        // Convert sensory neurons to feature vector for planning
+        std::vector<float> neuralState;
+        
+        // Add working memory activity
+        if (pImpl->workingMemory) {
+            const auto& memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            for (NeuronId id : memoryNeurons) {
+                const Neuron* neuron = nullptr;
+                if (pImpl->neuronById.find(id.index()) != pImpl->neuronById.end()) {
+                    neuron = pImpl->neuronById.at(id.index());
+                }
+                if (neuron) {
+                    neuralState.push_back(neuron->getFiringRate());
+                }
+            }
+        }
+        
+        // Add attention strength
+        if (pImpl->attention) {
+            neuralState.push_back(pImpl->attention->getAttentionStrength());
+        }
+        
+        // Add prediction error for learning
+        if (pImpl->dopamine) {
+            neuralState.push_back(pImpl->dopamine->getPredictionError());
+        }
+        
+        // Add novelty for exploration
+        if (pImpl->dopamine) {
+            neuralState.push_back(pImpl->dopamine->getNovelty());
+        }
+        
+        // Ensure we have at least some state
+        if (neuralState.empty()) {
+            neuralState.resize(5, 0.0f); // Default zero state
+        }
+        
+        // Let planner process current neural state
+        pImpl->planner->update(neuralState, pImpl->timestep);
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
