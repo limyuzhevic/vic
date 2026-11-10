@@ -846,27 +846,122 @@ void Brain::develop() {
 void Brain::reset() {
     NLM_LOG_INFO("Resetting NLM Brain...");
     
+    // Step 1: Clear spike system state (prevents spike accumulation)
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    }
+    
+    // Step 2: Reset simulation counters (consistent state)
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     pImpl->totalSpikesThisStep = 0;
     pImpl->totalSpikesTotal = 0;
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
+    pImpl->stepsSinceLastConsolidation = 0;
     
+    // Step 3: Reset developmental stage (fresh start)
+    pImpl->developmentalStage = DevelopmentalStage::Initial;
+    pImpl->learnedPreference = 0.0f;
+    
+    // Step 4: Reset all neural regions with proper cleanup
     for (auto& region : pImpl->regions) {
-        region->reset();
+        if (region) {
+            region->reset();
+            // Clear neuron lookup table to prevent dangling references
+            region->clearNeuronLookup();
+        }
     }
     
-    pImpl->spikeSystem->reset();
-    pImpl->developmentalStage = DevelopmentalStage::Initial;
+    // Step 5: Clear neuron and synapse lookup tables (prevent memory leaks)
+    pImpl->sensoryNeurons.clear();
+    pImpl->motorNeurons.clear();
+    pImpl->neuronById.clear();
     
-    // Reset memory systems
-    if (pImpl->workingMemory) pImpl->workingMemory->clear();
-    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
-    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
-    if (pImpl->attention) pImpl->attention->reset();
+    // Step 6: Reset integrated memory systems with proper cleanup
+    if (pImpl->workingMemory) {
+        pImpl->workingMemory->clear();
+        pImpl->workingMemory->reset();
+    }
+    if (pImpl->episodicMemory) {
+        pImpl->episodicMemory->clear();
+        pImpl->episodicMemory->reset();
+    }
+    if (pImpl->associativeMemory) {
+        pImpl->associativeMemory->clear();
+        pImpl->associativeMemory->reset();
+    }
     
+    // Step 7: Reset cognitive systems
+    if (pImpl->planner) {
+        pImpl->planner->reset();
+    }
+    if (pImpl->conceptFormation) {
+        pImpl->conceptFormation->reset();
+    }
+    if (pImpl->attention) {
+        pImpl->attention->reset();
+    }
+    
+    // Step 8: Reset neuromodulation systems
+    if (pImpl->dopamine) {
+        pImpl->dopamine->reset();
+    }
+    if (pImpl->curiosity) {
+        pImpl->curiosity->reset();
+    }
+    if (pImpl->predictionError) {
+        pImpl->predictionError->reset();
+    }
+    if (pImpl->novelty) {
+        pImpl->novelty->reset();
+    }
+    
+    // Step 9: Reset plasticity systems
+    if (pImpl->stdp) {
+        pImpl->stdp->reset();
+    }
+    if (pImpl->hebbian) {
+        pImpl->hebbian->reset();
+    }
+    if (pImpl->structuralPlasticity) {
+        pImpl->structuralPlasticity->reset();
+    }
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->reset();
+    }
+    
+    // Step 10: Reset development system
+    if (pImpl->developmentSystem) {
+        pImpl->developmentSystem->reset();
+    }
+    
+    // Step 11: Reset prediction system
+    if (pImpl->predictionSystem) {
+        pImpl->predictionSystem->reset();
+    }
+    
+    // Step 12: Reset checkpoint manager
+    if (pImpl->checkpointManager) {
+        pImpl->checkpointManager->reset();
+    }
+    
+    // Step 13: Reset replay and consolidation state
+    pImpl->replayInterval = 100;
+    pImpl->consolidationInterval = 1000;
+    
+    // Step 14: Log completion with detailed summary
     NLM_LOG_INFO("NLM Brain reset complete");
+    NLM_LOG_INFO("  Reset statistics:");
+    NLM_LOG_INFO("    Total regions: " + std::to_string(pImpl->regions.size()));
+    NLM_LOG_INFO("    Total neurons: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("    Total synapses: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_INFO("    Memory systems cleared: working, episodic, associative");
+    NLM_LOG_INFO("    Cognitive systems reset: planner, concept formation, attention");
+    NLM_LOG_INFO("    Neuromodulation reset: dopamine, curiosity, prediction error, novelty");
+    NLM_LOG_INFO("    Plasticity systems reset: STDP, Hebbian, structural");
+    NLM_LOG_INFO("    Development system reset: synaptogenesis, pruning, maturation");
+    NLM_LOG_INFO("    Checkpoint manager reset: pending checkpoints cleared");
 }
 
 namespace {

@@ -80,13 +80,10 @@ public:
                                       float meanWeight,
                                       float weightVariance);
     
-    // Get all neurons across all populations
-    std::vector<Neuron*> getAllNeurons();
-    std::vector<const Neuron*> getAllNeurons() const;
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+// Clear neuron lookup table (used during brain reset)
+     void clearNeuronLookup();
+     
+     // Check if lookup table is empty
+     bool isNeuronLookupEmpty() const;
 
 } // namespace nlm

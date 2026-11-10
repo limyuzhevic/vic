@@ -319,4 +319,14 @@ std::vector<const Neuron*> NeuralRegion::getAllNeurons() const {
     return result;
 }
 
+// Clear neuron lookup table (used during brain reset)
+void NeuralRegion::clearNeuronLookup() {
+    pImpl->synapseById.clear();
+}
+
+// Check if lookup table is empty
+bool NeuralRegion::isNeuronLookupEmpty() const {
+    return pImpl->synapseById.empty();
+}
+
 } // namespace nlm
