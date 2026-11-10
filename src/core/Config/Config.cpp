@@ -3,8 +3,11 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
+
+using json = nlohmann::json;
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -18,42 +21,106 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+// Parse JSON configuration file
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+    try {
+        json configJson;
+        file >> configJson;
+        
+        // Convert JSON to config entries
+        if (configJson.contains("config_entries") && configJson["config_entries"].is_array()) {
+            const auto& entries = configJson["config_entries"];
+            for (const auto& entry : entries) {
+                if (entry.is_object() && entry.contains("key") && entry.contains("value")) {
+                    std::string key = entry["key"];
+                    ConfigValue value;
+                    
+                    // Parse value based on JSON type
+                    if (entry["value"].is_string()) {
+                        value = entry["value"].get<std::string>();
+                    } else if (entry["value"].is_number_integer()) {
+                        value = entry["value"].get<int64_t>();
+                    } else if (entry["value"].is_number_unsigned()) {
+                        value = entry["value"].get<uint64_t>();
+                    } else if (entry["value"].is_number()) {
+                        value = entry["value"].get<double>();
+                    } else if (entry["value"].is_boolean()) {
+                        value = entry["value"].get<bool>();
+                    } else if (entry["value"].is_array()) {
+                        const auto& arr = entry["value"];
+                        if (!arr.empty() && arr[0].is_number_integer()) {
+                            std::vector<int> intVec;
+                            intVec.reserve(arr.size());
+                            for (const auto& item : arr) {
+                                intVec.push_back(item.get<int>());
+                            }
+                            value = intVec;
+                        } else if (!arr.empty() && arr[0].is_number()) {
+                            std::vector<double> doubleVec;
+                            doubleVec.reserve(arr.size());
+                            for (const auto& item : arr) {
+                                doubleVec.push_back(item.get<double>());
+                            }
+                            value = doubleVec;
+                        } else if (!arr.empty() && arr[0].is_string()) {
+                            std::vector<std::string> stringVec;
+                            stringVec.reserve(arr.size());
+                            for (const auto& item : arr) {
+                                stringVec.push_back(item.get<std::string>());
+                            }
+                            value = stringVec;
+                        }
+                    }
+                    
+                    ConfigSource source = ConfigSource::File;
+                    if (entry.contains("source")) {
+                        std::string sourceStr = entry["source"];
+                        if (sourceStr == "Default") source = ConfigSource::Default;
+                        else if (sourceStr == "CommandLine") source = ConfigSource::CommandLine;
+                        else if (sourceStr == "Runtime") source = ConfigSource::Runtime;
+                    }
+                    
+                    std::string description = entry.contains("description") ? entry["description"] : "";
+                    pImpl->entries.emplace_back(key, value, source, description);
+                }
+            }
+        } else {
+            // For backward compatibility, try to parse old-style key=value format
+            std::string line;
+            while (std::getline(file, line)) {
+                // Skip empty lines and comments
+                line = trim(line);
+                if (line.empty() || line[0] == '#' || line[0] == '/') {
+                    continue;
+                }
+                
+                // Parse simple key=value pairs
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    std::string key = trim(line.substr(0, pos));
+                    std::string value = trim(line.substr(pos + 1));
+                    
+                    // Remove quotes if present
+                    if (value.size() >= 2 && 
+                        ((value.front() == '"' && value.back() == '"') ||
+                         (value.front() == '\'' && value.back() == '\''))) {
+                        value = value.substr(1, value.size() - 2);
+                    }
+                    
+                    set(key, value, ConfigSource::File);
+                }
+            }
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        return true;
+    } catch (const json::exception& e) {
+        // Log error and fall back to old format
+        return false;
     }
-    
-    return true;
-}
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
@@ -84,10 +151,51 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+    // Create JSON structure
+    json configJson;
+    
+    // Convert config entries to JSON
+    json entriesJson = json::array();
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        json entryJson;
+        entryJson["key"] = entry.key;
+        
+        // Convert ConfigValue to JSON
+        std::visit([&entryJson](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                entryJson["value"] = arg;
+            } else if constexpr (std::is_same_v<T, int>) {
+                entryJson["value"] = arg;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                entryJson["value"] = arg;
+            } else if constexpr (std::is_same_v<T, uint64_t>) {
+                entryJson["value"] = arg;
+            } else if constexpr (std::is_same_v<T, double>) {
+                entryJson["value"] = arg;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                entryJson["value"] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                entryJson["value"] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                entryJson["value"] = arg;
+            } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                entryJson["value"] = arg;
+            }
+        }, entry.value);
+        
+        entryJson["source"] = (entry.source == ConfigSource::Default) ? "Default" :
+                             (entry.source == ConfigSource::File) ? "File" :
+                             (entry.source == ConfigSource::CommandLine) ? "CommandLine" : "Runtime";
+        entryJson["description"] = entry.description;
+        
+        entriesJson.push_back(entryJson);
     }
+    
+    configJson["config_entries"] = entriesJson;
+    
+    // Write JSON to file
+    file << configJson.dump(2);
     
     return true;
 }

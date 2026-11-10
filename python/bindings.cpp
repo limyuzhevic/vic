@@ -6,15 +6,19 @@
 #include <string>
 #include <vector>
 
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/brain/NeuralRegion.hpp"
+#include "../src/brain/NeuralPopulation.hpp"
+#include "../src/brain/Synapse.hpp"
+#include "../src/memory/NeuralWorkingMemory.hpp"
+#include "../src/memory/NeuralEpisodicMemory.hpp"
+#include "../src/memory/Memory.hpp"
+#include "../src/development/DevelopmentSystem.hpp"
+#include "../src/plasticity/StructuralPlasticity.hpp"
+#include "../src/neuromodulation/Neuromodulator.hpp"
+#include "../src/neuromodulation/Dopamine.hpp"
+#include "../src/neuromodulation/Curiosity.hpp"
+#include "../src/neuromodulation/Novelty.hpp"
+#include "../src/neuromodulation/PredictionError.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -105,42 +109,127 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Inhibited", FiringState::Inhibited)
         .export_values();
 
-    py::enum_<ActionType>(m, "ActionType", R"pbdoc(Action type enumeration)pbdoc")
-        .value("MoveForward", ActionType::MoveForward)
-        .value("MoveBackward", ActionType::MoveBackward)
-        .value("MoveLeft", ActionType::MoveLeft)
-        .value("MoveRight", ActionType::MoveRight)
-        .value("TurnLeft", ActionType::TurnLeft)
-        .value("TurnRight", ActionType::TurnRight)
-        .value("Look", ActionType::Look)
-        .value("LookUp", ActionType::LookUp)
-        .value("LookDown", ActionType::LookDown)
-        .value("Interact", ActionType::Interact)
-        .value("Eat", ActionType::Eat)
-        .value("Drink", ActionType::Drink)
-        .value("Rest", ActionType::Rest)
-        .value("Wait", ActionType::Wait)
-        .value("Custom", ActionType::Custom)
-        .export_values();
+    // ---------- NEURAL REGION ----------
+    
+    py::class_<NeuralRegion>(m, "NeuralRegion", R"pbdoc(A container for neural populations and synapses)pbdoc")
+        .def(py::init<>())
+        .def("getId", &NeuralRegion::getId)
+        .def("getName", &NeuralRegion::getName)
+        .def("setName", &NeuralRegion::setName)
+        .def("getPopulationCount", &NeuralRegion::getPopulationCount)
+        .def("getSynapseCount", &NeuralRegion::getSynapseCount)
+        .def("getTotalNeuronCount", &NeuralRegion::getTotalNeuronCount)
+        .def("getActiveNeuronCount", &NeuralRegion::getActiveNeuronCount)
+        .def("getFiringNeuronCount", &NeuralRegion::getFiringNeuronCount)
+        .def("getAverageFiringRate", &NeuralRegion::getAverageFiringRate)
+        .def("getAverageSynapticWeight", &NeuralRegion::getAverageSynapticWeight)
+        .def("getSynapticDensity", &NeuralRegion::getSynapticDensity)
+        .def("getPopulations", &NeuralRegion::getPopulations)
+        .def("getAllPopulations", &NeuralRegion::getAllPopulations)
+        .def("getSynapses", &NeuralRegion::getSynapses)
+        .def("getSynapsesFrom", &NeuralRegion::getSynapsesFrom)
+        .def("getSynapsesTo", &NeuralRegion::getSynapsesTo)
+        .def("addPopulation", &NeuralRegion::addPopulation, py::arg("size"), py::arg("type"))
+        .def("addSynapse", &NeuralRegion::addSynapse, 
+             py::arg("source"), py::arg("destination"), py::arg("weight") = 0.0f, py::arg("delay") = 1)
+        .def("getSynapse", &NeuralRegion::getSynapse)
+        .def("initializeRandomConnectivity", &NeuralRegion::initializeRandomConnectivity,
+             py::arg("rng"), py::arg("connectionProbability"), py::arg("meanWeight") = 0.0f, py::arg("weightVariance") = 0.1f);
 
-    py::enum_<MotorCommand>(m, "MotorCommand", R"pbdoc(Low-level motor command enumeration)pbdoc")
-        .value("MoveForward", MotorCommand::MoveForward)
-        .value("MoveBackward", MotorCommand::MoveBackward)
-        .value("TurnLeft", MotorCommand::TurnLeft)
-        .value("TurnRight", MotorCommand::TurnRight)
-        .value("LookLeft", MotorCommand::LookLeft)
-        .value("LookRight", MotorCommand::LookRight)
-        .value("Interact", MotorCommand::Interact)
-        .value("Wait", MotorCommand::Wait)
-        .export_values();
+    // ---------- NEURAL POPULATION ----------
+    
+    py::class_<NeuralPopulation>(m, "NeuralPopulation", R"pbdoc(A group of neurons with the same type)pbdoc")
+        .def(py::init<>())
+        .def("getId", &NeuralPopulation::getId)
+        .def("getSize", &NeuralPopulation::getSize)
+        .def("isEmpty", &NeuralPopulation::isEmpty)
+        .def("getNeuronType", &NeuralPopulation::getNeuronType)
+        .def("setNeuronType", &NeuralPopulation::setNeuronType)
+        .def("getActiveCount", &NeuralPopulation::getActiveCount)
+        .def("getFiringCount", &NeuralPopulation::getFiringCount)
+        .def("getAverageFiringRate", &NeuralPopulation::getAverageFiringRate)
+        .def("getActivityLevel", &NeuralPopulation::getActivityLevel)
+        .def("getNeuron", &NeuralPopulation::getNeuron)
+        .def("getNeurons", &NeuralPopulation::getNeurons)
+        .def("getNeuronIds", &NeuralPopulation::getNeuronIds)
+        .def("initializeRandom", &NeuralPopulation::initializeRandom, py::arg("rng"))
+        .def("getMeanMembranePotential", &NeuralPopulation::getMeanMembranePotential)
+        .def("getVarianceMembranePotential", &NeuralPopulation::getVarianceMembranePotential);
 
-    py::enum_<WorldObjectType>(m, "WorldObjectType", R"pbdoc(World object type enumeration)pbdoc")
-        .value("Empty", WorldObjectType::Empty)
-        .value("Resource", WorldObjectType::Resource)
-        .value("Hazard", WorldObjectType::Hazard)
-        .value("Wall", WorldObjectType::Wall)
-        .value("Marker", WorldObjectType::Marker)
-        .export_values();
+    // ---------- SYNAPSE ----------
+    
+    py::class_<Synapse>(m, "Synapse", R"pbdoc(Connection between two neurons)pbdoc")
+        .def(py::init<>())
+        .def("getId", &Synapse::getId)
+        .def("getSourceNeuron", &Synapse::getSourceNeuron)
+        .def("getDestinationNeuron", &Synapse::getDestinationNeuron)
+        .def("getWeight", &Synapse::getWeight)
+        .def("setWeight", &Synapse::setWeight)
+        .def("addToWeight", &Synapse::addToWeight)
+        .def("getDelay", &Synapse::getDelay)
+        .def("setDelay", &Synapse::setDelay)
+        .def("getType", &Synapse::getType)
+        .def("setType", &Synapse::setType)
+        .def("isExcitatory", &Synapse::isExcitatory)
+        .def("isInhibitory", &Synapse::isInhibitory)
+        .def("recordPreSpike", &Synapse::recordPreSpike)
+        .def("recordPostSpike", &Synapse::recordPostSpike)
+        .def("getPreSpikeHistory", &Synapse::getPreSpikeHistory)
+        .def("getPostSpikeHistory", &Synapse::getPostSpikeHistory)
+        .def("clearHistory", &Synapse::clearHistory)
+        .def("getEligibilityTrace", &Synapse::getEligibilityTrace)
+        .def("setEligibilityTrace", &Synapse::setEligibilityTrace)
+        .def("getEfficacy", &Synapse::getEfficacy)
+        .def("setEfficacy", &Synapse::setEfficacy)
+        .def("step", &Synapse::step)
+        .def("reset", &Synapse::reset);
+
+    // ---------- MEMORY SYSTEMS ----------
+    
+    // Working Memory (inherited from base Memory class)
+    py::class_<NeuralWorkingMemory, std::shared_ptr<NeuralWorkingMemory>>(m, "WorkingMemory", R"pbdoc(Working memory for transient active information)pbdoc")
+        .def("store", &NeuralWorkingMemory::store)
+        .def("recall", &NeuralWorkingMemory::recall)
+        .def("clear", &NeuralWorkingMemory::clear)
+        .def("getActiveTraces", &NeuralWorkingMemory::getActiveTraces)
+        .def("getTrace", &NeuralWorkingMemory::getTrace)
+        .def("getAllTraces", &NeuralWorkingMemory::getAllTraces)
+        .def("getCapacity", &NeuralWorkingMemory::getCapacity);
+
+    // Episodic Memory (inherited from base Memory class)
+    py::class_<NeuralEpisodicMemory, std::shared_ptr<NeuralEpisodicMemory>>(m, "EpisodicMemory", R"pbdoc(Episodic memory for experience storage)pbdoc")
+        .def("store", &NeuralEpisodicMemory::store)
+        .def("recall", &NeuralEpisodicMemory::recall)
+        .def("getEpisodeCount", &NeuralEpisodicMemory::getEpisodeCount)
+        .def("getEpisode", &NeuralEpisodicMemory::getEpisode)
+        .def("getRecentEpisodes", &NeuralEpisodicMemory::getRecentEpisodes)
+        .def("clear", &NeuralEpisodicMemory::clear)
+        .def("consolidate", &NeuralEpisodicMemory::consolidate)
+        .def("getTotalMemories", &NeuralEpisodicMemory::getTotalMemories);
+
+    // NeuralAssociativeMemory (for pattern associations)
+    py::class_<NeuralAssociativeMemory, std::shared_ptr<NeuralAssociativeMemory>>(m, "AssociativeMemory", R"pbdoc(Associative memory for pattern associations)pbdoc")
+        .def("storePattern", &NeuralAssociativeMemory::storePattern)
+        .def("recallPattern", &NeuralAssociativeMemory::recallPattern)
+        .def("getPattern", &NeuralAssociativeMemory::getPattern)
+        .def("removePattern", &NeuralAssociativeMemory::removePattern)
+        .def("clear", &NeuralAssociativeMemory::clear)
+        .def("getPatternCount", &NeuralAssociativeMemory::getPatternCount)
+        .def("getPatternNames", &NeuralAssociativeMemory::getPatternNames);
+
+    // ---------- DEVELOPMENT SYSTEM ----------
+    
+    // DevelopmentSystem (coordination of developmental processes)
+    py::class_<DevelopmentSystem, std::shared_ptr<DevelopmentSystem>>(m, "DevelopmentSystem", R"pbdoc(Coordination of developmental processes)pbdoc")
+        .def("getDevelopmentalStage", &DevelopmentSystem::getDevelopmentalStage)
+        .def("setDevelopmentalStage", &DevelopmentSystem::setDevelopmentalStage)
+        .def("update", &DevelopmentSystem::update)
+        .def("getSynaptogenesis", &DevelopmentSystem::getSynaptogenesis)
+        .def("getPruning", &DevelopmentSystem::getPruning)
+        .def("getMaturation", &DevelopmentSystem::getMaturation)
+        .def("enableSynaptogenesis", &DevelopmentSystem::enableSynaptogenesis)
+        .def("enablePruning", &DevelopmentSystem::enablePruning)
+        .def("enableMaturation", &DevelopmentSystem::enableMaturation);
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
