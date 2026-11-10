@@ -219,7 +219,6 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     }
     
     // Apply repeated input pattern to stimulate learning
-    NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
     // A pattern, not a seizure: stimulate only the first 20 sensory neurons
@@ -239,15 +238,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         for (NeuronId id : patternNeurons) {
             brain->injectCurrent(id, 30.0f);
         }
-        
         brain->step(step, step * 0.001);
-        
-        // Log progress every 100 steps
-        if (step % 100 == 0) {
-            NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
-        }
     }
     
     // Record final state

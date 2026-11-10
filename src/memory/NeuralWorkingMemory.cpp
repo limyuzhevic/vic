@@ -17,12 +17,22 @@ struct NeuralWorkingMemory::Impl {
     Impl() : brain(nullptr) {}
 };
 
-NeuralWorkingMemory::NeuralWorkingMemory()
-    : pImpl(new Impl)
-    , brain_(nullptr)
-    , capacity_(100)
-    , decayRate_(0.01f)
-{
+// Initialize working memory data structures
+    // Initialize all vectors to avoid undefined behavior
+    brain_ = nullptr;
+    capacity_ = 100;
+    decayRate_ = 0.01f;
+    
+    // Clear all vectors to ensure consistent initial state
+    memoryNeurons_.clear();
+    memoryActivations_.clear();
+    memoryTimestamps_.clear();
+    activeTraces_.clear();
+    winners_.clear();
+    recurrentConnections_.clear();
+    
+    // Initialize the implementation details
+    pImpl = std::make_unique<Impl>();
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -72,18 +82,22 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        memoryActivations_[idx] = activation;
-        memoryTimestamps_[idx] = 0;
-    } else if (memoryNeurons_.size() < capacity_) {
+    bool isNewNeuron = (it == memoryNeurons_.end());
+    
+    if (isNewNeuron && memoryNeurons_.size() < capacity_) {
+        // Add new neuron to memory
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        // Update iterator to point to the newly added neuron
         it = memoryNeurons_.end() - 1;
+    } else if (it != memoryNeurons_.end()) {
+        // Update existing neuron activation
+        size_t idx = std::distance(memoryNeurons_.begin(), it);
+        memoryActivations_[idx] = activation;
+        memoryTimestamps_[idx] = 0;
     }
-
+    
     // Phase 6: activeTraces_ is the trace list getActiveTraces()
     // reports, and it was never populated — only cleared — so it
     // always read 0 even when memory held 50 neurons. A stored

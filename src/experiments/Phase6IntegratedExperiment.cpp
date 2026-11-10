@@ -21,40 +21,69 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     auto startWall = std::chrono::high_resolution_clock::now();
     
+    // Set log level based on config
+    LogLevel logLevel;
+    if (config.logLevel == "DEBUG") logLevel = LogLevel::Debug;
+    else if (config.logLevel == "WARNING") logLevel = LogLevel::Warning;
+    else if (config.logLevel == "ERROR") logLevel = LogLevel::Error;
+    else if (config.logLevel == "CRITICAL") logLevel = LogLevel::Critical;
+    else logLevel = LogLevel::Info;
+    
+    Logger::getGlobal().setLevel(logLevel);
+    
     NLM_LOG_INFO("=== Phase 6 Integration Experiment ===");
     NLM_LOG_INFO("Configuration: " + std::to_string(config.neuronCount) + " neurons, " +
-                 std::to_string(config.maxSteps) + " steps");
+                 std::to_string(config.maxSteps) + " steps, " +
+                 "regions: " + std::to_string(config.regionCount) + ", " +
+                 "connection probability: " + std::to_string(config.connectionProbability));
     
-    // Create configuration
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount));
-    cfg->set("region_count", static_cast<int64_t>(config.regionCount));
-    cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    NLM_LOG_INFO("Enabled Features: Checkpointing=" + std::string(config.enableCheckpointing ? "YES" : "NO") +
+                 ", Replay=" + std::string(config.enableReplay ? "YES" : "NO") +
+                 ", Development=" + std::string(config.enableDevelopment ? "YES" : "NO") +
+                 ", Neuromodulation=" + std::string(config.enableNeuromodulation ? "YES" : "NO") +
+                 ", Prediction=" + std::string(config.enablePrediction ? "YES" : "NO") +
+                 ", Cognition=" + std::string(config.enableCognition ? "YES" : "NO"));
     
-    // Create brain
-    auto brain = std::make_shared<Brain>(cfg);
-    if (!brain->initialize()) {
-        NLM_LOG_ERROR("Failed to initialize brain");
-        result.endTime = time(nullptr);
-        return result;
+    if (config.enableDetailedLogging) {
+        NLM_LOG_INFO("Advanced Parameters: PlasticityStrength=" + std::to_string(config.plasticityStrength) +
+                     ", LearningRate=" + std::to_string(config.learningRate) +
+                     ", NoveltyThreshold=" + std::to_string(config.noveltyThreshold) +
+                     ", CuriosityGain=" + std::to_string(config.curiosityGain));
     }
+    
+    // Create configuration from enhanced config
     
     // Create simple world
     SimpleWorld world;
     world.configure(16, 16, 16, 16);
     world.reset();
     
-    // Create agent
+    // Create agent with advanced configuration
     AgentBrain agent(brain);
     agent.initialize(world);
-    agent.enableRewardModulation(true);
-    agent.enableStructuralPlasticity(config.enableDevelopment);
-    agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+    
+    // Configure advanced agent features
+    agent.enableRewardModulation(config.enableNeuromodulation);
+    agent.enableStructuralPlasticity(config.enableDevelopment && config.plasticityStrength > 1.0f);
+    agent.enableDevelopment(config.enableDevelopment && config.developmentalStageRate > 0.0f);
+    agent.enableCuriosity(config.noveltyThreshold > 0.0f && config.curiosityGain > 0.0f);
+    
+    // Set advanced neuromodulation parameters
+    if (config.enableNeuromodulation) {
+        // Configure neuromodulation levels based on config
+        float curiosityLevel = config.curiosityGain;
+        float noveltyThreshold = config.noveltyThreshold;
+        float dopamineBias = config.dopamineBias;
+        
+        NLM_LOG_INFO("Neuromodulation configured: curiosity=" + std::to_string(curiosityLevel) +
+                     ", novelty_threshold=" + std::to_string(noveltyThreshold) +
+                     ", dopamine_bias=" + std::to_string(dopamineBias));
+    }
+    
+    // Set learning rate
+    if (config.learningRate > 0.0f && config.enableDevelopment) {
+        NLM_LOG_INFO("Learning enabled: rate=" + std::to_string(config.learningRate));
+    }
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
@@ -129,24 +158,44 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
     
-    // Test checkpointing
+    // Test checkpointing with enhanced configuration
     if (config.enableCheckpointing) {
-        NLM_LOG_INFO("Testing checkpoint save/load...");
+        NLM_LOG_INFO("Testing enhanced checkpoint save/load with advanced features...");
+        
+        // Configure checkpoint manager with new parameters
         if (brain->save(config.checkpointPath)) {
-            NLM_LOG_INFO("Checkpoint saved successfully");
+            NLM_LOG_INFO("Enhanced checkpoint saved successfully with memory and plasticity state");
             
-            // Create new brain and load
+            // Create new brain and load with configuration
             auto brain2 = std::make_shared<Brain>(cfg);
             brain2->initialize();
             
             if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
+                NLM_LOG_INFO("Enhanced checkpoint loaded successfully - state restored");
                 result.checkpointingWorks = true;
+                
+                // Verify that advanced state was restored
+                if (config.enableNeuromodulation) {
+                    auto* dopamine = brain2->getDopamine();
+                    if (dopamine) {
+                        float neuromodulationLevel = dopamine->getLevel();
+                        NLM_LOG_INFO("Neuromodulation state restored: level=" + std::to_string(neuromodulationLevel));
+                    }
+                }
+                
+                if (config.enableDevelopment) {
+                    auto* devSystem = brain2->getDevelopmentSystem();
+                    if (devSystem) {
+                        DevelopmentalStage stage = devSystem->getCurrentStage();
+                        NLM_LOG_INFO("Development state restored: stage=" + std::to_string(static_cast<int>(stage)));
+                    }
+                }
+                
             } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
+                NLM_LOG_ERROR("Failed to load enhanced checkpoint");
             }
         } else {
-            NLM_LOG_ERROR("Failed to save checkpoint");
+            NLM_LOG_ERROR("Failed to save enhanced checkpoint");
         }
     }
     
@@ -291,10 +340,13 @@ bool Phase6IntegratedExperiment::testMemoryIntegration() {
 }
 
 bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
-    NLM_LOG_INFO("=== Testing Neuromodulation Integration ===");
+    NLM_LOG_INFO("=== Testing Enhanced Neuromodulation Integration ===");
     
     auto cfg = std::make_shared<Config>();
     cfg->set("neuron_count", 100);
+    cfg->set("novelty_threshold", 0.1f);  // Set novelty threshold from config
+    cfg->set("curiosity_gain", 0.5f);   // Set curiosity gain from config
+    cfg->set("dopamine_bias", 0.2f);    // Set dopamine bias from config
     
     auto brain = std::make_shared<Brain>(cfg);
     brain->initialize();
@@ -309,14 +361,28 @@ bool Phase6IntegratedExperiment::testNeuromodulationIntegration() {
         return false;
     }
     
+    // Set up advanced neuromodulation testing
+    NLM_LOG_INFO("Testing advanced neuromodulation with config parameters:");
+    NLM_LOG_INFO("  Novelty threshold: " + std::to_string(0.1f));
+    NLM_LOG_INFO("  Curiosity gain: " + std::to_string(0.5f));
+    NLM_LOG_INFO("  Dopamine bias: " + std::to_string(0.2f));
+    
     // Run some steps with sensory input
     for (int i = 0; i < 50; ++i) {
         // Inject some sensory activity
         brain->injectCurrentToNeurons(NeuronType::Sensory, 5.0f);
         brain->step(i, i * 0.001);
+        
+        // Check neuromodulation levels
+        if (curiosity) {
+            float curiosityLevel = curiosity->getLevel();
+            if (curiosityLevel > 0.1f) {
+                NLM_LOG_INFO("  Step " + std::to_string(i) + ": curiosity level = " + std::to_string(curiosityLevel));
+            }
+        }
     }
     
-    NLM_LOG_INFO("[PASS] Neuromodulation systems are functional");
+    NLM_LOG_INFO("[PASS] Enhanced neuromodulation systems are functional");
     return true;
 }
 

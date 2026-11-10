@@ -76,14 +76,69 @@ struct Phase6IntegrationResult {
  * Configuration for Phase 6 integration experiment
  */
 struct Phase6Config {
+    // Core simulation parameters
     uint64_t maxSteps;
     size_t neuronCount;
     size_t regionCount;
     float connectionProbability;
+    
+    // System features
     bool enableCheckpointing;
     bool enableReplay;
     bool enableDevelopment;
+    bool enableNeuromodulation;
+    bool enablePrediction;
+    bool enableCognition;
+    
+    // Advanced features
+    float plasticityStrength;
+    float neuromodulationLevel;
+    float learningRate;
+    float noveltyThreshold;
+    float curiosityGain;
+    float dopamineBias;
+    
+    // Memory system parameters
+    size_t workingMemoryCapacity;
+    size_t episodicMemoryMaxEpisodes;
+    size_t associativeMemorySize;
+    float memoryDecayRate;
+    
+    // Replay and consolidation
+    size_t replayInterval;
+    size_t consolidationInterval;
+    float consolidationThreshold;
+    
+    // Environment and behavior
+    std::string worldType;
+    std::string agentType;
+    std::string rewardScheme;
+    
+    // Checkpoint and persistence
     std::string checkpointPath;
+    bool compressCheckpoints;
+    size_t maxCheckpoints;
+    
+    // Development and maturation
+    float developmentalStageRate;
+    float plasticityMaturationRate;
+    float neuronMaturationRate;
+    
+    // Monitoring and logging
+    bool enableDetailedLogging;
+    std::string logLevel;
+    std::string logFile;
+    bool enableMetrics;
+    
+    // Performance optimization
+    bool enableMultithreading;
+    bool enableSIMD;
+    size_t parallelThreads;
+    
+    // Experimental parameters
+    float inputNoiseLevel;
+    float outputNoiseLevel;
+    std::string initializationStrategy;
     
     Phase6Config()
         : maxSteps(10000)
@@ -93,7 +148,41 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , enableNeuromodulation(true)
+        , enablePrediction(true)
+        , enableCognition(true)
+        , plasticityStrength(1.0f)
+        , neuromodulationLevel(1.0f)
+        , learningRate(0.01f)
+        , noveltyThreshold(0.1f)
+        , curiosityGain(0.5f)
+        , dopamineBias(0.0f)
+        , workingMemoryCapacity(500)
+        , episodicMemoryMaxEpisodes(1000)
+        , associativeMemorySize(100)
+        , memoryDecayRate(0.01f)
+        , replayInterval(100)
+        , consolidationInterval(1000)
+        , consolidationThreshold(0.3f)
+        , worldType("SimpleWorld")
+        , agentType("StandardAgent")
+        , rewardScheme("Standard")
+        , checkpointPath("./checkpoint_test.bin")
+        , compressCheckpoints(true)
+        , maxCheckpoints(100)
+        , developmentalStageRate(1.0f)
+        , plasticityMaturationRate(0.5f)
+        , neuronMaturationRate(0.3f)
+        , enableDetailedLogging(true)
+        , logLevel("INFO")
+        , logFile("")
+        , enableMetrics(true)
+        , enableMultithreading(false)
+        , enableSIMD(true)
+        , parallelThreads(4)
+        , inputNoiseLevel(0.0f)
+        , outputNoiseLevel(0.0f)
+        , initializationStrategy("Random") {}
 };
 
 /**

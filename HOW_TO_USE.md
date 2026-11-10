@@ -193,76 +193,191 @@ world.setAgentStart(10.0, 10.0)
 world.update(timestep=0.1)
 ```
 
-### Complete Agent Example
+### Advanced Configuration Options
+
+NLM's Phase 6 integration experiment now supports a comprehensive set of configuration options for advanced users. Below is an example of using the enhanced Phase 6 configuration:
 
 ```python
 import pynlm
 
-def run_agent_simulation(num_steps=1000):
-    """Run a complete agent simulation with brain and world."""
-    
-    # 1. Create configuration
-    config = pynlm.createDefaultConfig()
-    
-    # 2. Create brain and initialize
-    brain = pynlm.createBrain(config)
-    brain.initialize()
-    
-    # 3. Create agent brain interface
-    agent = pynlm.createAgentBrain(brain)
-    
-    # 4. Create and configure world
-    world = pynlm.createSimpleWorld()
-    world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-    world.reset()
-    world.setAgentStart(10.0, 10.0)
-    
-    # 5. Initialize agent with world
-    agent.initialize(world)
-    
-    # 6. Enable subsystems
-    agent.enableRewardModulation(True)
-    agent.enableStructuralPlasticity(True)
-    agent.enableDevelopment(True)
-    agent.enableCuriosity(True)
-    
-    # 7. Run simulation loop
-    for step in range(num_steps):
-        # Update world
-        world.update(timestep=0.1)
-        
-        # Get sensory input from world
-        percept = world.getSensoryPercept()
-        
-        # Process sensory input in brain
-        agent.processSensoryInput(percept)
-        
-        # Run brain step
-        brain.step(step)
-        
-        # Decode motor command from brain activity
-        motor_cmd = agent.decodeMotorCommand()
-        
-        # Apply motor command to world
-        world.applyMotorCommand(motor_cmd, world.getSimulationTime())
-        
-        # Apply reward modulation
-        reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
-        agent.applyRewardModulation(reward, 0.0)
-        
-        # Update development
-        agent.updateDevelopment(0.1)
-        
-        # Print progress
-        if step % 100 == 0:
-            print(f"Step {step}:")
-            print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
-            print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
-            print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
-            print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+# Create enhanced Phase 6 configuration
+config = pynlm.createPhase6Config()
 
-# Run the simulation
-run_agent_simulation(1000)
+# Configure advanced parameters
+config.maxSteps = 20000
+config.neuronCount = 2000
+config.regionCount = 2
+config.connectionProbability = 0.15f
+
+# Enable all advanced features
+config.enableNeuromodulation = True
+config.enablePrediction = True
+config.enableCognition = True
+config.enableCheckpointing = True
+config.enableReplay = True
+config.enableDevelopment = True
+
+# Set advanced plasticity parameters
+config.plasticityStrength = 1.5f
+config.learningRate = 0.005f
+config.noveltyThreshold = 0.05f
+config.curiosityGain = 0.8f
+config.dopamineBias = 0.1f
+
+# Configure memory systems
+config.workingMemoryCapacity = 1000
+config.episodicMemoryMaxEpisodes = 5000
+config.memoryDecayRate = 0.005f
+
+# Configure replay and consolidation
+config.replayInterval = 200
+config.consolidationInterval = 5000
+config.consolidationThreshold = 0.5f
+
+# Set development parameters
+config.developmentalStageRate = 2.0f
+config.plasticityMaturationRate = 0.8f
+config.neuronMaturationRate = 0.6f
+
+# Configure logging and monitoring
+config.enableDetailedLogging = True
+config.logLevel = "INFO"
+config.logFile = "nlm_experiment.log"
+
+# Create brain with enhanced configuration
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create and configure agent with advanced features
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Configure all advanced agent subsystems
+agent.enableRewardModulation(config.enableNeuromodulation)
+agent.enableStructuralPlasticity(config.enableDevelopment && config.plasticityStrength > 1.0f)
+agent.enableDevelopment(config.enableDevelopment && config.developmentalStageRate > 0.0f)
+agent.enableCuriosity(config.noveltyThreshold > 0.0f && config.curiosityGain > 0.0f)
+
+# Run enhanced simulation with detailed monitoring
+for step in range(config.maxSteps):
+    world.update(0.001)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    
+    # Log advanced metrics
+    if step % 500 == 0:
+        print(f"Advanced metrics at step {step}:")
+        print(f"  Memory traces: {brain.getWorkingMemory().getActiveTraces() if brain.getWorkingMemory() else 0}")
+        print(f"  Episodic memory: {brain.getEpisodicMemory().getEpisodeCount() if brain.getEpisodicMemory() else 0}")
+        print(f"  Neuromodulation: curiosity={agent.getCuriosityLevel():.3f}, novelty={agent.getNoveltyLevel():.3f}")
+        print(f"  Development: stage={brain.getDevelopmentalStage()}")
+        
+        # Save checkpoint periodically
+        if step % 2000 == 0 and config.enableCheckpointing:
+            checkpoint_path = f"checkpoint_{step//1000}.bin"
+            if brain.save(checkpoint_path):
+                print(f"  Checkpoint saved: {checkpoint_path}")
+```
+
+### Example: Complex Experiment with Advanced Features
+
+```python
+import pynlm
+from datetime import datetime
+
+def run_advanced_experiment(config_path=None):
+    """Run a complete advanced experiment with all features."""
+    
+    # Load configuration or create enhanced config
+    if config_path:
+        config = pynlm.createPhase6Config()
+        # Load from file would require additional implementation
+        print(f"Loading config from: {config_path}")
+    else:
+        config = create_advanced_experiment_config()
+    
+    # Create experiment runner
+    experiment = pynlm.createPhase6Experiment()
+    
+    # Run the experiment with progress monitoring
+    print("Starting Phase 6 Integration Experiment with Advanced Features")
+    print("=" * 60)
+    
+    start_time = datetime.now()
+    result = experiment.run(config)
+    end_time = datetime.now()
+    
+    # Generate comprehensive report
+    print("\n=== EXPERIMENT RESULTS ===")
+    print(f"Duration: {(end_time - start_time).total_seconds():.1f} seconds")
+    print(f"Total reward: {result.totalReward:.3f}")
+    print(f"Average firing rate: {result.avgFiringRate:.3f}")
+    print(f"Memory episodes stored: {result.memoryEpisodesStored:.0f}")
+    
+    print("\n=== SYSTEM INTEGRATION STATUS ===")
+    print(f"Working Memory: {'✓' if result.memoryWorkingMemoryIntegrated else '✗'}")
+    print(f"Episodic Memory: {'✓' if result.memoryEpisodicMemoryIntegrated else '✗'}")
+    print(f"Neuromodulation: {'✓' if result.neuromodulationIntegrated else '✗'}")
+    print(f"Prediction: {'✓' if result.predictionIntegrated else '✗'}")
+    print(f"Development: {'✓' if result.developmentIntegrated else '✗'}")
+    print(f"Checkpointing: {'✓' if result.checkpointingWorks else '✗'}")
+    print(f"Replay: {'✓' if result.replayWorks else '✗'}")
+    
+    return result
+
+def create_advanced_experiment_config():
+    """Create a comprehensive advanced experiment configuration."""
+    
+    config = pynlm.createPhase6Config()
+    
+    # High-performance configuration
+    config.neuronCount = 5000
+    config.maxSteps = 50000
+    config.regionCount = 4
+    config.connectionProbability = 0.2f
+    
+    # Enable all advanced subsystems
+    config.enableNeuromodulation = True
+    config.enablePrediction = True
+    config.enableCognition = True
+    config.enableDevelopment = True
+    config.enableCheckpointing = True
+    config.enableReplay = True
+    
+    # Advanced plasticity settings
+    config.plasticityStrength = 2.0f
+    config.learningRate = 0.01f
+    config.noveltyThreshold = 0.02f
+    config.curiosityGain = 1.0f
+    config.dopamineBias = 0.3f
+    
+    # Enhanced memory systems
+    config.workingMemoryCapacity = 3000
+    config.episodicMemoryMaxEpisodes = 20000
+    config.associativeMemorySize = 2000
+    config.memoryDecayRate = 0.01f
+    
+    # Advanced replay and consolidation
+    config.replayInterval = 500
+    config.consolidationInterval = 10000
+    config.consolidationThreshold = 0.7f
+    
+    # Development and maturation
+    config.developmentalStageRate = 3.0f
+    config.plasticityMaturationRate = 1.2f
+    config.neuronMaturationRate = 0.8f
+    
+    # Advanced logging and monitoring
+    config.enableDetailedLogging = True
+    config.logLevel = "DEBUG"
+    config.logFile = "advanced_experiment.log"
+    
+    # Performance optimization
+    config.enableMultithreading = True
+    config.enableSIMD = True
+    config.parallelThreads = 8
+    
+    return config
 ```
 
 ### Key Classes and Methods
