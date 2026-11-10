@@ -95,9 +95,9 @@ std::unique_ptr<SensoryInput> Audio::clone() const {
     return audio;
 }
 
-void Audio::setData(const std::vector<float>& data) {
-    if (data.size() == pImpl->data.size()) {
-        pImpl->data = data;
+void Audio::setData(float* data, size_t size) {
+    if (size == pImpl->data.size()) {
+        std::copy(data, data + size, pImpl->data.begin());
     }
 }
 

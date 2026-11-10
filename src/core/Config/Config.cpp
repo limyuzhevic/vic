@@ -62,10 +62,17 @@ bool Config::loadFromArgs(int argc, char** argv) {
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
-            if (pos != std::string::npos) {
+            if (pos != std::string::npos && pos > 2) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
                 set(key, value, ConfigSource::CommandLine);
+            } else if (pos != std::string::npos && pos == 2) {
+                // Case: --=value, skip as invalid
+                continue;
+            } else if (pos == std::string::npos) {
+                // Case: --key without value, store empty string
+                std::string key = arg.substr(2);
+                set(key, "", ConfigSource::CommandLine);
             }
         }
         // Handle -key value format
@@ -93,14 +100,96 @@ bool Config::saveToFile(const std::string& filepath) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    // Input validation
+    if (key.empty() || key.find_first_of(" ") != std::string::npos) {
+        // Invalid key: empty or contains whitespace
+        return; // Silent failure for compatibility
+    }
     
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
+    // Key length check
+    if (key.length() > 255) {
+        return; // Silent failure for long keys
+    }
+    
+    // Check for duplicate keys (case-insensitive comparison)
+    for (const auto& entry : pImpl->entries) {
+        if (toLower(entry.key) == toLower(key)) {
+            // Key already exists, update it
+            entry.value = value;
+            entry.source = source;
+            return;
+        }
+    }
+    
+    // Validate value based on type
+    bool isValid = true;
+    std::visit([&isValid](auto&& v) {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_integral_v<T>) {
+            // Check for reasonable integer values
+            if constexpr (std::is_same_v<T, int>) {
+                if (v < -2'147'483'648 || v > 2'147'483'647) {
+                    isValid = false;
+                }
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                if (v < -9'223'372'036'854'775'807LL || v > 9'223'372'036'854'775'807LL) {
+                    isValid = false;
+                }
+            }
+        } else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
+            // Check for NaN or infinite values
+            if constexpr (std::is_same_v<T, float>) {
+                if (std::isnan(v) || std::isinf(v)) {
+                    isValid = false;
+                }
+            } else {
+                if (std::isnan(v) || std::isinf(v)) {
+                    isValid = false;
+                }
+            }
+        } else if constexpr (std::is_same_v<T, bool>) {
+            // Boolean values are always valid
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            // Check for extremely long strings
+            if (v.length() > 1024) {
+                isValid = false;
+            }
+        }
+        // Vector types: validate each element
+        else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                          std::is_same_v<T, std::vector<double>> ||
+                          std::is_same_v<T, std::vector<std::string>>) {
+            for (const auto& item : v) {
+                if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    if (item < -2'147'483'648 || item > 2'147'483'647) {
+                        isValid = false;
+                        break;
+                    }
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    if (std::isnan(item) || std::isinf(item)) {
+                        isValid = false;
+                        break;
+                    }
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    if (item.length() > 255) {
+                        isValid = false;
+                        break;
+                    }
+                }
+            }
+        }
+    }, value);
+    
+    if (isValid) {
+        auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+            [&key](const ConfigEntry& e) { return e.key == key; });
+        
+        if (it != pImpl->entries.end()) {
+            it->value = value;
+            it->source = source;
+        } else {
+            pImpl->entries.emplace_back(key, value, source);
+        }
     }
 }
 
@@ -197,16 +286,31 @@ std::optional<T> Config::get(const std::string& key) const {
     if (it == pImpl->entries.end()) {
         return std::nullopt;
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
+    
+    // Improved type conversion with better error handling
     return std::visit([](auto&& v) -> std::optional<T> {
         using V = std::decay_t<decltype(v)>;
         if constexpr (std::is_same_v<V, T>) {
             return v;
         } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
+            // Safe numeric conversion with range checking
+            if constexpr (std::is_integral_v<T> && std::is_floating_point_v<V>) {
+                // Float to int: check if value is within range and has no fractional part
+                if (static_cast<double>(v) < std::numeric_limits<T>::lowest() || 
+                    static_cast<double>(v) > static_cast<double>(std::numeric_limits<T>::max()) ||
+                    std::floor(static_cast<double>(v)) != static_cast<double>(v)) {
+                    return std::nullopt;
+                }
+                return static_cast<T>(v);
+            } else if constexpr (std::is_floating_point_v<T> && std::is_integral_v<V>) {
+                // Int to float: safe conversion
+                return static_cast<T>(v);
+            } else {
+                // Same arithmetic type (both int, both float, etc.)
+                return static_cast<T>(v);
+            }
         } else {
-            return std::nullopt;
+            return std::nullopt; // Type mismatch
         }
     }, it->value);
 }

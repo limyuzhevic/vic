@@ -150,9 +150,15 @@ PYBIND11_MODULE(pynlm, m) {
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
+            // Fix memory safety: create string objects that outlive the pointers
+            std::vector<std::string> argStrings;
+            argStrings.reserve(args.size());
+            for (const auto& a : args) argStrings.push_back(a);
+            
             std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+            argv.reserve(argStrings.size());
+            for (auto& a : argStrings) argv.push_back(const_cast<char*>(a.c_str()));
+            
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
            "Load configuration from command line arguments")
@@ -185,6 +191,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("setData", [](Vision& self, const py::buffer& buffer) {
+            auto buf = buffer.request();
+            if (buf.format != "f") {
+                throw std::runtime_error("Buffer must be float format");
+            }
+            size_t size = buf.size;
+            if (size > 0) {
+                self.setData(static_cast<float*>(buf.ptr), size);
+            }
+        }, py::arg("buffer"))
         .def("getWidth", &Vision::getWidth)
         .def("getHeight", &Vision::getHeight)
         .def("getChannels", &Vision::getChannels);
@@ -195,6 +211,17 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setData", [](Audio& self, const std::vector<float>& data) {
             self.setData(data);
         }, py::arg("data"))
+        .def("setData", [](Audio& self, const py::buffer& buffer) {
+            auto buf = buffer.request();
+            if (buf.format != "f") {
+                throw std::runtime_error("Buffer must be float format");
+            }
+            size_t size = buf.size;
+            // Create a vector from the buffer and set it
+            std::vector<float> data(size);
+            std::memcpy(data.data(), buf.ptr, size * sizeof(float));
+            self.setData(data);
+        }, py::arg("buffer"))
         .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
         .def("getSampleRate", &Audio::getSampleRate)
         .def("getNumSamples", &Audio::getNumSamples);

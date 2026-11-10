@@ -72,8 +72,9 @@ public:
     
     // Set audio data
     void setData(const std::vector<float>& data);
+    void setData(float* data, size_t size);
     void setSampleRate(size_t rate);
-    
+
     size_t getSampleRate() const;
     size_t getNumSamples() const;
     
