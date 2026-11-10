@@ -4,6 +4,7 @@
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../agent/AgentBody.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include <chrono>
@@ -47,6 +48,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     SimpleWorld world;
     world.configure(16, 16, 16, 16);
     world.reset();
+    
+    // Add resources and hazards for interaction
+    world.addObject(WorldObject(5.0f, 5.0f, WorldObjectType::Resource, 1.0f));      // Resource at (5,5)
+    world.addObject(WorldObject(15.0f, 15.0f, WorldObjectType::Resource, 1.0f));     // Resource at (15,15)
+    world.addObject(WorldObject(10.0f, 10.0f, WorldObjectType::Hazard, -2.0f));     // Hazard at (10,10)
     
     // Create agent
     AgentBrain agent(brain);

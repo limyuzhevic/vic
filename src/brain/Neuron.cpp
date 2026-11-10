@@ -249,7 +249,14 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     if (V >= threshold) {
         fired = true;
         if (dt > 0.0) {
-            pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
+            // Add spike to firing rate with proper weight - better EMA implementation
+            float spikeContribution = 1.0f / static_cast<float>(dt);
+            if (pImpl->state.firingRate > spikeContribution) {
+                // Exponential moving average of firing rate
+                pImpl->state.firingRate = 0.9f * pImpl->state.firingRate + 0.1f * spikeContribution;
+            } else {
+                pImpl->state.firingRate = 0.95f * pImpl->state.firingRate + 0.05f * spikeContribution;
+            }
         }
         pImpl->state.firingState = FiringState::Active;
         pImpl->state.lastSpikeTime = static_cast<float>(currentTime);
@@ -257,21 +264,50 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Record spike
         recordSpike(currentTime);
         
-        // Reset membrane potential
+        // Reset membrane potential with adaptive threshold
         V = V_reset;
         
-        // Enter refractory period
-        pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
+        // Enter refractory period with longer refractory time for sensory neurons
+        pImpl->state.refractoryRemaining = std::max(pImpl->state.refractoryPeriod, 
+                                                  static_cast<uint32_t>(5));  // At least 5ms
         pImpl->state.firingState = FiringState::Refractory;
         
-        // Update adaptation for spike-frequency adaptation
-        pImpl->state.adaptationVariable += 1.0f;
+        // Stronger spike-frequency adaptation
+        pImpl->state.adaptationVariable = std::max(0.5f, pImpl->state.adaptationVariable + 2.0f);
+        
+        // Reduce threshold after spike to prevent immediate re-firing
+        if (dt > 0.0) {
+            pImpl->state.threshold += 2.0f;  // Increase threshold
+        }
     } else {
+        // Recover threshold if it was increased after last spike
+        if (pImpl->state.threshold > -55.0f) {
+            pImpl->state.threshold = std::max(-55.0f, pImpl->state.threshold - 1.0f * static_cast<float>(dt));
+        }
         pImpl->state.firingState = FiringState::Active;
     }
     
     // Clear synaptic input for next step
     pImpl->synapticInput = 0.0f;
+    
+    // Apply firing rate limiting based on neuron type
+    if (dt > 0.0) {
+        float maxFiringRate = 1000.0f;  // 1000 Hz maximum
+        if (pImpl->type == NeuronType::Inhibitory) {
+            maxFiringRate *= 0.8f;  // Inhibitory neurons fire slightly slower
+        } else if (pImpl->type == NeuronType::Sensory) {
+            maxFiringRate *= 1.2f;  // Sensory neurons can fire faster
+        }
+        
+        // Apply exponential moving average with proper decay
+        float rateDecay = 0.98f;  // Less aggressive decay for better tracking
+        pImpl->state.firingRate = rateDecay * pImpl->state.firingRate;
+        
+        // Cap firing rate
+        if (pImpl->state.firingRate > maxFiringRate) {
+            pImpl->state.firingRate = maxFiringRate;
+        }
+    }
     
     return fired;
 }

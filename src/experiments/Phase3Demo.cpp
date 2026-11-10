@@ -1,5 +1,6 @@
 #include "Phase3Experiment.hpp"
 #include "../agent/AgentBrain.hpp"
+#include "../agent/AgentBody.hpp"
 #include "../agent/SensoryPercept.hpp"
 #include "../world/SimpleWorld.hpp"
 #include "../brain/Brain.hpp"
@@ -38,6 +39,11 @@ public:
         SimpleWorld world;
         world.configure(20.0f, 20.0f, 16, 16);
         world.setRandomSeed(42);
+        
+        // Add resources and hazards for interaction
+        world.addObject(WorldObject(5.0f, 5.0f, WorldObjectType::Resource, 1.0f));      // Resource at (5,5)
+        world.addObject(WorldObject(15.0f, 15.0f, WorldObjectType::Resource, 1.0f));     // Resource at (15,15)
+        world.addObject(WorldObject(10.0f, 10.0f, WorldObjectType::Hazard, -2.0f));     // Hazard at (10,10)
         
         // Create brain
         auto brain = std::make_shared<Brain>(config);
