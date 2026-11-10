@@ -146,16 +146,93 @@ PYBIND11_MODULE(pynlm, m) {
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
              "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
+            // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
             argv.reserve(args.size());
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+            if (args.empty()) {
+                py::pybind11::raise(PyExcType::ValueError, "At least one argument is required for loadFromArgs");
+            }
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments. Args must be non-empty.")
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            if (filepath.empty()) {
+                py::pybind11::raise(PyExcType::ValueError, "Filepath cannot be empty for loadFromFile");
+            }
+            if (!self.loadFromFile(filepath)) {
+                py::pybind11::raise(PyExcType::IOError, "Failed to load configuration from file: " + filepath);
+            }
+        }, py::arg("filepath"),
+           "Load configuration from a JSON file. Raises ValueError if filepath is empty, IOError if file cannot be loaded.")
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            if (filepath.empty()) {
+                py::pybind11::raise(PyExcType::ValueError, "Filepath cannot be empty for saveToFile");
+            }
+            if (!self.saveToFile(filepath)) {
+                py::pybind11::raise(PyExcType::IOError, "Failed to save configuration to file: " + filepath);
+            }
+        }, py::arg("filepath"),
+           "Save configuration to a JSON file. Raises ValueError if filepath is empty, IOError if file cannot be saved.")
+        .def("get", [](Config& self, const std::string& key) {
+            if (key.empty()) {
+                py::pybind11::raise(PyExcType::ValueError, "Key cannot be empty for get operation");
+            }
+            if (!self.has(key)) {
+                py::pybind11::raise(PyExcType::KeyError, "Configuration key not found: " + key);
+            }
+            return self.get(key);
+        }, py::arg("key"),
+           "Get a configuration value by key. Raises ValueError if key is empty, KeyError if key not found.")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            if (key.empty()) {
+                py::pybind11::raise(PyExcType::ValueError, "Key cannot be empty for set operation");
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration key-value pair. Raises ValueError if key is empty.")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            if (key.empty()) {
+                py::pybind11::raise(PyExcType::ValueError, "Key cannot be empty for set operation");
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration key-value pair (int). Raises ValueError if key is empty.")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            if (key.empty()) {
+                py::pybind11::raise(PyExcType::ValueError, "Key cannot be empty for set operation");
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration key-value pair (float). Raises ValueError if key is empty.")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            if (key.empty()) {
+                py::pybind11::raise(PyExcType::ValueError, "Key cannot be empty for set operation");
+            }
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set a configuration key-value pair (bool). Raises ValueError if key is empty.")
+        .def("remove", [](Config& self, const std::string& key) {
+            if (key.empty()) {
+                py::pybind11::raise(PyExcType::ValueError, "Key cannot be empty for remove operation");
+            }
+            self.remove(key);
+        }, py::arg("key"),
+           "Remove a configuration key. Raises ValueError if key is empty.")
+        .def("has", &Config::has, py::arg("key"),
+           "Check if a configuration key exists. Raises ValueError if key is empty.")
+        .def("getKeys", &Config::getKeys,
+           "Get all configuration keys")
+        .def("clear", &Config::clear,
+           "Clear all configuration entries")
+        .def("summary", &Config::summary,
+           "Get a summary string of the configuration")
+        .def("__repr__", [](const Config& cfg) {
+            return "<Config: " + cfg.summary() + ">";
+        });
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -296,9 +373,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"),
+             "Create brain with configuration. Config must not be None.")
         .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+             "Initialize the brain with configuration. Raises RuntimeError if initialization fails.")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
              py::arg("currentStep"),
              "Perform a simulation step")
@@ -307,10 +385,16 @@ PYBIND11_MODULE(pynlm, m) {
              "Perform a simulation step with timestamp")
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
-             "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
+             "Inject sensory input into the brain. Input must not be None.")
+        .def("injectCurrent", [](Brain& self, NeuronId neuron, MembranePotential current) {
+            // Check if brain is initialized by checking if we can access regions
+            auto regions = self.getRegions();
+            if (regions.empty()) {
+                py::pybind11::raise(PyExcType::RuntimeError, "Brain not initialized");
+            }
+            self.injectCurrent(neuron, current);
+        }, py::arg("neuron"), py::arg("current"),
+           "Inject current into a specific neuron. Raises RuntimeError if brain not initialized.")
         .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
              py::arg("type"), py::arg("current"),
              "Inject current into all neurons of a specific type")
@@ -318,17 +402,30 @@ PYBIND11_MODULE(pynlm, m) {
              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
              "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
+        .def("save", [](Brain& self, const std::string& filepath) {
+            if (filepath.empty()) {
+                py::pybind11::raise(PyExcType::ValueError, "Filepath cannot be empty for save operation");
+            }
+            if (!self.save(filepath)) {
+                py::pybind11::raise(PyExcType::IOError, "Failed to save brain state to file: " + filepath);
+            }
+        }, py::arg("filepath"),
+           "Save brain state to file. Raises ValueError if filepath is empty, IOError if save fails.")
+        .def("load", [](Brain& self, const std::string& filepath) {
+            if (filepath.empty()) {
+                py::pybind11::raise(PyExcType::ValueError, "Filepath cannot be empty for load operation");
+            }
+            if (!self.load(filepath)) {
+                py::pybind11::raise(PyExcType::IOError, "Failed to load brain state from file: " + filepath);
+            }
+        }, py::arg("filepath"),
+           "Load brain state from file. Raises ValueError if filepath is empty, IOError if load fails.")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
-        // getRegion is const/non-const overloaded; bind the mutable one.
         .def("getRegion", static_cast<NeuralRegion* (Brain::*)(RegionId)>(&Brain::getRegion),
              py::arg("id"),
              py::return_value_policy::reference_internal,
-             "Get a region by ID")
+             "Get a region by ID. Raises KeyError if region not found.")
         .def("getRegionCount", &Brain::getRegionCount,
              "Get the number of regions")
         .def("getRegionIds", &Brain::getRegionIds,
@@ -362,24 +459,42 @@ PYBIND11_MODULE(pynlm, m) {
              "Log brain status");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
-        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
-        .def("initialize", &AgentBrain::initialize, py::arg("world"),
-             "Initialize with world")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"),
+             "Create agent brain with brain instance. Brain must not be None.")
+        .def("initialize", [](AgentBrain& self, const SimpleWorld& world) {
+            if (!self.getBrain()) {
+                py::pybind11::raise(PyExcType::RuntimeError, "AgentBrain not properly initialized - missing brain");
+            }
+            self.initialize(world);
+        }, py::arg("world"),
+             "Initialize agent brain with world. Raises RuntimeError if brain not available.")
         .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
              "Get expected sensory input size")
         .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
              "Get expected motor output size")
-        .def("processSensoryInput", &AgentBrain::processSensoryInput,
-             py::arg("percept"),
-             "Process sensory percept and inject into brain")
+        .def("processSensoryInput", [](AgentBrain& self, const SensoryPercept& percept) {
+            if (!self.getBrain()) {
+                py::pybind11::raise(PyExcType::RuntimeError, "AgentBrain not properly initialized - missing brain");
+            }
+            self.processSensoryInput(percept);
+        }, py::arg("percept"),
+             "Process sensory percept and inject into brain. Raises RuntimeError if brain not available.")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
-        .def("updateDevelopment", &AgentBrain::updateDevelopment,
-             py::arg("timestep"),
-             "Update development system")
+        .def("applyRewardModulation", [](AgentBrain& self, float reward, float predictedReward) {
+            if (!self.getBrain()) {
+                py::pybind11::raise(PyExcType::RuntimeError, "AgentBrain not properly initialized - missing brain");
+            }
+            self.applyRewardModulation(reward, predictedReward);
+        }, py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation. Raises RuntimeError if brain not available.")
+        .def("updateDevelopment", [](AgentBrain& self, double timestep) {
+            if (!self.getBrain()) {
+                py::pybind11::raise(PyExcType::RuntimeError, "AgentBrain not properly initialized - missing brain");
+            }
+            self.updateDevelopment(timestep);
+        }, py::arg("timestep"),
+             "Update development system. Raises RuntimeError if brain not available.")
         .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
              "Get current developmental stage")
         .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
@@ -403,10 +518,14 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
