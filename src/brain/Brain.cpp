@@ -305,28 +305,28 @@ bool Brain::initialize() {
     // again and double-count every spike.
     if (!pImpl->spikeHandlersRegistered) {
         pImpl->spikeHandlersRegistered = true;
-    // Register spike handlers for event-driven processing
-    pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
-        // Count spikes
-        ++pImpl->totalSpikesThisStep;
-        ++pImpl->totalSpikesTotal;
-    });
-    
-    // Register delayed spike handler to deliver synaptic input
-    pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
-        auto it = pImpl->neuronById.find(event.destination_neuron.index());
-        if (it != pImpl->neuronById.end()) {
-            Neuron* neuron = it->second;
-            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
-            if (event.is_excitatory) {
-                neuron->receiveExcitatoryInput(synapticCurrent);
-            } else {
-                neuron->receiveInhibitoryInput(-synapticCurrent);
+        // Register spike handlers for event-driven processing
+        pImpl->spikeSystem->registerHandler([this](const DetailedSpikeEvent& event) {
+            // Count spikes
+            ++pImpl->totalSpikesThisStep;
+            ++pImpl->totalSpikesTotal;
+        });
+        
+        // Register delayed spike handler to deliver synaptic input
+        pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
+            auto it = pImpl->neuronById.find(event.destination_neuron.index());
+            if (it != pImpl->neuronById.end()) {
+                Neuron* neuron = it->second;
+                MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+                if (event.is_excitatory) {
+                    neuron->receiveExcitatoryInput(synapticCurrent);
+                } else {
+                    neuron->receiveInhibitoryInput(-synapticCurrent);
+                }
             }
-        }
-    });
+        });
     }  // spikeHandlersRegistered
-    
+
     // Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
