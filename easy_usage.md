@@ -1,5 +1,176 @@
 # NLM - Easy Usage Guide for Beginners
 
+## Quick Start (Copy & Paste)
+
+### Example 1: Using the CLI Tool
+
+```bash
+# Run a basic simulation
+nlm-cli run --steps=1000 --neurons=500 --timestep=0.001
+
+# Load configuration from file
+nlm-cli config --load=default.cfg
+
+# Save configuration to file
+nlm-cli config --save=my_config.cfg
+
+# Show current configuration
+nlm-cli config --show
+
+# Save brain state
+nlm-cli brain --save=checkpoint.brain
+
+# Load brain state
+nlm-cli brain --load=checkpoint.brain
+
+# Run with verbose output
+nlm-cli run --steps=500 --neurons=100 --verbose
+```
+
+### Example 2: Advanced Python Usage with New Features
+
+```python
+import pynlm
+
+# Create brain with advanced configuration
+config = pynlm.createDefaultConfig()
+
+# Set configuration values with schema validation
+config.set("neuron_count", 500)
+config.set("connection_probability", 0.15)
+config.set("stdp_ltp_weight", 0.02)
+config.set("stdp_ltd_weight", 0.012)
+config.set("stdp_time_constant", 20.0)
+
+# Validate configuration
+if not config.validate("neuron_count"):
+    print("Invalid neuron_count value")
+
+# Show configuration summary
+print(config.summary())
+
+# Save configuration
+config.saveToFile("my_config.cfg")
+
+# Load from file
+config2 = pynlm.createDefaultConfig()
+config2.loadFromFile("my_config.cfg")
+
+# Create brain
+brain = pynlm.createBrain(config2)
+brain.initialize()
+
+# Run simulation with batch operations
+for step in range(1000):
+    brain.step(step, step * 0.001)
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+print(f"Simulation complete: {brain.getTotalSpikeCount()} total spikes")
+```
+
+### Example 3: Configuration Schema Validation
+
+```python
+import pynlm
+
+# Create configuration with schema
+config = pynlm.createDefaultConfig()
+
+# Define configuration schema
+schema = {
+    "neuron_count": {
+        "type": "int",
+        "required": True,
+        "minValue": 10,
+        "maxValue": 10000,
+        "description": "Number of neurons in the brain"
+    },
+    "connection_probability": {
+        "type": "double", 
+        "required": False,
+        "minValue": 0.0,
+        "maxValue": 1.0,
+        "description": "Probability of synapse formation"
+    },
+    "stdp_ltp_weight": {
+        "type": "double",
+        "required": False,
+        "minValue": 0.0,
+        "maxValue": 1.0,
+        "description": "STDP LTP weight"
+    }
+}
+
+# Add schema to configuration
+for key, schema_def in schema.items():
+    config.addSchema(schema_def)
+
+# Validate configuration
+if config.validateSchema():
+    print("Configuration schema validation passed!")
+else:
+    print("Configuration schema validation failed")
+    print("Invalid keys:", config.getInvalidKeys())
+
+# Test setting values
+config.set("neuron_count", 200)  # Valid
+config.set("connection_probability", 0.5)  # Valid
+
+# This should fail validation
+try:
+    config.set("neuron_count", 5)  # Too small
+except Exception as e:
+    print(f"Validation error: {e}")
+```
+
+### Example 
+Brain in a Simple World (Updated
+
+```python
+import pynlm
+
+# Create everything
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+world = pynlm.createSimpleWorld()
+world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Run for 50 steps
+for step in range(50):
+    world.update(0.1)  # Update world
+    percept = world.getSensoryPercept()  # What does the agent see?
+    agent.processSensoryInput(percept)  # Brain sees it
+    brain.step(step)  # Brain thinks
+    action = agent.decodeMotorCommand()  # Brain decides action
+    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
+
+print("Simulation finished!")
+print("Firing neurons:", brain.getFiringNeuronCount())
+```
+
+# The Simplest Possible Example
+
+```python
+import pynlm
+
+# One line to create a virtual brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+
+# Initialize it
+brain.initialize()
+
+# Make it active
+brain.step(0)
+
+print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+```
+
 ## What is NLM?
 
 NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!

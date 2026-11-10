@@ -132,7 +132,17 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# CLI Tool for common NLM operations
+add_executable(nlm_cli
+    src/nlm_cli.cpp
+)
+target_link_libraries(nlm_cli PUBLIC nlm_core)
+set_target_properties(nlm_cli PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    OUTPUT_NAME "nlm-cli"
+)
+
+# Main executable (Phase 2 demo - core neural computation)
 add_executable(nlm
     src/main.cpp
 )
@@ -179,15 +189,16 @@ add_executable(nlm_benchmark
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
-# Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
+# Python bindings build notes:
+# The standalone python/CMakeLists.txt creates its own nlm_core/nlm_agent/nlm_world targets
+# for building the pynlm module. When using NLM_BUILD_PYTHON_BINDINGS=ON in the root
+# build (via pyproject.toml), this target reuses the root libraries instead of creating
+# duplicate targets. This avoids linker conflicts and ensures consistency.
+
+# To build Python bindings:
+# 1. pip install . (uses pyproject.toml and sets NLM_BUILD_PYTHON_BINDINGS=ON)
+# 2. cmake .. -DNLM_BUILD_PYTHON_BINDINGS=ON (standalone Python bindings build)
+# 3. cmake -S python -B build (standalone with python/CMakeLists.txt)
 option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)

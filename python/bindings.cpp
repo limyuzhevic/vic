@@ -142,6 +142,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Enhanced Config class with validation and batch operations
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -166,6 +167,41 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        .def("validate", &Config::validate, py::arg("key"),
+             "Validate a configuration key (returns bool)")
+        .def("validateSchema", &Config::validateSchema,
+             "Validate entire configuration schema")
+        .def("getInvalidKeys", &Config::getInvalidKeys,
+             "Get list of invalid configuration keys")
+        .def("addSchema", &Config::addSchema, py::arg("schema"),
+             "Add a configuration schema")
+        .def("removeSchema", &Config::removeSchema, py::arg("key"),
+             "Remove a configuration schema")
+        .def("getSchema", &Config::getSchema,
+             "Get all configuration schemas")
+        .def("clearSchema", &Config::clearSchema,
+             "Clear all configuration schemas")
+        .def("toDouble", &Config::toDouble, py::arg("key"),
+             "Convert configuration value to double (returns optional)")
+        .def("toInt", &Config::toInt, py::arg("key"),
+             "Convert configuration value to int (returns optional)")
+        .def("toBool", &Config::toBool, py::arg("key"),
+             "Convert configuration value to bool (returns optional)")
+        .def("toString", &Config::toString, py::arg("key"),
+             "Convert configuration value to string (returns optional)")
+        .def("setSchema", [](Config& self, const ConfigSchema& schema) {
+            return self.addSchema(schema);
+        }, py::arg("schema"),
+           "Set configuration schema (convenience method)")
+        .def("getConfigValue", [](const Config& self, const std::string& key) {
+            // Helper to get raw ConfigValue for inspection
+            auto value = self.get<ConfigValue>(key);
+            if (value) {
+                return value.value();
+            }
+            throw std::runtime_error("Configuration key not found: " + key);
+        }, py::arg("key"),
+           "Get raw configuration value (for advanced inspection)")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });

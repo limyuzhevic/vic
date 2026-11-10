@@ -533,6 +533,226 @@ pip install --force-reinstall .
 - Check that `initialize()` is called before `step()`
 - Ensure `reset()` is called before re-running simulation
 
+  world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(0)
+    world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+  ```
+
+---
+
+## Advanced Python API Features
+
+### Configuration Schema Validation
+
+NLM now includes advanced configuration schema validation to ensure your configurations are correct before simulation.
+
+```python
+import pynlm
+
+# Create configuration with schema validation
+config = pynlm.createDefaultConfig()
+
+# Define schema with validators
+def validateNeuronCount(value):
+    return 10 <= value <= 10000
+
+def validateConnectionProbability(value):
+    return 0.0 <= value <= 1.0
+
+# Add schema (automatically performed when setting values with validation)
+config.addSchema({
+    "neuron_count": {
+        "type": "int",
+        "required": True,
+        "minValue": 10,
+        "maxValue": 10000,
+        "description": "Number of neurons in the brain"
+    },
+    "connection_probability": {
+        "type": "double",
+        "required": False,
+        "minValue": 0.0,
+        "maxValue": 1.0,
+        "description": "Probability of synapse formation"
+    }
+})
+
+# Validate configuration
+if config.validateSchema():
+    print("✓ Configuration schema validation passed!")
+else:
+    print("✗ Configuration schema validation failed")
+    print("Invalid keys:", config.getInvalidKeys())
+
+# Set values with automatic validation
+config.set("neuron_count", 200)  # Valid
+config.set("connection_probability", 0.3)  # Valid
+
+# This will raise an exception due to validation
+try:
+    config.set("neuron_count", 5)  # Too small
+    print("ERROR: Invalid value accepted!")
+except Exception as e:
+    print(f"✓ Correctly rejected invalid value: {e}")
+```
+
+### Command Line Interface (CLI)
+
+NLM includes a powerful CLI tool for common operations:
+
+```bash
+# Help and usage information
+./nlm-cli --help
+./nlm-cli help
+
+# Version information
+./nlm-cli --version
+./nlm-cli version
+
+# Run basic simulation
+./nlm-cli run --steps=1000 --neurons=500 --timestep=0.001
+
+# Run simulation with verbose output
+./nlm-cli run --steps=500 --neurons=100 --verbose
+
+# Configuration management
+./nlm-cli config --load=default.cfg
+./nlm-cli config --save=my_config.cfg
+./nlm-cli config --show
+
+# Brain state management
+./nlm-cli brain --save=checkpoint.brain
+./nlm-cli brain --load=checkpoint.brain
+
+# System information
+./nlm-cli --info
+```
+
+### Batch Operations and Performance Monitoring
+
+```python
+import pynlm
+import time
+
+# Create configuration with performance settings
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 1000)
+config.set("region_count", 2)
+config.set("connection_probability", 0.1)
+
+# Create brain
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run performance benchmark
+print("Running performance benchmark...")
+start_time = time.time()
+
+for step in range(1000):
+    brain.step(step)
+    
+    # Batch processing with progress monitoring
+    if step % 100 == 0:
+        elapsed = time.time() - start_time
+        print(f"  Step {step}: {elapsed:.2f}s elapsed, "
+              f"{brain.getTotalSpikeCount()}/{step} spikes")
+
+elapsed = time.time() - start_time
+steps_per_second = 1000 / elapsed
+print(f"\nBenchmark completed:")
+print(f"  Time: {elapsed:.2f}s")
+print(f"  Steps/sec: {steps_per_second:.0f}")
+print(f"  Total neurons: {brain.getTotalNeuronCount()}")
+print(f"  Total synapses: {brain.getTotalSynapseCount()}")
+```
+
+### Configuration File Management
+
+```python
+import pynlm
+import os
+
+# Create and save configuration
+config = pynlm.createDefaultConfig()
+config.set("neuron_count", 300)
+config.set("connection_probability", 0.2)
+config.set("stdp_ltp_weight", 0.025)
+config.set("stdp_ltd_weight", 0.01)
+
+# Save configuration
+config.saveToFile("production_config.cfg")
+print("✓ Configuration saved to production_config.cfg")
+
+# Load and validate configuration
+config2 = pynlm.createDefaultConfig()
+if config2.loadFromFile("production_config.cfg"):
+    print("✓ Configuration loaded successfully")
+    
+    # Validate against schema
+    if config2.validateSchema():
+        print("✓ Configuration schema validation passed")
+    else:
+        print("✗ Configuration schema validation failed")
+        print(f"Invalid keys: {config2.getInvalidKeys()}")
+        
+    print("\nConfiguration summary:")
+    print(config2.summary())
+else:
+    print("✗ Failed to load configuration")
+
+# Clean up
+if os.path.exists("production_config.cfg"):
+    os.remove("production_config.cfg")
+    print("✓ Cleaned up production_config.cfg")
+```
+
+### Error Handling and Robustness
+
+```python
+import pynlm
+
+# Create configuration with error handling
+config = pynlm.createDefaultConfig()
+
+# Test error handling during configuration loading
+print("Testing error handling...")
+
+# Test 1: Load non-existent file
+if not config.loadFromFile("nonexistent.cfg"):
+    print("✓ Correctly handled missing configuration file")
+
+# Test 2: Validate configuration with schema
+def validateCustom(value):
+    return value > 0 and value < 1000
+
+config.addSchema({
+    "test_value": {
+        "type": "int",
+        "validator": validateCustom,
+        "description": "Test value with custom validation"
+    }
+})
+
+# Set valid value
+config.set("test_value", 500)
+print("✓ Valid value accepted")
+
+# Set invalid value (should raise exception)
+try:
+    config.set("test_value", -10)
+    print("✗ ERROR: Invalid value was accepted!")
+except Exception as e:
+    print(f"✓ Invalid value correctly rejected: {e}")
+
+# Show invalid keys
+invalid_keys = config.getInvalidKeys()
+if invalid_keys:
+    print(f"⚠ Invalid configuration keys: {invalid_keys}")
+else:
+    print("✓ All configuration keys are valid")
+```
+
 ---
 
 ## Further Reading
@@ -540,3 +760,55 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [PERFORMANCE.md](docs/PERFORMANCE.md) - Performance measurements
+- [LIMITATIONS.md](docs/LIMITATIONS.md) - Project limitations and future work
+
+---
+
+## Quick Reference
+
+### Python API Functions
+
+| Function | Description | Example |
+|----------|-------------|---------|
+| `createDefaultConfig()` | Create default configuration | `config = pynlm.createDefaultConfig()` |
+| `createBrain(config)` | Create brain with configuration | `brain = pynlm.createBrain(config)` |
+| `createSimpleWorld()` | Create simple 2D world | `world = pynlm.createSimpleWorld()` |
+| `createAgentBrain(brain)` | Create agent interface | `agent = pynlm.createAgentBrain(brain)` |
+
+### Configuration Keys
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `neuron_count` | int | 1000 | Number of neurons |
+| `region_count` | int | 2 | Number of brain regions |
+| `connection_probability` | double | 0.1 | Synapse formation probability |
+| `simulation_timestep` | double | 0.001 | Simulation timestep |
+| `stdp_ltp_weight` | double | 0.01 | STDP LTP weight |
+| `stdp_ltd_weight` | double | 0.012 | STDP LTD weight |
+
+### Common Errors
+
+1. **Not initialized**: Always call `brain.initialize()` before `brain.step()`
+2. **Configuration not loaded**: Check return value of `loadFromFile()`
+3. **Invalid values**: Use schema validation to catch errors early
+4. **Missing files**: Handle file not found errors gracefully
+
+### Performance Tips
+
+1. Use `nlm-cli run --steps=1000 --neurons=500` for benchmarking
+2. Enable validation with `config.validateSchema()`
+3. Use batch operations for large simulations
+4. Monitor performance with the CLI tool
+
+### Next Steps
+
+1. Read [ARCHITECTURE.md](docs/ARCHITECTURE.md) to understand the system architecture
+2. Try the phase demos: `./nlm_phase3_demo`, `./nlm_phase4_demo`, `./nlm_phase6_demo`
+3. Build with Python bindings: `pip install .`
+4. Run the benchmark: `./nlm_benchmark`
+5. Explore the Python API examples in this guide
+
+---
+
+NLM is continuously evolving with new features and improvements. Check the project documentation for the latest updates and examples.

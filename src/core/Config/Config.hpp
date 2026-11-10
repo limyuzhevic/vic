@@ -6,6 +6,7 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <functional>
 
 namespace nlm {
 
@@ -44,6 +45,26 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration schema definition
+struct ConfigSchema {
+    using ValidatorFunc = std::function<bool(const ConfigValue&)>;
+    using NormalizerFunc = std::function<ConfigValue(const ConfigValue&)>;
+    
+    std::string key;
+    std::string type; // "int", "int64", "double", "bool", "string", "vector<int>", etc.
+    ConfigSource source; // Allowed sources for this key
+    ConfigValue defaultValue;
+    std::string description;
+    ValidatorFunc validator;
+    NormalizerFunc normalizer;
+    bool required;
+    std::vector<std::string> allowedValues; // For string types
+    double minValue; // For numeric types
+    double maxValue; // For numeric types
+    
+    ConfigSchema() : source(ConfigSource::Runtime), required(false), minValue(-1e9), maxValue(1e9) {}
+};
+
 // Main configuration class
 class Config {
 public:
@@ -66,12 +87,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,13 +116,44 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Validation and schema methods
+    bool validateSchema() const;
+    bool validate(const std::string& key) const;
+    ConfigValue normalize(const std::string& key, const ConfigValue& value) const;
+    bool addSchema(const ConfigSchema& schema);
+    bool removeSchema(const std::string& key);
+    std::vector<ConfigSchema> getSchema() const;
+    void clearSchema();
+    
+    // Configuration validation
+    bool isValid(const std::string& key) const;
+    std::vector<std::string> getInvalidKeys() const;
+    
+    // Configuration value type conversion
+    std::optional<double> toDouble(const std::string& key) const;
+    std::optional<int> toInt(const std::string& key) const;
+    std::optional<bool> toBool(const std::string& key)�טא类似
+    std::optional<std::string> toString(const std::string& key) const;
+    
+    // Range validation helpers
+    static bool validateRange(const ConfigValue& value, double min, double max);
+    static bool validateChoices(const ConfigValue& value, const std::vector<std::string>& choices);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
+    // Schema management
+    struct SchemaImpl;
+    std::unique_ptr<SchemaImpl> schemaImpl;
+    
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isNumericType(const ConfigValue& value);
+    static bool isStringType(const ConfigValue& value);
+    static bool isVectorType(const ConfigValue& value);
+    static bool parseValue(const std::string& str, ConfigValue& outValue);
 };
 
 } // namespace nlm

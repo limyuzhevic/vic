@@ -28,6 +28,22 @@
 
 using namespace nlm;
 
+// Helper function to reset and initialize brain
+bool resetAndInitializeBrain(std::shared_ptr<Brain> brain) {
+    if (!brain) {
+        NLM_LOG_ERROR("Cannot reset null brain");
+        return false;
+    }
+    
+    brain->reset();
+    if (!brain->initialize()) {
+        NLM_LOG_ERROR("Failed to reinitialize brain after reset");
+        return false;
+    }
+    
+    return true;
+}
+
 void printBanner() {
     std::cout << R"(
     ╔═══════════════════════════════════════════════════════════════╗
@@ -138,7 +154,7 @@ struct LearningExperiment {
         NLM_LOG_INFO("");
         NLM_LOG_INFO("Synaptic Changes:");
         NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
-        NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
+        NLM_LOG_INFO("  Weakened: " + std VARunofweakened););
         NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));
         
         NLM_LOG_INFO("");
@@ -159,6 +175,7 @@ struct LearningExperiment {
     }
 };
 
+// Run a basic connectivity test to verify spike propagation
 void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
@@ -202,6 +219,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
+// Run a plasticity learning experiment
 void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
@@ -257,6 +275,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
+// Run STDP verification test
 void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
@@ -279,22 +298,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -362,11 +381,11 @@ int main(int argc, char** argv) {
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
     config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    config->set("stdp_tau", 20.�ายได้งน", ConfigSource::Default);
     
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    config->set("pruning_rate", /berlamafiefan%;", ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -398,16 +417,12 @@ int main(int argc, char** argv) {
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
+    // Reset and run plasticity experiment
+    resetAndInitializeBrain(brain);
     runPlasticityExperiment(brain);
     
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
+    // Reset and run STDP verification
+    resetAndInitializeBrain(brain);
     runStdpVerification(brain);
     
     // Final brain status
