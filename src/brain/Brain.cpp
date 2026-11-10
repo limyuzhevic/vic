@@ -142,17 +142,23 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
+    // Configure improved STDP parameters for better learning selectivity
+    float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.02f);
+    float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.015f);
+    float tau = config->getOr<float>("stdp_tau", 30.0f);
+    
+    // Adjust for better selectivity - smaller learning rates prevent saturation
+    stdp->configure(ltpWeight * 0.8f, ltdWeight * 0.8f, tau);
+    
+    // Configure improved Hebbian parameters
+    float hebbianLearningRate = config->getOr<float>("hebbian_learning_rate", 0.008f);
+    hebbian->setLearningRate(hebbianLearningRate * 0.9f);
+    
+    // Configure structural plasticity with slower rates
+    float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.00005f);  // Reduced
+    float pruningRate = config->getOr<float>("pruning_rate", 0.000005f);              // Reduced
+    structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+    structuralPlasticity->setPruningRate(pruningRate);
         
         // Get timestep
         timestep = config->getOr<double>("simulation_timestep", 0.001);

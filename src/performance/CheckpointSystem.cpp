@@ -181,8 +181,18 @@ bool CheckpointReader::open(const std::string& filepath) {
         if (!stream_) break;
         sections_.push_back(section);
         if (section.type == static_cast<uint32_t>(CheckpointSection::End)) break;
+        // Validate offset before seeking
+        if (section.offset > header_.totalSize) {
+            error_ = "invalid section offset";
+            close();
+            return false;
+        }
         stream_.seekg(static_cast<std::streamoff>(section.offset + section.size), std::ios::beg);
-        if (!stream_) break;
+        if (!stream_) {
+            error_ = "failed to seek to section " + std::to_string(section.type);
+            close();
+            return false;
+        }
     }
     stream_.clear();
     return true;
@@ -499,8 +509,10 @@ void CheckpointManager::pruneOldCheckpoints(size_t keepCount) {
     }
 }
 
-std::string CheckpointManager::getLastCheckpointPath() const {
-    return lastCheckpointPath_;
+double CheckpointWriter::getProgress() const {
+    if (!stream_.is_open() || header_.totalSize == 0) return 0.0;
+    double p = static_cast<double>(bytesWritten_) / static_cast<double>(header_.totalSize);
+    return std::clamp(p, 0.0, 1.0);
 }
 
 } // namespace nlm

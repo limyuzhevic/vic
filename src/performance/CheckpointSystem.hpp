@@ -238,7 +238,7 @@ public:
     const std::string& getError() const { return error_; }
     
     /**
-     * Get reader progress (0.0 - 1.0)
+     * Get writer progress (0.0 - 1.0)
      */
     double getProgress() const;
 
@@ -330,6 +330,16 @@ public:
      */
     uint64_t getBytesWritten() const { return bytesWritten_; }
 
+    /**
+     * Get validation error message
+     */
+    const std::string& getError() const { return error_; }
+    
+    /**
+     * Get writer progress (0.0 - 1.0)
+     */
+    double getProgress() const;
+
 private:
     bool writeHeader();
     bool writeSectionHeader(const SectionHeader& header);
@@ -348,6 +358,7 @@ private:
     std::vector<uint8_t> delayedSpikePayload_;
     // Phase 5 extra sections, in the fixed write order used by finalize().
     std::vector<std::pair<CheckpointSection, std::vector<uint8_t>>> extraPayloads_;
+    std::string error_;
 };
 
 /**

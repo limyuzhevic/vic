@@ -98,6 +98,14 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Aging", DevelopmentalStage::Aging)
         .export_values();
 
+    // Add missing ConfigSource enum for configuration source tracking
+    py::enum_<ConfigSource>(m, "ConfigSource", R"pbdoc(Configuration source enumeration)pbdoc")
+        .value("Default", ConfigSource::Default)
+        .value("File", ConfigSource::File)
+        .value("CommandLine", ConfigSource::CommandLine)
+        .value("Runtime", ConfigSource::Runtime)
+        .export_values();
+
     py::enum_<FiringState>(m, "FiringState", R"pbdoc(Neuron firing state enumeration)pbdoc")
         .value("Resting", FiringState::Resting)
         .value("Active", FiringState::Active)
@@ -408,21 +416,178 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
+    m.def("createConfigFromDict", [](const py::dict& config_dict) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        for (const auto& item : config_dict) {
+            std::string key = item.first.cast<std::string>();
+            const auto& value = item.second;
+            
+            if (value.is(py::int_())) {
+                config->set(key, value.cast<int64_t>());
+            } else if (value.is(py::float_())) {
+                config->set(key, value.cast<double>());
+            } else if (value.is(py::bool_())) {
+                config->set(key, value.cast<bool>());
+            } else if (value.is(py::str())) {
+                config->set(key, value.cast<std::string>());
+            } else if (value.is(py::list())) {
+                py::list list_value = value.cast<py::list>();
+                if (!list_value.empty()) {
+                    if (list_value[0].is(py::int_())) {
+                        std::vector<int64_t> int_list;
+                        int_list.reserve(list_value.size());
+                        for (const auto& item : list_value) {
+                            int_list.push_back(item.cast<int64_t>());
+                        }
+                        config->set(key, ConfigValue(int_list));
+                    } else if (list_value[0].is(py::float_())) {
+                        std::vector<double> float_list;
+                        float_list.reserve(list_value.size());
+                        for (const auto& item : list_value) {
+                            float_list.push_back(item.cast<double>());
+                        }
+                        config->set(key, ConfigValue(float_list));
+                    } else if (list_value[0].is(py::str())) {
+                        std::vector<std::string> string_list;
+                        string_list.reserve(list_value.size());
+                        for (const auto& item : list_value) {
+                            string_list.push_back(item.cast<std::string>());
+                        }
+                        config->set(key, ConfigValue(string_list));
+                    }
+                }
+            }
+        }
+        return config;
+    }, py::arg("config_dict"), "Create configuration from Python dictionary");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    m.def("createConfigFromFile", [](const std::string& filepath) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return config;
+    }, py::arg("filepath"), "Create configuration from file");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("createConfigFromArgs", [](const std::vector<std::string>& args) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->loadFromArgs(static_cast<int>(args.size()), &args[0]);
+        return config;
+    }, py::arg("args"), "Create configuration from command line arguments");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Text processing utilities
+    m.def("encode_text", &AgentBrain::encodeText,
+          py::arg("text"), "Encode text into sparse pattern for neural processing");
+
+    // Simulation helper functions
+    m.def("create_simulation", [](const std::shared_ptr<Config>& config) -> std::tuple<std::shared_ptr<Brain>, std::shared_ptr<SimpleWorld>, std::shared_ptr<AgentBrain>> {
+        auto brain = std::make_shared<Brain>(config);
+        auto world = std::make_shared<SimpleWorld>();
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        brain->initialize();
+        return std::make_tuple(brain, world, agent);
+    }, py::arg("config"), "Create complete simulation setup with brain, world, and agent");
+
+    m.def("run_episode", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, 
+                          const std::vector<std::vector<float>>& sensory_inputs) {
+        for (const auto& input_data : sensory_inputs) {
+            if (input_data.size() >= agent->getSensoryInputSize()) {
+                Vision vision(
+                    static_cast<size_t>(world->getWidth()),
+                    static_cast<size_t>(world->getHeight())
+                );
+                std::vector<float> vision_data;
+                size_t data_index = 0;
+                
+                if (input_data.size() > 0) {
+                    vision_data = input_data;
+                    vision.setData(vision_data);
+                }
+                
+                SensoryPercept percept;
+                percept.setVision(vision);
+                
+                agent->processSensoryInput(percept);
+                MotorCommand action = agent->decodeMotorCommand();
+                
+                agent->applyRewardModulation(0.0f, 0.0f); // No reward during simulation
+                world->update(1); // Single timestep
+            }
+        }
+    }, py::arg("agent"), py::arg("world"), py::arg("sensory_inputs"), "Run simulation episode with given sensory inputs");
+
+    // Statistics and analysis utilities
+    m.def("compute_simulation_stats", [](const std::shared_ptr<Brain>& brain, 
+                                         const std::shared_ptr<AgentBrain>& agent,
+                                         const std::shared_ptr<SimpleWorld>& world) {
+        py::dict stats;
+        
+        // Brain statistics
+        stats["brain_total_neurons"] = brain->getTotalNeuronCount();
+        stats["brain_total_synapses"] = brain->getTotalSynapseCount();
+        stats["brain_active_neurons"] = brain->getActiveNeuronCount();
+        stats["brain_firing_neurons"] = brain->getFiringNeuronCount();
+        stats["brain_avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["brain_ei_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["brain_total_spikes"] = brain->getTotalSpikeCount();
+        stats["brain_developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        
+        // Agent statistics
+        stats["agent_dopamine_level"] = agent->getNeuromodulationLevel();
+        stats["agent_curiosity_level"] = agent->getCuriosityLevel();
+        stats["agent_novelty_level"] = agent->getNoveltyLevel();
+        stats["agent_prediction_error"] = agent->getPredictionError();
+        stats["agent_developmental_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+        
+        // World statistics
+        stats["world_width"] = world->getWidth();
+        stats["world_height"] = world->getHeight();
+        stats["world_simulation_time"] = world->getSimulationTime();
+        
+        // Thought trace
+        stats["agent_thought_trace"] = agent->getThoughtTrace();
+        
+        return stats;
+    }, py::arg("brain"), py::arg("agent"), py::arg("world"), "Compute comprehensive statistics for simulation components");
+
+    // Configuration validation utilities
+    m.def("validate_config", [](const std::shared_ptr<Config>& config) {
+        std::vector<std::string> errors;
+        
+        // Check required configuration parameters
+        if (!config->has("neuron_count")) {
+            errors.push_back("Missing required parameter: neuron_count");
+        }
+        if (!config->has("region_count")) {
+            errors.push_back("Missing required parameter: region_count");
+        }
+        if (!config->has("connection_probability")) {
+            errors.push_back("Missing required parameter: connection_probability");
+        }
+        if (!config->has("simulation_timestep")) {
+            errors.push_back("Missing required parameter: simulation_timestep");
+        }
+        
+        // Validate parameter ranges
+        auto neuron_count = config->getOr<int64_t>("neuron_count", -1);
+        if (neuron_count < 100) {
+            errors.push_back("neuron_count must be at least 100");
+        }
+        if (neuron_count > 100000) {
+            errors.push_back("neuron_count must not exceed 100000");
+        }
+        
+        auto connection_prob = config->getOr<float>("connection_probability", -1.0f);
+        if (connection_prob < 0.0f || connection_prob > 1.0f) {
+            errors.push_back("connection_probability must be between 0.0 and 1.0");
+        }
+        
+        auto timestep = config->getOr<double>("simulation_timestep", -1.0);
+        if (timestep <= 0.0) {
+            errors.push_back("simulation_timestep must be positive");
+        }
+        
+        return errors;
+    }, py::arg("config"), "Validate configuration and return list of errors");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
