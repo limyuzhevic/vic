@@ -159,7 +159,7 @@ agent.enableCuriosity(True)             # Explore new things
 
 ### `pynlm.createBrain(config)`
 Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+- `config` = settings for the brain (use `pynlm.createDefaultConfig()` for simple setup)
 
 ### `brain.initialize()`
 Starts up the brain. Always call this before using the brain!
@@ -178,6 +178,110 @@ Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
 Reads the brain's motor neurons to decide what action to take.
+
+---
+
+## Additional Useful Python Commands
+
+Here are some additional Python commands that weren't in the original documentation but are very useful:
+
+### Query Brain State
+
+```python
+# Get detailed brain information
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+print("=== Brain Statistics ===")
+print(f"Total neurons: {brain.getTotalNeuronCount()}")
+print(f"Total synapses: {brain.getTotalSynapseCount()}")
+print(f"Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"Total spikes: {brain.getTotalSpikeCount()}")
+print(f"Average firing rate: {brain.getAverageFiringRate():.2f} Hz")
+print(f"Excitatory/Inhibitory ratio: {brain.getExcitationInhibitionRatio():.2f}")
+print(f"Development stage: {brain.getDevelopmentalStage()}")
+```
+
+### Save/Load Brain States
+
+```python
+# Save a trained brain
+brain.save("my_trained_brain.nml")
+
+# Load a saved brain
+loaded_brain = pynlm.createBrain(pynlm.createDefaultConfig())
+loaded_brain.load("my_trained_brain.nml")
+```
+
+### Configure World Environment
+
+```python
+# Create a custom world
+world = pynlm.createSimpleWorld()
+world.configure(width=50, height=50, visionWidth=16, visionHeight=16)
+world.setAgentStart(25, 25)
+world.setMaxEnergy(100.0)
+world.setEnergyDecayRate(0.01)
+world.setRandomSeed(12345)
+```
+
+### Brain Development
+
+```python
+# Enable and track brain development
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+for step in range(1000):
+    # Run simulation
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 100 == 0:
+        print(f"Step {step}: Development age {agent.getDevelopmentalStage()}, "
+              f"Curiosity {agent.getCuriosityLevel():.2f}, "
+              f"Firing {brain.getFiringNeuronCount()}")
+```
+
+### Advanced Agent Features
+
+```python
+# Create an intelligent agent with all features
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable all learning features
+agent.enableRewardModulation(True)        # Learn from rewards
+agent.enableStructuralPlasticity(True)     # Grow/shrink connections
+agent.enableDevelopment(True)              # Mature over time
+agent.enableCuriosity(True)                # Explore novel things
+
+# Run learning episode
+for step in range(500):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Simulate reward based on action
+    reward = world.getAgentBody().getEnergy() * 0.01  # Simple reward model
+    agent.applyRewardModulation(reward, 0.0)  # Apply reward modulation
+
+# Get final agent intelligence metrics
+print(f"Final Performance:")
+print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+print(f"  Development stage: {agent.getDevelopmentalStage()}")
+print(f"  Curiosity level: {agent.getCuriosityLevel():.2f}")
+print(f"  Novelty level: {agent.getNoveltyLevel():.2f}")
+print(f"  Planning override count: {agent.getPlannerOverrideCount()}")
+```
 
 ---
 
@@ -261,6 +365,7 @@ print("Agent simulation complete!")
 | What you want | Code |
 |--------------|------|
 | Create brain | `pynlm.createBrain(config)` |
+| Create default config | `pynlm.createDefaultConfig()` |
 | Start brain | `brain.initialize()` |
 | Make brain think | `brain.step(step)` |
 | Create world | `pynlm.createSimpleWorld()` |
@@ -268,6 +373,9 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Apply reward | `agent.applyRewardModulation(reward, predicted)` |
+| Save brain | `brain.save("filename")` |
+| Load brain | `brain.load("filename")` |
 
 ---
 
@@ -276,22 +384,39 @@ print("Agent simulation complete!")
 **"My brain isn't doing anything"**
 - Did you call `brain.initialize()`?
 - Try increasing the number of steps
+- Check that neurons have been initialized
 
 **"The agent isn't moving"**
 - Did you call `world.applyMotorCommand()`?
 - Check that `world.update()` is being called
+- Verify that motor neurons are being activated
 
 **"Everything is 0"**
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
+- Check that neural initialization is happening properly
+
+**"Learning isn't happening"**
+- Enable reward modulation: `agent.enableRewardModulation(True)`
+- Enable structural plasticity: `agent.enableStructuralPlasticity(True)`
+- Check that plastic neurons have pre/post spike history
+
+**"Memory systems not working"**
+- Verify that working memory is properly configured
+- Check that episodic memory has storage capacity
+- Ensure prediction system is active
 
 ---
 
 ## Next Steps
 
 When you're comfortable:
+
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
+4. Create your own agent training simulations
+5. Try integrating with real-world environments
 
-That's it! You're now ready to use NLM.
+That's it! You're now ready to use NLM with confidence and can explore all the advanced features!
+

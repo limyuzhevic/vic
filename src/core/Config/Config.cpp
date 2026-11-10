@@ -211,28 +211,206 @@ std::optional<T> Config::get(const std::string& key) const {
     }, it->value);
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+} // namespace nlm
+
+// ConfigSchema implementation
+namespace nlm {
+
+ValidationResult ConfigSchema::validate(const Config& config) const {
+    ValidationResult result;
+    
+    for (const auto& rulePair : rules) {
+        const std::string& key = rulePair.first;
+        const ValidationRule& rule = rulePair.second;
+        
+        if (config.has(key)) {
+            const ConfigValue& value = config.get(key);
+            
+            // Check if value passes the validator
+            if (!rule.validator(value)) {
+                result.addError(rule.errorMessage + " (key: '" + key + "')");
+                continue;
+            }
+        } else {
+            // Check if default should be applied
+            if (rule.defaultGenerator) {
+                result.addWarning("Default value should be applied for key: '" + key + "'");
+            } else if (!rule.warningMessage.empty()) {
+                result.addWarning("Missing required configuration key: '" + key + "'");
+            }
+        }
+    }
+    
+    return result;
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+ConfigSchema ConfigSchema::createDefaultSchema() {
+    ConfigSchema schema;
+    
+    // Define configuration schema rules
+    // Random seed
+    schema.addRule("random_seed",
+                   [](const ConfigValue& v) { return std::get_if<int64_t>(&v) != nullptr; },
+                   "Random seed must be an integer");
+    
+    // Simulation timestep
+    schema.addRule("simulation_timestep",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "Simulation timestep must be a double");
+    
+    // Neuron count
+    schema.addRule("neuron_count",
+                   [](const ConfigValue& v) { return std::get_if<int64_t>(&v) != nullptr; },
+                   "Neuron count must be an integer");
+    
+    // Region count
+    schema.addRule("region_count",
+                   [](const ConfigValue& v) { return std::get_if<int64_t>(&v) != nullptr; },
+                   "Region count must be an integer");
+    
+    // Connection probability
+    schema.addRule("connection_probability",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "Connection probability must be a double");
+    
+    // STDP LTP weight
+    schema.addRule("stdp_ltp_weight",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "STDP LTP weight must be a double");
+    
+    // STDP LTD weight
+    schema.addRule("stdp_ltd_weight",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "STDP LTD weight must be a double");
+    
+    // STDP tau
+    schema.addRule("stdp_tau",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "STDP tau must be a double");
+    
+    // Synaptogenesis rate
+    schema.addRule("synaptogenesis_rate",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "Synaptogenesis rate must be a double");
+    
+    // Pruning rate
+    schema.addRule("pruning_rate",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "Pruning rate must be a double");
+    
+    // Hebbian learning rate
+    schema.addRule("hebbian_rate",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "Hebbian rate must be a double");
+    
+    // Developmental stage
+    schema.addRule("developmental_stage",
+                   [](const ConfigValue& v) { return std::get_if<std::string>(&v) != nullptr; },
+                   "Developmental stage must be a string",
+                   "Valid stages: Initial, CriticalPeriod, Maturation, Adult, Aging",
+                   nullptr,
+                   {-1e6, 1e6},
+                   {"Initial", "CriticalPeriod", "Maturation", "Adult", "Aging"});
+    
+    // Replay interval
+    schema.addRule("replay_interval",
+                   [](const ConfigValue& v) { return std::get_if<int64_t>(&v) != nullptr; },
+                   "Replay interval must be an integer");
+    
+    // Consolidation interval
+    schema.addRule("consolidation_interval",
+                   [](const ConfigValue& v) { return std::get_if<int64_t>(&v) != nullptr; },
+                   "Consolidation interval must be an integer");
+    
+    // Dopamine level
+    schema.addRule("dopamine_level",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "Dopamine level must be a double");
+    
+    // Curiosity level
+    schema.addRule("curiosity_level",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "Curiosity level must be a double");
+    
+    // Novelty level
+    schema.addRule("novelty_level",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "Novelty level must be a double");
+    
+    // Prediction error
+    schema.addRule("prediction_error",
+                   [](const ConfigValue& v) { return std::get_if<double>(&v) != nullptr; },
+                   "Prediction error must be a double");
+    
+    return schema;
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+std::string ConfigSchema::getSchemaDocumentation() {
+    std::string doc = "=== NLM Configuration Schema ===\n\n";
+    doc += "This schema defines the validation rules for all NLM configuration parameters.\n\n";
+    
+    for (const auto& rulePair : rules) {
+        const std::string& key = rulePair.first;
+        const ValidationRule& rule = rulePair.second;
+        
+        doc += "Key: '" + key + "'\n";
+        doc += "  Type: Automatically inferred\n";
+        doc += "  Required: " + (rule.validator ? "Yes" : "No") + "\n";
+        doc += "  Error Message: " + rule.errorMessage + "\n";
+        if (!rule.warningMessage.empty()) {
+            doc += "  Warning: " + rule.warningMessage + "\n";
+        }
+        if (!rule.allowedValues.empty()) {
+            doc += "  Allowed Values: ";
+            for (size_t i = 0; i < rule.allowedValues.size(); ++i) {
+                if (i > 0) doc += ", ";
+                doc += "'" + rule.allowedValues[i] + "'";
+            }
+            doc += "\n";
+        }
+        doc += "\n";
+    }
+    
+    return doc;
+}
+
+} // namespace nlm
+
+// Implement the helper functions in the Config.cpp namespace
+namespace nlm {
+
+bool getBool(const ConfigValue& value) {
+    if (auto b = std::get_if<bool>(&value)) {
+        return *b;
+    }
+    return false;
+}
+
+int64_t getInt(const ConfigValue& value) {
+    if (auto i = std::get_if<int>(&value)) {
+        return *i;
+    } else if (auto i64 = std::get_if<int64_t>(&value)) {
+        return *i64;
+    }
+    return 0;
+}
+
+double getDouble(const ConfigValue& value) {
+    if (auto d = std::get_if<double>(&value)) {
+        return *d;
+    } else if (auto i = std::get_if<int>(&value)) {
+        return *i;
+    } else if (auto i64 = std::get_if<int64_t>(&value)) {
+        return *i64;
+    }
+    return 0.0;
+}
+
+std::string getString(const ConfigValue& value) {
+    if (auto s = std::get_if<std::string>(&value)) {
+        return *s;
+    }
+    return "";
+}
 
 } // namespace nlm

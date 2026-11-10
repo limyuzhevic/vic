@@ -268,6 +268,12 @@ bool Brain::initialize() {
         if (region) {
             // Initialize random connectivity and synapse weights
             region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+            
+            // Initialize neurons with biologically plausible random values
+            // This ensures neurons start with realistic membrane potentials, thresholds, etc.
+            for (auto& pop : region->getPopulations()) {
+                pop->initializeRandom(*pImpl->rng);
+            }
         }
     }
     
