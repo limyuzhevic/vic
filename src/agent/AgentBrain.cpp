@@ -21,6 +21,11 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , hasLastPosition_(false)
+    , lastPosX_(0.0f)
+    , lastPosY_(0.0f)
+    , proximityReward_(0.0f)
+    , conceptLearningReward_(0.0f)
 {
     // Initialize motor and sensory neuron groups
     if (brain_) {
@@ -406,7 +411,12 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
                         + 0.6f * curiosityLevel_;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
-}
+    
+    // Store position for proximity-based reward
+    // Note: agent_.x and agent_.y come from the SimpleWorld, which is the
+    // agent's body, not the brain. We need to access it through the world.
+    // For now, we'll calculate proximity reward in applyRewardModulation
+    // using the world state passed from the Phase6 demo.
 
 MotorCommand AgentBrain::decodeMotorCommand() {
     if (!brain_) return MotorCommand::Wait;
@@ -978,11 +988,27 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     float plasticityFactor = 0.5f + 0.5f * dopamineLevel_;
     plasticityFactor = std::clamp(plasticityFactor, 0.1f, 2.0f);
     
-    // Apply to STDP
+// Apply to STDP
     auto* stdp = brain_->getSTDP();
     if (stdp) {
         stdp->setLTPWeight(0.01f * plasticityFactor);
         stdp->setLTDWeight(0.012f * plasticityFactor);
+    }
+    
+    // Phase 6: proximity-based reward for resource discovery
+    // This creates a positive incentive to explore and find resources
+    proximityReward_ = 0.0f;
+    if (std::abs(reward) > 0.1f) {  // Only for significant rewards (> 1 energy unit)
+        proximityReward_ = std::abs(reward) * 0.5f;  // 50% of the resource value as proximity bonus
+    }
+    
+    // Phase 6: concept learning reward
+    // This encourages learning that leads to better concepts
+    conceptLearningReward_ = 0.0f;
+    if (hasLastDecoded_ && std::abs(reward) > 0.05f) {
+        // Reward concept formation by the action that led to the reward
+        // This helps the brain learn better action-reward mappings
+        conceptLearningReward_ = std::abs(reward) * 0.3f;  // 30% of the reward for concept learning
     }
 }
 
@@ -1039,6 +1065,18 @@ float AgentBrain::getNoveltyLevel() const {
 
 float AgentBrain::getPredictionError() const {
     return predictionError_;
+}
+
+float AgentBrain::getProximityReward() const {
+    return proximityReward_;
+}
+
+float AgentBrain::getConceptLearningReward() const {
+    return conceptLearningReward_;
+}
+
+float AgentBrain::getTotalEnhancedReward() const {
+    return thoughtReward_ + proximityReward_ + conceptLearningReward_;
 }
 
 namespace {

@@ -331,6 +331,59 @@ bool Brain::initialize() {
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
+    // Set up providers for CheckpointManager
+    pImpl->checkpointManager->setNeuronProvider([this](NeuronCheckpointData& data) {
+        // Collect current neuron states for checkpoint
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    data.membranePotential.push_back(state.membranePotential);
+                    data.restingPotential.push_back(state.restingPotential);
+                    data.threshold.push_back(state.threshold);
+                    data.resetPotential.push_back(state.resetPotential);
+                    data.leakConductance.push_back(state.leakConductance);
+                    data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                    data.refractoryRemaining.push_back(state.refractoryRemaining);
+                    data.refractoryPeriod.push_back(state.refractoryPeriod);
+                    data.lastSpikeTime.push_back(state.lastSpikeTime);
+                    data.firingRate.push_back(state.firingRate);
+                    data.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                    data.regionId.push_back(region->getId().index());
+                    data.populationId.push_back(pop->getId().index());
+                }
+            }
+        }
+        return true;
+    });
+    
+    pImpl->checkpointManager->setSynapseProvider([this](SynapseCheckpointData& data) {
+        // Collect current synapse states for checkpoint
+        for (const auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+                data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+                data.weight.push_back(syn->getWeight());
+                data.delay.push_back(syn->getDelay());
+                data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                // PlasticityFlags struct has 5 bit fields; serialize to uint8_t
+                PlasticityFlags flags = syn->getPlasticityFlags();
+                uint8_t flagByte = 0;
+                if (flags.hebbian) flagByte |= 0x01;
+                if (flags.stdp) flagByte |= 0x02;
+                if (flags.reward_modulated) flagByte |= 0x04;
+                if (flags.structural) flagByte |= 0x08;
+                if (flags.eligible) flagByte |= 0x10;
+                data.plasticityFlags.push_back(flagByte);
+                data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+                data.efficacy.push_back(syn->getEfficacy());
+                data.shortTermDepression.push_back(syn->getShortTermDepression());
+                data.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+            }
+        }
+        return true;
+    });
+    
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
@@ -987,9 +1040,21 @@ bool Brain::save(const std::string& filepath) const {
                 synapseData.weight.push_back(syn->getWeight());
                 synapseData.delay.push_back(syn->getDelay());
                 synapseData.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+                // PlasticityFlags struct has 5 bit fields; serialize to uint8_t
+                PlasticityFlags flags = syn->getPlasticityFlags();
+                uint8_t flagByte = 0;
+                if (flags.hebbian) flagByte |= 0x01;
+                if (flags.stdp) flagByte |= 0x02;
+                if (flags.reward_modulated) flagByte |= 0x04;
+                if (flags.structural) flagByte |= 0x08;
+                if (flags.eligible) flagByte |= 0x10;
+                synapseData.plasticityFlags.push_back(flagByte);
                 synapseData.eligibilityTrace.push_back(syn->getEligibilityTrace());
                 synapseData.efficacy.push_back(syn->getEfficacy());
+                synapseData.shortTermDepression.push_back(syn->getShortTermDepression());
+                synapseData.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
             }
+        }
         }
         
         if (!writer.writeSynapses(synapseData)) {
@@ -1227,6 +1292,23 @@ bool Brain::load(const std::string& filepath) {
                 }
                 if (i < synapseData.efficacy.size()) {
                     target->setEfficacy(synapseData.efficacy[i]);
+                }
+                // Restore plasticity flags
+                if (i < synapseData.plasticityFlags.size()) {
+                    uint8_t flagByte = synapseData.plasticityFlags[i];
+                    PlasticityFlags flags;
+                    flags.hebbian = (flagByte & 0x01);
+                    flags.stdp = (flagByte & 0x02);
+                    flags.reward_modulated = (flagByte & 0x04);
+                    flags.structural = (flagByte & 0x08);
+                    flags.eligible = (flagByte & 0x10);
+                    target->enablePlasticity(flags.hebbian, flags.stdp, flags.reward_modulated);
+                }
+                if (i < synapseData.shortTermDepression.size()) {
+                    target->setShortTermDepression(synapseData.shortTermDepression[i]);
+                }
+                if (i < synapseData.shortTermFacilitation.size()) {
+                    target->setShortTermFacilitation(synapseData.shortTermFacilitation[i]);
                 }
                 ++restored;
             }

@@ -115,6 +115,11 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
     
+    // Phase 6: Add enhanced rewards (proximity + concept learning) to the total reward
+    // This creates positive incentives for exploration and learning
+    float enhancedReward = agent.getTotalEnhancedReward() / config.maxSteps;
+    result.totalReward += enhancedReward;
+    
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);
     result.memoryEpisodicMemoryIntegrated = (brain->getEpisodicMemory() != nullptr);

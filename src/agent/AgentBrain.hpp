@@ -70,7 +70,16 @@ public:
     
     // Get prediction error
     float getPredictionError() const;
-
+    
+    // Get proximity-based reward (Phase 6 enhancement)
+    float getProximityReward() const;
+    
+    // Get concept learning reward (Phase 6 enhancement)
+    float getConceptLearningReward() const;
+    
+    // Get total enhanced reward (base + proximity + concept learning)
+    float getTotalEnhancedReward() const;
+    
     // Thought trace (Phase 5): a one-line, human-readable record of the
     // most recent loop — what was perceived, what the planner suggested
     // from learned action quality, what the brain actually decoded, and
@@ -262,6 +271,15 @@ private:
     bool hasThoughtPlanned_ = false;
     float thoughtReward_ = 0.0f;
     bool hasThoughtOutcome_ = false;
+    
+    // Phase 6 position tracking for proximity-based reward
+    bool hasLastPosition_ = false;
+    float lastPosX_ = 0.0f;
+    float lastPosY_ = 0.0f;
+    
+    // Phase 6 proximity-based reward
+    float proximityReward_ = 0.0f;
+    float conceptLearningReward_ = 0.0f;
 };
 
 } // namespace nlm
