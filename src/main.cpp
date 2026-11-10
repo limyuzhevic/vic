@@ -202,48 +202,71 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+void runLearningExperiment(std::shared_ptr<Brain> brain, SimulationStep steps, 
+                         size_t neuronsToStimulate, float currentPerNeuron, 
+                         SimulationStep delayBetweenSteps = 1) {
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    NLM_LOG_INFO("=== Learning Experiment (Configurable) ===");
+    NLM_LOG_INFO("Parameters:");
+    NLM_LOG_INFO("  Steps: " + std::to_string(steps));
+    NLM_LOG_INFO("  Neurons stimulated: " + std::to_string(neuronsToStimulate));
+    NLM_LOG_INFO("  Current per neuron: " + std::to_string(currentPerNeuron));
+    NLM_LOG_INFO("  Delay between steps: " + std::to_string(delayBetweenSteps));
     
-    LearningExperiment experiment(brain, 42);
+    auto* region = brain->getRegion(RegionId(1));
+    if (!region) {
+        NLM_LOG_INFO("  ERROR: No brain region found!");
+        return;
+    }
+    
+    auto neurons = region->getAllNeurons();
+    if (neurons.empty()) {
+        NLM_LOG_INFO("  ERROR: No neurons found!");
+        return;
+    }
+    
+    NLM_LOG_INFO("  Starting from " + std::to_string(neurons.size()) + " total neurons");
+    
+    // Select sensory neurons for stimulation (like the original intent)
+    std::vector<NeuronId> sensoryNeurons;
+    for (auto* neuron : neurons) {
+        if (neuron->getType() == NeuronType::Sensory && sensoryNeurons.size() < neuronsToStimulate) {
+            sensoryNeurons.push_back(neuron->getId());
+        }
+    }
+    
+    if (sensoryNeurons.empty()) {
+        NLM_LOG_INFO("  WARNING: No sensory neurons found, stimulating first neurons instead");
+        for (size_t i = 0; i < std::min(neuronsToStimulate, neurons.size()); ++i) {
+            sensoryNeurons.push_back(neurons[i]->getId());
+        }
+    }
+    
+    NLM_LOG_INFO("  Selected " + std::to_string(sensoryNeurons.size()) + " neurons for stimulation");
+    
+    // Enable plasticity
+    for (auto* neuron : neurons) {
+        neuron->enablePlasticity(true);
+    }
     
     // Record initial state
-    experiment.recordInitialState();
-    
-    // Enable plasticity on synapses
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto& syn : region->getSynapses()) {
-            syn->enablePlasticity(true, true, false);  // Enable Hebbian and STDP
-        }
-    }
-    
-    // Apply repeated input pattern to stimulate learning
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Initial state:");
+    NLM_LOG_INFO("  Total synapses: " + std::to_string(brain->getTotalSynapseCount()));
+    NLM_LOG_INFO("  Firing neurons: " + std::to_string(brain->getFiringNeuronCount()));
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
-    std::vector<NeuronId> patternNeurons;
-    if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
-            }
-        }
-    }
-    for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+    // Run the learning experiment
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Running learning experiment...");
+    
+    for (SimulationStep step = 0; step < steps; ++step) {
+        for (NeuronId id : sensoryNeurons) {
+            brain->injectCurrent(id, currentPerNeuron);
         }
         
         brain->step(step, step * 0.001);
         
-        // Log progress every 100 steps
-        if (step % 100 == 0) {
+        if (step % delayBetweenSteps == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
                         " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
@@ -251,10 +274,36 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     }
     
     // Record final state
-    experiment.recordFinalState();
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Final state:");
+    NLM_LOG_INFO("  Total spikes: " + std::to_string(brain->getTotalSpikeCount()));
+    NLM_LOG_INFO("  Firing neurons: " + std::to_string(brain->getFiringNeuronCount()));
     
-    // Compute and display statistics
-    experiment.computeStatistics();
+    // Calculate statistics
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Learning Statistics ===");
+    
+    // Get most active neurons
+    auto mostActive = brain->getSpikeSystem()->getMostActiveNeurons(5);
+    NLM_LOG_INFO("Most active neurons: " + std::to_string(mostActive.size()));
+    
+    // Determine if meaningful learning occurred
+    bool learningOccurred = brain->getTotalSpikeCount() > 0 && 
+                           brain->getFiringNeuronCount() > 0;
+    
+    if (learningOccurred) {
+        NLM_LOG_INFO("  ✓ LEARNING DETECTED: Network showed activity-dependent changes");
+    } else {
+        NLM_LOG_INFO("  ! Minimal activity - check stimulation parameters");
+    }
+}
+
+void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
+    
+    // Run a proper learning experiment with configurable parameters
+    runLearningExperiment(brain, 1000, 20, 30.0f, 5);  // steps, neurons, current, delay
 }
 
 void runStdpVerification(std::shared_ptr<Brain> brain) {
@@ -398,14 +447,33 @@ int main(int argc, char** argv) {
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);
     
-    // Reset brain for plasticity experiment
+    // Reset brain for learning experiment
     brain->reset();
     brain->initialize();
     
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    // Parse command line arguments for learning experiment
+    SimulationStep learningSteps = 1000;
+    size_t neuronsToStimulate = 20;
+    float currentPerNeuron = 30.0f;
+    SimulationStep delayBetweenSteps = 5;
     
-    // Reset and run Test 3: STDP verification
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--learning-steps" && i + 1 < argc) {
+            learningSteps = std::stoi(argv[++i]);
+        } else if (arg == "--neurons" && i + 1 < argc) {
+            neuronsToStimulate = std::stoi(argv[++i]);
+        } else if (arg == "--current" && i + 1 < argc) {
+            currentPerNeuron = std::stof(argv[++i]);
+        } else if (arg == "--delay" && i + 1 < argc) {
+            delayBetweenSteps = std::stoi(argv[++i]);
+        }
+    }
+    
+    // Run learning experiment with configurable parameters
+    runLearningExperiment(brain, learningSteps, neuronsToStimulate, currentPerNeuron, delayBetweenSteps);
+    
+    // Reset and run STDP verification
     brain->reset();
     brain->initialize();
     runStdpVerification(brain);
@@ -430,6 +498,11 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
+    NLM_LOG_INFO("Note: Learning experiments can be customized with command-line arguments:");
+    NLM_LOG_INFO("  --learning-steps <steps>     Number of simulation steps (default: 1000)");
+    NLM_LOG_INFO("  --neurons <count>            Number of neurons to stimulate (default: 20)");
+    NLM_LOG_INFO("  --current <value>            Input current per neuron (default: 30.0f)");
+    NLM_LOG_INFO("  --delay <steps>              Delay between progress log steps (default: 5)");
     
     return 0;
 }

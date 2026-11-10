@@ -356,10 +356,27 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("stage"),
              "Set developmental stage")
         .def("getConfig", &Brain::getConfig,
-             py::return_value_policy::reference_internal,
-             "Get the configuration")
+              py::return_value_policy::reference_internal,
+              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+              "Log brain status")
+        .def("copy", [](const Brain& self) {
+            return std::make_shared<Brain>(self.getConfig());
+        }, "Create a copy of the brain with the same configuration")
+        .def("__enter__", [](py::object self) { return self; })
+        .def("__exit__", [](py::object self, py::args args, py::kwargs kwargs) {
+            return py::none;
+        })
+        .def("__repr__", [](const Brain& brain) {
+            return "<Brain: " + std::to_string(brain.getTotalNeuronCount()) + " neurons, " +
+                   std::to_string(brain.getTotalSynapseCount()) + " synapses, " +
+                   std::to_string(brain.getTotalSpikeCount()) + " spikes>";
+        })
+        .def("__str__", [](const Brain& brain) {
+            return "Brain with " + std::to_string(brain.getTotalNeuronCount()) + " neurons, " +
+                   std::to_string(brain.getTotalSynapseCount()) + " synapses, " +
+                   std::to_string(brain.getTotalSpikeCount()) + " total spikes";
+        });
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -407,27 +424,109 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
-
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
-        return std::make_shared<Config>();
-    }, "Create a default configuration");
-
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
-
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
-
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
-
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    
+    // Add AgentBrain convenience functions and context managers
+    m.def("run_agent_simulation", [](std::shared_ptr<AgentBrain> agent, std::shared_ptr<SimpleWorld> world, 
+                                     SimulationStep steps) {
+        for (SimulationStep step = 0; step < steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            
+            // For headless simulations, we'll use the brain's step directly
+            // In real usage, you'd want to get action from agent and apply it
+            auto brain = agent->getBrain();
+            brain->step(step);
+            
+            // Apply reward modulation if enabled
+            if (agent->isRewardModulationEnabled()) {
+                auto reward = !percept.getInternal().empty() ? percept.getInternal()[0] : 0.0f;
+                agent->applyRewardModulation(reward, 0.0f);
+            }
+            
+            agent->updateDevelopment(0.1);
+        }
+        
+        return std::make_pair(agent->getBrain()->getTotalSpikeCount(), 
+                             agent->getCuriosityLevel());
+    }, py::arg("agent"), py::arg("world"), py::arg("steps"),
+              "Run a complete agent simulation with given brain and world");
+    
+    // Add experiment utilities
+    m.def("create_experiment_config", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set experiment-friendly defaults
+        config->set("brain.neuron_count", static_cast<int64_t>(1000), ConfigSource::User);
+        config->set("brain.synapse_density", 0.15f, ConfigSource::User);
+        config->set("plasticity.stdp.enable", true, ConfigSource::User);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::User);
+        config->set("neuromod.dopamine.scale", 2.0f, ConfigSource::User);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::User);
+        config->set("neuromod.novelty.enable", true, ConfigSource::User);
+        
+        return config;
+    }, "Create configuration optimized for experiments");
+    m.attr("__version__") = "0.1.0";
+    m.attr("__author__") = "NLM Authors";
+    m.attr("__description__") = "Python bindings for NLM (Neural Learning Machine) C++ neural simulation framework";
+    
+    // Add package metadata
+    py::module::enable_gil(true);
+    
+    // Add convenience functions
+    m.def("get_library_info", []() {
+        return "NLM Python bindings version 0.1.0";
+    }, "Get library information and version");
+    
+    m.def("validate_config", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::runtime_error("Configuration is null");
+        }
+        
+        auto keys = config->getKeys();
+        if (keys.empty()) {
+            throw std::runtime_error("Configuration is empty");
+        }
+        
+        return keys;
+    }, py::arg("config"), "Validate configuration and return keys");
+    
+    // Add configuration helper functions
+    m.def("create_config_from_dict", [](const py::dict& config_dict) {
+        auto config = std::make_shared<Config>();
+        
+        for (auto item : config_dict) {
+            std::string key = py::str(item.first);
+            
+            py::object value = item.second;
+            if (value.is(py::int_())) {
+                config->set(key, value.cast<int64_t>(), ConfigSource::User);
+            } else if (value.is(py::float_())) {
+                config->set(key, value.cast<float>(), ConfigSource::User);
+            } else if (value.is(py::str())) {
+                // String values are not directly supported by config, skip or convert as needed
+                continue;
+            } else if (value.is(py::bool_())) {
+                config->set(key, value.cast<bool>(), ConfigSource::User);
+            }
+        }
+        
+        return config;
+    }, py::arg("config_dict"), "Create configuration from Python dictionary");
+    
+    m.def("create_config_from_env", []() {
+        auto config = std::make_shared<Config>();
+        
+        // Set some sensible defaults for Python users
+        config->set("brain.neuron_count", static_cast<int64_t>(500), ConfigSource::User);
+        config->set("brain.synapse_density", 0.1f, ConfigSource::User);
+        config->set("plasticity.stdp.enable", true, ConfigSource::User);
+        config->set("plasticity.hebbian.enable", true, ConfigSource::User);
+        config->set("neuromod.dopamine.scale", 1.0f, ConfigSource::User);
+        config->set("neuromod.curiosity.enable", true, ConfigSource::User);
+        
+        return config;
+    }, "Create default configuration with Python-friendly defaults");
 
 } // namespace nlm
