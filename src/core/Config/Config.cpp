@@ -19,39 +19,103 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Enhanced config loader with better type support and error handling
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not open config file: " + filepath);
         return false;
     }
     
+    // Clear existing config
+    clear();
+    
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        ++lineNum;
+        
         // Skip empty lines and comments
+        size_t commentPos = line.find('#');
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+        }
+        
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty()) continue;
+        
+        // Parse key = value pairs with support for nested keys
+        size_t equalPos = line.find('=');
+        if (equalPos == std::string::npos) {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": " + line);
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
+        std::string key = trim(line.substr(0, equalPos));
+        std::string valueStr = trim(line.substr(equalPos + 1));
+        
+        // Remove quotes if present
+        if (valueStr.size() >= 2 && 
+            ((valueStr.front() == '"' && valueStr.back() == '"') ||
+             (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+            valueStr = valueStr.substr(1, valueStr.size() - 2);
+        }
+        
+        // Handle nested configuration keys (e.g., brain.neuron_count)
+        if (key.find('.') != std::string::npos) {
+            // For now, treat as single key with dots
+            // Could be enhanced to create nested Config objects
+            NLM_LOG_DEBUG("Parsed nested config key: " + key + " = " + valueStr);
+        }
+        
+        // Try to parse value as different types
+        bool parsed = false;
+        
+        // Try as integer
+        try {
+            size_t pos;
+            int64_t intVal = std::stoll(valueStr, &pos);
+            if (pos == valueStr.length()) {
+                set(key, intVal, ConfigSource::File);
+                parsed = true;
+                NLM_LOG_DEBUG("Parsed integer: " + key + " = " + valueStr);
             }
-            
-            set(key, value, ConfigSource::File);
+        } catch (...) {}
+        
+        // Try as float
+        if (!parsed) {
+            try {
+                size_t pos;
+                double floatVal = std::stod(valueStr, &pos);
+                if (pos == valueStr.length()) {
+                    set(key, floatVal, ConfigSource::File);
+                    parsed = true;
+                    NLM_LOG_DEBUG("Parsed float: " + key + " = " + valueStr);
+                }
+            } catch (...) {}
+        }
+        
+        // Try as boolean
+        if (!parsed) {
+            std::string lowerValue = toLower(valueStr);
+            if (lowerValue == "true" || lowerValue == "1" || lowerValue == "yes") {
+                set(key, true, ConfigSource::File);
+                parsed = true;
+                NLM_LOG_DEBUG("Parsed boolean true: " + key + " = " + valueStr);
+            } else if (lowerValue == "false" || lowerValue == "0" || lowerValue == "no") {
+                set(key, false, ConfigSource::File);
+                parsed = true;
+                NLM_LOG_DEBUG("Parsed boolean false: " + key + " = " + valueStr);
+            }
+        }
+        
+        // As string (default)
+        if (!parsed) {
+            set(key, valueStr, ConfigSource::File);
+            NLM_LOG_DEBUG("Parsed string: " + key + " = " + valueStr);
         }
     }
     
+    NLM_LOG_INFO("Loaded configuration from: " + filepath);
     return true;
 }
 
@@ -81,14 +145,41 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Could not save config to file: " + filepath);
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated on " << getTimestamp() << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = ";
+        
+        // Write value based on type
+        std::visit([&](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << '"' << val << '"';
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (val ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, double>) {
+                file << val;
+            } else if constexpr (std::is_same_v<T, int64_t>) {
+                file << val;
+            } else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
+                file << val;
+            } else if constexpr (std::is_floating_point_v<T>) {
+                file << val;
+            } else {
+                file << "PLACEHOLDER_" << val;
+            }
+        }, entry.value);
+        
+        file << "\n\n";
     }
     
+    NLM_LOG_INFO("Saved configuration to: " + filepath);
     return true;
 }
 
