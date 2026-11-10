@@ -39,7 +39,7 @@ struct Brain::Impl {
     // ========== INTEGRATED PREDICTION SYSTEM ==========
     std::unique_ptr<PredictionSystem> predictionSystem;
     
-    // ========== INTEGRATED COGNITION SYSTEMS ==========
+    // ========== COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
     std::unique_ptr<ConceptFormation> conceptFormation;
     std::unique_ptr<AttentionalSelection> attention;
@@ -59,6 +59,19 @@ struct Brain::Impl {
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
+    // Motor system
+    std::unique_ptr<NeuralMotorSystem> motorSystem;
+    
+    // Goals for prediction
+    std::vector<NeuronId> goals;
+    
+    // Thread safety locks
+    std::mutex stepMutex;           // Protects step operations and shared data
+    std::mutex accessMutex;         // Protects access to regions, neurons, synapses
+    std::mutex memoryMutex;         // Protects memory system access
+    std::mutex predictionMutex;    // Protects prediction system access
+    std::mutex cognitionMutex;     // Protects cognition system access
+    
     // Simulation parameters
     TimestepDuration timestep;
     SimulationStep currentStep;
@@ -67,7 +80,7 @@ struct Brain::Impl {
     // Statistics
     size_t totalSpikesThisStep;
     size_t totalSpikesTotal;
-
+    
     // Phase 5 learned preference trait (see Brain.hpp). Updated only
     // from sandbox reward via AgentBrain; checkpointed with the
     // simulation state so a reloaded brain keeps what it learned.
@@ -550,6 +563,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // saturating, but they do not stop the *sum* of ~25 incoming
     // weights growing until every neuron is driven over threshold on
     // every refractory cycle — the periodic attractor of Phase 3.
+    // Step thread-safe implementation with mutex protection
+    std::lock_guard<std::mutex> stepLock(pImpl->stepMutex);
+    std::lock_guard<std::mutex> accessLock(pImpl->accessMutex);
+    
     // Rescaling only when the sum exceeds the cap, and scaling all
     // incoming excitatory weights by the same factor, preserves the
     // *relative* pattern of strengths (selectivity) while bounding
@@ -614,11 +631,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current sensory input
+        // Integrate prediction error with learning
+        integratePredictionSystem();
     }
     
-    // ========== STEP 9: Update attention system ==========
+    // ========== STEP 9: Integrate cognitive systems ==========
+    integrateCognitiveSystems();
+    
+    // ========== STEP 9B: Update attention system ==========
     if (pImpl->attention) {
         pImpl->attention->update(pImpl->timestep);
         
@@ -631,8 +652,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Integrate with prediction error for learning
+        integrateConceptFormation();
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -653,29 +675,116 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Development affects all integrated systems
+        auto developmentalStage = pImpl->developmentalStage;
+        float plasticityMod = 1.0f;
+        
+        switch (developmentalStage) {
+            case DevelopmentalStage::Initial:
+                plasticityMod = 1.0f;  // High plasticity
+                break;
+            case DevelopmentalStage::CriticalPeriod:
+                plasticityMod = 0.8f;
+                break;
+            case DevelopmentalStage::Maturation:
+                plasticityMod = 0.5f;
+                break;
+            case DevelopmentalStage::Adult:
+                plasticityMod = 0.2f;  // Stable
+                break;
+        }
+        
+        // Development effects on memory systems
+        if (pImpl->workingMemory) {
+            pImpl->workingMemory->setDecayRate(0.01f * plasticityMod);
+            pImpl->workingMemory->setCapacity(static_cast<size_t>(100 * plasticityMod));
+        }
+        if (pImpl->episodicMemory) {
+            // Episodic memory consolidation affected by development
+            pImpl->episodicMemory->setConsolidationThreshold(0.3f * plasticityMod);
+        }
+        if (pImpl->associativeMemory) {
+            // Associative memory connection strength affected by development
+            pImpl->associativeMemory->setConnectionStrength(plasticityMod);
+        }
+        
+        // Development effects on prediction system
+        if (pImpl->predictionSystem) {
+            // Prediction model learning rate affected by development
+            pImpl->predictionSystem->setLearningRate(0.01f * plasticityMod);
+        }
+        
+        // Development effects on cognitive systems
+        if (pImpl->planner) {
+            // Neural planner maturity affected by development
+            pImpl->planner->setMaturityLevel(plasticityMod);
+        }
+        if (pImpl->conceptFormation) {
+            // Concept formation sensitivity affected by development
+            pImpl->conceptFormation->setConceptSensitivity(plasticityMod);
+        }
+        if (pImpl->attention) {
+            // Attentional selection mechanisms affected by development
+            pImpl->attention->setInhibitionStrength(0.5f * plasticityMod);
+        }
+        
+        // Development effects on neuromodulation systems
+        if (pImpl->dopamine) {
+            // Dopamine system maturation affected by development
+            pImpl->dopamine->setMaturationLevel(plasticityMod);
+        }
+        if (pImpl->curiosity) {
+            // Curiosity system development affected by development
+            pImpl->curiosity->setDevelopmentFactor(plasticityMod);
+        }
+        if (pImpl->novelty) {
+            // Novelty detection sensitivity affected by development
+            pImpl->novelty->setSensitivity(0.8f * plasticityMod);
+        }
+        if (pImpl->predictionError) {
+            // Prediction error learning affected by development
+            pImpl->predictionError->setLearningRate(0.02f * plasticityMod);
+        }
+        
+        // Development effects on plasticity
         auto* sp = pImpl->structuralPlasticity.get();
         if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
+        }
+        
+        // Development effects on working memory
+        if (pImpl->workingMemory) {
+            // Working memory capacity increases with development
+            pImpl->workingMemory->setCapacity(static_cast<size_t>(100 * plasticityMod));
+            pImpl->workingMemory->setDecayRate(0.01f * (1.0f - plasticityMod)); // Slower decay in mature brain
+        }
+        
+        // Development effects on attention
+        if (pImpl->attention) {
+            // Attentional control improves with development
+            pImpl->attention->setInhibitionStrength(0.5f * plasticityMod);
+            pImpl->attention->setExcitationStrength(1.5f * plasticityMod);
+        }
+        
+        // Development effects on memory consolidation
+        if (pImpl->episodicMemory) {
+            // Episodic memory consolidation improves with development
+            pImpl->episodicMemory->setConsolidationThreshold(0.2f * (2.0f - plasticityMod));
+        }
+        
+        // Development effects on learning rates
+        if (pImpl->stdp) {
+            // STDP learning rate affected by development
+            float currentLtp = pImpl->stdp->getLTPWeight();
+            float currentLtd = pImpl->stdp->getLTDWeight();
+            pImpl->stdp->configure(currentLtp * plasticityMod, currentLtd * plasticityMod, 20.0f);
+        }
+        
+        // Development effects on synaptic stability
+        if (pImpl->hebbian) {
+            // Hebbian learning affected by development
+            pImpl->hebbian->setWeightRange(plasticityMod);
         }
     }
     
@@ -1503,6 +1612,148 @@ void Brain::setLearnedPreference(float preference) {
     pImpl->learnedPreference = std::clamp(preference, -1.0f, 1.0f);
 }
 
+// ========== COGNITIVE SYSTEM INTEGRATION ==========
+
+void Brain::integrateCognitiveSystems() {
+    // Integrate NeuralPlanner with action selection
+    if (pImpl->planner && getMotorSystem()) {
+        pImpl->planner->setActionSelector(getMotorSystem());
+        pImpl->planner->setWorldInterface(this);
+        pImpl->planner->setTimeStep(pImpl->timestep);
+    }
+    
+    // Connect concept formation to memory
+    if (pImpl->conceptFormation) {
+        if (auto* wm = getWorkingMemory()) {
+            pImpl->conceptFormation->setWorkingMemory(wm);
+        }
+        if (auto* em = getEpisodicMemory()) {
+            pImpl->conceptFormation->setEpisodicMemory(em);
+        }
+        if (auto* pm = getPredictionSystem()) {
+            pImpl->conceptFormation->setPredictionSystem(pm);
+        }
+    }
+    
+    // Connect attention to working memory and prediction
+    if (pImpl->attention) {
+        if (auto* wm = getWorkingMemory()) {
+            pImpl->attention->setWorkingMemory(wm);
+        }
+        if (auto* pm = getPredictionSystem()) {
+            pImpl->attention->setPredictionSystem(pm);
+        }
+    }
+    
+    // Connect prediction error to neuromodulation
+    if (pImpl->predictionError) {
+        pImpl->predictionError->setPredictionSource(getPredictionSystem());
+        pImpl->predictionError->setWorkingMemory(getWorkingMemory());
+    }
+}
+
+void Brain::integratePredictionSystem() {
+    if (!pImpl->predictionSystem) return;
+    
+    // Convert neural activity to sensory input
+    auto sensoryData = convertNeuralActivityToSensoryInput();
+    
+    // Generate predictions
+    auto predictions = pImpl->predictionSystem->predictNextState(sensoryData);
+    
+    // Compare with expected outcomes (when available)
+    if (hasExpectedOutcome()) {
+        // Simple prediction error computation for now
+        float error = computePredictionError(sensoryData, predictions.get());
+        applyPredictionErrorLearning(error);
+    }
+}
+
+void Brain::integrateConceptFormation() {
+    if (!pImpl->conceptFormation) return;
+    
+    // Collect current neural activity patterns
+    std::vector<float> currentActivity;
+    for (const auto& region : pImpl->regions) {
+        for (const auto& pop : region->getPopulations()) {
+            for (auto* neuron : pop->getNeurons()) {
+                if (neuron->isFiring()) {
+                    currentActivity.push_back(neuron->getState().membranePotential);
+                } else {
+                    currentActivity.push_back(0.0f);
+                }
+            }
+        }
+    }
+    
+    // Process patterns to form concepts
+    if (!currentActivity.empty()) {
+        pImpl->conceptFormation->processPattern(currentActivity);
+    }
+    
+    // Apply learned concepts to behavior
+    auto learnedConcepts = pImpl->conceptFormation->getActiveConcepts();
+    for (const auto& concept : learnedConcepts) {
+        applyConceptToBehavior(concept);
+    }
+}
+
+// Helper methods
+
+std::vector<float> Brain::collectSensoryData() const {
+    std::vector<float> sensoryData;
+    
+    // Collect from all sensory neurons
+    for (NeuronId id : pImpl->sensoryNeurons) {
+        auto it = pImpl->neuronById.find(id.index());
+        if (it != pImpl->neuronById.end()) {
+            sensoryData.push_back(it->second->getState().membranePotential);
+        }
+    }
+    
+    return sensoryData;
+}
+
+bool Brain::hasExpectedOutcome() const {
+    // Check if there's a goal or target to predict
+    return !pImpl->goals.empty();
+}
+
+void Brain::applyPredictionErrorLearning(float error) {
+    if (pImpl->predictionError) {
+        pImpl->predictionError->update(error, pImpl->timestep);
+        
+        // Apply prediction error to neuromodulation
+        if (pImpl->dopamine) {
+            pImpl->dopamine->setPredictionError(error);
+        }
+        if (pImpl->curiosity) {
+            pImpl->curiosity->setPredictionError(error);
+        }
+    }
+}
+
+void Brain::applyConceptToBehavior(const Concept& concept) {
+    // Apply learned concept to influence behavior
+    // This is a simplified implementation - in a real system, concepts
+    // would be used to guide action selection, attention, and learning
+    
+    // For now, just log the concept application
+    if (concept.confidence > 0.5f) {
+        NLM_LOG_INFO("Applying concept to behavior: " + concept.description + 
+                    " (confidence: " + std::to_string(concept.confidence) + ")");
+    }
+}
+
+NeuralMotorSystem* Brain::getMotorSystem() {
+    // Return the motor system for action selection
+    // This is a simplified implementation
+    if (!pImpl->motorSystem) {
+        pImpl->motorSystem = std::make_unique<NeuralMotorSystem>();
+    }
+    return pImpl->motorSystem.get();
+}
+
 ConceptFormation* Brain::getConceptFormation() {
     return pImpl->conceptFormation.get();
 }
@@ -1510,8 +1761,6 @@ ConceptFormation* Brain::getConceptFormation() {
 AttentionalSelection* Brain::getAttention() {
     return pImpl->attention.get();
 }
-
-// ========== DEVELOPMENT SYSTEM ==========
 
 DevelopmentSystem* Brain::getDevelopmentSystem() {
     return pImpl->developmentSystem.get();

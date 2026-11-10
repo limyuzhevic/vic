@@ -6,45 +6,12 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include "TypedConfiguration.hpp"
 
 namespace nlm {
 
-// Forward declarations
-class Config;
-
-// Configuration value types
-using ConfigValue = std::variant<
-    int,
-    int64_t,
-    double,
-    bool,
-    std::string,
-    std::vector<int>,
-    std::vector<double>,
-    std::vector<std::string>
->;
-
-// Configuration source
-enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
-};
-
-// Main configuration class
+// Backward compatibility: Use the new TypedConfiguration internally
+// For backward compatibility, we keep the same interface
 class Config {
 public:
     Config();
@@ -56,7 +23,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports both simple key=value and JSON formats)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -65,17 +32,15 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
-    // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    // Get values (backward compatibility)
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set values (backward compatibility)
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
@@ -95,13 +60,45 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
+    // Advanced: Access the underlying typed configuration
+    TypedConfiguration& getTypedConfig() { return typedConfig; }
+    const TypedConfiguration& getTypedConfig() const { return typedConfig; }
     
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+private:
+    // Use the new typed configuration internally
+    TypedConfiguration typedConfig;
+    
+    // Helper to get section name from key (for backward compatibility)
+    static std::string extractSectionName(const std::string& key, const std::string& defaultSection = "general");
+    
+    // Helper to extract key from full key with section
+    static std::string extractKey(const std::string& fullKey);
+    
+    // Convert old ConfigValue to new TypedConfiguration format
+    static TypedConfiguration::ConfigValue convertToTyped(const ConfigValue& oldValue);
+    
+    // Convert TypedConfiguration format to old ConfigValue
+    static ConfigValue convertFromTyped(const TypedConfiguration::ConfigValue& newValue);
+};
+
+// Configuration source enum (for backward compatibility)
+enum class ConfigSource {
+    Default,
+    File,
+    CommandLine,
+    Runtime
+};
+
+// Configuration entry (for backward compatibility)
+struct ConfigEntry {
+    std::string key;
+    std::variant<int, int64_t, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>> value;
+    ConfigSource source;
+    std::string description;
+    
+    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
+    ConfigEntry(const std::string& k, const std::variant<int, int64_t, double, bool, std::string, std::vector<int>, std::vector<double>, std::vector<std::string>>& v, ConfigSource s, const std::string& desc = "")
+        : key(k), value(v), source(s), description(desc) {}
 };
 
 } // namespace nlm

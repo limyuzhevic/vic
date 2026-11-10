@@ -88,49 +88,81 @@ public:
     // Get neurons currently in working memory
     const std::vector<NeuronId>& getMemoryNeurons() const { return memoryNeurons_; }
 
-    // Strengthen working memory representation (for rehearsal)
-    void strengthenMemory(float factor);
-
-    // Competition between memory traces
-    void runCompetition();
-
-    // Is this neuron part of the winning population?
-    bool isWinning(NeuronId neuron) const;
-
-    // Get overall memory activity level
-    float getMemoryActivity() const;
-
-private:
-    // Create recurrent connection for maintenance
-    void createRecurrentConnection(NeuronId from, NeuronId to, float strength);
-
-    // Update recurrent connections for maintenance
-    void updateRecurrentConnections();
-
-    // Decay weak memory traces
-    void decayWeakTraces();
-
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-
-    Brain* brain_;
-    size_t capacity_;
-    float decayRate_;
+    // Development effects on working memory
+    void applyDevelopmentEffects(float plasticityMod);
     
-    // Memory content
-    std::vector<NeuronId> memoryNeurons_;
-    std::vector<float> memoryActivations_;
-    std::vector<SimulationStep> memoryTimestamps_;
+    // Get working memory health status
+    float getWorkingMemoryHealth() const;
     
-    // Active memory traces
-    std::vector<size_t> activeTraces_;
+    // Validate working memory state
+    bool validateWorkingMemory() const;
     
-    // Recurrent connections for maintenance
-    std::vector<std::pair<NeuronId, NeuronId>> recurrentConnections_;
+    // Debug working memory content
+    std::string debugWorkingMemory() const;
     
-    // Winner neurons (for competition)
-    std::vector<NeuronId> winners_;
-};
+    // Get working memory statistics
+    struct WorkingMemoryStats {
+        size_t neuronCount = 0;
+        float averageActivation = 0.0f;
+        size_t activeTraceCount = 0;
+        float decayRate = 0.0f;
+        size_t capacity = 0;
+    };
+    
+    WorkingMemoryStats getWorkingMemoryStats() const;
+    
+    // Validate episodic memory state
+    bool validateEpisodicMemory() const;
+    
+    // Debug episodic memory content
+    std::string debugEpisodicMemory() const;
+    
+    // Get episodic memory statistics
+    struct EpisodicMemoryStats {
+        size_t episodeCount = 0;
+        float averageReward = 0.0f;
+        size_t totalNeuronsStored = 0;
+        float consolidationThreshold = 0.0f;
+    };
+    
+    EpisodicMemoryStats getEpisodicMemoryStats() const;
+    
+    // Validate associative memory state
+    bool validateAssociativeMemory() const;
+    
+    // Debug associative memory content
+    std::string debugAssociativeMemory() const;
+    
+    // Get associative memory statistics
+    struct AssociativeMemoryStats {
+        size_t associationCount = 0;
+        float averageStrength = 0.0f;
+        size_t totalNeuronsConnected = 0;
+        float connectionStrength = 0.0f;
+    };
+    
+    AssociativeMemoryStats getAssociativeMemoryStats() const;
+    
+    // Validate cognitive system integration
+    bool validateCognitionIntegration() const;
+    
+    // Get cognitive system health score
+    float getCognitionHealth() const;
+    
+    // Validate prediction system integration
+    bool validatePredictionIntegration() const;
+    
+    // Get prediction system health score
+    float getPredictionHealth() const;
+    
+    // Validate neuromodulation system integration
+    bool validateNeuromodulationIntegration() const;
+    
+    // Get neuromodulation system health score
+    float getNeuromodulationHealth() const;
+    
+    // Get overall Phase 6 system health score
+    float getPhase6SystemHealth() const;
 
 // AttentionalSelection: Neural attention through competition
 // NOT Transformer attention - uses lateral inhibition and gain modulation

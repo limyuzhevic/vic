@@ -30,6 +30,17 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class NeuralMotorSystem;
+
+// Concept structure (simplified)
+struct Concept {
+    std::string description;
+    float confidence;
+    std::vector<float> pattern;
+    
+    Concept() : description(), confidence(0.0f) {}
+    Concept(const std::string& desc, float conf) : description(desc), confidence(conf) {}
+};
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -186,24 +197,25 @@ public:
     // Prediction error signal
     PredictionError* getPredictionErrorSignal();
     
-    // Get current configuration
-    std::shared_ptr<const Config> getConfig() const;
+// Get concept formation system for pattern discovery
+    ConceptFormation* getConceptFormation();
     
-    // Get random generator
-    RandomGenerator* getRandomGenerator();
-
-    // Learned preference trait (Phase 5): a single scalar, -1..1,
-    // updated only by sandbox reward through AgentBrain, saved in the
-    // checkpoint (SimulationState section) and used as a small bias in
-    // later action choice. This is the measured "personality" step: a
-    // preference learned from experience that survives a reload and
-    // changes later behaviour. It is not a language-model persona and
-    // it does not, on its own, make the brain a human brain.
-    float getLearnedPreference() const;
-    void setLearnedPreference(float preference);
+    // Get attentional selection system for focus
+    AttentionalSelection* getAttention();
     
-    // Logging
-    void logStatus() const;
+    // Integration methods for cognitive systems
+    void integrateCognitiveSystems();
+    void integratePredictionSystem();
+    void integrateConceptFormation();
+    
+    // Helper methods for integration
+    std::vector<float> collectSensoryData() const;
+    bool hasExpectedOutcome() const;
+    void applyPredictionErrorLearning(float error);
+    void applyConceptToBehavior(const Concept& concept);
+    
+    // Motor system access (for planner integration)
+    NeuralMotorSystem* getMotorSystem();
     
 private:
     struct Impl;

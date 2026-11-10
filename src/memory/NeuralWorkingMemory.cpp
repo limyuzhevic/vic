@@ -72,7 +72,8 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-
+    bool isNew = false;
+    
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         memoryActivations_[idx] = activation;
@@ -82,6 +83,15 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
         it = memoryNeurons_.end() - 1;
+        isNew = true;
+    }
+
+    // Determine the index
+    size_t idx;
+    if (isNew) {
+        idx = memoryNeurons_.size() - 1;
+    } else {
+        idx = std::distance(memoryNeurons_.begin(), it);
     }
 
     // Phase 6: activeTraces_ is the trace list getActiveTraces()
@@ -90,14 +100,16 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // neuron is an active trace; decayWeakTraces() below removes
     // it again when its activation falls below threshold, and
     // clear()/restoreSnapshot() reset the list with the content.
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
-        if (activation > 0.1f && !present) activeTraces_.push_back(idx);
-        if (activation <= 0.1f && present) {
-            activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
-                                activeTraces_.end());
-        }
+    bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
+    if (activation > 0.1f && !present) activeTraces_.push_back(idx);
+    if (activation <= 0.1f && present) {
+        activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
+                            activeTraces_.end());
+    }
+    
+    // Ensure new neurons are added to active traces if they have high activation
+    if (isNew && activation > 0.1f) {
+        activeTraces_.push_back(idx);
     }
     
     // Inject current to maintain activation
