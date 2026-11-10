@@ -16,38 +16,75 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // Validate neuron ID
+    if (neuron == INVALID_NEURON_ID) {
+        NLM_LOG_WARNING("Cannot store working memory for invalid neuron ID");
+        return;
+    }
+    
+    // Check for value validity (optional: check for NaN or inf)
+    if (std::isnan(value) || std::isinf(value)) {
+        NLM_LOG_WARNING("Invalid working memory value: " + std::to_string(value));
+        return;
+    }
+    
+    // Update existing item or add new one
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
             item.second = value;
+            NLM_LOG_DEBUG("Updated working memory for neuron " + std::to_string(neuron));
             return;
         }
     }
+    
+    // Add new item if capacity allows
     if (pImpl->items.size() < pImpl->capacity) {
         pImpl->items.emplace_back(neuron, value);
+        NLM_LOG_DEBUG("Added working memory item for neuron " + std::to_string(neuron));
+    } else {
+        // Remove oldest item and add new one (FIFO replacement)
+        pImpl->items.erase(pImpl->items.begin());
+        pImpl->items.emplace_back(neuron, value);
+        NLM_LOG_INFO("Working memory full, replaced oldest item for neuron " + std::to_string(neuron));
     }
 }
 
 float WorkingMemory::retrieve(NeuronId neuron) const {
+    // Validate neuron ID
+    if (neuron == INVALID_NEURON_ID) {
+        NLM_LOG_WARNING("Cannot retrieve working memory for invalid neuron ID");
+        return 0.0f;
+    }
+    
     for (const auto& item : pImpl->items) {
         if (item.first == neuron) {
             return item.second;
         }
     }
+    
     return 0.0f;
 }
 
 bool WorkingMemory::contains(NeuronId neuron) const {
+    // Validate neuron ID
+    if (neuron == INVALID_NEURON_ID) {
+        return false;
+    }
+    
     for (const auto& item : pImpl->items) {
         if (item.first == neuron) {
             return true;
         }
     }
+    
     return false;
 }
 
 void WorkingMemory::clear() {
-    pImpl->items.clear();
+    if (!pImpl->items.empty()) {
+        pImpl->items.clear();
+        NLM_LOG_DEBUG("Cleared working memory");
+    }
 }
 
 size_t WorkingMemory::getCapacity() const {
@@ -59,8 +96,17 @@ size_t WorkingMemory::getCurrentSize() const {
 }
 
 void WorkingMemory::decay(float decayRate) {
-    for (auto& item : pImpl->items) {
-        item.second *= (1.0f - decayRate);
+    // Validate decay rate
+    if (decayRate < 0.0f || decayRate > 1.0f) {
+        NLM_LOG_WARNING("Invalid decay rate: " + std::to_string(decayRate));
+        return;
+    }
+    
+    if (!pImpl->items.empty() && decayRate > 0.0f) {
+        for (auto& item : pImpl->items) {
+            item.second *= (1.0f - decayRate);
+        }
+        NLM_LOG_DEBUG("Decayed working memory items by " + std::to_string(decayRate));
     }
 }
 
@@ -108,7 +154,50 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // Validate relevance threshold
+    if (relevanceThreshold < 0.0f || relevanceThreshold > 1.0f) {
+        NLM_LOG_WARNING("Invalid relevance threshold for consolidation: " + std::to_string(relevanceThreshold));
+        return;
+    }
+    
+    if (pImpl->episodes.empty()) {
+        return;
+    }
+    
+    // Step 1: Calculate relevance scores for each episode
+    std::vector<std::pair<size_t, float>> relevanceScores;
+    relevanceScores.reserve(pImpl->episodes.size());
+    
+    for (size_t i = 0; i < pImpl->episodes.size(); ++i) {
+        float score = calculateEpisodeRelevance(pImpl->episodes[i], i);
+        relevanceScores.emplace_back(i, score);
+    }
+    
+    // Step 2: Sort by relevance (descending) - most relevant first
+    std::sort(relevanceScores.begin(), relevanceScores.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    
+    // Step 3: Keep only high-relevance episodes
+    std::vector<EpisodicMemoryItem> keptEpisodes;
+    keptEpisodes.reserve(std::min(static_cast<size_t>(pImpl->maxEpisodes * 0.8f), pImpl->episodes.size()));
+    
+    for (const auto& pair : relevanceScores) {
+        if (pair.second >= relevanceThreshold || 
+            keptEpisodes.size() < static_cast<size_t>(pImpl->maxEpisodes * 0.8f)) {
+            keptEpisodes.push_back(pImpl->episodes[pair.first]);
+        }
+    }
+    
+    // Step 4: If we still have more episodes than capacity, use FIFO eviction
+    if (keptEpisodes.size() > pImpl->maxEpisodes) {
+        keptEpisodes.resize(pImpl->maxEpisodes);
+    }
+    
+    // Step 5: Replace old episodes with consolidated ones
+    pImpl->episodes = std::move(keptEpisodes);
+    
+    NLM_LOG_INFO("Episodic memory consolidated: " + std::to_string(pImpl->episodes.size()) + 
+                " episodes retained, threshold=" + std::to_string(relevanceThreshold));
 }
 
 // Semantic Memory Implementation
@@ -261,8 +350,27 @@ void AssociativeMemory::updateAssociation(NeuronId a, NeuronId b, float delta) {
     }
 }
 
-void AssociativeMemory::clear() {
-    pImpl->associations.clear();
+// Helper function to calculate episode relevance score
+float calculateEpisodeRelevance(const EpisodicMemoryItem& episode, size_t index) {
+    float relevance = 1.0f;
+    
+    // Higher weight for recent episodes (recency effect)
+    float recencyWeight = 1.0f - (static_cast<float>(index) / std::max(static_cast<size_t>(1), 10));
+    relevance *= recencyWeight;
+    
+    // Size of episode (number of neurons + data)
+    float episodeSize = static_cast<float>(episode.neurons.size() + episode.values.size());
+    float sizeScore = std::min(episodeSize / 20.0f, 1.0f);  // Normalize to 0-1
+    relevance *= (0.3f + 0.7f * sizeScore);
+    
+    // Metadata factor if present
+    if (!episode.metadata.empty()) {
+        // More complex metadata generally indicates more significant episode
+        relevance *= (0.5f + 0.5f * std::min(static_cast<float>(episode.metadata.size()) / 100.0f, 1.0f));
+    }
+    
+    // Clamp to valid range
+    return std::clamp(relevance, 0.0f, 1.0f);
 }
 
 } // namespace nlm

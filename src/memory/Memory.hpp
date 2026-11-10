@@ -8,36 +8,56 @@
 namespace nlm {
 
 // Working memory: temporary active storage of information
-// PLACEHOLDER - Phase 2 will implement real working memory
+// Provides short-term storage for neural information and activation patterns
+// Key properties:
+// - Limited capacity (configurable via constructor)
+// - Automatic decay to prevent indefinite storage
+// - Fast access by neuron ID for efficient retrieval
+// - Supports episodic memory encoding through neural patterns
 
 class WorkingMemory {
 public:
+    /// Constructor - initializes with default capacity
     WorkingMemory();
+    
+    /// Destructor
     ~WorkingMemory();
     
-    // Store item
-    // TODO PHASE 2: Implement real storage
+    /// Store information in working memory
+    /// @param neuron Identifier of the neuron associated with this information
+    /// @param value Numeric value representing the stored information
+    /// @note If neuron ID is invalid (INVALID_NEURON_ID), the operation is ignored
     void store(NeuronId neuron, float value);
     
-    // Retrieve item
+    /// Retrieve information from working memory
+    /// @param neuron Identifier of the neuron
+    /// @return Stored value, or 0.0f if not found
     float retrieve(NeuronId neuron) const;
     
-    // Check if item exists
+    /// Check if information is stored for given neuron
+    /// @param neuron Identifier of the neuron
+    /// @return True if information exists for this neuron
     bool contains(NeuronId neuron) const;
     
-    // Clear all
+    /// Clear all stored information
     void clear();
     
-    // Get capacity
+    /// Get maximum capacity of working memory
+    /// @return Maximum number of items that can be stored
     size_t getCapacity() const;
+    
+    /// Get current number of stored items
+    /// @return Current memory usage
     size_t getCurrentSize() const;
     
-    // Decay all items
+    /// Decay all stored information by given factor
+    /// @param decayRate Decay factor (0.0 to 1.0, where 1.0 means complete decay)
+    /// @note Invalid decay rates are clamped to valid range
     void decay(float decayRate);
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 // Episodic memory: storage of events and experiences
