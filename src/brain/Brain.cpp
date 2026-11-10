@@ -366,14 +366,38 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
      * 14. Collect statistics
      */
     
+    // Initialize step state
+    initializeStepState(currentStep, currentTime);
+    
+    // Execute each step component in order
+    processDelayedSpikeEvents(currentStep, currentTime);
+    updateNeuralDynamics(currentTime);
+    detectAndScheduleSpikes(currentStep, currentTime);
+    updateWorkingMemory();
+    updateNeuromodulation();
+    updatePlasticity();
+    applyHomeostaticScaling(currentStep);
+    updateEpisodicMemory(currentStep);
+    updatePredictionSystem();
+    updateAttentionSystem();
+    updateConceptFormation();
+    applyStructuralPlasticity(currentStep);
+    replayMemories(currentStep);
+    applyDevelopment(currentStep);
+    updateCheckpoint(currentStep, currentTime);
+}
+
+void Brain::initializeStepState(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->currentStep = currentStep;
     pImpl->currentTime = currentTime;
     pImpl->totalSpikesThisStep = 0;
-    
-    // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+}
+
+void Brain::processDelayedSpikeEvents(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
-    
-    // ========== STEP 2: Update all neurons (LIF dynamics) ==========
+}
+
+void Brain::updateNeuralDynamics(Timestamp currentTime) {
     for (auto& region : pImpl->regions) {
         for (auto& pop : region->getPopulations()) {
             for (auto* neuron : pop->getNeurons()) {
@@ -381,6 +405,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
         }
     }
+}
     
     // ========== STEP 3: Detect spikes and schedule spike events ==========
     for (auto& region : pImpl->regions) {
@@ -1579,6 +1604,34 @@ void Brain::logStatus() const {
     // Development status
     NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
     
+void Brain::logStatus() const {
+    NLM_LOG_INFO("=== NLM Brain Status (Phase 6 - Integrated) ===");
+    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
+    NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_INFO("Active neurons: " + std::to_string(getActiveNeuronCount()));
+    NLM_LOG_INFO("Firing neurons (this step): " + std::to_string(getFiringNeuronCount()));
+    NLM_LOG_INFO("Total spikes: " + std::to_string(getTotalSpikeCount()));
+    NLM_LOG_INFO("Pending spike events: " + std::to_string(getPendingSpikeEventCount()));
+    NLM_LOG_INFO("Average firing rate: " + std::to_string(getAverageFiringRate()));
+    NLM_LOG_INFO("E/I ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    
+    // Memory system status
+    if (pImpl->workingMemory) {
+        NLM_LOG_INFO("Working memory traces: " + std::to_string(pImpl->workingMemory->getActiveTraces()));
+    }
+    if (pImpl->episodicMemory) {
+        NLM_LOG_INFO("Episodic memory episodes: " + std::to_string(pImpl->episodicMemory->getEpisodeCount()));
+    }
+    
+    // Neuromodulation status
+    if (pImpl->dopamine) {
+        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    }
+    
+    // Development status
+    NLM_LOG_INFO("Developmental stage: " + std::to_string(static_cast<int>(pImpl->developmentalStage)));
+    
     for (const auto& region : pImpl->regions) {
         NLM_LOG_INFO("  Region " + std::to_string(region->getId().index()) + 
                     " (" + region->getName() + "): " +
@@ -1586,6 +1639,103 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+bool Brain::validateConfiguration() const {
+    NLM_LOG_INFO("Validating brain configuration...");
+    
+    // Basic validation checks
+    bool valid = true;
+    
+    // Check that we have at least one region
+    if (getRegionCount() == 0) {
+        NLM_LOG_WARNING("No regions configured");
+        valid = false;
+    }
+    
+    // Check that neurons exist
+    if (getTotalNeuronCount() == 0) {
+        NLM_LOG_WARNING("No neurons configured");
+        valid = false;
+    }
+    
+    // Check that we have at least one synapse
+    if (getTotalSynapseCount() == 0) {
+        NLM_LOG_WARNING("No synapses configured");
+        valid = false;
+    }
+    
+    if (valid) {
+        NLM_LOG_INFO("Brain configuration validation passed");
+    }
+    
+    return valid;
+}
+
+void Brain::printBrainStats() const {
+    NLM_LOG_INFO("=== Brain Statistics ===");
+    NLM_LOG_INFO("Regions: " + std::to_string(getRegionCount()));
+    NLM_LOG_INFO("Total Neurons: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("Total Synapses: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_INFO("Active Neurons: " + std::to_string(getActiveNeuronCount()));
+    NLM_LOG_INFO("Firing Neurons: " + std::to_string(getFiringNeuronCount()));
+    NLM_LOG_INFO("Average Firing Rate: " + std::to_string(getAverageFiringRate()) + " Hz");
+    NLM_LOG_INFO("Total Spike Count: " + std::to_string(getTotalSpikeCount()));
+    NLM_LOG_INFO("Pending Spike Events: " + std::to_string(getPendingSpikeEventCount()));
+    NLM_LOG_INFO("Excitatory/Inhibitory Ratio: " + std::to_string(getExcitationInhibitionRatio()));
+    NLM_LOG_INFO("=========================");
+}
+
+void Brain::debugSpikingActivity() const {
+    NLM_LOG_INFO("=== Spiking Activity Debug ===");
+    NLM_LOG_INFO("Total spikes this step: " + std::to_string(pImpl->totalSpikesThisStep));
+    NLM_LOG_INFO("Total spikes overall: " + std::to_string(pImpl->totalSpikesTotal));
+    
+    // Check firing neurons by region
+    for (const auto& region : pImpl->regions) {
+        NLM_LOG_INFO("Region " + std::to_string(region->getId().index()) + ": ");
+        
+        size_t firingCount = 0;
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                if (neuron->isFiring()) {
+                    firingCount++;
+                }
+            }
+        }
+        
+        NLM_LOG_INFO("  Firing neurons: " + std::to_string(firingCount) + 
+                    " out of " + std::to_string(region->getTotalNeuronCount()));
+    }
+    
+    NLM_LOG_INFO("==================================");
+}
+
+void Brain::analyzeNetworkTopology() const {
+    NLM_LOG_INFO("=== Network Topology Analysis ===");
+    
+    size_t totalIncoming = 0;
+    size_t totalOutgoing = 0;
+    
+    for (const auto& region : pImpl->regions) {
+        for (const auto& syn : region->getSynapses()) {
+            if (syn->getWeight() > 0.0f) {
+                totalIncoming++;
+            } else {
+                totalOutgoing++;
+            }
+        }
+    }
+    
+    NLM_LOG_INFO("Excitatory synapses: " + std::to_string(totalIncoming));
+    NLM_LOG_INFO("Inhibitory synapses: " + std::to_string(totalOutgoing));
+    
+    if (totalIncoming > 0) {
+        NLM_LOG_INFO("E/I Ratio: " + std::to_string(static_cast<float>(totalIncoming) / 
+                                                    std::max(1.0f, static_cast<float>(totalOutgoing))));
+    }
+    
+    NLM_LOG_INFO("=====================================");
 }
 
 } // namespace nlm

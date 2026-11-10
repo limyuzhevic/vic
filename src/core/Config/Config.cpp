@@ -3,14 +3,33 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <unordered_map>
+#include <memory>
+#include <variant>
+#include <string>
 
 namespace nlm {
 
+// JSON/YAML support
+#ifdef HAS_JSON_PARSER
+#include <nlohmann/json.hpp>
+#endif
+
+#ifdef HAS_YAML_PARSER
+#include <yaml-cpp/yaml.h>
+#endif
+
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
+    // Version tracking for backward compatibility
+    std::string formatVersion = "1.0";
+    std::unordered_map<std::string, ConfigValue> defaults;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    // Initialize default values for common configuration options
+    initializeDefaultValues();
+}
 
 Config::~Config() = default;
 
@@ -18,17 +37,40 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+void Config::initializeDefaultValues() {
+    // Set up default values for common configuration options
+    // This ensures backward compatibility and provides sensible defaults
     
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
+    pImpl->defaults["neuron_count"] = static_cast<int64_t>(1000);
+    pImpl->defaults["region_count"] = static_cast<int64_t>(2);
+    pImpl->defaults["connection_probability"] = 0.1f;
+    pImpl->defaults["simulation_timestep"] = 0.001f;
+    pImpl->defaults["random_seed"] = static_cast<int64_t>(42);
+    pImpl->defaults["stdp_ltp_weight"] = 0.01f;
+    pImpl->defaults["stdp_ltd_weight"] = 0.012f;
+    pImpl->defaults["stdp_tau"] = 20.0f;
+    pImpl->defaults["synaptogenesis_rate"] = 0.0001f;
+    pImpl->defaults["pruning_rate"] = 0.00001f;
+    pImpl->defaults["dopamine_baseline"] = 0.1f;
+    pImpl->defaults["reward_discount_factor"] = 0.99f;
+    pImpl->defaults["log_level"] = std::string("INFO");
+    pImpl->defaults["log_to_file"] = false;
+    pImpl->defaults["log_filename"] = std::string("nlm.log");
+    pImpl->defaults["max_simulation_steps"] = static_cast<int64_t>(10000);
+    pImpl->defaults["simulation_time_limit"] = 0.0f;
+    pImpl->defaults["visualization_enabled"] = false;
+    pImpl->defaults["visualization_update_rate"] = 30.0f;
+    pImpl->defaults["environment_name"] = std::string("GridWorld");
+    pImpl->defaults["environment_width"] = static_cast<int64_t>(10);
+    pImpl->defaults["environment_height"] = static_cast<int64_t>(10);
+}
+
+std::string Config::normalizeKey(const std::string& key) {
+    // Normalize keys for case-insensitive lookup and consistency
+    std::string result = key;
+    std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {

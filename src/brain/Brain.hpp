@@ -205,9 +205,57 @@ public:
     // Logging
     void logStatus() const;
     
+    // ========== STEP METHODS (for refactoring brain step() into focused methods) ==========
+    
+    // Step state management
+    void initializeStepState(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Step component methods
+    void processDelayedSpikeEvents(SimulationStep currentStep, Timestamp currentTime);
+    void updateNeuralDynamics(Timestamp currentTime);
+    void detectAndScheduleSpikes(SimulationStep currentStep, Timestamp currentTime);
+    void updateWorkingMemory();
+    void updateNeuromodulation();
+    void updatePlasticity();
+    void applyHomeostaticScaling(SimulationStep currentStep);
+    void updateEpisodicMemory(SimulationStep currentStep);
+    void updatePredictionSystem();
+    void updateAttentionSystem();
+    void updateConceptFormation();
+    void applyStructuralPlasticity(SimulationStep currentStep);
+    void replayMemories(SimulationStep currentStep);
+    void applyDevelopment(SimulationStep currentStep);
+    void updateCheckpoint(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Step integration methods
+    void integrateWithSensoryInput(const class SensoryInput& input);
+    void integrateWithMotorOutput();
+    void integrateWithLearning();
+
+    // Configuration validation and utilities
+    bool validateConfiguration() const;
+    void printBrainStats() const;
+    
+    // Performance monitoring
+    double getCurrentStepDuration() const;
+    void startStepTimer();
+    void stopStepTimer();
+    
+    // Memory and state management
+    void compactMemory();
+    void purgeWeakMemories();
+    
+    // Debugging and diagnostics
+    void debugSpikingActivity() const;
+    void analyzeNetworkTopology() const;
+    
 private:
     struct Impl;
     Impl* pImpl;
+    
+    // Performance timing
+    Timestamp stepStartTime;
+    double stepDuration;
 };
 
 } // namespace nlm
