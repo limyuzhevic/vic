@@ -176,10 +176,10 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Get initial spike count
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
+    // Inject current into first 10 neurons
     NLM_LOG_INFO("  Injecting current into 10 neurons...");
     for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
-        neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
+        neurons[i]->injectCurrent(5.0f);  // Reduced from 50.0f for realistic firing rates
     }
     
     // Run a few steps
@@ -218,15 +218,12 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         }
     }
     
-    // Apply repeated input pattern to stimulate learning
+    // Apply repeated input pattern to stimulate learning with realistic current levels
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Applying repeated input patterns (1000 steps) with realistic current...");
     
     // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // each step with lower current to achieve realistic firing rates (~10-20 Hz)
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
@@ -237,7 +234,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     }
     for (SimulationStep step = 0; step < 1000; ++step) {
         for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+            brain->injectCurrent(id, 5.0f);  // Reduced from 30.0f for realistic firing rates
         }
         
         brain->step(step, step * 0.001);
@@ -283,10 +280,13 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
 
+    NLM_LOG_INFO("  Creating correlated pre->post activity (STDP test)...");
+    
     for (int trial = 0; trial < 50; ++trial) {
-        brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
+        // Reduced current levels for realistic firing rates
+        brain->injectCurrent(syn->getSourceNeuron(), 10.0f);  // Reduced from 60.0f
         brain->step(trial * 2, trial * 2 * 0.001);
-        brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
+        brain->injectCurrent(syn->getDestinationNeuron(), 10.0f);  // Reduced from 60.0f
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
 
@@ -402,7 +402,7 @@ int main(int argc, char** argv) {
     brain->reset();
     brain->initialize();
     
-    // Run Test 2: Plasticity learning experiment
+    // Run Test 2: Plasticity learning experiment with reduced current for realistic firing rates
     runPlasticityExperiment(brain);
     
     // Reset and run Test 3: STDP verification

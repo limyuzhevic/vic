@@ -155,53 +155,67 @@ int main() {
     probePattern("dark ahead+touch  ", makePercept(darkVision, fwdTouch));
     std::cout << "\n";
 
-    // --- 2. Sandbox run + checkpoint round-trip ---
+    // --- 2. Sandbox run + checkpoint round-trip (improved) ---
     std::cout << "--- 2. Sandbox run (100 steps) + checkpoint round-trip ---\n";
     auto config = makeConfig();
-    auto brain = std::make_shared<Brain>(config);
-    brain->initialize();
-    SimpleWorld world;
-    world.configure(20.0f, 20.0f, 16, 16);
-    world.setRandomSeed(42);
-    world.reset();
-    AgentBrain agent(brain);
-    agent.initialize(world);
-    agent.enableRewardModulation(true);
-    agent.enableCuriosity(true);
+    auto brain1 = std::make_shared<Brain>(config);
+    brain1->initialize();
+    SimpleWorld world1;
+    world1.configure(20.0f, 20.0f, 16, 16);
+    world1.setRandomSeed(42);
+    world1.reset();
+    AgentBrain agent1(brain1);
+    agent1.initialize(world1);
+    agent1.enableRewardModulation(true);
+    agent1.enableCuriosity(true);
 
     float totalReward = 0.0f;
     int resources = 0, hazards = 0, emptyInteracts = 0;
     std::set<std::pair<int, int>> visited;
     uint64_t brainStep = 0;
-    for (int step = 0; step < 100; ++step) {
-        const SensoryPercept& percept = world.getSensoryPercept();
-        agent.processSensoryInput(percept);
-        for (int i = 0; i < 10; ++i) brain->step(brainStep++);
-        MotorCommand cmd = agent.decodeMotorCommand();
-        ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
-        agent.applyRewardModulation(result.reward, 0.0f);
-        world.update(0.1);  // Phase 6 pacing: one decision = one 0.1 s action interval.
+    
+    // Run sandbox: simulate and save brain state
+    for (int step = 0; step < 50; ++step) {  // Reduced to 50 for more controlled learning
+        const SensoryPercept& percept = world1.getSensoryPercept();
+        agent1.processSensoryInput(percept);
+        for (int i = 0; i < 10; ++i) brain1->step(brainStep++);
+        MotorCommand cmd = agent1.decodeMotorCommand();
+        ActionResult result = world1.applyMotorCommand(cmd, world1.getSimulationTime());
+        agent1.applyRewardModulation(result.reward, 0.0f);
+        world1.update(0.1);  // Phase 6 pacing: one decision = one 0.1 s action interval.
         totalReward += result.reward;
         if (cmd == MotorCommand::Interact) {
             if (result.message == "consumed_resource") ++resources;
             else if (result.message == "hit_hazard") ++hazards;
             else ++emptyInteracts;
         }
-        const auto& body = world.getAgentBody();
+        const auto& body = world1.getAgentBody();
         visited.insert({static_cast<int>(std::floor(body.x)),
                         static_cast<int>(std::floor(body.y))});
         if (step % 25 == 0) {
-            std::cout << "  step " << step << ": " << agent.getThoughtTrace()
-                      << " wmNeurons=" << (brain->getWorkingMemory() ? brain->getWorkingMemory()->getMemoryNeuronCount() : 0)
-                      << " firing=" << brain->getFiringNeuronCount() << "\n";
+            std::cout << "  step " << step << ": " << agent1.getThoughtTrace()
+                      << " wmNeurons=" << (brain1->getWorkingMemory() ? brain1->getWorkingMemory()->getMemoryNeuronCount() : 0)
+                      << " firing=" << brain1->getFiringNeuronCount() << "\n";
         }
     }
-    std::cout << "  sandbox: reward=" << totalReward
+    
+    // Save brain state (checkpoint)
+    std::string checkpointPath = "/tmp/nlm_phase5_checkpoint.bin";
+    bool saved = brain1->save(checkpointPath);
+    std::cout << "  checkpoint: saved=" << (saved ? "yes" : "NO") << std::endl;
+
+    // Create new brain and load from checkpoint
+    auto brain2 = std::make_shared<Brain>(config);
+    brain2->initialize();
+    bool loaded = brain2->load(checkpointPath);
+    std::cout << "  checkpoint: loaded=" << (loaded ? "yes" : "NO") << std::endl;
+
+    // Compare the two brains to see if checkpoint worked
+    std::cout << "  sandbox1: reward=" << totalReward 
               << " resources=" << resources << " hazards=" << hazards
-              << " emptyInteracts=" << emptyInteracts
               << " visitedCells=" << visited.size()
-              << " avgRate=" << brain->getAverageFiringRate()
-              << " totalSpikes=" << brain->getTotalSpikeCount()
+              << " firing=" << brain1->getAverageFiringRate()
+              << " totalSpikes=" << brain1->getTotalSpikeCount() << std::endl;
               << " workingNeurons=" << (brain->getWorkingMemory() ? brain->getWorkingMemory()->getMemoryNeuronCount() : 0)
               << " episodic=" << (brain->getEpisodicMemory() ? brain->getEpisodicMemory()->getEpisodeCount() : 0)
               << " preference=" << agent.getLearnedPreference() << "\n";

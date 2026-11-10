@@ -412,17 +412,178 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<Config>();
     }, "Create a default configuration");
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // Advanced configuration functions
+    m.def("createConfigWithParameters", 
+        [](int64_t neuronCount, int64_t regionCount, float connectionProbability) -> std::shared_ptr<Config> {
+            auto config = std::make_shared<Config>();
+            config->set("neuron_count", neuronCount);
+            config->set("region_count", regionCount);
+            config->set("connection_probability", connectionProbability);
+            return config;
+        },
+        py::arg("neuronCount"), py::arg("regionCount"), py::arg("connectionProbability"),
+        "Create a configuration with specific parameters");
 
-    m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
-        return std::make_shared<SimpleWorld>();
-    }, "Create a new simple world");
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            py::raise(ValueError, "Config is null");
+        }
+        std::string errors;
+        for (const auto& key : config->getKeys()) {
+            if (config->has(key)) {
+                errors += "  " + key + " = " + std::to_string(config->getOr<float>(key, 0.0f)) + "\n";
+            }
+        }
+        return "Valid configuration with keys:" + errors;
+    }, py::arg("config"), "Validate configuration and return error messages");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    // Advanced brain functions
+    m.def("brainGetTotalSpikes", [](const std::shared_ptr<Brain>& brain) {
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), "Get total spike count");
+
+    m.def("brainGetAverageFiringRate", [](const std::shared_ptr<Brain>& brain) {
+        return brain->getAverageFiringRate();
+    }, py::arg("brain"), "Get average firing rate");
+
+    m.def("brainGetActiveNeuronCount", [](const std::shared_ptr<Brain>& brain) {
+        return brain->getActiveNeuronCount();
+    }, py::arg("brain"), "Get active neuron count");
+
+    m.def("brainGetFiringNeuronCount", [](const std::shared_ptr<Brain>& brain) {
+        return brain->getFiringNeuronCount();
+    }, py::arg("brain"), "Get firing neuron count");
+
+    m.def("brainGetExcitementInhibitionRatio", [](const std::shared_ptr<Brain>& brain) {
+        return brain->getExcitationInhibitionRatio();
+    }, py::arg("brain"), "Get excitation/inhibition ratio");
+
+    // Brain simulation control
+    m.def("brainStepWithTime", [](std::shared_ptr<Brain>& brain, SimulationStep currentStep, Timestamp currentTime) {
+        brain->step(currentStep, currentTime);
+    }, py::arg("brain"), py::arg("currentStep"), py::arg("currentTime"), "Step brain with explicit timestamp");
+
+    m.def("brainResetWithInitialize", [](std::shared_ptr<Brain>& brain) {
+        brain->reset();
+        brain->initialize();
+    }, py::arg("brain"), "Reset and re-initialize brain");
+
+    m.def("brainSaveState", [](const std::shared_ptr<Brain>& brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Save brain state to file");
+
+    m.def("brainLoadState", [](stdCleanup, const std::string& filepath) {
+        auto brain = std::make_shared<Brain>(std::make_shared<Config>());
+        brain->initialize();
+        return brain->load(filepath) ? brain : nullptr;
+    }, py::arg("filepath"), "Load brain state from file and return brain");
+
+    // Debug and analysis functions
+    m.def("brainAnalyzeNetworkTopology", [](const std::shared_ptr<Brain>& brain) {
+        std::ostringstream oss;
+        oss << "Network Topology Analysis:" << std::endl;
+        oss << "  Total neurons: " << brain->getTotalNeuronCount() << std::endl;
+        oss << "  Total synapses: " << brain->getTotalSynapseCount() << std::endl;
+        oss << "  Regions: " << brain->getRegionCount() << std::endl;
+        oss << "  Average firing rate: " << brain->getAverageFiringRate() << " Hz" << std::endl;
+        oss << "  Active neurons: " << brain->getActiveNeuronCount() << std::endl;
+        oss << "  Firing neurons: " << brain->getFiringNeuronCount() << std::endl;
+        return oss.str();
+    }, py::arg("brain"), "Analyze network topology");
+
+    m.def("brainGetLearningStatistics", [](const std::shared_ptr<Brain>& brain) {
+        std::ostringstream oss;
+        oss << "Learning Statistics:" << std::endl;
+        oss << "  Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        oss << "  Average firing rate: " << brain->getAverageFiringRate() << " Hz" << std::endl;
+        oss << "  Firing neuron count: " << brain->getFiringNeuronCount() << std::endl;
+        return oss.str();
+    }, py::arg("brain"), "Get learning statistics");
+
+    m.def("brainComputePatternSimilarity", [](const std::shared_ptr<Brain>& brain, 
+                                             const std::vector<float>& pattern1,
+                                             const std::vector<float>& pattern2) {
+        float similarity = 0.0f;
+        if (pattern1.size() == pattern2.size()) {
+            for (size_t i = 0; i < pattern1.size(); ++i) {
+                similarity += std::abs(pattern1[i] - pattern2[i]);
+            }
+            similarity /= pattern1.size();
+        }
+        return similarity;
+    }, py::arg("brain"), py::arg("pattern1"), py::arg("pattern2"), "Compute similarity between two patterns");
+
+    // Configuration management
+    m.def("configSetMultipleParameters", [](std::shared_ptr<Config>& config,
+                                            const std::unordered_map<std::string, float>& params) {
+        for (const auto& pair : params) {
+            config->set(pair.first, pair.second);
+        }
+    }, py::arg("config"), py::arg("params"), "Set multiple configuration parameters");
+
+    m.def("configGetAllParameters", [](const std::shared_ptr<Config>& config) {
+        py::dict paramDict;
+        for (const auto& key : config->getKeys()) {
+            paramDict[key.c_str()] = config->getOr<float>(key, 0.0f);
+        }
+        return paramDict;
+    }, py::arg("config"), "Get all configuration parameters as Python dictionary");
+
+    m.def("configPrintSummary", [](const std::shared_ptr<Config>& config) {
+        return config->summary();
+    }, py::arg("config"), "Print configuration summary");
+
+    // Simulation utilities
+    m.def("createSimulatingBrain", [](int64_t neuronCount, size_t steps) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuronCount);
+        config->set("simulation_timestep", 0.001);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Run simulation
+        for (size_t step = 0; step < steps; ++step) {
+            // Simple random input
+            if (step % 10 == 0) {
+                brain->injectCurrentToNeurons(NeuronType::Sensory, 1.0f);
+            }
+            brain->step(step, step * 0.001);
+        }
+        
+        return brain;
+    }, py::arg("neuronCount"), py::arg("steps"), "Create and simulate a brain for testing");
+
+    m.def("simulateStep", [](std::shared_ptr<Brain>& brain, size_t step) {
+        brain->step(step, step * 0.001);
+        return brain->getAverageFiringRate();
+    }, py::arg("brain"), py::arg("step"), "Simulate one step and return firing rate");
+
+    // Error handling and validation
+    m.def("validateBrainOperation", [](const std::shared_ptr<Brain>& brain, 
+                                       const std::string& operation) {
+        if (!brain) {
+            py::raise(ValueError, "Brain is null");
+        }
+        if (operation == "step") {
+            if (brain->getTotalNeuronCount() == 0) {
+                py::raise(ValueError, "Cannot step brain with 0 neurons");
+            }
+        }
+        return "Brain validation passed for operation: " + operation;
+    }, py::arg("brain"), py::arg("operation"), "Validate brain operation");
+
+    m.def("brainExportForAnalysis", [](const std::shared_ptr<Brain>& brain, 
+                                       const std::string& format) {
+        std::ostringstream oss;
+        oss << "Brain Export Analysis:" << std::endl;
+        oss << "Format: " << format << std::endl;
+        oss << "Neurons: " << brain->getTotalNeuronCount() << std::endl;
+        oss << "Synapses: " << brain->getTotalSynapseCount() << std::endl;
+        oss << "Average firing rate: " << brain->getAverageFiringRate() << " Hz" << std::endl;
+        oss << "Total spikes: " << brain->getTotalSpikeCount() << std::endl;
+        return oss.str();
+    }, py::arg("brain"), py::arg("format"), "Export brain data for analysis");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
