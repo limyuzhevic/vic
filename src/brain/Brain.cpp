@@ -16,6 +16,11 @@
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
+#include "../performance/MemoryPool.hpp"
+#include "../performance/EventQueue.hpp"
+#include "../performance/SIMDVectorization.hpp"
+#include "../performance/SparseConnectivity.hpp"
+#include "../performance/ParallelProcessing.hpp"
 #include <fstream>
 #include <algorithm>
 #include <unordered_map>
@@ -53,42 +58,36 @@ struct Brain::Impl {
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
     
-    // Phase 2: Real neural computation components
+// Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
     std::unique_ptr<STDP> stdp;
     std::unique_ptr<Hebbian> hebbian;
     std::unique_ptr<StructuralPlasticity> structuralPlasticity;
     
-    // Simulation parameters
-    TimestepDuration timestep;
-    SimulationStep currentStep;
-    Timestamp currentTime;
+    // Phase 5: Performance infrastructure
+    // Event-driven spike processing
+    std::unique_ptr<SpikeRingBuffer> spikeEventQueue;
+    std::unique_ptr<DelayedSpikeQueue> delayedSpikeQueue;
+    std::unique_ptr<PriorityEventQueue> priorityEventQueue;
     
-    // Statistics
-    size_t totalSpikesThisStep;
-    size_t totalSpikesTotal;
-
-    // Phase 5 learned preference trait (see Brain.hpp). Updated only
-    // from sandbox reward via AgentBrain; checkpointed with the
-    // simulation state so a reloaded brain keeps what it learned.
-    float learnedPreference = 0.0f;
+    // Memory pools for efficient allocation
+    std::unique_ptr<MemoryPool<NeuronState>> neuronMemoryPool;
+    std::unique_ptr<MemoryPool<SynapseState>> synapseMemoryPool;
     
-    // Sensory neurons for input injection
-    std::vector<Neuron*> sensoryNeurons;
-    std::vector<Neuron*> motorNeurons;
-    // NeuronId -> neuron, for O(1) synaptic delivery (was a linear scan
-    // over all neurons per delayed spike, which made real networks unusable).
-    std::unordered_map<uint64_t, Neuron*> neuronById;
-    bool spikeHandlersRegistered = false;
+    // SIMD vectorization
+    SIMDVectorization simdVectorizer;
     
-    // Integration state
-    bool isResting;  // For sleep/rest cycle
-    size_t stepsSinceLastEpisode;
-    size_t replayInterval;
-    size_t consolidationInterval;
+    // Sparse connectivity for large networks
+    std::unique_ptr<SparseConnectivity> sparseConnectivity;
     
-    // Checkpoint system
-    std::unique_ptr<CheckpointManager> checkpointManager;
+    // Parallel processing
+    std::unique_ptr<ParallelProcessor> parallelProcessor;
+    
+    // Performance flags
+    bool eventDrivenEnabled;
+    bool simdEnabled;
+    bool sparseEnabled;
+    bool multithreadingEnabled;
     
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
@@ -163,6 +162,29 @@ struct Brain::Impl {
         
         // Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // ========== INITIALIZE PERFORMANCE INFRASTRUCTURE ==========
+        
+        // Initialize event queues for event-driven processing
+        spikeEventQueue = std::make_unique<SpikeRingBuffer>(16384);  // 16K capacity
+        delayedSpikeQueue = std::make_unique<DelayedSpikeQueue>(1024, 100);  // 1024 buckets, 100 max delay
+        priorityEventQueue = std::make_unique<PriorityEventQueue>();
+        
+        // Initialize memory pools for efficient allocation
+        neuronMemoryPool = std::make_unique<MemoryPool<NeuronState>>(1024, 4);  // 1024 per block, 4 initial blocks
+        synapseMemoryPool = std::make_unique<MemoryPool<SynapseState>>(2048, 4);  // 2048 per block, 4 initial blocks
+        
+        // Initialize sparse connectivity for large networks
+        sparseConnectivity = std::make_unique<SparseConnectivity>();
+        
+        // Initialize parallel processing
+        parallelProcessor = std::make_unique<ParallelProcessor>();
+        
+        // Performance flags
+        eventDrivenEnabled = true;  // Enable by default for better performance
+        simdEnabled = SIMDUtils::isSIMDAvailable();
+        sparseEnabled = true;  // Enable sparse connectivity
+        multithreadingEnabled = false;  // Disable for now to avoid complexity
     }
     
     DevelopmentalStage developmentalStage;
@@ -613,9 +635,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() > 0) {
+        // Update prediction system with current sensory observations
+        // This enables predictive coding and prediction error computation
+        pImpl->predictionSystem->update(pImpl->timestep);
+        
+        // Generate prediction error signal based on sensory prediction
+        float predictionError = 0.0f;
+        if (pImpl->predictionError) {
+            // Update prediction error with current sensory state
+            predictionError = pImpl->predictionError->updatePredictionError();
+        }
+        
+        // Apply prediction error to neuromodulation systems
+        if (pImpl->curiosity) {
+            pImpl->curiosity->setTargetError(predictionError);
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,8 +666,30 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // This requires sensory state encoding and working memory integration
+        
+        // Convert current neural activation patterns to experience data
+        std::vector<float> currentActivationPattern;
+        currentActivationPattern.reserve(pImpl->neuronById.size());
+        
+        for (const auto& pair : pImpl->neuronById) {
+            const auto* neuron = pair.second;
+            currentActivationPattern.push_back(
+                neuron->getState().membranePotential - neuron->getState().restingPotential);
+        }
+        
+        // Process patterns through concept formation system
+        pImpl->conceptFormation->processExperience(currentActivationPattern, pImpl->timestep);
+        
+        // Extract and store concepts that emerge
+        auto newConcepts = pImpl->conceptFormation->getEmergingConcepts();
+        for (const auto& concept : newConcepts) {
+            // Store concepts in episodic memory for persistence
+            if (pImpl->episodicMemory) {
+                pImpl->episodicMemory->storeConcept(concept);
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -736,17 +793,63 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
     }
 }
 
-void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
-    for (auto& region : pImpl->regions) {
-        for (auto& pop : region->getPopulations()) {
-            if (pop->getNeuronType() == type) {
-                for (auto* neuron : pop->getNeurons()) {
-                    neuron->injectCurrent(current);
+    void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
+        auto it = pImpl->neuronById.find(neuron.index());
+        if (it != pImpl->neuronById.end()) {
+            it->second->injectCurrent(current);
+            return;
+        }
+        // Fallback: linear scan through regions (optimized for rare cases only)
+        // This should be very rare with proper map population
+        for (auto& region : pImpl->regions) {
+            auto neurons = region->getAllNeurons();
+            for (auto* n : neurons) {
+                if (n->getId() == neuron) {
+                    n->injectCurrent(current);
+                    return;
                 }
             }
         }
     }
-}
+    
+    void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {
+        // Use SIMD vectorization for batch current injection
+        std::vector<Neuron*> targetNeurons;
+        
+        // Collect all neurons of the specified type
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                if (pop->getNeuronType() == type) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        targetNeurons.push_back(neuron);
+                    }
+                }
+            }
+        }
+        
+        // Apply current using SIMD for better performance
+        if (pImpl->simdEnabled && targetNeurons.size() >= SIMDUtils::SIMD_WIDTH) {
+            // Vectorized injection (placeholder for actual SIMD implementation)
+            size_t batchSize = SIMDUtils::SIMD_WIDTH;
+            for (size_t i = 0; i + batchSize <= targetNeurons.size(); i += batchSize) {
+                // Process batch with SIMD (implementation would use SIMD instructions)
+                for (size_t j = 0; j < batchSize; ++j) {
+                    targetNeurons[i + j]->injectCurrent(current);
+                }
+            }
+            
+            // Remainder
+            for (size_t i = SIMDUtils::SIMD_WIDTH * (std::ceil(targetNeurons.size() / SIMDUtils::SIMD_WIDTH)); 
+                 i < targetNeurons.size(); ++i) {
+                targetNeurons[i]->injectCurrent(current);
+            }
+        } else {
+            // Scalar fallback
+            for (auto* neuron : targetNeurons) {
+                neuron->injectCurrent(current);
+            }
+        }
+    }
 
 SpikeSystem* Brain::getSpikeSystem() {
     return pImpl->spikeSystem.get();
@@ -798,14 +901,14 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Enhanced action selection using neural planner for goal-directed behavior
+    // Combines neural activity with cognitive planning for better decision making
     
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
-    // Calculate activity of motor neuron groups
+    // Calculate baseline motor activity
     size_t firingMotor = 0;
     for (auto* neuron : pImpl->motorNeurons) {
         if (neuron->isFiring()) {
@@ -813,24 +916,88 @@ std::unique_ptr<class Action> Brain::produceAction() {
         }
     }
     
-    // Return a simple action
+    // Use neural planner to determine optimal action
     ActionType type = ActionType::Wait;
-    if (firingMotor > 0) {
-        type = ActionType::MoveForward;
+    float plannerConfidence = 0.0f;
+    
+    if (pImpl->planner) {
+        // Let the neural planner analyze current state and select action
+        type = pImpl->planner->planAction(*this);
+        plannerConfidence = pImpl->planner->getPlanningConfidence();
+    } 
+    // If no planner or confidence is low, fall back to motor-based selection
+    if (type == ActionType::Wait || plannerConfidence < 0.5f) {
+        if (firingMotor > 0) {
+            type = ActionType::MoveForward;
+        }
     }
     
     auto action = std::make_unique<Action>(type);
+    
+    // Apply learned preference bias to action selection
+    if (firingMotor > 0 && type != ActionType::Wait) {
+        float learnedPref = pImpl->learnedPreference;
+        
+        // Bias action based on learned preferences
+        if (std::abs(learnedPref) > 0.3f) {
+            // Apply small bias to make preference more likely
+            if (learnedPref > 0 && type != ActionType::MoveForward) {
+                type = ActionType::MoveForward;
+            } else if (learnedPref < 0 && type == ActionType::MoveForward) {
+                type = ActionType::Wait;
+            }
+        }
+        
+        // Update action with learned preference
+        action = std::make_unique<Action>(type);
+    }
     
     return action;
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
-    // Apply neuromodulation effects on plasticity
+    // Enhanced neuromodulation with multi-system integration
+    // Dopamine affects neural excitability, memory consolidation, and attention
+    
     float modulation = signal.getLevel();
     
-    // Scale STDP learning rates
+    // Scale STDP learning rates (original functionality)
     pImpl->stdp->setLTPWeight(0.01f * modulation);
     pImpl->stdp->setLTDWeight(0.012f * modulation);
+    
+    // Enhanced dopamine effects on neural excitability
+    if (modulation > 0.0f) {
+        float excitabilityMod = modulation * 0.5f;
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Dopamine modulates excitability by injecting additional current
+                    neuron->injectCurrent(excitabilityMod);
+                }
+            }
+        }
+    }
+    
+    // Apply neuromodulation to memory systems
+    if (pImpl->workingMemory && modulation > 0.0f) {
+        // Enhance working memory consolidation
+        pImpl->workingMemory->applyModulation(modulation);
+    }
+    
+    if (pImpl->episodicMemory && modulation > 0.0f) {
+        // Enhance episodic memory encoding
+        pImpl->episodicMemory->applyModulation(modulation);
+    }
+    
+    // Apply neuromodulation to attention system
+    if (pImpl->attention) {
+        pImpl->attention->applyModulation(modulation);
+    }
+    
+    // Apply neuromodulation to development system
+    if (pImpl->developmentSystem && modulation > 0.0f) {
+        pImpl->developmentSystem->applyModulation(modulation);
+    }
 }
 
 void Brain::updatePlasticity() {
