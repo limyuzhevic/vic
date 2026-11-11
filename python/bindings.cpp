@@ -142,10 +142,10 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
-    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
+py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+             "Load configuration from a JSON file. Returns True on success, False on failure.")
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
@@ -155,9 +155,9 @@ PYBIND11_MODULE(pynlm, m) {
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+            "Load configuration from command line arguments. Returns True on success, False on failure.")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a JSON file. Returns True on success, False on failure.")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -181,28 +181,31 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Vision, SensoryInput>(m, "Vision", R"pbdoc(Vision sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t, size_t>(), py::arg("width"), py::arg("height"),
-             py::arg("channels") = 3)
+              py::arg("channels") = 3)
         .def("setData", [](Vision& self, const std::vector<float>& data) {
             self.setData(data);
-        }, py::arg("data"))
-        .def("getWidth", &Vision::getWidth)
-        .def("getHeight", &Vision::getHeight)
-        .def("getChannels", &Vision::getChannels);
+        }, py::arg("data"), "Set vision data. Data should be flattened RGB array with size width*height*channels.")
+        .def("getWidth", &Vision::getWidth, "Get vision width in pixels")
+        .def("getHeight", &Vision::getHeight, "Get vision height in pixels")
+        .def("getChannels", &Vision::getChannels, "Get number of color channels (1=grayscale, 3=RGB)");
 
     py::class_<Audio, SensoryInput>(m, "Audio", R"pbdoc(Audio sensory input)pbdoc")
         .def(py::init<>())
         .def(py::init<size_t, size_t>(), py::arg("sampleRate"), py::arg("numSamples"))
         .def("setData", [](Audio& self, const std::vector<float>& data) {
             self.setData(data);
-        }, py::arg("data"))
-        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"))
-        .def("getSampleRate", &Audio::getSampleRate)
-        .def("getNumSamples", &Audio::getNumSamples);
+        }, py::arg("data"), "Set audio data. Data should be a flattened array of audio samples.")
+        .def("setSampleRate", &Audio::setSampleRate, py::arg("sampleRate"),
+              "Set the audio sample rate in Hz")
+        .def("getSampleRate", &Audio::getSampleRate, "Get the audio sample rate in Hz")
+        .def("getNumSamples", &Audio::getNumSamples, "Get the number of audio samples");
 
     py::class_<InternalSignals, SensoryInput>(m, "InternalSignals", R"pbdoc(Internal signals sensory input)pbdoc")
         .def(py::init<>())
-        .def("addSignal", &InternalSignals::addSignal, py::arg("value"))
-        .def("clearSignals", &InternalSignals::clearSignals);
+        .def("addSignal", &InternalSignals::addSignal, py::arg("value"),
+              "Add an internal signal value to the signal buffer")
+        .def("clearSignals", &InternalSignals::clearSignals,
+              "Clear all internal signals");
 
     py::class_<Action>(m, "Action", R"pbdoc(Action representation for motor output)pbdoc")
         .def(py::init<>())
@@ -428,6 +431,52 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // Expose neuron types as constants
+    m.attr("NEURON_TYPE_EXCITATORY") = static_cast<int>(NeuronType::Excitatory);
+    m.attr("NEURON_TYPE_INHIBITORY") = static_cast<int>(NeuronType::Inhibitory);
+    m.attr("NEURON_TYPE_MODULATORY") = static_cast<int>(NeuronType::Modulatory);
+    m.attr("NEURON_TYPE_SENSORY") = static_cast<int>(NeuronType::Sensory);
+    m.attr("NEURON_TYPE_MOTOR") = static_cast<int>(NeuronType::Motor);
+    m.attr("NEURON_TYPE_INTERNAL") = static_cast<int>(NeuronType::Internal);
+
+    // Expose synapse types as constants
+    m.attr("SYNAPSE_TYPE_EXCITATORY") = static_cast<int>(SynapseType::Excitatory);
+    m.attr("SYNAPSE_TYPE_INHIBITORY") = static_cast<int>(SynapseType::Inhibitory);
+    m.attr("SYNAPSE_TYPE_MODULATORY") = static_cast<int>(SynapseType::Modulatory);
+    m.attr("SYNAPSE_TYPE_ELECTRICAL") = static_cast<int>(SynapseType::Electrical);
+    m.attr("SYNAPSE_TYPE_GAP_JUNCTION") = static_cast<int>(SynapseType::GapJunction);
+
+    // Expose developmental stages as constants
+    m.attr("DEVELOPMENTAL_STAGE_INITIAL") = static_cast<int>(DevelopmentalStage::Initial);
+    m.attr("DEVELOPMENTAL_STAGE_CRITICAL_PERIOD") = static_cast<int>(DevelopmentalStage::CriticalPeriod);
+    m.attr("DEVELOPMENTAL_STAGE_MATURATION") = static_cast<int>(DevelopmentalStage::Maturation);
+    m.attr("DEVELOPMENTAL_STAGE_ADULT") = static_cast<int>(DevelopmentalStage::Adult);
+    m.attr("DEVELOPMENTAL_STAGE_AGING") = static_cast<int>(DevelopmentalStage::Aging);
+
+    // Expose action types as constants
+    m.attr("ACTION_TYPE_MOVE_FORWARD") = static_cast<int>(ActionType::MoveForward);
+    m.attr("ACTION_TYPE_MOVE_BACKWARD") = static_cast<int>(ActionType::MoveBackward);
+    m.attr("ACTION_TYPE_MOVE_LEFT") = static_cast<int>(ActionType::MoveLeft);
+    m.attr("ACTION_TYPE_MOVE_RIGHT") = static_cast<int>(ActionType::MoveRight);
+    m.attr("ACTION_TYPE_TURN_LEFT") = static_cast<int>(ActionType::TurnLeft);
+    m.attr("ACTION_TYPE_TURN_RIGHT") = static_cast<int>(ActionType::TurnRight);
+    m.attr("ACTION_TYPE_LOOK") = static_cast<int>(ActionType::Look);
+    m.attr("ACTION_TYPE_LOOK_UP") = static_cast<int>(ActionType::LookUp);
+    m.attr("ACTION_TYPE_LOOK_DOWN") = static_cast<int>(ActionType::LookDown);
+    m.attr("ACTION_TYPE_INTERACT") = static_cast<int>(ActionType::Interact);
+    m.attr("ACTION_TYPE_EAT") = static_cast<int>(ActionType::Eat);
+    m.attr("ACTION_TYPE_DRINK") = static_cast<int>(ActionType::Drink);
+    m.attr("ACTION_TYPE_REST") = static_cast<int>(ActionType::Rest);
+    m.attr("ACTION_TYPE_WAIT") = static_cast<int>(ActionType::Wait);
+    m.attr("ACTION_TYPE_CUSTOM") = static_cast<int>(ActionType::Custom);
+
+    // Expose world object types as constants
+    m.attr("WORLD_OBJECT_TYPE_EMPTY") = static_cast<int>(WorldObjectType::Empty);
+    m.attr("WORLD_OBJECT_TYPE_RESOURCE") = static_cast<int>(WorldObjectType::Resource);
+    m.attr("WORLD_OBJECT_TYPE_HAZARD") = static_cast<int>(WorldObjectType::Hazard);
+    m.attr("WORLD_OBJECT_TYPE_WALL") = static_cast<int>(WorldObjectType::Wall);
+    m.attr("WORLD_OBJECT_TYPE_MARKER") = static_cast<int>(WorldObjectType::Marker);
 }
 
 } // namespace nlm
