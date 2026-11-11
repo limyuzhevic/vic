@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "ExperimentBase.hpp"
 #include <string>
 #include <memory>
 #include <vector>
@@ -8,7 +9,7 @@
 namespace nlm {
 
 // Experiment: Records data from a single experimental run
-class Experiment {
+class Experiment : public ExperimentBase {
 public:
     Experiment();
     Experiment(const std::string& name);
