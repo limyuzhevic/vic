@@ -286,12 +286,124 @@ print("Agent simulation complete!")
 - Some neurons need input to fire - make sure sensory input is connected
 
 ---
-
 ## Next Steps
 
 When you're comfortable:
+
 1. Read `HOW_TO_USE.md` for more details
 2. Read `docs/ARCHITECTURE.md` to understand how it all works
 3. Experiment with different configurations!
 
 That's it! You're now ready to use NLM.
+
+## New Advanced Features
+
+With the enhanced Python bindings, you can now:
+
+1. **Create complete learning setups**: Use `createLearningSetup()` for brains that actually learn
+2. **Run simulations automatically**: Use `runSimulationSteps()` for hands-off simulation
+3. **Get detailed statistics**: Use `formatSimulationStats()` for comprehensive debugging
+4. **Access Phase 6 features**: Brain, world, and agent now support all Phase 6 functionality
+5. **Use convenience methods**: New helper methods like `placeResource()`, `placeHazard()`
+6. **Format output**: Get nicely formatted stats for debugging and analysis
+7. **Create custom setups**: Flexible factory functions for your specific needs
+
+### Example Advanced Usage
+
+```python
+# Create an advanced setup with all learning features
+brain, world, agent = pynlm.createLearningSetup(
+    enableCuriosity=True,
+    enableRewardModulation=True,
+    enableStructuralPlasticity=True
+)
+
+# Run a learning simulation with automatic statistics
+pynlm.runSimulationSteps(agent, world, 500, showProgress=True)
+
+# Get comprehensive statistics
+stats = pynlm.formatSimulationStats(agent, world)
+print(stats)
+
+# Use convenience methods to setup world
+world.placeResource()  # Add a resource object
+world.placeHazard()    # Add a hazard object
+```
+
+## Complete API Reference
+
+### New Factory Functions
+
+#### `createLearningSetup(enableCuriosity=True, enableRewardModulation=True, enableStructuralPlasticity=False)`
+Creates a setup optimized for learning and development with configurable features.
+
+#### `createQuickTestSetup()`
+Creates a minimal setup for quick testing.
+
+#### `createExampleSetup()`
+Creates a complete example setup for easy testing.
+
+#### `createConfigWithDefaults(neuronCount=100, regionCount=2, connectionProb=0.1)`
+Creates a configuration with specified parameters.
+
+#### `createVisionInput(width, height, channels=3, data)`
+Creates vision sensory input.
+
+#### `createAudioInput(sampleRate, numSamples, data)`
+Creates audio sensory input.
+
+#### `createInternalSignalsInput(signals)`
+Creates internal signals sensory input.
+
+#### `createMoveCommand(direction, power=1.0f)`
+Creates a movement motor command.
+
+### New Global Functions
+
+#### `runSimulationSteps(agent, world, numSteps, timestep=0.1, showProgress=False)`
+Runs a complete simulation with agent and world.
+
+#### `formatSimulationStats(agent, world)`
+Gets formatted statistics for brain, world, and agent.
+
+#### `encodeText(text)`
+Static helper to encode text as sensory pattern (Phase 6).
+
+### New AgentBrain Methods
+
+#### Phase 5 and Phase 6 Methods
+
+- `getThoughtTrace()` - Get thought trace (Phase 5)
+- `getLearnedPreference()` - Get learned preference trait
+- `getReflexBonusCount()` - Get vision-gated reflex bonus count (Phase 5)
+- `getReflexSuppressCount()` - Get hazard suppression count (Phase 5)
+- `getWtaPulseCount()` - Get winner-take-all pulse count (Phase 5)
+- `encodeText(text)` - Encode text as sensory pattern (Phase 6) - static helper
+- `getInternalFiringRates()` - Get internal firing rates (Phase 6)
+- `getPlannerOverrideCount()` - Get planner override count (Phase 6)
+- `getPlannerAgreementCount()` - Get planner agreement count (Phase 6)
+- `getPlannerDecisionCount()` - Get planner decision count (Phase 6)
+- `getConceptBiasCount()` - Get concept bias count (Phase 6)
+- `getSelfBiasCount()` - Get self bias count (Phase 6)
+- `getSocialBiasCount()` - Get social bias count (Phase 6)
+- `getConceptCount()` - Get concept count (Phase 6)
+- `getSelfModelConfidence()` - Get self model confidence (Phase 6)
+- `getSocialObservationCount()` - Get social observation count (Phase 6)
+- `observeOtherAgent(observed, beforeVision, afterVision)` - Observe another agent's action (Phase 6)
+- `getMotorGroupActivities()` - Get motor group activities for diagnostics
+
+### New SimpleWorld Methods
+
+#### Convenience Methods
+
+- `placeResource()` - Convenience method to place a resource object
+- `placeHazard()` - Convenience method to place a hazard object
+- `removeObjectAt()` - Alias for removeObject
+- `isOccupied()` - Check if position is occupied by object
+
+#### Extended Methods
+
+- `getVisionWidth()` - Get vision width
+- `getVisionHeight()` - Get vision height
+- `removeObjectAt()` - Remove object at given position (alias for removeObject)
+- `isOccupied()` - Check if position is occupied by object (convenience method)
