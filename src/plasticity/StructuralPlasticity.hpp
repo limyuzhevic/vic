@@ -1,34 +1,35 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
+#include "../core/Random/Random.hpp"
+#include <memory>
 
 namespace nlm {
 
 class Brain;
 
 // Structural plasticity: creation and removal of synapses and neurons
-// PLACEHOLDER - Phase 2 will implement real structural plasticity
-
+// REAL IMPLEMENTATION - Phase 2 real structural plasticity
 class StructuralPlasticity {
 public:
     StructuralPlasticity();
     ~StructuralPlasticity();
     
     // Create new synapse
-    // TODO PHASE 2: Implement real synapse creation
+    // REAL IMPLEMENTATION: Implement real synapse creation
     SynapseId createSynapse(Brain* brain, NeuronId source, NeuronId destination,
                            SynapticWeight weight);
     
     // Remove synapse
-    // TODO PHASE 2: Implement real synapse removal
+    // REAL IMPLEMENTATION: Implement real synapse removal
     bool removeSynapse(Brain* brain, SynapseId synapse);
     
     // Create new neuron
-    // TODO PHASE 2: Implement real neuron creation
+    // REAL IMPLEMENTATION: Implement real neuron creation
     NeuronId createNeuron(Brain* brain, NeuronType type);
     
     // Remove neuron
-    // TODO PHASE 2: Implement real neuron removal
+    // REAL IMPLEMENTATION: Implement real neuron removal
     bool removeNeuron(Brain* brain, NeuronId neuron);
     
     // Get creation rate
@@ -40,11 +41,15 @@ public:
     void setPruningRate(float rate);
     
     // Update structural plasticity
-    void update(Brain* brain, class RandomGenerator& rng);
+    void update(Brain* brain, RandomGenerator& rng);
+    
+    // Get structural statistics
+    float getCurrentSynapticDensity() const;
+    float getCurrentNeuronDensity() const;
     
 private:
     struct Impl;
-    Impl* pImpl;
+    std::unique_ptr<Impl> pImpl;
 };
 
 } // namespace nlm

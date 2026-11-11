@@ -3,20 +3,20 @@
 #include "Action.hpp"
 #include <memory>
 #include <vector>
+#include "../brain/NeuralRegion.hpp"
 
 namespace nlm {
 
 // Motor system: converts neural activity to actions
-// PLACEHOLDER - Phase 2 will implement real action selection
-
+// REAL IMPLEMENTATION - Phase 2 real action selection
 class MotorSystem {
 public:
     MotorSystem();
     ~MotorSystem();
     
     // Select action based on neural activity
-    // TODO PHASE 2: Implement real action selection
-    std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
+    // REAL IMPLEMENTATION: Select action based on neural activity
+    std::unique_ptr<Action> selectAction(const NeuralRegion& motorRegion);
     
     // Get available actions
     const std::vector<ActionType>& getAvailableActions() const;
@@ -27,6 +27,9 @@ public:
     // Get action history
     const std::vector<const Action*>& getActionHistory() const;
     void clearHistory();
+    
+    // Get action statistics
+    const std::vector<float>& getActionStatistics() const;
     
 private:
     struct Impl;

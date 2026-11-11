@@ -4,19 +4,19 @@
 #include "../sensory/SensoryInput.hpp"
 #include <vector>
 #include <memory>
+#include <string>
 
 namespace nlm {
 
 // Prediction system: predicts future sensory states and consequences
-// PLACEHOLDER - Phase 2 will implement real predictive coding
-
+// REAL IMPLEMENTATION - Phase 2 real predictive coding
 class PredictionSystem {
 public:
     PredictionSystem();
     ~PredictionSystem();
     
     // Make prediction for next timestep
-    // TODO PHASE 2: Implement real prediction
+    // REAL IMPLEMENTATION: Make prediction using neural network
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation
@@ -34,6 +34,12 @@ public:
     
     // Train prediction model
     void train(const SensoryInput& observation);
+    
+    // Get prediction strength
+    float getPredictionStrength() const;
+    
+    // Get prediction horizon
+    int getPredictionHorizon() const;
     
 private:
     struct Impl;

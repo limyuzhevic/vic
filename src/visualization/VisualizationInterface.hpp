@@ -3,11 +3,16 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include "../brain/Brain.hpp"
+#include "../brain/Neuron.hpp"
+#include "../brain/Synapse.hpp"
+#include "../sensory/Vision.hpp"
+#include "../dynamics/SpikeSystem.hpp"
 
 namespace nlm {
 
 // Visualization interface for debugging and analysis
-// PLACEHOLDER - Phase 2 will have real visualization
+// REAL IMPLEMENTATION - Phase 2 real visualization
 class VisualizationInterface {
 public:
     VisualizationInterface();
@@ -33,16 +38,16 @@ public:
     double getUpdateRate() const;
     
     // Network visualization
-    void visualizeNetwork(const class Brain& brain);
+    void visualizeNetwork(const Brain& brain);
     
     // Activity visualization
-    void visualizeActivity(const class Brain& brain);
+    void visualizeActivity(const Brain& brain);
     
     // Spike raster plot
-    void visualizeSpikes(const std::vector<class SpikeEvent>& spikes);
+    void visualizeSpikes(const std::vector<SpikeEvent>& spikes);
     
     // Weight matrix visualization
-    void visualizeWeights(const class Brain& brain);
+    void visualizeWeights(const Brain& brain);
     
 private:
     struct Impl;

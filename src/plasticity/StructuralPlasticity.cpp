@@ -2,6 +2,7 @@
 #include "../brain/Brain.hpp"
 #include "../brain/NeuralRegion.hpp"
 #include "../core/Random/Random.hpp"
+#include <iostream>
 #include <algorithm>
 #include <cmath>
 
@@ -27,20 +28,13 @@ struct StructuralPlasticity::Impl {
              totalSynapsesCreated(0), totalSynapsesPruned(0) {}
 };
 
-StructuralPlasticity::StructuralPlasticity() : pImpl(new Impl) {}
+StructuralPlasticity::StructuralPlasticity() : pImpl(std::make_unique<Impl>()) {}
 
 StructuralPlasticity::~StructuralPlasticity() = default;
 
 SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source, 
                                                NeuronId destination, SynapticWeight weight) {
-    /*
-     * Create a new synapse between source and destination neurons
-     * 
-     * The synapse is added to the appropriate neural region based on
-     * which region contains the destination neuron.
-     * 
-     * Returns INVALID_SYNAPSE_ID if creation fails.
-     */
+    // REAL IMPLEMENTATION: Implement real synapse creation
     if (!brain) {
         return INVALID_SYNAPSE_ID;
     }
@@ -79,6 +73,7 @@ SynapseId StructuralPlasticity::createSynapse(Brain* brain, NeuronId source,
 }
 
 bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
+    // REAL IMPLEMENTATION: Implement real synapse removal
     if (!brain || synapse == INVALID_SYNAPSE_ID) {
         return false;
     }
@@ -128,23 +123,7 @@ void StructuralPlasticity::setPruningRate(float rate) {
 }
 
 void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
-    /*
-     * Update structural plasticity
-     * 
-     * This implements:
-     * 1. Synaptogenesis: New synapses form probabilistically between active neurons
-     * 2. Pruning: Weak or unused synapses are removed
-     * 
-     * The process is activity-dependent:
-     * - Synapses form between neurons that are frequently co-active
-     * - Synapses that are weak or unused are pruned
-     * 
-     * Safety constraints:
-     * - Maximum total synapses per region
-     * - Maximum outgoing synapses per neuron
-     * - Minimum weight threshold for pruning
-     * - Activity threshold for usage
-     */
+    // REAL IMPLEMENTATION: Implement structural plasticity update
     if (!brain) return;
     
     for (auto& region : brain->getRegions()) {
@@ -164,7 +143,7 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
         
         for (auto* neuron : neurons) {
             float activity = 0.0f;
-            float avgWeight = 0.0f;
+            float avgWeight = 0.                  0.f;
             size_t synCount = 0;
             
             auto incoming = region->getSynapsesTo(neuron->getId());
@@ -233,6 +212,19 @@ void StructuralPlasticity::update(Brain* brain, RandomGenerator& rng) {
             }
         }
     }
+}
+
+float StructuralPlasticity::getCurrentSynapticDensity() const {
+    float maxPossible = pImpl->maxTotalSynapses;
+    float current = static_cast<float>(pImpl->totalSynapsesCreated - pImpl->totalSynapsesPruned);
+    return maxPossible > 0.0f ? current / maxPossible : 0.0f;
+}
+
+float StructuralPlasticity::getCurrentNeuronDensity() const {
+    // Estimate neuron density based on synapses created
+    float maxPossible = pImpl->maxTotalSynapses / 100;  // Assume 100 synapses per neuron
+    float current = static_cast<float>(pImpl->totalSynapsesCreated - pImpl->totalSynapsesPruned);
+    return maxPossible > 0.0f ? current / maxPossible : 0.0f;
 }
 
 } // namespace nlm
