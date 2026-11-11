@@ -102,6 +102,32 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Internal file loading methods
+    bool loadFromSimpleFormat(const std::string& filepath);
+    bool loadFromJson(const std::string& filepath);
+    bool loadFromYaml(const std::string& filepath);
 };
+
+// Explicit template instantiations
+// (uint64_t and size_t are the same type on this platform, so only one is listed)
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
+template std::optional<float> Config::get<float>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
+template float Config::getOr<float>(const std::string&, const float&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+extern std::map<std::string, std::pair<ConfigValue, std::string>> Config::Impl::defaultConfig;
+extern std::map<std::string, Config::Impl::ConfigMetadata> Config::Impl::configMetadata;
 
 } // namespace nlm

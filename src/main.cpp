@@ -331,6 +331,10 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    bool showHelp = false;
+    bool showVersion = false;
+    
+    // Parse command line arguments
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -339,14 +343,52 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            showVersion = true;
         }
+    }
+    
+    // Show help if requested
+    if (showHelp) {
+        printBanner();
+        std::cout << "Usage: nlm [OPTIONS]" << std::endl;
+        std::cout << "NLM Phase 2 Real Neural Computation Demo" << std::endl;
+        std::cout << "Options:" << std::endl;
+        std::cout << "  -h, --help           Show this help message and exit" << std::endl;
+        std::cout << "  -v, --version        Show version information and exit" << std::endl;
+        std::cout << "  --config=file        Load configuration from file (default: configs/default.cfg)" << std::endl;
+        std::cout << "  --config <file>      Alternative syntax for config file" << std::endl;
+        std::cout << "  --neuron_count=N     Override neuron count (default: 500)" << std::endl;
+        std::cout << "  --region_count=N     Override region count (default: 1)" << std::endl;
+        std::cout << "  --connection_probability=N  Set connection probability (default: 0.15)" << std::endl;
+        std::cout << "  --stdp_ltp_weight=N  Set STDP LTP weight (default: 0.02)" << std::endl;
+        std::cout << "  --stdp_ltd_weight=N  Set STDP LTD weight (default: 0.015)" << std::endl;
+        std::cout << "  --stdp_tau=N         Set STDP time constant (default: 20)" << std::endl;
+        std::cout << "  --synaptogenesis_rate=N  Set synaptogenesis rate (default: 0.0001)" << std::endl;
+        std::cout << "  --pruning_rate=N     Set pruning rate (default: 0.00001)" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Examples:" << std::endl;
+        std::cout << "  ./nlm --neuron_count=1000 --region_count=2" << std::endl;
+        std::cout << "  ./nlm --config=my_config.cfg --stdp_tau=10" << std::endl;
+        return 0;
+    }
+    
+    // Show version if requested
+    if (showVersion) {
+        printBanner();
+        std::cout << "NLM Phase 2 - Version 0.1.0" << std::endl;
+        std::cout << "An experimental artificial developmental brain." << std::endl;
+        std::cout << "Phase 2: Real Neural Computation with LIF dynamics." << std::endl;
+        return 0;
     }
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Could not load configuration from " + configFile + ", using defaults");
     }
     
     // Override with command line args
