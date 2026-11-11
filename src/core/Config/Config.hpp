@@ -6,6 +6,7 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <limits>
 
 namespace nlm {
 
@@ -59,19 +60,31 @@ public:
     // Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
+    // Load from simple key=value format
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    // Load from JSON format
+    bool loadFromJSON(const std::string& filepath);
+    
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
+    // Save to simple format
+    bool saveToSimpleFormat(const std::string& filepath) const;
+    
+    // Save to JSON format
+    bool saveToJSON(const std::string& filepath) const;
+    
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -79,6 +92,12 @@ template<typename T>
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Internal helper for type-based parsing
+    void setValueByType(const std::string& key, const std::string& value, ConfigSource source);
+    
+    // Convert ConfigValue to string for file output
+    static std::string getConfigValueAsString(const ConfigValue& value);
     
     // Check existence
     bool has(const std::string& key) const;
