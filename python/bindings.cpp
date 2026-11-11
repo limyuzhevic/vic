@@ -160,12 +160,14 @@ PYBIND11_MODULE(pynlm, m) {
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+    .def("getEntryCount", &Config::getEntryCount)
+        .def("getEntryCount", &Config::getEntryCount, py::arg("source"))
+        .def("hasSourceConflict", &Config::hasSourceConflict, py::arg("key"))
+        .def("getPrimarySource", &Config::getPrimarySource, py::arg("key"))
+        .def("validate", &Config::validate)
+        .def("getLastError", &Config::getLastError)
+        .def("clearLastError", &Config::clearLastError)
+        .def("merge", &Config::merge, py::arg("other"), py::arg("source"))
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -420,14 +422,150 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
-    m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
-        return std::make_shared<AgentBrain>(brain);
-    }, py::arg("brain"), "Create a new agent brain interface");
+    .def("enableCuriosity", &AgentBrain::enableCuriosity, py::arg("enable"))
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Python-friendly utility functions
+    m.def("createBrainFromFile", [](const std::string& configFile) {
+        auto config = std::make_shared<Config>();
+        if (config->loadFromFile(configFile)) {
+            return std::make_shared<Brain>(config);
+        }
+        throw std::runtime_error("Failed to load configuration from: " + configFile);
+    }, py::arg("configFile"), "Create brain from configuration file");
+
+    m.def("createBrainWithParams", [](int neuronCount, float connectionProb, double timestep) {
+        auto config = std::make_shared<Config>();
+        config->set("random_seed", static_cast<int64_t>(42));
+        config->set("simulation_timestep", timestep);
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", connectionProb);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuronCount"), py::arg("connectionProb"), py::arg("timestep"),
+        "Create brain with specified parameters");
+
+    m.def("validateBrain", [](std::shared_ptr<Brain> brain) {
+        std::vector<std::string> issues;
+        
+        if (brain->getTotalNeuronCount() == 0) {
+            issues.push_back("WARNING: Brain has no neurons");
+        }
+        
+        if (brain->getTotalSynapseCount() == 0) {
+            issues.push_back("WARNING: Brain has no synapses");
+        }
+        
+        double firingRate = brain->getAverageFiringRate();
+        if (firingRate > 100.0) {
+            issues.push_back("WARNING: Very high firing rate: " + std::to_string(firingRate) + " Hz");
+        } else if (firingRate < 0.1) {
+            issues.push_back("WARNING: Very low firing rate: " + std::to_string(firingRate) + " Hz");
+        }
+        
+        double eiRatio = brain->getExcitationInhibitionRatio();
+        if (eiRatio > 10.0 || eiRatio < 0.1) {
+            issues.push_back("WARNING: Unbalanced E/I ratio: " + std::to_string(eiRatio));
+        }
+        
+        if (issues.empty()) {
+            issues.push_back("SUCCESS: Brain appears valid");
+        }
+        
+        return issues;
+    }, py::arg("brain"), "Validate brain state and return issues list");
+
+    m.def("getBrainStats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["firing_count"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["ei_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["development_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"), "Get comprehensive brain statistics");
+
+    m.def("createAgentFromString", [](std::shared_ptr<Brain> brain, const std::string& worldConfig) {
+        auto agent = std::make_shared<AgentBrain>(brain);
+        
+        // Simple world configuration parser
+        if (worldConfig.find("width=") != std::string::npos) {
+            size_t widthPos = worldConfig.find("width=") + 6;
+            size_t commaPos = worldConfig.find(",", widthPos);
+            int width = std::stoi(worldConfig.substr(widthPos, commaPos - widthPos));
+            
+            size_t heightPos = worldConfig.find("height=", commaPos) + 7;
+            commaPos = worldConfig.find(",", heightPos);
+            int height = std::stoi(worldConfig.substr(heightPos, commaPos - heightPos));
+            
+            size_t visionWidthPos = worldConfig.find("visionWidth=", commaPos) + 12;
+            commaPos = worldConfig.find(",", visionWidthPos);
+            int visionWidth = std::stoi(worldConfig.substr(visionWidthPos, commaPos - visionWidthPos));
+            
+            size_t visionHeightPos = worldConfig.find("visionHeight=", commaPos) + 13;
+            int visionHeight = std::stoi(worldConfig.substr(visionHeightPos));
+            
+            auto world = std::make_shared<SimpleWorld>();
+            world->configure(width, height, visionWidth, visionHeight);
+            agent->initialize(world);
+        }
+        
+        return agent;
+    }, py::arg("brain"), py::arg("worldConfig"),
+        "Create agent brain with world configuration from string");
+
+    m.def("runSimulation", [](std::shared_ptr<Brain> brain, size_t steps, bool verbose) {
+        for (SimulationStep step = 0; step < static_cast<SimulationStep>(steps); ++step) {
+            brain->step(step);
+            if (verbose && step % 100 == 0) {
+                std::cout << "Step " << step << ": " << brain->getFiringNeuronCount() << " firing neurons" << std::endl;
+            }
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("steps"), py::arg("verbose"), "Run simulation and return total spike count");
+
+    m.def("createDefaultConfigWithCustomValues", [](std::unordered_map<std::string, std::variant<int, double, bool, std::string>> values) {
+        auto config = std::make_shared<Config>();
+        for (const auto& pair : values) {
+            if (std::holds_alternative<int>(pair.second)) {
+                config->set(pair.first, std::get<int>(pair.second));
+            } else if (std::holds_alternative<double>(pair.second)) {
+                config->set(pair.first, std::get<double>(pair.second));
+            } else if (std::holds_alternative<bool>(pair.second)) {
+                config->set(pair.first, std::get<bool>(pair.second));
+            } else if (std::holds_alternative<std::string>(pair.second)) {
+                config->set(pair.first, std::get<std::string>(pair.second));
+            }
+        }
+        return config;
+    }, py::arg("values"), "Create default config with custom values");
+
+    m.def("benchmarkBrain", [](std::shared_ptr<Brain> brain, size_t steps) {
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        for (SimulationStep step = 0; step < static_cast<SimulationStep>(steps); ++step) {
+            brain->step(step);
+        }
+        
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        
+        double seconds = duration.count() / 1000.0;
+        double stepsPerSecond = steps / seconds;
+        
+        std::map<std::string, double> benchResults;
+        benchResults["steps"] = steps;
+        benchResults["duration_seconds"] = seconds;
+        benchResults["steps_per_second"] = stepsPerSecond;
+        benchResults["total_spikes"] = brain->getTotalSpikeCount();
+        benchResults["neurons_per_second"] = brain->getTotalNeuronCount() / seconds;
+        
+        return benchResults;
+    }, py::arg("brain"), py::arg("steps"), "Benchmark brain performance");
 
 } // namespace nlm

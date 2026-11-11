@@ -80,20 +80,28 @@ template<typename T>
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Validate configuration
+    bool validate() const;
     
-    // Remove key
-    void remove(const std::string& key);
+    // Get configuration statistics
+    size_t getEntryCount() const;
+    size_t getEntryCount(ConfigSource source) const;
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Check for configuration conflicts
+    bool hasSourceConflict(const std::string& key) const;
+    ConfigSource getPrimarySource(const std::string& key) const;
     
-    // Clear all
-    void clear();
+    // Utility functions for configuration values
+    static bool isValidInt(const std::string& value, int64_t& out);
+    static bool isValidDouble(const std::string& value, double& out);
+    static bool isValidBool(const std::string& value, bool& out);
     
-    // Get configuration summary
-    std::string summary() const;
+    // Error handling
+    std::string getLastError() const;
+    void clearLastError();
+    
+    // Batch operations
+    void merge(const Config& other, ConfigSource source = ConfigSource::Runtime);
     
 private:
     struct Impl;

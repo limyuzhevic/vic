@@ -22,13 +22,20 @@ bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
+    // Validate file path
+    if (filepath.empty() || filepath.find('/') == std::string::npos) {
+        return false;
+    }
+    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
     std::string line;
+    size_t lineNum = 0;
     while (std::getline(file, line)) {
+        ++lineNum;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -40,6 +47,11 @@ bool Config::loadFromFile(const std::string& filepath) {
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
             std::string value = trim(line.substr(pos + 1));
+            
+            // Validate key
+            if (key.empty()) {
+                return false;
+            }
             
             // Remove quotes if present
             if (value.size() >= 2 && 
@@ -124,9 +136,16 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
     set(key, ConfigValue(value), source);
 }
 
-bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
+void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
+
+    if (it != pImpl->entries.end()) {
+        it->value = value;
+        it->source = source;
+    } else {
+        pImpl->entries.emplace_back(key, value, source);
+    }
 }
 
 void Config::remove(const std::string& key) {
@@ -190,49 +209,114 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
+bool Config::validate() const {
+    for (const auto& entry : pImpl->entries) {
+        bool valid = false;
+        if (std::holds_alternative<int>(entry.value) ||
+            std::holds_alternative<int64_t>(entry.value) ||
+            std::holds_alternative<double>(entry.value) ||
+            std::holds_alternative<bool>(entry.value) ||
+            std::holds_alternative<std::string>(entry.value)) {
+            valid = true;
+        }
+        if (std::holds_alternative<std::vector<int>>(entry.value) ||
+            std::holds_alternative<std::vector<double>>(entry.value) ||
+            std::holds_alternative<std::vector<std::string>>(entry.value)) {
+            valid = true;
+        }
+        
+        if (!valid) {
+            throw std::runtime_error("Invalid value type for key: " + entry.key);
+        }
+    }
+    return true;
+}
+
+size_t Config::getEntryCount() const {
+    return pImpl->entries.size();
+}
+
+size_t Config::getEntryCount(ConfigSource source) const {
+    return std::count_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [source](const ConfigEntry& e) { return e.source == source; });
+}
+
+bool Config::hasSourceConflict(const std::string& key) const {
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
-    }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
-        } else {
-            return std::nullopt;
+    return (it != pImpl->entries.end());
+}
+
+ConfigSource Config::getPrimarySource(const std::string& key) const {
+    ConfigSource bestSource = ConfigSource::Default;
+    int bestPriority = 0;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (entry.key == key) {
+            int priority = static_cast<int>(entry.source);
+            if (priority > bestPriority) {
+                bestPriority = priority;
+                bestSource = entry.source;
+            }
         }
-    }, it->value);
+    }
+    
+    return bestSource;
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+bool Config::isValidInt(const std::string& value, int64_t& out) {
+    try {
+        size_t pos;
+        int64_t result = std::stoll(value, &pos);
+        if (pos != value.size()) {
+            return false;
+        }
+        out = result;
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+bool Config::isValidDouble(const std::string& value, double& out) {
+    try {
+        size_t pos;
+        double result = std::stod(value, &pos);
+        if (pos != value.size()) {
+            return false;
+        }
+        out = result;
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+bool Config::isValidBool(const std::string& value, bool& out) {
+    if (value == "true" || value == "1" || value == "yes") {
+        out = true;
+        return true;
+    } else if (value == "false" || value == "0" || value == "no") {
+        out = false;
+        return true;
+    }
+    return false;
+}
+
+std::string Config::getLastError() const {
+    // Placeholder for error handling system
+    return "";
+}
+
+void Config::clearLastError() {
+    // Placeholder for error handling system
+}
+
+void Config::merge(const Config& other, ConfigSource source) {
+    for (const auto& entry : other.pImpl->entries) {
+        // Override with new value
+        set(entry.key, entry.value, source);
+    }
+}
 
 } // namespace nlm
