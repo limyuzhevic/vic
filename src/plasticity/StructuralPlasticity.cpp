@@ -2,6 +2,7 @@
 #include "../brain/Brain.hpp"
 #include "../brain/NeuralRegion.hpp"
 #include "../core/Random/Random.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <algorithm>
 #include <cmath>
 
@@ -99,15 +100,21 @@ bool StructuralPlasticity::removeSynapse(Brain* brain, SynapseId synapse) {
 }
 
 NeuronId StructuralPlasticity::createNeuron(Brain* brain, NeuronType type) {
-    // Neuron creation would require adding to a population
-    // For Phase 2, we focus on synaptic structural plasticity
-    // and don't implement neuronal creation
+    // Neuron creation is not implemented in Phase 2
+    // For now, we log an error and return invalid ID
+    if (brain) {
+        NLM_LOG_WARNING("Neuron creation not implemented in Phase 2");
+    }
     return INVALID_NEURON_ID;
 }
 
 bool StructuralPlasticity::removeNeuron(Brain* brain, NeuronId neuron) {
     // Neuron removal would require removing all synapses and the neuron itself
     // For Phase 2, we focus on synaptic structural plasticity
+    // Log the unimplemented operation for debugging
+    if (brain) {
+        NLM_LOG_WARNING("Neuron removal not implemented in Phase 2");
+    }
     return false;
 }
 

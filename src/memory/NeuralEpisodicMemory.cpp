@@ -300,19 +300,29 @@ bool NeuralEpisodicMemory::matchesCriteria(
     SimulationStep* endTime,
     ActionType* actionQuery) const {
     
+    // Check sensory pattern similarity if query provided
     if (sensoryQuery) {
-        if (computeSimilarity(*sensoryQuery, episode) < 0.3f) {
+        float sim = computeSimilarity(*sensoryQuery, episode);
+        if (sim < 0.3f) {
+            NLM_LOG_DEBUG("Sensory similarity too low: " + std::to_string(sim) + " < 0.3");
             return false;
         }
     }
     
+    // Check temporal range if both start and end provided
     if (startTime && endTime) {
         if (episode.timestamp < *startTime || episode.timestamp > *endTime) {
+            NLM_LOG_DEBUG("Episode timestamp " + std::to_string(episode.timestamp) + 
+                         " outside range [" + std::to_string(*startTime) + ", " + 
+                         std::to_string(*endTime) + "]");
             return false;
         }
     }
     
+    // Check action type if query provided
     if (actionQuery && episode.action != *actionQuery) {
+        NLM_LOG_DEBUG("Action type mismatch: expected " + std::to_string(static_cast<int>(*actionQuery)) + 
+                     ", got " + std::to_string(static_cast<int>(episode.action)));
         return false;
     }
     

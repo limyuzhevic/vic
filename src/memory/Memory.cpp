@@ -16,14 +16,26 @@ WorkingMemory::WorkingMemory() : pImpl(new Impl(100)) {}
 WorkingMemory::~WorkingMemory() = default;
 
 void WorkingMemory::store(NeuronId neuron, float value) {
-    // TODO PHASE 2: Implement real storage with capacity limits
+    // TODO PHASE 2: Implement real storage with capacity limits and decay management
+    // For now: update existing neuron or add new one if capacity not exceeded
     for (auto& item : pImpl->items) {
         if (item.first == neuron) {
+            NLM_LOG_DEBUG("WorkingMemory: updating neuron " + std::to_string(neuron) + 
+                         " from " + std::to_string(item.second) + " to " + std::to_string(value));
             item.second = value;
             return;
         }
     }
     if (pImpl->items.size() < pImpl->capacity) {
+        NLM_LOG_DEBUG("WorkingMemory: storing new neuron " + std::to_string(neuron) + 
+                     " with value " + std::to_string(value));
+        pImpl->items.emplace_back(neuron, value);
+    } else {
+        NLM_LOG_WARNING("WorkingMemory: capacity limit reached (" + std::to_string(pImpl->items.size()) + 
+                       "/" + std::to_string(pImpl->capacity) + "), dropping oldest entry");
+        // For now, we don't implement LRU, just drop the oldest entry
+        // This is a placeholder for Phase 2 implementation
+        pImpl->items.erase(pImpl->items.begin());
         pImpl->items.emplace_back(neuron, value);
     }
 }
@@ -40,9 +52,11 @@ float WorkingMemory::retrieve(NeuronId neuron) const {
 bool WorkingMemory::contains(NeuronId neuron) const {
     for (const auto& item : pImpl->items) {
         if (item.first == neuron) {
+            NLM_LOG_DEBUG("WorkingMemory: neuron found: " + std::to_string(neuron));
             return true;
         }
     }
+    NLM_LOG_DEBUG("WorkingMemory: neuron not found: " + std::to_string(neuron));
     return false;
 }
 
@@ -108,7 +122,26 @@ void EpisodicMemory::clear() {
 }
 
 void EpisodicMemory::consolidate(float relevanceThreshold) {
-    // TODO PHASE 2: Implement real consolidation
+    // TODO PHASE 2: Implement real consolidation based on relevance thresholds and sparsity
+    // For now: remove episodes below relevance threshold (age-based approximation)
+    // NOTE: Current EpisodicMemoryItem doesn't have a relevance field, using age as proxy
+    NLM_LOG_INFO("EpisodicMemory: consolidating with relevance threshold " + std::to_string(relevanceThreshold));
+    
+    auto originalSize = pImpl->episodes.size();
+    // Remove episodes older than a threshold based on relevance
+    // This is a placeholder for Phase 2 implementation
+    size_t minAgeForConsolidation = static_cast<size_t>(relevanceThreshold * 1000);  // Convert 0-1 to age range
+    
+    pImpl->episodes.erase(
+        std::remove_if(pImpl->episodes.begin(), pImpl->episodes.end(),
+            [minAgeForConsolidation](const EpisodicMemoryItem& ep) {
+                return ep.age > minAgeForConsolidation;
+            }),
+        pImpl->episodes.end()
+    );
+    
+    NLM_LOG_INFO("EpisodicMemory: consolidated " + std::to_string(originalSize - pImpl->episodes.size()) + 
+                 " episodes, remaining: " + std::to_string(pImpl->episodes.size()));
 }
 
 // Semantic Memory Implementation
@@ -142,9 +175,11 @@ std::string SemanticMemory::retrieveFact(const std::string& key) const {
 bool SemanticMemory::hasFact(const std::string& key) const {
     for (const auto& fact : pImpl->facts) {
         if (fact.first == key) {
+            NLM_LOG_DEBUG("SemanticMemory: fact found with key: " + key);
             return true;
         }
     }
+    NLM_LOG_DEBUG("SemanticMemory: fact not found with key: " + key);
     return false;
 }
 

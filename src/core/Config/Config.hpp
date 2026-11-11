@@ -44,6 +44,41 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// JSON/YAML parsing helpers
+namespace detail {
+    // Convert JSON value to ConfigValue
+    ConfigValue jsonToConfigValue(const nlohmann::json& value);
+    
+    // Convert ConfigValue to JSON value
+    nlohmann::json configValueToJson(const ConfigValue& value);
+    
+    // Convert JSON to flat key-value pairs (for backward compatibility)
+    std::unordered_map<std::string, std::string> flattenJson(const nlohmann::json& node);
+    
+    // Convert flat key-value pairs to ConfigValue with support for nested paths
+    ConfigValue flattenToConfigValue(const std::unordered_map<std::string, std::string>& flatData);
+    
+    // Helper to convert nested YAML to flat key-value pairs
+    std::unordered_map<std::string, std::string> flattenYaml(const YAML::Node& node);
+    
+    // Helper to convert YAML value to ConfigValue
+    ConfigValue yamlToConfigValue(const YAML::Node& value);
+    
+    // Check file extension to determine format
+    bool isJsonFile(const std::string& filepath);
+    bool isYamlFile(const std::string& filepath);
+    
+    // Error handling
+    class ConfigParseError {
+    public:
+        ConfigParseError(const std::string& message) : message(message) {}
+        const std::string& getMessage() const { return message; }
+        
+    private:
+        std::string message;
+    };
+}
+
 // Main configuration class
 class Config {
 public:
@@ -56,8 +91,14 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format - primary, YAML format - optional)
     bool loadFromFile(const std::string& filepath);
+    
+    // Load from JSON file (explicit JSON format)
+    bool loadFromJSON(const std::string& filepath);
+    
+    // Load from YAML file (optional - backward compatibility)
+    bool loadFromYAML(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
