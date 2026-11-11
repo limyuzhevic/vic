@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -18,10 +19,41 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
+// Load from file (JSON format)
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Try to parse as JSON first, fallback to simple key=value format
+    return loadFromJSON(filepath);
+}
+
+// Load from JSON file (Phase 2 requirement)
+bool Config::loadFromJSON(const std::string& filepath) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        // Fallback to simple parser
+        return loadFromSimpleFile(filepath);
+    }
     
+    try {
+        // Try to parse as JSON
+        nlohmann::json j;
+        file >> j;
+        
+        if (j.is_object()) {
+            for (const auto& [key, value] : j.items()) {
+                set(key, value, ConfigSource::File);
+            }
+            return true;
+        }
+    } catch (const std::exception&) {
+        // Fallback to simple parser
+    }
+    
+    // Fallback to simple parser
+    return loadFromSimpleFile(filepath);
+}
+
+// Load from simple key=value format file (Phase 1 fallback)
+bool Config::loadFromSimpleFile(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -43,7 +75,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -86,7 +118,27 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        std::visit([&file, &entry](auto&& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << value << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < value.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << value[i] << "\"";
+                    } else {
+                        file << value[i];
+                    }
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << value << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -234,5 +286,43 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Helper function to parse JSON values to ConfigValue
+ConfigValue Config::jsonToConfigValue(const nlohmann::json& j) {
+    if (j.is_string()) {
+        return j.get<std::string>();
+    } else if (j.is_number_integer()) {
+        return j.get<int64_t>();
+    } else if (j.is_number_float()) {
+        return j.get<double>();
+    } else if (j.is_boolean()) {
+        return j.get<bool>();
+    } else if (j.is_array()) {
+        // Handle arrays
+        std::vector<int> intVec;
+        std::vector<double> doubleVec;
+        std::vector<std::string> stringVec;
+        
+        for (const auto& elem : j) {
+            if (elem.is_string()) {
+                stringVec.push_back(elem.get<std::string>());
+            } else if (elem.is_number_integer()) {
+                intVec.push_back(elem.get<int>());
+            } else if (elem.is_number_float()) {
+                doubleVec.push_back(elem.get<double>());
+            }
+        }
+        
+        // Return the first matching type found
+        if (!stringVec.empty()) {
+            return stringVec;
+        } else if (!intVec.empty()) {
+            return intVec;
+        } else if (!doubleVec.empty()) {
+            return doubleVec;
+        }
+    }
+    throw std::runtime_error("Unsupported JSON value type");
+}
 
 } // namespace nlm
