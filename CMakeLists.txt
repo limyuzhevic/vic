@@ -1,213 +1,316 @@
 cmake_minimum_required(VERSION 3.16)
-project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
-# C++20 standard
+project(NLM
+    VERSION 0.1.0
+    LANGUAGES CXX
+    DESCRIPTION "An Experimental Artificial Developmental Brain"
+)
+
+# Set C++ standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Build type
+# Default build type
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-# Enable warnings
+# Configure build configurations for different build types
+foreach(CONF IN ITEMS Debug Release RelWithDebInfo MinSizeRel)
+    string(TOUPPER ${CONF} CONF_UPPER)
+    set(CMAKE_CXX_FLAGS_${CONF_UPPER} "${CMAKE_CXX_FLAGS_${CONF_UPPER}} -O${CMAKE_BUILD_TYPE_OPTIMIZATION_${CONF_UPPER}}")
+endforeach()
+
+# Compiler warnings configuration
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /WX)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+# Source directory configuration
+set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src" CACHE INTERNAL "NLM source directory")
 
-# Core library
-add_library(nlm_core STATIC
-    # Core
-    src/core/Types/Types.cpp
-    src/core/Config/Config.cpp
-    src/core/Random/Random.cpp
-    src/core/Logger/Logger.cpp
-    src/core/SimulationClock/SimulationClock.cpp
-    # Brain
-    src/brain/Neuron.cpp
-    src/brain/Synapse.cpp
-    src/brain/NeuralPopulation.cpp
-    src/brain/NeuralRegion.cpp
-    src/brain/Brain.cpp
-    # Dynamics
-    src/dynamics/NeuralDynamics.cpp
-    src/dynamics/SpikeSystem.cpp
-    # Plasticity
-    src/plasticity/PlasticityRule.cpp
-    src/plasticity/Hebbian.cpp
-    src/plasticity/STDP.cpp
-    src/plasticity/StructuralPlasticity.cpp
-    # Development
-    src/development/DevelopmentSystem.cpp
-    src/development/Synaptogenesis.cpp
-    src/development/Pruning.cpp
-    src/development/Maturation.cpp
+# Forward declarations for circular dependencies
+include(CMakeDependentOption)
+
+# Core library with modern CMake practices
+add_library(nlm_core STATIC)
+
+# Core sources organized by category
+set(NLM_CORE_SOURCES
+    # Core utilities
+    ${NLM_SOURCE_DIR}/core/Types/Types.cpp
+    ${NLM_SOURCE_DIR}/core/Config/Config.cpp
+    ${NLM_SOURCE_DIR}/core/Random/Random.cpp
+    ${NLM_SOURCE_DIR}/core/Logger/Logger.cpp
+    ${NLM_SOURCE_DIR}/core/SimulationClock/SimulationClock.cpp
+    
+    # Brain components
+    ${NLM_SOURCE_DIR}/brain/Neuron.cpp
+    ${NLM_SOURCE_DIR}/brain/Synapse.cpp
+    ${NLM_SOURCE_DIR}/brain/NeuralPopulation.cpp
+    ${NLM_SOURCE_DIR}/brain/NeuralRegion.cpp
+    ${NLM_SOURCE_DIR}/brain/Brain.cpp
+    
+    # Neural dynamics
+    ${NLM_SOURCE_DIR}/dynamics/NeuralDynamics.cpp
+    ${NLM_SOURCE_DIR}/dynamics/SpikeSystem.cpp
+    
+    # Plasticity rules
+    ${NLM_SOURCE_DIR}/plasticity/PlasticityRule.cpp
+    ${NLM_SOURCE_DIR}/plasticity/Hebbian.cpp
+    ${NLM_SOURCE_DIR}/plasticity/STDP.cpp
+    ${NLM_SOURCE_DIR}/plasticity/StructuralPlasticity.cpp
+    
+    # Development system
+    ${NLM_SOURCE_DIR}/development/DevelopmentSystem.cpp
+    ${NLM_SOURCE_DIR}/development/Synaptogenesis.cpp
+    ${NLM_SOURCE_DIR}/development/Pruning.cpp
+    ${NLM_SOURCE_DIR}/development/Maturation.cpp
+    
     # Neuromodulation
-    src/neuromodulation/Neuromodulator.cpp
-    src/neuromodulation/Reward.cpp
-    src/neuromodulation/PredictionError.cpp
-    src/neuromodulation/Novelty.cpp
-    src/neuromodulation/Curiosity.cpp
-    # Memory
-    src/memory/Memory.cpp
-    src/performance/CheckpointSystem.cpp
-    src/memory/NeuralWorkingMemory.cpp
-    src/memory/NeuralEpisodicMemory.cpp
-    # Cognition
-    src/cognition/ConceptFormation.cpp
-    src/cognition/NeuralPlanner.cpp
-    # Sensory
-    src/sensory/SensoryInput.cpp
-    src/sensory/Vision.cpp
-    src/sensory/Audio.cpp
-    src/sensory/InternalSignals.cpp
-    # Prediction
-    src/prediction/PredictionSystem.cpp
-    src/prediction/NeuralPrediction.cpp
-    # Motor
-    src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/motor/Action.cpp
-    # Experiments
-    src/experiments/Experiment.cpp
-    src/experiments/ExperimentRunner.cpp
-    src/experiments/Metrics.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Neuromodulator.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Reward.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/PredictionError.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Novelty.cpp
+    ${NLM_SOURCE_DIR}/neuromodulation/Curiosity.cpp
+    
+    # Memory systems
+    ${NLM_SOURCE_DIR}/memory/Memory.cpp
+    ${NLM_SOURCE_DIR}/performance/CheckpointSystem.cpp
+    ${NLM_SOURCE_DIR}/memory/NeuralWorkingMemory.cpp
+    ${NLM_SOURCE_DIR}/memory/NeuralEpisodicMemory.cpp
+    
+    # Cognitive functions
+    ${NLM_SOURCE_DIR}/cognition/ConceptFormation.cpp
+    ${NLM_SOURCE_DIR}/cognition/NeuralPlanner.cpp
+    
+    # Sensory processing
+    ${NLM_SOURCE_DIR}/sensory/SensoryInput.cpp
+    ${NLM_SOURCE_DIR}/sensory/Vision.cpp
+    ${NLM_SOURCE_DIR}/sensory/Audio.cpp
+    ${NLM_SOURCE_DIR}/sensory/InternalSignals.cpp
+    
+    # Prediction systems
+    ${NLM_SOURCE_DIR}/prediction/PredictionSystem.cpp
+    ${NLM_SOURCE_DIR}/prediction/NeuralPrediction.cpp
+    
+    # Motor functions
+    ${NLM_SOURCE_DIR}/motor/MotorSystem.cpp
+    ${NLM_SOURCE_DIR}/motor/Action.cpp
+    
+    # Environment interface
+    ${NLM_SOURCE_DIR}/environment/Environment.cpp
+    ${NLM_SOURCE_DIR}/environment/Observation.cpp
+    
+    # Experiment framework
+    ${NLM_SOURCE_DIR}/experiments/Experiment.cpp
+    ${NLM_SOURCE_DIR}/experiments/ExperimentRunner.cpp
+    ${NLM_SOURCE_DIR}/experiments/Metrics.cpp
+    
     # Visualization
-    src/visualization/VisualizationInterface.cpp
+    ${NLM_SOURCE_DIR}/visualization/VisualizationInterface.cpp
+    ${NLM_SOURCE_DIR}/visualization/AdvancedVisualizationInterface.cpp
 )
 
+target_sources(nlm_core PRIVATE ${NLM_CORE_SOURCES})
+
 target_include_directories(nlm_core PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<BUILD_INTERFACE:${NLM_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
 )
 
-# Agent system (body, sensory percept, agent-brain interface)
-add_library(nlm_agent STATIC
-    src/agent/SensoryPercept.cpp
-    src/agent/AgentBrain.cpp
+# Compiler-specific options
+target_compile_options(nlm_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -Werror -fPIC>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
 )
-target_include_directories(nlm_agent PUBLIC src)
+
+# Position-independent code for static library
+set_target_properties(nlm_core PROPERTIES
+    POSITION_INDEPENDENT_CODE TRUE
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED TRUE
+)
+
+# Agent system with better dependency management
+add_library(nlm_agent STATIC)
+target_sources(nlm_agent PRIVATE
+    ${NLM_SOURCE_DIR}/agent/SensoryPercept.cpp
+    ${NLM_SOURCE_DIR}/agent/AgentBrain.cpp
+)
+target_include_directories(nlm_agent PUBLIC ${NLM_SOURCE_DIR})
 target_link_libraries(nlm_agent PUBLIC nlm_core)
+set_target_properties(nlm_agent PROPERTIES CXX_STANDARD 20)
 
-# World system (environment, objects, simple world)
-add_library(nlm_world STATIC
-    src/world/SimpleWorld.cpp
-)
-target_include_directories(nlm_world PUBLIC src)
+# World system with better abstraction
+add_library(nlm_world STATIC)
+target_sources(nlm_world PRIVATE ${NLM_SOURCE_DIR}/world/SimpleWorld.cpp)
+target_include_directories(nlm_world PUBLIC ${NLM_SOURCE_DIR})
 target_link_libraries(nlm_world PUBLIC nlm_core nlm_agent)
+set_target_properties(nlm_world PROPERTIES CXX_STANDARD 20)
 
-# Phase 3 experiments
-add_library(nlm_phase3 STATIC
-    src/experiments/Phase3Experiment.cpp
-)
-target_include_directories(nlm_phase3 PUBLIC src)
+# Phase 3 experiments (world interaction)
+add_library(nlm_phase3 STATIC)
+target_sources(nlm_phase3 PRIVATE ${NLM_SOURCE_DIR}/experiments/Phase3Experiment.cpp)
+target_include_directories(nlm_phase3 PUBLIC ${NLM_SOURCE_DIR})
 target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+set_target_properties(nlm_phase3 PROPERTIES CXX_STANDARD 20)
 
-# Phase 4 experiments
-add_library(nlm_phase4 STATIC
-    src/experiments/Phase4Experiment.cpp
-)
-target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+# Phase 4 experiments (cognitive functions)
+add_library(nlm_phase4 STATIC)
+target_sources(nlm_phase4 PRIVATE ${NLM_SOURCE_DIR}/experiments/Phase4Experiment.cpp)
+target_include_directories(nlm_phase4 PUBLIC ${NLM_SOURCE_DIR})
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+set_target_properties(nlm_phase4 PROPERTIES CXX_STANDARD 20)
 
-# Phase 5 experiments
-add_library(nlm_phase5 STATIC
-    src/experiments/Phase5Experiment.cpp
-)
-target_include_directories(nlm_phase5 PUBLIC src)
-target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
+# Phase 5 experiments (performance optimizations)
+add_library(nlm_phase5 STATIC)
+target_sources(nlm_phase5 PRIVATE ${NLM_SOURCE_DIR}/experiments/Phase5Experiment.cpp)
+target_include_directories(nlm_phase5 PUBLIC ${NLM_SOURCE_DIR})
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+set_target_properties(nlm_phase5 PROPERTIES CXX_STANDARD 20)
 
-# Phase 6 experiments
-add_library(nlm_phase6 STATIC
-    src/experiments/Phase6IntegratedExperiment.cpp
-)
-target_include_directories(nlm_phase6 PUBLIC src)
+# Phase 6 experiments (integration tests)
+add_library(nlm_phase6 STATIC)
+target_sources(nlm_phase6 PRIVATE ${NLM_SOURCE_DIR}/experiments/Phase6IntegratedExperiment.cpp)
+target_include_directories(nlm_phase6 PUBLIC ${NLM_SOURCE_DIR})
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+set_target_properties(nlm_phase6 PROPERTIES CXX_STANDARD 20)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
+# Main executable with proper metadata
+add_executable(nlm ${NLM_SOURCE_DIR}/main.cpp)
+target_link_libraries(nlm PRIVATE nlm_core)
+set_target_properties(nlm PROPERTIES
+    CXX_STANDARD 20
+    OUTPUT_NAME "nlm"
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
-target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
-add_executable(nlm_phase3_demo
-    src/experiments/Phase3Demo.cpp
-)
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+# Demo executables with phase-specific configurations
+function(add_nlm_demo TARGET_NAME SOURCE_FILE DESCRIPTION)
+    add_executable(${TARGET_NAME} ${SOURCE_FILE})
+    target_link_libraries(${TARGET_NAME} PRIVATE nlm_core nlm_agent nlm_world)
+    set_target_properties(${TARGET_NAME} PROPERTIES
+        CXX_STANDARD 20
+        OUTPUT_NAME ${TARGET_NAME}
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+    add_custom_target(${TARGET_NAME}_info COMMENT "Demo: ${DESCRIPTION}")
+endfunction()
 
-# Phase 4 demo executable
-add_executable(nlm_phase4_demo
-    src/experiments/Phase4Demo.cpp
-)
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
-
-# Phase 5 demo executable (Phase 5, added here: pattern probe,
-# sandbox run, and checkpoint round-trip for the brain-personality
-# step — previously Phase 5 was library-only with no demo).
-add_executable(nlm_phase5_demo
-    src/experiments/Phase5Demo.cpp
-)
-target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
-
-# Phase 6 demo executable
-add_executable(nlm_phase6_demo
-    src/experiments/Phase6Demo.cpp
-)
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
-
-# Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
-# association probe, concept/social probes, and a sandbox run with
-# a teacher, planner overrides, and a checkpoint round-trip. The old
-# nlm_phase6_demo integration demo is left unchanged.
-add_executable(nlm_phase6_text_demo
-    src/experiments/Phase6TextDemo.cpp
-)
-target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+add_nlm_demo(nlm_phase3_demo ${NLM_SOURCE_DIR}/experiments/Phase3Demo.cpp "Phase 3: World Interaction")
+add_nlm_demo(nlm_phase4_demo ${NLM_SOURCE_DIR}/experiments/Phase4Demo.cpp "Phase 4: Cognitive Functions")
+add_nlm_demo(nlm_phase5_demo ${NLM_SOURCE_DIR}/experiments/Phase5Demo.cpp "Phase 5: Performance Optimizations")
+add_nlm_demo(nlm_phase6_demo ${NLM_SOURCE_DIR}/experiments/Phase6Demo.cpp "Phase 6: Integration Tests")
+add_nlm_demo(nlm_phase6_text_demo ${NLM_SOURCE_DIR}/experiments/Phase6TextDemo.cpp "Phase 6 Text: Advanced Learning")
 
 # Benchmark executable
-add_executable(nlm_benchmark
-    src/benchmark.cpp
+add_executable(nlm_benchmark ${NLM_SOURCE_DIR}/benchmark.cpp)
+target_link_libraries(nlm_benchmark PRIVATE nlm_core)
+set_target_properties(nlm_benchmark PROPERTIES
+    CXX_STANDARD 20
+    OUTPUT_NAME "nlm_benchmark"
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
-target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
-# Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
-option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
+# Python bindings with scikit-build-core integration
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
     find_package(pybind11 CONFIG REQUIRED)
-    # The module is shared, so the static libs it links need PIC.
+    
+    # Configure Python module properties
     set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
-        POSITION_INDEPENDENT_CODE ON)
-    pybind11_add_module(pynlm python/bindings.cpp)
+        POSITION_INDEPENDENT_CODE TRUE
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN TRUE
+    )
+    
+    # Python module with enhanced configuration
+    pybind11_add_module(pynlm ${CMAKE_CURRENT_SOURCE_DIR}/python/bindings.cpp)
     target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
-    target_include_directories(pynlm PRIVATE src)
-    install(TARGETS pynlm LIBRARY DESTINATION .)
+    target_include_directories(pynlm PRIVATE ${NLM_SOURCE_DIR})
+    
+    # Python-specific compiler options
+    target_compile_options(pynlm PRIVATE
+        $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic -fPIC>
+        $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+    )
+    
+    if(MSVC)
+        target_compile_options(pynlm PRIVATE /permissive-)
+    endif()
+    
+    # Installation for Python package
+    install(TARGETS pynlm
+        LIBRARY DESTINATION python/pynlm
+        ARCHIVE DESTINATION python/pynlm
+        RUNTIME DESTINATION python/pynlm
+    )
 endif()
 
-# Testing
+# Testing framework configuration
 enable_testing()
-add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
+# Add tests subdirectory with modern CMake
+set(TEST_SOURCE_DIR ${NLM_SOURCE_DIR}/tests)
+if(EXISTS ${TEST_SOURCE_DIR})
+    add_subdirectory(tests)
+endif()
+
+# Installation configuration
+install(DIRECTORY ${NLM_SOURCE_DIR}/core/ DESTINATION include/nlm/core
+    FILES_MATCHING PATTERN "*.hpp"
 )
+
+install(DIRECTORY ${NLM_SOURCE_DIR}/brain/ DESTINATION include/nlm/brain
+    FILES_MATCHING PATTERN "*.hpp"
+)
+
+install(DIRECTORY ${NLM_SOURCE_DIR}/memory/ DESTINATION include/nlm/memory
+    FILES_MATCHING PATTERN "*.hpp"
+)
+
+# Configure installation paths
+include(GNUInstallDirs)
+
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6
+    EXPORT NLMTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/easy_usage.md
+    DESTINATION ${CMAKE_INSTALL_DOCDIR}
+)
+
+# Generate and install configuration for find_package
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(EXPORT NLMTargets
+    FILE NLMTargets.cmake
+    NAMESPACE nlm::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nlm
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/NLMConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/nlm
+)
+
+# Summary output for build configuration
+message(STATUS "NLM Configuration Summary:")
+message(STATUS "  Version: ${PROJECT_VERSION}")
+message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  C++ standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  Core library: nlm_core")
+message(STATUS "  Python bindings: ${NLM_BUILD_PYTHON_BINDINGS}")
+message(STATUS "  Installation prefix: ${CMAKE_INSTALL_PREFIX}")
