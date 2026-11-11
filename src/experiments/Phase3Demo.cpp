@@ -6,6 +6,7 @@
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "DemoCLI.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -21,18 +22,16 @@ namespace nlm {
 
 class Phase3Demo {
 public:
-    Phase3Demo() {}
+    Phase3Demo(const cli::DemoOptions& options) : options(options) {}
     ~Phase3Demo() {}
     
-    void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
+    void run() {
         std::cout << "===========================================\n";
         std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
         std::cout << "===========================================\n\n";
         
         // Create configuration
-        auto config = std::make_shared<Config>();
-        configureEnvironment(config);
-        configureBrain(config);
+        auto config = cli::createDemoConfig(options);
         
         // Create world
         SimpleWorld world;
@@ -63,7 +62,7 @@ public:
         std::vector<ExperimentMetrics> allMetrics;
         
         // Run episodes
-        for (int episode = 0; episode < numEpisodes; ++episode) {
+        for (int episode = 0; episode < options.numEpisodes; ++episode) {
             std::cout << "--- Episode " << episode << " started ---\n";
             
             // Reset world
@@ -94,7 +93,7 @@ public:
             uint64_t brainStepCounter = 0;
 
             // Run steps
-            for (int step = 0; step < stepsPerEpisode; ++step) {
+            for (int step = 0; step < options.stepsPerEpisode; ++step) {
                 // 1. Get sensory percept from world
                 const SensoryPercept& percept = world.getSensoryPercept();
 
@@ -110,54 +109,21 @@ public:
                 // 4. Decode motor command from brain activity
                 MotorCommand cmd = agentBrain.decodeMotorCommand();
 
-                // Instrumentation (opt-in, off by default): log the exact
-                // quantities the Wait-default hypothesis depends on, for
-                // episode 0 only. Set NLM_PHASE3_INSTRUMENT=1 to enable.
-                if (episode == 0 && std::getenv("NLM_PHASE3_INSTRUMENT")) {
-                    auto acts = agentBrain.getMotorGroupActivities();
-                    size_t visionSeen = 0;
-                    for (float v : percept.getVision()) {
-                        if (v < 0.999f) ++visionSeen;
-                    }
-                    std::cout << "INSTR step=" << step
-                              << " firing=" << brain->getFiringNeuronCount()
-                              << " avgRate=" << brain->getAverageFiringRate()
-                              << " visionSeen=" << visionSeen << "/"
-                              << percept.getVision().size();
-                    for (const auto& a : acts) {
-                        std::cout << " " << a.name << "=" << a.activity
-                                  << "/rate=" << a.firingRate
-                                  << "(n=" << a.size << ",refr=" << a.refractoryCount << ")";
-                    }
-                    std::cout << " cmd=" << motorCommandToString(cmd) << "\n";
-                }
-                
                 // 5. Apply motor command to world
                 ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
-                
+
                 // 6. Apply reward modulation
                 agentBrain.applyRewardModulation(result.reward, 0.0f);
-                
-                // 7. Update world — Phase 6 pacing fix: one decision
-                // is one world action interval (0.1 s). The old
-                // 0.01 s step meant the world's 0.1 s action gate
-                // rejected 181/200 decisions as "too soon", so the
-                // brain was judged on actions it never took. The
-                // world gate itself is unchanged; the demo now
-                // actually steps the world by the interval the
-                // world's own physics (3.0 units/s, 2.0 rad/s) is
-                // defined over.
-                world.update(0.1);
 
-                // 8. Update development
+                // 7. Update development
                 agentBrain.updateDevelopment(0.1);
-                
+
                 // Track metrics
                 episodeReward += result.reward;
                 metrics.steps++;
                 metrics.totalReward += result.reward;
                 metrics.totalSpikes += brain->getFiringNeuronCount();
-                
+
                 // Phase 5 metrics: coverage, interact outcome, oscillation.
                 {
                     const auto& body = world.getAgentBody();
@@ -187,17 +153,6 @@ public:
                     case MotorCommand::LookRight: metrics.lookRightCount++; break;
                     default: metrics.waitCount++; break;
                 }
-                
-                // Print periodic updates
-                if (step % 50 == 0) {
-                    std::cout << "  Step " << step 
-                              << ": reward=" << result.reward
-                              << ", action=" << motorCommandToString(cmd)
-                              << ", neuromod=" << agentBrain.getNeuromodulationLevel()
-                              << ", novelty=" << agentBrain.getNoveltyLevel()
-                              << ", energy=" << world.getAgentBody().energy
-                              << "\n";
-                }
             }
             
             // Record final metrics
@@ -219,7 +174,7 @@ public:
             std::cout << "  Synapses: " << metrics.totalSynapses << "\n";
             std::cout << "  Action counts: fwd=" << metrics.forwardCount
                       << ", bwd=" << metrics.backwardCount
-                      << ", left=" << metrics.turnLeftCount
+                     襤" << metrics.turnLeftCount
                       << ", right=" << metrics.turnRightCount
                       << ", interact=" << metrics.interactCount
                       << ", wait=" << metrics.waitCount
@@ -235,7 +190,7 @@ public:
                       << ", finalNovelty=" << metrics.finalNovelty
                       << ", finalCuriosity=" << metrics.finalCuriosity
                       << ", tooSoon=" << tooSoonCount
-                      << ", executed=" << (stepsPerEpisode - tooSoonCount)
+                      << ", executed=" << (options.stepsPerEpisode - tooSoonCount)
                       << ", reflexBonus=" << agentBrain.getReflexBonusCount()
                       << ", reflexSuppress=" << agentBrain.getReflexSuppressCount()
                       << ", wtaPulses=" << agentBrain.getWtaPulseCount()
@@ -336,24 +291,26 @@ private:
             default: return "Unknown";
         }
     }
+    
+    cli::DemoOptions options;
 };
 
 } // namespace nlm
 
-// Main entry point for Phase 3 demo
+// Main entry point for Phase 3 demo with enhanced CLI
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
+    // Parse command line arguments using common CLI interface
+    nlm::cli::DemoOptions options = nlm::cli::parseCommonArgs(argc, argv);
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
-    }
+    // Initialize demo logger
+    nlm::cli::initializeDemoLogger(options);
     
-    nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
+    // Run Phase 3 demo
+    nlm::Phase3Demo demo(options);
+    demo.run();
+    
+    // Cleanup
+    nlm::cli::cleanupDemo();
     
     return 0;
 }

@@ -1,3 +1,4 @@
+// Config.hpp - Clean version with backward compatibility
 #pragma once
 
 #include <string>
@@ -6,11 +7,9 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <filesystem>
 
 namespace nlm {
-
-// Forward declarations
-class Config;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -26,22 +25,10 @@ using ConfigValue = std::variant<
 
 // Configuration source
 enum class ConfigSource {
-    Default,
-    File,
-    CommandLine,
-    Runtime
-};
-
-// Configuration entry
-struct ConfigEntry {
-    std::string key;
-    ConfigValue value;
-    ConfigSource source;
-    std::string description;
-    
-    ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
-    ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
-        : key(k), value(v), source(s), description(desc) {}
+    Default = 0,
+    File = 1,
+    CommandLine = 2,
+    Runtime = 3
 };
 
 // Main configuration class
@@ -56,7 +43,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (supports both key=value and basic JSON-like syntax)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -71,7 +58,7 @@ template<typename T>
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,13 +82,22 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Validation and error reporting
+    bool validate() const;
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Utility methods
+    static std::string trim(const std::string& str);
+    static std::string toLower(const std::string& str);
+    static std::string getCurrentTimestamp();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
     
     // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
+    void validateValue(const std::string& key, const ConfigValue& value) const;
+    bool validateDependencies() const;
 };
 
 } // namespace nlm
