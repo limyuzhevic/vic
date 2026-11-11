@@ -7,11 +7,32 @@
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
+#include "common/NLMCommonUtilities.hpp"
 #include <iostream>
 
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
+    using namespace nlm;
+    
+    // Parse command line arguments using common utilities
+    auto args = parseCommandLine(argc, argv, 
+        "Phase 6 Demo - Integration Test\nTesting that all brain systems are properly connected.");
+    
+    // Handle help/version requests
+    if (args.help) {
+        printHelp(argv[0], "Phase 6 Demo - Integration Test\nTesting that all brain systems are properly connected.");
+        return 0;
+    }
+    
+    if (args.version) {
+        printVersion();
+        return 0;
+    }
+    
+    // Initialize environment using common utilities
+    initializeEnvironment(args);
+    
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     

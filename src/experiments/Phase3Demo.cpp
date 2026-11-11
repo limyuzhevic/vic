@@ -6,6 +6,7 @@
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../common/NLMCommonUtilities.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -342,18 +343,28 @@ private:
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
+    using namespace nlm;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    // Parse command line arguments using common utilities
+    auto args = parseCommandLine(argc, argv, 
+        "Phase 3 demonstrates world interaction: experience -> neural activity -> action -> consequence -> learning");
+    
+    // Handle help/version requests
+    if (args.help) {
+        printHelp(argv[0], "Phase 3 demonstrates world interaction: experience -> neural activity -> action -> consequence -> learning");
+        return 0;
     }
     
-    nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
+    if (args.version) {
+        printVersion();
+        return 0;
+    }
+    
+    // Initialize environment using common utilities
+    initializeEnvironment(args);
+    
+    Phase3Demo demo;
+    demo.run(args.numEpisodes, args.stepsPerEpisode);
     
     return 0;
 }

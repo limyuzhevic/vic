@@ -43,6 +43,7 @@
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../common/NLMCommonUtilities.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -130,8 +131,27 @@ float cosine(const std::vector<float>& a, const std::vector<float>& b) {
 }  // namespace
 }  // namespace nlm
 
-int main() {
+int main(int argc, char* argv[]) {
     using namespace nlm;
+    
+    // Parse command line arguments using common utilities
+    auto args = parseCommandLine(argc, argv, 
+        "Phase 6 - Text teaching / thought demo\nDemonstrates text as a sense, concept formation, social learning, and planner in the loop");
+    
+    // Handle help/version requests
+    if (args.help) {
+        printHelp(argv[0], "Phase 6 - Text teaching / thought demo\nDemonstrates text as a sense, concept formation, social learning, and planner in the loop");
+        return 0;
+    }
+    
+    if (args.version) {
+        printVersion();
+        return 0;
+    }
+    
+    // Initialize environment using common utilities
+    initializeEnvironment(args);
+    
     Logger::getGlobal().setLevel(LogLevel::Error);
     std::cout << "===========================================\n";
     std::cout << "NLM PHASE 6 - TEXT TEACHING / THOUGHT DEMO\n";

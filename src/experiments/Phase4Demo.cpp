@@ -13,6 +13,7 @@
 #include "memory/NeuralEpisodicMemory.hpp"
 #include "cognition/ConceptFormation.hpp"
 #include "cognition/NeuralPlanner.hpp"
+#include "common/NLMCommonUtilities.hpp"
 
 using namespace nlm;
 
@@ -36,12 +37,38 @@ void printSection(const std::string& title) {
 }
 
 int main(int argc, char* argv[]) {
+    using namespace nlm;
+    
+    // Parse command line arguments using common utilities
+    auto args = parseCommandLine(argc, argv, 
+        "Phase 4 demonstrates emerging cognition: prediction, memory, attention, planning");
+    
+    // Handle help/version requests
+    if (args.help) {
+        printHelp(argv[0], "Phase 4 demonstrates emerging cognition: prediction, memory, attention, planning");
+        return 0;
+    }
+    
+    if (args.version) {
+        printVersion();
+        return 0;
+    }
+    
+    // Initialize environment using common utilities
+    initializeEnvironment(args);
+    
     std::cout << "NLM Phase 4: Emerging Cognition\n";
     std::cout << "================================\n\n";
     
-    // Parse command line arguments
+    // Parse trials from arguments (support for existing usage)
     size_t numTrials = 50;
-    if (argc > 1) {
+    if (!args.extraArgs.empty()) {
+        try {
+            numTrials = std::stoul(args.extraArgs[0]);
+        } catch (...) {
+            // Use default
+        }
+    } else if (argc > 1) {
         numTrials = std::stoi(argv[1]);
     }
     

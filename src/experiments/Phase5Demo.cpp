@@ -35,6 +35,7 @@
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../common/NLMCommonUtilities.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -135,11 +136,19 @@ void probePattern(const char* label, const SensoryPercept& percept) {
 
 int main() {
     using namespace nlm;
-    Logger::getGlobal().setLevel(LogLevel::Error);
+    
+    // Use common utilities for improved demo
+    DemoArgs args;
+    args.verbose = false;  // Phase 5 demo is focused on advanced features
+    args.logLevel = "error";  // Only show errors to keep output clean
+    
+    // Initialize environment
+    initializeEnvironment(args);
+    
     std::cout << "===========================================\n";
     std::cout << "NLM PHASE 5 - BRAIN-PERSONALITY / SANDBOX DEMO\n";
     std::cout << "===========================================\n\n";
-
+    
     // --- 1. Pattern probe ---
     std::cout << "--- 1. Pattern probe (fresh brain per pattern, seed 42) ---\n";
     std::vector<float> emptyVision(16, 1.0f);
@@ -154,7 +163,7 @@ int main() {
     for (int i = 5; i <= 10; ++i) darkVision[i] = 0.25f;  // dark = hazard encoding
     probePattern("dark ahead+touch  ", makePercept(darkVision, fwdTouch));
     std::cout << "\n";
-
+    
     // --- 2. Sandbox run + checkpoint round-trip ---
     std::cout << "--- 2. Sandbox run (100 steps) + checkpoint round-trip ---\n";
     auto config = makeConfig();
@@ -168,7 +177,7 @@ int main() {
     agent.initialize(world);
     agent.enableRewardModulation(true);
     agent.enableCuriosity(true);
-
+    
     float totalReward = 0.0f;
     int resources = 0, hazards = 0, emptyInteracts = 0;
     std::set<std::pair<int, int>> visited;
@@ -205,7 +214,7 @@ int main() {
               << " workingNeurons=" << (brain->getWorkingMemory() ? brain->getWorkingMemory()->getMemoryNeuronCount() : 0)
               << " episodic=" << (brain->getEpisodicMemory() ? brain->getEpisodicMemory()->getEpisodeCount() : 0)
               << " preference=" << agent.getLearnedPreference() << "\n";
-
+    
     // Per-synapse spike-history totals, for the checkpoint check below.
     auto synHistoryTotal = [](const std::shared_ptr<Brain>& b) {
         size_t total = 0;
@@ -217,7 +226,7 @@ int main() {
         return total;
     };
     size_t histBefore = synHistoryTotal(brain);
-
+    
     const std::string ckpt = "/tmp/nlm_phase5_demo.ckpt";
     bool saved = brain->save(ckpt);
     auto brain2 = std::make_shared<Brain>(makeConfig());
