@@ -35,6 +35,7 @@
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/DemoConfig.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -60,18 +61,7 @@ const char* cmdName(MotorCommand cmd) {
 }
 
 std::shared_ptr<Config> makeConfig() {
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", 500);
-    config->set("region_count", 2);
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", static_cast<int64_t>(42));
-    config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
-    config->set("stdp_tau", 20.0f);
-    config->set("synaptogenesis_rate", 0.0001f);
-    config->set("pruning_rate", 0.00001f);
-    return config;
+    auto config = nlm::demo::createDefaultBrainConfig();
 }
 
 SensoryPercept makePercept(const std::vector<float>& vision,
@@ -86,8 +76,8 @@ SensoryPercept makePercept(const std::vector<float>& vision,
 }
 
 // Run one pattern through a fresh brain and report the decode.
-void probePattern(const char* label, const SensoryPercept& percept) {
-    auto brain = std::make_shared<Brain>(makeConfig());
+void probePattern(const char* label, const SensoryPercept& percept, std::shared_ptr<Config> config) {
+    auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     SimpleWorld world;
     world.configure(20.0f, 20.0f, 16, 16);
@@ -133,8 +123,26 @@ void probePattern(const char* label, const SensoryPercept& percept) {
 
 }  // namespace nlm
 
-int main() {
+int main(int argc, char* argv[]) {
     using namespace nlm;
+    
+    // Check for help request
+    if (argc > 1 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
+        nlm::demo::printDemoHelp();
+        return 0;
+    }
+    
+    // Create configuration using common demo utilities
+    auto config = nlm::demo::createDefaultBrainConfig();
+    
+    // Parse command line arguments
+    nlm::demo::parseDemoArgs(argc, argv, config);
+    
+    // Validate configuration
+    if (!nlm::demo::validateConfig(config)) {
+        return 1;
+    }
+    
     Logger::getGlobal().setLevel(LogLevel::Error);
     std::cout << "===========================================\n";
     std::cout << "NLM PHASE 5 - BRAIN-PERSONALITY / SANDBOX DEMO\n";
@@ -144,25 +152,24 @@ int main() {
     std::cout << "--- 1. Pattern probe (fresh brain per pattern, seed 42) ---\n";
     std::vector<float> emptyVision(16, 1.0f);
     std::vector<float> noTouch(8, 0.0f);
-    probePattern("empty scene      ", makePercept(emptyVision, noTouch));
+    probePattern("empty scene      ", makePercept(emptyVision, noTouch), config);
     std::vector<float> brightVision(16, 1.0f);
     for (int i = 5; i <= 10; ++i) brightVision[i] = 0.7f;  // bright = resource encoding
     std::vector<float> fwdTouch(8, 0.0f);
     fwdTouch[0] = 0.8f;
-    probePattern("bright ahead+touch", makePercept(brightVision, fwdTouch));
+    probePattern("bright ahead+touch", makePercept(brightVision, fwdTouch), config);
     std::vector<float> darkVision(16, 1.0f);
     for (int i = 5; i <= 10; ++i) darkVision[i] = 0.25f;  // dark = hazard encoding
-    probePattern("dark ahead+touch  ", makePercept(darkVision, fwdTouch));
+    probePattern("dark ahead+touch  ", makePercept(darkVision, fwdTouch), config);
     std::cout << "\n";
 
     // --- 2. Sandbox run + checkpoint round-trip ---
     std::cout << "--- 2. Sandbox run (100 steps) + checkpoint round-trip ---\n";
-    auto config = makeConfig();
     auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     SimpleWorld world;
     world.configure(20.0f, 20.0f, 16, 16);
-    world.setRandomSeed(42);
+    world.setRandomSeed(config->getOr<int64_t>("random_seed", 42));
     world.reset();
     AgentBrain agent(brain);
     agent.initialize(world);
@@ -220,7 +227,7 @@ int main() {
 
     const std::string ckpt = "/tmp/nlm_phase5_demo.ckpt";
     bool saved = brain->save(ckpt);
-    auto brain2 = std::make_shared<Brain>(makeConfig());
+    auto brain2 = std::make_shared<Brain>(config);
     brain2->initialize();
     bool loaded = saved && brain2->load(ckpt);
     std::cout << "  checkpoint: saved=" << (saved ? "yes" : "NO")

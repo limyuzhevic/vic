@@ -6,6 +6,7 @@
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/DemoConfig.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -25,16 +26,20 @@ public:
     ~Phase3Demo() {}
     
     void run(int numEpisodes = 5, int stepsPerEpisode = 200) {
-        std::cout << "===========================================\n";
-        std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\n";
-        std::cout << "===========================================\n\n";
+        std::cout << "===========================================\\n";
+        std::cout << "NLM PHASE 3 - WORLD INTERACTION DEMO\\n";
+        std::cout << "===========================================\\n\\n";
         
         // Create configuration
-        auto config = std::make_shared<Config>();
-        configureEnvironment(config);
-        configureBrain(config);
+        auto config = nlm::demo::createDefaultBrainConfig();
         
-        // Create world
+        // Parse command line arguments
+        nlm::demo::parseDemoArgs(argc, argv, config);
+        
+        // Validate configuration
+        if (!nlm::demo::validateConfig(config)) {
+            return 1;
+        }
         SimpleWorld world;
         world.configure(20.0f, 20.0f, 16, 16);
         world.setRandomSeed(42);
@@ -286,30 +291,9 @@ public:
             }
         }
         
-        std::cout << "\nPhase 3 demonstration complete.\n";
-        std::cout << "The brain received sensory input, produced actions,\n";
-        std::cout << "experienced consequences, and modified its synapses.\n";
-    }
-    
-private:
-    void configureEnvironment(std::shared_ptr<Config> config) {
-        config->set("environment_width", 20);
-        config->set("environment_height", 20);
-        config->set("vision_width", 16);
-        config->set("vision_height", 16);
-    }
-    
-    void configureBrain(std::shared_ptr<Config> config) {
-        config->set("neuron_count", 500);
-        config->set("region_count", 2);
-        config->set("connection_probability", 0.1f);
-        config->set("random_seed", static_cast<int64_t>(42));
-        config->set("simulation_timestep", 0.001);
-        config->set("stdp_ltp_weight", 0.01f);
-        config->set("stdp_ltd_weight", 0.012f);
-        config->set("stdp_tau", 20.0f);
-        config->set("synaptogenesis_rate", 0.0001f);
-        config->set("pruning_rate", 0.00001f);
+    std::cout << "\nPhase 3 demonstration complete.\n";
+    std::cout << "The brain received sensory input, produced actions,\n";
+    std::cout << "experienced consequences, and modified its synapses.\n";
     }
     
     const char* motorCommandToString(MotorCommand cmd) {
@@ -342,18 +326,30 @@ private:
 
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
-    int numEpisodes = 5;
-    int stepsPerEpisode = 200;
-    
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
-    }
-    
     nlm::Phase3Demo demo;
-    demo.run(numEpisodes, stepsPerEpisode);
+    
+    // Parse command line arguments for demo configuration
+    if (argc > 1) {
+        if (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h") {
+            nlm::demo::printDemoHelp();
+            return 0;
+        }
+        
+        // Parse episode and step parameters
+        int numEpisodes = 5;
+        int stepsPerEpisode = 200;
+        
+        if (argc > 1) {
+            numEpisodes = std::atoi(argv[1]);
+        }
+        if (argc > 2) {
+            stepsPerEpisode = std::atoi(argv[2]);
+        }
+        
+        demo.run(numEpisodes, stepsPerEpisode);
+    } else {
+        demo.run();
+    }
     
     return 0;
 }

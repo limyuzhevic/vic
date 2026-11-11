@@ -7,11 +7,18 @@
 
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
+#include "core/DemoConfig.hpp"
 #include <iostream>
 
 using namespace nlm;
 
 int main(int argc, char* argv[]) {
+    // Check for help request
+    if (argc > 1 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
+        nlm::demo::printDemoHelp();
+        return 0;
+    }
+    
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
@@ -27,7 +34,9 @@ int main(int argc, char* argv[]) {
     
     std::cout << std::endl;
     
-    if (!integrationOK) {
+    if (integrationOK) {
+        std::cout << "Integration verification passed!" << std::endl << std::endl;
+    } else {
         std::cerr << "ERROR: Integration verification failed!" << std::endl;
         return 1;
     }
@@ -51,16 +60,27 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
+    // Create configuration using common demo utilities
+    auto config = nlm::demo::createDefaultBrainConfig();
+    
+    // Parse command line arguments
+    nlm::demo::parseDemoArgs(argc, argv, config);
+    
+    // Validate configuration
+    if (!nlm::demo::validateConfig(config)) {
+        return 1;
+    }
+    
     // Run full experiment with smaller settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
-    Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    Phase6Config phase6Config;
+    phase6Config.neuronCount = config->getOr<int64_t>("neuron_count", 500);
+    phase6Config.maxSteps = 2000;
+    phase6Config.enableCheckpointing = true;
+    phase6Config.enableReplay = true;
+    phase6Config.enableDevelopment = true;
     
-    auto result = experiment.run(config);
+    auto result = experiment.run(phase6Config);
     
     std::cout << std::endl;
     std::cout << "=== FINAL RESULTS ===" << std::endl;
