@@ -853,6 +853,10 @@ void Brain::reset() {
     pImpl->isResting = false;
     pImpl->stepsSinceLastEpisode = 0;
     
+    // Save important state before reset
+    float savedPreference = pImpl->learnedPreference;
+    
+    // Reset regions (neurons and synapses)
     for (auto& region : pImpl->regions) {
         region->reset();
     }
@@ -865,6 +869,14 @@ void Brain::reset() {
     if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
     if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
     if (pImpl->attention) pImpl->attention->reset();
+    
+    // Restore learned preference trait (Phase 5): a single scalar, -1..1,
+    // updated only by sandbox reward through AgentBrain, saved in the
+    // checkpoint (SimulationState section) and used as a small bias in
+    // later action choice. This is the measured "personality" step: a
+    // preference learned from experience that survives a reload and
+    // changes later behaviour.
+    pImpl->learnedPreference = savedPreference;
     
     NLM_LOG_INFO("NLM Brain reset complete");
 }

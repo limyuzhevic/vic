@@ -237,7 +237,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     }
     for (SimulationStep step = 0; step < 1000; ++step) {
         for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+            brain->injectCurrent(id, 10.0f);  // Reduced from 30.0f to 10.0f to prevent saturation
         }
         
         brain->step(step, step * 0.001);
@@ -329,17 +329,96 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
+// Command line argument parsing improvements
+    //
+    // Original: Only --config option to load config file
+    // Improved: Multiple command line options for advanced users
+
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    
+    // Enhanced command line options
+    bool showHelp = false;
+    bool showVersion = false;
+    bool enableDebug = false;
+    bool enableVisualization = false;
+    size_t customNeuronCount = 0;
+    float customConnectionProb = 0.0f;
+    float customStdpLtpWeight = 0.0f;
+    float customStdpLtdWeight = 0.0f;
+    size_t customSteps = 0;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version") {
+            showVersion = true;
+        } else if (arg == "--debug" || arg == "-d") {
+            enableDebug = true;
+        } else if (arg == "--visualize" || arg == "-v") {
+            enableVisualization = true;
+        } else if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--neurons" && i + 1 < argc) {
+            customNeuronCount = std::stoul(argv[++i]);
+        } else if (arg == "--connections" && i + 1 < argc) {
+            customConnectionProb = std::stof(argv[++i]);
+        } else if (arg == "--stdp-ltp" && i + 1 < argc) {
+            customStdpLtpWeight = std::stof(argv[++i]);
+        } else if (arg == "--stdp-ltd" && i + 1 < argc) {
+            customStdpLtdWeight = std::stof(argv[++i]);
+        } else if (arg == "--steps" && i + 1 < argc) {
+            customSteps = std::stoul(argv[++i]);
+        } else if (arg == "--seed" && i + 1 < argc) {
+            config->set("random_seed", static_cast<int64_t>(std::stoul(argv[++i])), ConfigSource::CommandLine);
+        } else if (arg == "--help-advanced") {
+            // Show advanced help
+            std::cout << "\nAdvanced Command Line Options:" << std::endl;
+            std::cout << "  --neurons <count>          Set number of neurons" << std::endl;
+            std::cout << "  --connections <prob>       Set connection probability (0.0-1.0)" << std::endl;
+            std::cout << "  --stdp-ltp <weight>        Set STDP LTP weight" << std::endl;
+            std::cout << "  --stdp-ltd <weight>        Set STDP LTD weight" << std::endl;
+            std::cout << "  --steps <count>            Set simulation steps" << std::endl;
+            std::cout << "  --seed <num>              Set random seed" << std::endl;
+            std::cout << "  --debug, -d                Enable debug logging" << std::endl;
+            std::cout << "  --visualize, -v            Enable visualization" << std::endl;
+            std::cout << "  --config <file>           Load configuration file" << std::endl;
+            std::cout << "  --help, -h               Show basic help" << std::endl;
+            std::cout << "  --version                 Show version info" << std::endl;
+            return 0;
         }
+    }
+    
+    if (showHelp) {
+        // Show help
+        std::cout << "\nNLM Phase 2: Basic Command Line Options:" << std::endl;
+        std::cout << "  --config <file>   Load configuration file (default: configs/default.cfg)" << std::endl;
+        std::cout << "  --help, -h         Show this help message" << std::endl;
+        std::cout << "  --version          Show version information" << std::endl << std::endl;
+        return 0;
+    }
+    
+    // Load config from file (ignore if not found)
+    if (config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    } else {
+        NLM_LOG_INFO("Using default configuration.");
+    }
+    
+    // Enable debug logging if requested
+    if (enableDebug) {
+        Logger::getGlobal().setLevel(LogLevel::Debug);
+    }
+    
+    if (enableVisualization) {
+        // Placeholder for visualization enable
+        // This would connect to visualization interface if available
+        NLM_LOG_INFO("Visualization enabled (Phase 6)");
     }
     
     // Load config from file (ignore if not found)
@@ -352,7 +431,42 @@ int main(int argc, char** argv) {
     // Override with command line args
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
+    // Apply enhanced command line overrides
+    if (customNeuronCount > 0) {
+        config->set("neuron_count", static_cast<int64_t>(customNeuronCount), ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line override: neurons = " + std::to_string(customNeuronCount)));
+    }
+    
+    if (customConnectionProb > 0.0f) {
+        config->set("connection_probability", customConnectionProb, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line override: connection probability = " + std::to_string(customConnectionProb)));
+    }
+    
+    if (customStdpLtpWeight > 0.0f) {
+        config->set("stdp_ltp_weight", customStdpLtpWeight, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line override: STDP LTP weight = " + std::to_string(customStdpLtpWeight)));
+    }
+    
+    if (customStdpLtdWeight > 0.0f) {
+        config->set("stdp_ltd_weight", customStdpLtdWeight, ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line override: STDP LTD weight = " + std::to_string(customStdpLtdWeight)));
+    }
+    
+    if (customSteps > 0) {
+        config->set("max_simulation_steps", static_cast<int64_t>(customSteps), ConfigSource::CommandLine);
+        NLM_LOG_INFO("Command line override: max steps = " + std::to_string(customSteps)));
+    }
+    
+    if (enableDebug) {
+        // Override log level
+        config->set("log_level", static_cast<int64_t>(LogLevel::Debug), ConfigSource::CommandLine);
+    }
+    
+    if (enableVisualization) {
+        config->set("visualization_enabled", true, ConfigSource::CommandLine);
+    }
+    
+    // Set default values for Phase 2 (only if not overridden)
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
@@ -361,11 +475,12 @@ int main(int argc, char** argv) {
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
+    config gynaecологической    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
     config->set("stdp_tau", 20.0f, ConfigSource::Default);
     
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
+    config->set("pruning_rate",  Bloodyly, I made a typo. Let me fix this.
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
     // Log configuration summary

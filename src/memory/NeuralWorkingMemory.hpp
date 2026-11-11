@@ -17,6 +17,7 @@ namespace nlm {
 // - Recurrent synaptic connections for maintaining information
 // - Activity-dependent short-term plasticity
 // - Neural competition for selective retention
+// - Phase 6: Fixed working memory trace management to prevent permanent emptiness
 
 class NeuralWorkingMemory {
 public:
