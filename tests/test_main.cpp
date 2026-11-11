@@ -37,6 +37,14 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_connectivity {
+    void runAll();
+}
+
+namespace test_plasticity {
+    void runAll();
+}
+
 int main() {
     std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
@@ -119,7 +127,23 @@ int main() {
         allPassed = false;
     }
     
-    std::cout << std::endl;
+    std::cout << "Running Connectivity tests..." << std::endl;
+    try {
+        test_connectivity::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Plasticity tests..." << std::endl;
+    try {
+        test_plasticity::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
     if (allPassed) {
         std::cout << "=== All Tests PASSED ===" << std::endl;
         return 0;
