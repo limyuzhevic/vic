@@ -1,15 +1,35 @@
 #pragma once
 
 #include "../core/Types/Types.hpp"
-#include "../sensory/SensoryInput.hpp"
-#include "../motor/Action.hpp"
-#include "NeuralRegion.hpp"
-#include "../dynamics/SpikeSystem.hpp"
-#include "../plasticity/STDP.hpp"
-#include "../plasticity/Hebbian.hpp"
-#include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+
+namespace nlm {
+
+// Forward declarations for all dependent classes
+class Config;
+class RandomGenerator;
+class SimulationClock;
+class Logger;
+class NeuralWorkingMemory;
+class NeuralEpisodicMemory;
+class NeuralAssociativeMemory;
+class PredictionSystem;
+class NeuralPlanner;
+class ConceptFormation;
+class AttentionalSelection;
+class DevelopmentSystem;
+class Dopamine;
+class Curiosity;
+class Novelty;
+class PredictionError;
+class SensoryInput;
+class Action;
+class NeuralRegion;
+class SpikeSystem;
+class STDP;
+class Hebbian;
+class StructuralPlasticity;
 
 namespace nlm {
 
