@@ -53,6 +53,73 @@ bool readVec(const uint8_t*& p, const uint8_t* end, std::vector<T>& v) {
     return true;
 }
 
+// Simple run-length encoding compression for small payloads
+std::vector<uint8_t> simpleCompress(const uint8_t* data, size_t size) {
+    if (size < 100) return std::vector<uint8_t>(data, data + size); // Too small to compress
+    
+    std::vector<uint8_t> compressed;
+    compressed.reserve(size * 0.8); // Estimate 20% compression
+    
+    // Simple RLE for repetitive data
+    const uint8_t* end = data + size;
+    const uint8_t* runStart = data;
+    
+    while (runStart < end) {
+        uint8_t byte = *runStart;
+        size_t runLength = 1;
+        const uint8_t* pos = runStart + 1;
+        
+        // Find run length
+        while (pos < end && *pos == byte && runLength < 255) {
+            runLength++;
+            pos++;
+        }
+        
+        if (runLength > 3) {
+            // Use RLE marker
+            compressed.push_back(0xFF); // RLE marker
+            compressed.push_back(static_cast<uint8_t>(runLength));
+            compressed.push_back(byte);
+        } else {
+            // Store literal bytes
+            compressed.push_back(0xFE); // Literal marker
+            compressed.push_back(static_cast<uint8_t>(runLength));
+            for (size_t i = 0; i < runLength; i++) {
+                compressed.push_back(runStart[i]);
+            }
+        }
+        
+        runStart += runLength;
+    }
+    
+    return compressed;
+}
+
+std::vector<uint8_t> simpleDecompress(const uint8_t* data, size_t size) {
+    std::vector<uint8_t> decompressed;
+    const uint8_t* end = data + size;
+    
+    while (data < end) {
+        uint8_t marker = *data++;
+        if (marker == 0xFF) { // RLE
+            if (data + 2 > end) return {};
+            uint8_t runLength = *data++;
+            uint8_t byte = *data++;
+            decompressed.insert(decompressed.end(), runLength, byte);
+        } else if (marker == 0xFE) { // Literal
+            if (data + 1 > end) return {};
+            uint8_t literalLength = *data++;
+            if (data + literalLength > end) return {};
+            decompressed.insert(decompressed.end(), data, data + literalLength);
+            data += literalLength;
+        } else {
+            decompressed.push_back(marker);
+        }
+    }
+    
+    return decompressed;
+}
+
 std::vector<uint8_t> serializeNeurons(const NeuronCheckpointData& d) {
     std::vector<uint8_t> out;
     appendVec(out, d.membranePotential);
@@ -136,21 +203,38 @@ bool parseSynapses(const std::vector<uint8_t>& payload, SynapseCheckpointData& d
            readVec(p, end, d.shortTermFacilitation) &&
            p == end;
 }
-
 bool writeSectionToStream(std::ofstream& stream, CheckpointSection type,
-                  const std::vector<uint8_t>& payload, uint64_t& bytesWritten) {
+                   const std::vector<uint8_t>& payload, uint64_t& bytesWritten) {
     SectionHeader header;
     header.type = static_cast<uint32_t>(type);
     header.offset = static_cast<uint64_t>(stream.tellp()) + sizeof(SectionHeader);
-    header.size = static_cast<uint64_t>(payload.size());
-    header.compressedSize = 0;
-    header.checksum = payload.empty() ? 0 : ChecksumCalculator::crc32(payload.data(), payload.size());
-    stream.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    
+    // Apply compression if requested
+    std::vector<uint8_t> compressedPayload = payload;
+    uint64_t compressedSize = payload.size();
+    
     if (!payload.empty()) {
-        stream.write(reinterpret_cast<const char*>(payload.data()), static_cast<std::streamsize>(payload.size()));
+        // Apply simple compression for small payloads
+        compressedPayload = simpleCompress(payload.data(), payload.size());
+        compressedSize = compressedPayload.size();
+        
+        // Only use compression if it actually saves space
+        if (compressedPayload.size() >= payload.size()) {
+            compressedPayload = payload;
+            compressedSize = payload.size();
+        }
+    }
+    
+    header.size = static_cast<uint64_t>(compressedPayload.size());
+    header.compressedSize = static_cast<uint64_t>(compressedSize);
+    header.checksum = ChecksumCalculator::crc32(compressedPayload.data(), compressedPayload.size());
+    
+    stream.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!compressedPayload.empty()) {
+        stream.write(reinterpret_cast<const char*>(compressedPayload.data()), static_cast<std::streamsize>(compressedPayload.size()));
     }
     if (!stream) return false;
-    bytesWritten += sizeof(header) + payload.size();
+    bytesWritten += sizeof(header) + compressedPayload.size();
     return true;
 }
 
@@ -222,6 +306,16 @@ std::vector<uint8_t> CheckpointReader::readSection(CheckpointSection sectionType
             error_ = "section checksum mismatch";
             return {};
         }
+        
+        // Decompress if compressedSize > 0 and size > 0
+        if (s.compressedSize > 0 && s.size > 0) {
+            payload = simpleDecompress(payload.data(), payload.size());
+            if (payload.empty()) {
+                error_ = "failed to decompress section";
+                return {};
+            }
+        }
+        
         return payload;
     }
     return {};
@@ -288,12 +382,20 @@ bool CheckpointWriter::create(const std::string& filepath, CompressionLevel comp
     neuronPayload_.clear();
     synapsePayload_.clear();
     delayedSpikePayload_.clear();
+    extraPayloads_.clear();
     bytesWritten_ = 0;
+    
     // Open (truncating) now so a failure to create the file is reported
     // here, not silently at finalize(). Payloads are buffered and only
     // written at finalize(), when the header is complete.
     stream_.open(filepath, std::ios::binary | std::ios::trunc);
     if (!stream_) return false;
+    
+    // Initialize compression buffer if needed
+    if (compression_ != CompressionLevel::None) {
+        compressBuffer_.clear();
+    }
+    
     return true;
 }
 

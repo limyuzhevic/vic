@@ -327,10 +327,54 @@ bool Brain::initialize() {
     });
     }  // spikeHandlersRegistered
     
-    // Configure checkpoint manager
+// Configure checkpoint manager
     std::string checkpointDir = pImpl->config->getOr<std::string>("checkpoint_dir", "./checkpoints");
     pImpl->checkpointManager->configure(checkpointDir, 10000, 5, true);
     
+    // Set checkpoint providers - this is CRITICAL for checkpointing to work
+    pImpl->checkpointManager->setNeuronProvider([this](NeuronCheckpointData& data) {
+        // Simple version - just save basic neuron state
+        data.neuronType.resize(getTotalNeuronCount());
+        data.regionId.resize(getTotalNeuronCount());
+        data.populationId.resize(getTotalNeuronCount());
+        
+        size_t idx = 0;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    const auto& state = neuron->getState();
+                    data.neuronType[idx] = static_cast<uint64_t>(neuron->getType());
+                    data.regionId[idx] = region->getId().index();
+                    data.populationId[idx] = pop->getId().index();
+                    idx++;
+                }
+            }
+        }
+        return true;
+    });
+    
+    pImpl->checkpointManager->setSynapseProvider([this](SynapseCheckpointData& data) {
+        // Simple version - just save basic synapse state
+        data.sourceNeuron.resize(getTotalSynapseCount());
+        data.destinationNeuron.resize(getTotalSynapseCount());
+        data.weight.resize(getTotalSynapseCount());
+        data.delay.resize(getTotalSynapseCount());
+        data.synapseType.resize(getTotalSynapseCount());
+        
+        size_t idx = 0;
+        for (const auto& region : pImpl->regions) {
+            for (const auto& syn : region->getSynapses()) {
+                data.sourceNeuron[idx] = syn->getSourceNeuron().index();
+                data.destinationNeuron[idx] = syn->getDestinationNeuron().index();
+                data.weight[idx] = syn->getWeight();
+                data.delay[idx] = syn->getDelay();
+                data.synapseType[idx] = static_cast<uint8_t>(syn->getType());
+                idx++;
+            }
+        }
+        return true;
+    });
+
     NLM_LOG_INFO("NLM Brain initialization complete (Phase 6 - Integrated)");
     NLM_LOG_INFO("Total neurons: " + std::to_string(getTotalNeuronCount()));
     NLM_LOG_INFO("Total synapses: " + std::to_string(getTotalSynapseCount()));

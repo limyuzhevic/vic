@@ -39,6 +39,16 @@ void SimpleWorld::configure(float width, float height, size_t visionWidth, size_
     height_ = height;
     visionWidth_ = visionWidth;
     visionHeight_ = visionHeight;
+    
+    // Add reward configuration parameters
+    resourceEnergyGain_ = 30.0f;
+    hazardDamage_ = 15.0f;
+    movementCost_ = 0.01f;
+    collisionCost_ = 0.05f;
+    turnCost_ = 0.005f;
+    exploreReward_ = 0.02f;  // Reward for exploration
+    resourceValue_ = 10.0f;
+    hazardValue_ = -15.0f;
 }
 
 void SimpleWorld::setRandomSeed(uint64_t seed) {
@@ -52,23 +62,34 @@ void SimpleWorld::reset() {
     agent_.x = urand(rngState_, 2.0f, width_ - 2.0f);
     agent_.y = urand(rngState_, 2.0f, height_ - 2.0f);
     agent_.energy = maxEnergy_;
+    agent_.health = 1.0f;
+    agent_.age = 0.0;
+    
     rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
     
     objects_.clear();
+    
+    // Track explored positions for exploration reward
+    exploredPositions_.clear();
     
     // Place some resource objects (positive reward when touched)
     for (int i = 0; i < 5; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Resource, resourceValue_, 0.4f);
     }
     
     // Place some hazard objects (negative reward when touched)
     for (int i = 0; i < 3; ++i) {
         float ox = urand(rngState_, 1.0f, width_ - 1.0f);
         float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, hazardValue_, 0.3f);
     }
+    
+    // Place a goal object (high reward when reached)
+    float gx = urand(rngState_, width_ * 0.3f, width_ * 0.7f);
+    float gy = urand(rngState_, height_ * 0.3f, height_ * 0.7f);
+    objects_.emplace_back(gx, gy, WorldObjectType::Goal, 100.0f, 0.5f);
     
     generateVision();
 }
@@ -164,10 +185,24 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.01f;  // Small cost for movement
+                result.reward = movementCost_;  // Small cost for movement
                 result.success = true;
+                
+                // Exploration reward: reward for visiting new positions
+                bool isNewPosition = true;
+                for (const auto& pos : exploredPositions_) {
+                    if (std::abs(pos.first - agent_.x) < 0.1f && 
+                        std::abs(pos.second - agent_.y) < 0.1f) {
+                        isNewPosition = false;
+                        break;
+                    }
+                }
+                if (isNewPosition) {
+                    exploredPositions_.push_back(std::make_pair(agent_.x, agent_.y));
+                    result.reward += exploreReward_;  // Bonus for exploration
+                }
             } else {
-                result.reward = -0.05f;  // Cost for hitting wall
+                result.reward = collisionCost_;  // Cost for hitting wall
                 result.success = false;
             }
             break;
@@ -186,10 +221,24 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
                 agent_.x = newX;
                 agent_.y = newY;
                 agent_.isMoving = true;
-                result.reward = -0.02f;
+                result.reward = movementCost_ * 2.0f;
                 result.success = true;
+                
+                // Exploration reward for backward movement
+                bool isNewPosition = true;
+                for (const auto& pos : exploredPositions_) {
+                    if (std::abs(pos.first - agent_.x) < 0.1f && 
+                        std::abs(pos.second - agent_.y) < 0.1f) {
+                        isNewPosition = false;
+                        break;
+                    }
+                }
+                if (isNewPosition) {
+                    exploredPositions_.push_back(std::make_pair(agent_.x, agent_.y));
+                    result.reward += exploreReward_ * 0.5f;
+                }
             } else {
-                result.reward = -0.05f;
+                result.reward = collisionCost_;
                 result.success = false;
             }
             break;
@@ -198,14 +247,14 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
         case MotorCommand::TurnLeft:
             agent_.angularVelocity = -turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = turnCost_;
             result.success = true;
             break;
             
         case MotorCommand::TurnRight:
             agent_.angularVelocity = turnSpeed;
             agent_.isTurning = true;
-            result.reward = -0.005f;
+            result.reward = turnCost_;
             result.success = true;
             break;
             
@@ -274,6 +323,10 @@ ActionResult SimpleWorld::interact() {
                 result.reward = obj.value;  // Negative reward
                 result.success = true;
                 result.message = "hit_hazard";
+            } else if (obj.type == WorldObjectType::Goal) {
+                result.reward = obj.value;  // Very high positive reward
+                result.success = true;
+                result.message = "reached_goal";
             }
             
             // Only interact with one object at a time

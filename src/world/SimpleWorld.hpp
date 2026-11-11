@@ -117,6 +117,15 @@ private:
     float energyDecayRate_;
     float resourceEnergyGain_;
     
+    // Reward configuration
+    float movementCost_;
+    float turnCost_;
+    float collisionCost_;
+    float exploreReward_;
+    float hazardValue_;
+    float resourceValue_;
+    float goalValue_;
+    
     // Simulation time
     double simTime_;
     
@@ -125,6 +134,9 @@ private:
     
     // Simple RNG state
     uint64_t rngState_;
+    
+    // Exploration tracking
+    std::vector<std::pair<float, float>> exploredPositions_;
     uint64_t nextRandom();
 };
 

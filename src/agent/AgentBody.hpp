@@ -85,7 +85,8 @@ enum class WorldObjectType {
     Resource = 1,      // Positive reward
     Hazard = 2,        // Negative reward
     Wall = 3,         // Boundary
-    Marker = 4        // Navigation aid
+    Marker = 4,       // Navigation aid
+    Goal = 5          // High value goal object
 };
 
 } // namespace nlm

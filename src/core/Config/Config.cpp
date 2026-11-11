@@ -19,16 +19,16 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,9 +49,14 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            NLM_LOG_INFO("Loaded config: " + key + " = " + value + " (line " + 
+                        std::to_string(lineNumber) + ")");
+        } else {
+            NLM_LOG_WARNING("Skipping malformed config line " + std::to_string(lineNumber) + ": " + line);
         }
     }
     
+    NLM_LOG_INFO("Loaded configuration from file: " + filepath);
     return true;
 }
 
@@ -81,14 +86,19 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to create config file: " + filepath);
         return false;
     }
     
+    file << "# NLM Configuration File\n";
+    file << "# Generated on " << std::chrono::system_clock::now() << "\n\n";
+    
     for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << "# " << entry.key << " (from " << static_cast<int>(entry.source) << ")\n";
+        file << entry.key << " = " << "VALUE_PLACEHOLDER\n\n";
     }
     
+    NLM_LOG_INFO("Saved configuration to file: " + filepath);
     return true;
 }
 
