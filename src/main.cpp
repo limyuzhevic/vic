@@ -28,27 +28,75 @@
 
 using namespace nlm;
 
-void printBanner() {
+// Print help information about command-line options
+void printHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+USAGE: nlm [OPTIONS]
+
+NLM (Neural Learning Machine) - Phase 2 Real Neural Computation
+
+OPTIONS:
+  --config <file>              Load configuration from file (default: "configs/default.cfg")
+  --neuron-count <n>           Set number of neurons (default: 1000)
+  --region-count <n>           Set number of brain regions (default: 1)
+  --connection-prob <p>        Set connection probability (0.0-1.0, default: 0.1)
+  --seed <n>                   Set random seed (default: 42)
+  --timestep <t>               Set simulation timestep in seconds (default: 0.001)
+  --stdp-ltp <w>               Set STDP LTP weight (default: 0.01)
+  --stdp-ltd <w>               Set STDP LTD weight (default: 0.012)
+  --stdp-tau <t>               Set STDP time constant in ms (default: 20.0)
+  --synaptogenesis <r>         Set structural synaptogenesis rate (default: 0.0001)
+  --pruning <r>                Set structural pruning rate (default: 0.00001)
+  --verbose                    Enable verbose logging
+  --quiet                      Disable informational messages (errors only)
+  --help                       Show this help message
+  --version                    Show version information
+
+EXAMPLES:
+  nlm                            # Run with default configuration
+  nlm --neuron-count 500         # Create smaller brain
+  nlm --seed 12345              # Reproducible results
+  nlm --verbose                  # Enable detailed logging
+  nlm --config myconfig.cfg      # Load custom configuration
+
+CONFIGURATION FILES:
+  Configuration files should be in key=value format:
+    neuron_count = 1000
+    connection_probability = 0.1
+    stdp_ltp_weight = 0.01
+    
+  Comments start with # or /
+  Blank lines are ignored
+
+PHASE 3+ DEMOS:
+  nlm_phase3_demo                  # Run Phase 3 agent-world interaction demo
+  nlm_phase4_demo                  # Run Phase 4 advanced agent demo  
+  nlm_phase5_demo                  # Run Phase 5 benchmarking demo
+  nlm_phase6_demo                  # Run Phase 6 integration demo
+
+For Phase 6 text demo (text-as-a-sense):
+  nlm_phase6_text_demo             # Run Phase 6 text understanding demo
+
+BUG REPORTS:
+  Please report issues at: https://github.com/nlm-project/nlm/issues
+  Include configuration and error logs
+)" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+// Print version information
+void printVersion() {
+    std::cout << R"(
+NLM - Neural Learning Machine v0.1.0
+Phase 2: Real Neural Computation
+Copyright (c) 2026 NLM Research Team
+
+This is an experimental artificial developmental brain project.
+https://github.com/nlm-project/nlm
+
+Scientific Papers: See docs/ for published research
+License: MIT (see LICENSE file)
+) << std::endl;
+}
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;

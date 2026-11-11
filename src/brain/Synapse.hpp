@@ -48,11 +48,16 @@ public:
     bool isExcitatory() const;
     bool isInhibitory() const;
     
-    // Activity history for plasticity
+// Activity history for plasticity
+    // Records when presynaptic neuron spiked (for STDP and Hebbian learning)
     void recordPreSpike(Timestamp timestamp);
+    // Records when postsynaptic neuron spiked (for STDP and Hebbian learning)
     void recordPostSpike(Timestamp timestamp);
+    // Get history of presynaptic spikes (for plasticity calculations)
     const std::vector<Timestamp>& getPreSpikeHistory() const;
+    // Get history of postsynaptic spikes (for plasticity calculations)
     const std::vector<Timestamp>& getPostSpikeHistory() const;
+    // Clear all spike history (for reset)
     void clearHistory();
     // Phase 5 checkpoint support: restore histories recorded by
     // recordPre/PostSpike (capped at the same MAX_SPIKE_HISTORY).

@@ -59,6 +59,8 @@ void SpikeSystem::processSpikes(SimulationStep currentStep) {
         detailed.source = event.source_neuron;
         detailed.timestamp = event.timestamp;
         detailed.step = event.step;
+        detailed.regionId = RegionId(0);  // TODO: Get actual region from event
+        detailed.populationId = PopulationId(0);  // TODO: Get actual population from event
         
         // Add to history
         pImpl->spikeHistory.push_back(detailed);

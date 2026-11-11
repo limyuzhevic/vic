@@ -19,44 +19,97 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    /**
+     * Load configuration from a file with multiple format support
+     * 
+     * Currently implements Phase 1 format (key=value) with support for:
+     * - Comments (starting with # or /)
+     * - Quoted string values
+     * - Multiple data types (int, float, bool, string, lists)
+     * 
+     * TODO PHASE 2: Implement proper JSON/YAML parser with:
+     * - Schema validation
+     * - Type checking
+     * - Default value merging
+     * - Configuration inheritance
+     * 
+     * @param filepath Path to the configuration file
+     * @return true if file loaded successfully, false if file not found or error
+     * @note Command line arguments override file values
+     * @see ConfigSource::File
+     */
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Configuration file not found or cannot be opened: " + filepath);
         return false;
     }
     
+    size_t lineNumber = 0;
     std::string line;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
+        if (line.empty() || line[ northern comments and section separators
+         * Comments: Starting with # or / (allows for documentation)
+         * Examples: # This is a comment, / Another comment
+         * Skips to next iteration
+         */
+    
+    bool isComment = line[0] == '#' || line[0] == '/';
+    if (isComment) {
+        continue;
+    }
+    
+    // Parse simple key=value pairs
+    size_t pos = line.find('=');
+    if (pos != std::string::npos) {
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '"' && value.back() == '"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Validate key format
+        if (key.empty() || key.find(' ') != std::string::npos) {
+            NLM_LOG_WARNING("Invalid key format at line " + std::to_string(lineNumber) + ": " + key);
             continue;
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        set(key, value, ConfigSource::File);
+        NLM_LOG_DEBUG("Loaded config from file: " + key + " = " + value);
+    } else {
+        NLM_LOG_WARNING("Invalid syntax at line " + std::to_string(lineNumber) + ": missing '='");
     }
+}
     
+    NLM_LOG_INFO("Configuration loaded from file: " + filepath);
     return true;
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
-    for (int i = 1; i < argc; ++i) {
+    /**
+     * Load configuration from command line arguments
+     * 
+     * Supports two formats:
+     * - --key=value (long format)
+     * - -key value (short format)
+     * 
+     * @param argc Number of command line arguments
+     * @param argv Command line arguments array
+     * @return true if arguments processed successfully
+     * 
+     * @note Command line arguments override file and default values
+     * @see ConfigSource::CommandLine
+     */
+    
+    size_t argCount = static_cast<size_t>(argc);
+    for (size_t i = 1; i < argCount; ++i) {
         std::string arg(argv[i]);
         
         // Handle --key=value format
@@ -65,16 +118,36 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key format
+                if (key.empty()) {
+                    NLM_LOG_ERROR("Empty key in command line argument: " + arg);
+                    continue;
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+                NLM_LOG_DEBUG("Loaded config from CLI: " + key + " = " + value);
+            } else {
+                NLM_LOG_ERROR("Invalid command line argument format (missing '='): " + arg);
             }
         }
         // Handle -key value format
-        else if (arg[0] == '-' && i + 1 < argc) {
+        else if (arg[0] == '-' && i + 1 < argCount) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            if (key.empty()) {
+                NLM_LOG_ERROR("Empty key in command line argument: " + arg);
+                continue;
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+            NLM_LOG_DEBUG("Loaded config from CLI: " + key + " = " + value);
+        } else {
+            NLM_LOG_WARNING("Unknown command line argument (skipping): " + arg);
         }
     }
+    
     return true;
 }
 
@@ -109,6 +182,13 @@ void Config::set(const std::string& key, const std::string& value, ConfigSource 
 }
 
 void Config::set(const std::string& key, int value, ConfigSource source) {
+    /**
+     * Set a configuration value
+     * 
+     * @param key Configuration key (e.g., "brain.neuron_count")
+     * @param value Integer value to set
+     * @param source Source of this configuration value
+     */
     set(key, ConfigValue(value), source);
 }
 

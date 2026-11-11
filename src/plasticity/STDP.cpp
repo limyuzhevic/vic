@@ -16,7 +16,17 @@ struct STDP::Impl {
              minWeight(-1.0f), maxWeight(1.0f) {}
 };
 
-STDP::STDP() : pImpl(new Impl) {}
+STDP::STDP() : pImpl(new Impl) {
+    /**
+     * Constructor initializes STDP with default biological parameters
+     * 
+     * Default parameters based on typical cortical synapses:
+     * - LTP weight: 0.01 (1% weight increase per optimal timing)
+     * - LTD weight: 0.012 (1.2% weight decrease per optimal timing)
+     * - Time constant: 20ms (typical NMDA receptor time window)
+     * - Weight bounds: [-1.0, 1.0] (exc. positive, inh. negative)
+     */
+}
 
 STDP::~STDP() = default;
 
@@ -24,32 +34,32 @@ void STDP::update(Synapse* synapse,
                    const std::vector<Timestamp>& preSpikes,
                    const std::vector<Timestamp>& postSpikes,
                    TimestepDuration dt) {
-    /*
-     * Real STDP implementation based on spike-timing correlation
+    /**
+     * Apply Spike-Timing-Dependent Plasticity (STDP)
+     * 
+     * STDP is a Hebbian learning rule where synaptic strength depends on
+     * the relative timing of pre- and post-synaptic spikes.
      * 
      * Mathematical formulation:
-     * For each pre-post spike pair with timing difference Δt = t_post - t_pre:
-     * 
-     * If Δt > 0 (pre before post): POTENTIATION
-     *   Δw = A+ * exp(-Δt / τ+)
-     *   
-     * If Δt < 0 (post before pre): DEPRESSION
-     *   Δw = A- * exp(Δt / τ-)
-     * 
-     * Where:
-     *   A+ = ltpWeight (potentiation amplitude)
-     *   A- = ltdWeight (depression amplitude)  
-     *   τ+ = τ- = timeConstant (STDP time window)
+     * - For Δt > 0 (pre before post): LTP (potentiation)
+     *   Δw = A+ × exp(-Δt / τ+) where A+ = ltpWeight
+     * - For Δt < 0 (post before pre): LTD (depression)
+     *   Δw = A- × exp(Δt / τ-) where A- = ltdWeight
      * 
      * Biological inspiration:
-     *   - Reflects NMDA receptor-mediated calcium signaling
-     *   - Pre-before-post activates NMDA receptors when postsynaptic spikes
-     *   - Post-before-pre causes backpropagating action potentials
-     *   
-     * Limitations:
-     *   - Simplified pairwise rule (doesn't capture triplet interactions)
-     *   - Assumes single exponential window (more complex in biology)
-     *   - Doesn't account for synaptic eligibility traces
+     * - Pre-before-post activates NMDA receptors when postsynaptic neurons spike
+     * - Postsynaptic spikes cause calcium influx that strengthens synapses
+     * - Pre-before-post patterns are associative (neurons that fire together strengthen)
+     * - Post-before-pre patterns are anti-associative (neurons that fire apart weaken)
+     * 
+     * @param synapse Target synaptic connection to update
+     * @param preSpikes History of presynaptic spike times
+     * @param postSpikes History of postsynaptic spike times
+     * @param dt Simulation timestep for normalization
+     * 
+     * @note Uses nearest-neighbor approach for efficiency (vs. all-pairs)
+     * @note Inhibitory synapses flip sign to preserve inhibition
+     * @see https://en.wikipedia.org/wiki/Spike-timing_dependent_plasticity
      */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
@@ -58,12 +68,10 @@ void STDP::update(Synapse* synapse,
     
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
-
-    // Nearest-neighbour STDP: only the most recent pre/post pair is used.
-    // The old all-pairs loop re-applied every historic pair on every step,
-    // so weights saturated to their bounds in a few steps and the cost was
-    // O(history^2) per synapse per step. Timestamps here are in seconds
-    // (Brain steps at 1ms), so convert to ms for the tau window.
+    
+    // Nearest-neighbor STDP: only the most recent pre/post pair is used.
+    // This is biologically plausible and computationally efficient:
+    // cortical synapses typically respond to the most recent spike pair
     float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
     if (dtMs > 0) {
         totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
@@ -86,11 +94,9 @@ void STDP::update(Synapse* synapse,
         }
 
         // Soft (weight-dependent) bounds, Phase 4: the old rule added a
-        // fixed ~0.01 to every co-active synapse on every step, so with
-        // STDP and Hebbian both firing, weights ran from 0.2 to the 1.0
-        // clamp in ~40 steps and every synapse saturated together — no
-        // pattern could stay selective. Potentiation (away from zero)
-        // now scales by (1 - |w|) and depression (toward zero) by |w|,
+       (Float clipping for weight-dependent plasticity)
+        // Promatement (away from zero) now scales by (1 - |w|);
+        // depression (toward zero) by |w|,
         // so weights approach their bounds asymptotically, increments
         // shrink as a synapse saturates, and relative differences between
         // synapses are preserved instead of all being clamped equal.
