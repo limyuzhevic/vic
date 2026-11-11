@@ -1,8 +1,6 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
-#include <algorithm>
+#include "ConfigValidator.hpp"
 #include <filesystem>
+#include <stdexcept>
 
 namespace nlm {
 
@@ -235,4 +233,258 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
-} // namespace nlm
+//
+// ConfigValidator implementation
+//
+
+struct ConfigValidator::Impl {
+    std::unordered_map<std::string, std::pair<Validator, std::string>> validators;
+};
+
+ConfigValidator::ConfigValidator() : pImpl(std::make_unique<Impl>()) {}
+
+void ConfigValidator::registerValidator(const std::string& key, 
+                                        Validator validator,
+                                        const std::string& description) {
+    pImpl->validators[key] = std::make_pair(validator, description);
+}
+
+bool ConfigValidator::validate(const std::string& key, const ConfigValue& value, 
+                             std::string& errorMessage) const {
+    auto it = pImpl->validators.find(key);
+    if (it == pImpl->validators.end()) {
+        errorMessage = "Key '" + key + "' has no validator registered";
+        return false;
+    }
+    
+    bool isValid = it->second.first(value, errorMessage);
+    return isValid;
+}
+
+bool ConfigValidator::validate(const Config& config, std::string& errorMessage) const {
+    bool allValid = true;
+    for (const auto& entry : config.pImpl->entries) {
+        std::string entryError;
+        if (!validate(entry.key, entry.value, entryError)) {
+            allValid = false;
+            if (!errorMessage.empty()) errorMessage += "\n";
+            errorMessage += "Key '" + entry.key + "': " + entryError;
+        }
+    }
+    return allValid;
+}
+
+bool ConfigValidator::validateFile(const std::string& filepath, std::string& errorMessage) const {
+    Config config;
+    if (!config.loadFromFile(filepath)) {
+        errorMessage = "Failed to load configuration file: " + filepath;
+        return false;
+    }
+    return validate(config, errorMessage);
+}
+
+std::vector<std::pair<std::string, std::string>> ConfigValidator::getRegisteredValidators() const {
+    std::vector<std::pair<std::string, std::string>> result;
+    result.reserve(pImpl->validators.size());
+    for (const auto& pair : pImpl->validators) {
+        result.push_back(pair);
+    }
+    return result;
+}
+
+void ConfigValidator::removeValidator(const std::string& key) {
+    pImpl->validators.erase(key);
+}
+
+void ConfigValidator::clearValidators() {
+    pImpl->validators.clear();
+}
+
+void ConfigValidator::setupDefaultValidators() {
+    // Clear existing validators
+    clearValidators();
+    
+    // Register default validators for common NLM configuration keys
+    registerValidator("neuron_count", makeNeuronCountValidator(), "Valid range for neuron count");
+    registerValidator("region_count", makeRegionCountValidator(), "Valid range for region count");
+    registerValidator("connection_probability", makeConnectivityValidator(), 
+                     "Valid connectivity probability (0.0 to 1.0)");
+    registerValidator("simulation_timestep", makeTimestepValidator(), "Valid timestep (positive)");
+    registerValidator("plasticity_learning_rate", makePlasticityValidator(), 
+                     "Valid learning rate (0.0 to 1.0)");
+    registerValidator("stdp_ltp_weight", makePlasticityValidator(), 
+                     "Valid STDP LTP weight (0.0 to 1.0)");
+    registerValidator("stdp_ltd_weight", makePlasticityValidator(), 
+                     "Valid STDP LTD weight (0.0 to 1.0)");
+    registerValidator("dopamine_baseline", makeNeuromodulationValidator(), 
+                     "Valid dopamine baseline (0.0 to 1.0)");
+    registerValidator("random_seed", makeRandomSeedValidator(), "Valid random seed (0 to 2^64-1)");
+    registerValidator("max_simulation_steps", makeSimulationStepsValidator(), 
+                     "Valid maximum simulation steps (reasonable range)");
+    registerValidator("log_level", makeLogLevelValidator(), "Valid logging level");
+    registerValidator("checkpoint_dir", makeCheckpointDirValidator(), "Valid checkpoint directory");
+}
+
+ConfigValidator::Validator ConfigValidator::makeRangeValidator(double min, double max, bool inclusive) {
+    return [min, max, inclusive](const ConfigValue& value, std::string& errorMessage) {
+        if constexpr (std::is_same_v<ConfigValue, double> || 
+                      std::is_same_v<ConfigValue, int> || 
+                      std::is_same_v<ConfigValue, int64_t> || 
+                      std::is_same_v<ConfigValue, float>) {
+            double val = std::visit([](auto&& v) { return static_cast<double>(v); }, value);
+            
+            if (inclusive) {
+                if (val < min || val > max) {
+                    errorMessage = "Value " + std::to_string(val) + " is outside range [" + 
+                                 std::to_string(min) + ", " + std::to_string(max) + "]";
+                    return false;
+                }
+            } else {
+                if (val <= min || val >= max) {
+                    errorMessage = "Value " + std::to_string(val) + " is outside range (" + 
+                                 std::to_string(min) + ", " + std::to_string(max) + ")";
+                    return false;
+                }
+            }
+        } else {
+            errorMessage = "Value is not numeric";
+            return false;
+        }
+        return true;
+    };
+}
+
+ConfigValidator::Validator ConfigValidator::makePositiveValidator() {
+    return [](const ConfigValue& value, std::string& errorMessage) {
+        if constexpr (std::is_same_v<ConfigValue, double> || 
+                      std::is_same_v<ConfigValue, int> || 
+                      std::is_same_v<ConfigValue, int64_t> || 
+                      std::is_same_v<ConfigValue, float>) {
+            double val = std::visit([](auto&& v) { return static_cast<double>(v); }, value);
+            
+            if (val < 0.0) {
+                errorMessage = "Value " + std::to_string(val) + " must be non-negative";
+                return false;
+            }
+        } else {
+            errorMessage = "Value is not numeric";
+            return false;
+        }
+        return true;
+    };
+}
+
+ConfigValidator::Validator ConfigValidator::makeStringLengthValidator(size_t minLength, size_t maxLength) {
+    return [minLength, maxLength](const ConfigValue& value, std::string& errorMessage) {
+        if constexpr (std::is_same_v<ConfigValue, std::string>) {
+            size_t length = value.get<std::string>().size();
+            
+            if (length < minLength) {
+                errorMessage = "String length " + std::to_string(length) + " is less than minimum " + 
+                             std::to_string(minLength);
+                return false;
+            }
+            if (length > maxLength) {
+                errorMessage = "String length " + std::to_string(length) + " exceeds maximum " + 
+                             std::to_string(maxLength);
+                return false;
+            }
+        } else {
+            errorMessage = "Value is not a string";
+            return false;
+        }
+        return true;
+    };
+}
+
+ConfigValidator::Validator ConfigValidator::makeEnumValidator(const std::vector<std::string>& validValues) {
+    std::unordered_set<std::string> validSet;
+    for (const auto& val : validValues) {
+        validSet.insert(val);
+    }
+    
+    return [validSet](const ConfigValue& value, std::string& errorMessage) {
+        if constexpr (std::is_same_v<ConfigValue, std::string>) {
+            std::string strVal = value.get<std::string>();
+            if (validSet.find(strVal) == validSet.end()) {
+                errorMessage = "Value '" + strVal + "' is not a valid enum value";
+                return false;
+            }
+        } else {
+            errorMessage = "Value is not a string";
+            return false;
+        }
+        return true;
+    };
+}
+
+ConfigValidator::Validator ConfigValidator::makeConnectivityValidator() {
+    return makeRangeValidator(0.0, 1.0, true);
+}
+
+ConfigValidator::Validator ConfigValidator::makeTimestepValidator() {
+    return makeRangeValidator(0.000001, 1.0, true); // Very small timestep to large timestep
+}
+
+ConfigValidator::Validator ConfigValidator::makeNeuronCountValidator() {
+    return makeRangeValidator(1, 1000000, true); // 1 to 1 million neurons
+}
+
+ConfigValidator::Validator ConfigValidator::makeRegionCountValidator() {
+    return makeRangeValidator(1, 100, true); // 1 to 100 regions
+}
+
+ConfigValidator::Validator ConfigValidator::makePlasticityValidator() {
+    return makeRangeValidator(0.0, 1.0, true);
+}
+
+ConfigValidator::Validator ConfigValidator::makeNeuromodulationValidator() {
+    return makeRangeValidator(0.0, 1.0, true);
+}
+
+ConfigValidator::Validator ConfigValidator::makeRandomSeedValidator() {
+    return makeRangeValidator(0, std::numeric_limits<uint64_t>::max(), true);
+}
+
+ConfigValidator::Validator ConfigValidator::makeSimulationStepsValidator() {
+    return makeRangeValidator(1, 1000000000, true); // 1 to 1 billion steps
+}
+
+ConfigValidator::Validator ConfigValidator::makeCheckpointDirValidator() {
+    return [](const ConfigValue& value, std::string& errorMessage) {
+        if constexpr (std::is_same_v<ConfigValue, std::string>) {
+            std::string dir = value.get<std::string>();
+            if (dir.empty()) {
+                errorMessage = "Checkpoint directory cannot be empty";
+                return false;
+            }
+            if (dir.find('/') == std::string::npos && dir.find('\\') == std::string::npos) {
+                errorMessage = "Checkpoint directory should be an absolute path";
+                return false;
+            }
+        } else {
+            errorMessage = "Value is not a string";
+            return false;
+        }
+        return true;
+    };
+}
+
+ConfigValidator::Validator ConfigValidator::makeLogLevelValidator() {
+    const std::vector<std::string> validLevels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "OFF"};
+    return makeEnumValidator(validLevels);
+}
+
+ConfigValidator::Validator ConfigValidator::makeVisualizationValidator() {
+    return [](const ConfigValue& value, std::string& errorMessage) {
+        if constexpr (std::is_same_v<ConfigValue, bool>) {
+            return true; // Boolean value is always valid
+        } else {
+            errorMessage = "Value is not a boolean";
+            return false;
+        }
+    };
+}
+
+// ConfigValidator destructor
+ConfigValidator::~ConfigValidator() = default;

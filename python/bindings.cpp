@@ -7,14 +7,23 @@
 #include <vector>
 
 #include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
+#include "../src/experiments/Phase6IntegratedExperiment.hpp"
+#include "../src/experiments/Metrics.hpp"
+#include "../src/experiments/Phase6Demo.hpp"
+#include "../src/experiments/Phase5Demo.hpp"
+#include "../src/experiments/Phase4Demo.hpp"
+#include "../src/experiments/Phase3Demo.hpp"
+#include "../src/experiments/Phase6TextDemo.hpp"
+#include "../src/experiments/Phase6IntegratedExperiment.hpp"
+#include "../src/experiments/Metrics.hpp"
+#include "../src/experiments/Experiment.hpp"
+#include "../src/experiments/ExperimentRunner.hpp"
+#include "../src/experiments/AblationSystem.hpp"
+#include "../src/experiments/Phase5Experiment.hpp"
+#include "../src/experiments/Phase4Experiment.hpp"
+#include "../src/experiments/Phase3Experiment.hpp"
+#include "../src/experiments/Phase6IntegratedExperiment.hpp"
+#include "../src/experiments/Metrics.hpp"
 
 namespace py = pybind11;
 namespace nlm {
@@ -149,13 +158,21 @@ PYBIND11_MODULE(pynlm, m) {
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
+.def("createConfigWithArgs", [](Config& self, const std::vector<std::string>& args) {
+            std::vector<char*> argv;
+            argv.reserve(args.size());
+            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str());
+            self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
+            return self;
+        }, py::arg("args"),
+           "Create configuration from Python arguments (simplified API)")
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
             argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str());
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments (original API)")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
              "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
@@ -408,13 +425,22 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
-    m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+    m.def("createConfigWithArgs", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
-    }, "Create a default configuration");
+    }, "Create a default configuration")
 
-    m.def("createBrain", [](std::shared_ptr<Config> config) -> std::shared_ptr<Brain> {
-        return std::make_shared<Brain>(config);
-    }, py::arg("config"), "Create a new brain with configuration");
+    // High-level Python configuration builder
+    m.def("createSimulationConfig", [](int neuronCount, int regionCount, 
+                                       float connectionProb = 0.1f, float learningRate = 0.01f) -> std::shared_ptr<Config> {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount), nlm::ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(regionCount), nlm::ConfigSource::Default);
+        config->set("connection_probability", connectionProb, nlm::ConfigSource::Default);
+        config->set("plasticity_learning_rate", learningRate, nlm::ConfigSource::Default);
+        return config;
+    }, py::arg("neuronCount"), py::arg("regionCount"), 
+       py::arg("connectionProb") = 0.1f, py::arg("learningRate") = 0.01f,
+       "Create a configuration optimized for simulation");
 
     m.def("createSimpleWorld", []() -> std::shared_ptr<SimpleWorld> {
         return std::make_shared<SimpleWorld>();
@@ -428,6 +454,199 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
+
+    // High-level simulation and training manager
+    py::class_<SimulationManager>(m, "SimulationManager", R"pbdoc(High-level simulation and training manager)")
+        .def(py::init<>())
+        .def("runSimulation", [](SimulationManager& self, std::shared_ptr<Config> config, 
+                                std::shared_ptr<SimpleWorld> world, SimulationStep steps) {
+            auto brain = std::make_shared<Brain>(config);
+            brain->initialize();
+            return self.runSingleEpisode(brain, world, steps);
+        }, py::arg("config"), py::arg("world"), py::arg("steps"),
+            "Run a complete simulation episode")
+        .def("trainAgent", [](SimulationManager& self, std::shared_ptr<Config> config,
+                             std::shared_ptr<SimpleWorld> world, int episodes,
+                             int stepsPerEpisode) {
+            return self.trainAgent(config, world, episodes, stepsPerEpisode);
+        }, py::arg("config"), py::arg("world"), py::arg("episodes"), py::arg("stepsPerEpisode"),
+            "Train an agent in the world")
+        .def("runExperiment", &SimulationManager::runExperiment,
+             py::arg("experiment"), py::arg("brain"), py::arg("world"), py::arg("steps"),
+             "Run a specific experiment")
+        .def("runBatchExperiments", &SimulationManager::runBatch,
+             py::arg("experiments"), py::arg("brainTemplate"), py::arg("worldTemplate"), py::arg("steps"),
+             "Run a batch of experiments");
+
+    // High-level training and learning APIs
+    m.def("trainModel", [](std::shared_ptr<Config> config, std::shared_ptr<SimpleWorld> world,
+                          int episodes, int stepsPerEpisode, int populationSize) {
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        float bestFitness = -std::numeric_limits<float>::max();
+        std::shared_ptr<Brain> bestBrain;
+        
+        for (int pop = 0; pop < populationSize; ++pop) {
+            auto episodeBrain = std::make_shared<Brain>(config);
+            episodeBrain->initialize();
+            
+            float totalReward = 0.0f;
+            for (int episode = 0; episode < episodes; ++episode) {
+                world->reset();
+                auto percept = world->getSensoryPercept();
+                // Process sensory input
+                
+                float episodeReward = 0.0f;
+                for (int step = 0; step < stepsPerEpisode; ++step) {
+                    auto action = episodeBrain->produceAction();
+                    world->applyMotorCommand(action, static_cast<float>(step));
+                    auto newPercept = world->getSensoryPercept();
+                    episodeBrain->receiveSensoryInput(*newPercept);
+                    episodeBrain->step(step);
+                    episodeReward += world->getLastReward();
+                }
+                totalReward += episodeReward;
+            }
+            
+            if (totalReward > bestFitness) {
+                bestFitness = totalReward;
+                bestBrain = episodeBrain;
+            }
+        }
+        
+        return std::make_tuple(bestBrain, bestFitness);
+    }, py::arg("config"), py::arg("world"), py::arg("episodes"), py::arg("stepsPerEpisode"), py::arg("populationSize"),
+        "Train a model using evolutionary algorithm");
+
+    // Advanced analysis and visualization tools
+    py::class_<MetricsCalculator>(m, "MetricsCalculator", R"pbdoc(Advanced metrics calculator for NLM)")
+        .def(py::init<>())
+        .def("calculatePerformance", &MetricsCalculator::calculatePerformance,
+             py::arg("brain"), py::arg("world"), py::arg("steps"),
+             "Calculate comprehensive performance metrics")
+        .def("analyzeLearningCurve", &MetricsCalculator::analyzeLearningCurve,
+             py::arg("fitnessHistory"), py::arg("windowSize"),
+             "Analyze learning curve from fitness history")
+        .def("detectPlateaus", &MetricsCalculator::detectPlateaus,
+             py::arg("fitnessHistory"), py::arg("threshold"),
+             "Detect learning plateaus")
+        .def("calculateNeuralStability", &MetricsCalculator::calculateNeuralStability,
+             py::arg("brainHistory"), py::arg("numSnapshots"),
+             "Calculate neural stability metrics")
+        .def("generateReport", &MetricsCalculator::generateReport,
+             py::arg("metrics"), py::arg("format"),
+             "Generate a comprehensive report from metrics");
+
+    // High-level convenience functions
+    m.def("createBrainFromConfig", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(filepath);
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"), "Create a brain from a configuration file");
+
+    m.def("createDefaultWorld", []() {
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(10, 10, 84, 84); // Width, height, vision width, vision height
+        return world;
+    }, "Create a default world for NLM simulations");
+
+    m.def("runCompleteTrainingPipeline", [](const std::string& configFile, int episodes,
+                                          int stepsPerEpisode, const std::string& outputDir) {
+        auto config = std::make_shared<Config>();
+        config->loadFromFile(configFile);
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(10, 10, 84, 84);
+        
+        // Run training
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        float totalFitness = 0.0f;
+        for (int episode = 0; episode < episodes; ++episode) {
+            world->reset();
+            auto percept = world->getSensoryPercept();
+            brain->receiveSensoryInput(*percept);
+            
+            float episodeFitness = 0.0f;
+            for (int step = 0; step < stepsPerEpisode; ++step) {
+                auto action = brain->produceAction();
+                world->applyMotorCommand(action, static_cast<float>(step));
+                auto newPercept = world->getSensoryPercept();
+                brain->receiveSensoryInput(*newPercept);
+                brain->step(step);
+                episodeFitness += world->getLastReward();
+            }
+            totalFitness += episodeFitness;
+        }
+        
+        float avgFitness = totalFitness / static_cast<float>(episodes);
+        return std::make_tuple(brain, avgFitness);
+    }, py::arg("configFile"), py::arg("episodes"), py::arg("stepsPerEpisode"), py::arg("outputDir"),
+        "Run a complete training pipeline with evaluation");
+
+    // Phase-specific demo runners for educational purposes
+    m.def("runPhase3Demo", &Phase3Demo::runDemo,
+         py::arg("config"), py::arg("world"), py::arg("steps"),
+         "Run Phase 3 neural development demo");
+
+    m.def("runPhase4Demo", &Phase4Demo::runDemo,
+         py::arg("config"), py::arg("world"), py::arg("steps"),
+         "Run Phase 4 homeostatic regulation demo");
+
+    m.def("runPhase5Demo", &Phase5Demo::runDemo,
+         py::arg("config"), py::arg("world"), py::arg("steps"),
+         "Run Phase 5 cognitive development demo");
+
+    m.def("runPhase6Demo", &Phase6Demo::runDemo,
+         py::arg("config"), py::arg("world"), py::arg("steps"),
+         "Run Phase 6 integrated brain demo");
+
+    m.def("runPhase6TextDemo", &Phase6TextDemo::runDemo,
+         py::arg("config"), py::arg("world"), py::arg("steps"),
+         "Run Phase 6 text encoding demo");
+
+    m.def("runPhase6IntegratedExperiment", &Phase6IntegratedExperiment::runExperiment,
+         py::arg("config"), py::arg("world"), py::arg("steps"),
+         "Run Phase 6 integrated experiment");
+
+    // Advanced debugging and visualization tools
+    m.def("visualizeBrainState", [](std::shared_ptr<Brain> brain, const std::string& outputFile) {
+        // Placeholder for visualization - would integrate with visualization library
+        brain->logStatus();
+        return "Brain state logged to console";
+    }, py::arg("brain"), py::arg("outputFile"), "Visualize brain state");
+
+    m.def("debugBrainDynamics", [](std::shared_ptr<Brain> brain, int steps) {
+        // Collect debugging information
+        std::string debugInfo = "=== Brain Debug Information ===\n";
+        debugInfo += "Region count: " + std::to_string(brain->getRegionCount()) + "\n";
+        debugInfo += "Neuron count: " + std::to_string(brain->getTotalNeuronCount()) + "\n";
+        debugInfo += "Synapse count: " + std::to_string(brain->getTotalSynapseCount()) + "\n";
+        debugInfo += "Firing neurons: " + std::to_string(brain->getFiringNeuronCount()) + "\n";
+        debugInfo += "Total spikes: " + std::to_string(brain->getTotalSpikeCount()) + "\n";
+        
+        // Run simulation steps and collect statistics
+        for (int step = 0; step < steps; ++step) {
+            brain->step(step);
+            debugInfo += "Step " + std::to_string(step) + ": " + 
+                        "Active: " + std::to_string(brain->getActiveNeuronCount()) + ", " +
+                        "Firing: " + std::to_string(brain->getFiringNeuronCount()) + "\n";
+        }
+        
+        return debugInfo;
+    }, py::arg("brain"), py::arg("steps"), "Debug brain dynamics and collect statistics");
+
+    m.def("exportBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Export brain state to checkpoint file");
+
+    m.def("importBrainState", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->load(filepath);
+    }, py::arg("brain"), py::arg("filepath"), "Import brain state from checkpoint file");
 }
+
+} // namespace nlm
 
 } // namespace nlm

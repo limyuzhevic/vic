@@ -1,376 +1,475 @@
 #pragma once
 
-/**
- * MemoryPool - Lock-free memory pool for neurons and synapses
- * 
- * Provides pre-allocated object pools to reduce allocation overhead during simulation.
- * Each pool manages objects of a single type with fixed size.
- * 
- * Features:
- * - Lock-free allocation and deallocation
- * - Pre-allocated memory blocks
- * - Memory-efficient slab allocation
- * - Thread-safe operations
- * 
- * Biological motivation:
- * - Like biological neural systems that maintain fixed numbers of neurons/synapses
- * - Reduces "allocation" overhead similar to how biological systems don't constantly create/destroy neurons
- */
-
-#include <cstddef>
 #include <cstdint>
-#include <vector>
+#include <cstddef>
 #include <memory>
+#include <vector>
 #include <atomic>
-#include <array>
-#include <optional>
+#include <algorithm>
+#include <unordered_map>
+#include <string>
 
 namespace nlm {
 
 /**
- * Lock-free stack node for memory pool free list
+ * Memory pool for efficient allocation of small objects
+ * 
+ * Memory pools are particularly useful in neural simulations where many
+ * small objects (like spikes, synapses, neurons) are frequently allocated
+ * and deallocated. By reusing pre-allocated memory blocks, pools can
+ * significantly reduce memory fragmentation and improve cache locality.
  */
-struct MemPoolNode {
-    std::atomic<MemPoolNode*> next;
-    
-    MemPoolNode() : next(nullptr) {}
+class MemoryPool {
+public:
+    // Pool statistics
+    struct Statistics {
+        uint64_t allocations = 0;
+        uint64_t deallocations = 0;
+        uint64_t currentSize = 0;
+        uint64_t peakSize = 0;
+        uint64_t bytesAllocated = 0;
+        double fragmentation = 0.0;
+    };
+
+    MemoryPool();
+    ~MemoryPool();
+
+    // Disable copying and moving
+    MemoryPool(const MemoryPool&) = delete;
+    MemoryPool& operator=(const MemoryPool&) = delete;
+    MemoryPool(MemoryPool&&) = delete;
+    MemoryPool& operator=(MemoryPool&&) = delete;
+
+    /**
+     * Allocate memory for an object
+     * 
+     * @param size Number of bytes to allocate
+     * @param alignment Alignment requirement (default: 8 bytes)
+     * @return Pointer to allocated memory
+     */
+    void* allocate(size_t size, size_t alignment = 8);
+
+    /**
+     * Deallocate memory
+     * 
+     * @param ptr Pointer to memory to deallocate
+     * @param size Size of the memory block
+     */
+    void deallocate(void* ptr, size_t size);
+
+    /**
+     * Allocate and construct an object
+     * 
+     * @tparam T Type of object to allocate
+     * @tparam Args Constructor arguments
+     * @param args Arguments to pass to constructor
+     * @return Pointer to constructed object
+     */
+    template<typename T, typename... Args>
+    T* makeObject(Args&&... args) {
+        void* memory = allocate(sizeof(T), alignof(T));
+        if (!memory) return nullptr;
+        try {
+            T* obj = new (memory) T(std::forward<Args>(args)...);
+            return obj;
+        } catch (...) {
+            deallocate(memory, sizeof(T));
+            throw;
+        }
+    }
+
+    /**
+     * Destroy and deallocate an object
+     * 
+     * @tparam T Type of object
+     * @param ptr Pointer to object to destroy
+     */
+    template<typename T>
+    void destroyObject(T* ptr) {
+        if (!ptr) return;
+        ptr->~T();
+        deallocate(ptr, sizeof(T));
+    }
+
+    /**
+     * Allocate memory for a vector
+     * 
+     * @tparam T Element type
+     * @param count Number of elements
+     * @return Pointer to allocated vector memory
+     */
+    template<typename T>
+    T* allocateVector(size_t count) {
+        return static_cast<T*>(allocate(count * sizeof(T), alignof(T)));
+    }
+
+    /**
+     * Deallocate vector memory
+     * 
+     * @tparam T Element type
+     * @param ptr Pointer to vector memory
+     * @param count Number of elements
+     */
+    template<typename T>
+    void deallocateVector(T* ptr, size_t count) {
+        deallocate(ptr, count * sizeof(T));
+    }
+
+    /**
+     * Get memory usage statistics
+     * 
+     * @return Pool statistics
+     */
+    Statistics getStatistics() const;
+
+    /**
+     * Reset pool to free all allocated memory
+     */
+    void reset();
+
+    /**
+     * Set growth factor
+     * 
+     * @param factor Growth factor (default: 2.0)
+     */
+    void setGrowthFactor(double factor);
+
+private:
+    struct Block {
+        void* ptr;
+        size_t size;
+        Block* next;
+    };
+
+    // Memory blocks for different sizes
+    std::vector<Block*> blocks;
+    std::unordered_map<size_t, std::vector<void*>> freeBlocks;
+    std::atomic<size_t> currentSize;
+    double growthFactor;
+    size_t alignment;
+
+    void* allocateBlock(size_t size);
+    void deallocateBlock(void* ptr);
+    Block* createBlock(size_t size);
+    void destroyBlock(Block* block);
 };
 
 /**
- * MemoryPool - Slab allocator for fixed-size objects
+ * Typed memory pool for specific types
  * 
- * Template parameter T specifies the object type to allocate.
- * All objects have the same fixed size determined at construction.
+ * This is more efficient than the generic MemoryPool when allocating
+ * many objects of the same type.
  */
 template<typename T>
-class MemoryPool {
+class TypedMemoryPool {
 public:
+    TypedMemoryPool() = default;
+    ~TypedMemoryPool() { clear(); }
+
+    // Disable copying and moving
+    TypedMemoryPool(const TypedMemoryPool&) = delete;
+    TypedMemoryPool& operator=(const TypedMemoryPool&) = delete;
+
     /**
-     * Create a memory pool
-     * @param blockSize Number of objects per memory block
-     * @param initialBlocks Number of blocks to pre-allocate
+     * Allocate an object
+     * 
+     * @tparam Args Constructor arguments
+     * @param args Arguments to pass to constructor
+     * @return Pointer to allocated object
      */
-    explicit MemoryPool(size_t blockSize = 1024, size_t initialBlocks = 4);
-    
-    ~MemoryPool();
-    
-    // Disable copying
-    MemoryPool(const MemoryPool&) = delete;
-    MemoryPool& operator=(const MemoryPool&) = delete;
-    
+    template<typename... Args>
+    T* allocate(Args&&... args) {
+        if (!freeList.empty()) {
+            T* obj = freeList.back();
+            freeList.pop_back();
+            new (obj) T(std::forward<Args>(args)...);
+            ++statistics.allocations;
+            statistics.currentSize++;
+            if (statistics.currentSize > statistics.peakSize) {
+                statistics.peakSize = statistics.currentSize;
+            }
+            return obj;
+        }
+
+        // Allocate new block
+        void* memory = allocator.allocate(sizeof(T), alignof(T));
+        T* obj = new (memory) T(std::forward<Args>(args)...);
+        ++statistics.allocations;
+        statistics.currentSize++;
+        if (statistics.currentSize > statistics.peakSize) {
+            statistics.peakSize = statistics.currentSize;
+        }
+        return obj;
+    }
+
     /**
-     * Allocate an object from the pool
-     * Lock-free operation
+     * Deallocate an object
+     * 
+     * @param ptr Pointer to object to deallocate
      */
-    T* allocate();
-    
+    void deallocate(T* ptr) {
+        if (!ptr) return;
+        ptr->~T();
+        freeList.push_back(ptr);
+        ++statistics.deallocations;
+        statistics.currentSize--;
+    }
+
     /**
-     * Return an object to the pool
-     * Lock-free operation
+     * Get statistics
+     * 
+     * @return Pool statistics
      */
-    void deallocate(T* obj);
-    
+    auto getStatistics() const { return statistics; }
+
+    /**
+     * Clear all allocated objects
+     * 
+     * Note: This does not return memory to the system, just marks
+     * all objects as free for reuse.
+     */
+    void clear() {
+        // Destroy all objects in free list
+        for (T* obj : freeList) {
+            obj->~T();
+            allocator.deallocate(obj, sizeof(T));
+        }
+        freeList.clear();
+        statistics.currentSize = 0;
+    }
+
     /**
      * Check if pool is empty
+     * 
+     * @return true if pool is empty
      */
-    bool empty() const { return freeList_.load(std::memory_order_relaxed) == nullptr; }
-    
+    bool empty() const { return freeList.empty(); }
+
     /**
-     * Get number of allocated objects
+     * Get number of free objects
+     * 
+     * @return Number of free objects
      */
-    size_t allocatedCount() const { return allocatedCount_.load(std::memory_order_relaxed); }
-    
-    /**
-     * Get number of available objects
-     */
-    size_t availableCount() const { return availableCount_.load(std::memory_order_relaxed); }
-    
-    /**
-     * Total memory used by pool (bytes)
-     */
-    size_t memoryUsage() const;
-    
-    /**
-     * Pre-allocate objects
-     */
-    void reserve(size_t count);
-    
+    size_t size() const { return freeList.size(); }
+
 private:
-    // Memory block containing objects
-    struct Block {
-        std::vector<uint8_t> data;
-        Block* nextBlock;
-        
-        explicit Block(size_t objectSize, size_t count);
-        
-        T* getObject(size_t index, size_t objectSize) {
-            return reinterpret_cast<T*>(data.data() + index * objectSize);
-        }
-    };
-    
-    // Add a new block to the pool
-    void addBlock();
-    
-    // Slab size for each object (rounded up to alignment)
-    size_t slabSize_;
-    
-    // Number of objects per block
-    size_t blockSize_;
-    
-    // Head of free list (lock-free)
-    std::atomic<MemPoolNode*> freeList_;
-    
-    // List of memory blocks
-    std::vector<std::unique_ptr<Block>> blocks_;
-    
-    // Block we're currently allocating from
-    std::atomic<Block*> currentBlock_;
-    
-    // Index of next available object in current block
-    std::atomic<size_t> currentIndex_;
-    
-    // Statistics
-    std::atomic<size_t> allocatedCount_;
-    std::atomic<size_t> availableCount_;
+    std::vector<T*> freeList;
+    MemoryPool allocator;
+    Statistics statistics;
 };
 
-// Template implementation must be in header for generic types
-
-template<typename T>
-MemoryPool<T>::Block::Block(size_t objectSize, size_t count)
-    : data(objectSize * count)
-    , nextBlock(nullptr)
-{
-    // Data is left uninitialized for performance
-}
-
-template<typename T>
-MemoryPool<T>::MemoryPool(size_t blockSize, size_t initialBlocks)
-    : slabSize_(sizeof(T))
-    , blockSize_(blockSize)
-    , freeList_(nullptr)
-    , currentBlock_(nullptr)
-    , currentIndex_(0)
-    , allocatedCount_(0)
-    , availableCount_(0)
-{
-    // Align slab size to cache line (64 bytes) for false sharing prevention
-    constexpr size_t cacheLineSize = 64;
-    if (slabSize_ % cacheLineSize != 0) {
-        slabSize_ = ((slabSize_ / cacheLineSize) + 1) * cacheLineSize;
-    }
-    
-    // Pre-allocate initial blocks
-    for (size_t i = 0; i < initialBlocks; ++i) {
-        addBlock();
-    }
-}
-
-template<typename T>
-MemoryPool<T>::~MemoryPool() {
-    // Blocks are automatically freed via unique_ptr
-}
-
-template<typename T>
-void MemoryPool<T>::addBlock() {
-    auto block = std::make_unique<Block>(slabSize_, blockSize_);
-    
-    // Chain existing blocks
-    Block* expected = nullptr;
-    if (!currentBlock_.compare_exchange_strong(expected, block.get())) {
-        // Another thread already added a block, add to chain
-        block->nextBlock = expected;
-    } else {
-        block.release();
-    }
-    
-    // Initialize free list for this block
-    Block* b = block.get();
-    for (size_t i = 0; i < blockSize_; ++i) {
-        T* obj = b->getObject(i, slabSize_);
-        MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
-        node->next.store(freeList_.load(std::memory_order_relaxed), std::memory_order_relaxed);
-        freeList_.store(node, std::memory_order_relaxed);
-        availableCount_.fetch_add(1, std::memory_order_relaxed);
-    }
-    
-    blocks_.push_back(std::move(block));
-}
-
-template<typename T>
-T* MemoryPool<T>::allocate() {
-    // Try to get from free list first (lock-free pop)
-    MemPoolNode* node = freeList_.load(std::memory_order_acquire);
-    
-    while (node != nullptr) {
-        MemPoolNode* next = node->next.load(std::memory_order_relaxed);
-        if (freeList_.compare_exchange_weak(node, next, 
-                                             std::memory_order_release, 
-                                             std::memory_order_relaxed)) {
-            allocatedCount_.fetch_add(1, std::memory_order_relaxed);
-            availableCount_.fetch_sub(1, std::memory_order_relaxed);
-            return reinterpret_cast<T*>(node);
-        }
-        // node was updated by CAS, reload next
-    }
-    
-    // Free list empty, add a new block
-    addBlock();
-    
-    // Try again
-    return allocate();
-}
-
-template<typename T>
-void MemoryPool<T>::deallocate(T* obj) {
-    if (obj == nullptr) return;
-    
-    MemPoolNode* node = reinterpret_cast<MemPoolNode*>(obj);
-    
-    // Lock-free push to free list
-    MemPoolNode* current = freeList_.load(std::memory_order_relaxed);
-    do {
-        node->next.store(current, std::memory_order_relaxed);
-    } while (!freeList_.compare_exchange_weak(current, node,
-                                             std::memory_order_release,
-                                             std::memory_order_relaxed));
-    
-    allocatedCount_.fetch_sub(1, std::memory_order_relaxed);
-    availableCount_.fetch_add(1, std::memory_order_relaxed);
-}
-
-template<typename T>
-size_t MemoryPool<T>::memoryUsage() const {
-    size_t total = 0;
-    for (const auto& block : blocks_) {
-        total += block->data.capacity() * sizeof(uint8_t);
-    }
-    return total;
-}
-
-template<typename T>
-void MemoryPool<T>::reserve(size_t count) {
-    while (availableCount_.load(std::memory_order_relaxed) < count) {
-        addBlock();
-    }
-}
-
-// NeuronPool - Specialized pool for neurons with cache-aligned states
-class NeuronPool {
+/**
+ * Memory allocator for performance-critical systems
+ * 
+ * This allocator uses memory pools to reduce memory allocation overhead
+ * and improve cache locality. It's particularly useful for real-time
+ * neural simulations where predictable memory access patterns are important.
+ */
+class PerformanceMemoryAllocator {
 public:
-    NeuronPool();
-    ~NeuronPool();
-    
-    // Allocate a neuron with its state
-    NeuronId allocate();
-    
-    // Deallocate a neuron
-    void deallocate(NeuronId id);
-    
-    // Access neuron state directly (for SoA access)
-    template<typename Member>
-    Member* getState(NeuronIndex index);
-    
-    // Get total count
-    size_t size() const { return size_; }
-    
-    // Memory usage
-    size_t memoryUsage() const;
-    
+    PerformanceMemoryAllocator() = default;
+    ~PerformanceMemoryAllocator() = default;
+
+    /**
+     * Allocate memory
+     * 
+     * @param size Number of bytes to allocate
+     * @return Pointer to allocated memory
+     */
+    void* allocate(size_t size) {
+        return memoryPool.allocate(size);
+    }
+
+    /**
+     * Deallocate memory
+     * 
+     * @param ptr Pointer to memory to deallocate
+     * @param size Size of memory block
+     */
+    void deallocate(void* ptr, size_t size) {
+        memoryPool.deallocate(ptr, size);
+    }
+
+    /**
+     * Get memory pool statistics
+     * 
+     * @return Pool statistics
+     */
+    auto getStatistics() const { return memoryPool.getStatistics(); }
+
+    /**
+     * Reset memory pool
+     */
+    void reset() {
+        memoryPool.reset();
+    }
+
 private:
-    static constexpr size_t CACHE_LINE = 64;
-    
-    struct alignas(CACHE_LINE) alignas(sizeof(void*)) NeuronBlock {
-        // SoA storage for neuron states
-        std::vector<float> membranePotential;
-        std::vector<float> restingPotential;
-        std::vector<float> threshold;
-        std::vector<float> resetPotential;
-        std::vector<float> leakConductance;
-        std::vector<float> synapseConductance;
-        std::vector<float> firingRate;
-        std::vector<uint8_t> firingState;  // FiringState enum
-        std::vector<uint32_t> refractoryRemaining;
-        std::vector<uint32_t> refractoryPeriod;
-        std::vector<float> adaptationVariable;
-        std::vector<float> lastSpikeTime;
-        std::vector<uint64_t> neuronType;  // NeuronType enum
-        std::vector<uint64_t> regionId;
-        std::vector<uint64_t> populationId;
-        
-        // Per-neuron current injection (not in NeuronState, but needed for hot path)
-        std::vector<float> synapticInput;
-        
-        NeuronBlock() {}
-    };
-    
-    size_t size_;
-    size_t capacity_;
-    std::vector<std::unique_ptr<NeuronBlock>> blocks_;
-    
-    // Free list for deallocated neurons
-    std::vector<NeuronIndex> freeList_;
-    std::atomic<size_t> freeListTop_;
+    MemoryPool memoryPool;
 };
 
-// SynapsePool - Specialized pool for synapses
-class SynapsePool {
+/**
+ * SIMD-optimized math functions for neural computation
+ * 
+ * These functions use SIMD instructions to accelerate neural computation
+ * operations like matrix multiplication, vector operations, and neural
+ * network forward passes.
+ */
+namespace simd {
+
+/**
+ * SIMD-optimized vector addition
+ * 
+ * @param a First vector
+ * @param b Second vector
+ * @param result Output vector
+ * @param size Number of elements
+ */
+void add(const float* a, const float* b, float* result, size_t size);
+
+/**
+ * SIMD-optimized vector multiplication
+ * 
+ * @param a First vector
+ * @param b Second vector
+ * @param result Output vector
+ * @param size Number of elements
+ */
+void multiply(const float* a, const float* b, float* result, size_t size);
+
+/**
+ * SIMD-optimized vector sigmoid function
+ * 
+ * @param input Input vector
+ * @param output Output vector
+ * @param size Number of elements
+ */
+void sigmoid(const float* input, float* output, size_t size);
+
+/**
+ * SIMD-optimized vector ReLU function
+ * 
+ * @param input Input vector
+ * @param output Output vector
+ * @param size Number of elements
+ */
+void relu(const float* input, float* output, size_t size);
+
+/**
+ * SIMD-optimized vector softmax function
+ * 
+ * @param input Input vector
+ * @param output Output vector
+ * @param size Number of elements
+ */
+void softmax(const float* input, float* output, size_t size);
+
+/**
+ * SIMD-optimized matrix multiplication
+ * 
+ * @param a First matrix (m x n)
+ * @param b Second matrix (n x p)
+ * @param result Output matrix (m x p)
+ * @param m Number of rows in matrix A
+ * @param n Number of columns in matrix A / rows in matrix B
+ * @param p Number of columns in matrix B
+ */
+void matrixMultiply(const float* a, const float* b, float* result,
+                   size_t m, size_t n, size_t p);
+
+/**
+ * SIMD-optimized element-wise vector operation
+ * 
+ * @param a First vector
+ * @param b Second vector
+ * @param result Output vector
+ * @param size Number of elements
+ * @param op Operation to perform (0: add, 1: multiply, 2: max, 3: min)
+ */
+void elementWise(const float* a, const float* b, float* result,
+                size_t size, int op);
+
+} // namespace simd
+
+/**
+ * Performance monitor for tracking system performance
+ * 
+ * This class tracks key performance metrics like memory usage,
+ * CPU utilization, and computational throughput to help optimize
+ * neural simulation performance.
+ */
+class PerformanceMonitor {
 public:
-    SynapsePool();
-    ~SynapsePool();
-    
-    // Allocate a synapse
-    SynapseId allocate(NeuronId source, NeuronId destination);
-    
-    // Deallocate a synapse
-    void deallocate(SynapseId id);
-    
-    // Get synapse data (for SoA access)
-    template<typename Member>
-    Member* getState(SynapseIndex index);
-    
-    // Get source/destination neurons
-    NeuronId getSource(SynapseIndex index) const;
-    NeuronId getDestination(SynapseIndex index) const;
-    
-    // Total count
-    size_t size() const { return size_; }
-    
-    // Memory usage
-    size_t memoryUsage() const;
-    
-private:
-    static constexpr size_t CACHE_LINE = 64;
-    
-    struct alignas(CACHE_LINE) SynapseBlock {
-        // SoA storage for synapse states
-        std::vector<uint64_t> sourceNeuron;  // Source neuron ID
-        std::vector<uint64_t> destinationNeuron;  // Dest neuron ID
-        std::vector<float> weight;
-        std::vector<uint32_t> delay;
-        std::vector<uint8_t> synapseType;  // SynapseType enum
-        std::vector<uint8_t> plasticityFlags;  // Packed flags
-        
-        // Short-term plasticity
-        std::vector<float> shortTermDepression;
-        std::vector<float> shortTermFacilitation;
-        std::vector<float> lastPreSpikeTime;
-        std::vector<float> lastPostSpikeTime;
-        
-        // Eligibility trace
-        std::vector<float> eligibilityTrace;
-        
-        // Synaptic efficacy
-        std::vector<float> efficacy;
-        
-        SynapseBlock() {}
+    PerformanceMonitor() = default;
+    ~PerformanceMonitor() = default;
+
+    /**
+     * Start performance monitoring
+     * 
+     * @param name Name of the performance measurement
+     */
+    void start(const std::string& name);
+
+    /**
+     * Stop performance monitoring
+     * 
+     * @param name Name of the performance measurement
+     * @return Elapsed time in milliseconds
+     */
+    double stop(const std::string& name);
+
+    /**
+     * Record a memory allocation
+     * 
+     * @param size Number of bytes allocated
+     */
+    void recordAllocation(size_t size);
+
+    /**
+     * Record a memory deallocation
+     * 
+     * @param size Number of bytes deallocated
+     */
+    void recordDeallocation(size_t size);
+
+    /**
+     * Get performance statistics
+     * 
+     * @return Performance statistics
+     */
+    struct Statistics {
+        std::unordered_map<std::string, std::vector<double>> timings;
+        uint64_t totalAllocations = 0;
+        uint64_t totalDeallocations = 0;
+        uint64_t currentMemoryUsage = 0;
+        uint64_t peakMemoryUsage = 0;
+        uint64_t totalOperations = 0;
     };
-    
-    size_t size_;
-    size_t capacity_;
-    std::vector<std::unique_ptr<SynapseBlock>> blocks_;
-    std::vector<SynapseIndex> freeList_;
-    std::atomic<size_t> freeListTop_;
+
+    Statistics getStatistics() const;
+
+    /**
+     * Generate performance report
+     * 
+     * @return Performance report as string
+     */
+    std::string generateReport() const;
+
+    /**
+     * Clear performance statistics
+     */
+    void clear();
+
+private:
+    struct Measurement {
+        std::string name;
+        double startTime;
+        double endTime;
+        bool active;
+    };
+
+    std::vector<Measurement> measurements;
+    Statistics stats;
 };
 
 } // namespace nlm

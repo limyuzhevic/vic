@@ -92,16 +92,160 @@ template<typename T>
     // Clear all
     void clear();
     
-    // Get configuration summary
-    std::string summary() const;
+    #include <functional>
+#include <unordered_map>
+#include <string>
+
+namespace nlm {
+
+/**
+ * Configuration validation system
+ * 
+ * Provides validation for configuration values with custom validators for
+ * different types of configuration parameters.
+ */
+class ConfigValidator {
+public:
+    using Validator = std::function<bool(const ConfigValue&, std::string& errorMessage)>;
+    
+    ConfigValidator() = default;
+    
+    /**
+     * Register a validator for a configuration key
+     * @param key Configuration key to validate
+     * @param validator Function that returns true if valid, false with error message if invalid
+     * @param description Description of the validation rule
+     */
+    void registerValidator(const std::string& key, 
+                          Validator validator,
+                          const std::string& description = "");
+    
+    /**
+     * Validate a configuration value for a key
+     * @param key Configuration key
+     * @param value Configuration value to validate
+     * @return true if valid, false with error message if invalid
+     */
+    bool validate(const std::string& key, const ConfigValue& value, 
+                  std::string& errorMessage) const;
+    
+    /**
+     * Validate an entire configuration
+     * @param config Configuration to validate
+     * @return true if valid, false with error message if invalid
+     */
+    bool validate(const Config& config, std::string& errorMessage) const;
+    
+    /**
+     * Validate a configuration file
+     * @param filepath Path to configuration file (JSON)
+     * @return true if valid, false with error message if invalid
+     */
+    bool validateFile(const std::string& filepath, std::string& errorMessage) const;
+    
+    /**
+     * Get all registered validators
+     * @return Vector of pairs (key, description)
+     */
+    std::vector<std::pair<std::string, std::string>> getRegisteredValidators() const;
+    
+    /**
+     * Remove validator for a key
+     * @param key Configuration key
+     */
+    void removeValidator(const std::string& key);
+    
+    /**
+     * Clear all validators
+     */
+    void clearValidators();
+    
+    /**
+     * Get default validators for NLM configuration
+     */
+    void setupDefaultValidators();
+    
+    /**
+     * Add validator for numeric range
+     * @param min Minimum allowed value
+     * @param max Maximum allowed value
+     * @param inclusive Whether to include min/max in valid range
+     */
+    static Validator makeRangeValidator(double min, double max, bool inclusive = true);
+    
+    /**
+     * Add validator for positive values
+     */
+    static Validator makePositiveValidator();
+    
+    /**
+     * Add validator for string length range
+     */
+    static Validator makeStringLengthValidator(size_t minLength, size_t maxLength);
+    
+    /**
+     * Add validator for enum values
+     */
+    static Validator makeEnumValidator(const std::vector<std::string>& validValues);
+    
+    /**
+     * Add validator for connectivity probability (0.0 to 1.0)
+     */
+    static Validator makeConnectivityValidator();
+    
+    /**
+     * Add validator for timestep (non-negative, reasonable value)
+     */
+    static Validator makeTimestepValidator();
+    
+    /**
+     * Add validator for neuron count (reasonable range)
+     */
+    static Validator makeNeuronCountValidator();
+    
+    /**
+     * Add validator for region count (reasonable range)
+     */
+    static Validator makeRegionCountValidator();
+    
+    /**
+     * Add validator for plasticity parameters (0.0 to 1.0)
+     */
+    static Validator makePlasticityValidator();
+    
+    /**
+     * Add validator for neuromodulation levels (0.0 to 1.0)
+     */
+    static Validator makeNeuromodulationValidator();
+    
+    /**
+     * Add validator for random seed (reasonable range)
+     */
+    static Validator makeRandomSeedValidator();
+    
+    /**
+     * Add validator for simulation steps (reasonable range)
+     */
+    static Validator makeSimulationStepsValidator();
+    
+    /**
+     * Add validator for checkpoint directory
+     */
+    static Validator makeCheckpointDirValidator();
+    
+    /**
+     * Add validator for logging level
+     */
+    static Validator makeLogLevelValidator();
+    
+    /**
+     * Add validator for visualization settings
+     */
+    static Validator makeVisualizationValidator();
     
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-    
-    // Internal helpers
-    static std::string trim(const std::string& str);
-    static std::string toLower(const std::string& str);
 };
 
 } // namespace nlm
