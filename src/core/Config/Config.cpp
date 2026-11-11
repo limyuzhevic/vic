@@ -3,6 +3,107 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
+
+namespace nlm {
+
+struct Config::Impl {
+    std::vector<ConfigEntry> entries;
+};
+
+Config::Config() : pImpl(std::make_unique<Impl>()) {}
+
+Config::~Config() = default;
+
+Config::Config(Config&&) noexcept = default;
+
+Config& Config::operator=(Config&&) noexcept = default;
+
+// Add comprehensive error handling function
+void Config::printHelp() {
+    NLM_LOG_INFO("NLM Configuration Help:");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration File Format:");
+    NLM_LOG_INFO("  key = value           # Simple key-value pairs");
+    NLM_LOG_INFO("  key = \"value\"         # String values with quotes");
+    NLM_LOG_INFO("  key = [1, 2, 3]       # Vector values with brackets");
+    NLM_LOG_INFO("  # Comments start with # or //");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Command Line Options:");
+    NLM_LOG_INFO("  --key=value          # Set configuration key");
+    NLM_LOG_INFO("  -key value           # Alternative format");
+    NLM_LOG_INFO("  --config=file.cfg    # Load configuration file");
+    NLM_LOG_INFO("  --help, -h           # Show this help message");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Common Configuration Keys:");
+    NLM_LOG_INFO("  brain.neuron_count           Number of neurons (int)");
+    NLM_LOG_INFO("  brain.synapse_density       Synapse connectivity density (float)");
+    NLM_LOG_INFO("  brain.connection_probability Connection probability (float)");
+    NLM_LOG_INFO("  brain.v_thresh              Neuron threshold (mV)");
+    NLM_LOG_INFO("  brain.v_rest                Resting potential (mV)");
+    NLM_LOG_INFO("  brain.tau_mem               Membrane time constant (ms)");
+    NLM_LOG_INFO("  brain.tau_ref               Refractory period (ms)");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Plasticity Configuration:");
+    NLM_LOG_INFO("  plasticity.stdp.enable      Enable STDP (bool)");
+    NLM_LOG_INFO("  plasticity.stdp.learning_rate STDP learning rate (float)");
+    NLM_LOG_INFO("  plasticity.hebbian.enable   Enable Hebbian learning (bool)");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Neuromodulation Configuration:");
+    NLM_LOG_INFO("  neuromod.dopamine.scale      Dopamine modulation scale (float)");
+    NLM_LOG_INFO("  neuromod.curiosity.enable    Enable curiosity-driven exploration (bool)");
+    NLM_LOG_INFO("");
+}
+
+bool Config::loadFromFile(const std::string& filepath) {
+    // TODO PHASE 2: Implement proper JSON/YAML parser
+    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
+        return false;
+    }
+    
+    std::string line;
+    int lineNum = 0;
+    while (std::getline(file, line)) {
+        lineNum++;
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '/') {
+            continue;
+        }
+        
+        // Parse simple key=value pairs
+        size_t pos = line.find('=');
+        if (pos != std::string::npos) {
+            std::string key = trim(line.substr(0, pos));
+            std::string value = trim(line.substr(pos + 1));
+            
+            // Remove quotes if present
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+            NLM_LOG_DEBUG("Parsed config: " + key + " = " + value);
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": " + line);
+        }
+    }
+    
+    return true;
+}
+
+#include "Config.hpp"
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -24,11 +125,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open configuration file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNum = 0;
     while (std::getline(file, line)) {
+        lineNum++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -49,6 +153,9 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            NLM_LOG_DEBUG("Parsed config: " + key + " = " + value);
+        } else {
+            NLM_LOG_WARNING("Invalid config line " + std::to_string(lineNum) + ": " + line);
         }
     }
     
@@ -74,6 +181,11 @@ bool Config::loadFromArgs(int argc, char** argv) {
             std::string value = argv[++i];
             set(key, value, ConfigSource::CommandLine);
         }
+        // Handle --help
+        else if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return true;  // Special handling for help
+        }
     }
     return true;
 }
@@ -86,7 +198,28 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        // Convert ConfigValue to string representation
+        std::visit([&file](const auto& val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << val << "\"\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < val.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << val[i] << "\"";
+                    } else {
+                        file << val[i];
+                    }
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << val << "\n";
+            }
+        }, entry.value);
     }
     
     return true;
