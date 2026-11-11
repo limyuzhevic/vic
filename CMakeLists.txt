@@ -11,11 +11,18 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Enable warnings
+# Enable warnings and modern C++ features
 if(MSVC)
-    add_compile_options(/W4)
+    add_compile_options(/W4 /permissive-)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast)
+endif()
+
+# Enable profiling and optimization flags for performance monitoring
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-g -O0 -DDEBUG)
+else()
+    add_compile_options(-O3 -DNDEBUG)
 endif()
 
 # Source directory
@@ -201,12 +208,18 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
+# Test Framework
+add_executable(test_runner
+    src/TestFramework.cpp
+)
+target_link_libraries(test_runner PUBLIC nlm_core nlm_agent nlm_world)
+
 # Testing
 enable_testing()
 add_subdirectory(tests)
 
 # Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark test_runner
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
