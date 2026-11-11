@@ -229,7 +229,7 @@ std::vector<uint8_t> CheckpointReader::readSection(CheckpointSection sectionType
 
 bool CheckpointReader::readNeurons(NeuronCheckpointData& data) {
     auto payload = readSection(CheckpointSection::Neurons);
-    if (payload.empty() && header_.neuronCount > 0) return false;
+    if (!payload.empty() && header_.neuronCount == 0) return false;
     if (!parseNeurons(payload, data)) {
         error_ = "failed to parse neuron section";
         return false;
@@ -254,7 +254,7 @@ bool CheckpointReader::readDelayedSpikes(std::vector<DelayedSpikeEvent>& events)
 
 bool CheckpointReader::readSynapses(SynapseCheckpointData& data) {
     auto payload = readSection(CheckpointSection::Synapses);
-    if (payload.empty() && header_.synapseCount > 0) return false;
+    if (!payload.empty() && header_.synapseCount == 0) return false;
     if (!parseSynapses(payload, data)) {
         error_ = "failed to parse synapse section";
         return false;
