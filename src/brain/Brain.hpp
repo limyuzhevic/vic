@@ -111,6 +111,9 @@ public:
     // Reset brain state
     void reset();
     
+    // Reset brain state more efficiently (keep config, clear runtime state)
+    void resetRuntime();
+    
     // Save brain state to file (checkpointing)
     bool save(const std::string& filepath) const;
     

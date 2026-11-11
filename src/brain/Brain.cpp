@@ -869,6 +869,32 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
+void Brain::resetRuntime() {
+    NLM_LOG_INFO("Resetting NLM Brain runtime state (preserving config)...");
+    
+    pImpl->currentStep = 0;
+    pImpl->currentTime = 0.0;
+    pImpl->totalSpikesThisStep = 0;
+    pImpl->isResting = false;
+    pImpl->stepsSinceLastEpisode = 0;
+    
+    // Reset only runtime-dependent components, not the structure
+    for (auto& region : pImpl->regions) {
+        region->reset();
+    }
+    
+    pImpl->spikeSystem->reset();
+    pImpl->developmentalStage = DevelopmentalStage::Initial;
+    
+    // Reset memory systems
+    if (pImpl->workingMemory) pImpl->workingMemory->clear();
+    if (pImpl->episodicMemory) pImpl->episodicMemory->clear();
+    if (pImpl->associativeMemory) pImpl->associativeMemory->clear();
+    if (pImpl->attention) pImpl->attention->reset();
+    
+    NLM_LOG_INFO("NLM Brain runtime reset complete (structure preserved)");
+}
+
 namespace {
 // Phase 5 checkpoint payload helpers for the extra sections. Format is
 // deliberately simple and self-describing per value: a uint64 count
