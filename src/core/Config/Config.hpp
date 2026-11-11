@@ -44,6 +44,12 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Enhanced JSON parser for configuration files
+class SimpleJSONParser {
+public:
+    bool parse(const std::string& json, std::vector<ConfigEntry>& outEntries);
+};
+
 // Main configuration class
 class Config {
 public:
@@ -56,7 +62,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (JSON format preferred, falls back to key=value)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -66,12 +72,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -103,5 +109,22 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
+
+// Explicit template instantiations
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
+template std::optional<float> Config::get<float>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
+template int Config::getOr<int>(const std::string&, const int&) const;
+template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
+template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
+template float Config::getOr<float>(const std::string&, const float&) const;
+template double Config::getOr<double>(const std::string&, const double&) const;
+template bool Config::getOr<bool>(const std::string&, const bool&) const;
+template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
 } // namespace nlm

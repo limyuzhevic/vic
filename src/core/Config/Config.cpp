@@ -24,10 +24,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath + " - file may not exist or permissions may be insufficient");
         return false;
     }
     
     std::string line;
+    size_t successCount = 0;
+    size_t errorCount = 0;
+    
     while (std::getline(file, line)) {
         // Skip empty lines and comments
         line = trim(line);
@@ -49,10 +53,20 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+            successCount++;
+        } else {
+            NLM_LOG_WARNING("Invalid config line (no '=' found): " + line);
+            errorCount++;
         }
     }
     
-    return true;
+    if (successCount == 0 && errorCount > 0) {
+        NLM_LOG_ERROR("Config file parsing failed: " + std::to_string(errorCount) + " invalid lines in " + filepath);
+    } else {
+        NLM_LOG_INFO("Config file loaded: " + std::to_string(successCount) + " entries from " + filepath);
+    }
+    
+    return !file.bad();
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -81,15 +95,25 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file for writing: " + filepath + " - check permissions and disk space");
         return false;
     }
+    
+    size_t successCount = 0;
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
         file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        successCount++;
     }
     
-    return true;
+    if (successCount == 0) {
+        NLM_LOG_WARNING("No configuration entries to save to " + filepath);
+    } else {
+        NLM_LOG_INFO("Configuration saved: " + std::to_string(successCount) + " entries to " + filepath);
+    }
+    
+    return !file.bad();
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {

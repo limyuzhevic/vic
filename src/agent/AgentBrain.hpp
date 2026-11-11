@@ -100,41 +100,30 @@ public:
     // internal pattern evoked by text alone moves toward the pattern
     // evoked by the paired visual scene.
     std::vector<float> getInternalFiringRates() const;
-    // Phase 6 thought/planning counters: how often the planner, a
-    // learned concept, the self-model, or a social observation
-    // actually changed the decoded action (not just advised it).
-    int getPlannerOverrideCount() const { return plannerOverrideCount_; }
-    int getPlannerAgreementCount() const { return plannerAgreementCount_; }
-    int getPlannerDecisionCount() const { return plannerDecisionCount_; }
-    int getConceptBiasCount() const { return conceptBiasCount_; }
-    int getSelfBiasCount() const { return selfBiasCount_; }
-    int getSocialBiasCount() const { return socialBiasCount_; }
-    // Phase 6 wired systems, for demos/tests: concept count and the
-    // self-model's mean confidence, plus social observation. A second
-    // agent (teacher) is observed through observeOtherAgent; in a
-    // single-agent world this stays at zero and social bias stays off.
-    size_t getConceptCount() const;
-    float getSelfModelConfidence() const;
-    size_t getSocialObservationCount() const;
-    void observeOtherAgent(MotorCommand observed, const std::vector<float>& beforeVision,
-                           const std::vector<float>& afterVision);
-    
-    // Reset agent for new episode
+// Reset agent for new episode
     void reset();
-    
+
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
-    
+
     // Configuration
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
-    
+
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
     bool isDevelopmentEnabled() const { return developmentEnabled_; }
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
+
+    // Information and statistics
+    float getNeuromodulationLevel() const;
+    float getCuriosityLevel() const;
+    float getNoveltyLevel() const;
+    float getPredictionError() const;
+    float getLearnedPreference() const;
+    std::string getThoughtTrace() const;
     
 private:
     // Motor decoding: convert neural activity to motor command
