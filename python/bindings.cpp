@@ -142,6 +142,7 @@ PYBIND11_MODULE(pynlm, m) {
         .value("Marker", WorldObjectType::Marker)
         .export_values();
 
+    // Enhanced Python bindings for Config with Pythonic API
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
@@ -166,6 +167,91 @@ PYBIND11_MODULE(pynlm, m) {
              "Clear all configuration entries")
         .def("summary", &Config::summary,
              "Get a summary string of the configuration")
+        // Pythonic convenience methods
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set a string configuration value")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set an integer configuration value")
+        .def("set", [](Config& self, const std::string& key, float value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set a float configuration value")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set a double configuration value")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value, ConfigSource::User);
+        }, py::arg("key"), py::arg("value"),
+           "Set a boolean configuration value")
+        // Pythonic get methods
+        .def("get", [](const Config& self, const std::string& key) {
+            auto val = self.get<std::string>(key);
+            if (val.has_value()) return val.value();
+            throw std::runtime_error("Key not found: " + key);
+        }, py::arg("key"),
+           "Get a string configuration value")
+        .def("get", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            auto val = self.get<std::string>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a string configuration value with default")
+        .def("get", [](const Config& self, const std::string& key, int defaultValue) {
+            auto val = self.get<int>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get an integer configuration value with default")
+        .def("get", [](const Config& self, const std::string& key, float defaultValue) {
+            auto val = self.get<float>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a float configuration value with default")
+        .def("get", [](const Config& self, const std::string& key, bool defaultValue) {
+            auto val = self.get<bool>(key);
+            return val.has_value() ? val.value() : defaultValue;
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get a boolean configuration value with default")
+        // Batch operations
+        .def("update", [](Config& self, const py::dict& updates) {
+            for (auto item : updates) {
+                std::string key = py::cast<std::string>(item.first);
+                auto value = py::cast<py::object>(item.second);
+                if (value.is(py::int_())) {
+                    self.set(key, py::cast<int>(value), ConfigSource::User);
+                } else if (value.is(py::float_())) {
+                    self.set(key, py::cast<float>(value), ConfigSource::User);
+                } else if (value.is(py::bool_())) {
+                    self.set(key, py::cast<bool>(value), ConfigSource::User);
+                } else if (value.is(py::str())) {
+                    self.set(key, py::cast<std::string>(value), ConfigSource::User);
+                }
+            }
+        }, py::arg("updates"),
+           "Update multiple configuration values from a dictionary")
+        .def("toDict", [](const Config& self) {
+            py::dict result;
+            for (const auto& entry : self.getKeys()) {
+                auto val = self.get<std::string>(entry);
+                if (val.has_value()) {
+                    result[entry] = val.value();
+                } else {
+                    auto intVal = self.get<int>(entry);
+                    if (intVal.has_value()) {
+                        result[entry] = intVal.value();
+                    } else {
+                        auto floatVal = self.get<float>(entry);
+                        if (floatVal.has_value()) {
+                            result[entry] = floatVal.value();
+                        }
+                    }
+                }
+            }
+            return result;
+        }, "Convert configuration to Python dictionary"),
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -420,9 +506,266 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<SimpleWorld>();
     }, "Create a new simple world");
 
+    // AgentBrain convenience methods
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Python convenience functions for easier scripting
+    m.def("createDefaultBrain", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(500));
+        config->set("region_count", static_cast<int64_t>(1));
+        config->set("connection_probability", 0.1f);
+        config->set("random_seed", static_cast<int64_t>(42));
+        return std::make_shared<Brain>(config);
+    }, "Create a default brain with typical settings");
+
+    m.def("createCustomBrain", [](size_t neuronCount, size_t regionCount, float connectionProb, int64_t seed) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuronCount));
+        config->set("region_count", static_cast<int64_t>(regionCount));
+        config->set("connection_probability", connectionProb);
+        config->set("random_seed", seed);
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuron_count") = 500, py::arg("region_count") = 1,
+       py::arg("connection_prob") = 0.1f, py::arg("seed") = 42,
+       "Create a brain with custom parameters");
+
+    // Easy simulation setup
+    m.def("setupSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world) {
+        if (!brain->initialize()) {
+            throw std::runtime_error("Failed to initialize brain");
+        }
+        if (world) {
+            auto agentBrain = std::make_shared<AgentBrain>(brain);
+            agentBrain->initialize(*world);
+            return agentBrain;
+        }
+        return std::shared_ptr<AgentBrain>(nullptr);
+    }, py::arg("brain"), py::arg("world") = nullptr,
+       "Initialize a brain and optionally create an agent brain interface");
+
+    // Common operation shortcuts
+    m.def("runStep", [](std::shared_ptr<Brain> brain, size_t steps = 1) {
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("steps") = 1,
+       "Run multiple simulation steps and return total spike count");
+
+    m.def("injectRandomSensoryInput", [](std::shared_ptr<Brain> brain, float intensity = 1.0f) {
+        if (auto* region = brain->getRegion(RegionId(1)); region) {
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron->getType() == NeuronType::Sensory) {
+                    neuron->injectCurrent(intensity * 10.0f);
+                }
+            }
+        }
+    }, py::arg("brain"), py::arg("intensity") = 1.0f,
+       "Inject random sensory input to all sensory neurons");
+
+    m.def("getNetworkStats", [](std::shared_ptr<Brain> brain) {
+        std::map<std::string, double> stats;
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibitory_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        return stats;
+    }, "Get comprehensive network statistics");
+
+    // Development and exploration helpers
+    m.def("exploreNetworkStructure", [](std::shared_ptr<Brain> brain) {
+        std::vector<std::string> regions;
+        auto ids = brain->getRegionIds();
+        for (const auto& id : ids) {
+            regions.push_back("Region " + std::to_string(id.value()));
+        }
+        return regions;
+    }, "Get list of region names in the brain");
+
+    // Easy configuration presets
+    m.def("getConfigurationPresets", []() {
+        std::vector<std::string> presets;
+        presets.push_back("minimal");
+        presets.push_back("balanced");
+        presets.push_back("high_plasticity");
+        presets.push_back("low_activity");
+        return presets;
+    }, "Get available configuration preset names");
+
+    m.def("applyConfigurationPreset", [](std::shared_ptr<Config> config, const std::string& preset) {
+        config->clear();
+        if (preset == "minimal") {
+            config->set("neuron_count", static_cast<int64_t>(100));
+            config->set("connection_probability", 0.05f);
+        } else if (preset == "balanced") {
+            config->set("neuron_count", static_cast<int64_t>(500));
+            config->set("connection_probability", 0.1f);
+            config->set("stdp_ltp_weight", 0.01f);
+        } else if (preset == "high_plasticity") {
+            config->set("neuron_count", static_cast<int64_t>(1000));
+            config->set("connection_probability", 0.15f);
+            config->set("stdp_ltp_weight", 0.05f);
+            config->set("synaptogenesis_rate", 0.001f);
+        } else if (preset == "low_activity") {
+            config->set("neuron_count", static_cast<int64_t>(500));
+            config->set("connection_probability", 0.05f);
+            config->set("stdp_ltp_weight", 0.005f);
+        }
+    }, "Apply a predefined configuration preset");
+
+    // Advanced analysis and exploration tools
+    m.def("analyzeLearningTrajectory", [](std::shared_ptr<Brain> brain, const std::vector<std::pair<size_t, Timestamp>>& timeline) {
+        std::map<size_t, std::map<std::string, double>> trajectory;
+        
+        for (const auto& [step, time] : timeline) {
+            brain->step(step, time);
+            std::map<std::string, double> snapshot;
+            snapshot["spike_count"] = brain->getTotalSpikeCount();
+            snapshot["firing_rate"] = brain->getAverageFiringRate();
+            snapshot["active_neurons"] = brain->getActiveNeuronCount();
+            snapshot["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+            
+            trajectory[step] = snapshot;
+        }
+        
+        return trajectory;
+    }, py::arg("brain"), py::arg("timeline"),
+       "Analyze how the brain evolves over time");
+
+    m.def("findActiveNeurons", [](std::shared_ptr<Brain> brain, size_t step, Timestamp time) {
+        brain->step(step, time);
+        std::vector<NeuronId> activeNeurons;
+        
+        for (const auto& region : brain->getRegions()) {
+            for (const auto* neuron : region->getAllNeurons()) {
+                if (neuron->isFiring()) {
+                    activeNeurons.push_back(neuron->getId());
+                }
+            }
+        }
+        
+        return activeNeurons;
+    }, py::arg("brain"), py::arg("step"), py::arg("time"),
+       "Get IDs of all currently firing neurons");
+
+    // Brain state exploration
+    m.def("getSensoryNeurons", [](std::shared_ptr<Brain> brain) {
+        std::vector<NeuronId> sensoryNeurons;
+        
+        for (const auto& region : brain->getRegions()) {
+            for (const auto* neuron : region->getAllNeurons()) {
+                if (neuron->getType() == NeuronType::Sensory) {
+                    sensoryNeurons.push_back(neuron->getId());
+                }
+            }
+        }
+        
+        return sensoryNeurons;
+    }, "Get IDs of all sensory neurons");
+
+    m.def("getMotorNeurons", [](std::shared_ptr<Brain> brain) {
+        std::vector<NeuronId> motorNeurons;
+        
+        for (const auto& region : brain->getRegions()) {
+            for (const auto* neuron : region->getAllNeurons()) {
+                if (neuron->getType() == NeuronType::Motor) {
+                    motorNeurons.push_back(neuron->getId());
+                }
+            }
+        }
+        
+        return motorNeurons;
+    }, "Get IDs of all motor neurons");
+
+    // Educational tools for understanding the brain
+    m.def("createEducationalDemoBrain", []() {
+        auto config = std::make_shared<Config>();
+        // Smaller brain for educational demos
+        config->set("neuron_count", static_cast<int64_t>(200));
+        config->set("region_count", static_cast<int64_t>(2));
+        config->set("connection_probability", 0.2f);
+        config->set("random_seed", static_cast<int64_t>(12345));
+        
+        // Enable all learning systems for educational demos
+        config->set("stdp_ltp_weight", 0.03f);
+        config->set("stdp_ltd_weight", 0.025f);
+        config->set("synaptogenesis_rate", 0.0002f);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        // Create some test activity
+        if (auto* region = brain->getRegion(RegionId(1)); region) {
+            for (auto* neuron : region->getAllNeurons()) {
+                if (neuron->getType() == NeuronType::Sensory) {
+                    neuron->injectCurrent(20.0f);
+                }
+            }
+        }
+        
+        return brain;
+    }, "Create a smaller brain with learning enabled for educational demos");
+
+    m.def("simulateLearningExperiment", [](std::shared_ptr<Brain> brain, size_t initialSteps, size_t learningSteps, float stimulusIntensity) {
+        // Record initial state
+        size_t initialSpikes = brain->getTotalSpikeCount();
+        auto initialWeights = std::vector<float>();
+        if (auto* region = brain->getRegion(RegionId(1)); region) {
+            for (const auto& syn : region->getSynapses()) {
+                initialWeights.push_back(syn->getWeight());
+            }
+        }
+        
+        // Initial period
+        for (size_t i = 0; i < initialSteps; ++i) {
+            brain->step(i, i * 0.001);
+        }
+        
+        // Learning phase with stimulus
+        for (size_t i = initialSteps; i < initialSteps + learningSteps; ++i) {
+            // Inject stimulus to sensory neurons to trigger learning
+            if (auto* region = brain->getRegion(RegionId(1)); region) {
+                for (auto* neuron : region->getAllNeurons()) {
+                    if (neuron->getType() == NeuronType::Sensory) {
+                        neuron->injectCurrent(stimulusIntensity);
+                    }
+                }
+            }
+            
+            brain->step(i, i * 0.001);
+        }
+        
+        // Record final state
+        size_t finalSpikes = brain->getTotalSpikeCount();
+        auto finalWeights = std::vector<float>();
+        if (auto* region = brain->getRegion(RegionId(1)); region) {
+            for (const auto& syn : region->getSynapses()) {
+                finalWeights.push_back(syn->getWeight());
+            }
+        }
+        
+        // Calculate learning metrics
+        std::map<std::string, double> metrics;
+        metrics["initial_spikes"] = initialSpikes;
+        metrics["final_spikes"] = finalSpikes;
+        metrics["spike_change"] = finalSpikes - initialSpikes;
+        
+        if (!initialWeights.empty() && !finalWeights.empty()) {
+            double initialMeanWeight = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0) / initialWeights.size();
+            double finalMeanWeight = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0) / finalWeights.size();
+            metrics["initial_mean_weight"] = initialMeanWeight;
+            metrics["final_mean_weight"] = finalMeanWeight;
+            metrics["weight_change"] = finalMeanWeight - initialMeanWeight;
+        }
+        
+        return metrics;
+    }, "Simulate a learning experiment and return metrics");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
