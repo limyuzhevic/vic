@@ -12,7 +12,7 @@
 #include "../neuromodulation/PredictionError.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
-#include "../prediction/PredictionSystem.hpp"
+#include "../prediction/NeuralPrediction.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include "../performance/CheckpointSystem.hpp"
@@ -37,7 +37,7 @@ struct Brain::Impl {
     std::unique_ptr<NeuralAssociativeMemory> associativeMemory;
     
     // ========== INTEGRATED PREDICTION SYSTEM ==========
-    std::unique_ptr<PredictionSystem> predictionSystem;
+    std::unique_ptr<NeuralPrediction> prediction;
     
     // ========== INTEGRATED COGNITION SYSTEMS ==========
     std::unique_ptr<NeuralPlanner> planner;
@@ -126,12 +126,18 @@ struct Brain::Impl {
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
         // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
+        prediction = std::make_unique<NeuralPrediction>();
+        prediction->initialize(this);
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
+        planner->initialize(this);
+        
         conceptFormation = std::make_unique<ConceptFormation>();
+        conceptFormation->initialize(this);
+        
         attention = std::make_unique<AttentionalSelection>();
+        attention->initialize(this);
         
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
@@ -613,9 +619,53 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->prediction) {
+        // Use NeuralPrediction to generate predictions based on current state
+        std::vector<float> currentSensoryState;
+        
+        // Collect sensory observations from sensory neurons
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            currentSensoryState.push_back(neuron->getMembranePotential() / 10.0f); // Normalize
+        }
+        
+        // Update predictions based on current state and working memory
+        pImpl->prediction->recordSensoryState(currentSensoryState, currentStep);
+        
+        // Generate prediction for next state
+        std::vector<float> predictedState = pImpl->prediction->generatePrediction(currentStep);
+        
+        // Compare with actual state to compute prediction error
+        float predictionError = 0.0f;
+        if (!predictedState.empty() && !currentSensoryState.empty()) {
+            predictionError = pImpl->prediction->getPredictionError();
+        }
+        
+        // Apply prediction error to neuromodulation systems
+        if (predictionError > 0.01f) {
+            // Scale prediction error for neuromodulation
+            float neuromodulationLevel = predictionError * 0.5f;
+            
+            // Update novelty detection
+            if (pImpl->novelty) {
+                pImpl->novelty->update(neuromodulationLevel);
+            }
+            
+            // Update curiosity
+            if (pImpl->curiosity) {
+                pImpl->curiosity->update(
+                    pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f,
+                    predictionError,
+                    pImpl->timestep);
+            }
+            
+            // Apply prediction error to working memory to strengthen successful predictions
+            if (pImpl->workingMemory && predictionError < 0.1f) {
+                // Successful prediction - reinforce memory traces
+                for (NeuronId neuron : pImpl->workingMemory->getMemoryNeurons()) {
+                    pImpl->workingMemory->strengthenMemory(1.1f);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -625,14 +675,66 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         // Apply attention to working memory winners
         if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
             std::vector<NeuronId> competitors = pImpl->workingMemory->getMemoryNeurons();
-            pImpl->attention->processCompetition(competitors);
+            std::vector<NeuronId> attended = pImpl->attention->processCompetition(competitors);
+            
+            // Apply top-down bias from prediction system
+            if (pImpl->prediction) {
+                // Use prediction confidence to bias attention
+                float predictionConfidence = pImpl->prediction->getPredictionConfidence();
+                if (predictionConfidence > 0.7f) {
+                    // High confidence prediction - strongly attend to predicted sensory states
+                    for (NeuronId neuron : attended) {
+                        pImpl->attention->applyTopDownBias(neuron, predictionConfidence * 2.0f);
+                    }
+                }
+            }
+            
+            // Apply attention to working memory
+            if (pImpl->workingMemory) {
+                for (NeuronId neuron : attended) {
+                    if (pImpl->workingMemory->contains(neuron)) {
+                        // Boost activation of attended neurons
+                        float activation = pImpl->workingMemory->getNeuronActivation(neuron);
+                        pImpl->workingMemory->strengthenMemory(1.05f);
+                    }
+                }
+            }
         }
     }
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Concept formation uses working memory patterns and predictions
+        if (pImpl->workingMemory && pImpl->prediction) {
+            std::vector<float> currentSensoryState;
+            
+            // Collect sensory observations
+            for (auto* neuron : pImpl->sensoryNeurons) {
+                currentSensoryState.push_back(neuron->getMembranePotential() / 10.0f);
+            }
+            
+            // Check if we have enough working memory content to form concepts
+            if (!pImpl->workingMemory->getMemoryNeurons().empty()) {
+                // Use prediction to guide concept formation
+                std::vector<float> predictedState = pImpl->prediction->generatePrediction(currentStep);
+                
+                if (!predictedState.empty()) {
+                    // Update concept formation with prediction error
+                    float predictionError = pImpl->prediction->getPredictionError();
+                    
+                    // Get working memory traces for concept formation
+                    std::vector<float> workingMemoryActivations = pImpl->workingMemory->retrieve();
+                    
+                    // Concept formation would typically process these patterns to form
+                    // abstract representations and categories
+                    pImpl->conceptFormation->update(
+                        workingMemoryActivations,
+                        predictedState,
+                        predictionError,
+                        pImpl->timestep);
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -701,6 +803,9 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
     size_t numSensory = pImpl->sensoryNeurons.size();
     if (numSensory == 0) return;
     
+    // Prepare sensory state vector for prediction system
+    std::vector<float> sensoryState(values.begin(), values.end());
+    
     // Distribute input across sensory neurons
     for (size_t i = 0; i < numSensory; ++i) {
         // Normalize input value to range [-10, 10] mV
@@ -716,6 +821,11 @@ void Brain::receiveSensoryInput(const class SensoryInput& input) {
         if (pImpl->workingMemory && normalizedValue > 0.5f) {
             pImpl->workingMemory->storeToNeuron(pImpl->sensoryNeurons[i]->getId(), normalizedValue / 10.0f);
         }
+    }
+    
+    // Record sensory state in prediction system for learning
+    if (pImpl->prediction) {
+        pImpl->prediction->recordSensoryState(sensoryState, pImpl->currentStep);
     }
 }
 
@@ -1485,8 +1595,8 @@ NeuralAssociativeMemory* Brain::getAssociativeMemory() {
 
 // ========== PREDICTION SYSTEM ACCESSOR ==========
 
-PredictionSystem* Brain::getPredictionSystem() {
-    return pImpl->predictionSystem.get();
+NeuralPrediction* Brain::getPrediction() {
+    return pImpl->prediction.get();
 }
 
 // ========== COGNITION SYSTEM ACCESSORS ==========

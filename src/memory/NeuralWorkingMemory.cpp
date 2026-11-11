@@ -14,6 +14,9 @@ struct NeuralWorkingMemory::Impl {
     // Memory trace ages
     std::vector<SimulationStep> traceAges;
     
+    // Active memory traces
+    std::vector<size_t> activeTraces;
+    
     Impl() : brain(nullptr) {}
 };
 
@@ -29,12 +32,11 @@ NeuralWorkingMemory::~NeuralWorkingMemory() = default;
 
 void NeuralWorkingMemory::initialize(Brain* brain) {
     pImpl->brain = brain;
-    brain_ = brain;
     NLM_LOG_INFO("NeuralWorkingMemory initialized");
 }
 
 void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strength) {
-    if (pattern.empty() || !brain_) return;
+    if (pattern.empty() || !pImpl->brain) return;
     
     // Find neurons to encode this pattern
     size_t neuronsNeeded = std::min(pattern.size(), memoryNeurons_.size());
@@ -44,7 +46,7 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
         float activation = pattern[i] * strength;
         
         // Set neuron activation
-        if (auto* region = brain_->getRegion(RegionId(neuron.index() / 1000))) {
+        if (auto* region = pImpl->brain->getRegion(RegionId(neuron.index() / 1000))) {
             for (auto* nn : region->getAllNeurons()) {
                 if (nn->getId() == neuron) {
                     nn->injectCurrent(activation * 5.0f);
@@ -84,7 +86,7 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         it = memoryNeurons_.end() - 1;
     }
 
-    // Phase 6: activeTraces_ is the trace list getActiveTraces()
+    // Phase 6: activeTraces is the trace list getActiveTraces()
     // reports, and it was never populated — only cleared — so it
     // always read 0 even when memory held 50 neurons. A stored
     // neuron is an active trace; decayWeakTraces() below removes
@@ -92,17 +94,16 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // clear()/restoreSnapshot() reset the list with the content.
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
-        bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
-        if (activation > 0.1f && !present) activeTraces_.push_back(idx);
+        bool present = std::find(pImpl->activeTraces.begin(), pImpl->activeTraces.end(), idx) != pImpl->activeTraces.end();
+        if (activation > 0.1f && !present) pImpl->activeTraces.push_back(idx);
         if (activation <= 0.1f && present) {
-            activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
-                                activeTraces_.end());
-        }
+            pImpl->activeTraces.erase(std::remove(pImpl->activeTraces.begin(), pImpl->activeTraces.end(), idx),
+                                      pImpl->activeTraces.end());
     }
     
     // Inject current to maintain activation
-    if (brain_) {
-        brain_->injectCurrent(neuron, activation * 5.0f);
+    if (pImpl->brain) {
+        pImpl->brain->injectCurrent(neuron, activation * 5.0f);
     }
 }
 
@@ -131,7 +132,7 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
 }
 
 void NeuralWorkingMemory::update(TimestepDuration dt) {
-    if (!brain_) return;
+    if (!pImpl->brain) return;
     
     // Update maintenance - reinforce active memory neurons
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
@@ -140,7 +141,7 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
         
         if (activation > 0.1f) {
             // Inject maintenance current
-            brain_->injectCurrent(neuron, activation * 2.0f);
+            pImpl->brain->injectCurrent(neuron, activation * 2.0f);
             
             // Age the trace
             memoryTimestamps_[i]++;
@@ -165,7 +166,7 @@ void NeuralWorkingMemory::clear() {
     memoryNeurons_.clear();
     memoryActivations_.clear();
     memoryTimestamps_.clear();
-    activeTraces_.clear();
+    pImpl->activeTraces.clear();
     pImpl->maintenanceSynapses.clear();
 }
 
@@ -193,9 +194,9 @@ void NeuralWorkingMemory::runCompetition() {
     for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
         bool isWinner = std::find(winners_.begin(), winners_.end(), memoryNeurons_[i]) != winners_.end();
         
-        if (!isWinner && brain_) {
+        if (!isWinner && pImpl->brain) {
             // Apply strong inhibition
-            brain_->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
+            pImpl->brain->injectCurrent(memoryNeurons_[i], -memoryActivations_[i] * 3.0f);
         }
     }
 }
@@ -235,9 +236,9 @@ void NeuralWorkingMemory::updateRecurrentConnections() {
             fromActivation = memoryActivations_[idx];
         }
         
-        if (fromActivation > 0.1f && brain_) {
+        if (fromActivation > 0.1f && pImpl->brain) {
             // Send maintenance signal
-            brain_->injectCurrent(conn.second, fromActivation * 2.0f);
+            pImpl->brain->injectCurrent(conn.second, fromActivation * 2.0f);
         }
     }
 }
@@ -262,9 +263,9 @@ void NeuralWorkingMemory::decayWeakTraces() {
     // Phase 6: erasing shifts memory indices, so the trace list
     // cannot survive removal untouched — rebuild it from the
     // remaining activations instead of leaving stale indices.
-    activeTraces_.clear();
+    pImpl->activeTraces.clear();
     for (size_t i = 0; i < memoryActivations_.size(); ++i) {
-        if (memoryActivations_[i] > 0.1f) activeTraces_.push_back(i);
+        if (memoryActivations_[i] > 0.1f) pImpl->activeTraces.push_back(i);
     }
 }
 
@@ -290,7 +291,7 @@ AttentionalSelection::~AttentionalSelection() = default;
 
 void AttentionalSelection::initialize(Brain* brain) {
     pImpl = std::make_unique<Impl>();
-    brain_ = brain;
+    // pImpl->brain = brain; // brain pointer stored in parent's brain_ for coordination
     NLM_LOG_INFO("AttentionalSelection initialized");
 }
 
@@ -331,8 +332,8 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
             
             if (relativeActivity > 1.5f) {
                 // i is much stronger than j - apply inhibition to j
-                if (brain_) {
-                    brain_->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
+                if (pImpl->brain) {
+                    pImpl->brain->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
                 }
                 pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);
             }
@@ -347,8 +348,8 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
             winners_.push_back(competitors[i]);
             
             // Apply excitation to winners
-            if (brain_) {
-                brain_->injectCurrent(competitors[i], excitationStrength_ * 2.0f);
+            if (pImpl->brain) {
+                pImpl->brain->injectCurrent(competitors[i], excitationStrength_ * 2.0f);
             }
         }
     }
