@@ -1,0 +1,71 @@
+{
+    "version": "1.0",
+    "description": "NLM (Phase 6: Integrated Artificial Brain)",
+    
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    
+    "neuron_count": 1000,
+    "region_count": 1,
+    
+    "connection_probability": 0.1,
+    
+    "plasticity_learning_rate": 0.01,
+    "stdp_ltp_weight": 0.01,
+    "stdp_ltd_weight": 0.012,
+    "stdp_time_constant": 20.0,
+    
+    "development_synaptogenesis_rate": 0.001,
+    "development_pruning_rate": 0.0001,
+    
+    "dopamine_baseline": 0.1,
+    
+    "reward_discount_factor": 0.99,
+    
+    "environment_name": "GridWorld",
+    "environment_width": 10,
+    "environment_height": 10,
+    
+    "log_level": "INFO",
+    "log_to_file": false,
+    "log_filename": "nlm.log",
+    
+    "max_simulation_steps": 10000,
+    "simulation_time_limit": 0.0,
+    
+    "visualization_enabled": false,
+    "visualization_update_rate": 30.0,
+    
+    "working_memory_capacity": 100,
+    "working_memory_decay_rate": 0.95,
+    
+    "episodic_memory_max_episodes": 1000,
+    
+    "associative_memory_strength": 1.0,
+    
+    "prediction_system_update_interval": 10,
+    
+    "neural_planner_planning_depth": 5,
+    "concept_formation_threshold": 0.7,
+    "concept_formation_stability_window": 100,
+    
+    "self_model_max_history": 1000,
+    "self_model_confidence_threshold": 0.8,
+    
+    "social_learning_max_observations": 100,
+    "social_learning_imitation_similarity": 0.8,
+    
+    "development_initial_plasticity": 1.0,
+    "development_critical_period_plasticity": 0.8,
+    "development_maturation_plasticity": 0.5,
+    "development_adult_plasticity": 0.2,
+    
+    "neuromodulation_dopamine_update_interval": 1,
+    "neuromodulation_curiosity_update_interval": 1,
+    "neuromodulation_prediction_error_update_interval": 1,
+    "neuromodulation_novelty_update_interval": 1,
+    
+    "checkpoint_save_interval": 10000,
+    "checkpoint_max_count": 10,
+    "checkpoint_compression": true
+}

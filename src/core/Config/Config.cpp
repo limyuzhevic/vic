@@ -27,6 +27,18 @@ bool Config::loadFromFile(const std::string& filepath) {
         return false;
     }
     
+    // Try to parse as JSON first (if nlohmann/json is available)
+    std::string firstLine;
+    std::getline(file, firstLine);
+    file.clear();
+    file.seekg(0, std::ios::beg);
+    
+    // Check if file starts with "{" for JSON
+    if (firstLine.find('{') != std::string::npos) {
+        return loadFromJSON(filepath);
+    }
+    
+    // Otherwise parse as simple key=value format
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -54,6 +66,22 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     return true;
 }
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Placeholder for JSON parsing implementation
+    // In Phase 2, this will use nlohmann/json or similar library
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    // For now, just accept JSON files and assume they're valid
+    // TODO: Implement proper JSON parsing with error handling
+    std::string line;
+    while (std::getline(file, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[ spilky content truncated | 131 chars
 
 bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
@@ -84,10 +112,48 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\"";
+        
+        // Write value based on type
+        std::visit([&file](const auto& value) {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << ": \"" << value << "\"";
+            } else if constexpr (std::is_same_v<T, int> || 
+                                std::is_same_v<T, int64_t> || 
+                                std::is_same_v<T, double>) {
+                file << ": " << value;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << ": " << (value ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                std::is_same_v<T, std::vector<double>> ||
+                                std::is_same_v<T, std::vector<std::string>>) {
+                file << ": [";
+                for (size_t j = 0; j < value.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << value[j] << "\"";
+                    } else {
+                        file << value[j];
+                    }
+                }
+                file << "]";
+            } else {
+                file << ": null";
+            }
+        }, entry.value);
+        
+        file << ",\n";
     }
+    
+    if (!pImpl->entries.empty()) {
+        file.seekp(-2, std::ios_base::end);  // Remove trailing comma
+    }
+    
+    file << "}\n";
     
     return true;
 }

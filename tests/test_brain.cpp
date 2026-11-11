@@ -8,6 +8,7 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#include "world/SimpleWorld.hpp"
 
 namespace test_brain {
 
@@ -121,7 +122,7 @@ void testBrainStatus() {
     assert(brain.getTotalNeuronCount() > 0);
     assert(brain.getTotalSynapseCount() >= 0);
     assert(brain.getFiringNeuronCount() >= 0);
-    assert(brain.getAverageFiringRate() >= 0.0f);
+    assert(brain.getAverageFiringRate() >= 0.4f);
     
     std::cout << "    testBrainStatus passed" << std::endl;
 }
@@ -135,7 +136,7 @@ void testBrainCheckpointRoundTrip() {
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
     config->set("connection_probability", 0.1, nlm::ConfigSource::Default);
     config->set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::Default);
-
+    
     nlm::Brain brain1(config);
     brain1.initialize();
     // Drive the brain so there is real state to restore (weights move,
@@ -144,10 +145,10 @@ void testBrainCheckpointRoundTrip() {
     for (nlm::SimulationStep step = 0; step < 60; ++step) {
         brain1.step(step);
     }
-
+    
     const std::string path = "/tmp/nlm_test_checkpoint.bin";
     if (!brain1.save(path)) throw std::runtime_error("checkpoint save failed");
-
+    
     auto meanWeight = [](nlm::Brain& b) {
         double sum = 0.0;
         size_t count = 0;
@@ -167,11 +168,11 @@ void testBrainCheckpointRoundTrip() {
         }
         return 0.0f;
     };
-
+    
     double savedMeanWeight = meanWeight(brain1);
     float savedMembrane = firstMembrane(brain1);
     size_t savedPending = brain1.getPendingSpikeEventCount();
-
+    
     nlm::Brain brain2(config);
     brain2.initialize();
     if (!brain2.load(path)) throw std::runtime_error("checkpoint load failed");
@@ -179,7 +180,7 @@ void testBrainCheckpointRoundTrip() {
     if (std::abs(firstMembrane(brain2) - savedMembrane) >= 1e-6) throw std::runtime_error("membrane not restored");
     // Pending delayed spikes round-trip (in-flight synaptic input).
     if (brain2.getPendingSpikeEventCount() != savedPending) throw std::runtime_error("pending spikes not restored");
-
+    
     // Continue both brains with identical steps: firing rates should
     // stay close (they are not bit-identical: per-synapse spike
     // histories and RNG state are not part of the checkpoint, see the
@@ -192,7 +193,7 @@ void testBrainCheckpointRoundTrip() {
     float rate2 = brain2.getAverageFiringRate();
     float denom = std::max(std::abs(rate1), 1.0f);
     if (std::abs(rate1 - rate2) / denom >= 0.25f) throw std::runtime_error("continued firing rates diverged");
-
+    
     // Mismatched structure must fail, not silently misalign.
     auto smallConfig = std::make_shared<nlm::Config>();
     smallConfig->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
@@ -200,7 +201,7 @@ void testBrainCheckpointRoundTrip() {
     nlm::Brain smallBrain(smallConfig);
     smallBrain.initialize();
     if (smallBrain.load(path)) throw std::runtime_error("mismatched-structure load should fail");
-
+    
     std::cout << "    testBrainCheckpointRoundTrip passed (meanWeight="
               << savedMeanWeight << ", pending=" << savedPending
               << ", rates " << rate1 << " vs " << rate2 << ")" << std::endl;
@@ -262,6 +263,104 @@ void testPhase6WorkingMemoryTraces() {
     std::cout << "    testPhase6WorkingMemoryTraces passed" << std::endl;
 }
 
+void testPhase6IntegratedBrain() {
+    // Test full Phase 6 integration: memory systems, cognition systems, neuromodulation
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    config->set("connection_probability", 0.1, nlm::ConfigSource::Default);
+    config->set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Verify all Phase 6 systems are initialized
+    assert(brain.getWorkingMemory() != nullptr);
+    assert(brain.getEpisodicMemory() != nullptr);
+    assert(brain.getAssociativeMemory() != nullptr);
+    assert(brain.getPlanner() != nullptr);
+    assert(brain.getConceptFormation() != nullptr);
+    assert(brain.getAttention() != nullptr);
+    assert(brain.getDevelopmentSystem() != nullptr);
+    assert(brain.getDopamine() != nullptr);
+    assert(brain.getCuriosity() != nullptr);
+    assert(brain.getNovelty() != nullptr);
+    assert(brain.getPredictionError() != nullptr);
+    assert(brain.getPredictionSystem() != nullptr);
+    
+    // Test that systems are integrated (working memory actually stores/retrieves)
+    nlm::NeuronId testNeuron;
+    bool found = false;
+    for (const auto& region : brain.getRegions()) {
+        for (auto* neuron : region->getAllNeurons()) {
+            testNeuron = neuron->getId();
+            found = true;
+            break;
+        }
+        if (found) break;
+    }
+    assert(found);
+    
+    auto* wm = brain.getWorkingMemory();
+    wm->storeToNeuron(testNeuron, 0.5f);
+    assert(wm->contains(testNeuron));
+    assert(wm->getNeuronActivation(testNeuron) > 0.0f);
+    
+    // Test episodic memory
+    nlm::EpisodicMemoryItem episode;
+    episode.timestamp = 1;
+    episode.reward = 0.5f;
+    episode.positionX = 1.0f;
+    episode.positionY = 1.0f;
+    episode.action = nlm::ActionType::MoveForward;
+    brain.getEpisodicMemory()->storeEpisode(episode);
+    assert(brain.getEpisodicMemory()->getEpisodeCount() > 0);
+    
+    // Test cognition system integration
+    std::vector<float> testVision(16, 0.5f);
+    auto action = brain.getPlanner()->planAction(testVision);
+    assert(action != nlm::ActionType::Wait);  // Should have a planned action
+    
+    std::vector<float> testConcept(24, 0.0f);
+    for (int i = 5; i <= 10; ++i) testConcept[i] = 0.3f;
+    size_t conceptId = brain.getConceptFormation()->getMatchingConcept(testConcept);
+    assert(conceptId > 0);  // Should have found a matching concept
+    
+    std::cout << "    testPhase6IntegratedBrain passed" << std::endl;
+}
+
+void testPhase6AgentBrainIntegration() {
+    // Test AgentBrain integration with Phase 6 cognitive systems
+    auto config = std::make_shared<nlm::Config>();
+    config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
+    
+    nlm::Brain brain(config);
+    brain.initialize();
+    
+    // Create AgentBrain
+    nlm::AgentBrain agentBrain(std::make_shared<nlm::Brain>(brain));
+    
+    // Create SimpleWorld for testing
+    nlm::SimpleWorld world;
+    agentBrain.initialize(world);
+    
+    // Test AgentBrain methods that use Phase 6 systems
+    std::string testText = "test";
+    auto encoded = agentBrain.encodeText(testText);
+    assert(encoded.size() == 4);
+    
+    // Test thought trace generation
+    std::string thoughtTrace = agentBrain.getThoughtTrace();
+    assert(thoughtTrace.find("perceived=") != std::string::npos);
+    
+    // Test neuromodulation access
+    assert(agentBrain.getNeuromodulationLevel() >= 0.0f);
+    assert(agentBrain.getCuriosityLevel() >= 0.0f);
+    
+    std::cout << "    testPhase6AgentBrainIntegration passed" << std::endl;
+}
+
 void runAll() {
     testBrainCreation();
     testBrainInitialization();
@@ -274,6 +373,8 @@ void runAll() {
     testPhase6TextEncoding();
     testPhase6ConceptSimilarity();
     testPhase6WorkingMemoryTraces();
+    testPhase6IntegratedBrain();
+    testPhase6AgentBrainIntegration();
 }
 
 } // namespace test_brain

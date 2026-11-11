@@ -616,6 +616,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        pImpl->predictionSystem->update(pImpl->timestep);
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,8 +632,48 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity to form concepts from patterns
+        // Get current sensory state from sensory neurons
+        std::vector<float> currentSensoryState;
+        for (auto* neuron : pImpl->sensoryNeurons) {
+            currentSensoryState.push_back(neuron->getState().membranePotential);
+        }
+        for (auto* neuron : pImpl->motorNeurons) {
+            currentSensoryState.push_back(neuron->getState().membranePotential);
+        }
+        
+        // Convert to concept formation features (closeness and touch)
+        std::vector<float> conceptFeatures;
+        float visionSum = 0.0f;
+        int visionCount = 0;
+        for (float v : currentSensoryState) {
+            if (visionCount < 16) {  // First 16 are vision-related
+                visionSum += v;
+                visionCount++;
+            }
+        }
+        float visionMean = visionCount > 0 ? visionSum / visionCount : 0.0f;
+        
+        // Get closest object (from forward vision processing)
+        float closestObject = 1.0f;
+        if (visionCount > 10) {
+            for (int i = 5; i <= 10 && i < visionCount; ++i) {
+                if (currentSensoryState[i] < closestObject) {
+                    closestObject = currentSensoryState[i];
+                }
+            }
+        }
+        
+        // Create concept pattern
+        std::vector<float> conceptPattern;
+        for (float v : currentSensoryState) {
+            conceptPattern.push_back(1.0f - v);  // Convert to concept formation format
+        }
+        
+        // Present experience for concept formation
+        if (!conceptPattern.empty()) {
+            pImpl->conceptFormation->presentExperience(conceptPattern, conceptPattern, 0.0f, currentStep);
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
