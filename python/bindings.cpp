@@ -293,7 +293,16 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("getTemperature", &SimpleWorld::getTemperature)
+        .def("setTemperature", &SimpleWorld::setTemperature, py::arg("temp"))
+        .def("getTerrainType", &SimpleWorld::getTerrainType)
+        .def("setTerrainType", &SimpleWorld::setTerrainType, py::arg("type"))
+        .def("getAgent", &SimpleWorld::getAgent)
+        .def("getObjects", &SimpleWorld::getObjects)
+        .def("getAllObjects", &SimpleWorld::getAllObjects)
+        .def("setWind", &SimpleWorld::setWind, py::arg("windX"), py::arg("windY"))
+        .def("getWind", &SimpleWorld::getWind);
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -359,7 +368,32 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        // Additional Pythonic methods
+        .def("setRandomSeed", &Brain::setRandomSeed, py::arg("seed"),
+             "Set random seed for reproducible results")
+        .def("getRandomSeed", &Brain::getRandomSeed,
+             "Get current random seed")
+        .def("setNeuronCount", &Brain::setNeuronCount, py::arg("count"),
+             "Set neuron count (requires reinitialization)")
+        .def("getNeuronCount", &Brain::getTotalNeuronCount,
+             "Get current neuron count")
+        .def("setConnectionProbability", &Brain::setConnectionProbability, py::arg("prob"),
+             "Set connection probability (requires reinitialization)")
+        .def("getConnectionProbability", &Brain::getConnectionProbability,
+             "Get current connection probability")
+        .def("enablePlasticity", &Brain::enablePlasticity, py::arg("enable"),
+             "Enable/disable synaptic plasticity")
+        .def("isPlasticityEnabled", &Brain::isPlasticityEnabled,
+             "Check if plasticity is enabled")
+        .def("setLearningRate", &Brain::setLearningRate, py::arg("rate"),
+             "Set global learning rate")
+        .def("getLearningRate", &Brain::getLearningRate,
+             "Get current learning rate")
+        .def("getMemoryStats", &Brain::getMemoryStats,
+             "Get brain memory statistics")
+        .def("getPerformanceMetrics", &Brain::getPerformanceMetrics,
+             "Get performance metrics");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -406,7 +440,17 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
         .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled)
+        .def("getMemoryCapacity", &AgentBrain::getMemoryCapacity,
+             "Get working memory capacity")
+        .def("getEpisodicMemoryCapacity", &AgentBrain::getEpisodicMemoryCapacity,
+             "Get episodic memory capacity")
+        .def("getAttentionSpan", &AgentBrain::getAttentionSpan,
+             "Get attention span")
+        .def("getLearningRate", &AgentBrain::getLearningRate,
+             "Get current learning rate")
+        .def("setLearningRate", &AgentBrain::setLearningRate, py::arg("rate"),
+             "Set learning rate");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();

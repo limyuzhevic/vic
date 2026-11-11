@@ -72,13 +72,21 @@ template<typename T>
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
 
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    // Set values with validation
+    bool set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
+    bool set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set values with validation and error messages
+    bool setWithValidation(const std::string& key, const ConfigValue& value, std::string& errorMessage, ConfigSource source = ConfigSource::Runtime);
+    bool setWithValidation(const std::string& key, const std::string& value, std::string& errorMessage, ConfigSource source = ConfigSource::Runtime);
+    bool setWithValidation(const std::string& key, int value, std::string& errorMessage, ConfigSource source = ConfigSource::Runtime);
+    bool setWithValidation(const std::string& key, int64_t value, std::string& errorMessage, ConfigSource source = ConfigSource::Runtime);
+    bool setWithValidation(const std::string& key, double value, std::string& errorMessage, ConfigSource source = ConfigSource::Runtime);
+    bool setWithValidation(const std::string& key, bool value, std::string& errorMessage, ConfigSource source = ConfigSource::Runtime);
     
     // Check existence
     bool has(const std::string& key) const;

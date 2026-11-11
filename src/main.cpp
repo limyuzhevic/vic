@@ -353,20 +353,40 @@ int main(int argc, char** argv) {
     config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
-    
+    if (!config->setWithValidation("random_seed", static_cast<int64_t>(42), errorMsg, ConfigSource::Default)) {
+        NLM_LOG_WARNING("Failed to set default random_seed: " + errorMsg);
+    }
+    if (!config->setWithValidation("simulation_timestep", 0.001, errorMsg, ConfigSource::Default)) {
+        NLM_LOG_WARNING("Failed to set default simulation_timestep: " + errorMsg);
+    }
+    if (!config->setWithValidation("neuron_count", static_cast<int64_t>(500), errorMsg, ConfigSource::Default)) {
+        NLM_LOG_WARNING("Failed to set default neuron_count: " + errorMsg);
+    }
+    if (!config->setWithValidation("region_count", static_cast<int64_t>(1), errorMsg, ConfigSource::Default)) {
+        NLM_LOG_WARNING("Failed to set default region_count: " + errorMsg);
+    }
+    if (!config->setWithValidation("connection_probability", 0.15f, errorMsg, ConfigSource::Default)) {
+        NLM_LOG_WARNING("Failed to set default connection_probability: " + errorMsg);
+    }
+
     // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
-    
+    if (!config->setWithValidation("stdp_ltp_weight", 0.02f, errorMsg, ConfigSource::Default)) {
+        NLM_LOG_WARNING("Failed to set default stdp_ltp_weight: " + errorMsg);
+    }
+    if (!config->setWithValidation("stdp_ltd_weight", 0.015f, errorMsg, ConfigSource::Default)) {
+        NLM_LOG_WARNING("Failed to set default stdp_ltd_weight: " + errorMsg);
+    }
+    if (!config->setWithValidation("stdp_tau", 20.0f, errorMsg, ConfigSource::Default)) {
+        NLM_LOG_WARNING("Failed to set default stdp_tau: " + errorMsg);
+    }
+
     // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    if (!config->setWithValidation("synaptogenesis_rate", 0.0001f, errorMsg, ConfigSource::Default)) {
+        NLM_LOG_WARNING("Failed to set default synaptogenesis_rate: " + errorMsg);
+    }
+    if (!config->setWithValidation("pruning_rate", 0.00001f, errorMsg, ConfigSource::Default)) {
+        NLM_LOG_WARNING("Failed to set default pruning_rate: " + errorMsg);
+    }
     
     // Log configuration summary
     NLM_LOG_INFO("");

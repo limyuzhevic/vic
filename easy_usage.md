@@ -143,15 +143,129 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 4: Advanced Agent with All Systems
 
 ```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
-```
+def run_advanced_agent_simulation(config_file="configs/default.cfg"):
+    """Run a comprehensive agent simulation with all NLM subsystems."""
+    
+    # 1. Load configuration
+    import pynlm
+    config = pynlm.createDefaultConfig()
+    if config.loadFromFile(config_file):
+        print(f"Loaded configuration from: {config_file}")
+    
+    # 2. Create and initialize brain
+    brain = pynlm.createBrain(config)
+    brain.initialize()
+    print(f"Created brain with {brain.getTotalNeuronCount()} neurons")
+    
+    # 3. Create agent interface
+    agent = pynlm.createAgentBrain(brain)
+    
+    # 4. Create and configure world
+    world = pynlm.createSimpleWorld()
+    world.configure(
+        width=50, height=50, 
+        visionWidth=16, visionHeight=16
+    )
+    world.setAgentStart(25.0, 25.0)
+    world.reset()
+    
+    # 5. Initialize agent
+    agent.initialize(world)
+    
+    # 6. Enable all advanced subsystems
+    agent.enableRewardModulation(True)
+    agent.enableStructuralPlasticity(True)
+    agent.enableDevelopment(True)
+    agent.enableCuriosity(True)
+    
+    print("All subsystems enabled:")
+    print(f"  Reward Modulation: {'Enabled' if agent.isRewardModulationEnabled() else 'Disabled'}")
+    print(f"  Structural Plasticity: {'Enabled' if agent.isStructuralPlasticityEnabled() else 'Disabled'}")
+    print(f"  Development: {'Enabled' if agent.isDevelopmentEnabled() else 'Disabled'}")
+    print(f"  Curiosity: {'Enabled' if agent.isCuriosityEnabled() else 'Disabled'}")
+    
+    # 7. Run simulation loop
+    episode = 0
+    max_episodes = 10
+    steps_per_episode = 1000
+    
+    while episode < max_episodes:
+        episode_steps = 0
+        episode_reward = 0.0
+        
+        while episode_steps < steps_per_episode:
+            # Update world
+            world.update(0.1)
+            
+            # Get sensory input
+            percept = world.getSensoryPercept()
+            
+            # Process in agent (brain)
+            agent.processSensoryInput(percept)
+            
+            # Brain thinks
+            brain.step(episode_steps)
+            
+            # Get action from agent (brain)
+            action = agent.decodeMotorCommand()
+            
+            # Apply action to world
+            world.applyMotorCommand(action, world.getSimulationTime())
+            
+            # Compute and apply reward
+            reward = world.getSensoryPercept().getInternal()[0] if world.getSensoryPercept().getInternal() else 0.0
+            agent.applyRewardModulation(reward, 0.0)
+            
+            # Update development system
+            agent.updateDevelopment(0.1)
+            
+            episode_reward += reward
+            episode_steps += 1
+            
+            # Log progress
+            if episode_steps % 200 == 0:
+                print(f"  Step {episode_steps}: Reward={reward:.3f}, "
+                      f"Firing={brain.getFiringNeuronCount()}, "
+                      f"Curiosity={agent.getCuriosityLevel():.3f}, "
+                      f"Novelty={agent.getNoveltyLevel():.3f}")
+        
+        episode += 1
+        print(f"Episode {episode} completed: Total reward={episode_reward:.2f}")
+    
+    # 8. Print final statistics
+    print("\n=== Final Brain Statistics ===")
+    print(f"  Total Neurons: {brain.getTotalNeuronCount()}")
+    print(f"  Total Synapses: {brain.getTotalSynapseCount()}")
+    print(f"  Final Spike Count: {brain.getTotalSpikeCount()}")
+    print(f"  Average Firing Rate: {brain.getAverageFiringRate():.2f} Hz")
+    print(f"  Excitation/Inhibition Ratio: {brain.getExcitationInhibitionRatio():.2f}")
+    print(f"  Developmental Stage: {brain.getDevelopmentalStage()}")
+    
+    print("\n=== Final Agent Statistics ===")
+    print(f"  Neuromodulation Level: {agent.getNeuromodulationLevel():.3f}")
+    print(f"  Curiosity Level: {agent.getCuriosityLevel():.3f}")
+    print(f"  Novelty Level: {agent.getNoveltyLevel():.3f}")
+    print(f"  Prediction Error: {agent.getPredictionError():.3f}")
+    
+    # 9. Save final state
+    brain.save("final_brain_state.bin")
+    print(f"\nSaved final brain state to: final_brain_state.bin")
+    
+    return {
+        'brain': brain,
+        'agent': agent,
+        'world': world,
+        'episode': episode,
+        'total_reward': episode_reward
+    }
+
+# Usage:
+# result = run_advanced_agent_simulation()
+# print(f"Simulation completed with {result['episode']} episodes")
+
 
 ---
 

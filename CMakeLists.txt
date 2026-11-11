@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
+# Project version
+project(NLM VERSION 0.1.0 LANGUAGES CXX)
+
 # C++20 standard
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+add_compile_features(nlm_core cxx_std_20)
 
 # Build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -15,7 +16,7 @@ endif()
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Source directory
@@ -89,6 +90,12 @@ target_include_directories(nlm_core PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Performance optimizations for core library
+target_compile_options(nlm_core PRIVATE
+    -march=native
+    -flto
+)
+
 # Agent system (body, sensory percept, agent-brain interface)
 add_library(nlm_agent STATIC
     src/agent/SensoryPercept.cpp
@@ -138,7 +145,7 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
-# Phase 3 demo executable
+# Phase IoM demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
@@ -210,4 +217,20 @@ install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
+)
+
+# Custom targets for common build scenarios
+
+# Create convenience targets
+add_custom_target(build_all ALL
+    COMMENT "Build all targets and tests"
+    DEPENDS nlm nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark nlm_test
+)
+
+add_custom_target(install_python_bindings
+    COMMENT "Build and install Python bindings"
+    DEPENDS pynlm
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND ${Python_EXECUTABLE} -m pip install -e .
+    VERBATIM
 )
