@@ -84,6 +84,7 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### Standard C++ Build
 ```bash
 mkdir build
 cd build
@@ -91,17 +92,234 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+### Python Bindings Build (pynlm)
+```bash
+# From the project root, install the Python module
+pip install scikit-build-core pybind11 pytest numpy
+pip install .  # This builds and installs pynlm
+
+# Or in development mode
+pip install -e .
+```
+
 ## Running
+
 Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
 
+### Core Demos
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
-./nlm_phase3_demo
-./nlm_phase4_demo
-./nlm_phase6_demo     # Phase 6 integration test
-./nlm_benchmark
+./nlm                 # Phase 2: Real Neural Computation demo (from src/main.cpp)
+./nlm_phase3_demo     # Phase 3: Basic environment interaction
+./nlm_phase4_demo     # Phase 4: Advanced cognitive capabilities
+./nlm_phase5_demo     # Phase 5: Pattern probe, sandbox, and checkpoint demo
+./nlm_phase6_demo     # Phase 6: Complete integration test
+./nlm_phase6_text_demo # Phase 6: Text-based interaction demo
+./nlm_benchmark       # Performance benchmark suite
 ```
+
+### Testing
+```bash
+# Run unit tests (requires build with tests enabled)
+cd build
+ctest --output-on-failure
+
+# Or run specific test suites
+./nlm_test           # Core unit tests
+```
+
+### Python API
+```bash
+# After installing pynlm with pip install .
+python -c "import pynlm; print(pynlm.__version__)"
+python examples/simple.py   # Example from examples/ directory
+python examples/full_agent.py # Full agent example
+```
+
+## Python API Usage
+
+The `pynlm` Python module provides a simplified interface to the NLM brain:
+
+### Basic Usage
+```python
+import pynlm
+
+# Create a brain with default configuration
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation for 100 steps
+for i in range(100):
+    brain.step(i)
+
+print(f"Neurons: {brain.getTotalNeuronCount()}")
+print(f"Spikes: {brain.getTotalSpikeCount()}")
+```
+
+### Agent in World Simulation
+```python
+import pynlm
+
+# Create brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Create agent interface
+agent = pynlm.createAgentBrain(brain)
+
+# Create and configure world
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+# Initialize agent
+agent.initialize(world)
+
+# Enable learning capabilities
+agent.enableRewardModulation(True)
+agent.enableCuriosity(True)
+agent.enableDevelopment(True)
+
+# Run episode
+for step in range(500):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+```
+
+### Configuration
+```python
+import pynlm
+
+config = pynlm.createDefaultConfig()
+
+# Modify configuration options
+config.set("brain.neuron_count", 2000)
+config.set("brain.connection_probability", 0.15)
+config.set("plasticity.stdp.learning_rate", 0.001)
+config.set("neuromod.dopamine.scale", 1.5)
+
+# Save configuration to file
+config.saveToFile("my_config.json")
+
+# Load configuration from file
+config.loadFromFile("my_config.json")
+```
+
+## Configuration Options
+
+NLM supports extensive configuration through key-value pairs. Common configuration options include:
+
+### Brain Configuration
+- `brain.neuron_count`: Number of neurons (default: 1000)
+- `brain.region_count`: Number of brain regions (default: 1)
+- `brain.connection_probability`: Probability of synaptic connections (default: 0.1)
+- `brain.initial_weight_mean`: Mean initial synaptic weight (default: 0.5)
+- `brain.v_thresh`: Neuron threshold potential (mV, default: -50.0)
+
+### Plasticity Configuration
+- `plasticity.stdp.enable`: Enable STDP (default: true)
+- `plasticity.stdp.learning_rate`: STDP learning rate (default: 0.001)
+- `plasticity.hebbian.enable`: Enable Hebbian learning (default: true)
+
+### Neuromodulation Configuration
+- `neuromod.dopamine.scale`: Dopamine modulation scale (default: 1.0)
+- `neuromod.curiosity.enable`: Enable curiosity (default: true)
+- `neuromod.novelty.enable`: Enable novelty detection (default: true)
+
+### Developmental Configuration
+- `development.initial_plasticity`: Initial plasticity rate (default: 1.0)
+- `development.maturation_rate`: Rate of developmental maturation (default: 0.01)
+
+## Example Scripts
+
+See the `examples/` directory for complete working examples:
+
+### examples/simple.py
+Basic brain initialization and simulation
+
+### examples/full_agent.py
+Complete agent-in-world simulation with learning
+
+### examples/visualize.py
+Visualize brain activity and connections
+
+## Development Setup
+
+### Prerequisites
+- C++20 compatible compiler (GCC 10+, Clang 12+, or MSVC 2019+)
+- CMake 3.16 or higher
+- Python 3.8+ (for Python bindings)
+
+### Build Options
+```bash
+# Debug build with symbols
+cmake .. -DCMAKE_BUILD_TYPE=Debug
+
+# Custom installation prefix
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+
+# Build with Python bindings
+cmake .. -DNLM_BUILD_PYTHON_BINDINGS=ON
+```
+
+### Running Tests
+```bash
+# Build with tests
+mkdir build
+cd build
+cmake .. -DBUILD_TESTING=ON
+make -j4
+
+# Run all tests
+ctest --output-on-failure
+
+# Run specific test category
+./nlm_test                    # Core brain tests
+./nlm_benchmark              # Performance tests
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**"ImportError: No module named 'pynlm'"**
+```bash
+pip install --force-reinstall .
+```
+
+**"CMake cannot find Python"**
+```bash
+pip install scikit-build-core pybind11
+cmake .. -DPython_EXECUTABLE=$(which python)
+```
+
+**"Segmentation fault"**
+- Ensure `initialize()` is called before `step()`
+- Check that `reset()` is called before re-running simulations
+- Verify configuration values are within expected ranges
+
+### Getting Help
+
+For technical questions:
+- Check the documentation in `docs/` directory
+- Review the Phase-specific demo outputs for expected behavior
+- Consult the API reference in the Python module documentation
+
+### Quick Reference
+
+| What you want | Code |
+|--------------|------|
+| Create brain | `pynlm.createBrain(config)` |
+| Start brain | `brain.initialize()` |
+| Make brain think | `brain.step(step)` |
+| Create agent | `pynlm.createAgentBrain(brain)` |
+| See world | `world.getSensoryPercept()` |
+| Make action | `agent.decodeMotorCommand()` |
 
 `nlm_phase6_demo` runs a comprehensive integration test verifying all
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`

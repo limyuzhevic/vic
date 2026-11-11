@@ -20,32 +20,40 @@
 #include "experiments/ExperimentRunner.hpp"
 
 #include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
 #include <iomanip>
 #include <numeric>
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printUsage(const char* programName) {
+    std::cout << "NLM (熙然) - Neural Learning Machine" << std::endl;
+    std::cout << "=================================" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [options]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "  --help                    Show this help message" << std::endl;
+    std::cout << "  --config=file.cfg         Load configuration from file" << std::endl;
+    std::cout << "  --brain.neuron_count=N    Set number of neurons (e.g., 500)" << std::endl;
+    std::cout << "  --brain.region_count=N     Set number of brain regions (e.g., 2)" << std::endl;
+    std::cout << "  --plasticity.stdp.rate=R   Set STDP learning rate" << std::endl;
+    std::cout << "  --random_seed=N            Set random seed for reproducible results" << std::endl;
+    std::cout << "  --phase3_demo              Run Phase 3 demonstration" << std::endl;
+    std::cout << "  --phase4_demo              Run Phase 4 demonstration" << std::endl;
+    std::cout << "  --phase5_demo              Run Phase 5 demonstration" << std::endl;
+    std::cout << "  --phase6_demo              Run Phase 6 integration demo" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Phase-specific options:" << std::endl;
+    std::cout << "  --phase3                   Enable Phase 3 features" << std::endl;
+    std::cout << "  --phase4                   Enable Phase 4 features" << std::endl;
+    std::cout << "  --phase5                   Enable Phase 5 features" << std::endl;
+    std::cout << "  --phase6                   Enable Phase 6 features" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Examples:" << std::endl;
+    std::cout << "  " << programName << " --help" << std::endl;
+    std::cout << "  " << programName << " --phase6_demo --brain.neuron_count=1000" << std::endl;
+    std::cout << "  " << programName << " --phase3_demo --random_seed=42" << std::endl;
+    std::cout << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -349,10 +357,62 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Parse command line arguments
+    std::string configFile = "configs/default.cfg";
+    std::string demoMode = "phase2"; // Default to phase2 demo
     
-    // Set default values for Phase 2
+    // Handle --help flag first
+    bool showHelp = false;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-help") {
+            showHelp = true;
+            break;
+        }
+    }
+    
+    if (showHelp) {
+        printUsage(argv[0]);
+        return 0;
+    }
+    
+    // Process other arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 2) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg == "--phase3" || arg == "--phase4" || arg == "--phase5" || arg == "--phase6") {
+            if (arg == "--phase3") demoMode = "phase3";
+            else if (arg == "--phase4") demoMode = "phase4";
+            else if (arg == "--phase5") demoMode = "phase5";
+            else if (arg == "--phase6") demoMode = "phase6";
+        } else if (arg == "--phase3_demo" || arg == "--phase4_demo" || arg == "--phase5_demo" || arg == "--phase6_demo") {
+            demoMode = arg.substr(2); // Extract phase name
+        } else if (arg == "--nlm" || arg == "--nlm_phase3_demo" || arg == "--nlm_phase4_demo" || arg == "--nlm_phase5_demo" || arg == "--nlm_phase6_demo") {
+            // Legacy executable names - these are already compiled separately
+            // This code would only run if using the main executable
+            if (arg == "--nlm") demoMode = "phase2";
+            else if (arg == "--nlm_phase3_demo") demoMode = "phase3";
+            else if (arg == "--nlm_phase4_demo") demoMode = "phase4";
+            else if (arg == "--nlm_phase5_demo") demoMode = "phase5";
+            else if (arg == "--nlm_phase6_demo") demoMode = "phase6";
+        } else if (arg == "--version") {
+            std::cout << "NLM Version 0.1.0 (Phase 6: Final Integration)" << std::endl;
+            return 0;
+        } else if (arg == "--authors") {
+            std::cout << "NLM Research Project" << std::endl;
+            std::cout << "Scientific team: nlm-project.org" << std::endl;
+            return 0;
+        }
+    }
+    
+    // Log mode selection
+    NLM_LOG_INFO("Demo mode: " + demoMode);
+    NLM_LOG_INFO("Config file: " + configFile);
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
