@@ -300,6 +300,8 @@ bool Brain::initialize() {
     // Initialize neuromodulation
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
+    pImpl->predictionError->initialize(this);
+    pImpl->dopamine->initialize(this);
     
     // Register spike handlers once; re-initialising used to register them
     // again and double-count every spike.
