@@ -10,8 +10,6 @@ Think of it like this:
 - **Learning** = When connections get stronger or weaker based on what happens
 - **Memory** = The brain remembering patterns
 
-That's it! NLM simulates all of this.
-
 ---
 
 ## The 3 Things You Need to Know
@@ -73,6 +71,50 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 
 ---
 
+## Advanced Usage: Learning Brain
+
+For brains that actually learn and change through experience:
+
+```python
+import pynlm
+
+# Create brain and agent
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+agent = pynlm.createAgentBrain(brain)
+
+# Create world and enable learning
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+agent.initialize(world)
+
+# Enable learning features (optional but recommended for learning)
+agent.enableRewardModulation(True)      # Learn from rewards
+agent.enableStructuralPlasticity(True)  # Grow new connections
+agent.enableDevelopment(True)           # Brain matures over time
+agent.enableCuriosity(True)             # Explore new things
+
+# Run simulation loop
+for step in range(1000):
+    world.update(0.1)
+    agent.processSensoryInput(world.getSensoryPercept())
+    brain.step(step)
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+        print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+        print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+        print(f"  Dev Stage: {brain.getDevelopmentalStage()}")
+
+print("Learning simulation complete!")
+```
+
+---
+
 ## Simple Analogy
 
 | Real World | NLM Code |
@@ -82,25 +124,6 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 | You decide to act | `action = agent.decodeMotorCommand()` |
 | You do the action | `world.applyMotorCommand(action, time)` |
 | Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
-
----
-
-## The Simplest Possible Example
-
-```python
-import pynlm
-
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Initialize it
-brain.initialize()
-
-# Make it active
-brain.step(0)
-
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
-```
 
 ---
 

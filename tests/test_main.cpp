@@ -1,5 +1,6 @@
 // NLM Test Main
 // Phase 2: Real Neural Computation Tests
+// Phase 3+: Extended Integration Tests
 
 #include <iostream>
 #include <cassert>
@@ -37,12 +38,32 @@ namespace test_brain {
     void runAll();
 }
 
+namespace test_neuromodulation {
+    void runAll();
+}
+
+namespace test_memory {
+    void runAll();
+}
+
+namespace test_cognition {
+    void runAll();
+}
+
+namespace test_development {
+    void runAll();
+}
+
 int main() {
-    std::cout << "=== NLM Phase 2 Tests ===" << std::endl;
+    std::cout << "=== NLM Phase 2+ Tests ===" << std::endl;
     std::cout << "Testing Real Neural Computation:" << std::endl;
     std::cout << "  - LIF Neuron Dynamics" << std::endl;
     std::cout << "  - Synaptic Transmission" << std::endl;
     std::cout << "  - STDP Plasticity" << std::endl;
+    std::cout << "  - Neuromodulation Integration" << std::endl;
+    std::cout << "  - Memory Systems" << std::endl;
+    std::cout << "  - Cognition Mechanisms" << std::endl;
+    std::cout << "  - Development Stages" << std::endl;
     std::cout << std::endl;
     
     bool allPassed = true;
@@ -113,6 +134,42 @@ int main() {
     std::cout << "Running Brain tests..." << std::endl;
     try {
         test_brain::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Neuromodulation tests..." << std::endl;
+    try {
+        test_neuromodulation::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Memory tests..." << std::endl;
+    try {
+        test_memory::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Cognition tests..." << std::endl;
+    try {
+        test_cognition::runAll();
+        std::cout << "  PASSED" << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << "  FAILED: " << e.what() << std::endl;
+        allPassed = false;
+    }
+    
+    std::cout << "Running Development tests..." << std::endl;
+    try {
+        test_development::runAll();
         std::cout << "  PASSED" << std::endl;
     } catch (const std::exception& e) {
         std::cout << "  FAILED: " << e.what() << std::endl;

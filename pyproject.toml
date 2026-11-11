@@ -55,6 +55,9 @@ cmake.args = [
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+# Use python/CMakeLists.txt instead of python bindings from root CMake to avoid duplication
+# The build backend will use the python/CMakeLists.txt directory to configure
+project_directory = "python"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

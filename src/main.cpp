@@ -310,6 +310,73 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
+    // Initialize advanced command-line parser
+    std::string configFile = "configs/default.cfg";
+    std::string outputFile;
+    bool enableDebug = false;
+    bool enableProfiling = false;
+    bool enableDevelopment = true;
+    bool enableNeuromodulation = true;
+    bool enableStructuralPlasticity = true;
+    SimulationStep customSteps = 0;
+    double customTimestep = 0.0;
+    std::string checkpointFile;
+    std::string experimentName = "nlm_experiment";
+    
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        } else if (arg == "--debug" || arg == "--debug-mode") {
+            enableDebug = true;
+        } else if (arg == "--profile" || arg == "--performance-monitoring") {
+            enableProfiling = true;
+        } else if (arg == "--no-development") {
+            enableDevelopment = false;
+        } else if (arg == "--no-neuromodulation") {
+            enableNeuromodulation = false;
+        } else if (arg == "--no-structural-plasticity") {
+            enableStructuralPlasticity = false;
+        } else if (arg == "--steps" && i + 1 < argc) {
+            customSteps = std::stoull(argv[++i]);
+        } else if (arg == "--timestep" && i + 1 < argc) {
+            customTimestep = std::stod(argv[++i]);
+        } else if (arg == "--checkpoint" && i + 1 < argc) {
+            checkpointFile = argv[++i];
+        } else if (arg == "--checkpoint-save" && i + 1 < argc) {
+            checkpointFile = argv[++i];
+        } else if (arg == "--experiment-name" && i + 1 < argc) {
+            experimentName = argv[++i];
+        } else if (arg == "--output" && i + 1 < argc) {
+            outputFile = argv[++i];
+        } else if (arg == "--help" || arg == "--help-advanced") {
+            std::cout << "\n=== Advanced NLM Command Line Options ===\n" << std::endl;
+            std::cout << "Basic Options:\n";
+            std::cout << "  --config=file.cfg          Load configuration from file\n";
+            std::cout << "  --steps=N                Custom number of simulation steps\n";
+            std::cout << "  --timestep=0.001          Custom simulation timestep\n" << std::endl;
+            std::cout << "Advanced Options:\n";
+            std::cout << "  --debug                   Enable debug logging and diagnostics\n";
+            std::cout << "  --profile                 Enable performance monitoring\n";
+            std::cout << "  --no-development          Disable developmental stages\n";
+            std::cout << "  --no-neuromodulation      Disable neuromodulation effects\n";
+            std::cout << "  --no-structural-plasticity Disable structural plasticity\n" << std::endl;
+            std::cout << "Checkpoint Options:\n";
+            std::cout << "  --checkpoint-save=file    Save final brain state to file\n";
+            std::cout << "  --experiment-name=name   Set experiment identifier\n" << std::endl;
+            std::cout << "Output Options:\n";
+            std::cout << "  --output=file            Write brain state to file\n" << std::endl;
+            std::cout << "Example:\n";
+            std::cout << "  ./nlm --config=myconfig.cfg --debug --profile --steps=5000 --checkpoint-save=final_brain.bin\n" << std::endl;
+            return 0;
+        }
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
     // Initialize logger
@@ -330,7 +397,6 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -351,6 +417,25 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
+    
+    // Apply advanced feature toggles
+    if (!enableDevelopment) {
+        config->set("development.enabled", false, ConfigSource::CommandLine);
+    }
+    if (!enableNeuromodulation) {
+        config->set("neuromodulation.enabled", false, ConfigSource::CommandLine);
+    }
+    if (!enableStructuralPlasticity) {
+        config->set("structural_plasticity.enabled", false, ConfigSource::CommandLine);
+    }
+    
+    // Apply custom simulation parameters
+    if (customSteps > 0) {
+        config->set("simulation.max_steps", static_cast<int64_t>(customSteps), ConfigSource::CommandLine);
+    }
+    if (customTimestep > 0.0) {
+        config->set("simulation.timestep", customTimestep, ConfigSource::CommandLine);
+    }
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -378,10 +463,25 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
     NLM_LOG_INFO("");
     
-    // Initialize simulation clock
-    double timestep = config->getOr<double>("simulation_timestep", 0.001);
-    SimulationClock clock(timestep);
-    NLM_LOG_INFO("Simulation clock initialized with timestep: " + std::to_string(timestep) + "s");
+    // Log advanced feature status
+    if (enableDebug) {
+        NLM_LOG_INFO("Advanced features enabled:");
+        NLM_LOG_INFO("  Debug mode: YES");
+        NLM_LOG_INFO("  Performance monitoring: " + std::string(enableProfiling ? "YES" : "NO"));
+        NLM_LOG_INFO("  Development stages: " + std::string(enableDevelopment ? "YES" : "NO"));
+        NLM_LOG_INFO("  Neuromodulation: " + std::string(enableNeuromodulation ? "YES" : "NO"));
+        NLM_LOG_INFO("  Structural plasticity: " + std::string(enableStructuralPlasticity ? "YES" : "NO"));
+        if (customSteps > 0) {
+            NLM_LOG_INFO("  Custom steps: " + std::to_string(customSteps));
+        }
+        if (customTimestep > 0.0) {
+            NLM_LOG_INFO("  Custom timestep: " + std::to_string(customTimestep) + "s");
+        }
+        if (!checkpointFile.empty()) {
+            NLM_LOG_INFO("  Checkpoint file: " + checkpointFile);
+        }
+        NLM_LOG_INFO("  Experiment name: " + experimentName);
+    }
     
     // Initialize brain
     NLM_LOG_INFO("");

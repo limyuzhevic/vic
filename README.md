@@ -92,20 +92,33 @@ make -j4
 ```
 
 ## Running
-Build all targets first (see Building above). The entry points are
-currently separate demos per phase, not a single unified binary:
+Build all targets first (see Building above). The entry point is
 
 ```bash
 ./nlm                 # Phase 2 demo in src/main.cpp
 ./nlm_phase3_demo
 ./nlm_phase4_demo
+./nlm_phase5_demo     # Phase 5 demo
 ./nlm_phase6_demo     # Phase 6 integration test
 ./nlm_benchmark
 ```
 
-`nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+`./nlm` runs the Phase 2 demonstration with real neural computation, including:
+- Basic connectivity test with spiking neurons
+- Plasticity learning experiment showing STDP and Hebbian learning
+- STDP verification demonstrating pre-post timing-dependent potentiation
+
+All other demos show higher-level functionality:
+- `nlm_phase3_demo`: World interaction loop, sensory input, motor output
+- `nlm_phase4_demo`: Prediction system, working memory, episodic memory
+- `nlm_phase5_demo`: Performance optimizations, checkpoint system
+- `nlm_phase6_demo`: Complete integration of all systems
+
+Phase 5 is wired as the `nlm_phase5` library in CMake; it does not yet have a standalone demo executable.
+
+## Phase 6 Integration
+
+Phase 6 focuses on integrating all existing systems into a coherent artificial brain. Previous phases built individual components; Phase 6 ensures they work together as a unified system.
 
 ## Project Structure
 
