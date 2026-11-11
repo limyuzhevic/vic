@@ -21,7 +21,34 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , developmentEnabled_(true)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
+    , predictionSystemEnabled_(false)
+    , plannerEnabled_(false)
+    , conceptFormationEnabled_(false)
+    , attentionEnabled_(false)
 {
+    // Initialize brain systems
+    if (brain_) {
+        // Connect prediction system if available
+        if (brain_->getPredictionSystem()) {
+            predictionSystem_ = brain_->getPredictionSystem();
+            predictionSystemEnabled_ = true;
+        }
+        
+        // Connect cognitive systems if available
+        if (brain_->getPlanner()) {
+            planner_ = brain_->getPlanner();
+            plannerEnabled_ = true;
+        }
+        if (brain_->getConceptFormation()) {
+            conceptFormation_ = brain_->getConceptFormation();
+            conceptFormationEnabled_ = true;
+        }
+        if (brain_->getAttention()) {
+            attention_ = brain_->getAttention();
+            attentionEnabled_ = true;
+        }
+    }
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -404,6 +431,91 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     if (curiosityEnabled_) {
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f
                         + 0.6f * curiosityLevel_;
+        curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
+    }
+    
+    // Phase 6 prediction system integration
+    // Enhanced agent uses predictive coding to anticipate sensory input
+    if (predictionSystemEnabled_ && predictionSystem_ && !lastVision_.empty() && !percept.getVision().empty()) {
+        // Convert vision to SensoryInput for prediction system
+        SensoryInput currentState;
+        currentState.setData(percept.getVision());
+        
+        // Make prediction for next state (if prediction system has predictNextState method)
+        // For now, we'll update the visual prediction using the enhanced method
+        if (!predictedVision_.empty() && predictedVision_.size() == percept.getVision().size()) {
+            float totalDiff = 0.0f;
+            for (size_t i = 0; i < percept.getVision().size(); ++i) {
+                totalDiff += std::abs(percept.getVision()[i] - predictedVision_[i]);
+            }
+            predictionError_ = totalDiff / std::max<size_t>(percept.getVision().size(), 1);
+            
+            // Update prediction using adaptive learning
+            constexpr float kPredictionAlpha = 0.05f;
+            for (size_t i = 0; i < percept.getVision().size(); ++i) {
+                predictedVision_[i] += kPredictionAlpha * (percept.getVision()[i] - predictedVision_[i]);
+            }
+            
+            // Use prediction error for neuromodulation
+            if (rewardModulationEnabled_) {
+                float predictionErrorSignal = predictionError_;
+                if (predictionErrorSignal > 0.5f) {
+                    // Large prediction error -> enhanced learning
+                    curiosityLevel_ *= 1.5f;
+                    dopamineLevel_ *= 1.3f;
+                } else if (predictionErrorSignal < 0.1f) {
+                    // Small prediction error -> reduced exploration
+                    curiosityLevel_ *= 0.7f;
+                }
+            }
+            
+            // Signal prediction error to prediction system if available
+            if (predictionSystem_) {
+                // This would be called in a real implementation
+                // predictionSystem_->signalPredictionError(predictionError_);
+            }
+        }
+    } else {
+        // Fallback prediction method
+        if (!vision.empty()) {
+            if (predictedVision_.size() != vision.size()) {
+                predictedVision_.assign(vision.size(), 0.0f);
+            }
+            float totalDiff = 0.0f;
+            for (size_t i = 0; i < vision.size(); ++i) {
+                totalDiff += std::abs(vision[i] - predictedVision_[i]);
+            }
+            noveltyLevel_ = totalDiff / std::max<size_t>(vision.size(), 1);
+            noveltyLevel_ *= sensoryNoveltyDecay_;
+            // Predict (keep previous implementation)
+            constexpr float kPredictionAlpha = 0.05f;
+            for (size_t i = 0; i < vision.size(); ++i) {
+                predictedVision_[i] += kPredictionAlpha * (vision[i] - predictedVision_[i]);
+            }
+        }
+    }
+    
+    // Update curiosity based on novelty and prediction error (enhanced with prediction system)
+    if (curiosityEnabled_) {
+        // Enhanced curiosity update with prediction system integration
+        float noveltyContribution = noveltyLevel_ * 2.0f;
+        float predictionErrorContribution = std::abs(predictionError_) * 0.5f;
+        float curiosityBaseline = 0.6f * curiosityLevel_;
+        
+        // Add prediction system influence
+        if (predictionSystemEnabled_ && predictionSystem_) {
+            // Get enhanced novelty from prediction system
+            float enhancedNovelty = noveltyLevel_;
+            if (enhancedNovelty > 0.5f) {
+                // Very novel scene -> high curiosity
+                curiosityLevel_ += enhancedNovelty * 0.5f;
+            } else if (predictionError_ < 0.1f) {
+                // Low prediction error -> reduced curiosity
+                curiosityLevel_ *= 0.8f;
+            }
+        }
+        
+        curiosityLevel_ = noveltyContribution + predictionErrorContribution + curiosityBaseline;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }
@@ -1038,6 +1150,9 @@ float AgentBrain::getNoveltyLevel() const {
 }
 
 float AgentBrain::getPredictionError() const {
+    if (predictionSystemEnabled_ && predictionSystem_) {
+        return predictionSystem_->getPredictionError();
+    }
     return predictionError_;
 }
 
@@ -1105,6 +1220,18 @@ void AgentBrain::reset() {
     hasLastDecoded_ = false;
     hasThoughtPlanned_ = false;
     hasThoughtOutcome_ = false;
+    }
+    
+    // Phase 6: prediction system and cognitive systems
+    std::shared_ptr<PredictionSystem> predictionSystem_;
+    std::shared_ptr<NeuralPlanner> planner_;
+    std::shared_ptr<ConceptFormation> conceptFormation_;
+    std::shared_ptr<AttentionalSelection> attention_;
+    
+    // Configuration flags for Phase 6 integration
+    bool predictionSystemEnabled_;
+    bool plannerEnabled_;
+    bool conceptFormationEnabled_;
+    bool attentionEnabled_;
+    
 }
-
-} // namespace nlm

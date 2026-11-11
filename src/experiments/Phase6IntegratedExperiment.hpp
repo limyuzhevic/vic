@@ -84,6 +84,8 @@ struct Phase6Config {
     bool enableReplay;
     bool enableDevelopment;
     std::string checkpointPath;
+    uint64_t checkpointInterval;  // Save checkpoint every N steps
+    bool autoSaveCheckpoint;     // Automatically save checkpoints during simulation
     
     Phase6Config()
         : maxSteps(10000)
@@ -93,7 +95,18 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , checkpointInterval(1000)  // Save checkpoint every 1000 steps
+        , autoSaveCheckpoint(false)  // Don't auto-save by default to avoid I/O overhead
+    {}
+    
+    /**
+     * Check if checkpoint should be saved at current step
+     */
+    bool shouldSaveCheckpoint(uint64_t currentStep) const {
+        return enableCheckpointing && autoSaveCheckpoint && 
+               (checkpointInterval > 0) && (currentStep % checkpointInterval == 0);
+    }
 };
 
 /**

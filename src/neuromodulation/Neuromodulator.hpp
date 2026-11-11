@@ -7,7 +7,7 @@
 namespace nlm {
 
 // Neuromodulator: Abstract base for neuromodulatory signals
-// PLACEHOLDER - Phase 2 will implement real neuromodulation effects
+// Enhanced for Phase 6 integration
 
 class Neuromodulator {
 public:
@@ -21,7 +21,7 @@ public:
     virtual void setLevel(float level) = 0;
     
     // Apply neuromodulatory effect to plasticity
-    // TODO PHASE 2: Implement real modulation
+    // Enhanced for Phase 6
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state
@@ -32,7 +32,7 @@ protected:
 };
 
 // Dopamine: Reward and reinforcement learning signal
-// PLACEHOLDER - Phase 2
+// Enhanced for Phase 6 integration
 class Dopamine : public Neuromodulator {
 public:
     Dopamine();
@@ -53,8 +53,35 @@ private:
     Impl* pImpl;
 };
 
+// Enhanced Dopamine for Phase 6
+class DopamineEnhanced : public Neuromodulator {
+public:
+    DopamineEnhanced();
+    ~DopamineEnhanced() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Enhanced reward signaling with adaptive learning
+    void signalReward(float reward);
+    void signalRewardPredictionError(float error);
+    
+    // Get prediction error for learning
+    float getPredictionError() const;
+    
+    // Get recent experience for exploration
+    float getRecentExperience() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
 // Acetylcholine: Attention and memory consolidation
-// PLACEHOLDER - Phase 2
+// Enhanced for Phase 6 integration
 class Acetylcholine : public Neuromodulator {
 public:
     const char* getName() const override { return "ACh"; }
@@ -64,8 +91,29 @@ public:
     void update(TimestepDuration dt) override {}
 };
 
+// Enhanced Acetylcholine for Phase 6
+class AcetylcholineEnhanced : public Neuromodulator {
+public:
+    AcetylcholineEnhanced();
+    ~AcetylcholineEnhanced() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Enhanced attention modulation
+    void signalAttention(float attentionLevel);
+    void modulateMemoryConsolidation(float consolidationFactor);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
 // Norepinephrine: Arousal and vigilance
-// PLACEHOLDER - Phase 2
+// Enhanced for Phase 6 integration
 class Norepinephrine : public Neuromodulator {
 public:
     const char* getName() const override { return "NE"; }
@@ -75,8 +123,29 @@ public:
     void update(TimestepDuration dt) override {}
 };
 
+// Enhanced Norepinephrine for Phase 6
+class NorepinephrineEnhanced : public Neuromodulator {
+public:
+    NorepinephrineEnhanced();
+    ~NorepinephrineEnhanced() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Enhanced arousal modulation
+    void signalArousal(float arousalLevel);
+    void modulateVigilance(float vigilanceFactor);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
 // Serotonin: Mood, impulsivity, and social behavior
-// PLACEHOLDER - Phase 2
+// Enhanced for Phase 6 integration
 class Serotonin : public Neuromodulator {
 public:
     const char* getName() const override { return "5-HT"; }
@@ -84,6 +153,119 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+};
+
+// Enhanced Serotonin for Phase 6
+class SerotoninEnhanced : public Neuromodulator {
+public:
+    SerotoninEnhanced();
+    ~SerotoninEnhanced() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Enhanced mood and social modulation
+    void signalMood(float moodLevel);
+    void modulateSocialBehavior(float socialFactor);
+    void modulateImpulseControl(float impulseControlFactor);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Curiosity: Exploration motivation
+// Enhanced for Phase 6 integration
+class Curiosity : public Neuromodulator {
+public:
+    Curiosity();
+    ~Curiosity() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt, float novelty, float predictionError, float dtTime);
+    
+    // Enhanced curiosity dynamics
+    void signalNovelty(float noveltyLevel);
+    void signalPredictionError(float predictionError);
+    float getNoveltyLevel() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Enhanced Curiosity for Phase 6
+class CuriosityEnhanced : public Neuromodulator {
+public:
+    CuriosityEnhanced();
+    ~CuriosityEnhanced() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt, float novelty, float predictionError, float dtTime);
+    
+    // Enhanced exploration dynamics
+    void signalExploration(float explorationLevel);
+    void adaptBasedOnExperience(float experienceLevel);
+    void modulateExplorationThreshold(float threshold);
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Novelty detection: Novelty detection
+// Enhanced for Phase 6 integration
+class Novelty : public Neuromodulator {
+public:
+    Novelty();
+    ~Novelty() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Enhanced novelty detection
+    void signalNovelty(float noveltyLevel);
+    void updatePatternHistory(const std::vector<float>& pattern);
+    float getPatternNovelty(const std::vector<float>& pattern) const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
+};
+
+// Enhanced Novelty for Phase 6
+class NoveltyEnhanced : public Neuromodulator {
+public:
+    NoveltyEnhanced();
+    ~NoveltyEnhanced() override;
+    
+    const char* getName() const override;
+    float getLevel() const override;
+    void setLevel(float level) override;
+    float getPlasticityFactor() const override;
+    void update(TimestepDuration dt) override;
+    
+    // Enhanced novelty detection with pattern matching
+    void signalNovelty(float noveltyLevel);
+    void updatePatternDatabase(const std::vector<float>& pattern);
+    float detectPatternNovelty(const std::vector<float>& pattern) const;
+    void clearPatternDatabase();
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm

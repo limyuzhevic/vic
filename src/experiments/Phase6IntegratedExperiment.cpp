@@ -92,6 +92,66 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             agent.updateDevelopment(0.001);
         }
         
+        // Store experience in episodic memory
+        if (brain->getEpisodicMemory()) {
+            auto* em = brain->getEpisodicMemory();
+            
+            // Create episode from current state
+            EpisodicMemoryItem episode;
+            episode.timestamp = step;
+            
+            // Store sensory state (simplified)
+            // Get sensory input from percept
+            const auto& vision = percept.getVision();
+            const auto& audio = percept.getAudio();
+            const auto& touch = percept.getTouch();
+            const auto& internal = percept.getInternal();
+            
+            // Combine all sensory inputs
+            episode.sensoryState.clear();
+            for (float v : vision) episode.sensoryState.push_back(v);
+            for (float a : audio) episode.sensoryState.push_back(a);
+            for (float t : touch) episode.sensoryState.push_back(t);
+            for (float i : internal) episode.sensoryState.push_back(i);
+            
+            // Store location information (simplified - use world agent position)
+            episode.positionX = 0;  // TODO: Get actual position
+            episode.positionY = 0;  // TODO: Get actual position
+            episode.orientation = 0;  // TODO: Get actual orientation
+            
+            // Store action taken
+            episode.action = ActionType::Move;  // TODO: Convert MotorCommand to ActionType
+            
+            // Store internal state
+            episode.reward = reward;
+            episode.energy = 0;  // TODO: Get actual energy
+            episode.novelty = agent.getNoveltyLevel();
+            
+            // Store consequences (simplified)
+            episode.resultingSensoryState = episode.sensoryState;  // For now, assume same
+            episode.resultingReward = reward;
+            
+            // Store associated neural activity (simplified)
+            // Get neurons that were active
+            size_t activeNeurons = brain->getFiringNeuronCount();
+            episode.activeNeurons.clear();
+            for (size_t i = 0; i < std::min(activeNeurons, size_t(10)); ++i) {
+                episode.activeNeurons.push_back(static_cast<uint64_t>(i));
+            }
+            episode.neuronActivations.clear();
+            for (size_t i = 0; i < episode.activeNeurons.size(); ++i) {
+                episode.neuronActivations.push_back(1.0f);
+            }
+            
+            // Set age
+            episode.age = 0;
+            
+            em->storeEpisode(episode);
+            NLM_LOG_INFO("Stored episode at step " + std::to_string(step) + ", reward: " + std::to_string(reward));
+        } else {
+            NLM_LOG_INFO("Episodic memory not available at step " + std::to_string(step));
+        }
+        
         // Collect metrics
         totalFiringRate += brain->getAverageFiringRate();
         if (brain->getFiringNeuronCount() > 0) firingCount++;
@@ -103,6 +163,17 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
                             brain->getWorkingMemory()->getActiveTraces() : 0));
+        }
+        
+        // Auto-save checkpoint if enabled
+        if (config.autoSaveCheckpoint && config.checkpointInterval > 0 && step % config.checkpointInterval == 0) {
+            std::string checkpointFile = config.checkpointPath + ".step_" + std::to_string(step);
+            NLM_LOG_INFO("Auto-saving checkpoint to: " + checkpointFile);
+            if (brain->save(checkpointFile)) {
+                NLM_LOG_INFO("Auto-checkpoint saved successfully at step " + std::to_string(step));
+            } else {
+                NLM_LOG_ERROR("Failed to auto-save checkpoint at step " + std::to_string(step));
+            }
         }
     }
     

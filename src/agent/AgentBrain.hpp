@@ -5,6 +5,7 @@
 #include "SensoryPercept.hpp"
 #include "../brain/Brain.hpp"
 #include "../world/SimpleWorld.hpp"
+#include "../prediction/PredictionSystem.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
 #include <memory>
@@ -125,16 +126,23 @@ public:
     // Get brain pointer
     Brain* getBrain() { return brain_.get(); }
     
-    // Configuration
-    void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
-    void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
-    void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
-    void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
+    // Phase 6: prediction system integration
+    // Enhanced agent processes sensory input with predictive coding
+    PredictionSystem* getPredictionSystem() { return predictionSystem_.get(); }
+    NeuralPlanner* getPlanner() { return planner_.get(); }
+    ConceptFormation* getConceptFormation() { return conceptFormation_.get(); }
+    AttentionalSelection* getAttention() { return attention_.get(); }
     
-    bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
-    bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
-    bool isCuriosityEnabled() const { return curiosityEnabled_; }
+    // Configuration for prediction integration
+    void enablePredictionSystem(bool enable) { predictionSystemEnabled_ = enable; }
+    void enablePlanner(bool enable) { plannerEnabled_ = enable; }
+    void enableConceptFormation(bool enable) { conceptFormationEnabled_ = enable; }
+    void enableAttention(bool enable) { attentionEnabled_ = enable; }
+    
+    bool isPredictionSystemEnabled() const { return predictionSystemEnabled_; }
+    bool isPlannerEnabled() const { return plannerEnabled_; }
+    bool isConceptFormationEnabled() const { return conceptFormationEnabled_; }
+    bool isAttentionEnabled() const { return attentionEnabled_; }
     
 private:
     // Motor decoding: convert neural activity to motor command

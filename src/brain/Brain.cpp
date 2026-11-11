@@ -136,11 +136,11 @@ struct Brain::Impl {
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
         
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
+        // Initialize enhanced neuromodulation systems for Phase 6
+        dopamine = std::make_unique<DopamineEnhanced>();
+        curiosity = std::make_unique<CuriosityEnhanced>();
         predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        novelty = std::make_unique<NoveltyEnhanced>();
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -479,24 +479,23 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->novelty->update(pImpl->timestep);
     }
     
-    // Update curiosity
+    // Update curiosity (enhanced version needs novelty and prediction error)
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
+        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, 
+                               pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, 
+                               pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
+    // Update dopamine (enhanced version with reward signaling)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
-        // Apply dopamine effects on neural excitability
-        // Dopamine modulates neural excitability by adjusting effective current injection
-        // Higher dopamine increases excitability (lower effective threshold)
+        // Apply enhanced dopamine effects on neural excitability
         float dopamineLevel = pImpl->dopamine->getLevel();
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
-                    // Dopamine modulates excitability by injecting additional current
-                    // Positive dopamine adds excitatory bias
+                    // Enhanced dopamine modulates excitability with adaptive learning
                     float excitabilityMod = dopamineLevel * 0.5f;
                     if (excitabilityMod > 0.0f) {
                         neuron->injectCurrent(excitabilityMod);
@@ -506,25 +505,42 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // Update novelty detection (enhanced version)
+    if (pImpl->novelty) {
+        pImpl->novelty->update(pImpl->timestep);
+    }
+    
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
+    // Calculate enhanced neuromodulation factor for plasticity
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
     }
+    if (pImpl->curiosity) {
+        plasticityMod *= pImpl->curiosity->getPlasticityFactor();
+    }
+    if (pImpl->novelty) {
+        plasticityMod *= pImpl->novelty->getPlasticityFactor();
+    }
     
     for (auto& region : pImpl->regions) {
         for (auto& syn : region->getSynapses()) {
-            // Apply STDP with neuromodulation
+            // Apply STDP with enhanced neuromodulation
             if (syn->getPlasticityFlags().stdp) {
                 const auto& preSpikes = syn->getPreSpikeHistory();
                 const auto& postSpikes = syn->getPostSpikeHistory();
                 
                 if (!preSpikes.empty() && !postSpikes.empty()) {
-                    // Modify weight change based on dopamine
+                    // Update synapse with enhanced neuromodulation
                     pImpl->stdp->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
                     float weight = syn->getWeight();
-                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    
+                    // Enhanced weight modification with neuromodulation factors
+                    float weightChange = (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    weight += weightChange;
+                    
+                    // Clamp weight to reasonable range
+                    weight = std::clamp(weight, 0.0f, 1.0f);
                     syn->setWeight(weight);
                 }
             }
