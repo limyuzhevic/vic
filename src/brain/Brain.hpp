@@ -49,6 +49,19 @@ struct InterRegionConnection {
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+//
+// This class represents Phase 6 - Final Integration of all neural subsystems:
+// - Real LIF neuron dynamics with event-driven spike propagation
+// - Integrated memory systems (working + episodic + associative memory)
+// - Prediction system with error-driven learning
+// - Neuromodulation systems (dopamine, curiosity, novelty, prediction error)
+// - Cognitive systems (neural planning, concept formation, attention)
+// - Development system with developmental stages
+// - Structural plasticity (synaptogenesis and pruning)
+// - Checkpoint save/load and replay systems
+//
+// The brain operates as a closed-loop system connecting sensory input to
+// action output through multiple integrated processing stages.
 
 class Brain {
 public:

@@ -64,7 +64,11 @@ public:
     size_t getSpikeCount() const;
     size_t getPendingSpikeCount() const;
     size_t getPendingDelayedCount() const;
-
+    
+    // Performance optimization: Methods to maintain cached counter
+    void incrementPendingDelayedCount();
+    void decrementPendingDelayedCount();
+    
     // Phase 4: pending delayed spikes are in-flight synaptic input —
     // without them, a checkpoint reload loses every spike scheduled
     // for delivery in the next 1-5 steps and cannot continue the saved

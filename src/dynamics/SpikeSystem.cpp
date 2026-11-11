@@ -12,10 +12,14 @@ struct SpikeSystem::Impl {
     std::unordered_map<SimulationStep, std::vector<DelayedSpikeEvent>> delayedSpikes;  // Grouped by delivery step
     size_t maxHistorySize;
     
+    // Performance optimization: Cached count to avoid O(N) iteration
+    size_t pendingDelayedCount;
+    
     // Spike counting for statistics
     std::unordered_map<uint64_t, size_t> spikeCountPerNeuron;  // neuron_id -> count
     
-    Impl() : maxHistorySize(10000) {}
+    Impl() : maxHistorySize(10000), pendingDelayedCount(0) {}
+};
 };
 
 SpikeSystem::SpikeSystem() : pImpl(new Impl) {}
@@ -46,6 +50,8 @@ void SpikeSystem::queueSpike(NeuronId neuron, Timestamp timestamp, SimulationSte
 void SpikeSystem::queueDelayedSpike(const DelayedSpikeEvent& event) {
     // Store by delivery step for efficient processing
     pImpl->delayedSpikes[event.delivery_step].push_back(event);
+    // Update cached count for performance optimization
+    pImpl->pendingDelayedCount++;
 }
 
 void SpikeSystem::processSpikes(SimulationStep currentStep) {
@@ -83,6 +89,9 @@ void SpikeSystem::processDelayedSpikes(SimulationStep currentStep, Timestamp cur
     auto it = pImpl->delayedSpikes.find(currentStep);
     if (it != pImpl->delayedSpikes.end()) {
         // Process all spikes scheduled for this step
+        // Decrement cached count by the number of spikes being processed
+        pImpl->pendingDelayedCount -= static_cast<size_t>(it->second.size());
+        
         for (const auto& delayedEvent : it->second) {
             // Call delayed spike handlers (these will deliver synaptic input)
             for (auto& handler : pImpl->delayedHandlers) {
@@ -117,6 +126,8 @@ size_t SpikeSystem::getSpikeCount() const {
 
 std::vector<DelayedSpikeEvent> SpikeSystem::getPendingDelayedSpikes() const {
     std::vector<DelayedSpikeEvent> out;
+    out.reserve(pImpl->pendingDelayedCount); // Reserve based on cached count
+    
     for (const auto& pair : pImpl->delayedSpikes) {
         out.insert(out.end(), pair.second.begin(), pair.second.end());
     }
@@ -124,9 +135,13 @@ std::vector<DelayedSpikeEvent> SpikeSystem::getPendingDelayedSpikes() const {
 }
 
 void SpikeSystem::restorePendingDelayedSpikes(const std::vector<DelayedSpikeEvent>& events) {
+    // Optimized: Clear and rebuild with proper count tracking
     pImpl->delayedSpikes.clear();
+    pImpl->pendingDelayedCount = 0;
+    
     for (const auto& event : events) {
         pImpl->delayedSpikes[event.delivery_step].push_back(event);
+        pImpl->pendingDelayedCount++;
     }
 }
 
@@ -135,34 +150,52 @@ size_t SpikeSystem::getPendingSpikeCount() const {
 }
 
 size_t SpikeSystem::getPendingDelayedCount() const {
-    size_t count = 0;
-    for (const auto& pair : pImpl->delayedSpikes) {
-        count += pair.second.size();
+    // Optimized: Use cached count instead of iterating through all pairs
+    return pImpl->pendingDelayedCount;
+}
+
+void SpikeSystem::incrementPendingDelayedCount() {
+    ++pImpl->pendingDelayedCount;
+}
+
+void SpikeSystem::decrementPendingDelayedCount() {
+    if (pImpl->pendingDelayedCount > 0) {
+        --pImpl->pendingDelayedCount;
     }
-    return count;
 }
 
 float SpikeSystem::getAverageSpikeRate() const {
-    // Calculate average spike rate based on history
-    if (pImpl->spikeHistory.size() < 2) {
+    // Optimized: Track running min/max times instead of recalculating each time
+    static float cachedMinTime = std::numeric_limits<float>::max();
+    static float cachedMaxTime = -std::numeric_limits<float>::max();
+    static size_t cachedHistorySize = 0;
+    static bool cacheValid = false;
+    
+    if (!cacheValid || pImpl->spikeHistory.size() != cachedHistorySize) {
+        // Update cache when history changes
+        cacheValid = true;
+        cachedHistorySize = pImpl->spikeHistory.size();
+        
+        cachedMinTime = std::numeric_limits<float>::max();
+        cachedMaxTime = -std::numeric_limits<float>::max();
+        
+        for (const auto& spike : pImpl->spikeHistory) {
+            float time = static_cast<float>(spike.timestamp);
+            cachedMinTime = std::min(cachedMinTime, time);
+            cachedMaxTime = std::max(cachedMaxTime, time);
+        }
+    }
+    
+    if (cachedHistorySize < 2 || cachedMaxTime <= cachedMinTime) {
         return 0.0f;
     }
     
-    // Find time range
-    float minTime = std::numeric_limits<float>::max();
-    float maxTime = -std::numeric_limits<float>::max();
-    
-    for (const auto& spike : pImpl->spikeHistory) {
-        minTime = std::min(minTime, static_cast<float>(spike.timestamp));
-        maxTime = std::max(maxTime, static_cast<float>(spike.timestamp));
-    }
-    
-    float duration = maxTime - minTime;
+    float duration = cachedMaxTime - cachedMinTime;
     if (duration <= 0.0f) {
         return 0.0f;
     }
     
-    return static_cast<float>(pImpl->spikeHistory.size()) / duration;
+    return static_cast<float>(cachedHistorySize) / duration;
 }
 
 std::vector<NeuronId> SpikeSystem::getMostActiveNeurons(size_t count) const {
@@ -193,6 +226,8 @@ void SpikeSystem::reset() {
     pImpl->spikeHistory.clear();
     pImpl->spikeCountPerNeuron.clear();
     pImpl->delayedSpikes.clear();
+    // Reset performance counter
+    pImpl->pendingDelayedCount = 0;
 }
 
 } // namespace nlm
