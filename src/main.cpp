@@ -235,10 +235,17 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             }
         }
     }
+    
+    // More selective and varied pattern to prevent saturation
+    // Use smaller, varied current values and cycle through neurons
     for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
-        }
+        // Select neuron and current based on step to create a more natural pattern
+        NeuronId currentNeuron = patternNeurons[step % patternNeurons.size()];
+        
+        // Vary current intensity and use smaller values to prevent saturation
+        float currentIntensity = 5.0f + 10.0f * std::sin(static_cast<float>(step) * 0.1f);
+        
+        brain->injectCurrent(currentNeuron, currentIntensity);
         
         brain->step(step, step * 0.001);
         
@@ -246,7 +253,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                        " | Mean weight: " + std::to_string(getMeanSynapseWeight(brain.get())));
         }
     }
     

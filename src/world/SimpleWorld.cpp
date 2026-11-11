@@ -248,7 +248,7 @@ ActionResult SimpleWorld::applyMotorCommand(MotorCommand cmd, double currentTime
 
 ActionResult SimpleWorld::interact() {
     ActionResult result;
-    result.reward = 0.0f;
+    result.reward = -0.01f;  // Small cost for interaction attempt
     result.success = false;
     
     // Check for objects in interaction range
@@ -266,12 +266,12 @@ ActionResult SimpleWorld::interact() {
             
             if (obj.type == WorldObjectType::Resource) {
                 agent_.energy = std::min(maxEnergy_, agent_.energy + resourceEnergyGain_);
-                result.reward = obj.value;  // Positive reward
+                result.reward = obj.value;  // Positive reward (10.0f)
                 result.success = true;
                 result.message = "consumed_resource";
             } else if (obj.type == WorldObjectType::Hazard) {
                 agent_.health -= 0.2f;
-                result.reward = obj.value;  // Negative reward
+                result.reward = obj.value;  // Negative reward (-15.0f)
                 result.success = true;
                 result.message = "hit_hazard";
             }
