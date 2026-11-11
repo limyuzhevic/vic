@@ -326,10 +326,17 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
-    // Load configuration
+    // Load configuration with better validation and additional options
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
+    // Set default values for advanced options with better validation
+    config->set("max_simulation_steps", static_cast<int64_t>(10000), ConfigSource::Default);
+    config->set("simulation_time_limit", 0.0, ConfigSource::Default);
+    config->set("visualization_enabled", false, ConfigSource::Default);
+    config->set("log_level", static_cast<int64_t>(1), ConfigSource::Default);  // Info level
+    config->set("log_to_file", false, ConfigSource::Default);
+    
+    // Try to load from file if provided using improved config loader
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
@@ -339,25 +346,54 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--help" || arg == "-h") {
+            // Print help using the improved Config class
+            config->printHelp();
+            return 0;
+        } else if (arg == "--verbose" || arg == "-v") {
+            // Enable verbose logging
+            config->set("log_level", static_cast<int64_t>(0), ConfigSource::CommandLine);  // Debug level
+        } else if (arg.substr(0, 8) == "--log_level") {
+            // Parse log level from command line
+            if (arg.find('=') != std::string::npos) {
+                std::string levelStr = arg.substr(arg.find('=') + 1);
+                if (levelStr == "debug") config->set("log_level", static_cast<int64_t>(0), ConfigSource::CommandLine);
+                else if (levelStr == "info") config->set("log_level", static_cast<int64_t>(1), ConfigSource::CommandLine);
+                else if (levelStr == "warning") config->set("log_level", static_cast<int64_t>(2), ConfigSource::CommandLine);
+                else if (levelStr == "error") config->set("log_level", static_cast<int64_t>(3), ConfigSource::CommandLine);
+                else if (levelStr == "critical") config->set("log_level", static_cast<int64_t>(4), ConfigSource::CommandLine);
+            }
         }
     }
     
-    // Load config from file (ignore if not found)
+    // Load config from file with improved error handling
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_WARNING("Using default configuration (file not found or invalid).");
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Override with command line args using improved parser
+    if (config->loadFromArgs(argc, argv)) {
+        NLM_LOG_INFO("Configuration updated from command line arguments");
+    }
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Set default values for Phase 2 (these will only be used if not set elsewhere)
+    if (!config->has("random_seed")) {
+        config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    }
+    if (!config->has("simulation_timestep")) {
+        config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    }
+    if (!config->has("neuron_count")) {
+        config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
+    }
+    if (!config->has("region_count")) {
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    }
+    if (!config->has("connection_probability")) {
+        config->set("connection_probability", 0.15f, ConfigSource::Default);
+    }
     
     // STDP parameters
     config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
@@ -368,6 +404,12 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Validate configuration values
+    if (!validateConfig(config)) {
+        NLM_LOG_ERROR("Invalid configuration detected");
+        return 1;
+    }
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -376,6 +418,11 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  max_simulation_steps: " + std::to_string(config->getOr<int64_t>("max_simulation_steps", 10000)));
+    NLM_LOG_INFO("  simulation_time_limit: " + std::to_string(config->getOr<double>("simulation_time_limit", 0.0)) + "s");
+    NLM_LOG_INFO("  visualization_enabled: " + std::string(config->getOr<bool>("visualization_enabled", false) ? "true" : "false"));
+    NLM_LOG_INFO("  log_level: " + std::to_string(config->getOr<int64_t>("log_level", 1)));
+    NLM_LOG_INFO("  log_to_file: " + std::string(config->getOr<bool>("log_to_file", false) ? "true" : "false"));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock
@@ -432,4 +479,89 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// Configuration validation function
+bool validateConfig(std::shared_ptr<Config> config) {
+    bool isValid = true;
+    
+    // Validate essential parameters
+    if (!config->has("neuron_count") || config->getOr<int64_t>("neuron_count", 0) <= 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: must be positive");
+        isValid = false;
+    }
+    
+    if (!config->has("region_count") || config->getOr<int64_t>("region_count", 0) <= 0) {
+        NLM_LOG_ERROR("Invalid region_count: must be positive");
+        isValid = false;
+    }
+    
+    if (!config->has("simulation_timestep") || config->getOr<double>("simulation_timestep", 0.0) <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation_timestep: must be positive");
+        isValid = false;
+    }
+    
+    if (!config->has("connection_probability") || 
+        config->getOr<float>("connection_probability", 0.0) < 0.0 || 
+        config->getOr<float>("connection_probability", 1.0) > 1.0) {
+        NLM_LOG_ERROR("Invalid connection_probability: must be between 0.0 and 1.0");
+        isValid = false;
+    }
+    
+    if (!config->has("random_seed")) {
+        NLM_LOG_ERROR("Missing random_seed parameter");
+        isValid = false;
+    }
+    
+    if (!config->has("max_simulation_steps") || config->getOr<int64_t>("max_simulation_steps", 0) <= 0) {
+        NLM_LOG_ERROR("Invalid max_simulation_steps: must be positive");
+        isValid = false;
+    }
+    
+    if (!config->has("log_level") || 
+        config->getOr<int64_t>("log_level", 0) < 0 || 
+        config->getOr<int64_t>("log_level", 5) > 4) {
+        NLM_LOG_ERROR("Invalid log_level: must be between 0 and 4");
+        isValid = false;
+    }
+    
+    // Validate STDP parameters
+    if (!config->has("stdp_ltp_weight") || config->getOr<float>("stdp_ltp_weight", 0.0) < 0.0) {
+        NLM_LOG_ERROR("Invalid stdp_ltp_weight: must be positive");
+        isValid = false;
+    }
+    
+    if (!config->has("stdp_ltd_weight") || config->getOr<float>("stdp_ltd_weight", 0.0) < 0.0) {
+        NLM_LOG_ERROR("Invalid stdp_ltd_weight: must be positive");
+        isValid = false;
+    }
+    
+    if (!config->has("stdp_tau") || config->getOr<float>("stdp_tau", 0.0) <= 0.0) {
+        NLM_LOG_ERROR("Invalid stdp_tau: must be positive");
+        isValid = false;
+    }
+    
+    if (!config->has("synaptogenesis_rate") || config->getOr<float>("synaptogenesis_rate", 0.0) < 0.0) {
+        NLM_LOG_ERROR("Invalid synaptogenesis_rate: must be non-negative");
+        isValid = false;
+    }
+    
+    if (!config->has("pruning_rate") || config->getOr<float>("pruning_rate", 0.0) < 0.0) {
+        NLM_LOG_ERROR("Invalid pruning_rate: must be non-negative");
+        isValid = false;
+    }
+    
+    // Validate plasticity parameter ranges
+    float ltp_weight = config->getOr<float>("stdp_ltp_weight", 0.02f);
+    float ltd_weight = config->getOr<float>("stdp_ltd_weight", 0.015f);
+    if (ltp_weight <= ltd_weight) {
+        NLM_LOG_WARNING("STDP LTP weight should typically be > LTD weight");
+    }
+    
+    float conn_prob = config->getOr<float>("connection_probability", 0.15f);
+    if (conn_prob > 0.5) {
+        NLM_LOG_WARNING("High connection probability may cause dense connectivity");
+    }
+    
+    return isValid;
 }

@@ -62,6 +62,9 @@ public:
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
+    // Print help/usage information
+    void printHelp() const;
+    
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
