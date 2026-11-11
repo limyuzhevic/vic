@@ -35,6 +35,8 @@ add_library(nlm_core STATIC
     src/brain/NeuralPopulation.cpp
     src/brain/NeuralRegion.cpp
     src/brain/Brain.cpp
+    src/brain/BrainInitialization.cpp
+    src/brain/BrainProcessing.cpp
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
@@ -125,14 +127,15 @@ add_library(nlm_phase5 STATIC
 target_include_directories(nlm_phase5 PUBLIC src)
 target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Phase 6 experiments
+# Phase 6 experiments (enhanced with advanced features)
 add_library(nlm_phase6 STATIC
     src/experiments/Phase6IntegratedExperiment.cpp
+    src/experiments/AdvancedFeatures.cpp
 )
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
+# Main executable (enhanced)
 add_executable(nlm
     src/main.cpp
 )
@@ -158,10 +161,12 @@ add_executable(nlm_phase5_demo
 )
 target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
 
-# Phase 6 demo executable
+# Phase 6 demo executable (enhanced with advanced features)
 add_executable(nlm_phase6_demo
     src/experiments/Phase6Demo.cpp
+    src/experiments/AdvancedFeatures.cpp
 )
+target_include_directories(nlm_phase6_demo PUBLIC src)
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
@@ -170,8 +175,18 @@ target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 # nlm_phase6_demo integration demo is left unchanged.
 add_executable(nlm_phase6_text_demo
     src/experiments/Phase6TextDemo.cpp
+    src/experiments/AdvancedFeatures.cpp
 )
+target_include_directories(nlm_phase6_text_demo PUBLIC src)
 target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+
+# Phase 6 visualization and monitoring demo (new)
+add_executable(nlm_phase6_viz_demo
+    src/experiments/Phase6VizDemo.cpp
+    src/experiments/AdvancedFeatures.cpp
+)
+target_include_directories(nlm_phase6_viz_demo PUBLIC src)
+target_link_libraries(nlm_phase6_viz_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
 # Benchmark executable
 add_executable(nlm_benchmark
