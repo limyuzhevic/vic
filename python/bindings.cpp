@@ -2,9 +2,11 @@
 #include <pybind11/stl.h>
 #include <pybind11/functional.h>
 #include <pybind11/chrono.h>
+#include <pybind11/numpy.h>
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -168,7 +170,95 @@ PYBIND11_MODULE(pynlm, m) {
              "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
-        });
+        })
+        // NumPy integration methods
+        .def("getAsDict", [](const Config& self) {
+            std::unordered_map<std::string, std::string> result;
+            auto keys = self.getKeys();
+            for (const auto& key : keys) {
+                auto value = self.get<std::string>(key);
+                if (value.has_value()) {
+                    result[key] = value.value();
+                }
+            }
+            return result;
+        }, "Get configuration as Python dictionary")
+        .def("setFromDict", [](Config& self, const std::unordered_map<std::string, std::string>& dict) {
+            for (const auto& [key, value] : dict) {
+                self.set(key, value, nlm::ConfigSource::Runtime);
+            }
+        }, py::arg("config_dict"), "Set configuration from Python dictionary")
+        .def("getAsNumPy", [](const Config& self) {
+            py::list keys;
+            py::dict values;
+            auto c_keys = self.getKeys();
+            for (const auto& key : c_keys) {
+                py::object value;
+                
+                // Try different types
+                auto int_val = self.get<int64_t>(key);
+                if (int_val.has_value()) {
+                    value = py::int_(int_val.value());
+                    keys.append(py::str(key));
+                    values[key] = value;
+                    continue;
+                }
+                
+                auto double_val = self.get<double>(key);
+                if (double_val.has_value()) {
+                    value = py::float_(double_val.value());
+                    keys.append(py::str(key));
+                    values[key] = value;
+                    continue;
+                }
+                
+                auto bool_val = self.get<bool>(key);
+                if (bool_val.has_value()) {
+                    value = py::bool_(bool_val.value());
+                    keys.append(py::str(key));
+                    values[key] = value;
+                    continue;
+                }
+                
+                auto string_val = self.get<std::string>(key);
+                if (string_val.has_value()) {
+                    value = py::str(string_val.value());
+                    keys.append(py::str(key));
+                    values[key] = value;
+                    continue;
+                }
+            }
+            
+            py::dict result;
+            result["keys"] = keys;
+            result["values"] = values;
+            return result;
+        }, "Get configuration as NumPy-compatible Python dictionary")
+        .def("validate", [](Config& self, const std::unordered_map<std::string, std::string>& schema) {
+            bool is_valid = true;
+            for (const auto& [key, expected_type] : schema) {
+                if (!self.has(key)) {
+                    is_valid = false;
+                    continue;
+                }
+                
+                auto value = self.get<std::string>(key);
+                if (value.has_value()) {
+                    // Simple type checking based on expected_type string
+                    if (expected_type == "int" && !std::all_of(value->begin(), value->end(), ::isdigit)) {
+                        is_valid = false;
+                    } else if (expected_type == "float") {
+                        try {
+                            std::stod(value.value());
+                        } catch (...) {
+                            is_valid = false;
+                        }
+                    }
+                }
+            }
+            return is_valid;
+        }, py::arg("schema"), "Validate configuration against schema");
+    py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
