@@ -80,6 +80,7 @@ add_library(nlm_core STATIC
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
     src/experiments/Metrics.cpp
+    src/experiments/DemoFramework.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
 )
@@ -103,6 +104,13 @@ add_library(nlm_world STATIC
 )
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core nlm_agent)
+
+# Demo framework (base for all phase demos)
+add_library(nlm_demo_framework STATIC
+    src/experiments/DemoFramework.cpp
+)
+target_include_directories(nlm_demo_framework PUBLIC src)
+target_link_libraries(nlm_demo_framework PUBLIC nlm_core nlm_agent nlm_world)
 
 # Phase 3 experiments
 add_library(nlm_phase3 STATIC
@@ -142,13 +150,13 @@ target_link_libraries(nlm PUBLIC nlm_core)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
-target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
+target_link_libraries(nlm_phase3_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_demo_framework)
 
 # Phase 4 demo executable
 add_executable(nlm_phase4_demo
     src/experiments/Phase4Demo.cpp
 )
-target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4)
+target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_demo_framework)
 
 # Phase 5 demo executable (Phase 5, added here: pattern probe,
 # sandbox run, and checkpoint round-trip for the brain-personality
@@ -156,13 +164,13 @@ target_link_libraries(nlm_phase4_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 add_executable(nlm_phase5_demo
     src/experiments/Phase5Demo.cpp
 )
-target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
+target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_demo_framework)
 
 # Phase 6 demo executable
 add_executable(nlm_phase6_demo
     src/experiments/Phase6Demo.cpp
 )
-target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
+target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6 nlm_demo_framework)
 
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
 # association probe, concept/social probes, and a sandbox run with
@@ -171,7 +179,7 @@ target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_ph
 add_executable(nlm_phase6_text_demo
     src/experiments/Phase6TextDemo.cpp
 )
-target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6 nlm_demo_framework)
 
 # Benchmark executable
 add_executable(nlm_benchmark
@@ -184,10 +192,7 @@ target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 # but the root CMakeLists never built the module — pip install
 # succeeded yet `import pynlm` failed. The option is OFF by default so
 # a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
+# ON. This target reuses the root libraries instead.
 option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)

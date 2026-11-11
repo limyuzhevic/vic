@@ -1,141 +1,262 @@
 #pragma once
 
 #include <string>
-#include <memory>
-#include <sstream>
-#include <functional>
 #include <vector>
+#include <memory>
+#include <mutex>
+#include <map>
 #include <chrono>
+#include <iomanip>
+#include <sstream>
 
 namespace nlm {
 
-// Log severity levels
+// Standardized logging levels
 enum class LogLevel {
-    Debug = 0,
-    Info = 1,
-    Warning = 2,
-    Error = 3,
-    Critical = 4
+    Trace,
+    Debug,
+    Info,
+    Warning,
+    Error,
+    Critical
 };
 
-// Log entry structure
-struct LogEntry {
+// Log message structure
+struct LogMessage {
+    std::chrono::steady_clock::time_point timestamp;
     LogLevel level;
     std::string message;
-    std::string file;
-    int line;
-    std::string function;
-    std::chrono::system_clock::time_point timestamp;
+    std::string module;
 };
 
-// Logger interface
-class ILogger {
+// Abstract log handler interface
+class LogHandler {
 public:
-    virtual ~ILogger() = default;
-    virtual void log(const LogEntry& entry) = 0;
+    virtual ~LogHandler() = default;
+    virtual void handle(const LogMessage& message) = 0;
     virtual void setLevel(LogLevel level) = 0;
     virtual LogLevel getLevel() const = 0;
 };
 
-// Console logger implementation
-class ConsoleLogger : public ILogger {
+// Console log handler
+class ConsoleLogHandler : public LogHandler {
 public:
-    ConsoleLogger();
-    explicit ConsoleLogger(LogLevel level);
-    ~ConsoleLogger() override;
+    ConsoleLogHandler(LogLevel level = LogLevel::Info) : level_(level) {}
     
-    void log(const LogEntry& entry) override;
-    void setLevel(LogLevel level) override;
-    LogLevel getLevel() const override;
+    void handle(const LogMessage& message) override {
+        if (message.level < level_) return;
+        
+        std::string levelStr;
+        switch (message.level) {
+            case LogLevel::Trace: levelStr = "TRACE"; break;
+            case LogLevel::Debug: levelStr = "DEBUG"; break;
+            case LogLevel::Info: levelStr = "INFO"; break;
+            case LogLevel::Warning: levelStr = "WARNING"; break;
+            case LogLevel::Error: levelStr = "ERROR"; break;
+            case LogLevel::Critical: levelStr = "CRITICAL"; break;
+        }
+        
+        auto now = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - message.timestamp);
+        
+        std::cout << "[" << duration.count() << "ms] "
+                  << "[" << levelStr << "] "
+                  << "[" << message.module << "] "
+                  << message.message << std::endl;
+    }
     
-    // Enable/disable colors
-    void setUseColors(bool useColors);
-    bool getUseColors() const;
+    void setLevel(LogLevel level) override {
+        level_ = level;
+    }
     
-    // Set output file (in addition to console)
-    void setOutputFile(const std::string& filepath);
-    void closeOutputFile();
-    
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-    
-    std::string levelToString(LogLevel level) const;
-    std::string levelToColor(LogLevel level) const;
-};
-
-// Main Logger class
-class Logger {
-public:
-    Logger();
-    ~Logger();
-    
-    // Disable copying
-    Logger(const Logger&) = delete;
-    Logger& operator=(const Logger&) = delete;
-    
-    // Add logger sink
-    void addLogger(std::shared_ptr<ILogger> logger);
-    
-    // Remove all loggers
-    void clearLoggers();
-    
-    // Set minimum level for all loggers
-    void setLevel(LogLevel level);
-    
-    // Global logging functions
-    void log(LogLevel level, const std::string& message, 
-             const std::string& file = "", int line = 0, 
-             const std::string& function = "");
-    
-    // Convenience methods
-    void debug(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void info(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void warning(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void error(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    void critical(const std::string& message, const std::string& file = "", int line = 0, const std::string& function = "");
-    
-    // Check if level is enabled
-    bool isEnabled(LogLevel level) const;
-    
-    // Get global logger instance
-    static Logger& getGlobal();
-    
-    // Set global logger
-    static void setGlobal(std::shared_ptr<Logger> logger);
-
-private:
-    struct Impl;
-    std::unique_ptr<Impl> pImpl;
-};
-
-// Convenience macro for file/line/function info
-#define NLM_LOG_DEBUG(msg) nlm::Logger::getGlobal().debug(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_INFO(msg) nlm::Logger::getGlobal().info(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_WARNING(msg) nlm::Logger::getGlobal().warning(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_ERROR(msg) nlm::Logger::getGlobal().error(msg, __FILE__, __LINE__, __func__)
-#define NLM_LOG_CRITICAL(msg) nlm::Logger::getGlobal().critical(msg, __FILE__, __LINE__, __func__)
-
-// Stream-style logging helper
-class LogStream {
-public:
-    LogStream(LogLevel level, const std::string& file, int line, const std::string& function);
-    ~LogStream();
-    
-    template<typename T>
-    LogStream& operator<<(const T& value) {
-        oss_ << value;
-        return *this;
+    LogLevel getLevel() const override {
+        return level_;
     }
     
 private:
     LogLevel level_;
-    std::ostringstream oss_;
-    std::string file_;
-    int line_;
-    std::string function_;
 };
 
-#define NLM_LOG_STREAM(level) nlm::LogStream(level, __FILE__, __LINE__, __func__)
+// File log handler
+class FileLogHandler : public LogHandler {
+public:
+    FileLogHandler(const std::string& filename, LogLevel level = LogLevel::Info) : level_(level) {
+        file_.open(filename);
+        if (!file_.is_open()) {
+            throw std::runtime_error("Cannot open log file: " + filename);
+        }
+    }
+    
+    ~FileLogHandler() override {
+        if (file_.is_open()) {
+            file_.close();
+        }
+    }
+    
+    void handle(const LogMessage& message) override {
+        if (message.level < level_) return;
+        
+        std::string levelStr;
+        switch (message.level) {
+            case LogLevel::Trace: levelStr = "TRACE"; break;
+            case LogLevel::Debug: levelStr = "DEBUG"; break;
+            case LogLevel::Info: levelStr = "INFO"; break;
+            case LogLevel::Warning: levelStr = "WARNING"; break;
+            case LogLevel::Error: levelStr = "ERROR"; break;
+            case LogLevel::Critical: levelStr = "CRITICAL"; break;
+        }
+        
+        auto now = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now - message.timestamp);
+        
+        file_ << "[" << duration.count() << "ms] "
+              << "[" << levelStr << "] "
+              << "[" << message.module << "] "
+              << message.message << std::endl;
+        file_.flush();
+        
+        // Also output to console for real-time monitoring
+        std::cout << "[FILE] " << message.message << std::endl;
+    }
+    
+    void setLevel(LogLevel level) override {
+        level_ = level;
+    }
+    
+    LogLevel getLevel() const override {
+        return level_;
+    }
+    
+    void flush() {
+        file_.flush();
+    }
+    
+private:
+    std::ofstream file_;
+    LogLevel level_;
+};
+
+// Global logger class
+class Logger {
+public:
+    static Logger& getInstance() {
+        static Logger instance;
+        return instance;
+    }
+    
+    void setLevel(LogLevel level) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        level_ = level;
+        for (auto& handler : handlers_) {
+            handler->setLevel(level);
+        }
+    }
+    
+    LogLevel getLevel() const {
+        return level_;
+    }
+    
+    void addHandler(std::unique_ptr<LogHandler> handler) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        handlers_.push_back(std::move(handler));
+    }
+    
+    void log(LogLevel level, const std::string& module, const std::string& message) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        if (level < level_) return;
+        
+        LogMessage logMessage {
+            std::chrono::steady_clock::now(),
+            level,
+            message,
+            module
+        };
+        
+        for (auto& handler : handlers_) {
+            handler->handle(logMessage);
+        }
+    }
+    
+    void trace(const std::string& module, const std::string& message) {
+        log(LogLevel::Trace, module, message);
+    }
+    
+    void debug(const std::string& module, const std::string& message) {
+        log(LogLevel::Debug, module, message);
+    }
+    
+    void info(const std::string& module, const std::string& message) {
+        log(LogLevel::Info, module, message);
+    }
+    
+    void warning(const std::string& module, const std::string& message) {
+        log(LogLevel::Warning, module, message);
+    }
+    
+    void error(const std::string& module, const std::string& message) {
+        log(LogLevel::Error, module, message);
+    }
+    
+    void critical(const std::string& module, const std::string& message) {
+        log(LogLevel::Critical, module, message);
+    }
+    
+    void flush() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& handler : handlers_) {
+            if (auto fileHandler = dynamic_cast<FileLogHandler*>(handler.get())) {
+                fileHandler->flush();
+            }
+        }
+    }
+    
+private:
+    Logger() {
+        addHandler(std::make_unique<ConsoleLogHandler>(LogLevel::Info));
+    }
+    
+    ~Logger() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        handlers_.clear();
+    }
+    
+    std::mutex mutex_;
+    LogLevel level_ = LogLevel::Info;
+    std::vector<std::unique_ptr<LogHandler>> handlers_;
+};
+
+// Convenience macros
+#define NLM_LOG_TRACE(module, message) Logger::getInstance().trace(module, message)
+#define NLM_LOG_DEBUG(module, message) Logger::getInstance().debug(module, message)
+#define NLM_LOG_INFO(module, message) Logger::getInstance().info(module, message)
+#define NLM_LOG_WARNING(module, message) Logger::getInstance().warning(module, message)
+#define NLM_LOG_ERROR(module, message) Logger::getInstance().error(module, message)
+#define NLM_LOG_CRITICAL(module, message) Logger::getInstance().critical(module, message)
+
+// Helper functions for common logging patterns
+class LoggerHelper {
+public:
+    template<typename... Args>
+    static void info(const std::string& module, const std::string& format, const Args&... args) {
+        std::stringstream ss;
+        ss << std::vformat(format, std::make_format_args(args...));
+        NLM_LOG_INFO(module, ss.str());
+    }
+    
+    template<typename... Args>
+    static void warning(const std::string& module, const std::string& format, const Args&... args) {
+        std::stringstream ss;
+        ss << std::vformat(format, std::make_format_args(args...));
+        NLM_LOG_WARNING(module, ss.str());
+    }
+    
+    template<typename... Args>
+    static void error(const std::string& module, const std::string& format, const Args&... args) {
+        std::stringstream ss;
+        ss << std::vformat(format, std::make_format_args(args...));
+        NLM_LOG_ERROR(module, ss.str());
+    }
+};
 
 } // namespace nlm
