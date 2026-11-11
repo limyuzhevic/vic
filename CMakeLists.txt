@@ -136,7 +136,7 @@ target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
