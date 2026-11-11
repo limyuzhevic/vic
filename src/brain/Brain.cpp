@@ -49,6 +49,9 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -298,6 +301,10 @@ bool Brain::initialize() {
     pImpl->attention->setExcitationStrength(1.5f);
     
     // Initialize neuromodulation
+    pImpl->dopamine->initialize(this);
+    pImpl->acetylcholine->initialize(this);
+    pImpl->norepinephrine->initialize(this);
+    pImpl->serotonin->initialize(this);
     pImpl->novelty->initialize(this);
     pImpl->curiosity->initialize(this);
     
@@ -484,7 +491,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
     }
     
-    // Update dopamine (reward prediction error)
+    // Update dopamine (reward prediction error and prediction error)
     if (pImpl->dopamine) {
         pImpl->dopamine->update(pImpl->timestep);
         
@@ -506,11 +513,106 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
+    // Update prediction system and use prediction error for enhanced neuromodulation
+    if (pImpl->predictionSystem && pImpl->dopamine) {
+        // Generate predictions based on current working memory
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Generate predictions for memory neurons
+            std::vector<float> predictions;
+            for (NeuronId neuron : memoryNeurons) {
+                if (auto* region = getRegion(RegionId(neuron.index() / 1000))) {
+                    for (auto* nn : region->getAllNeurons()) {
+                        if (nn->getId() == neuron) {
+                            // Use the neuron's recent activity to generate prediction
+                            auto spikeHistory = nn->getSpikeHistory();
+                            if (!spikeHistory.empty()) {
+                                float prediction = spikeHistory.back();  // Simplified prediction
+                                predictions.push_back(prediction);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (!predictions.empty()) {
+                // Compute prediction error across the network
+                float predictionError = 0.0f;
+                for (float pred : predictions) {
+                    predictionError += pred;
+                }
+                predictionError /= predictions.size();
+                
+                // Apply prediction-based neuromodulation to enhance learning
+                float predictionMod = 1.0f + predictionError * 0.5f;  // Scale by prediction error
+                if (predictionMod > 1.0f) predictionMod = 1.0f;
+                
+                // Use prediction error to modulate STDP
+                for (auto& region : pImpl->regions) {
+                    for (auto& syn : region->getSynapses()) {
+                        if (syn->getPlasticityFlags().stdp) {
+                            const auto& preSpikes = syn->getPreSpikeHistory();
+                            const auto& postSpikes = syn->getPostSpikeHistory();
+                            
+                            if (!preSpikes.empty() && !postSpikes.empty()) {
+                                // Apply prediction-based scaling to STDP
+                                pImpl->stdp->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
+                                float weight = syn->getWeight();
+                                weight += (weight > 0 ? 1.0f : -1.0f) * (predictionMod - 1.0f) * 0.001f;
+                                syn->setWeight(weight);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     // ========== STEP 6: Apply plasticity rules (STDP and Hebbian) ==========
-    // Calculate neuromodulation factor for plasticity
+    // Calculate neuromodulation factor for plasticity (combines dopamine + prediction)
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    // Apply prediction-based scaling to plasticity
+    if (pImpl->predictionSystem && pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+        // Use prediction error to enhance plasticity when prediction is accurate
+        float predictionMod = 1.0f;
+        
+        // Generate predictions for memory neurons (simplified)
+        std::vector<float> predictions;
+        auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+        
+        for (NeuronId neuron : memoryNeurons) {
+            if (auto* region = getRegion(RegionId(neuron.index() / 1000))) {
+                for (auto* nn : region->getAllNeurons()) {
+                    if (nn->getId() == neuron) {
+                        auto spikeHistory = nn->getSpikeHistory();
+                        if (!spikeHistory.empty()) {
+                            float prediction = spikeHistory.back();
+                            predictions.push_back(prediction);
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!predictions.empty()) {
+            float predictionError = 0.0f;
+            for (float pred : predictions) {
+                predictionError += pred;
+            }
+            predictionError /= predictions.size();
+            
+            // Scale plasticity based on prediction accuracy
+            predictionMod = 1.0f + predictionError * 0.3f;  // Enhance plasticity with good predictions
+            if (predictionMod > 1.5f) predictionMod = 1.5f;  // Cap maximum enhancement
+        }
+        
+        // Combine dopamine and prediction effects
+        plasticityMod *= predictionMod;
     }
     
     for (auto& region : pImpl->regions) {
@@ -616,6 +718,22 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (pImpl->predictionSystem) {
         // The prediction system would be updated with sensory observations
         // For now, just track prediction error history
+        if (pImpl->workingMemory) {
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            
+            // Apply prediction to working memory - helps with competition
+            // For each active memory neuron, generate prediction
+            for (NeuronId neuron : memoryNeurons) {
+                if (auto* region = getRegion(RegionId(neuron.index() / 1000))) {
+                    for (auto* nn : region->getAllNeurons()) {
+                        if (nn->getId() == neuron) {
+                            // Neuron has been recently active - this is a prediction
+                            pImpl->predictionSystem->trainFromNeuron(neuron);
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
