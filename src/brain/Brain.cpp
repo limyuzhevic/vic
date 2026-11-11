@@ -481,7 +481,9 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // Update curiosity
     if (pImpl->curiosity) {
-        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
+        pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, 
+                                pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, 
+                                pImpl->timestep);
     }
     
     // Update dopamine (reward prediction error)
@@ -503,6 +505,29 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     }
                 }
             }
+        }
+        
+        // Enhanced neuromodulation integration (Phase 6)
+        
+        // 1. Dopamine-guided memory enhancement
+        if (dopamineLevel > 0.3f) {  // Strong reward signal
+            if (pImpl->workingMemory) {
+                pImpl->workingMemory->strengthenMemory(dopamineLevel * 2.0f);
+            }
+        }
+        
+        // 2. Neuromodulation-guided attention
+        if (pImpl->attention) {
+            // Dopamine modulates attention selection strength
+            float attentionMod = 1.0f + dopamineLevel * 0.3f;
+            // This is a placeholder for more sophisticated attention modulation
+            // Real implementation would use dopamine to modulate attention parameters
+        }
+        
+        // 3. Neuromodulation-enhanced prediction confidence
+        if (pImpl->predictionSystem) {
+            // Dopamine scales prediction confidence based on reward signal
+            // Real implementation would update prediction confidence based on dopamine level
         }
     }
     
@@ -613,9 +638,52 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 8: Update prediction system ==========
-    if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+    if (pImpl->predictionSystem && pImpl->sensoryNeurons.size() >= 2) {
+        // Extract current sensory state from active sensory neurons
+        std::vector<float> currentState;
+        for (size_t i = 0; i < std::min(size_t(10), pImpl->sensoryNeurons.size()); ++i) {
+            currentState.push_back(
+                std::abs(pImpl->sensoryNeurons[i]->getMembranePotential() - 
+                        pImpl->sensoryNeurons[i]->getRestingPotential()) / 20.0f
+            );
+        }
+        
+        // Create SensoryInput from current state (placeholder for real implementation)
+        class SensoryInput current(currentState);
+        
+        // Use prediction system to predict next state
+        std::unique_ptr<SensoryInput> predicted = pImpl->predictionSystem->predictNextState(current);
+        
+        if (predicted) {
+            // Update prediction system with actual observation
+            pImpl->predictionSystem->updatePredictions(*predicted, current);
+            
+            // Use prediction error to guide learning (Phase 6 enhancement)
+            float predictionError = pImpl->predictionSystem->getPredictionError();
+            float predictionConfidence = pImpl->predictionSystem->getConfidence();
+            
+            // Integrate prediction error with neuromodulation for learning
+            if (predictionError > 0.5f) {  // Significant prediction error
+                // Scale dopamine based on prediction error
+                if (pImpl->dopamine) {
+                    // Enhance dopamine signal - prediction errors drive learning
+                    pImpl->dopamine->setLevel(predictionError * 2.0f);
+                }
+                
+                // Store prediction error in working memory for future reference
+                if (pImpl->workingMemory) {
+                    pImpl->workingMemory->store(currentState, predictionError);
+                }
+            }
+            
+            // If prediction is confident, reinforce the neural pattern
+            if (predictionConfidence > 0.8f) {
+                if (pImpl->workingMemory && !currentState.empty()) {
+                    // Store the predicted state as a learned pattern
+                    pImpl->workingMemory->store(currentState, predictionConfidence);
+                }
+            }
+        }
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,8 +699,47 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Extract current neural activity as candidate features for concept formation
+        std::vector<float> currentPattern;
+        
+        // Use working memory content and sensory neuron activity to form concepts
+        if (pImpl->workingMemory && !pImpl->workingMemory->getMemoryNeurons().empty()) {
+            // Use working memory pattern as candidate for concept formation
+            currentPattern = pImpl->workingMemory->retrieve();
+        } else {
+            // Fall back to sensory neuron activity patterns
+            for (size_t i = 0; i < std::min(size_t(10), pImpl->sensoryNeurons.size()); ++i) {
+                currentPattern.push_back(
+                    std::abs(pImpl->sensoryNeurons[i]->getMembranePotential() - 
+                            pImpl->sensoryNeurons[i]->getRestingPotential()) / 20.0f
+                );
+            }
+        }
+        
+        if (!currentPattern.empty()) {
+            // Get features from neural activity (simplified feature extraction)
+            std::vector<float> features = currentPattern;
+            
+            // Get current reward signal from dopamine
+            float reward = pImpl->dopamine ? pImpl->dopamine->getLevel() : 0.0f;
+            
+            // Present experience to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                currentPattern, features, reward, pImpl->currentStep
+            );
+            
+            if (conceptId > 0) {
+                // Check if concept is becoming stable
+                float stability = pImpl->conceptFormation->getConceptStability(conceptId);
+                if (stability > 0.7f) {
+                    // Store concept as long-term knowledge
+                    if (pImpl->associativeMemory) {
+                        pImpl->associativeMemory->storeAssociation(
+                            currentPattern, conceptId, stability);
+                    }
+                }
+            }
+        }
     }
     
     // ========== STEP 11: Apply structural plasticity periodically ==========
@@ -798,13 +905,45 @@ size_t Brain::getPendingSpikeEventCount() const {
 }
 
 std::unique_ptr<class Action> Brain::produceAction() {
-    // Simple action selection based on motor neuron activity
-    // The motor neuron population with highest average activity determines action
+    // Enhanced action selection using cognitive systems (Phase 6)
+    // Uses NeuralPlanner for goal-directed planning, falls back to simple
+    // motor-based selection if planner is not available
     
     if (pImpl->motorNeurons.empty()) {
         return std::make_unique<Action>(ActionType::Wait);
     }
     
+    // Try to use NeuralPlanner for intelligent action selection
+    if (pImpl->planner) {
+        // Extract current state from sensory input
+        std::vector<float> currentState;
+        for (size_t i = 0; i < std::min(size_t(10), pImpl->sensoryNeurons.size()); ++i) {
+            currentState.push_back(
+                std::abs(pImpl->sensoryNeurons[i]->getMembranePotential() - 
+                        pImpl->sensoryNeurons[i]->getRestingPotential()) / 20.0f
+            );
+        }
+        
+        // Get current goal from planner (default: move toward reward)
+        std::vector<float> currentGoal = pImpl->planner->getCurrentGoal();
+        if (currentGoal.empty()) {
+            // Simple goal: increase forward movement
+            currentGoal.resize(10, 0.5f);
+            currentGoal[0] = 1.0f;  // Prefer forward movement
+        }
+        
+        // Plan action using NeuralPlanner
+        ActionType plannedAction = pImpl->planner->planAction(currentState, currentGoal);
+        
+        // Check if planner suggests a meaningful action
+        if (plannedAction != ActionType::Wait) {
+            // Update planner with actual outcome (in a real implementation)
+            // For now, we just use the planned action
+            return std::make_unique<Action>(plannedAction);
+        }
+    }
+    
+    // Fallback to simple motor-based selection for compatibility
     // Calculate activity of motor neuron groups
     size_t firingMotor = 0;
     for (auto* neuron : pImpl->motorNeurons) {
