@@ -20,6 +20,126 @@ That's it! NLM simulates all of this.
 2. **World** - The environment the brain lives in
 3. **Agent** - The bridge connecting brain to world
 
+### Advanced Quick Start (Copy & Paste)
+
+#### Advanced Learning Simulation
+```python
+import pynlm
+import time
+
+# Create a brain with learning enabled
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Enable learning features
+brain.getAgentBrain().enableRewardModulation(True)
+brain.getAgentBrain().enableCuriosity(True)
+brain.getAgentBrain().enableDevelopment(True)
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+world.reset()
+
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Advanced simulation with rewards and learning
+print("Starting advanced learning simulation...")
+start_time = time.time()
+
+for step in range(200):
+    # Update world with time
+    world.update(0.1)
+    
+    # Get sensory input
+    percept = world.getSensoryPercept()
+    
+    # Process with agent
+    agent.processSensoryInput(percept)
+    
+    # Brain thinking step
+    brain.step(step)
+    
+    # Get action and apply
+    action = agent.decodeMotorCommand()
+    world.applyMotorCommand(action, world.getSimulationTime())
+    
+    # Apply reward based on action outcome
+    # (Simple example: give small reward for moving)
+    reward = 0.1 if action.getType() != pynlm.ActionType.Wait else -0.5
+    predicted = agent.getPredictionError()
+    agent.applyRewardModulation(reward, predicted)
+    
+    # Print progress
+    if step % 20 == 0:
+        print(f"Step {step}: "
+              f"Firing={brain.getFiringNeuronCount()}, "
+              f"Spikes={brain.getTotalSpikeCount()}, "
+              f"Curiosity={agent.getCuriosityLevel():.2f}, "
+              f"Novelty={agent.getNoveltyLevel():.2f}, "
+              f"DevStage={brain.getDevelopmentalStage().name}")
+
+end_time = time.time()
+print(f"Simulation completed in {end_time - start_time:.1f} seconds")
+print(f"Final learned preference: {brain.getLearnedPreference():.2f}")
+print(f"Final developmental stage: {brain.getDevelopmentalStage().name}")
+```
+
+#### Quick Brain Visualization Helper
+```python
+import pynlm
+
+def create_and_run_brain_simulation(duration_steps=100, visualize=True):
+    """
+    Complete helper function that creates, runs, and visualizes a brain simulation.
+    
+    Args:
+        duration_steps: Number of simulation steps to run
+        visualize: Whether to print progress during simulation
+        
+    Returns:
+        dict: Statistics from the simulation
+    """
+    # Create and initialize brain
+    brain = pynlm.createBrain(pynlm.createDefaultConfig())
+    brain.initialize()
+    
+    # Statistics collection
+    stats = {
+        'steps': [],
+        'spike_counts': [],
+        'firing_counts': [],
+        'avg_rates': [],
+        'development_stages': []
+    }
+    
+    # Run simulation
+    for step in range(duration_steps):
+        brain.step(step)
+        
+        # Collect statistics
+        stats['steps'].append(step)
+        stats['spike_counts'].append(brain.getTotalSpikeCount())
+        stats['firing_counts'].append(brain.getFiringNeuronCount())
+        stats['avg_rates'].append(brain.getAverageFiringRate())
+        stats['development_stages'].append(brain.getDevelopmentalStage())
+        
+        if visualize and step % 20 == 0:
+            print(f"Step {step}: "
+                  f"Spikes={brain.getTotalSpikeCount()}, "
+                  f"Firing={brain.getFiringNeuronCount()}, "
+                  f"Rate={brain.getAverageFiringRate():.2f}Hz, "
+                  f"Stage={brain.getDevelopmentalStage().name}")
+    
+    return stats
+
+# Use it like this:
+# stats = create_and_run_brain_simulation(200, visualize=True)
+# print(f"Average firing rate: {sum(stats['avg_rates'])/len(stats['avg_rates']):.2f}Hz")
+```
+
 ---
 
 ## Quick Start (Copy & Paste)
