@@ -22,6 +22,9 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Initialize reward system
+    rewardSystem.reset();
+    
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -888,8 +891,18 @@ MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
 
 void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
     if (!brain_ || !rewardModulationEnabled_) return;
+    
+    // Update reward system
+    rewardSystem.add(reward);
+    rewardSystem.updateExpectedValue(predictedReward);
+    
     thoughtReward_ = reward;
     hasThoughtOutcome_ = true;
+    
+    // Signal reward to neuromodulation system
+    rewardSystem.signalDopamine(brain_->getDopamine());
+    rewardSystem.signalRewardPredictionError(brain_->getDopamine());
+    
     // Phase 6 concept formation, wired into the loop: the pattern
     // that led to this action, paired with this action's reward.
     // Concepts therefore emerge from experienced pattern/reward
@@ -906,6 +919,7 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
             brain_->getConceptFormation()->presentExperience(pat, lastTouch_, reward, 0);
         }
     }
+    
     // Phase 5 learning for the thought/preference systems, from the
     // same reward the synaptic modulation below uses:
     //  - Planner action quality: EMA toward reward/10 for the action

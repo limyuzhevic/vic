@@ -7,6 +7,7 @@
 #include "../world/SimpleWorld.hpp"
 #include "../cognition/NeuralPlanner.hpp"
 #include "../cognition/ConceptFormation.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include <memory>
 #include <string>
 #include <vector>
