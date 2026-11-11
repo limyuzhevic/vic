@@ -3,8 +3,24 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cctype>
+#include <cmath>
+#include <unordered_map>
 
 namespace nlm {
+
+// Forward declarations for JSON parsing
+static bool parseJSON(const std::string& jsonStr, std::unordered_map<std::string, ConfigValue>& entries);
+static ConfigValue parseJSONValue(const std::string& jsonStr, size_t& pos);
+static std::string parseJSONString(const std::string& jsonStr, size_t& pos);
+static double parseJSONNumber(const std::string& jsonStr, size_t& pos);
+static bool parseJSONBool(const std::string& jsonStr, size_t& pos);
+static std::vector<ConfigValue> parseJSONArray(const std::string& jsonStr, size_t& pos);
+static void skipWhitespace(const std::string& jsonStr, size_t& pos);
+static bool isDigit(char c);
+static bool isHexDigit(char c);
+static bool isAlpha(char c);
+static bool isAlphaNumeric(char c);
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
@@ -19,13 +35,36 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
+    // Try to parse as JSON first
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string content = buffer.str();
+    
+    // Skip BOM if present
+    if (content.size() >= 3 && content[0] == '\xEF' && content[1] == '\xBB' && content[2] == '\xBF') {
+        content = content.substr(3);
+    }
+    
+    // Try to parse as JSON
+    std::unordered_map<std::string, ConfigValue> jsonEntries;
+    if (parseJSON(content, jsonEntries)) {
+        NLM_LOG_INFO("Loaded JSON configuration from: " + filepath);
+        // Clear existing entries and add JSON entries
+        pImpl->entries.clear();
+        for (const auto& pair : jsonEntries) {
+            set(pair.first, pair.second, ConfigSource::File);
+        }
+        return true;
+    }
+    
+    // Fall back to simple key=value format
+    file.clear();
+    file.seekg(0);
     
     std::string line;
     while (std::getline(file, line)) {
@@ -235,4 +274,234 @@ template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
 
+// JSON parsing helper functions
+static bool parseJSON(const std::string& jsonStr, std::unordered_map<std::string, ConfigValue>& entries) {
+    size_t pos = 0;
+    skipWhitespace(jsonStr, pos);
+    
+    if (jsonStr[pos] != '{') {
+        return false; // Not a JSON object
+    }
+    
+    pos++; // Skip {
+    skipWhitespace(jsonStr, pos);
+    
+    while (pos < jsonStr.size() && jsonStr[pos] != '}') {
+        // Parse key
+        skipWhitespace(jsonStr, pos);
+        if (jsonStr[pos] != '"') {
+            return false; // Expected string key
+        }
+        
+        std::string key = parseJSONString(jsonStr, pos);
+        skipWhitespace(jsonStr, pos);
+        
+        if (pos >= jsonStr.size() || jsonStr[pos] != ':') {
+            return false; // Expected colon
+        }
+        
+        pos++; // Skip colon
+        skipWhitespace(jsonStr, pos);
+        
+        // Parse value
+        ConfigValue value = parseJSONValue(jsonStr, pos);
+        entries[key] = value;
+        
+        skipWhitespace(jsonStr, pos);
+        if (pos < jsonStr.size() && jsonStr[pos] == ',') {
+            pos++; // Skip comma
+            skipWhitespace(jsonStr, pos);
+        }
+    }
+    
+    if (pos < jsonStr.size() && jsonStr[pos] == '}') {
+        pos++; // Skip }
+    }
+    
+    return pos == jsonStr.size(); // Should reach end of string
+}
+
+static ConfigValue parseJSONValue(const std::string& jsonStr, size_t& pos) {
+    skipWhitespace(jsonStr, pos);
+    
+    if (pos >= jsonStr.size()) {
+        return ConfigValue(""); // Empty string as fallback
+    }
+    
+    switch (jsonStr[pos]) {
+        case '"':
+            return parseJSONString(jsonStr, pos);
+        case '[':
+            return parseJSONArray(jsonStr, pos);
+        case 't':
+            return parseJSONBool(jsonStr, pos) ? ConfigValue(true) : ConfigValue("");
+        case 'f':
+            return parseJSONBool(jsonStr, pos) ? ConfigValue(false) : ConfigValue("");
+        case 'n':
+            if (jsonStr.compare(pos, 4, "null") == 0) {
+                pos += 4;
+                return ConfigValue("");
+            }
+            return ConfigValue("");
+        default:
+            // Try to parse as number
+            return parseJSONNumber(jsonStr, pos);
+    }
+}
+
+static std::string parseJSONString(const std::string& jsonStr, size_t& pos) {
+    if (jsonStr[pos] != '"') {
+        return "";
+    }
+    
+    pos++; // Skip opening quote
+    std::string result;
+    
+    while (pos < jsonStr.size() && jsonStr[pos] != '"') {
+        if (jsonStr[pos] == '\\' && pos + 1 < jsonStr.size()) {
+            // Handle escape sequences
+            pos++; // Skip backslash
+            if (pos < jsonStr.size()) {
+                switch (jsonStr[pos]) {
+                    case '"': result += '"'; break;
+                    case '\\': result += '\\'; break;
+                    case '/': result += '/'; break;
+                    case 'b': result += '\b'; break;
+                    case 'f': result += '\f'; break;
+                    case 'n': result += '\n'; break;
+                    case 'r': result += '\r'; break;
+                    case 't': result += '\t'; break;
+                    case 'u': {
+                        // Unicode escape - simplified for now
+                        if (pos + 4 < jsonStr.size()) {
+                            pos += 4;
+                            result += "?";
+                        }
+                        break;
+                    }
+                    default: result += jsonStr[pos]; break;
+                }
+            }
+        } else {
+            result += jsonStr[pos];
+        }
+        pos++;
+    }
+    
+    if (pos < jsonStr.size() && jsonStr[pos] == '"') {
+        pos++; // Skip closing quote
+    }
+    
+    return result;
+}
+
+static double parseJSONNumber(const std::string& jsonStr, size_t& pos) {
+    size_t startPos = pos;
+    bool isNegative = false;
+    bool hasDecimal = false;
+    bool hasExponent = false;
+    
+    // Check for negative sign
+    if (jsonStr[pos] == '-') {
+        isNegative = true;
+        pos++;
+    }
+    
+    // Parse integer part
+    while (pos < jsonStr.size() && isDigit(jsonStr[pos])) {
+        pos++;
+    }
+    
+    // Check for decimal part
+    if (pos < jsonStr.size() && jsonStr[pos] == '.') {
+        hasDecimal = true;
+        pos++;
+        while (pos < jsonStr.size() && isDigit(jsonStr[pos])) {
+            pos++;
+        }
+    }
+    
+    // Check for exponent
+    if (pos < jsonStr.size() && (jsonStr[pos] == 'e' || jsonStr[pos] == 'E')) {
+        hasExponent = true;
+        pos++; // Skip e/E
+        if (pos < jsonStr.size() && (jsonStr[pos] == '+' || jsonStr[pos] == '-')) {
+            pos++; // Skip sign
+        }
+        while (pos < jsonStr.size() && isDigit(jsonStr[pos])) {
+            pos++;
+        }
+    }
+    
+    if (pos == startPos) {
+        return 0.0; // No number found
+    }
+    
+    // Convert to double
+    std::string numStr = jsonStr.substr(startPos, pos - startPos);
+    return std::stod(numStr) * (isNegative ? -1.0 : 1.0);
+}
+
+static bool parseJSONBool(const std::string& jsonStr, size_t& pos) {
+    if (jsonStr.compare(pos, 4, "true") == 0) {
+        pos += 4;
+        return true;
+    } else if (jsonStr.compare(pos, 5, "false") == 0) {
+        pos += 5;
+        return false;
+    }
+    return false;
+}
+
+static std::vector<ConfigValue> parseJSONArray(const std::string& jsonStr, size_t& pos) {
+    if (jsonStr[pos] != '[') {
+        return {};
+    }
+    
+    pos++; // Skip [
+    std::vector<ConfigValue> result;
+    skipWhitespace(jsonStr, pos);
+    
+    while (pos < jsonStr.size() && jsonStr[pos] != ']') {
+        // Parse element
+        ConfigValue value = parseJSONValue(jsonStr, pos);
+        result.push_back(value);
+        
+        skipWhitespace(jsonStr, pos);
+        if (pos < jsonStr.size() && jsonStr[pos] == ',') {
+            pos++; // Skip comma
+            skipWhitespace(jsonStr, pos);
+        }
+    }
+    
+    if (pos < jsonStr.size() && jsonStr[pos] == ']') {
+        pos++; // Skip ]
+    }
+    
+    return result;
+}
+
+static void skipWhitespace(const std::string& jsonStr, size_t& pos) {
+    while (pos < jsonStr.size() && std::isspace(jsonStr[pos])) {
+        pos++;
+    }
+}
+
+static bool isDigit(char c) {
+    return c >= '0' && c <= '9';
+}
+
+static bool isHexDigit(char c) {
+    return isDigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+static bool isAlpha(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+}
+
+static bool isAlphaNumeric(char c) {
+    return isDigit(c) || isAlpha(c);
+}
+
 } // namespace nlm
+
