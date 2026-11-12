@@ -10,6 +10,7 @@
 #include "../plasticity/StructuralPlasticity.hpp"
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nlm {
 
@@ -30,6 +31,7 @@ class Dopamine;
 class Curiosity;
 class Novelty;
 class PredictionError;
+class CheckpointSystem;
 
 // Inter-regional connection (long-range connectivity)
 struct InterRegionConnection {
@@ -46,9 +48,22 @@ struct InterRegionConnection {
         : sourceRegion(src), targetRegion(tgt), weight(w), delay(d), plasticityFlags() {}
 };
 
+// Forward declarations for Brain internal implementation
+class BrainInit;
+class BrainStep;
+class BrainIO;
+class BrainMemory;
+class BrainCognition;
+class BrainDevelopment;
+class BrainNeuromodulation;
+class BrainPersistence;
+
 // Brain: The central coordinator of the neural system
 // Implements real spiking neural computation with event-driven dynamics
 // and integrated memory, prediction, cognition, and neuromodulation systems
+//
+// This header now acts as a facade, delegating implementation to specialized
+// header files for better code organization and maintainability.
 
 class Brain {
 public:
@@ -74,7 +89,7 @@ public:
     
     // Receive sensory input from environment
     // Injects current into sensory neurons based on input pattern
-    void receiveSensoryInput(const class SensoryInput& input);
+    void receiveSensoryInput(const SensoryInput& input);
     
     // Inject current directly into a specific neuron
     void injectCurrent(NeuronId neuron, MembranePotential current);
@@ -97,10 +112,10 @@ public:
     size_t getPendingSpikeEventCount() const;
     
     // Produce motor/action output based on motor neuron activity
-    std::unique_ptr<class Action> produceAction();
+    std::unique_ptr<Action> produceAction();
     
     // Apply neuromodulatory signals
-    void applyNeuromodulation(const class Neuromodulator& signal);
+    void applyNeuromodulation(const Neuromodulator& signal);
     
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
@@ -191,7 +206,7 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
-
+    
     // Learned preference trait (Phase 5): a single scalar, -1..1,
     // updated only by sandbox reward through AgentBrain, saved in the
     // checkpoint (SimulationState section) and used as a small bias in
@@ -206,6 +221,16 @@ public:
     void logStatus() const;
     
 private:
+    // Brain is composed of specialized handler classes for better separation
+    std::unique_ptr<BrainInit> initHandler_;
+    std::unique_ptr<BrainStep> stepHandler_;
+    std::unique_ptr<BrainIO> ioHandler_;
+    std::unique_ptr<BrainMemory> memoryHandler_;
+    std::unique_ptr<BrainCognition> cognitionHandler_;
+    std::unique_ptr<BrainDevelopment> developmentHandler_;
+    std::unique_ptr<BrainNeuromodulation> neuromodulationHandler_;
+    std::unique_ptr<BrainPersistence> persistenceHandler_;
+    
     struct Impl;
     Impl* pImpl;
 };

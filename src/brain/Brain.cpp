@@ -1,4 +1,13 @@
 #include "Brain.hpp"
+#include "BrainInit.hpp"
+#include "BrainStep.hpp"
+#include "BrainIO.hpp"
+#include "BrainMemory.hpp"
+#include "BrainCognition.hpp"
+#include "BrainDevelopment.hpp"
+#include "BrainNeuromodulation.hpp"
+#include "BrainPersistence.hpp"
+#include "BrainUtils.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
@@ -169,12 +178,50 @@ struct Brain::Impl {
     RegionId nextRegionId;
 };
 
-Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
+Brain::Brain(std::shared_ptr<Config> config) {
+    pImpl = new Impl(config);
+    
+    // Initialize handler classes
+    initHandler_ = std::make_unique<BrainInit>(this, config);
+    stepHandler_ = std::make_unique<BrainStep>(this);
+    ioHandler_ = std::make_unique<BrainIO>(this);
+    memoryHandler_ = std::make_unique<BrainMemory>(this);
+    cognitionHandler_ = std::make_unique<BrainCognition>(this);
+    developmentHandler_ = std::make_unique<BrainDevelopment>(this);
+    neuromodulationHandler_ = std::make_unique<BrainNeuromodulation>(this);
+    persistenceHandler_ = std::make_unique<BrainPersistence>(this);
+    utilsHandler_ = std::make_unique<BrainUtils>(this);
+}
 
-Brain::~Brain() = default;
+Brain::~Brain() {
+    // Clean up handler classes
+    initHandler_.reset();
+    stepHandler_.reset();
+    ioHandler_.reset();
+    memoryHandler_.reset();
+    cognitionHandler_.reset();
+    developmentHandler_.reset();
+    neuromodulationHandler_.reset();
+    persistenceHandler_.reset();
+    utilsHandler_.reset();
+    
+    delete pImpl;
+}
 
-Brain::Brain(Brain&& other) noexcept : pImpl(other.pImpl) {
+Brain::Brain(Brain&& other) noexcept {
+    pImpl = other.pImpl;
     other.pImpl = nullptr;
+    
+    // Move ownership of handlers
+    initHandler_ = std::move(other.initHandler_);
+    stepHandler_ = std::move(other.stepHandler_);
+    ioHandler_ = std::move(other.ioHandler_);
+    memoryHandler_ = std::move(other.memoryHandler_);
+    cognitionHandler_ = std::move(other.cognitionHandler_);
+    developmentHandler_ = std::move(other.developmentHandler_);
+    neuromodulationHandler_ = std::move(other.neuromodulationHandler_);
+    persistenceHandler_ = std::move(other.persistenceHandler_);
+    utilsHandler_ = std::move(other.utilsHandler_);
 }
 
 Brain& Brain::operator=(Brain&& other) noexcept {
@@ -182,6 +229,17 @@ Brain& Brain::operator=(Brain&& other) noexcept {
         delete pImpl;
         pImpl = other.pImpl;
         other.pImpl = nullptr;
+        
+        // Move ownership of handlers
+        initHandler_ = std::move(other.initHandler_);
+        stepHandler_ = std::move(other.stepHandler_);
+        ioHandler_ = std::move(other.ioHandler_);
+        memoryHandler_ = std::move(other.memoryHandler_);
+        cognitionHandler_ = std::move(other.cognitionHandler_);
+        developmentHandler_ = std::move(other.developmentHandler_);
+        neuromodulationHandler_ = std::move(other.neuromodulationHandler_);
+        persistenceHandler_ = std::move(other.persistenceHandler_);
+        utilsHandler_ = std::move(other.utilsHandler_);
     }
     return *this;
 }
