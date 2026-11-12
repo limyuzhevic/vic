@@ -155,7 +155,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.totalWallClockTime = std::chrono::duration<double>(endWall - startWall).count();
     
     NLM_LOG_INFO("=== Experiment Complete ===");
-    NLM_LOG_INFO("Total reward: " + std::to_string(result.totalReward));
+    NLM_LOG_INFO("Avg reward: " + std::to_string(result.totalReward));
     NLM_LOG_INFO("Avg firing rate: " + std::to_string(result.avgFiringRate));
     NLM_LOG_INFO("Episodes stored: " + std::to_string(result.memoryEpisodesStored));
     NLM_LOG_INFO("Wall time: " + std::to_string(result.totalWallClockTime) + "s");

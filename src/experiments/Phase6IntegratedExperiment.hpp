@@ -39,7 +39,7 @@ struct Phase6IntegrationResult {
     bool replayWorks;
     
     // Metrics
-    float totalReward;
+    float totalReward;      // Average reward per step (total accumulated reward / maxSteps)
     float avgFiringRate;
     float avgSynapticWeight;
     float memoryEpisodesStored;
