@@ -27,6 +27,7 @@ class ConceptFormation;
 class AttentionalSelection;
 class DevelopmentSystem;
 class Dopamine;
+class Acetylcholine;
 class Curiosity;
 class Novelty;
 class PredictionError;
@@ -176,6 +177,9 @@ public:
     
     // Dopamine - reward and reinforcement
     Dopamine* getDopamine();
+    
+    // Acetylcholine - attention and memory consolidation
+    Acetylcholine* getAcetylcholine();
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();

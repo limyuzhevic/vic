@@ -62,6 +62,12 @@ public:
     void setLevel(float level) override {}
     float getPlasticityFactor() const override { return 1.0f; }
     void update(TimestepDuration dt) override {}
+    
+    // Signal attention event (novelty, salience)
+    void signalAttentionEvent(float salience);
+    
+    // Signal memory encoding (to promote consolidation)
+    void signalMemoryEncoding(const std::vector<float>& memoryStrengths);
 };
 
 // Norepinephrine: Arousal and vigilance
