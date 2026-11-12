@@ -28,24 +28,76 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+bool parseCommandLineArgs(int argc, char** argv, std::string& configFile, 
+                                       int& test1Steps, int& test2Steps, int& test3Steps) {
+    configFile = "configs/default.cfg";
+    test1Steps = 50;
+    test2Steps = 1000;
+    test3Steps = 50;
+    
+    // Print usage information
+    if (argc == 1) {
+        std::cout << "Usage: " << argv[0] << " [options]\n";
+        std::cout << "  --config <file>     Specify configuration file (default: configs/default.cfg)\n";
+        std::cout << "  --test1 <steps>      Number of steps for basic connectivity test (default: 50)\n";
+        std::cout << "  --test2 <steps>      Number of steps for plasticity experiment (default: 1000)\n";
+        std::cout << "  --test3 <steps>      Number of steps for STDP verification (default: 50)\n";
+        std::cout << "  --help               Show this help message\n";
+        return true;
+    }
+    
+    // Parse arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        
+        if (arg == "--help") {
+            std::cout << "Usage: " << argv[0] << " [options]\n";
+            std::cout << "  --config <file>     Specify configuration file (default: configs/default.cfg)\n";
+            std::cout << "  --test1 <steps>      Number of steps for basic connectivity test (default: 50)\n";
+            std::cout << "  --test2 <steps>      Number of steps for plasticity experiment (default: 1000)\n";
+            std::cout << "  --test3 <steps>      Number of steps for STDP verification (default: 50)\n";
+            std::cout << "  --help               Show this help message\n";
+            return true;
+        } 
+        else if (arg == "--config") {
+            if (i + 1 < argc) {
+                configFile = argv[++i];
+            } else {
+                std::cerr << "Error: --config requires a filename\n";
+                return false;
+            }
+        } 
+        else if (arg == "--test1") {
+            if (i + 1 < argc) {
+                test1Steps = std::atoi(argv[++i]);
+            } else {
+                std::cerr << "Error: --test1 requires a step count\n";
+                return false;
+            }
+        } 
+        else if (arg == "--test2") {
+            if (i + 1 < argc) {
+                test2Steps = std::atoi(argv[++i]);
+            } else {
+                std::cerr << "Error: --test2 requires a step count\n";
+                return false;
+            }
+        } 
+        else if (arg == "--test3") {
+            if (i + 1 < argc) {
+                test3Steps = std::atoi(argv[++i]);
+            } else {
+                std::cerr << "Error: --test3 requires a step count\n";
+                return false;
+            }
+        } 
+        else {
+            std::cerr << "Unknown argument: " << arg << "\n";
+            return false;
+        }
+    }
+    
+    return true;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -218,26 +270,37 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         }
     }
     
-    // Apply repeated input pattern to stimulate learning
+    // Apply varied input patterns to stimulate learning
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Applying varied input patterns (1000 steps)...");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
-    std::vector<NeuronId> patternNeurons;
+    // Create a more varied and selective input pattern to avoid saturation
+    // Collect all sensory neuron IDs for diverse stimulation patterns
+    std::vector<NeuronId> sensoryNeuronIds;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
+            if (neuron->getType() == NeuronType::Sensory) {
+                sensoryNeuronIds.push_back(neuron->getId());
             }
         }
     }
+    
+    // Clear previous state and start with fresh inputs
+    brain->reset();
+    brain->initialize();
+    
+    // Apply varied input patterns
     for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+        // Vary which neurons are stimulated each step to create diverse patterns
+        // This prevents saturation and promotes selective learning
+        float currentMagnitude = 15.0f + 10.0f * std::sin(step * 0.01f);  // Vary current
+        int neuronCount = std::min(static_cast<size_t>(3), sensoryNeuronIds.size());
+        
+        for (size_t i = 0; i < neuronCount; ++i) {
+            // Use different neurons each step for pattern diversity
+            size_t neuronIndex = (step + i) % sensoryNeuronIds.size();
+            NeuronId neuronId = sensoryNeuronIds[neuronIndex];
+            brain->injectCurrent(neuronId, currentMagnitude);
         }
         
         brain->step(step, step * 0.001);
@@ -246,7 +309,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                        " | Current: " + std::to_string(currentMagnitude));
         }
     }
     
@@ -312,6 +376,14 @@ int main(int argc, char** argv) {
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
+    // Parse command line arguments
+    std::string configFile;
+    int test1Steps, test2Steps, test3Steps;
+    if (!parseCommandLineArgs(argc, argv, configFile, test1Steps, test2Steps, test3Steps)) {
+        std::cerr << "Error parsing command line arguments.\n";
+        return 1;
+    }
+    
     // Initialize logger
     auto logger = std::make_shared<Logger>();
     auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
@@ -328,19 +400,6 @@ int main(int argc, char** argv) {
     
     // Load configuration
     auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
-            if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
-                configFile = argv[++i];
-            }
-        }
-    }
     
     // Load config from file (ignore if not found)
     if (config->loadFromFile(configFile)) {
