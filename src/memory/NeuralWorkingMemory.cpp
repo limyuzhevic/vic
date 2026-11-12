@@ -93,7 +93,24 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
         bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
-        if (activation > 0.1f && !present) activeTraces_.push_back(idx);
+        if (activation > 0.1f && !present) {
+            activeTraces_.push_back(idx);
+            // Also track the neuron in the main memory list if not already there
+            if (std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron) != memoryNeurons_.end()) {
+                bool neuronInMemory = false;
+                for (size_t i = 0; i < memoryNeurons_.size(); ++i) {
+                    if (memoryNeurons_[i] == neuron) {
+                        neuronInMemory = true;
+                        break;
+                    }
+                }
+                if (!neuronInMemory && memoryNeurons_.size() < capacity_) {
+                    memoryNeurons_.push_back(neuron);
+                    memoryActivations_.push_back(activation);
+                    memoryTimestamps_.push_back(0);
+                }
+            }
+        }
         if (activation <= 0.1f && present) {
             activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
                                 activeTraces_.end());
@@ -264,7 +281,9 @@ void NeuralWorkingMemory::decayWeakTraces() {
     // remaining activations instead of leaving stale indices.
     activeTraces_.clear();
     for (size_t i = 0; i < memoryActivations_.size(); ++i) {
-        if (memoryActivations_[i] > 0.1f) activeTraces_.push_back(i);
+        if (memoryActivations_[i] > 0.1f) {
+            activeTraces_.push_back(i);
+        }
     }
 }
 

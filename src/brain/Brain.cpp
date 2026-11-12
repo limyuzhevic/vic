@@ -388,9 +388,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             for (auto* neuron : pop->getNeurons()) {
                 // Check if neuron just fired this step
                 const auto& state = neuron->getState();
-                bool justFired = (state.firingState == FiringState::Refractory &&
-                                 state.lastSpikeTime >= 0.0f &&
-                                 std::abs(static_cast<float>(currentTime) - state.lastSpikeTime) < pImpl->timestep * 2.0f);
+bool justFired = (state.firingState == FiringState::Refractory &&
+                 state.lastSpikeTime >= 0.0f &&
+                 currentTime - state.lastSpikeTime <= 1.0f &&
+                 currentTime - state.lastSpikeTime >= 0.0f);
 
                 if (justFired) {
                     // Neuron fired this step - queue the spike
@@ -1179,9 +1180,15 @@ bool Brain::load(const std::string& filepath) {
                     idx++;
                 }
             }
+        // Rebuild neuron lookup after loading neuron states from checkpoint
+        // This is necessary because the load method only updates neuron states
+        // but does not add/remove neurons, so the neuronById map must be rebuilt
+        pImpl->neuronById.clear();
+        for (auto& region : pImpl->regions) {
+            for (auto* neuron : region->getAllNeurons()) {
+                pImpl->neuronById[neuron->getId().index()] = neuron;
+            }
         }
-
-        // Read synapses
         SynapseCheckpointData synapseData;
         if (!reader.readSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to read synapses from checkpoint");

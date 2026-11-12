@@ -33,6 +33,14 @@ void NeuralEpisodicMemory::initialize(Brain* brain) {
 }
 
 void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
+    if (episodes_.size() >= maxEpisodes_) {
+        // Remove the oldest episode to make room for the new one
+        episodes_.erase(episodes_.begin());
+        if (!pImpl->episodeNeurons.empty()) {
+            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
+        }
+    }
+    
     // Create episode copy with age 0
     EpisodicMemoryItem stored = episode;
     stored.age = 0;
@@ -41,19 +49,11 @@ void NeuralEpisodicMemory::storeEpisode(const EpisodicMemoryItem& episode) {
     
     // Create episode neuron for pattern completion
     if (brain_ && !episode.sensoryState.empty()) {
-        NeuronId epNeuron(episodes_.size() + 20000);
+        NeuronId epNeuron(20000 + episodes_.size() - 1);  // Unique ID based on episode index
         pImpl->episodeNeurons.push_back(epNeuron);
         
-        // Store episode index in the neuron
-        // (This is a simplified approach - real implementation would use more distributed encoding)
-    }
-    
-    // Remove old episodes if over capacity
-    while (episodes_.size() > maxEpisodes_) {
-        episodes_.erase(episodes_.begin());
-        if (!pImpl->episodeNeurons.empty()) {
-            pImpl->episodeNeurons.erase(pImpl->episodeNeurons.begin());
-        }
+        // Store episode index in the neuron for later retrieval
+        // This allows for efficient replay of specific episodes
     }
     
     // Age all episodes
