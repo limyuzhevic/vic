@@ -180,14 +180,18 @@ add_executable(nlm_benchmark
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
 # Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
+# Build outputs:
+# - If NLM_BUILD_PYTHON_BINDINGS=OFF (default): Standard C++ build with core libraries,
+#   demo executables, but NO Python module
+# - If NLM_BUILD_PYTHON_BINDINGS=ON: Same as above PLUS the pynlm Python module
+#   (using pyproject.toml defaults via scikit-build)
+#
+# For pure C++ development, leave NLM_BUILD_PYTHON_BINDINGS=OFF (default).
+# For Python development or building via pip, use pyproject.toml which sets
+# -DNLM_BUILD_PYTHON_BINDINGS=ON automatically.
+#
+# There's also a standalone python/CMakeLists.txt that can build the Python
+# module by itself, but it requires the core libraries to already be built.
 option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)
