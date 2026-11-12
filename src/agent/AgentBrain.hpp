@@ -227,6 +227,149 @@ private:
     // Last decoded command, for the interact no-repeat rule below.
     MotorCommand lastDecoded_ = MotorCommand::Wait;
     bool hasLastDecoded_ = false;
+    // Phase 6: Advanced exploration/exploitation management
+    // Advanced curiosity-based exploration with intensity control
+    void enableAdvancedCuriosity(bool enable, float baseIntensity = 0.5f, float noveltyThreshold = 0.7f);
+    float getCuriosityIntensity() const;
+    float getExplorationBonus() const;
+    
+    // Advanced planning with uncertainty and confidence
+    void enableAdvancedPlanning(bool enable, float confidenceWeight = 0.5f, float uncertaintyPenalty = 0.3f);
+    float getPlanningConfidence() const;
+    std::string getPlanningReason() const;
+    
+    // Social learning and observation
+    void enableSocialLearning(bool enable);
+    void observeOtherAgent(MotorCommand observed, const std::vector<float>& visionBefore,
+                          const std::vector<float>& visionAfter);
+    float getSocialLearningRate() const;
+    
+    // Episodic memory and replay management
+    void enableMemoryReplay(bool enable, size_t maxReplayEvents = 3);
+    bool replayLastEpisode();
+    size_t getReplayableEpisodesCount() const;
+    
+    // Neuromodulation fine-tuning
+    void fineTuneNeuromodulation(float dopamineFactor = 1.0f, float curiosityFactor = 1.0f,
+                                 float noveltyFactor = 1.0f, float predictionErrorFactor = 1.0f);
+    
+    // Advanced concept formation and categorization
+    void enableConceptFormation(bool enable, size_t maxConcepts = 50, float similarityThreshold = 0.7f);
+    size_t getConceptCount() const;
+    std::string categorizeObservation(const std::vector<float>& observation) const;
+    
+    // Development and plasticity control
+    void setDevelopmentRate(float rate);
+    void setPlasticityThreshold(float threshold);
+    float getDevelopmentAge() const;
+    float getPlasticityActivity() const;
+    
+    // Attention and competition management
+    void setAttentionScope(size_t scope);
+    void setCompetitionMode(bool competitive);
+    std::vector<NeuronId> getAttendedNeurons() const;
+    
+    // Advanced reward shaping for custom objectives
+    void addRewardFunction(std::function<float(Brain* brain)> func);
+    void setRewardShapingFunction(std::function<float(Brain* brain, const MotorCommand& action)> func);
+    float computeCustomReward(Brain* brain, const MotorCommand& action) const;
+    
+    // Debug and diagnostic tools
+    std::string getBrainStateSummary() const;
+    std::vector<std::string> getSystemStatusReports() const;
+    bool validateSystemIntegration() const;
+
+private:
+    // Motor decoding: convert neural activity to motor command
+    MotorCommand decodeFromMotorNeurons();
+    
+    // Motor command selection with curiosity/exploration
+    MotorCommand selectWithCuriosity(MotorCommand defaultCmd);
+    
+    std::shared_ptr<Brain> brain_;
+    
+    // Motor neuron groups
+    std::vector<Neuron*> motorForward_;
+    std::vector<Neuron*> motorBackward_;
+    std::vector<Neuron*> motorTurnLeft_;
+    std::vector<Neuron*> motorTurnRight_;
+    std::vector<Neuron*> motorInteract_;
+    std::vector<Neuron*> motorWait_;
+    
+    // Sensory neuron groups
+    std::vector<Neuron*> sensoryVision_;
+    std::vector<Neuron*> sensoryTouch_;
+    std::vector<Neuron*> sensoryInternal_;
+    std::vector<Neuron*> sensoryProprioception_;
+    // Internal (hidden) neurons, for the recall probe. Sensory neurons
+    // are the input layer; the association between a word and a scene
+    // lives in which internal neurons the two inputs jointly recruit.
+    std::vector<Neuron*> internalNeurons_;
+    
+    // Neuromodulation state
+    float dopamineLevel_;
+    float noveltyLevel_;
+    float curiosityLevel_;
+    float predictionError_;
+    float expectedReward_;
+    
+    // Development state
+    double developmentalAge_;
+    float plasticityModifier_;
+    
+    // Configuration flags
+    bool rewardModulationEnabled_;
+    bool structuralPlasticityEnabled_;
+    bool developmentEnabled_;
+    bool curiosityEnabled_;
+    
+    // Slowly adapting prediction of the visual scene, for novelty
+    // detection (see processSensoryInput). Not the previous frame:
+    // per-frame differencing cannot work here, because the world
+    // changes vision by only ~0-0.004 per action step while moving.
+    std::vector<float> predictedVision_;
+    float sensoryNoveltyDecay_;
+    // Strongest touch/proximity signal in the most recent percept
+    // (0 = nothing within touch range, 1 = touching). Used only for the
+    // innate proximity reflex in decodeFromMotorNeurons().
+    float maxTouch_ = 0.0f;
+    // Phase 5 vision-guided reflex features, derived from the same
+    // percept the brain already receives (no world label is leaked):
+    // forwardTouch_ is the strongest touch in the forward cone (touch
+    // sensors 0, 1, 7 of 8, i.e. -45..+45 degrees); forwardObjectVision_
+    // is the closest forward-cone vision value (centre rays 5..10 of
+    // 16) below the empty value 1.0. The world's vision encoding makes
+    // a close bright object ~0.65-0.8 (resource), a close dark object
+    // ~0.24-0.3 (hazard) and a close wall ~0.1-0.2 — so a value above
+    // 0.5 with forward touch is a resource cue, and a value below 0.35
+    // is a hazard/wall cue. Touch alone cannot tell them apart; vision
+    // in the same percept can, and only that is used here.
+    float forwardTouch_ = 0.0f;
+    float forwardObjectVision_ = 1.0f;
+    // Phase 5 winner-take-all state: the motor group that won the last
+    // decode, and by how much. On the next presentation its competitors
+    // receive a lateral-inhibition pulse (see processSensoryInput), so
+    // a decisive winner suppresses its rivals instead of every group
+    // saturating together at 70-90 Hz.
+    int lastWinnerGroup_ = -1;
+    float lastWinnerMargin_ = 0.0f;
+    int consecutiveWinnerCount_ = 0;
+    // Phase 5 action-diversity state, updated from final decoded
+    // actions: steps since the last turn, and how many times the same
+    // movement has repeated in a row. Used for a turn-diversity bias
+    // and a repetition-fatigue penalty in decode, not a pathfinder.
+    int stepsSinceTurn_ = 0;
+    int repeatCount_ = 0;
+    // Phase 5 diagnostic counters (not used for decisions): how often
+    // the vision-gated reflex bonus / hazard suppression / WTA pulse
+    // actually fired, so demo reports can tell a live mechanism from
+    // a dead one.
+    int reflexBonusCount_ = 0;
+    int reflexSuppressCount_ = 0;
+    int wtaPulseCount_ = 0;
+    // Last decoded command, for the interact no-repeat rule below.
+    MotorCommand lastDecoded_ = MotorCommand::Wait;
+    bool hasLastDecoded_ = false;
     // Phase 6 wired cognition: the brain owns the planner and concept
     // formation, but AgentBrain owns the self-model and social
     // learning (Brain never owned them) and calls them from the loop,
@@ -262,6 +405,84 @@ private:
     bool hasThoughtPlanned_ = false;
     float thoughtReward_ = 0.0f;
     bool hasThoughtOutcome_ = false;
+    
+    // ===== ADVANCED FEATURE STATE VARIABLES =====
+    
+    // Advanced curiosity system
+    struct AdvancedCuriosityState {
+        bool enabled = false;
+        float baseIntensity = 0.5f;
+        float noveltyThreshold = 0.7f;
+        float currentIntensity = 0.5f;
+        float explorationBonus = 0.0f;
+        float lastNovelty = 0.0f;
+    } advancedCuriosity_;
+    
+    // Advanced planning system
+    struct AdvancedPlanningState {
+        bool enabled = false;
+        float confidenceWeight = 0.5f;
+        float uncertaintyPenalty = 0.3f;
+        float confidence = 0.5f;
+        std::string lastReason;
+    } advancedPlanning_;
+    
+    // Social learning system
+    struct SocialLearningState {
+        bool enabled = false;
+        float learningRate = 0.1f;
+        size_t observationCount = 0;
+    } socialLearning_;
+    
+    // Memory replay system
+    struct MemoryReplayState {
+        bool enabled = false;
+        size_t maxReplayEvents = 3;
+        size_t replayIndex = 0;
+    } memoryReplay_;
+    
+    // Neuromodulation fine-tuning
+    struct NeuromodulationTuning {
+        float dopamineFactor = 1.0f;
+        float curiosityFactor = 1.0f;
+        float noveltyFactor = 1.0f;
+        float predictionErrorFactor = 1.0f;
+    } neuromodTuning_;
+    
+    // Concept formation system
+    struct ConceptFormationState {
+        bool enabled = false;
+        size_t maxConcepts = 50;
+        float similarityThreshold = 0.7f;
+        size_t conceptCount = 0;
+        std::unordered_map<std::string, std::vector<float>> conceptPrototypes;
+    } conceptFormation_;
+    
+    // Development control
+    struct DevelopmentControl {
+        float developmentRate = 0.01f;
+        float plasticityThreshold = 0.5f;
+    } development_;
+    
+    // Attention management
+    struct AttentionState {
+        size_t scope = 3;  // Number of neurons in attention window
+        bool competitive = true;
+        std::vector<NeuronId> attendedNeurons;
+    } attention_;
+    
+    // Reward shaping
+    struct RewardShaping {
+        std::vector<std::function<float(Brain* brain)>> rewardFunctions;
+        std::function<float(Brain* brain, const MotorCommand& action)> shapingFunction;
+    } rewardShaping_;
+    
+    // Diagnostic system
+    struct DiagnosticState {
+        bool systemValidated = false;
+        std::vector<std::string> statusReports;
+        double lastValidationTime = 0.0;
+    } diagnostic_;
 };
 
 } // namespace nlm

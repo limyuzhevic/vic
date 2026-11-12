@@ -81,25 +81,28 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
+        size_t idx = memoryNeurons_.size() - 1;
         it = memoryNeurons_.end() - 1;
-    }
 
-    // Phase 6: activeTraces_ is the trace list getActiveTraces()
-    // reports, and it was never populated — only cleared — so it
-    // always read 0 even when memory held 50 neurons. A stored
-    // neuron is an active trace; decayWeakTraces() below removes
-    // it again when its activation falls below threshold, and
-    // clear()/restoreSnapshot() reset the list with the content.
-    if (it != memoryNeurons_.end()) {
+        // Phase 6: activeTraces_ is the trace list getActiveTraces()
+        // reports, and it was never populated — only cleared — so it
+        // always read 0 even when memory held 50 neurons. A stored
+        // neuron is an active trace; decayWeakTraces() below removes
+        // it again when its activation falls below threshold, and
+        // clear()/restoreSnapshot() reset the list with the content.
+        // FIX: When storing a new neuron, ensure it's added to active traces
+        if (activation > 0.1f) {
+            activeTraces_.push_back(idx);
+        }
+    } else {
+        // Neuron not added due to capacity, but still update activation of matching neuron
         size_t idx = std::distance(memoryNeurons_.begin(), it);
-        bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
-        if (activation > 0.1f && !present) activeTraces_.push_back(idx);
-        if (activation <= 0.1f && present) {
-            activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
-                                activeTraces_.end());
+        if (idx < memoryActivations_.size()) {
+            memoryActivations_[idx] = activation;
+            memoryTimestamps_[idx] = 0;
         }
     }
-    
+
     // Inject current to maintain activation
     if (brain_) {
         brain_->injectCurrent(neuron, activation * 5.0f);
@@ -165,6 +168,7 @@ void NeuralWorkingMemory::clear() {
     memoryNeurons_.clear();
     memoryActivations_.clear();
     memoryTimestamps_.clear();
+    // FIX: Clear active traces to maintain consistency
     activeTraces_.clear();
     pImpl->maintenanceSynapses.clear();
 }
@@ -262,6 +266,7 @@ void NeuralWorkingMemory::decayWeakTraces() {
     // Phase 6: erasing shifts memory indices, so the trace list
     // cannot survive removal untouched — rebuild it from the
     // remaining activations instead of leaving stale indices.
+    // FIX: Rebuild active traces from remaining neurons after removal
     activeTraces_.clear();
     for (size_t i = 0; i < memoryActivations_.size(); ++i) {
         if (memoryActivations_[i] > 0.1f) activeTraces_.push_back(i);

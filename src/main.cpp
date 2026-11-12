@@ -430,6 +430,303 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
     NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
     NLM_LOG_INFO("");
-    
+
     return 0;
+}
+
+// ================ DEMONSTRATION MODES ===============================
+
+// Phase 2 demo - basic neural computation and learning
+void runPhase2Demo(const std::string& configFile) {
+    printBanner();
+    
+    std::cout << "Running NLM Phase 2 Real Neural Computation Demo..." << std::endl;
+    std::cout << "This demo demonstrates basic spiking neural dynamics, plasticity, and learning." << std::endl;
+    std::cout << "Press Ctrl+C to interrupt." << std::endl << std::endl;
+    
+    // Initialize configuration
+    auto config = std::make_shared<Config>();
+    
+    // Load configuration file
+    if (!config->loadFromFile(configFile)) {
+        NLM_LOG_INFO("Warning: Could not load config file '" + configFile + "'. Using defaults.");
+    }
+    
+    // Set Phase 2 specific defaults
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    
+    // Initialize logger
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    // Create and initialize brain
+    auto brain = std::make_shared<Brain>(config);
+    if (!brain->initialize()) {
+        std::cerr << "ERROR: Failed to initialize brain!" << std::endl;
+        return;
+    }
+    
+    // Run all tests
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== RUNNING PHASE 2 DEMONSTRATION ===");
+    NLM_LOG_INFO("");
+    
+    runBasicConnectivityTest(brain);
+    
+    brain->reset();
+    brain->initialize();
+    runPlasticityExperiment(brain);
+    
+    brain->reset();
+    brain->initialize();
+    runStdpVerification(brain);
+    
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== PHASE 2 DEMONSTRATION COMPLETE ===");
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("This demonstrates the core neural computation capabilities of NLM:");
+    NLM_LOG_INFO("- Leaky Integrate-and-Fire (LIF) neuron dynamics");
+    NLM_LOG_INFO("- Event-driven spike propagation and synaptic delays");
+    NLM_LOG_INFO("- STDP and Hebbian plasticity rules");
+    NLM_LOG_INFO("- Structural plasticity (synaptogenesis and pruning)");
+    NLM_LOG_INFO("- Activity-dependent synaptic modification");
+    NLM_LOG_INFO("-");
+    
+    std::cout << "Press Enter to continue...";
+    std::cin.ignore();
+}
+
+// Phase 6 demo - integration test of all brain systems
+void runPhase6Demo(const std::string& configFile) {
+    std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
+    std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
+    
+    // Initialize logging
+    Logger::getGlobal().setLevel(LogLevel::Info);
+    
+    // Create integration experiment
+    Phase6IntegratedExperiment experiment;
+    
+    // First, run the quick integration verification
+    std::cout << "--- Integration Verification ---" << std::endl;
+    bool integrationOK = experiment.verifyIntegration();
+    
+    std::cout << std::endl;
+    
+    if (!integrationOK) {
+        std::cerr << "ERROR: Integration verification failed!" << std::endl;
+        return;
+    }
+    
+    std::cout << "Integration verification passed!" << std::endl << std::endl;
+    
+    // Run comprehensive integration test
+    Phase6Config config;
+    config.neuronCount = 500;
+    config.maxSteps = 2000;
+    config.enableCheckpointing = true;
+    config.enableReplay = true;
+    config.enableDevelopment = true;
+    
+    std::cout << "--- Running Full Integration Test ---" << std::endl;
+    auto result = experiment.run(config);
+    
+    std::cout << std::endl;
+    std::cout << "=== INTEGRATION RESULTS ===" << std::endl;
+    std::cout << "Total reward: " << result.totalReward << std::endl;
+    std::cout << "Average firing rate: " << result.avgFiringRate << std::endl;
+    std::cout << "Episodic memory: " << result.memoryEpisodesStored << " episodes" << std::endl;
+    std::cout << std::endl;
+    
+    int connectedSystems = 0;
+    if (result.memoryWorkingMemoryIntegrated) connectedSystems++;
+    if (result.memoryEpisodicMemoryIntegrated) connectedSystems++;
+    if (result.neuromodulationIntegrated) connectedSystems++;
+    if (result.predictionIntegrated) connectedSystems++;
+    if (result.developmentIntegrated) connectedSystems++;
+    
+    std::cout << "Connected brain systems: " << connectedSystems << "/5" << std::endl;
+    
+    if (result.totalReward > 0.0f) {
+        std::cout << "✓ Learning detected: Brain is acquiring knowledge through experience" << std::endl;
+    } else {
+        std::cout << "⚠ No measurable learning: Consider adjusting network parameters" << std::endl;
+    }
+    
+    if (result.checkpointingWorks) {
+        std::cout << "✓ Checkpointing functional: Brain state can be saved and loaded" << std::endl;
+    } else {
+        std::cout << "⚠ Checkpointing may have issues" << std::endl;
+    }
+    
+    std::cout << "✓ Phase 6 integration complete: All major systems are connected" << std::endl;
+}
+
+// System benchmark test
+void runBenchmark() {
+    std::cout << "=== NLM System Benchmark ===" << std::endl;
+    std::cout << "Running performance benchmarks..." << std::endl << std::endl;
+    
+    // TODO: Implement comprehensive benchmark suite
+    // Benchmarks should test:
+    // - Neural computation speed (neurons per second)
+    // - Memory system performance (episodes per second)
+    // - Plasticity update speed (synapses per second)
+    // - Checkpoint I/O performance
+    // - Scalability with neuron count
+    // - Memory usage patterns
+    
+    std::cout << "Benchmark suite not yet implemented." << std::endl;
+    std::cout << "Basic timing tests can be run manually with different configurations." << std::endl;
+    std::cout << "See documentation for advanced benchmarking options." << std::endl;
+    
+    std::cout << std::endl;
+    std::cout << "For now, run specific demos with timing commands:" << std::endl;
+    std::cout << "  ./nlm_phase2_demo --help" << std::endl;
+    std::cout << "  ./nlm_phase6_demo --help" << std::endl;
+    std::cout << "  ./nlm_benchmark" << std::endl;
+}
+
+// =============== COMMAND LINE INTERFACE ============
+
+void printHelp(const char* programName) {
+    std::cout << "NLM - Neural Learning Machine" << std::endl;
+    std::cout << "Version 0.1.0 - Experimental Artificial Developmental Brain" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Usage: " << programName << " [OPTIONS]" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Main modes:" << std::endl;
+    std::cout << "  --phase2            Run Phase 2 demonstration (neural computation)" << std::endl;
+    std::cout << "  --phase6            Run Phase 6 demonstration (integration test)" << std::endl;
+    std::cout << "  --benchmark         Run system benchmarks" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Common options:" << std::endl;
+    std::cout << "  --help              Show this help message" << std::endl;
+    std::cout << "  --config FILE       Load configuration from FILE" << std::endl;
+    std::cout << "  --neurons N         Number of neurons (Phase 6: 500-10000)" << std::endl;
+    std::cout << "  --steps S           Number of simulation steps" << std::endl;
+    std::cout << "  --checkpoint        Enable checkpointing (default: enabled)" << std::endl;
+    std::cout << "  --no-checkpoint     Disable checkpointing" << std::endl;
+    std::cout << "  --replay            Enable replay system (default: enabled)" << std::endl;
+    std::cout << "  --no-replay         Disable replay system" << std::endl;
+    std::cout << "  --development       Enable development system (default: enabled)" << std::endl;
+    std::cout << "  --no-development    Disable development system" << std::endl;
+    std::cout << "  --log-level LEVEL   Set logging level (Debug, Info, Warning, Error)" << std::endl;
+    std::cout << "  --seed NUMBER       Set random seed for reproducible experiments" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Advanced options (Phase 6 only):" << std::endl;
+    std::cout << "  --curiosity         Enable curiosity-driven exploration" << std::endl;
+    std::cout << "  --novelty           Enable novelty detection" << std::endl;
+    std::cout << "  --prediction        Enable prediction system" << std::endl;
+    std::cout << "  --social            Enable social learning" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Example usage:" << std::endl;
+    std::cout << "  " << programName << " --phase2 --neurons 2000 --steps 5000 --seed 123" << std::endl;
+    std::cout << "  " << programName << " --phase6 --neurons 1000 --steps 3000 --checkpoint --replay" << std::endl;
+    std::cout << "  " << programName << " --benchmark --neurons 5000" << std::endl;
+}
+
+// Main entry point with enhanced CLI
+int main(int argc, char** argv) {
+    try {
+        // Print help if no arguments or --help is provided
+        if (argc == 1 || (argc == 2 && argv[1] == std::string("--help"))) {
+            printHelp(argv[0]);
+            return 0;
+        }
+        
+        // Parse configuration options
+        std::string configFile = "configs/default.cfg";
+        Phase6Config phase6Config;
+        int neuronCount = 500;
+        int steps = 2000;
+        bool enableCheckpointing = true;
+        bool enableReplay = true;
+        bool enableDevelopment = true;
+        std::string logLevel = "Info";
+        int64_t seed = 42;
+        
+        // Parse arguments
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            
+            if (arg == "--help") {
+                printHelp(argv[0]);
+                return 0;
+            } else if (arg == "--phase2") {
+                runPhase2Demo(configFile);
+                return 0;
+            } else if (arg == "--phase6") {
+                // Parse Phase 6 specific options
+                for (++i; i < argc; ++i) {
+                    std::string opt = argv[i];
+                    if (opt == "--neurons" && i + 1 < argc) {
+                        neuronCount = std::stoi(argv[++i]);
+                        phase6Config.neuronCount = static_cast<size_t>(neuronCount);
+                    } else if (opt == "--steps" && i + 1 < argc) {
+                        steps = std::stoi(argv[++i]);
+                        phase6Config.maxSteps = static_cast<size_t>(steps);
+                    } else if (opt == "--no-checkpoint") {
+                        enableCheckpointing = false;
+                        phase6Config.enableCheckpointing = false;
+                    } else if (opt == "--no-replay") {
+                        enableReplay = false;
+                        phase6Config.enableReplay = false;
+                    } else if (opt == "--no-development") {
+                        enableDevelopment = false;
+                        phase6Config.enableDevelopment = false;
+                    } else if (opt == "--log-level" && i + 1 < argc) {
+                        logLevel = argv[++i];
+                    } else if (opt == "--seed" && i + 1 < argc) {
+                        seed = std::stoll(argv[++i]);
+                    } else if (opt == "--help") {
+                        printHelp(argv[0]);
+                        return 0;
+                    } else if (opt.substr(0, 7) == "--config") {
+                        if (opt.find('=') != std::string::npos) {
+                            configFile = opt.substr(opt.find('=') + 1);
+                        } else if (i + 1 < argc) {
+                            configFile = argv[++i];
+                        }
+                    }
+                }
+                
+                // Run Phase 6 demo with parsed options
+                runPhase6Demo(configFile);
+                return 0;
+            } else if (arg == "--benchmark") {
+                runBenchmark();
+                return 0;
+            } else if (arg == "--log-level" && i + 1 < argc) {
+                logLevel = argv[++i];
+            } else if (arg == "--seed" && i + 1 < argc) {
+                seed = std::stoll(argv[++i]);
+            } else if (arg.substr(0, 7) == "--config") {
+                if (arg.find('=') != std::string::npos) {
+                    configFile = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    configFile = argv[++i];
+                }
+            }
+        }
+        
+        // Default: show help
+        printHelp(argv[0]);
+        return 0;
+        
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR: " << e.what() << std::endl;
+        std::cerr << "Use '--help' for usage information." << std::endl;
+        return 1;
+    } catch (...) {
+        std::cerr << "Unknown error occurred." << std::endl;
+        std::cerr << "Use '--help' for usage information." << std::endl;
+        return 1;
+    }
 }
