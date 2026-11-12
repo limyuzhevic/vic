@@ -159,7 +159,7 @@ struct LearningExperiment {
     }
 };
 
-void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
+void runBasicConnectivityTest(std::shared_ptr<Brain> brain, double timestep) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 1: Basic Neural Connectivity ===");
     
@@ -184,7 +184,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     
     // Run a few steps
     for (SimulationStep step = 0; step < 50; ++step) {
-        brain->step(step, step * 0.001);
+        brain->step(step, step * timestep);
     }
     
     size_t spikes = brain->getTotalSpikeCount() - initialSpikes;
@@ -202,7 +202,7 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     }
 }
 
-void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
+void runPlasticityExperiment(std::shared_ptr<Brain> brain, double timestep) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 2: Plasticity Learning Experiment ===");
     
@@ -240,7 +240,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             brain->injectCurrent(id, 30.0f);
         }
         
-        brain->step(step, step * 0.001);
+        brain->step(step, step * timestep);
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
@@ -257,7 +257,7 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     experiment.computeStatistics();
 }
 
-void runStdpVerification(std::shared_ptr<Brain> brain) {
+void runStdpVerification(std::shared_ptr<Brain> brain, double timestep) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Test 3: STDP Verification ===");
     
@@ -285,9 +285,9 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
-        brain->step(trial * 2, trial * 2 * 0.001);
+        brain->step(trial * 2, trial * 2 * timestep);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
-        brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
+        brain->step(trial * 2 + 1, (trial * 2 + 1) * timestep);
     }
 
     float delta = syn->getWeight() - beforeWeight;
@@ -351,10 +351,10 @@ int main(int argc, char** argv) {
     
     // Override with command line args
     config->loadFromArgs(argc, argv);
-    
+
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
+    // simulation_timestep uses default from configs/default.cfg (0.001)
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
@@ -396,19 +396,19 @@ int main(int argc, char** argv) {
     brain->logStatus();
     
     // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
+    runBasicConnectivityTest(brain, timestep);
     
     // Reset brain for plasticity experiment
     brain->reset();
     brain->initialize();
     
     // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
+    runPlasticityExperiment(brain, timestep);
     
     // Reset and run Test 3: STDP verification
     brain->reset();
     brain->initialize();
-    runStdpVerification(brain);
+    runStdpVerification(brain, timestep);
     
     // Final brain status
     NLM_LOG_INFO("");

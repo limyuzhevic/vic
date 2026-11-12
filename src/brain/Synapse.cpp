@@ -43,7 +43,7 @@ struct Synapse::Impl {
     static constexpr float STP_DEPRESSION_TAU = 200.0f;  // ms
     static constexpr float STP_U_MAX = 1.0f;  // Max utilization
     
-    static constexpr size_t MAX_SPIKE_HISTORY = 100;
+    static constexpr size_t MAX_SPIKE_HISTORY =  역대;
 };
 
 Synapse::Synapse(SynapseId id, NeuronId source, NeuronId destination)
@@ -213,13 +213,13 @@ void Synapse::setEfficacy(float efficacy) {
     pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
 }
 
-void Synapse::step(Timestamp currentTime) {
+void Synapse::step(Timestamp currentTime, TimestepDuration timestep) {
     // Real synaptic dynamics:
     // 1. Decay short-term plasticity state
     // 2. Decay eligibility trace
     // 3. Update efficacy based on use
     
-    TimestepDuration dt = 0.001;  // 1ms timestep
+    TimestepDuration dt = timestep;  // Use actual timestep from config
     
     // Decay short-term facilitation (Tsodyks-Markram model)
     if (pImpl->lastPreSpikeTime >= 0.0f) {

@@ -105,18 +105,28 @@ struct Brain::Impl {
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
     {
-        // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
-        if (auto seedOpt = config->get<int64_t>("random_seed")) {
-            seed = *seedOpt;
-        }
-        rng = std::make_unique<RandomGenerator>(seed);
+    // Initialize random generator with seed from config
+    uint64_t seed = 42;  // Default seed
+    if (auto seedOpt = config->get<int64_t>("random_seed")) {
+        seed = *seedOpt;
+    }
+    rng = std::make_unique<RandomGenerator>(seed);
+    
+    if (!rng) {
+        NLM_LOG_ERROR("Failed to initialize random generator");
+        return false;
+    }
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
         stdp = std::make_unique<STDP>();
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
+        
+        if (!spikeSystem || !stdp || !hebbian || !structuralPlasticity) {
+            NLM_LOG_ERROR("Failed to allocate plasticity system components");
+            return false;
+        }
         
         // ========== INITIALIZE INTEGRATED SYSTEMS ==========
         
@@ -125,22 +135,47 @@ struct Brain::Impl {
         episodicMemory = std::make_unique<NeuralEpisodicMemory>();
         associativeMemory = std::make_unique<NeuralAssociativeMemory>();
         
+        if (!workingMemory || !episodicMemory || !associativeMemory) {
+            NLM_LOG_ERROR("Failed to allocate memory system components");
+            return false;
+        }
+        
         // Initialize prediction system
         predictionSystem = std::make_unique<PredictionSystem>();
+        
+        if (!predictionSystem) {
+            NLM_LOG_ERROR("Failed to allocate prediction system component");
+            return false;
+        }
         
         // Initialize cognition systems
         planner = std::make_unique<NeuralPlanner>();
         conceptFormation = std::make_unique<ConceptFormation>();
         attention = std::make_unique<AttentionalSelection>();
         
+        if (!planner || !conceptFormation || !attention) {
+            NLM_LOG_ERROR("Failed to allocate cognition system components");
+            return false;
+        }
+        
         // Initialize development system
         developmentSystem = std::make_unique<DevelopmentSystem>();
+        
+        if (!developmentSystem) {
+            NLM_LOG_ERROR("Failed to allocate development system component");
+            return false;
+        }
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
+        
+        if (!dopamine || !curiosity || !predictionError || !novelty) {
+            NLM_LOG_ERROR("Failed to allocate neuromodulation system components");
+            return false;
+        }
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -527,6 +562,18 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                     weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
                     syn->setWeight(weight);
                 }
+            // Apply STDP with neuromodulation
+            if (syn->getPlasticityFlags().stdp) {
+                const auto& preSpikes = syn->getPreSpikeHistory();
+                const auto& postSpikes = syn->getPostSpikeHistory();
+                
+                if (!preSpikes.empty() && !postSpikes.empty()) {
+                    // Modify weight change based on dopamine
+                    pImpl->stdp->update(syn.get(), preSpikes, postSpikes, pImpl->timestep);
+                    float weight = syn->getWeight();
+                    weight += (weight > 0 ? 1.0f : -1.0f) * (plasticityMod - 1.0f) * 0.001f;
+                    syn->setWeight(weight);
+                }
             }
             
             // Apply Hebbian learning
@@ -540,7 +587,7 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
             }
             
             // Update synapse state
-            syn->step(currentTime);
+            syn->step(currentTime, pImpl->timestep);
         }
     }
     
