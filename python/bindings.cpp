@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <cassert>
 
 #include "../src/brain/Brain.hpp"
 #include "../src/core/Config/Config.hpp"
@@ -19,6 +21,32 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Custom Python exception types
+class ValueError : public std::runtime_error {
+public:
+    explicit ValueError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class TypeError : public std::runtime_error {
+public:
+    explicit TypeError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class FileNotFoundError : public std::runtime_error {
+public:
+    explicit FileNotFoundError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class InvalidConfigurationError : public std::runtime_error {
+public:
+    explicit InvalidConfigurationError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class InvalidOperationError : public std::runtime_error {
+public:
+    explicit InvalidOperationError(const std::string& msg) : std::runtime_error(msg) {}
+};
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
@@ -27,6 +55,11 @@ PYBIND11_MODULE(pynlm, m) {
         Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
     )pbdoc";
 
+    py::register_exception<ValueError>(m, "ValueError");
+    py::register_exception<TypeError>(m, "TypeError");
+    py::register_exception<FileNotFoundError>(m, "FileNotFoundError");
+    py::register_exception<InvalidConfigurationError>(m, "InvalidConfigurationError");
+    py::register_exception<InvalidOperationError>(m, "InvalidOperationError");
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
@@ -71,7 +104,11 @@ PYBIND11_MODULE(pynlm, m) {
         .def_readwrite("value", &PopulationId::value)
         .def("index", &PopulationId::index)
         .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def("__ne__", &PopulationId::operator!=)
+        .def("__hash__", [](const PopulationId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const PopulationId& id) {
+            return "<PopulationId: " + std::to_string(id.value) + ">";
+        });
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -143,21 +180,42 @@ PYBIND11_MODULE(pynlm, m) {
         .export_values();
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
-        .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
+        .def(py::init<>(), []() {
+            auto config = std::make_shared<Config>();
+            return config;
+        })
+        .def("loadFromFile", [](Config& self, const std::string& filepath) {
+            if (filepath.empty()) {
+                throw ValueError("Filepath cannot be empty");
+            }
+            return self.loadFromFile(filepath);
+        }, py::arg("filepath"),
+           "Load configuration from a JSON file")
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
+            if (args.empty()) {
+                throw InvalidConfigurationError("Arguments vector cannot be empty");
+            }
             std::vector<char*> argv;
             argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+            for (const auto& a : args) {
+                if (a.empty()) {
+                    throw InvalidConfigurationError("Argument cannot be empty");
+                }
+                argv.push_back(const_cast<char*>(a.c_str()));
+            }
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+        .def("saveToFile", [](Config& self, const std::string& filepath) {
+            if (filepath.empty()) {
+                throw ValueError("Filepath cannot be empty");
+            }
+            return self.saveToFile(filepath);
+        }, py::arg("filepath"),
+           "Save configuration to a JSON file")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
         .def("getKeys", &Config::getKeys,
@@ -296,7 +354,12 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getRandomSeed", &SimpleWorld::getRandomSeed);
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
-        .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
+        .def(py::init<std::shared_ptr<Config>>(), [](const std::shared_ptr<Config>& config) {
+            if (!config) {
+                throw ValueError("Config cannot be null");
+            }
+            return std::make_shared<Brain>(config);
+        }, py::arg("config"), "Create brain with configuration")
         .def("initialize", &Brain::initialize,
              "Initialize the brain with configuration")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
@@ -308,20 +371,38 @@ PYBIND11_MODULE(pynlm, m) {
         .def("receiveSensoryInput", &Brain::receiveSensoryInput,
              py::arg("input"),
              "Inject sensory input into the brain")
-        .def("injectCurrent", &Brain::injectCurrent,
-             py::arg("neuron"), py::arg("current"),
-             "Inject current into a specific neuron")
-        .def("injectCurrentToNeurons", &Brain::injectCurrentToNeurons,
-             py::arg("type"), py::arg("current"),
-             "Inject current into all neurons of a specific type")
+        .def("injectCurrent", [](Brain& self, const NeuronId& neuron, float current) {
+            if (current < -10000.0f || current > 10000.0f) {
+                throw ValueError("Current value out of valid range [-10000, 10000]");
+            }
+            self.injectCurrent(neuron, current);
+        }, py::arg("neuron"), py::arg("current"),
+           "Inject current into a specific neuron")
+        .def("injectCurrentToNeurons", [](Brain& self, NeuronType type, float current) {
+            if (current < -10000.0f || current > 10000.0f) {
+                throw ValueError("Current value out of valid range [-10000, 10000]");
+            }
+            self.injectCurrentToNeurons(type, current);
+        }, py::arg("type"), py::arg("current"),
+           "Inject current into all neurons of a specific type")
         .def("produceAction", &Brain::produceAction,
              "Produce motor action based on neural activity")
         .def("reset", &Brain::reset,
              "Reset brain state")
-        .def("save", &Brain::save, py::arg("filepath"),
-             "Save brain state to file")
-        .def("load", &Brain::load, py::arg("filepath"),
-             "Load brain state from file")
+        .def("save", [](Brain& self, const std::string& filepath) {
+            if (filepath.empty()) {
+                throw ValueError("Filepath cannot be empty");
+            }
+            return self.save(filepath);
+        }, py::arg("filepath"),
+           "Save brain state to file")
+        .def("load", [](Brain& self, const std::string& filepath) {
+            if (filepath.empty()) {
+                throw ValueError("Filepath cannot be empty");
+            }
+            return self.load(filepath);
+        }, py::arg("filepath"),
+           "Load brain state from file")
         .def("addRegion", &Brain::addRegion, py::arg("name") = "",
              "Add a new neural region")
         // getRegion is const/non-const overloaded; bind the mutable one.
