@@ -144,28 +144,89 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
-        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+        .def("loadFromFile", [](std::shared_ptr<Config> self, const std::string& filepath) -> bool {
+            try {
+                bool result = self->loadFromFile(filepath);
+                if (!result) {
+                    PyErr_SetString(PyExc_IOError, ("Failed to load config from file: " + filepath).c_str());
+                }
+                return result;
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, ("Error loading config: " + std::string(e.what())).c_str());
+                return false;
+            }
+        }, py::arg("filepath"),
              "Load configuration from a JSON file")
         // loadFromArgs takes (int, char**) in C++, which has no Python
         // equivalent; bind it as a list of strings instead (Phase 5
         // fix — the old binding did not compile).
-        .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
-            std::vector<char*> argv;
-            argv.reserve(args.size());
-            for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-            return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
+        .def("loadFromArgs", [](std::shared_ptr<Config> self, const std::vector<std::string>& args) -> bool {
+            try {
+                // Convert vector to argv style
+                std::vector<char*> argv;
+                argv.reserve(args.size() + 1);
+                argv.push_back(nullptr); // First arg is program name
+                for (const auto& a : args) {
+                    argv.push_back(const_cast<char*>(a.c_str()));
+                }
+                argv.push_back(nullptr); // End marker
+                
+                bool result = self->loadFromArgs(static_cast<int>(args.size()), argv.data() + 1);
+                if (!result) {
+                    PyErr_SetString(PyExc_RuntimeError, "Failed to load configuration from arguments");
+                }
+                return result;
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, ("Error loading config from args: " + std::string(e.what())).c_str());
+                return false;
+            }
         }, py::arg("args"),
            "Load configuration from command line arguments")
-        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+        .def("saveToFile", [](std::shared_ptr<Config> self, const std::string& filepath) -> bool {
+            try {
+                bool result = self->saveToFile(filepath);
+                if (!result) {
+                    PyErr_SetString(PyExc_IOError, ("Failed to save config to file: " + filepath).c_str());
+                }
+                return result;
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, ("Error saving config: " + std::string(e.what())).c_str());
+                return false;
+            }
+        }, py::arg("filepath"),
              "Save configuration to a JSON file")
-        .def("has", &Config::has, py::arg("key"),
+        .def("has", [](std::shared_ptr<Config> self, const std::string& key) -> bool {
+            try {
+                return self->has(key);
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, ("Error checking config key: " + std::string(e.what())).c_str());
+                return false;
+            }
+        }, py::arg("key"),
              "Check if a configuration key exists")
-        .def("getKeys", &Config::getKeys,
-             "Get all configuration keys")
-        .def("clear", &Config::clear,
-             "Clear all configuration entries")
-        .def("summary", &Config::summary,
-             "Get a summary string of the configuration")
+        .def("getKeys", [](std::shared_ptr<Config> self) -> std::vector<std::string> {
+            try {
+                return self->getKeys();
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, ("Error getting config keys: " + std::string(e.what())).c_str());
+                return std::vector<std::string>();
+            }
+        }, "Get all configuration keys")
+        .def("clear", [](std::shared_ptr<Config> self) {
+            try {
+                self->clear();
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, ("Error clearing config: " + std::string(e.what())).c_str());
+            }
+        }, "Clear all configuration entries")
+        .def("summary", [](std::shared_ptr<Config> self) -> std::string {
+            try {
+                return self->summary();
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, ("Error getting config summary: " + std::string(e.what())).c_str());
+                return std::string();
+            }
+        }, "Get a summary string of the configuration")
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
@@ -297,16 +358,27 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
-        .def("initialize", &Brain::initialize,
-             "Initialize the brain with configuration")
+        .def("initialize", [](std::shared_ptr<Brain> self) -> bool {
+            try {
+                return self->initialize();
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, ("Error initializing brain: " + std::string(e.what())).c_str());
+                return false;
+            }
+        }, "Initialize the brain with configuration")
         .def("step", static_cast<void (Brain::*)(SimulationStep)>(&Brain::step),
-             py::arg("currentStep"),
-             "Perform a simulation step")
+              py::arg("currentStep"),
+              "Perform a simulation step")
         .def("step", static_cast<void (Brain::*)(SimulationStep, Timestamp)>(&Brain::step),
-             py::arg("currentStep"), py::arg("currentTime"),
-             "Perform a simulation step with timestamp")
-        .def("receiveSensoryInput", &Brain::receiveSensoryInput,
-             py::arg("input"),
+              py::arg("currentStep"), py::arg("currentTime"),
+              "Perform a simulation step with timestamp")
+        .def("receiveSensoryInput", [](std::shared_ptr<Brain> self, const class SensoryInput& input) {
+            try {
+                self->receiveSensoryInput(input);
+            } catch (const std::exception& e) {
+                PyErr_SetString(PyExc_RuntimeError, ("Error receiving sensory input: " + std::string(e.what())).c_str());
+            }
+        }, py::arg("input"),
              "Inject sensory input into the brain")
         .def("injectCurrent", &Brain::injectCurrent,
              py::arg("neuron"), py::arg("current"),

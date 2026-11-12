@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <nlohmann/json.hpp>
 
 namespace nlm {
 
@@ -10,49 +11,66 @@ struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+// Validation function implementations
+namespace {
+    bool validateConfig(const std::string& key, const ConfigValue& value);
+    std::string validateConfig(const std::vector<ConfigEntry>& entries);
+}
 
-Config::~Config() = default;
-
-Config::Config(Config&&) noexcept = default;
-
-Config& Config::operator=(Config&&) noexcept = default;
-
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return false;
-    }
-    
-    std::string line;
-    while (std::getline(file, line)) {
-        // Skip empty lines and comments
-        line = trim(line);
-        if (line.empty() || line[0] == '#' || line[0] == '/') {
-            continue;
+// Validation function implementations
+namespace {
+    bool validateConfig(const std::string& key, const ConfigValue& value) {
+        // Basic validation based on key patterns
+        if (key.empty()) return false;
+        
+        // Check for configuration validation rules
+        if (key.find("neuron_count") != std::string::npos) {
+            if (!std::holds_alternative<int64_t>(value) && !std::holds_alternative<uint64_t>(value)) {
+                return false;
+            }
+            auto neuronCount = std::holds_alternative<int64_t>(value) 
+                ? std::get<int64_t>(value) 
+                : std::get<uint64_t>(value);
+            if (neuronCount < 1 || neuronCount > 1000000) {
+                return false;
+            }
+        }
+        else if (key.find("synapse_density") != std::string::npos) {
+            if (!std::holds_alternative<double>(value)) return false;
+            auto density = std::get<double>(value);
+            if (density < 0.0 || density > 1.0) {
+                return false;
+            }
+        }
+        else if (key.find("connection_probability") != std::string::npos) {
+            if (!std::holds_alternative<double>(value)) return false;
+            auto prob = std::get<double>(value);
+            if (prob < 0.0 || prob > 1.0) {
+                return false;
+            }
         }
         
-        // Parse simple key=value pairs
-        size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
-            if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
-                value = value.substr(1, value.size() - 2);
-            }
-            
-            set(key, value, ConfigSource::File);
-        }
+        return true;
     }
     
-    return true;
+    std::string validateConfig(const std::vector<ConfigEntry>& entries) {
+        std::string errors;
+        size_t errorCount = 0;
+        
+        for (const auto& entry : entries) {
+            if (!validateConfig(entry.key, entry.value)) {
+                if (errorCount > 0) errors += ", ";
+                errors += "Invalid value for key: " + entry.key;
+                errorCount++;
+                if (errorCount >= 10) { // Limit error count
+                    errors += ", and " + std::to_string(entries.size() - errorCount) + " more errors...";
+                    break;
+                }
+            }
+        }
+        
+        return errors;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -81,15 +99,51 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot open config file for writing: " + filepath);
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    try {
+        nlohmann::json jsonData;
+        
+        for (const auto& entry : pImpl->entries) {
+            std::visit([&](const auto& value) {
+                // Convert ConfigValue to nlohmann::json
+                using T = std::decay_t<decltype(value)>;
+                
+                if constexpr (std::is_same_v<T, std::string>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, int>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, double>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<int>>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                    jsonData[entry.key] = value;
+                } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                    jsonData[entry.key] = value;
+                } else {
+                    // Fallback for unknown types
+                    jsonData[entry.key] = "UNKNOWN_TYPE";
+                }
+            }, entry.value);
+        }
+        
+        // Write JSON with pretty formatting
+        file << jsonData.dump(2); // 2-space indentation
+        
+        NLM_LOG_INFO("Successfully saved configuration to: " + filepath);
+        return true;
+        
+    } catch (const std::exception& e) {
+        NLM_LOG_ERROR("Error saving JSON config file " + filepath + ": " + std::string(e.what()));
+        return false;
     }
-    
-    return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
@@ -227,6 +281,16 @@ template std::optional<double> Config::get<double>(const std::string&) const;
 template std::optional<bool> Config::get<bool>(const std::string&) const;
 template std::optional<std::string> Config::get<std::string>(const std::string&) const;
 
+// Explicit template instantiations
+// (uint64_t and size_t are the same type on this platform, so only one is listed)
+template std::optional<int> Config::get<int>(const std::string&) const;
+template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
+template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
+template std::optional<float> Config::get<float>(const std::string&) const;
+template std::optional<double> Config::get<double>(const std::string&) const;
+template std::optional<bool> Config::get<bool>(const std::string&) const;
+template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+
 template int Config::getOr<int>(const std::string&, const int&) const;
 template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
 template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
@@ -234,5 +298,19 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// Validation method
+std::string Config::validate() const {
+    return ::validateConfig(pImpl->entries);
+}
+
+// Add configuration set with validation
+default bool Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    bool isValid = ::validateConfig(key, value);
+    if (!isValid) {
+        NLM_LOG_WARNING("Invalid configuration value for key: " + key);
+    }
+    // (Original set method continues here)
+}
 
 } // namespace nlm
