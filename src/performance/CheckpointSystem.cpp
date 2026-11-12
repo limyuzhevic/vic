@@ -401,9 +401,44 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    if (!stream_.is_open()) return false;
+    
+    // Seek to beginning for header write
+    stream_.seekp(0, std::ios::beg);
+    stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+    if (!stream_) return false;
+    
+    return true;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    if (!stream_.is_open()) return false;
+    
+    // Calculate actual offset based on current position
+    SectionHeader adjustedHeader = header;
+    adjustedHeader.offset = static_cast<uint64_t>(stream_.tellp());
+    
+    stream_.write(reinterpret_cast<const char*>(&adjustedHeader), sizeof(adjustedHeader));
+    if (!stream_) return false;
+    
+    return true;
+}
+
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    if (!stream_.is_open() || alignment == 0) return true;
+    
+    size_t currentPos = static_cast<size_t>(stream_.tellp());
+    size_t remainder = currentPos % alignment;
+    
+    if (remainder == 0) return true;
+    
+    std::vector<char> padding(alignment - remainder, 0);
+    stream_.write(padding.data(), padding.size());
+    if (!stream_) return false;
+    
+    return true;
+}
 
 // ---------------- CheckpointManager ----------------
 

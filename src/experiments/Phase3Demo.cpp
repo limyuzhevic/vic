@@ -155,7 +155,8 @@ public:
                 // Track metrics
                 episodeReward += result.reward;
                 metrics.steps++;
-                metrics.totalReward += result.reward;
+                // Calculate average reward per step (consistent with Phase 6)
+                metrics.totalReward = episodeReward / steps;
                 metrics.totalSpikes += brain->getFiringNeuronCount();
                 
                 // Phase 5 metrics: coverage, interact outcome, oscillation.

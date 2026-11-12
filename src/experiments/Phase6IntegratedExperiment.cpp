@@ -104,13 +104,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
                             brain->getWorkingMemory()->getActiveTraces() : 0));
         }
-    }
-    
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
+    result.totalReward = totalReward;
     result.avgFiringRate = totalFiringRate / config.maxSteps;
-    result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
-        static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
