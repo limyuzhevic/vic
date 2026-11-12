@@ -82,7 +82,29 @@ add_library(nlm_core STATIC
     src/experiments/Metrics.cpp
     # Visualization
     src/visualization/VisualizationInterface.cpp
+    # Enhanced configuration system
+    src/core/Config/NLMConfigSystem.cpp
 )
+target_include_directories(nlm_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+
+# Enhanced configuration system library (separate from core for better organization)
+add_library(nlm_config STATIC
+    src/core/Config/NLMConfigSystem.cpp
+)
+target_include_directories(nlm_config PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(nlm_config PUBLIC nlm_core)
+
+# Link config system to relevant targets that need enhanced configuration
+# target_link_libraries(nlm_phase3_demo PUBLIC nlm_config)
+# target_link_libraries(nlm_phase4_demo PUBLIC nlm_config)
+# target_link_libraries(nlm_phase5_demo PUBLIC nlm_config)
+# target_link_libraries(nlm_phase6_demo PUBLIC nlm_config)
 
 target_include_directories(nlm_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>

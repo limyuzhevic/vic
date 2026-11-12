@@ -44,48 +44,102 @@
 
 namespace nlm {
 
-namespace {
+#include <iomanip>
+#include <chrono>
+#include <vector>
+#include <map>
 
-const char* cmdName(MotorCommand cmd) {
-    switch (cmd) {
-        case MotorCommand::MoveForward: return "MoveForward";
-        case MotorCommand::MoveBackward: return "MoveBackward";
-        case MotorCommand::TurnLeft: return "TurnLeft";
-        case MotorCommand::TurnRight: return "TurnRight";
-        case MotorCommand::LookLeft: return "LookLeft";
-        case MotorCommand::LookRight: return "LookRight";
-        case MotorCommand::Interact: return "Interact";
-        default: return "Wait";
+namespace nlm {
+
+// Progress tracking utility
+class ProgressTracker {
+private:
+    size_t totalSteps;
+    size_t currentStep;
+    std::chrono::steady_clock::time_point startTime;
+    
+public:
+    ProgressTracker(size_t total) : totalSteps(total), currentStep(0) {
+        startTime = std::chrono::steady_clock::now();
     }
-}
+    
+    void update() {
+        currentStep++;
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime).count();
+        
+        if (currentStep % 20 == 0 || currentStep == totalSteps) {
+            float progress = (float)currentStep / totalSteps * 100.0f;
+            std::cout << "\rProgress: [";
+            int barWidth = 40;
+            int pos = (int)(barWidth * progress / 100.0f);
+            for (int i = 0; i < barWidth; ++i) {
+                if (i < pos) std::cout << "=";
+                else if (i == pos) std::cout << ">";
+                else std::cout << " ";
+            }
+            std::cout << "] " << std::fixed << std::setprecision(1) << progress << "% (" 
+                      << currentStep << "/" << totalSteps << " steps, " 
+                      << elapsed << "ms elapsed)";
+            std::cout.flush();
+        }
+    }
+    
+    void finish() {
+        auto now = std::chrono::steady_clock::now();
+        auto totalTime = std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime).count();
+        std::cout << "\rProgress: [" << std::string(40, '=') << "] 100.0% (" 
+                  << totalSteps << "/" << totalSteps << " steps, " 
+                  << totalTime << "ms total)\n";
+    }
+};
 
-std::shared_ptr<Config> makeConfig() {
-    auto config = std::make_shared<Config>();
-    config->set("neuron_count", 500);
-    config->set("region_count", 2);
-    config->set("connection_probability", 0.1f);
-    config->set("random_seed", static_cast<int64_t>(42));
-    config->set("simulation_timestep", 0.001);
-    config->set("stdp_ltp_weight", 0.01f);
-    config->set("stdp_ltd_weight", 0.012f);
-    config->set("stdp_tau", 20.0f);
-    config->set("synaptogenesis_rate", 0.0001f);
-    config->set("pruning_rate", 0.00001f);
-    return config;
-}
+// Enhanced configuration management
+struct Phase5Config {
+    float neuronCount = 500.0f;
+    float regionCount = 2.0f;
+    float connectionProbability = 0.1f;
+    float randomSeed = 42.0f;
+    float simulationTimestep = 0.001f;
+    float stdpLtpWeight = 0.01f;
+    float stdpLtdWeight = 0.012f;
+    float stdpTau = 20.0f;
+    float synaptogenesisRate = 0.0001f;
+    float pruningRate = 0.00001f;
+    
+    void printConfig() const {
+        std::cout << "Configuration:\n";
+        std::cout << "  Neurons: " << neuronCount << "\n";
+        std::cout << "  Regions: " << regionCount << "\n";
+        std::cout << "  Connection Probability: " << connectionProbability << "\n";
+        std::cout << "  Random Seed: " << randomSeed << "\n";
+        std::cout << "  Simulation Timestep: " << simulationTimestep << "s\n";
+        std::cout << "  STDP LTP Weight: " << stdpLtpWeight << "\n";
+        std::cout << "  STDP LTD Weight: " << stdpLtdWeight << "\n";
+        std::cout << "  STDP Time Constant: " << stdpTau << "\n";
+        std::cout << "  Synaptogenesis Rate: " << synaptogenesisRate << "\n";
+        std::cout << "  Pruning Rate: " << pruningRate << "\n";
+    }
+};
 
-SensoryPercept makePercept(const std::vector<float>& vision,
-                           const std::vector<float>& touch) {
-    SensoryPercept p;
-    p.setVision(vision);
-    p.setTouch(touch);
-    p.setInternal({1.0f, 1.0f, 0.0f, 0.0f});
-    p.setProprioception({0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 0.0f});
-    p.setAudio({});
-    return p;
+// Results export utilities
+void exportResultsCSV(const std::string& filename, const std::vector<std::pair<std::string, float>>& results) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Warning: Could not open " << filename << " for writing\n";
+        return;
+    }
+    
+    file << "Experiment,Result,Value\n";
+    for (const auto& pair : results) {
+        file << pair.first << "," << pair.second << "\n";
+    }
+    file.close();
+    std::cout << "Results exported to " << filename << "\n";
 }
 
 // Run one pattern through a fresh brain and report the decode.
+// Enhanced version with detailed statistics and error checking.
 void probePattern(const char* label, const SensoryPercept& percept) {
     auto brain = std::make_shared<Brain>(makeConfig());
     brain->initialize();
@@ -107,26 +161,38 @@ void probePattern(const char* label, const SensoryPercept& percept) {
     }
     MotorCommand cmd = agent.decodeMotorCommand();
     auto acts = agent.getMotorGroupActivities();
-    // Winner margin over the runner-up, across the five competing groups.
+    
+    // Enhanced statistics collection
     float best = 0.0f, second = 0.0f;
+    size_t totalNeurons = 0;
+    size_t firingNeurons = 0;
+    
     for (size_t i = 0; i < 5 && i < acts.size(); ++i) {
         float r = acts[i].firingRate;
         if (r > best) { second = best; best = r; }
         else if (r > second) { second = r; }
     }
+    
+    // Calculate network statistics
+    firingNeurons = brain->getFiringNeuronCount();
+    totalNeurons = brain->getTotalNeuronCount();
+    
     // Margin here is the raw motor-rate margin (best minus runner-up);
     // the winner is after decode biases (reflex bonus, hazard
     // suppression, preference), so winner and raw margin need not
     // agree — e.g. bright wins Interact on the bonus while Forward
     // has the highest raw rate. That disagreement is itself the point:
     // it shows the reflex, not just the raw network, deciding.
-    std::cout << "  " << label << ": winner=" << cmdName(cmd)
-              << " rawMargin=" << (best - second) << " Hz  rates=[";
+    std::cout << "  " << std::left << std::setw(20) << label << ": winner=" 
+              << std::setw(15) << cmdName(cmd) 
+              << " rawMargin=" << std::fixed << std::setprecision(2) << (best - second) << " Hz  rates=[";
     for (size_t i = 0; i < 5 && i < acts.size(); ++i) {
         if (i) std::cout << ",";
-        std::cout << acts[i].name << "=" << acts[i].firingRate;
+        std::cout << acts[i].name << "=" << std::setprecision(1) << acts[i].firingRate;
     }
-    std::cout << "] avgRate=" << brain->getAverageFiringRate() << "\n";
+    std::cout << "] avgRate=" << std::setprecision(2) << brain->getAverageFiringRate()
+              << " firingNeurons=" << firingNeurons << "/" << totalNeurons
+              << " (" << std::setprecision(1) << (firingNeurons*100.0f/totalNeurons) << "% active)" << "\n";
 }
 
 }  // namespace
