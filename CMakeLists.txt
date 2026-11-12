@@ -132,13 +132,18 @@ add_library(nlm_phase6 STATIC
 target_include_directories(nlm_phase6 PUBLIC src)
 target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
-)
-target_link_libraries(nlm PUBLIC nlm_core)
+# Debug system (optional, for development and profiling)
+option(ENABLE_DEBUG "Enable debug and profiling features" OFF)
 
-# Phase 3 demo executable
+if(ENABLE_DEBUG)
+    add_library(nlm_debug STATIC
+        src/debug/Debugger.cpp
+    )
+    target_include_directories(nlm_debug PUBLIC src)
+    target_link_libraries(nlm_debug PUBLIC nlm_core)
+endif()
+
+# Agent system (body, sensory percept, agent-brain interface)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )

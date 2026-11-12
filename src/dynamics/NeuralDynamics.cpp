@@ -1,5 +1,6 @@
 #include "NeuralDynamics.hpp"
 #include <cmath>
+#include <algorithm>
 
 namespace nlm {
 
@@ -15,14 +16,16 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
+    if (!neuron) {
+        NLM_LOG_ERROR("Null neuron pointer in updateNeuron");
+        return;
+    }
     
     const auto& state = neuron->getState();
     
     // Leaky integration: dV/dt = -(V - V_rest) / tau + I / C
-    // For simplicity using explicit Euler:
-    // V_new = V_old + dt * (-(V_old - V_rest) / tau + I / C)
+    // V = membrane potential, V_rest = resting potential
+    // tau = membrane time constant, I = total current, C = membrane capacitance
     
     float V = neuron->getMembranePotential();
     float V_rest = state.restingPotential;
@@ -30,11 +33,25 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
     
-    // Simple Euler integration
-    float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
+    // Calculate derivative: (V_rest - V)/tau + I/R
+    float dV_dt = (V_rest - V) / tau + I / R;
     
-    // Check for firing
+    // Update membrane potential with exponential Euler integration
+    // V_new = V + dt * dV_dt
+    V += static_cast<float>(dt) * 1000.0f * dV_dt;  // dt is in seconds, convert to ms
+    
+    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
+    if (state.adaptationVariable > 0.0f) {
+        V -= state.adaptationVariable * 0.01f;
+        neuron->getState().adaptationVariable *= 0.95f;  // Decay adaptation
+    }
+    
+    // Clamp membrane potential to prevent instability
+    V = std::clamp(V, -100.0f, 50.0f);
+    
+    neuron->setMembranePotential(V);
+    
+    // Check for spike threshold crossing
     if (shouldFire(neuron)) {
         neuron->setFiringState(FiringState::Active);
         neuron->recordSpike(0.0);  // TODO: pass actual time
@@ -50,23 +67,38 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
 }
 
 void IntegrateAndFireDynamics::updateSynapse(Synapse* synapse, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real synaptic dynamics
-    // PLACEHOLDER: Synapse decay
-    synapse->step(0.0);
+    if (!synapse) {
+        NLM_LOG_ERROR("Null synapse pointer in updateSynapse");
+        return;
+    }
+    
+    // Simple exponential decay of synaptic weight
+    synapse->step(static_cast<float>(dt));
 }
 
 void IntegrateAndFireDynamics::applySpikeInput(Neuron* neuron, const Synapse* synapse) {
-    // TODO PHASE 2: Implement real synaptic input
-    // PLACEHOLDER: Simple additive input
+    if (!neuron || !synapse) {
+        NLM_LOG_ERROR("Null neuron or synapse pointer in applySpikeInput");
+        return;
+    }
+    
+    // Real synaptic input: excitatory currents add to total current
+    // amplitude represents synaptic conductance * reversal potential contribution
     SynapticWeight weight = synapse->getWeight();
     if (synapse->isExcitatory()) {
         neuron->receiveExcitatoryInput(weight);
-    } else {
+    } else if (synapse->isInhibitory()) {
         neuron->receiveInhibitoryInput(std::abs(weight));
+    } else if (synapse->isModulatory()) {
+        neuron->receiveModulatoryInput(weight);
     }
 }
 
 bool IntegrateAndFireDynamics::shouldFire(const Neuron* neuron) const {
+    if (!neuron) {
+        NLM_LOG_ERROR("Null neuron pointer in shouldFire");
+        return false;
+    }
     return neuron->getMembranePotential() >= neuron->getThreshold();
 }
 
