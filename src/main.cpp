@@ -277,8 +277,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     float beforeWeight = syn->getWeight();
     NLM_LOG_INFO("  Testing STDP on 1 synapse:");
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
-                 " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
-                 ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
+                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
+                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
 
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
@@ -293,7 +293,7 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
-                 " (Δ=" + std::to_string(delta) + ")");
+                  " (Δ=" + std::to_string(delta) + ")");
 
     float totalDelta = delta;
     
@@ -310,7 +310,8 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation..." << std::endl;
+    std::cout << std::endl;
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
