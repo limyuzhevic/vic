@@ -928,13 +928,11 @@ struct P5Reader {
 };
 }  // namespace
 
-bool Brain::save(const std::string& filepath) const {
-    NLM_LOG_INFO("Saving brain state to " + filepath);
-    
     try {
         CheckpointWriter writer;
         if (!writer.create(filepath, CompressionLevel::Balanced)) {
             NLM_LOG_ERROR("Failed to create checkpoint file: " + filepath);
+            NLM_LOG_ERROR("Check if the directory exists and you have write permissions");
             return false;
         }
         
@@ -948,6 +946,7 @@ bool Brain::save(const std::string& filepath) const {
         );
         
         // Write neurons
+        NLM_LOG_INFO("Writing " + std::to_string(getTotalNeuronCount()) + " neurons to checkpoint");
         NeuronCheckpointData neuronData;
         neuronData.membranePotential.reserve(getTotalNeuronCount());
         neuronData.restingPotential.reserve(getTotalNeuronCount());
@@ -975,10 +974,13 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to write neurons to checkpoint");
+            NLM_LOG_ERROR(std::to_string(neuronData.membranePotential.size()) + " neuron entries were processed before failure");
             return false;
         }
-        
+        NLM_LOG_INFO("Successfully wrote " + std::to_string(neuronData.membranePotential.size()) + " neuron entries");
+
         // Write synapses
+        NLM_LOG_INFO("Writing " + std::to_string(getTotalSynapseCount()) + " synapses to checkpoint");
         SynapseCheckpointData synapseData;
         for (const auto& region : pImpl->regions) {
             for (const auto& syn : region->getSynapses()) {
@@ -994,8 +996,10 @@ bool Brain::save(const std::string& filepath) const {
         
         if (!writer.writeSynapses(synapseData)) {
             NLM_LOG_ERROR("Failed to write synapses to checkpoint");
+            NLM_LOG_ERROR(std::to_string(synapseData.weight.size()) + " synapse entries were processed before failure");
             return false;
         }
+        NLM_LOG_INFO("Successfully wrote " + std::to_string(synapseData.weight.size()) + " synapse entries");
 
         // Pending delayed spikes are in-flight synaptic input; a reload
         // without them drops every spike scheduled for the next 1-5
@@ -1004,26 +1008,35 @@ bool Brain::save(const std::string& filepath) const {
             auto pending = pImpl->spikeSystem->getPendingDelayedSpikes();
             if (!writer.writeDelayedSpikes(pending)) {
                 NLM_LOG_ERROR("Failed to write pending spikes to checkpoint");
+                NLM_LOG_ERROR(std::to_string(pending.size()) + " pending spike events were processed before failure");
                 return false;
             }
+            NLM_LOG_INFO("Successfully wrote " + std::to_string(pending.size()) + " pending spike events");
         }
 
         // Phase 5 extra sections: everything Phase 4 left out.
-        // SimulationState: spike counters, learned preference trait,
-        // steps-since-episode counter (episodic storage cadence).
+        NLM_LOG_INFO("Writing Phase 5 extra data sections...");
         {
             std::vector<uint8_t> payload;
             p5AppendU64(payload, static_cast<uint64_t>(pImpl->totalSpikesTotal));
             p5AppendU64(payload, static_cast<uint64_t>(pImpl->totalSpikesThisStep));
             p5AppendFloat(payload, pImpl->learnedPreference);
             p5AppendU64(payload, static_cast<uint64_t>(pImpl->stepsSinceLastEpisode));
-            writer.bufferSection(CheckpointSection::SimulationState, payload);
+            if (!writer.bufferSection(CheckpointSection::SimulationState, payload)) {
+                NLM_LOG_ERROR("Failed to write SimulationState section to checkpoint");
+                return false;
+            }
+            NLM_LOG_INFO("Successfully wrote SimulationState section");
         }
         // RandomState: full RNG engine state, not just the seed.
         if (pImpl->rng) {
             std::string state = pImpl->rng->serializeState();
             std::vector<uint8_t> payload(state.begin(), state.end());
-            writer.bufferSection(CheckpointSection::RandomState, payload);
+            if (!writer.bufferSection(CheckpointSection::RandomState, payload)) {
+                NLM_LOG_ERROR("Failed to write RandomState section to checkpoint");
+                return false;
+            }
+            NLM_LOG_INFO("Successfully wrote RandomState section");
         }
         // Plasticity: per-synapse pre/post spike histories, in the same
         // region order as the synapse section, matched by pair on load.
@@ -1037,7 +1050,11 @@ bool Brain::save(const std::string& filepath) const {
                     p5AppendVec<double>(payload, syn->getPostSpikeHistory());
                 }
             }
-            writer.bufferSection(CheckpointSection::Plasticity, payload);
+            if (!writer.bufferSection(CheckpointSection::Plasticity, payload)) {
+                NLM_LOG_ERROR("Failed to write Plasticity section to checkpoint");
+                return false;
+            }
+            NLM_LOG_INFO("Successfully wrote Plasticity section with " + std::to_string(payload.size()) + " bytes");
         }
         // Memory: working-memory content + full episodic episodes.
         {
@@ -1050,10 +1067,8 @@ bool Brain::save(const std::string& filepath) const {
                 p5AppendVec<uint64_t>(payload, ids);
                 p5AppendVec<float>(payload, pImpl->workingMemory->getMemoryActivations());
                 p5AppendVec<uint64_t>(payload, pImpl->workingMemory->getMemoryTimestamps());
-            } else {
-                p5AppendVec<uint64_t>(payload, {});
-                p5AppendVec<float>(payload, {});
-                p5AppendVec<uint64_t>(payload, {});
+                NLM_LOG_INFO("Working memory: " + std::to_string(ids.size()) + " neurons, " + 
+                           std::to_string(pImpl->workingMemory->getMemoryActivations().size()) + " traces");
             }
             if (pImpl->episodicMemory) {
                 const auto& eps = pImpl->episodicMemory->getEpisodes();
@@ -1077,10 +1092,13 @@ bool Brain::save(const std::string& filepath) const {
                     p5AppendVec<uint64_t>(payload, activeIds);
                     p5AppendVec<float>(payload, ep.neuronActivations);
                 }
-            } else {
-                p5AppendU64(payload, 0);
+                NLM_LOG_INFO("Episodic memory: " + std::to_string(eps.size()) + " episodes");
             }
-            writer.bufferSection(CheckpointSection::Memory, payload);
+            if (!writer.bufferSection(CheckpointSection::Memory, payload)) {
+                NLM_LOG_ERROR("Failed to write Memory section to checkpoint");
+                return false;
+            }
+            NLM_LOG_INFO("Successfully wrote Memory section with " + std::to_string(payload.size()) + " bytes");
         }
         
         // Finalize
@@ -1094,22 +1112,22 @@ bool Brain::save(const std::string& filepath) const {
         
     } catch (const std::exception& e) {
         NLM_LOG_ERROR(std::string("Exception saving brain: ") + e.what());
+        NLM_LOG_ERROR("Please check file permissions and disk space");
         return false;
     }
 }
 
-bool Brain::load(const std::string& filepath) {
-    NLM_LOG_INFO("Loading brain state from " + filepath);
-    
     try {
         CheckpointReader reader;
         if (!reader.open(filepath)) {
             NLM_LOG_ERROR("Failed to open checkpoint file: " + filepath);
+            NLM_LOG_ERROR("Please check if the file exists and you have read permissions");
             return false;
         }
         
         if (!reader.validate()) {
             NLM_LOG_ERROR("Checkpoint validation failed: " + reader.getError());
+            NLM_LOG_ERROR("The checkpoint file may be corrupted or not compatible with this brain version");
             return false;
         }
         
@@ -1125,6 +1143,7 @@ bool Brain::load(const std::string& filepath) {
             NLM_LOG_ERROR("Checkpoint neuron mismatch: header has " +
                 std::to_string(reader.getHeader().neuronCount) + " neurons, this brain has " +
                 std::to_string(getTotalNeuronCount()));
+            NLM_LOG_ERROR("This checkpoint may have been saved with a different brain configuration");
             return false;
         }
         if (reader.getHeader().synapseCount != getTotalSynapseCount()) {
@@ -1135,9 +1154,19 @@ bool Brain::load(const std::string& filepath) {
         }
 
         // Read neurons
+        NLM_LOG_INFO("Restoring " + std::to_string(getTotalNeuronCount()) + " neurons from checkpoint");
         NeuronCheckpointData neuronData;
         if (!reader.readNeurons(neuronData)) {
             NLM_LOG_ERROR("Failed to read neurons from checkpoint");
+            NLM_LOG_ERROR("The checkpoint file may be corrupted or incomplete");
+            return false;
+        }
+        
+        if (neuronData.membranePotential.size() != getTotalNeuronCount()) {
+            NLM_LOG_ERROR("Neuron count mismatch in checkpoint: expected " +
+                std::to_string(getTotalNeuronCount()) + " neurons, got " +
+                std::to_string(neuronData.membranePotential.size()));
+            NLM_LOG_ERROR("The checkpoint file may be from a different brain configuration");
             return false;
         }
 
@@ -1147,6 +1176,7 @@ bool Brain::load(const std::string& filepath) {
         // refractory state from zero and does not continue where the
         // saved brain left off.
         size_t idx = 0;
+        size_t restoredNeurons = 0;
         for (auto& region : pImpl->regions) {
             for (auto& pop : region->getPopulations()) {
                 for (auto* neuron : pop->getNeurons()) {
@@ -1158,7 +1188,7 @@ bool Brain::load(const std::string& filepath) {
                         neuron->setLeakConductance(neuronData.leakConductance[idx]);
                         auto& state = neuron->getState();
                         if (idx < neuronData.firingState.size()) {
-                            state.firingState = static_cast<FiringState>(neuronData.firingState[idx]);
+                            state.firingState = static_cast<FiringState>(neuronData.firingState[idx]);\n
                         }
                         if (idx < neuronData.refractoryRemaining.size()) {
                             state.refractoryRemaining = neuronData.refractoryRemaining[idx];

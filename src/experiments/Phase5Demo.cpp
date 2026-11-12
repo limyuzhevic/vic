@@ -86,8 +86,8 @@ SensoryPercept makePercept(const std::vector<float>& vision,
 }
 
 // Run one pattern through a fresh brain and report the decode.
-void probePattern(const char* label, const SensoryPercept& percept) {
-    auto brain = std::make_shared<Brain>(makeConfig());
+void probePattern(const char* label, const SensoryPercept& percept, const std::shared_ptr<Config>& config) {
+    auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     SimpleWorld world;
     world.configure(20.0f, 20.0f, 16, 16);
@@ -142,6 +142,39 @@ int main() {
 
     // --- 1. Pattern probe ---
     std::cout << "--- 1. Pattern probe (fresh brain per pattern, seed 42) ---\n";
+    auto config = makeConfig();
+    
+    // Allow configuration override via command line if provided
+    int argc = 0;
+    char** argv = nullptr;
+    
+    // Parse configuration from command line
+    if (argc > 1) {
+        // Parse --neuron_count value
+        for (int i = 1; i < argc; i += 2) {
+            std::string arg = argv[i];
+            if (i + 1 < argc) {
+                if (arg == "--neuron_count") {
+                    config->set("neuron_count", std::stoll(argv[i + 1]));
+                } else if (arg == "--region_count") {
+                    config->set("region_count", std::stoll(argv[i + 1]));
+                } else if (arg == "--connection_probability") {
+                    config->set("connection_probability", std::stof(argv[i + 1]));
+                } else if (arg == "--random_seed") {
+                    config->set("random_seed", std::stoll(argv[i + 1]));
+                } else if (arg == "--simulation_timestep") {
+                    config->set("simulation_timestep", std::stod(argv[i + 1]));
+                } else if (arg == "--stdp_ltp_weight") {
+                    config->set("stdp_ltp_weight", std::stof(argv[i + 1]));
+                } else if (arg == "--stdp_ltd_weight") {
+                    config->set("stdp_ltd_weight", std::stof(argv[i + 1]));
+                }
+            }
+        }
+    }
+
+    // --- 1. Pattern probe ---
+    std::cout << "--- 1. Pattern probe (fresh brain per pattern, seed 42) ---\n";
     std::vector<float> emptyVision(16, 1.0f);
     std::vector<float> noTouch(8, 0.0f);
     probePattern("empty scene      ", makePercept(emptyVision, noTouch));
@@ -158,6 +191,37 @@ int main() {
     // --- 2. Sandbox run + checkpoint round-trip ---
     std::cout << "--- 2. Sandbox run (100 steps) + checkpoint round-trip ---\n";
     auto config = makeConfig();
+    
+    // Allow configuration override via command line if provided
+    // Parse command line arguments here
+    int argc = 0;
+    char** argv = nullptr;
+    
+    // Parse configuration from command line
+    if (argc > 1) {
+        // Parse --neuron_count value
+        for (int i = 1; i < argc; i += 2) {
+            std::string arg = argv[i];
+            if (i + 1 < argc) {
+                if (arg == "--neuron_count") {
+                    config->set("neuron_count", std::stoll(argv[i + 1]));
+                } else if (arg == "--region_count") {
+                    config->set("region_count", std::stoll(argv[i + 1]));
+                } else if (arg == "--connection_probability") {
+                    config->set("connection_probability", std::stof(argv[i + 1]));
+                } else if (arg == "--random_seed") {
+                    config->set("random_seed", std::stoll(argv[i + 1]));
+                } else if (arg == "--simulation_timestep") {
+                    config->set("simulation_timestep", std::stod(argv[i + 1]));
+                } else if (arg == "--stdp_ltp_weight") {
+                    config->set("stdp_ltp_weight", std::stof(argv[i + 1]));
+                } else if (arg == "--stdp_ltd_weight") {
+                    config->set("stdp_ltd_weight", std::stof(argv[i + 1]));
+                }
+            }
+        }
+    }
+    
     auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     SimpleWorld world;
@@ -220,7 +284,7 @@ int main() {
 
     const std::string ckpt = "/tmp/nlm_phase5_demo.ckpt";
     bool saved = brain->save(ckpt);
-    auto brain2 = std::make_shared<Brain>(makeConfig());
+    auto brain2 = std::make_shared<Brain>(config);
     brain2->initialize();
     bool loaded = saved && brain2->load(ckpt);
     std::cout << "  checkpoint: saved=" << (saved ? "yes" : "NO")
@@ -237,15 +301,15 @@ int main() {
                   << " preference=" << brain2->getLearnedPreference()
                   << " synHist=" << histBefore << "->" << synHistoryTotal(brain2)
                   << " rngMatch=" << (drawSaved == drawReloaded ? "yes" : "NO");
-        // Continue the reloaded brain for a few steps: it must still act.
-        AgentBrain agent2(brain2);
-        agent2.initialize(world);
-        agent2.enableCuriosity(false);
-        const SensoryPercept& percept = world.getSensoryPercept();
-        agent2.processSensoryInput(percept);
-        for (int i = 0; i < 10; ++i) brain2->step(brainStep++);
-        std::cout << " continuedCmd=" << cmdName(agent2.decodeMotorCommand());
-    }
-    std::cout << "\n\nPhase 5 demonstration complete.\n";
+// Continue the reloaded brain for a few steps: it must still act.
+    AgentBrain agent2(brain2);
+    agent2.initialize(world);
+    agent2.enableCuriosity(false);
+    const SensoryPercept& percept = world.getSensoryPercept();
+    agent2.processSensoryInput(percept);
+    for (int i = 0; i < 10; ++i) brain2->step(bs++);
+    std::cout << " continuedCmd=" << cmdName(agent2.decodeMotorCommand());
+}
+    std::cout << "\\n\\nPhase 5 demonstration complete.\\n";
     return 0;
 }

@@ -45,6 +45,38 @@ int main(int argc, char* argv[]) {
         numTrials = std::stoi(argv[1]);
     }
     
+    // Parse additional configuration from command line
+    auto config = std::make_shared<Config>();
+    config->set("neuron_count", static_cast<int64_t>(1000));
+    config->set("region_count", static_cast<int64_t>(2));
+    config->set("connection_probability", 0.1f);
+    config->set("random_seed", static_cast<int64_t>(42));
+    config->set("simulation_timestep", 0.001);
+    config->set("stdp_ltp_weight", 0.01f);
+    config->set("stdp_ltd_weight", 0.012f);
+    
+    // Parse additional command line arguments for configuration
+    for (int i = 2; i < argc; i += 2) {
+        std::string arg = argv[i];
+        if (i + 1 < argc) {
+            if (arg == "--neuron_count") {
+                config->set("neuron_count", std::stoll(argv[i + 1]));
+            } else if (arg == "--region_count") {
+                config->set("region_count", std::stoll(argv[i + 1]));
+            } else if (arg == "--connection_probability") {
+                config->set("connection_probability", std::stof(argv[i + 1]));
+            } else if (arg == "--random_seed") {
+                config->set("random_seed", std::stoll(argv[i + 1]));
+            } else if (arg == "--simulation_timestep") {
+                config->set("simulation_timestep", std::stod(argv[i + 1]));
+            } else if (arg == "--stdp_ltp_weight") {
+                config->set("stdp_ltp_weight", std::stof(argv[i + 1]));
+            } else if (arg == "--stdp_ltd_weight") {
+                config->set("stdp_ltd_weight", std::stof(argv[i + 1]));
+            }
+        }
+    }
+    
     // Create configuration
     auto config = std::make_shared<Config>();
     config->set("neuron_count", static_cast<int64_t>(1000));

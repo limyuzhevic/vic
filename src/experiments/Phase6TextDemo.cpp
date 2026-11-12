@@ -137,22 +137,47 @@ int main() {
     std::cout << "NLM PHASE 6 - TEXT TEACHING / THOUGHT DEMO\n";
     std::cout << "===========================================\n\n";
 
-    std::vector<float> emptyVision(16, 1.0f);
-    std::vector<float> noTouch(8, 0.0f);
-    std::vector<float> brightVision(16, 1.0f);
-    for (int i = 5; i <= 10; ++i) brightVision[i] = 0.7f;
-    std::vector<float> fwdTouch(8, 0.0f);
-    fwdTouch[0] = 0.8f;
-
     // --- 1. Text association probe ---
     std::cout << "--- 1. Text association: \"apple\" taught with a resource scene ---\n";
-    auto brain = std::make_shared<Brain>(makeConfig());
+    auto config = makeConfig();
+    
+    // Allow configuration override via command line if provided
+    // Parse command line arguments here
+    int argc = 0;
+    char** argv = nullptr;
+    
+    // Parse configuration from command line
+    if (argc > 1) {
+        // Parse --neuron_count value
+        for (int i = 1; i < argc; i += 2) {
+            std::string arg = argv[i];
+            if (i + 1 < argc) {
+                if (arg == "--neuron_count") {
+                    config->set("neuron_count", std::stoll(argv[i + 1]));
+                } else if (arg == "--region_count") {
+                    config->set("region_count", std::stoll(argv[i + 1]));
+                } else if (arg == "--connection_probability") {
+                    config->set("connection_probability", std::stof(argv[i + 1]));
+                } else if (arg == "--random_seed") {
+                    config->set("random_seed", std::stoll(argv[i + 1]));
+                } else if (arg == "--simulation_timestep") {
+                    config->set("simulation_timestep", std::stod(argv[i + 1]));
+                } else if (arg == "--stdp_ltp_weight") {
+                    config->set("stdp_ltp_weight", std::stof(argv[i + 1]));
+                } else if (arg == "--stdp_ltd_weight") {
+                    config->set("stdp_ltd_weight", std::stof(argv[i + 1]));
+                }
+            }
+        }
+    }
+    
+    auto brain = std::make_shared<Brain>(config);
     brain->initialize();
     SimpleWorld world;
     world.configure(20.0f, 20.0f, 16, 16);
     AgentBrain agent(brain);
     agent.initialize(world);
-    agent.enableCuriosity(false);
+    agent.enableCuriosity(false);  // Probe the brain, not the random explorer.
     agent.enableRewardModulation(false);  // Pure STDP association, no reward teacher.
     uint64_t step = 0;
 

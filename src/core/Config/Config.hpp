@@ -44,6 +44,18 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration validation result
+struct ConfigValidationResult {
+    bool isValid;
+    std::vector<std::string> errors;
+};
+
+// Configuration validator class (internal)
+class ConfigValidator {
+public:
+    static bool validate(const Config& config, std::vector<std::string>& errors);
+};
+
 // Main configuration class
 class Config {
 public:
@@ -66,12 +78,24 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
+    // Configuration validation
+    ConfigValidationResult validate() const;
+    
+    // Apply configuration defaults
+    void applyDefaults();
+    
+    // Get configuration source
+    ConfigSource getSource(const std::string& key) const;
+    
+    // Get source as string (for logging)
+    static std::string getSourceString(ConfigSource source);
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -102,6 +126,12 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // Helper for applying defaults
+    void setIfMissingOrInvalid(const std::string& key, const ConfigValue& defaultValue, ConfigSource source);
+    
+    // Helper for converting ConfigValue to string
+    static std::string ConfigValueToString(const ConfigValue& value);
 };
 
 } // namespace nlm

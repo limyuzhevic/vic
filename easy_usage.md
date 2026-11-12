@@ -104,34 +104,82 @@ print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 
 ---
 
-## Common Patterns
+## Command Line Arguments
 
-### Pattern 1: Run a Simulation
+Most NLM demos and executables now support command line arguments for customizing configuration:
 
-```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
+### General Configuration Options
 
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
+- `--neuron_count N`: Set number of neurons (default: 1000)
+- `--region_count N`: Set number of brain regions (default: 2)
+- `--connection_probability P`: Set connection probability (0.0-1.0, default: 0.1)
+- `--random_seed S`: Set random seed for reproducible experiments (default: 42)
+- `--simulation_timestep T`: Set simulation timestep in seconds (default: 0.001)
+- `--stdp_ltp_weight W`: Set STDP LTP weight (default: 0.01)
+- `--stdp_ltd_weight W`: Set STDP LTD weight (default: 0.012)
+
+### Phase-specific Arguments
+
+**Phase 3 Demo (`nlm_phase3_demo`):**
+- `nlm_phase3_demo [episodes] [steps_per_episode]`
+  - `episodes`: Number of episodes to run (default: 5)
+  - `steps_per_episode`: Steps per episode (default: 200)
+
+**Phase 4 Demo (`nlm_phase4_demo`):**
+- `nlm_phase4_demo [trials]`
+  - `trials`: Number of trials to run (default: 50)
+
+**Phase 5 Demo (`nlm_phase5_demo`):**
+- Supports all general configuration options above
+
+**Phase 6 Demos:**
+- `nlm_phase6_demo [neuron_count] [max_steps] [enable_checkpointing] [enable_replay] [enable_development] [checkpoint_path]`
+  - `neuron_count`: Number of neurons (default: 500)
+  - `max_steps`: Maximum simulation steps (default: 2000)
+  - `enable_checkpointing`: Enable checkpointing (true/false, default: true)
+  - `enable_replay`: Enable replay system (true/false, default: true)
+  - `enable_development`: Enable development system (true/false, default: true)
+  - `checkpoint_path`: Path for checkpoint files (default: ./checkpoint_test.bin)
+
+**Phase 6 Text Demo (`nlm_phase6_text_demo`):**
+- Supports all general configuration options above
+
+### Configuration File
+
+You can also load configuration from a file using the `--config` parameter:
+
+```bash
+./nlm --config my_config.cfg
 ```
+
+Or specify the config file directly with the `--config` parameter:
+
+```bash
+./nlm --config=my_config.cfg
+```
+
+### Example Usage
+
+Here's an example of running a Phase 4 demo with custom configuration:
+
+```bash
+./nlm_phase4_demo 100 --neuron_count=2000 --region_count=3 --random_seed=123
+```
+
+This will run the Phase 4 demo with 100 trials, 2000 neurons, 3 regions, and a random seed of 123.
+
+### Configuration Validation
+
+The NLM configuration system includes validation that checks:
+
+- Numeric ranges (e.g., neuron count must be between 10 and 100,000)
+- Log level validity
+- Environment name validity
+- Parameter consistency
+
+If validation fails, detailed error messages are displayed and the configuration may be adjusted with defaults applied.
+
+---
 
 ### Pattern 2: Get Brain Stats
 

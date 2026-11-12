@@ -15,11 +15,60 @@ int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
+    // Parse command line arguments
+    size_t neuronCount = 500;
+    size_t maxSteps = 2000;
+    bool enableCheckpointing = true;
+    bool enableReplay = true;
+    bool enableDevelopment = true;
+    std::string checkpointPath = "./checkpoint_test.bin";
+    
+    if (argc > 1) {
+        neuronCount = std::stoul(argv[1]);
+    }
+    if (argc > 2) {
+        maxSteps = std::stoul(argv[2]);
+    }
+    if (argc > 3) {
+        enableCheckpointing = (std::string(argv[3]) == "true" || std::string(argv[3]) == "1");
+    }
+    if (argc > 4) {
+        enableReplay = (std::string(argv[4]) == "true" || std::string(argv[4]) == "1");
+    }
+    if (argc > 5) {
+        enableDevelopment = (std::string(argv[5]) == "true" || std::string(argv[5]) == "1");
+    }
+    if (argc > 6) {
+        checkpointPath = argv[6];
+    }
+    
+    std::cout << "Configuration:" << std::endl;
+    std::cout << "  Neurons: " << neuronCount << std::endl;
+    std::cout << "  Max Steps: " << maxSteps << std::endl;
+    std::cout << "  Checkpointing: " << (enableCheckpointing ? "enabled" : "disabled") << std::endl;
+    std::cout << "  Replay: " << (enableReplay ? "enabled" : "disabled") << std::endl;
+    std::cout << "  Development: " << (enableDevelopment ? "enabled" : "disabled") << std::endl;
+    std::cout << "  Checkpoint Path: " << checkpointPath << std::endl;
+    std::cout << std::endl;
+    
     // Initialize logging
     Logger::getGlobal().setLevel(LogLevel::Info);
     
     // Create experiment
     Phase6IntegratedExperiment experiment;
+    
+    // First, run the quick integration verification
+    std::cout << "--- Integration Verification ---" << std::endl;
+    bool integrationOK = experiment.verifyIntegration();
+    
+    std::cout << std::endl;
+    
+    if (!integrationOK) {
+        std::cerr << "ERROR: Integration verification failed!" << std::endl;
+        return 1;
+    }
+    
+    std::cout << "Integration verification passed!" << std::endl << std::endl;
     
     // First, run the quick integration verification
     std::cout << "--- Integration Verification ---" << std::endl;
@@ -54,11 +103,12 @@ int main(int argc, char* argv[]) {
     // Run full experiment with smaller settings for demo
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    config.neuronCount = neuronCount;
+    config.maxSteps = maxSteps;
+    config.enableCheckpointing = enableCheckpointing;
+    config.enableReplay = enableReplay;
+    config.enableDevelopment = enableDevelopment;
+    config.checkpointPath = checkpointPath;
     
     auto result = experiment.run(config);
     
