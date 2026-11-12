@@ -269,22 +269,23 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getTimestamp", &SensoryPercept::getTimestamp)
         .def("setTimestamp", &SensoryPercept::setTimestamp, py::arg("timestamp"));
 
-    py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
+py::class_<SimpleWorld, std::shared_ptr<SimpleWorld>>(m, "SimpleWorld", R"pbdoc(Simple 2D world for NLM simulation)pbdoc")
         .def(py::init<>())
         .def("configure", &SimpleWorld::configure, py::arg("width"), py::arg("height"),
-             py::arg("visionWidth"), py::arg("visionHeight"))
+              py::arg("visionWidth"), py::arg("visionHeight"))
         .def("reset", &SimpleWorld::reset)
         .def("setAgentStart", &SimpleWorld::setAgentStart, py::arg("x"), py::arg("y"))
         .def("update", &SimpleWorld::update, py::arg("timestep"))
         .def("applyMotorCommand", &SimpleWorld::applyMotorCommand,
-             py::arg("cmd"), py::arg("currentTime"))
+              py::arg("cmd"), py::arg("currentTime"))
         .def("getSensoryPercept", &SimpleWorld::getSensoryPercept,
-             py::return_value_policy::reference_internal)
+              py::return_value_policy::reference_internal)
         .def("getAgentBody", &SimpleWorld::getAgentBody,
-             py::return_value_policy::reference_internal)
+              py::return_value_policy::reference_internal)
         .def("addObject", &SimpleWorld::addObject, py::arg("obj"))
         .def("removeObject", &SimpleWorld::removeObject, py::arg("x"), py::arg("y"))
         .def("isValidPosition", &SimpleWorld::isValidPosition, py::arg("x"), py::arg("y"))
+        .def("getObjectAt", &SimpleWorld::getObjectAt, py::arg("x"), py::arg("y"))
         .def("getWidth", &SimpleWorld::getWidth)
         .def("getHeight", &SimpleWorld::getHeight)
         .def("getMaxEnergy", &SimpleWorld::getMaxEnergy)
@@ -293,7 +294,46 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        // Enhanced Pythonic API
+        .def("create_resource", [](SimpleWorld& self, float x, float y) {
+            WorldObject obj(x, y, WorldObjectType::Resource, 10.0f, 0.4f);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), "Create a resource at position (x, y)")
+        .def("create_hazard", [](SimpleWorld& self, float x, float y) {
+            WorldObject obj(x, y, WorldObjectType::Hazard, -15.0f, 0.3f);
+            self.addObject(obj);
+        }, py::arg("x"), py::arg("y"), "Create a hazard at position (x, y)")
+        .def("get_nearby_resources", [](SimpleWorld& self, float x, float y, float range) {
+            std::vector<WorldObject> nearby;
+            for (auto& obj : self.getAllObjects()) {
+                if (obj.active && obj.type == WorldObjectType::Resource) {
+                    float dx = obj.x - x;
+                    float dy = obj.y - y;
+                    if (dx * dx + dy * dy <= range * range) {
+                        nearby.push_back(obj);
+                    }
+                }
+            }
+            return nearby;
+        }, py::arg("x"), py::arg("y"), py::arg("range"), "Get resources within range")
+        .def("get_nearby_hazards", [](SimpleWorld& self, float x, float y, float range) {
+            std::vector<WorldObject> nearby;
+            for (auto& obj : self.getAllObjects()) {
+                if (obj.active && obj.type == WorldObjectType::Hazard) {
+                    float dx = obj.x - x;
+                    float dy = obj.y - y;
+                    if (dx * dx + dy * dy <= range * range) {
+                        nearby.push_back(obj);
+                    }
+                }
+            }
+            return nearby;
+        }, py::arg("x"), py::arg("y"), py::arg("range"), "Get hazards within range")
+        .def("get_resource_count", &SimpleWorld::getResourceCount, "Get number of resources")
+        .def("get_hazard_count", &SimpleWorld::getHazardCount, "Get number of hazards")
+        .def("get_total_objects", &SimpleWorld::getTotalObjects, "Get total number of objects")
+        .def("clear_all_objects", &SimpleWorld::clearAllObjects, "Remove all objects");
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))

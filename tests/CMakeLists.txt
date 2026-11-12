@@ -14,6 +14,7 @@ add_executable(nlm_test
     test_synapse.cpp
     test_stdp.cpp
     test_brain.cpp
+    test_advanced.cpp
 )
 
 target_link_libraries(nlm_test PRIVATE nlm_core nlm_agent)
@@ -22,3 +23,14 @@ target_compile_features(nlm_test PRIVATE cxx_std_20)
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+
+# Add advanced test target
+add_executable(nlm_advanced_test
+    test_advanced.cpp
+)
+
+target_link_libraries(nlm_advanced_test PRIVATE nlm_core nlm_agent)
+target_compile_features(nlm_advanced_test PRIVATE cxx_std_20)
+
+# Add advanced test to testing suite
+add_test(NAME nlm_advanced_test COMMAND nlm_advanced_test)

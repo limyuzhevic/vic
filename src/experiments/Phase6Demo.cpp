@@ -60,6 +60,10 @@ int main(int argc, char* argv[]) {
     config.enableReplay = true;
     config.enableDevelopment = true;
     
+    // Note: Phase 6 integration experiment has reward issues - agent is not properly controlling world
+    // This is a known limitation that needs to be fixed in future phases
+    // TODO: Fix Phase 6 integration to properly use agent-brain interface for world interaction
+    
     auto result = experiment.run(config);
     
     std::cout << std::endl;
