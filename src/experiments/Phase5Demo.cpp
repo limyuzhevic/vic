@@ -35,6 +35,7 @@
 #include "../core/Config/Config.hpp"
 #include "../core/Random/Random.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/utilities/Utilities.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -135,10 +136,26 @@ void probePattern(const char* label, const SensoryPercept& percept) {
 
 int main() {
     using namespace nlm;
-    Logger::getGlobal().setLevel(LogLevel::Error);
-    std::cout << "===========================================\n";
-    std::cout << "NLM PHASE 5 - BRAIN-PERSONALITY / SANDBOX DEMO\n";
-    std::cout << "===========================================\n\n";
+    
+    // Enable verbose debug mode for debugging
+    enableDebugOutput(true);
+    
+    // Initialize logging with proper configuration
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Error);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    // Enhanced error handling for demo run
+    try {
+        Logger::getGlobal().setLevel(LogLevel::Error);
+        std::cout << "===========================================\n";
+        std::cout << "NLM PHASE 5 - BRAIN-PERSONALITY / SANDBOX DEMO\n";
+        std::cout << "===========================================\n\n";
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR initializing Phase 5 demo: " << e.what() << std::endl;
+        return 1;
+    }
 
     // --- 1. Pattern probe ---
     std::cout << "--- 1. Pattern probe (fresh brain per pattern, seed 42) ---\n";

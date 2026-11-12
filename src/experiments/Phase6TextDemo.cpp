@@ -43,13 +43,12 @@
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
+#include "../core/utilities/Utilities.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <set>
 #include <string>
-#include <utility>
-#include <vector>
 
 namespace nlm {
 namespace {
@@ -132,10 +131,26 @@ float cosine(const std::vector<float>& a, const std::vector<float>& b) {
 
 int main() {
     using namespace nlm;
-    Logger::getGlobal().setLevel(LogLevel::Error);
-    std::cout << "===========================================\n";
-    std::cout << "NLM PHASE 6 - TEXT TEACHING / THOUGHT DEMO\n";
-    std::cout << "===========================================\n\n";
+    
+    // Enable verbose debug mode for debugging
+    enableDebugOutput(true);
+    
+    // Initialize logging with proper configuration
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Error);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    // Enhanced error handling for demo run
+    try {
+        Logger::getGlobal().setLevel(LogLevel::Error);
+        std::cout << "===========================================\n";
+        std::cout << "NLM PHASE 6 - TEXT TEACHING / THOUGHT DEMO\n";
+        std::cout << "===========================================\n\n";
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR initializing Phase 6 Text demo: " << e.what() << std::endl;
+        return 1;
+    }
 
     std::vector<float> emptyVision(16, 1.0f);
     std::vector<float> noTouch(8, 0.0f);

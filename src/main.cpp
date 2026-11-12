@@ -18,6 +18,7 @@
 #include "motor/Action.hpp"
 #include "environment/Environment.hpp"
 #include "experiments/ExperimentRunner.hpp"
+#include "core/utilities/Utilities.hpp"
 
 #include <iostream>
 #include <memory>
@@ -25,6 +26,11 @@
 #include <vector>
 #include <iomanip>
 #include <numeric>
+#include <fstream>
+#include < chrono>
+#include <cmath>
+#include <set>
+#include <utility>
 
 using namespace nlm;
 
@@ -318,6 +324,103 @@ int main(int argc, char** argv) {
     logger->addLogger(consoleLogger);
     Logger::setGlobal(logger);
     
+    // Configure CLI options
+    std::string configFile = "configs/default.cfg";
+    std::string logLevelStr = "Info";
+    bool verboseMode = false;
+    bool helpRequested = false;
+    bool validateConfigMode = false;
+    bool dryRunMode = false;
+    std::string outputFile = "nlm_results.txt";
+    
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help") {
+            helpRequested = true;
+        } else if (arg == "--verbose") {
+            verboseMode = true;
+        } else if (arg == "--validate-config") {
+            validateConfigMode = true;
+        } else if (arg == "--dry-run") {
+            dryRunMode = true;
+        } else if (arg == "--output-file" && i + 1 < argc) {
+            outputFile = argv[++i];
+        } else if (arg == "--log-level" && i + 1 < argc) {
+            logLevelStr = argv[++i];
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                configFile = argv[++i];
+            }
+        }
+    }
+    
+    // Show help if requested
+    if (helpRequested) {
+        std::cout << "NLM — Neural Learning Machine" << std::endl;
+        std::cout << "Usage: nlm [OPTIONS]" << std::endl << std::endl;
+        std::cout << "Options:" << std::endl;
+        std::cout << "  --help                    Show this help message" << std::endl;
+        std::cout << "  --verbose                 Enable verbose output" << std::endl;
+        std::cout << "  --log-level LEVEL         Set log level (DEBUG|INFO|WARNING|ERROR)" << std::endl;
+        std::cout << "  --config=FILE             Load configuration from file" << std::endl;
+        std::cout << "  --validate-config         Validate configuration and exit" << std::endl;
+        std::cout << "  --dry-run                 Parse arguments but don't run experiments" << std::endl;
+        std::cout << "  --output-file FILE        Write results to file" << std::endl;
+        return 0;
+    }
+    
+    // Set verbose debug mode
+    enableDebugOutput(verboseMode);
+    
+    // Set log level
+    LogLevel level;
+    if (logLevelStr == "DEBUG") level = LogLevel::Debug;
+    else if (logLevelStr == "WARNING") level = LogLevel::Warning;
+    else if (logLevelStr == "ERROR") level = LogLevel::Error;
+    else level = LogLevel::Info;
+    consoleLogger->setLevel(level);
+    
+    NLM_LOG_INFO("Verbose mode: " + std::to_string(verboseMode));
+    NLM_LOG_INFO("Configuration file: " + configFile);
+    NLM_LOG_INFO("Log level: " + logLevelStr);
+    NLM_LOG_INFO("Output file: " + outputFile);
+    
+    // Dry run mode - just validate config and exit
+    if (dryRunMode) {
+        NLM_LOG_INFO("Dry run mode - validating configuration...");
+        auto config = std::make_shared<Config>();
+        
+        // Try to load from file if provided
+        for (int i = 1; i < argc; ++i) {
+            std::string arg(argv[i]);
+            if (arg.substr(0, 7) == "--config") {
+                if (arg.find('=') != std::string::npos) {
+                    configFile = arg.substr(arg.find('=') + 1);
+                } else if (i + 1 < argc) {
+                    configFile = argv[++i];
+                }
+            }
+        }
+        
+        // Load config from file (ignore if not found)
+        config->loadFromFile(configFile);
+        
+        // Validate configuration
+        if (validateConfig(config)) {
+            NLM_LOG_INFO("Configuration validation PASSED");
+        } else {
+            NLM_LOG_ERROR("Configuration validation FAILED");
+            return 1;
+        }
+        
+        NLM_LOG_INFO("Dry run completed successfully");
+        return 0;
+    }
+    
+    // Normal execution
     NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
     NLM_LOG_INFO("Implementing:");
     NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
@@ -330,7 +433,6 @@ int main(int argc, char** argv) {
     auto config = std::make_shared<Config>();
     
     // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
