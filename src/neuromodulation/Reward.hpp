@@ -31,7 +31,12 @@ public:
     void clearHistory();
     
 private:
-    struct Impl;
+    struct Impl {
+        float currentValue;
+        float accumulatedReward;
+        std::vector<float> history;
+        float lastPredictionError;  // Track for learning progress reward
+    };
     Impl* pImpl;
 };
 
