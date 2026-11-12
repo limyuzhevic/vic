@@ -1,18 +1,5 @@
-#include "Phase3Experiment.hpp"
-#include "../agent/AgentBrain.hpp"
-#include "../agent/SensoryPercept.hpp"
-#include "../world/SimpleWorld.hpp"
 #include "../brain/Brain.hpp"
-#include "../memory/NeuralWorkingMemory.hpp"
-#include "../core/Config/Config.hpp"
-#include "../core/Logger/Logger.hpp"
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <cstdlib>
-#include <cmath>
-#include <set>
-#include <utility>
+#include "../neuromodulation/Neuromodulator.hpp"
 
 namespace nlm {
 
@@ -135,22 +122,19 @@ public:
                 // 5. Apply motor command to world
                 ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
                 
-                // 6. Apply reward modulation
-                agentBrain.applyRewardModulation(result.reward, 0.0f);
+                // 6. Apply reward modulation through proper dopamine system
+                // Signal the actual reward to the brain's dopamine system
+                brain->signalReward(result.reward);
                 
-                // 7. Update world — Phase 6 pacing fix: one decision
-                // is one world action interval (0.1 s). The old
-                // 0.01 s step meant the world's 0.1 s action gate
-                // rejected 181/200 decisions as "too soon", so the
-                // brain was judged on actions it never took. The
-                // world gate itself is unchanged; the demo now
-                // actually steps the world by the interval the
-                // world's own physics (3.0 units/s, 2.0 rad/s) is
-                // defined over.
-                world.update(0.1);
-
-                // 8. Update development
-                agentBrain.updateDevelopment(0.1);
+                // Also signal reward prediction error (currently assumed to be 0 for simple demo)
+                brain->signalRewardPredictionError(0.0f);
+                
+                // OLD: agentBrain.applyRewardModulation(result.reward, 0.0f);
+                // NEW: Proper reward signaling through brain's neuromodulator system
+                
+                // Phase 5 thought: apply reward modulation to agent brain for
+                // thought/preference learning, which also affects the planner
+                agentBrain.applyRewardModulation(result.reward, 0.0f);
                 
                 // Track metrics
                 episodeReward += result.reward;

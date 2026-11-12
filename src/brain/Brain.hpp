@@ -102,6 +102,12 @@ public:
     // Apply neuromodulatory signals
     void applyNeuromodulation(const class Neuromodulator& signal);
     
+    // Signal reward to dopamine system (proper reward pathway)
+    void signalReward(float reward);
+    
+    // Signal reward prediction error to dopamine system
+    void signalRewardPredictionError(float error);
+    
     // Update plasticity rules (called automatically in step)
     void updatePlasticity();
     

@@ -148,7 +148,7 @@ struct Brain::Impl {
         float tau = config->getOr<float>("stdp_tau", 20.0f);
         stdp->configure(ltpWeight, ltdWeight, tau);
         
-        // Configure structural plasticity
+                // Configure structural plasticity
         float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
         float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
         structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
@@ -161,8 +161,11 @@ struct Brain::Impl {
         replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
         consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
         
-        // Initialize checkpoint manager
+// Initialize checkpoint manager
         checkpointManager = std::make_unique<CheckpointManager>();
+        
+        // Register checkpoint providers (register methods defined later in this file)
+        registerCheckpointProviders();
     }
     
     DevelopmentalStage developmentalStage;
@@ -825,12 +828,30 @@ std::unique_ptr<class Action> Brain::produceAction() {
 }
 
 void Brain::applyNeuromodulation(const class Neuromodulator& signal) {
+    NLM_LOG_INFO("Applying neuromodulation: " + std::string(signal.getName()));
+    
     // Apply neuromodulation effects on plasticity
     float modulation = signal.getLevel();
     
     // Scale STDP learning rates
     pImpl->stdp->setLTPWeight(0.01f * modulation);
     pImpl->stdp->setLTDWeight(0.012f * modulation);
+}
+
+void Brain::signalReward(float reward) {
+    NLM_LOG_INFO("Signaling reward: " + std::to_string(reward));
+    auto* dopamine = getDopamine();
+    if (dopamine) {
+        dopamine->signalReward(reward);
+    }
+}
+
+void Brain::signalRewardPredictionError(float error) {
+    NLM_LOG_INFO("Signaling reward prediction error: " + std::to_string(error));
+    auto* dopamine = getDopamine();
+    if (dopamine) {
+        dopamine->signalRewardPredictionError(error);
+    }
 }
 
 void Brain::updatePlasticity() {
@@ -1543,8 +1564,34 @@ PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
 
-std::shared_ptr<const Config> Brain::getConfig() const {
-    return pImpl->config;
+// ========== CHECKPOINT SYSTEM ==========
+
+// Get checkpoint manager
+CheckpointManager* Brain::getCheckpointManager() {
+    return pImpl->checkpointManager.get();
+}
+
+const CheckpointManager* Brain::getCheckpointManager() const {
+    return pImpl->checkpointManager.get();
+}
+
+// Register checkpoint providers
+void Brain::registerCheckpointProviders() {
+    if (pImpl->checkpointManager) {
+        // Register neuron provider
+        pImpl->checkpointManager->setNeuronProvider(
+            [this](NeuronCheckpointData& data) {
+                data = collectNeuronsForCheckpoint(this);
+                return true;
+            });
+        
+        // Register synapse provider
+        pImpl->checkpointManager->setSynapseProvider(
+            [this](SynapseCheckpointData& data) {
+                data = collectSynapsesForCheckpoint(this);
+                return true;
+            });
+    }
 }
 
 RandomGenerator* Brain::getRandomGenerator() {
@@ -1586,6 +1633,81 @@ void Brain::logStatus() const {
                     std::to_string(region->getSynapseCount()) + " synapses, " +
                     "avg weight: " + std::to_string(region->getAverageSynapticWeight()));
     }
+}
+
+// ========== CHECKPOINT HELPER FUNCTIONS ==========
+
+// Static helper function to collect neuron data for checkpointing
+static NeuronCheckpointData collectNeuronsForCheckpoint(const Brain* brain) {
+    NeuronCheckpointData data;
+    data.membranePotential.reserve(brain->getTotalNeuronCount());
+    data.restingPotential.reserve(brain->getTotalNeuronCount());
+    data.threshold.reserve(brain->getTotalNeuronCount());
+    data.resetPotential.reserve(brain->getTotalNeuronCount());
+    data.leakConductance.reserve(brain->getTotalNeuronCount());
+    data.firingState.reserve(brain->getTotalNeuronCount());
+    data.refractoryRemaining.reserve(brain->getTotalNeuronCount());
+    data.refractoryPeriod.reserve(brain->getTotalNeuronCount());
+    data.lastSpikeTime.reserve(brain->getTotalNeuronCount());
+    data.firingRate.reserve(brain->getTotalNeuronCount());
+    data.neuronType.reserve(brain->getTotalNeuronCount());
+    data.regionId.reserve(brain->getTotalNeuronCount());
+    data.populationId.reserve(brain->getTotalNeuronCount());
+    
+    for (const auto& region : brain->getRegions()) {
+        for (const auto& pop : region->getPopulations()) {
+            for (const auto* neuron : pop->getNeurons()) {
+                const auto& state = neuron->getState();
+                data.membranePotential.push_back(state.membranePotential);
+                data.restingPotential.push_back(state.restingPotential);
+                data.threshold.push_back(state.threshold);
+                data.resetPotential.push_back(state.resetPotential);
+                data.leakConductance.push_back(state.leakConductance);
+                data.firingState.push_back(static_cast<uint8_t>(state.firingState));
+                data.refractoryRemaining.push_back(state.refractoryRemaining);
+                data.refractoryPeriod.push_back(state.refractoryPeriod);
+                data.lastSpikeTime.push_back(state.lastSpikeTime);
+                data.firingRate.push_back(state.firingRate);
+                data.neuronType.push_back(static_cast<uint64_t>(neuron->getType()));
+                data.regionId.push_back(static_cast<uint64_t>(region->getId().index()));
+                data.populationId.push_back(static_cast<uint64_t>(pop->getId().index()));
+            }
+        }
+    }
+    
+    return data;
+}
+
+// Static helper function to collect synapse data for checkpointing
+static SynapseCheckpointData collectSynapsesForCheckpoint(const Brain* brain) {
+    SynapseCheckpointData data;
+    data.sourceNeuron.reserve(brain->getTotalSynapseCount());
+    data.destinationNeuron.reserve(brain->getTotalSynapseCount());
+    data.weight.reserve(brain->getTotalSynapseCount());
+    data.delay.reserve(brain->getTotalSynapseCount());
+    data.synapseType.reserve(brain->getTotalSynapseCount());
+    data.plasticityFlags.reserve(brain->getTotalSynapseCount());
+    data.eligibilityTrace.reserve(brain->getTotalSynapseCount());
+    data.efficacy.reserve(brain->getTotalSynapseCount());
+    data.shortTermDepression.reserve(brain->getTotalSynapseCount());
+    data.shortTermFacilitation.reserve(brain->getTotalSynapseCount());
+    
+    for (const auto& region : brain->getRegions()) {
+        for (const auto& syn : region->getSynapses()) {
+            data.sourceNeuron.push_back(syn->getSourceNeuron().index());
+            data.destinationNeuron.push_back(syn->getDestinationNeuron().index());
+            data.weight.push_back(syn->getWeight());
+            data.delay.push_back(syn->getDelay());
+            data.synapseType.push_back(static_cast<uint8_t>(syn->getType()));
+            data.plasticityFlags.push_back(syn->getPlasticityFlags());
+            data.eligibilityTrace.push_back(syn->getEligibilityTrace());
+            data.efficacy.push_back(syn->getEfficacy());
+            data.shortTermDepression.push_back(syn->getShortTermDepression());
+            data.shortTermFacilitation.push_back(syn->getShortTermFacilitation());
+        }
+    }
+    
+    return data;
 }
 
 } // namespace nlm
