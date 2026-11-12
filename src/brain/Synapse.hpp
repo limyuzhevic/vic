@@ -25,65 +25,65 @@ public:
     Synapse& operator=(Synapse&&) noexcept;
     
     // Identity
-    SynapseId getId() const;
+    [[nodiscard]] SynapseId getId() const noexcept;
     
     // Connection
-    NeuronId getSourceNeuron() const;
-    NeuronId getDestinationNeuron() const;
+    [[nodiscard]] NeuronId getSourceNeuron() const noexcept;
+    [[nodiscard]] NeuronId getDestinationNeuron() const noexcept;
     
     // Weight
-    SynapticWeight getWeight() const;
-    void setWeight(SynapticWeight weight);
-    void addToWeight(SynapticWeight delta);
+    [[nodiscard]] SynapticWeight getWeight() const noexcept;
+    void setWeight(SynapticWeight weight) noexcept;
+    void addToWeight(SynapticWeight delta) noexcept;
     
     // Delay (in simulation steps)
-    Delay getDelay() const;
-    void setDelay(Delay delay);
+    [[nodiscard]] Delay getDelay() const noexcept;
+    void setDelay(Delay delay) noexcept;
     
     // Type
-    SynapseType getType() const;
-    void setType(SynapseType type);
+    [[nodiscard]] SynapseType getType() const noexcept;
+    void setType(SynapseType type) noexcept;
     
     // Excitatory/Inhibitory
-    bool isExcitatory() const;
-    bool isInhibitory() const;
+    [[nodiscard]] bool isExcitatory() const noexcept;
+    [[nodiscard]] bool isInhibitory() const noexcept;
     
     // Activity history for plasticity
-    void recordPreSpike(Timestamp timestamp);
-    void recordPostSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getPreSpikeHistory() const;
-    const std::vector<Timestamp>& getPostSpikeHistory() const;
-    void clearHistory();
+    void recordPreSpike(Timestamp timestamp) noexcept;
+    void recordPostSpike(Timestamp timestamp) noexcept;
+    [[nodiscard]] const std::vector<Timestamp>& getPreSpikeHistory() const noexcept;
+    [[nodiscard]] const std::vector<Timestamp>& getPostSpikeHistory() const noexcept;
+    void clearHistory() noexcept;
     // Phase 5 checkpoint support: restore histories recorded by
     // recordPre/PostSpike (capped at the same MAX_SPIKE_HISTORY).
-    void setPreSpikeHistory(const std::vector<Timestamp>& history);
-    void setPostSpikeHistory(const std::vector<Timestamp>& history);
+    void setPreSpikeHistory(const std::vector<Timestamp>& history) noexcept;
+    void setPostSpikeHistory(const std::vector<Timestamp>& history) noexcept;
     
     // Plasticity flags
-    const PlasticityFlags& getPlasticityFlags() const;
-    PlasticityFlags& getPlasticityFlags();
+    [[nodiscard]] const PlasticityFlags& getPlasticityFlags() const noexcept;
+    PlasticityFlags& getPlasticityFlags() noexcept;
     
     // Enable/disable plasticity rules
-    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated);
+    void enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) noexcept;
     
     // Eligibility trace (for reward-modulated learning)
-    float getEligibilityTrace() const;
-    void setEligibilityTrace(float trace);
-    void decayEligibilityTrace(float decayRate);
+    [[nodiscard]] float getEligibilityTrace() const noexcept;
+    void setEligibilityTrace(float trace) noexcept;
+    void decayEligibilityTrace(float decayRate) noexcept;
     
     // Synaptic efficacy (use-dependent modulation)
-    float getEfficacy() const;
-    void setEfficacy(float efficacy);
+    [[nodiscard]] float getEfficacy() const noexcept;
+    void setEfficacy(float efficacy) noexcept;
     
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
-    void step(Timestamp currentTime);
+    void step(Timestamp currentTime) noexcept;
     
     // Reset to initial state
-    void reset();
+    void reset() noexcept;
     
     // Initialize with random parameters
-    void initializeRandom(class RandomGenerator& rng);
+    void initializeRandom(class RandomGenerator& rng) noexcept;
     
 private:
     struct Impl;
