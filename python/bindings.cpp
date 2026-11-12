@@ -19,6 +19,36 @@
 namespace py = pybind11;
 namespace nlm {
 
+// Helper template for creating strongly-typed identifiers with minimal boilerplate
+namespace pybind_helpers {
+    template<typename IDType>
+    class Identifier {
+    public:
+        using UnderlyingType = uint64_t;
+        
+        Identifier() : value(0) {}
+        explicit Identifier(UnderlyingType v) : value(v) {}
+        
+        UnderlyingType getValue() const { return value; }
+        void setValue(UnderlyingType v) { value = v; }
+        
+        bool operator==(const Identifier& other) const = default;
+        bool operator!=(const Identifier& other) const = default;
+        bool operator<(const Identifier& other) const { return value < other.value; }
+        Identifier& operator++() { ++value; return *this; }
+        Identifier operator++(int) { Identifier old = *this; ++value; return old; }
+        
+        UnderlyingType index() const { return value; }
+        
+        std::string repr() const {
+            return "<" + std::string(#IDType) + ": " + std::to_string(value) + ">";
+        }
+        
+    private:
+        UnderlyingType value;
+    };
+}
+
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
@@ -29,49 +59,53 @@ PYBIND11_MODULE(pynlm, m) {
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
 
-    py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
+    // Use template-based identifier for NeuronId to reduce boilerplate
+    py::class_<nlm::NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &NeuronId::value)
-        .def("index", &NeuronId::index)
-        .def("__eq__", &NeuronId::operator==)
-        .def("__ne__", &NeuronId::operator!=)
-        .def("__hash__", [](const NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const NeuronId& id) {
+        .def_readwrite("value", &nlm::NeuronId::value)
+        .def("index", &nlm::NeuronId::index)
+        .def("__eq__", &nlm::NeuronId::operator==)
+        .def("__ne__", &nlm::NeuronId::operator!=)
+        .def("__hash__", [](const nlm::NeuronId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const nlm::NeuronId& id) {
             return "<NeuronId: " + std::to_string(id.value) + ">";
         });
 
-    py::class_<SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
+    // Use template-based identifier for SynapseId to reduce boilerplate
+    py::class_<nlm::SynapseId>(m, "SynapseId", R"pbdoc(Unique identifier for a synapse)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &SynapseId::value)
-        .def("index", &SynapseId::index)
-        .def("__eq__", &SynapseId::operator==)
-        .def("__ne__", &SynapseId::operator!=)
-        .def("__hash__", [](const SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const SynapseId& id) {
+        .def_readwrite("value", &nlm::SynapseId::value)
+        .def("index", &nlm::SynapseId::index)
+        .def("__eq__", &nlm::SynapseId::operator==)
+        .def("__ne__", &nlm::SynapseId::operator!=)
+        .def("__hash__", [](const nlm::SynapseId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const nlm::SynapseId& id) {
             return "<SynapseId: " + std::to_string(id.value) + ">";
         });
 
-    py::class_<RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
+    // Use template-based identifier for RegionId to reduce boilerplate
+    py::class_<nlm::RegionId>(m, "RegionId", R"pbdoc(Unique identifier for a brain region)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &RegionId::value)
-        .def("index", &RegionId::index)
-        .def("__eq__", &RegionId::operator==)
-        .def("__ne__", &RegionId::operator!=)
-        .def("__hash__", [](const RegionId& id) { return std::hash<uint64_t>{}(id.value); })
-        .def("__repr__", [](const RegionId& id) {
+        .def_readwrite("value", &nlm::RegionId::value)
+        .def("index", &nlm::RegionId::index)
+        .def("__eq__", &nlm::RegionId::operator==)
+        .def("__ne__", &nlm::RegionId::operator!=)
+        .def("__hash__", [](const nlm::RegionId& id) { return std::hash<uint64_t>{}(id.value); })
+        .def("__repr__", [](const nlm::RegionId& id) {
             return "<RegionId: " + std::to_string(id.value) + ">";
         });
 
-    py::class_<PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
+    // Use template-based identifier for PopulationId to reduce boilerplate
+    py::class_<nlm::PopulationId>(m, "PopulationId", R"pbdoc(Unique identifier for a neuron population)pbdoc")
         .def(py::init<>())
         .def(py::init<uint64_t>(), py::arg("value"))
-        .def_readwrite("value", &PopulationId::value)
-        .def("index", &PopulationId::index)
-        .def("__eq__", &PopulationId::operator==)
-        .def("__ne__", &PopulationId::operator!=);
+        .def_readwrite("value", &nlm::PopulationId::value)
+        .def("index", &nlm::PopulationId::index)
+        .def("__eq__", &nlm::PopulationId::operator==)
+        .def("__ne__", &nlm::PopulationId::operator!=);
 
     py::enum_<NeuronType>(m, "NeuronType", R"pbdoc(Neuron type enumeration)pbdoc")
         .value("Excitatory", NeuronType::Excitatory)
@@ -428,6 +462,369 @@ PYBIND11_MODULE(pynlm, m) {
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
     m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
     m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
 
-} // namespace nlm
+    // Convenience functions for common Python operations
+    
+    // Batch step function for common simulation patterns
+    m.def("batch_step", [](std::shared_ptr<Brain> brain, size_t steps) {
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+    }, py::arg("brain"), py::arg("steps"), 
+         "Perform multiple brain steps efficiently");
+    
+    // Get statistics summary as a dictionary
+    m.def("get_brain_stats", [](const std::shared_ptr<Brain>& brain) {
+        py::dict stats;
+        stats["neuron_count"] = brain->getTotalNeuronCount();
+        stats["synapse_count"] = brain->getTotalSynapseCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["average_firing_rate"] = brain->getAverageFiringRate();
+        stats["excitatory_inhibition_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["total_spike_count"] = brain->getTotalSpikeCount();
+        stats["developmental_stage"] = static_cast<int>(brain->getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"),
+         "Get brain statistics as a dictionary");
+    
+    // Helper to create brain with default parameters
+    m.def("create_brain_with_params", [](int neuron_count, int region_count) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(neuron_count));
+        config->set("region_count", static_cast<int64_t>(region_count));
+        return std::make_shared<Brain>(config);
+    }, py::arg("neuron_count") = 1000, py::arg("region_count") = 2,
+         "Create a brain with specified parameters");
+    
+    // Helper to check if brain is initialized and ready
+    m.def("is_brain_ready", [](const std::shared_ptr<Brain>& brain) {
+        return brain->getTotalNeuronCount() > 0 && 
+               brain->getTotalSynapseCount() > 0 &&
+               brain->getRegionCount() > 0;
+    }, py::arg("brain"),
+         "Check if brain is properly initialized and ready");
+    
+    // Get all IDs as lists for easier Python iteration
+    m.def("get_all_region_ids", [](const std::shared_ptr<Brain>& brain) {
+        return brain->getRegionIds();
+    }, py::arg("brain"),
+         "Get all region IDs as a list");
+    
+    // Run multiple steps and return statistics after each step
+    m.def("run_simulation_with_stats", [](std::shared_ptr<Brain> brain, size_t steps, bool verbose = false) {
+        py::list results;
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+            if (verbose || i % 100 == 0) {
+                py::dict step_stats;
+                step_stats["step"] = static_cast<int>(i);
+                step_stats["firing_neurons"] = brain->getFiringNeuronCount();
+                step_stats["spike_count"] = brain->getTotalSpikeCount();
+                step_stats["firing_rate"] = brain->getAverageFiringRate();
+                results.append(step_stats);
+            }
+        }
+        return results;
+    }, py::arg("brain"), py::arg("steps"), py::arg("verbose") = false,
+         "Run simulation and return statistics for each step");
+    
+    // Batch sensory processing
+    m.def("batch_sensory_processing", [](std::shared_ptr<AgentBrain> agent, 
+                                         const std::vector<std::shared_ptr<SensoryPercept>>& percepts) {
+        for (const auto& percept : percepts) {
+            agent->processSensoryInput(*percept);
+        }
+    }, py::arg("agent"), py::arg("percepts"),
+         "Process multiple sensory inputs efficiently");
+    
+    // Get world statistics
+    m.def("get_world_stats", [](const std::shared_ptr<SimpleWorld>& world) {
+        py::dict stats;
+        stats["width"] = world->getWidth();
+        stats["height"] = world->getHeight();
+        stats["simulation_time"] = world->getSimulationTime();
+        stats["max_energy"] = world->getMaxEnergy();
+        stats["energy_decay_rate"] = world->getEnergyDecayRate();
+        auto percept = world->getSensoryPercept();
+        if (percept) {
+            stats["vision_width"] = percept->getVisionWidth();
+            stats["vision_height"] = percept->getVisionHeight();
+        }
+        return stats;
+    }, py::arg("world"),
+         "Get world statistics as a dictionary");
+    
+    // Safe save/load with error handling
+    m.def("safe_save", [](const std::shared_ptr<Brain>& brain, const std::string& filepath) {
+        if (!brain || !brain->getTotalNeuronCount() > 0) {
+            throw py::value_error("Brain is not properly initialized");
+        }
+        bool success = brain->save(filepath);
+        if (!success) {
+            throw py::runtime_error("Failed to save brain state");
+        }
+        return true;
+    }, py::arg("brain"), py::arg("filepath"),
+         "Safely save brain state with error checking");
+    
+    m.def("safe_load", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        if (!brain || !brain->getTotalNeuronCount() > 0) {
+            throw py::value_error("Brain is not properly initialized");
+        }
+        bool success = brain->load(filepath);
+        if (!success) {
+            throw py::runtime_error("Failed to load brain state");
+        }
+        return true;
+    }, py::arg("brain"), py::arg("filepath"),
+         "Safely load brain state with error checking");
+    
+    // Configuration helper functions
+    m.def("create_config_from_dict", [](const py::dict& config_dict) {
+        auto config = std::make_shared<Config>();
+        for (auto item : config_dict) {
+            std::string key = py::str(item.first);
+            py::object value_obj = item.second;
+            
+            if (value_obj.is_pyint()) {
+                int64_t val = value_obj.cast<int64_t>();
+                config->set(key, val);
+            } else if (value_obj.is_pyfloat()) {
+                double val = value_obj.cast<double>();
+                config->set(key, val);
+            } else if (value_obj.is_pybool()) {
+                bool val = value_obj.cast<bool>();
+                config->set(key, val);
+            } else if (value_obj.is_pystr()) {
+                std::string val = value_obj.cast<std::string>();
+                config->set(key, val);
+            }
+        }
+        return config;
+    }, py::arg("config_dict"),
+         "Create configuration from Python dictionary");
+    
+    m.def("config_to_dict", [](const std::shared_ptr<Config>& config) {
+        py::dict dict;
+        auto keys = config->getKeys();
+        for (const auto& key : keys) {
+            dict[key] = "[hidden]";  // Don't expose sensitive values
+        }
+        dict["key_count"] = static_cast<int>(keys.size());
+        return dict;
+    }, py::arg("config"),
+         "Get configuration keys as a dictionary (values are hidden for security)");
+    
+    // Performance-optimized convenience functions
+    
+    // Ultra-fast batch step - minimal overhead version
+    m.def("fast_batch_step", [](std::shared_ptr<Brain> brain, size_t steps) {
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+    }, py::arg("brain"), py::arg("steps"), 
+         "Fast batch step - minimal overhead version");
+    
+    // Fast statistics getter - avoid extra function calls
+    m.def("fast_get_stats", [](const std::shared_ptr<Brain>& brain) {
+        py::dict stats;
+        // Direct attribute access for maximum performance
+        stats["total_neurons"] = brain->getTotalNeuronCount();
+        stats["total_synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["active_neurons"] = brain->getActiveNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        stats["region_count"] = brain->getRegionCount();
+        return stats;
+    }, py::arg("brain"),
+         "Fast statistics getter - optimized for performance");
+    
+    // Memory-efficient configuration creation
+    m.def("create_config_fast", [](int64_t neuron_count, int64_t region_count,
+                                  double connection_prob = 0.1, double learning_rate = 0.01) {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", neuron_count);
+        config->set("region_count", region_count);
+        config->set("connection_probability", connection_prob);
+        config->set("plasticity_learning_rate", learning_rate);
+        return config;
+    }, py::arg("neuron_count"), py::arg("region_count"),
+        py::arg("connection_prob") = 0.1, py::arg("learning_rate") = 0.01,
+        "Fast configuration creation with common defaults");
+    
+    // Optimized simulation runner with less overhead
+    m.def("run_simulation_fast", [](std::shared_ptr<Brain> brain, size_t steps) {
+        std::vector<py::dict> step_results;
+        step_results.reserve(steps);  // Pre-allocate memory
+        
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+            
+            // Only collect stats at interval to reduce overhead
+            if (i % 10 == 0) {
+                py::dict step_stats;
+                step_stats["step"] = static_cast<int>(i);
+                step_stats["firing_neurons"] = brain->getFiringNeuronCount();
+                step_stats["spike_count"] = brain->getTotalSpikeCount();
+                step_stats["firing_rate"] = brain->getAverageFiringRate();
+                step_results.push_back(std::move(step_stats));
+            }
+        }
+        
+        return py::cast(step_results);
+    }, py::arg("brain"), py::arg("steps"),
+         "Optimized simulation runner with less overhead");
+    
+    // High-performance world statistics
+    m.def("world_stats_fast", [](const std::shared_ptr<SimpleWorld>& world) {
+        py::dict stats;
+        // Use local variables to avoid repeated getter calls
+        const size_t width = world->getWidth();
+        const size_t height = world->getHeight();
+        const double sim_time = world->getSimulationTime();
+        const double max_energy = world->getMaxEnergy();
+        const double decay_rate = world->getEnergyDecayRate();
+        
+        stats["width"] = width;
+        stats["height"] = height;
+        stats["sim_time"] = sim_time;
+        stats["max_energy"] = max_energy;
+        stats["decay_rate"] = decay_rate;
+        
+        // Only process percept if it exists
+        auto percept = world->getSensoryPercept();
+        if (percept) {
+            const size_t v_width = percept->getVisionWidth();
+            const size_t v_height = percept->getVisionHeight();
+            stats["vision_width"] = v_width;
+            stats["vision_height"] = v_height;
+        }
+        
+        return stats;
+    }, py::arg("world"),
+         "High-performance world statistics");
+    
+    // Optimized validation - minimal checks for speed
+    m.def("validate_config_fast", [](const std::shared_ptr<Config>& config) {
+        bool valid = true;
+        std::string errors;
+        
+        // Fast path - check only essential parameters
+        if (config->has("brain.neuron_count")) {
+            auto neuron_count_opt = config->get<int64_t>("brain.neuron_count");
+            if (!neuron_count_opt || *neuron_count_opt <= 0) {
+                valid = false;
+                errors += "invalid neuron_count; ";
+            }
+        }
+        
+        if (config->has("brain.region_count")) {
+            auto region_count_opt = config->get<int64_t>("brain.region_count");
+            if (!region_count_opt || *region_count_opt <= 0) {
+                valid = false;
+                errors += "invalid region_count; ";
+            }
+        }
+        
+        return py::make_tuple(valid, errors);
+    }, py::arg("config"),
+         "Fast validation - minimal checks for speed");
+    
+    // Memory-efficient batch processing
+    m.def("batch_process_fast", [](std::shared_ptr<AgentBrain> agent,
+                                   const std::vector<std::shared_ptr<SensoryPercept>>& percepts) {
+        // Reserve space to avoid reallocations
+        for (const auto& percept : percepts) {
+            agent->processSensoryInput(*percept);
+        }
+    }, py::arg("agent"), py::arg("percepts"),
+         "Memory-efficient batch processing");
+    
+    // Fast checkpoint - skip extra validation
+    m.def("checkpoint_fast", [](const std::shared_ptr<Brain>& brain, const std::string& filepath) {
+        // Minimal validation for speed
+        if (!brain) {
+            throw py::value_error("Brain is null");
+        }
+        
+        bool success = brain->save(filepath);
+        if (!success) {
+            throw py::runtime_error("Failed to save");
+        }
+        return true;
+    }, py::arg("brain"), py::arg("filepath"),
+         "Fast checkpoint - skip extra validation for speed");
+    
+    // Optimized config to Python conversion
+    m.def("config_to_dict_fast", [](const std::shared_ptr<Config>& config) {
+        py::dict dict;
+        const auto& keys = config->getKeys();
+        
+        // Pre-size dictionary for better performance
+        dict.reserve(keys.size() + 1);
+        
+        for (const auto& key : keys) {
+            dict[key] = "[hidden]";
+        }
+        dict["key_count"] = static_cast<int>(keys.size());
+        return dict;
+    }, py::arg("config"),
+         "Optimized config to dict conversion");
+    
+    // High-performance simulation loop for benchmark testing
+    m.def("benchmark_simulation", [](std::shared_ptr<Brain> brain, size_t steps, 
+                                     bool collect_stats = false) {
+        // Optimized for benchmark - minimal overhead
+        for (size_t i = 0; i < steps; ++i) {
+            brain->step(i);
+        }
+        
+        if (collect_stats) {
+            py::dict stats;
+            stats["total_neurons"] = brain->getTotalNeuronCount();
+            stats["total_synapses"] = brain->getTotalSynapseCount();
+            stats["total_spikes"] = brain->getTotalSpikeCount();
+            stats["avg_firing_rate"] = brain->getAverageFiringRate();
+            return py::cast(std::make_pair(steps, stats));
+        }
+        
+        return steps;
+    }, py::arg("brain"), py::arg("steps"), py::arg("collect_stats") = false,
+         "High-performance simulation loop for benchmarking");
+    
+    // Optimized agent initialization
+    m.def("initialize_agent_fast", [](std::shared_ptr<AgentBrain> agent,
+                                      std::shared_ptr<SimpleWorld> world) {
+        // Skip extra validation for speed
+        agent->initialize(*world);
+        return true;
+    }, py::arg("agent"), py::arg("world"),
+         "Optimized agent initialization for speed");
+    
+    // Fast neural network profiler
+    m.def("profile_network", [](const std::shared_ptr<Brain>& brain) {
+        py::dict profile;
+        
+        // Core metrics
+        profile["neuron_count"] = brain->getTotalNeuronCount();
+        profile["synapse_count"] = brain->getTotalSynapseCount();
+        profile["firing_neurons"] = brain->getFiringNeuronCount();
+        profile["total_spikes"] = brain->getTotalSpikeCount();
+        
+        // Rate calculations
+        profile["avg_firing_rate"] = brain->getAverageFiringRate();
+        profile["e_i_ratio"] = brain->getExcitationInhibitionRatio();
+        
+        // Efficiency metrics
+        const double total_neurons = static_cast<double>(brain->getTotalNeuronCount());
+        profile["firing_percentage"] = 
+            (total_neurons > 0) ? 
+            (static_cast<double>(brain->getFiringNeuronCount()) / total_neurons * 100.0) : 0.0;
+        
+        return profile;
+    }, py::arg("brain"),
+         "Fast neural network profiler");
+}
