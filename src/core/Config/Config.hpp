@@ -56,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+// Load from file (JSON/YAML format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -66,19 +66,29 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
-    std::optional<T> get(const std::string& key) const;
-
     template<typename T>
-    T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
-    void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
-    void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    std::optional<T> get(const std::string& key, const std::string& errorContext = "") const;
+    
+    template<typename T>
+    T getOr(const std::string& key, const T& defaultValue, const std::string& errorContext = "") const;
+    
+    // Set values with enhanced error handling
+    void set(const std::string& key, const ConfigValue& value, ConfigSource source, const std::string& description = "", bool requireValid = true);
+    void set(const std::string& key, const std::string& value, ConfigSource source, const std::string& description = "", bool requireValid = true);
+    void set(const std::string& key, int value, ConfigSource source, const std::string& description = "", bool requireValid = true);
+    void set(const std::string& key, int64_t value, ConfigSource source, const std::string& description = "", bool requireValid = true);
+    void set(const std::string& key, double value, ConfigSource source, const std::string& description = "", bool requireValid = true);
+    void set(const std::string& key, bool value, ConfigSource source, const std::string& description = "", bool requireValid = true);
+    
+    // Enhanced validation methods
+    bool validateConfig() const;
+    std::string getValidationError() const;
+    void setValidationEnabled(bool enabled);
+    
+    // Import/export utilities
+    bool importFromJson(const std::string& jsonStr, ConfigSource source = ConfigSource::Runtime);
+    bool importFromYaml(const std::string& yamlStr, ConfigSource source = ConfigSource::Runtime);
+    std::string exportToJson(bool pretty = true) const;
     
     // Check existence
     bool has(const std::string& key) const;
