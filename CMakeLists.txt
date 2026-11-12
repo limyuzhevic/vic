@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(NLM VERSION 0.1.0 LANGUAGES CXX)
 
+# Find nlohmann/json dependency
+find_package(nlohmann_json 3.2.0 REQUIRED)
+
 # C++20 standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -196,7 +199,7 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     set_target_properties(nlm_core nlm_agent nlm_world PROPERTIES
         POSITION_INDEPENDENT_CODE ON)
     pybind11_add_module(pynlm python/bindings.cpp)
-    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
+    target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world nlohmann_json::nlohmann_json)
     target_include_directories(pynlm PRIVATE src)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
