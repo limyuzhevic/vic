@@ -48,10 +48,37 @@ cmake.args = [
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
     "-DPYTHON_EXECUTABLE={python}",
-    # Phase 5: without this the root build produces no pynlm module
-    # at all (the option is OFF by default for plain C++ builds).
     "-DNLM_BUILD_PYTHON_BINDINGS=ON",
 ]
+cmake.build-dir = "build"
+
+[tool.scikit-build.cmake.define]
+NLM_BUILD_PYTHON_BINDINGS = true
+NLM_SOURCE_DIR = "src"
+
+# Ensure pybind11 is available for building
+[tool.scikit-build.cmake.find]
+pybind11 = {required = true}
+
+# Python package metadata
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "numpy>=1.20",
+    "pybind11>=2.11.0",
+    "scikit-build-core>=0.8.0",
+]
+
+# Scripts and executables
+[tool.scikit-build.scripts]
+nlm_demo = "scripts/demo.py"
+nlm_benchmark = "scripts/benchmark.py"
+
+# Configuration for building
+[tool.scikit-build]
+minimum-version = "0.8.0"
+build-type = "Release"
+clean = {dirs = ["build", "dist", "*.egg-info"]}
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"

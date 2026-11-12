@@ -199,6 +199,13 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     target_link_libraries(pynlm PRIVATE nlm_core nlm_agent nlm_world)
     target_include_directories(pynlm PRIVATE src)
     install(TARGETS pynlm LIBRARY DESTINATION .)
+    
+    # Generate Python module file for scikit-build-core
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/python/pynlm.py.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/pynlm.py"
+        COPYONLY
+    )
 endif()
 
 # Testing

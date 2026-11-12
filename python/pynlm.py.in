@@ -1,0 +1,41 @@
+"""
+NLM (Neural Learning Machine) Python Bindings
+
+This module provides a Python interface to the NLM C++ neural simulation framework.
+It allows creating and running artificial brains with spiking neurons, synapses,
+plasticity, memory systems, and neuromodulation.
+
+Usage Examples:
+-------------
+import pynlm
+
+# Create a default brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+# Run simulation
+for step in range(1000):
+    brain.step(step)
+    if step % 100 == 0:
+        print(f"Step {step}: {brain.getFiringNeuronCount()} firing neurons")
+
+# Create world and agent
+world = pynlm.createSimpleWorld()
+world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Enable advanced features
+agent.enableRewardModulation(True)
+agent.enableStructuralPlasticity(True)
+agent.enableDevelopment(True)
+agent.enableCuriosity(True)
+
+print("NLM simulation complete!")
+"""
+
+__version__ = "0.1.0"
+
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)

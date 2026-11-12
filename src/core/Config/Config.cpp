@@ -19,16 +19,25 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    std::string content((std::istreambuf_iterator<char>(file)), 
+                        std::istreambuf_iterator<char>());
+    
+    // Try to parse as JSON first
+    try {
+        return loadFromJSON(content);
+    } catch (...) {
+        // If JSON parsing fails, fall back to simple key=value format
+    }
+    
+    // Parse simple key=value format
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -50,6 +59,52 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             set(key, value, ConfigSource::File);
         }
+    }
+    
+    return true;
+}
+
+bool Config::loadFromJSON(const std::string& jsonContent) {
+    // Simple JSON parser for basic key-value pairs
+    // For production use, consider adding a proper JSON library like nlohmann/json
+    
+    size_t pos = 0;
+    while (pos < jsonContent.size()) {
+        // Find next key (assumes keys are strings without quotes in this simple case)
+        size_t keyStart = jsonContent.find('"', pos);
+        if (keyStart == std::string::npos) break;
+        
+        size_t keyEnd = jsonContent.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        
+        std::string key = jsonContent.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find value after colon
+        size_t colonPos = jsonContent.find(':', keyEnd);
+        if (colonPos == std::string::npos) break;
+        
+        size_t valueStart = jsonContent.find_first_not_of(' ', colonPos + 1);
+        if (valueStart == std::string::npos) break;
+        
+        // Find end of value (either comma, closing brace, or end of string)
+        size_t valueEnd = jsonContent.find_first_of(',}', valueStart);
+        if (valueEnd == std::string::npos) valueEnd = jsonContent.size();
+        
+        std::string valueStr = jsonContent.substr(valueStart, valueEnd - valueStart);
+        
+        // Trim whitespace
+        valueStr = trim(valueStr);
+        
+        // Remove surrounding quotes if present
+        if (valueStr.size() >= 2 && 
+            ((valueStr.front() == '"' && valueStr.back() == '"') ||
+             (valueStr.front() == '\'' && valueStr.back() == '\''))) {
+            valueStr = valueStr.substr(1, valueStr.size() - 2);
+        }
+        
+        set(key, valueStr, ConfigSource::File);
+        
+        pos = valueEnd;
     }
     
     return true;
@@ -84,10 +139,50 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    file << "{\n";
+    
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        
+        file << "  \"" << entry.key << "\": ";
+        
+        // Output JSON value based on type
+        std::visit([&file](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << v << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (v ? "true" : "false");
+            } else if constexpr (std::is_same_v<T, int> || 
+                                 std::is_same_v<T, int64_t> || 
+                                 std::is_same_v<T, double>) {
+                file << v;
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < v.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        file << "\"" << v[j] << "\"";
+                    } else {
+                        file << v[j];
+                    }
+                }
+                file << "]";
+            } else {
+                // Default fallback for unknown types
+                file << "null";
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",";
+        }
+        file << "\n";
     }
+    
+    file << "}\n";
     
     return true;
 }
