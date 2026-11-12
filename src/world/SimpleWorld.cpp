@@ -52,22 +52,29 @@ void SimpleWorld::reset() {
     agent_.x = urand(rngState_, 2.0f, width_ - 2.0f);
     agent_.y = urand(rngState_, 2.0f, height_ - 2.0f);
     agent_.energy = maxEnergy_;
+    agent_.health = 1.0f;  // Initialize health properly
+    agent_.age = 0.0;
+    agent_.isMoving = false;
+    agent_.isTurning = false;
+    agent_.lastActionTime = -1000.0f;
+    
     rngState_ = rngSeed_;  // Reset RNG for reproducible object placement
     
     objects_.clear();
     
     // Place some resource objects (positive reward when touched)
+    // Objects are placed closer to edges where agent is more likely to encounter them
     for (int i = 0; i < 5; ++i) {
-        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
-        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.4f);
+        float ox = urand(rngState_, 1.0f, 3.0f);  // Much closer to agent start (2.0, 2.0)
+        float oy = urand(rngState_, 1.0f, 3.0f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Resource, 10.0f, 0.6f);  // Larger radius
     }
     
     // Place some hazard objects (negative reward when touched)
     for (int i = 0; i < 3; ++i) {
-        float ox = urand(rngState_, 1.0f, width_ - 1.0f);
-        float oy = urand(rngState_, 1.0f, height_ - 1.0f);
-        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.3f);
+        float ox = urand(rngState_, 1.0f, 3.0f);  // Closer to agent start
+        float oy = urand(rngState_, 1.0f, 3.0f);
+        objects_.emplace_back(ox, oy, WorldObjectType::Hazard, -15.0f, 0.6f);  // Larger radius
     }
     
     generateVision();

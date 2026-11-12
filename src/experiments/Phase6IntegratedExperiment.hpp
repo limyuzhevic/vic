@@ -86,8 +86,8 @@ struct Phase6Config {
     std::string checkpointPath;
     
     Phase6Config()
-        : maxSteps(10000)
-        , neuronCount(1000)
+        : maxSteps(1000)              // Reduced for faster demo
+        , neuronCount(500)            // Reduced for faster demo
         , regionCount(1)
         , connectionProbability(0.1f)
         , enableCheckpointing(true)

@@ -401,9 +401,46 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+    if (!stream_.is_open()) return false;
+    stream_.write(reinterpret_cast<const char*>(&header_), sizeof(header_));
+    if (!stream_) {
+        error_ = "failed to write checkpoint header";
+        return false;
+    }
+    bytesWritten_ += sizeof(header_);
+    return true;
+}
+
+bool CheckpointWriter::writeSectionHeader(const SectionHeader& header) {
+    if (!stream_.is_open()) return false;
+    stream_.write(reinterpret_cast<const char*>(&header), sizeof(header));
+    if (!stream_) {
+        error_ = "failed to write section header";
+        return false;
+    }
+    bytesWritten_ += sizeof(header);
+    return true;
+}
+
+bool CheckpointWriter::padToAlignment(size_t alignment) {
+    if (!stream_.is_open() || alignment == 0) return true;
+    
+    size_t currentPos = static_cast<size_t>(stream_.tellp());
+    size_t padding = (alignment - (currentPos % alignment)) % alignment;
+    
+    if (padding > 0) {
+        std::vector<char> paddingBytes(padding, 0);
+        stream_.write(paddingBytes.data(), static_cast<std::streamsize>(padding));
+        if (!stream_) {
+            error_ = "failed to write padding bytes";
+            return false;
+        }
+        bytesWritten_ += padding;
+    }
+    
+    return true;
+}
 
 // ---------------- CheckpointManager ----------------
 

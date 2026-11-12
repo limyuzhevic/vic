@@ -65,20 +65,22 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     for (uint64_t step = 0; step < config.maxSteps; ++step) {
         // Get observation
-        world.update(0.001);
+        double timestep = 0.1;  // Match action interval to world physics
+        world.update(timestep);
         SensoryPercept percept = world.getSensoryPercept();
         
         // Process sensory input
         agent.processSensoryInput(percept);
         
-        // Brain step
-        brain->step(step, step * 0.001);
+        // Brain step - maintain consistent timing
+        double brainTimestep = timestep;
+        brain->step(step, step * brainTimestep);
         
         // Get motor command
         MotorCommand cmd = agent.decodeMotorCommand();
         
         // Apply action to world
-        ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
+        ActionResult actionResult = world.applyMotorCommand(cmd, step * timestep);
         
         // Compute reward
         float reward = actionResult.reward;
@@ -99,7 +101,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Periodic status
         if (step % 1000 == 0) {
             NLM_LOG_INFO("Step " + std::to_string(step) + 
-                        " | Reward: " + std::to_string(totalReward / (step + 1)) +
+                        " | Running reward: " + std::to_string(totalReward) +
                         " | Firing: " + std::to_string(brain->getAverageFiringRate()) +
                         " | WorkingMem: " + std::to_string(brain->getWorkingMemory() ? 
                             brain->getWorkingMemory()->getActiveTraces() : 0));
@@ -107,7 +109,7 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     }
     
     // Collect final metrics
-    result.totalReward = totalReward / config.maxSteps;
+    result.totalReward = totalReward;  // Fix: Don't divide by maxSteps - this nullified rewards
     result.avgFiringRate = totalFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;

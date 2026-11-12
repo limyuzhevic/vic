@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
     config.neuronCount = 500;
-    config.maxSteps = 2000;
+    config.maxSteps = 1000;  // Reduced for faster demo
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
