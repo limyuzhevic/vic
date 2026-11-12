@@ -158,16 +158,15 @@ add_executable(nlm_phase5_demo
 )
 target_link_libraries(nlm_phase5_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5)
 
-# Phase 6 demo executable
+# Phase 6 integration demo executable
 add_executable(nlm_phase6_demo
-    src/experiments/Phase6Demo.cpp
+    src/experiments/Phase6IntegrationDemo.cpp
 )
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
 # Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
 # association probe, concept/social probes, and a sandbox run with
-# a teacher, planner overrides, and a checkpoint round-trip. The old
-# nlm_phase6_demo integration demo is left unchanged.
+# a teacher, planner overrides, and a checkpoint round-trip.
 add_executable(nlm_phase6_text_demo
     src/experiments/Phase6TextDemo.cpp
 )
@@ -179,15 +178,46 @@ add_executable(nlm_benchmark
 )
 target_link_libraries(nlm_benchmark PUBLIC nlm_core)
 
+# Phase 1 demo executable
+add_executable(nlm_phase1_demo
+    src/experiments/Phase1Demo.cpp
+)
+target_link_libraries(nlm_phase1_demo PUBLIC nlm_core)
+
+# Environment configuration system (environment variable support)
+add_library(nlm_environment STATIC
+    src/core/Environment/EnvironmentConfig.cpp
+)
+target_include_directories(nlm_environment PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+target_compile_options(nlm_environment PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+)
+
+# Environment configuration is used by Python bindings
+# target_link_libraries(pynlm PRIVATE nlm_environment)
+
+# Validation system (configuration validation and error handling)
+add_library(nlm_validation STATIC
+    src/core/Validation/ValidationSystem.cpp
+)
+target_include_directories(nlm_validation PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+)
+target_compile_options(nlm_validation PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>
+)
+
+# Validation is used by Python bindings
+# target_link_libraries(pynlm PRIVATE nlm_validation)
+
 # Python bindings (Phase 5: this is what `pip install .` builds).
-# Previously pyproject.toml claimed scikit-build-core would build pynlm,
-# but the root CMakeLists never built the module — pip install
-# succeeded yet `import pynlm` failed. The option is OFF by default so
-# a plain C++ build needs no Python/pybind11; pyproject.toml turns it
-# ON. The standalone python/CMakeLists.txt build still works too, but
-# it must not be added here as a subdirectory: it defines its own
-# nlm_core/nlm_agent/nlm_world targets, which would collide with the
-# ones above. This target reuses the root libraries instead.
+# The option is ON by default for pip installs (via pyproject.toml) but
+# OFF for direct CMake builds so a plain C++ build needs no Python/pybind11.
+# This builds the pynlm Python module using pybind11.
 option(NLM_BUILD_PYTHON_BINDINGS "Build the pynlm Python module" OFF)
 if(NLM_BUILD_PYTHON_BINDINGS)
     find_package(Python REQUIRED COMPONENTS Interpreter Development)

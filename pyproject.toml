@@ -27,8 +27,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-dependencies = []
-
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
@@ -45,16 +43,13 @@ Repository = "https://github.com/nlm-project/nlm.git"
 cmake.version = ">=3.16"
 cmake.build-type = "Release"
 cmake.args = [
+    "-DNLM_BUILD_PYTHON_BINDINGS=ON",
     "-DCMAKE_CXX_STANDARD=20",
     "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
-    "-DPYTHON_EXECUTABLE={python}",
-    # Phase 5: without this the root build produces no pynlm module
-    # at all (the option is OFF by default for plain C++ builds).
-    "-DNLM_BUILD_PYTHON_BINDINGS=ON",
 ]
-
-[tool.scikit-build.cmake.define]
-NLM_SOURCE_DIR = "src"
+cmake.define = {
+    NLM_SOURCE_DIR = "src",
+}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
