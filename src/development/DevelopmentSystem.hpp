@@ -46,6 +46,26 @@ public:
     // Set developmental age
     void setDevelopmentalAge(double age) { age_ = age; }
     
+    // Get memory consolidation factor for current stage
+    float getMemoryConsolidationFactor() const;
+    
+    // Get neural excitability modifier for current stage
+    float getNeuralExcitabilityModifier() const;
+    
+    // Get attention modulation factor
+    float getAttentionModulationFactor() const;
+    
+    // Get reward sensitivity factor
+    float getRewardSensitivityFactor() const;
+    
+    // Check if stage enables specific capabilities
+    bool enablesComplexBehavior() const;
+    bool enablesLongTermMemory() const;
+    bool enablesSocialLearning() const;
+    
+    // Get stage duration thresholds
+    SimulationStep getStageDuration(DevelopmentalStage stage) const;
+    
 private:
     struct Impl;
     Impl* pImpl;

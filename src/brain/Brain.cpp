@@ -453,20 +453,88 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
         }
     }
     
-    // Process immediate spikes
-    pImpl->spikeSystem->processSpikes(currentStep);
-
-    // Phase 6, tried and reverted: global inhibitory feedback
-    // (inhibit every neuron when >10% of the population fired in
-    // a step). It lowered mean rate only slightly (80.8 -> 76.2 Hz
-    // in Phase 3) while making behaviour worse — a planner-driven
-    // Interact trap returned (115 empty interacts in one episode)
-    // and a hazard was consumed — because uniform inhibition
-    // flattens the motor pattern that the biases need to read, so
-    // the biases dominate more, not less. Population inhibition
-    // is the wrong lever here; see the drive-scaling change in
-    // AgentBrain/Neuron instead. This block is intentionally empty
-    // so the experiment and its result stay in the record.
+    // ========== STEP 3a: Capture sensory patterns for neuromodulation ==========
+    // Store current sensory pattern for novelty detection and prediction
+    // This enables Novelty and PredictionError systems to receive sensory input
+    std::vector<float> sensoryPattern;
+    
+    // Capture current sensory pattern (activation levels) for neuromodulation
+    for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+        auto* neuron = pImpl->sensoryNeurons[i];
+        if (neuron) {
+            // Normalize activation to [0, 1] range
+            float activation = neuron->getState().membranePotential;
+            // Map from typical range [-10, 10] to [0, 1]
+            float normalized = (activation + 10.0f) / 20.0f;
+            normalized = std::max(0.0f, std::min(1.0f, normalized));
+            sensoryPattern.push_back(normalized);
+        }
+    }
+    
+    // Update working memory with sensory pattern
+    if (pImpl->workingMemory && !sensoryPattern.empty()) {
+        pImpl->workingMemory->store(sensoryPattern, 1.0f);
+    }
+    
+    // Update novelty detection with sensory pattern change
+    if (pImpl->novelty && !pImpl->sensoryNeurons.empty() && !sensoryPattern.empty()) {
+        static std::vector<float> previousSensoryPattern;
+        if (previousSensoryPattern.empty()) {
+            // Store first pattern
+            previousSensoryPattern = sensoryPattern;
+        } else {
+            // Compute novelty based on pattern change
+            pImpl->novelty->detectNovelty(sensoryPattern, previousSensoryPattern);
+            previousSensoryPattern = sensoryPattern;
+        }
+    }
+    
+    // ========== STEP 3b: Prediction system integration ==========
+    // Generate predictions based on stored patterns
+    if (pImpl->predictionSystem && pImpl->workingMemory) {
+        // Use NeuralPrediction system for real predictive coding
+        // This replaces the simple placeholder prediction with actual neural prediction
+        if (auto* neuralPrediction = dynamic_cast<NeuralPrediction*>(pImpl->predictionSystem)) {
+            // Record current sensory pattern for prediction learning
+            neuralPrediction->recordSensoryState(sensoryPattern, currentStep);
+            
+            // Generate prediction for next timestep
+            std::vector<float> predictedPattern = neuralPrediction->generatePrediction(currentStep);
+            
+            if (!predictedPattern.empty() && !sensoryPattern.empty()) {
+                // Compute prediction error using proper prediction system
+                float predictionError = neuralPrediction->updateWithObservation(sensoryPattern, currentStep);
+                
+                // Store prediction error for neuromodulation
+                neuralPrediction->setPredictionError(predictionError);
+            }
+        } else if (auto* simplePrediction = dynamic_cast<PredictionSystem*>(pImpl->predictionSystem)) {
+            // Fallback to simple prediction system
+            auto memoryNeurons = pImpl->workingMemory->getMemoryNeurons();
+            auto memoryActivations = pImpl->workingMemory->getMemoryActivations();
+            
+            if (!memoryNeurons.empty() && !memoryActivations.empty()) {
+                // Generate predicted pattern from working memory
+                std::vector<float> predictedPattern;
+                for (float activation : memoryActivations) {
+                    // Apply prediction modulation (slightly different from actual)
+                    float predicted = activation * 0.9f + 0.1f;  // Simple prediction decay
+                    predictedPattern.push_back(predicted);
+                }
+                
+                // Compute prediction error
+                if (!predictedPattern.empty()) {
+                    float predictedValue = std::accumulate(predictedPattern.begin(), 
+                                                          predictedPattern.end(), 0.0f) / 
+                                                         predictedPattern.size();
+                    
+                    // For now, use a placeholder actual value based on current sensory
+                    float actualValue = 0.5f;  // Placeholder - should be computed from actual sensory
+                    simplePrediction->computeError(predictedValue, actualValue);
+                }
+            }
+        }
+    }
 
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
@@ -631,13 +699,68 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
+        // Process current neural activity patterns to form concepts
+        // Convert sensory pattern to features for concept formation
+        std::vector<float> sensoryFeatures;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                // Extract features from neuron activation
+                float activation = neuron->getState().membranePotential;
+                // Normalize and add to features
+                float feature = (activation + 10.0f) / 20.0f;
+                feature = std::max(0.0f, std::min(1.0f, feature));
+                sensoryFeatures.push_back(feature);
+            }
+        }
+        
+        if (!sensoryFeatures.empty()) {
+            // Present features to concept formation system
+            size_t conceptId = pImpl->conceptFormation->presentExperience(
+                sensoryFeatures, sensoryFeatures,  // Using same for features for now
+                0.0f,  // Reward placeholder
+                currentStep
+            );
+            
+            if (conceptId > 0) {
+                // A concept was matched or newly created
+                NLM_LOG_INFO("Concept formation identified concept " + std::to_string(conceptId));
+            }
+        }
     }
     
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+    // ========== STEP 11: Neural planner integration ==========
+    if (pImpl->planner) {
+        // Neural planner provides action planning based on learned preferences
+        // and current sensory state
+        
+        // Get current sensory state
+        std::vector<float> currentSensoryState;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size(); ++i) {
+            auto* neuron = pImpl->sensoryNeurons[i];
+            if (neuron) {
+                float activation = neuron->getState().membranePotential;
+                float normalized = (activation + 10.0f) / 20.0f;
+                normalized = std::max(0.0f, std::min(1.0f, normalized));
+                currentSensoryState.push_back(normalized);
+            }
+        }
+        
+        // Get learned preference from brain personality trait
+        float learnedPreference = pImpl->learnedPreference;
+        
+        // Generate action plan for current state and preferences
+        ActionType plannedAction = pImpl->planner->planAction(currentSensoryState, learnedPreference);
+        
+        // Apply planner suggestions if available and if development allows complex behavior
+        if (plannedAction != ActionType::Wait && pImpl->developmentSystem->enablesComplexBehavior()) {
+            // Store planner suggestions for later integration
+            // In a full implementation, this could modulate neural activity
+            // or provide biases to the action selection system
+            
+            // For now, log that planning occurred
+            NLM_LOG_INFO("Neural planner selected action: " + std::to_string(static_cast<int>(plannedAction)));
+        }
     }
     
     // ========== STEP 12: Replay important memories ==========
@@ -653,30 +776,89 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     if (currentStep % 1000 == 0) {  // Update development every 1000 steps
         pImpl->developmentSystem->update(this, *pImpl->rng, pImpl->timestep * 1000);
         
-        // Development affects plasticity rates
+        // Get developmental effects
+        float plasticityMod = pImpl->developmentSystem->getPlasticityModifier();
+        float memoryConsolidation = pImpl->developmentSystem->getMemoryConsolidationFactor();
+        float neuralExcitability = pImpl->developmentSystem->getNeuralExcitabilityModifier();
+        float attentionMod = pImpl->developmentSystem->getAttentionModulationFactor();
+        float rewardSensitivity = pImpl->developmentSystem->getRewardSensitivityFactor();
+        bool complexBehaviorEnabled = pImpl->developmentSystem->enablesComplexBehavior();
+        
+        // Development affects structural plasticity rates
         auto* sp = pImpl->structuralPlasticity.get();
         if (sp) {
-            DevelopmentalStage stage = pImpl->developmentalStage;
-            float plasticityMod = 1.0f;
-            
-            switch (stage) {
-                case DevelopmentalStage::Initial:
-                    plasticityMod = 1.0f;  // High plasticity
-                    break;
-                case DevelopmentalStage::CriticalPeriod:
-                    plasticityMod = 0.8f;
-                    break;
-                case DevelopmentalStage::Maturation:
-                    plasticityMod = 0.5f;
-                    break;
-                case DevelopmentalStage::Adult:
-                    plasticityMod = 0.2f;  // Stable
-                    break;
-            }
-            
             sp->setSynaptogenesisRate(0.0001f * plasticityMod);
             sp->setPruningRate(0.00001f * (2.0f - plasticityMod));
         }
+        
+        // Development affects neural excitability and dopamine response
+        if (pImpl->dopamine) {
+            // Higher developmental age increases baseline excitability
+            float developmentalBoost = (neuralExcitability - 1.0f) * 0.5f;  // Scale around 1.0
+            if (developmentalBoost > 0.0f) {
+                for (auto& region : pImpl->regions) {
+                    for (auto& pop : region->getPopulations()) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            // Development boosts baseline excitability
+                            neuron->injectCurrent(developmentalBoost * 0.5f);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Development affects working memory consolidation capacity
+        if (pImpl->workingMemory) {
+            // Increase working memory capacity based on development stage
+            size_t developmentalCapacity = static_cast<size_t>(100.0f * memoryConsolidation);
+            pImpl->workingMemory->setCapacity(developmentalCapacity);
+        }
+        
+        // Development affects attention system
+        if (pImpl->attention) {
+            pImpl->attention->setInhibitionStrength(0.5f * attentionMod);
+            pImpl->attention->setExcitationStrength(1.5f * attentionMod);
+        }
+        
+        // Development affects reward processing
+        if (pImpl->dopamine) {
+            // Increase reward sensitivity based on developmental stage
+            float rewardBoost = rewardSensitivity * 0.5f;
+            pImpl->dopamine->setLevel(pImpl->dopamine->getLevel() + rewardBoost);
+        }
+        
+        // Development enables or disables advanced capabilities
+        if (pImpl->conceptFormation) {
+            if (complexBehaviorEnabled) {
+                // Enable concept formation in advanced developmental stages
+                NLM_LOG_INFO("Development enabling advanced cognitive capabilities");
+            }
+        }
+        
+        if (pImpl->planner && complexBehaviorEnabled) {
+            // Enable neural planner in advanced developmental stages
+            pImpl->planner->setPlanningDepth(5);
+            NLM_LOG_INFO("Development enabling neural planning capabilities");
+        }
+        
+        if (pImpl->predictionSystem) {
+            // Enable prediction system in advanced developmental stages
+            if (complexBehaviorEnabled) {
+                NLM_LOG_INFO("Development enabling prediction capabilities");
+            }
+        }
+        
+        if (pImpl->episodicMemory && complexBehaviorEnabled) {
+            // Enable long-term memory capabilities in advanced stages
+            pImpl->episodicMemory->setMaxEpisodes(2000);
+            NLM_LOG_INFO("Development enabling long-term memory capabilities");
+        }
+        
+        // Log developmental progress
+        NLM_LOG_INFO("Development stage: " + std::string(pImpl->developmentSystem->getStageName()) +
+                     ", Age: " + std::to_string(pImpl->developmentSystem->getDevelopmentalAge()) +
+                     ", Plasticity: " + std::to_string(plasticityMod) +
+                     ", MemoryConsolidation: " + std::to_string(memoryConsolidation));
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========

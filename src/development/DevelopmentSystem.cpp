@@ -9,8 +9,9 @@ struct DevelopmentSystem::Impl {
     SimulationStep stageStartStep;
     SimulationStep stepsInCurrentStage;
     double stageAge;  // Age since entering current stage
+    double startAge;  // Age when entering current stage
     
-    Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0) {}
+    Impl() : stage(DevelopmentalStage::Initial), stageStartStep(0), stepsInCurrentStage(0), stageAge(0.0), startAge(0.0) {}
 };
 
 DevelopmentSystem::DevelopmentSystem() : pImpl(new Impl), age_(0.0) {}
@@ -24,6 +25,7 @@ DevelopmentalStage DevelopmentSystem::getStage() const {
 void DevelopmentSystem::setStage(DevelopmentalStage stage) {
     pImpl->stage = stage;
     pImpl->stageAge = 0.0;
+    pImpl->startAge = age_;
 }
 
 void DevelopmentSystem::advanceStage() {
@@ -46,6 +48,7 @@ void DevelopmentSystem::advanceStage() {
     }
     pImpl->stepsInCurrentStage = 0;
     pImpl->stageAge = 0.0;
+    pImpl->startAge = age_;
     NLM_LOG_INFO("Development advanced to stage: " + std::string(getStageName()));
 }
 
@@ -114,6 +117,81 @@ float DevelopmentSystem::getCriticalPeriodProgress() const {
     }
     // Progress through critical period (0 to 1)
     return std::min(1.0f, static_cast<float>(pImpl->stageAge / 300.0));
+}
+
+float DevelopmentSystem::getMemoryConsolidationFactor() const {
+    // Memory consolidation improves with development
+    switch (pImpl->stage) {
+        case DevelopmentalStage::Initial: return 0.1f;
+        case DevelopmentalStage::CriticalPeriod: return 0.3f;
+        case DevelopmentalStage::Maturation: return 0.7f;
+        case DevelopmentalStage::Adult: return 0.9f;
+        case DevelopmentalStage::Aging: return 0.8f;
+        default: return 0.5f;
+    }
+}
+
+float DevelopmentSystem::getNeuralExcitabilityModifier() const {
+    // Neural excitability follows a bell curve: high in development, optimal in adulthood
+    float ageFactor = static_cast<float>(age_) / 1200.0f;  // Normalize to 0-1
+    if (ageFactor < 0.3f) {
+        return 0.8f + 0.2f * (ageFactor / 0.3f);  // Rising from Initial
+    } else if (ageFactor < 0.8f) {
+        return 1.0f;  // Peak in adulthood
+    } else {
+        return 1.0f - 0.5f * ((ageFactor - 0.8f) / 0.2f);  // Declining in aging
+    }
+}
+
+float DevelopmentSystem::getAttentionModulationFactor() const {
+    // Attention improves with development
+    switch (pImpl->stage) {
+        case DevelopmentalStage::Initial: return 0.3f;
+        case DevelopmentalStage::CriticalPeriod: return 0.6f;
+        case DevelopmentalStage::Maturation: return 0.8f;
+        case DevelopmentalStage::Adult: return 1.0f;
+        case DevelopmentalStage::Aging: return 0.9f;
+        default: return 0.5f;
+    }
+}
+
+float DevelopmentSystem::getRewardSensitivityFactor() const {
+    // Reward sensitivity increases with development
+    switch (pImpl->stage) {
+        case DevelopmentalStage::Initial: return 0.2f;
+        case DevelopmentalStage::CriticalPeriod: return 0.5f;
+        case DevelopmentalStage::Maturation: return 0.8f;
+        case DevelopmentalStage::Adult: return 1.0f;
+        case DevelopmentalStage::Aging: return 0.7f;
+        default: return 0.5f;
+    }
+}
+
+bool DevelopmentSystem::enablesComplexBehavior() const {
+    // Enable complex behavior in maturation and adulthood
+    return pImpl->stage >= DevelopmentalStage::Maturation;
+}
+
+bool DevelopmentSystem::enablesLongTermMemory() const {
+    // Enable long-term memory in maturation and adulthood
+    return pImpl->stage >= DevelopmentalStage::Maturation;
+}
+
+bool DevelopmentSystem::enablesSocialLearning() const {
+    // Enable social learning in adulthood
+    return pImpl->stage == DevelopmentalStage::Adult || pImpl->stage == DevelopmentalStage::Aging;
+}
+
+SimulationStep DevelopmentSystem::getStageDuration(DevelopmentalStage stage) const {
+    // Return estimated duration in steps for each stage
+    switch (stage) {
+        case DevelopmentalStage::Initial: return 60;
+        case DevelopmentalStage::CriticalPeriod: return 300;
+        case DevelopmentalStage::Maturation: return 600;
+        case DevelopmentalStage::Adult: return 2400;
+        case DevelopmentalStage::Aging: return 1200;
+        default: return 60;
+    }
 }
 
 } // namespace nlm

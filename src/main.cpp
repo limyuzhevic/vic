@@ -48,6 +48,46 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printAdvancedHelp() {
+    std::cout << R"(
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                            ADVANCED NLM COMMANDS                              ║
+╠════════════════════════════════════════════════════════════════════════════════╣
+║                                                                             ║
+║ General Settings:                                                         ║
+║   --config=file.cfg                         Load configuration file         ║
+║                                                                             ║
+║ Checkpoint Management:                                                    ║
+║   --checkpoint=file                               Load brain from checkpoint  ║
+║   --save-checkpoint                         Save brain to checkpoint         ║
+║   --list-checkpoints                    List available checkpoints          ║
+║                                                                             ║
+║ Experiment Control:                                                       ║
+║   --e=experiment_id                           Run specific experiment        ║
+║                                                                             ║
+║ Development System:                                                       ║
+║   --dev=stage                        Set developmental stage (Initial,Critical) ║
+║                                                                             ║
+║ Neuromodulation Control:                                                  ║
+║   --neuromodulation=level              Set neuromodulation level (0.0-1.0)   ║
+║                                                                             ║
+║ Memory Management:                                                        ║
+║   --clear-memory                         Clear all memory systems         ║
+║                                                                             ║
+║ Benchmarking:                                                             ║
+║   --benchmark                             Run performance benchmark       ║
+║                                                                             ║
+║ Configuration Override:                                                   ║
+║   --key=value                              Override configuration value     ║
+║                                                                             ║
+║ Help:                                                                     ║
+║   --help                                 Show basic help                  ║
+║   --advanced-help                        Show advanced help               ║
+║                                                                             ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+)" << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -331,6 +371,16 @@ int main(int argc, char** argv) {
     
     // Try to load from file if provided
     std::string configFile = "configs/default.cfg";
+    std::string checkpointFile = "";
+    bool saveCheckpoint = false;
+    bool listCheckpoints = false;
+    std::string experimentMode = "";
+    bool showAdvancedHelp = false;
+    std::string developmentalStage = "";
+    float neuromodulationLevel = -1.0f;  // -1 means not set
+    bool clearMemory = false;
+    std::string benchmarkType = "";
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -339,7 +389,39 @@ int main(int argc, char** argv) {
             } else if (i + 1 < argc) {
                 configFile = argv[++i];
             }
+        } else if (arg == "--checkpoint") {
+            if (i + 1 < argc) {
+                checkpointFile = argv[++i];
+            }
+        } else if (arg == "--save-checkpoint") {
+            saveCheckpoint = true;
+        } else if (arg == "--list-checkpoints") {
+            listCheckpoints = true;
+        } else if (arg.substr(0, 2) == "--e=") {
+            experimentMode = arg.substr(2);
+        } else if (arg.substr(0, 작업阶段 = "--dev=") {
+            developmentalStage = arg.substr(arg.find('=') + 1);
+        } else if (arg.substr(0, 20) == "--neuromodulation=") {
+            neuromodulationLevel = std::stof(arg.substr(20));
+        } else if (arg == "--clear-memory") {
+            clearMemory = true;
+        } else if (arg == "--benchmark") {
+            benchmarkType = "simple";
+        } else if (arg == "--help") {
+            showAdvancedHelp = true;
+        } else if (arg == "--advanced-help") {
+            showAdvancedHelp = true;
+        } else if (arg.substr(0, 2) == "--") {
+            // Handle --key=value format for config
+            std::string key = arg.substr(2, arg.find('=') - 2);
+            std::string value = arg.substr(arg.find('=') + 1);
+            config->set(key, value, ConfigSource::CommandLine);
         }
+    }
+    
+    // Display advanced help if requested
+    if (showAdvancedHelp) {
+        printAdvancedHelp();
     }
     
     // Load config from file (ignore if not found)

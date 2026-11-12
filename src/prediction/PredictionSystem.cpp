@@ -1,4 +1,6 @@
 #include "PredictionSystem.hpp"
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
@@ -39,6 +41,12 @@ void PredictionSystem::updatePredictions(const SensoryInput& predicted, const Se
 
 float PredictionSystem::getPredictionError() const {
     return pImpl->predictionError;
+}
+
+void PredictionSystem::computeError(float predicted, float actual) {
+    // Compute prediction error between predicted and actual values
+    pImpl->predictionError = std::abs(actual - predicted);
+    pImpl->errorHistory.push_back(pImpl->predictionError);
 }
 
 float PredictionSystem::getConfidence() const {
