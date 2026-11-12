@@ -308,6 +308,17 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Handle help flag before anything else
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printBanner();
+            auto config = std::make_shared<Config>();
+            config->printHelp();
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -346,7 +357,16 @@ int main(int argc, char** argv) {
     if (config->loadFromFile(configFile)) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
-        NLM_LOG_INFO("Using default configuration.");
+        NLM_LOG_INFO("Using default configuration (file not found: " + configFile + ")");
+    }
+    
+    // Handle list-configs flag
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--list-configs") {
+            config->printAvailableConfigs();
+            return 0;
+        }
     }
     
     // Override with command line args
@@ -376,7 +396,18 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  stdp_tau: " + std::to_string(config->getOr<float>("stdp_tau", 20.0f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
     NLM_LOG_INFO("");
+    
+    // Validate configuration
+    if (!validateConfiguration(config)) {
+        NLM_LOG_ERROR("Configuration validation failed!");
+        return 1;
+    }
     
     // Initialize simulation clock
     double timestep = config->getOr<double>("simulation_timestep", 0.001);
@@ -432,4 +463,50 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     
     return 0;
+}
+
+// Add validation function for configuration
+bool validateConfiguration(std::shared_ptr<Config> config) {
+    // Validate neuron_count
+    auto neuronCount = config->getOr<int64_t>("neuron_count", 1000);
+    if (neuronCount <= 0) {
+        NLM_LOG_ERROR("Invalid neuron_count: must be positive!");
+        return false;
+    }
+    if (neuronCount > 100000) {
+        NLM_LOG_WARNING("Large neuron_count (" + std::to_string(neuronCount) + ") may impact performance");
+    }
+    
+    // Validate region_count
+    auto regionCount = config->getOr<int64_t>("region_count", 1);
+    if (regionCount <= 0) {
+        NLM_LOG_ERROR("Invalid region_count: must be positive!");
+        return false;
+    }
+    
+    // Validate connection_probability
+    auto connectionProb = config->getOr<float>("connection_probability", 0.1f);
+    if (connectionProb < 0.0f || connectionProb > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection_probability: must be between 0.0 and 1.0!");
+        return false;
+    }
+    
+    // Validate random_seed
+    auto randomSeed = config->getOr<int64_t>("random_seed", 42);
+    if (randomSeed < 0) {
+        NLM_LOG_ERROR("Invalid random_seed: must be non-negative!");
+        return false;
+    }
+    
+    // Validate simulation_timestep
+    auto timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep <= 0.0) {
+        NLM_LOG_ERROR("Invalid simulation_timestep: must be positive!");
+        return false;
+    }
+    if (timestep > 1.0) {
+        NLM_LOG_WARNING("Large simulation_timestep (" + std::to_string(timestep) + ") may cause numerical instability");
+    }
+    
+    return true;
 }

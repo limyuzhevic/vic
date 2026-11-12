@@ -59,22 +59,149 @@ bool Config::loadFromArgs(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         
+        // Handle --help or -h for help
+        if (arg == "--help" || arg == "-h") {
+            printHelp();
+            return false; // Exit after showing help
+        }
+        
+        // Handle --list-configs for listing all available options
+        if (arg == "--list-configs") {
+            printAvailableConfigs();
+            return false; // Exit after showing config list
+        }
+        
         // Handle --key=value format
         if (arg.substr(0, 2) == "--") {
             size_t pos = arg.find('=');
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
-                set(key, value, ConfigSource::CommandLine);
+                // Validate and set the configuration value
+                if (!setFromString(key, value, ConfigSource::CommandLine)) {
+                    // Silently ignore invalid values in batch processing
+                    // In a real application, you might want to log warnings
+                }
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            if (!setFromString(key, value, ConfigSource::CommandLine)) {
+                // Silently ignore invalid values in batch processing
+            }
         }
     }
+    return true;
+}
+
+void Config::printHelp() const {
+    std::cout << "NLM Configuration Options:" << std::endl;
+    std::cout << "=========================" << std::endl;
+    std::cout << "--help, -h                      Show this help message" << std::endl;
+    std::cout << "--list-configs                  List all available configuration options" << std::endl;
+    std::cout << "--config=<file>                Load configuration from file" << std::endl;
+    std::cout << "--<key>=<value>                Set configuration value (e.g., --neuron_count=100)" << std::endl;
+    std::cout << "-<key> <value>                 Short form for key=value pairs" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Common configuration options:" << std::endl;
+    printAvailableConfigs();
+}
+
+void Config::printAvailableConfigs() const {
+    std::cout << "Available Configuration Options:" << std::endl;
+    for (const auto& entry : pImpl->entries) {
+        std::cout << "  " << entry.key << " (type: " << getTypeName(entry.value) << ")" << std::endl;
+    }
+}
+
+std::string Config::getTypeName(const ConfigValue& value) const {
+    std::string typeName;
+    std::visit([&](auto&& v) {
+        if constexpr (std::is_same_v<decltype(v), int>) {
+            typeName = "int";
+        } else if constexpr (std::is_same_v<decltype(v), int64_t>) {
+            typeName = "int64";
+        } else if constexpr (std::is_same_v<decltype(v), double>) {
+            typeName = "double";
+        } else if constexpr (std::is_same_v<decltype(v), bool>) {
+            typeName = "bool";
+        } else if constexpr (std::is_same_v<decltype(v), std::string>) {
+            typeName = "string";
+        } else if constexpr (std::is_same_v<decltype(v), std::vector<int>>) {
+            typeName = "int[]";
+        } else if constexpr (std::is_same_v<decltype(v), std::vector<double>>) {
+            typeName = "double[]";
+        } else if constexpr (std::is_same_v<decltype(v), std::vector<std::string>>) {
+            typeName = "string[]";
+        }
+    }, value);
+    return typeName.empty() ? "unknown" : typeName;
+}
+
+bool Config::setFromString(const std::string& key, const std::string& valueStr, ConfigSource source) {
+    // Determine target type based on key name or value content
+    bool success = false;
+    
+    // Try to determine the best type based on the key name
+    std::string lowerKey = toLower(key);
+    
+    // Check for boolean values
+    if (valueStr == "true" || valueStr == "false") {
+        set(key, valueStr == "true", source);
+        success = true;
+    }
+    // Check for integer values
+    else if (isNumeric(valueStr)) {
+        // Try different integer types
+        try {
+            size_t pos;
+            long long intVal = std::stoll(valueStr, &pos);
+            if (pos == valueStr.length()) {
+                // Check if it fits in 32-bit range
+                if (intVal >= INT_MIN && intVal <= INT_MAX) {
+                    set(key, static_cast<int>(intVal), source);
+                    success = true;
+                } else {
+                    set(key, intVal, source);
+                    success = true;
+                }
+            }
+        } catch (...) {}
+        
+        // Try double if integer didn't work
+        if (!success) {
+            try {
+                double doubleVal = std::stod(valueStr);
+                set(key, doubleVal, source);
+                success = true;
+            } catch (...) {}
+        }
+    }
+    // Handle string values
+    else {
+        set(key, valueStr, source);
+        success = true;
+    }
+    
+    return success;
+}
+
+bool Config::isNumeric(const std::string& str) const {
+    if (str.empty()) return false;
+    
+    size_t start = 0;
+    if (str[0] == '-' || str[0] == '+') {
+        start = 1;
+    }
+    
+    for (size_t i = start; i < str.length(); ++i) {
+        if (!std::isdigit(static_cast<unsigned char>(str[i]))) {
+            return false;
+        }
+    }
+    
     return true;
 }
 

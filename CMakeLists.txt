@@ -205,6 +205,43 @@ endif()
 enable_testing()
 add_subdirectory(tests)
 
+# Enhanced build options
+option(NLM_BUILD_TESTS "Build test executables" ON)
+option(NLM_BUILD_DOCS "Build documentation" OFF)
+option(NLM_BUILD_PYTHON_BINDINGS "Build Python bindings" OFF)
+option(NLM_ENABLE_ASSERTIONS "Enable runtime assertions" ON)
+option(NLM_ENABLE_PROFILING "Enable performance profiling" OFF)
+option(NLM_ENABLE_LOGGING "Enable detailed logging" ON)
+option(NLM_ENABLE_CHECKPOINTING "Enable checkpoint system" ON)
+
+if(NLM_ENABLE_ASSERTIONS)
+    add_definitions(-DNLM_ENABLE_ASSERTIONS)
+endif()
+
+if(NLM_ENABLE_PROFILING)
+    add_definitions(-DNLM_ENABLE_PROFILING)
+endif()
+
+# Platform-specific optimizations
+if(MSVC)
+    add_compile_options(/W4 /WX)
+    add_definitions(-DNLM_MSVC)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wshadow -Wformat=2)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        add_compile_options(-Wnull-dereference -Wduplicated-cond -Wduplicated-branches)
+    endif()
+endif()
+
+# Summary message
+message(STATUS "NLM Build Configuration Summary:")
+message(STATUS "  - Test Suite: ${NLM_BUILD_TESTS}")
+message(STATUS "  - Python Bindings: ${NLM_BUILD_PYTHON_BINDINGS}")
+message(STATUS "  - Runtime Assertions: ${NLM_ENABLE_ASSERTIONS}")
+message(STATUS "  - Performance Profiling: ${NLM_ENABLE_PROFILING}")
+message(STATUS "  - Detailed Logging: ${NLM_ENABLE_LOGGING}")
+message(STATUS "  - Checkpoint System: ${NLM_ENABLE_CHECKPOINTING}")
+
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
     ARCHIVE DESTINATION lib
