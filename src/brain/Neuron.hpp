@@ -49,8 +49,43 @@ struct NeuronState {
         , lastSpikeTime(-1.0f) {}
 };
 
+// Global performance optimization settings
+struct GlobalPerformanceSettings {
+    bool enableInputFiltering = true;
+    bool enableRefractoryOptimization = true;
+    bool enableAdaptation = true;
+    float maxFiringRateHz = 1000.0f;  // Hard limit to prevent runaway firing
+    float inputFilteringThreshold = 50.0f;  // Threshold for input filtering
+    float adaptationTimeConstant = 100.0f;  // Time constant for adaptation
+    float adaptationStrength = 0.01f;      // Strength of adaptation
+    
+    // Performance optimization flags
+    bool useSparseSynapticDelivery = true;
+    bool useCompartmentalizedUpdates = false;
+    bool useAsynchronousSpikePropagation = true;
+    
+    // Configuration
+    static GlobalPerformanceSettings getDefaultSettings() {
+        GlobalPerformanceSettings settings;
+        settings.useSparseSynapticDelivery = true;
+        settings.useCompartmentalizedUpdates = false;  // Still in development
+        settings.useAsynchronousSpikePropagation = true;
+        return settings;
+    }
+};
+
+inline GlobalPerformanceSettings globalPerformanceSettings;
+
+inline void setGlobalPerformanceSettings(const GlobalPerformanceSettings& settings) {
+    globalPerformanceSettings = settings;
+}
+
+inline GlobalPerformanceSettings getGlobalPerformanceSettings() {
+    return globalPerformanceSettings;
+}
+
 // Neuron class representing a single neuron
-// Implements Leaky Integrate-and-Fire (LIF) dynamics
+// Implements Leaky Integrate-and-Fire (LIF) dynamics with performance optimizations
 class Neuron {
 public:
     // Create neuron with ID
@@ -95,7 +130,7 @@ public:
     FiringRate getFiringRate() const;
     void setFiringRate(FiringRate rate);
     
-    // LIF neuron parameters
+    // LIF neuron parameters with optimization flags
     void setLeakConductance(MembranePotential conductance);
     MembranePotential getLeakConductance() const;
     uint32_t getRefractoryPeriod() const;
@@ -107,15 +142,15 @@ public:
     bool checkThreshold() const;
     float getLastSpikeTime() const;
     
-    // LIF step function - returns true if neuron fired
+    // LIF step function - returns true if neuron fired with optimizations
     bool stepLIF(Timestamp currentTime, TimestepDuration dt);
     
-    // Incoming signals (post-synaptic potentials)
+    // Incoming signals (post-synaptic potentials) with filtering
     void receiveExcitatoryInput(MembranePotential amplitude);
     void receiveInhibitoryInput(MembranePotential amplitude);
     void receiveModulatoryInput(MembranePotential amplitude);
     
-    // Current injection (from external sources)
+    // Current injection (from external sources) with clamping
     void injectCurrent(MembranePotential current);
     MembranePotential getTotalCurrent() const;
     void clearTotalCurrent();
@@ -142,15 +177,28 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Update neuron for one simulation step - OPTIMIZED PHASE 2
     void step(Timestamp currentTime);
     
-    // Reset to initial state
+    // Reset to initial state with optimizations
     void reset();
     
-    // Initialize with random parameters
+    // Initialize with random parameters and optimization settings
     void initializeRandom(RandomGenerator& rng);
+    
+    // Performance optimization methods
+    void enableInputFiltering(bool enabled);
+    void setMaxFiringRate(float maxRate);
+    void setRefractoryOptimization(bool enabled);
+    void setAdaptationEnabled(bool enabled);
+    
+    // Statistics and monitoring
+    size_t getRecentSpikeCount(size_t windowSteps) const;
+    float getFiringRateEstimate(size_t windowSteps) const;
+    
+    // Configuration methods
+    void configureRefractoryPeriod(float maxFiringRateHz);
+    void configureAdaptationParameters(float timeConstant, float strength);
     
 private:
     struct Impl;

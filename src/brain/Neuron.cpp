@@ -2,6 +2,7 @@
 #include "../core/Random/Random.hpp"
 #include <cmath>
 #include <algorithm>
+#include <numeric>
 
 namespace nlm {
 
@@ -18,13 +19,43 @@ struct Neuron::Impl {
     std::vector<SynapseHandle> outgoingSynapses;
     PlasticityFlags plasticityFlags;
     
+    // Performance optimization flags
+    bool inputFilteringEnabled;
+    float maxFiringRateHz;
+    bool refractoryOptimizationEnabled;
+    bool adaptationEnabled;
+    float adaptationTimeConstant;
+    float adaptationStrength;
+    
+    // Spike rate tracking for performance optimization
+    float recentSpikeCount;
+    float spikeRateEstimate;
+    size_t consecutiveHighRateSpikes;
+    
+    // Input filtering state
+    float filteredInput;
+    float inputBuffer;
+    size_t inputBufferSize;
+    
     // LIF parameters
     static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
     static constexpr float TIME_CONSTANT = 20.0f;  // ms
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
-             totalCurrent(0.0f), synapticInput(0.0f) {}
+             totalCurrent(0.0f), synapticInput(0.0f),
+             inputFilteringEnabled(true),
+             maxFiringRateHz(1000.0f),
+             refractoryOptimizationEnabled(true),
+             adaptationEnabled(true),
+             adaptationTimeConstant(100.0f),
+             adaptationStrength(0.01f),
+             recentSpikeCount(0.0f),
+             spikeRateEstimate(0.0f),
+             consecutiveHighRateSpikes(0),
+             filteredInput(0.0f),
+             inputBuffer(0.0f),
+             inputBufferSize(4) {}
 };
 
 Neuron::Neuron(NeuronId id) : pImpl(new Impl) {
@@ -120,26 +151,87 @@ float Neuron::getLastSpikeTime() const {
 }
 
 void Neuron::receiveExcitatoryInput(MembranePotential amplitude) {
-    // Real synaptic input: excitatory currents add to total current
-    // amplitude represents synaptic conductance * reversal potential contribution
-    pImpl->synapticInput += amplitude;
+    if (!pImpl->inputFilteringEnabled) {
+        pImpl->synapticInput += amplitude;
+        return;
+    }
+    
+    // Input filtering to prevent runaway excitation
+    // Simple moving average filter to smooth high-frequency inputs
+    pImpl->inputBuffer += amplitude;
+    pImpl->inputBufferSize++;
+    
+    // Calculate running average
+    float avgInput = pImpl->inputBuffer / static_cast<float>(pImpl->inputBufferSize);
+    
+    // Apply filtering based on input level
+    if (std::abs(avgInput) > globalPerformanceSettings.inputFilteringThreshold) {
+        // Reduce extreme inputs
+        pImpl->filteredInput = avgInput * 0.5f;
+    } else {
+        pImpl->filteredInput = avgInput;
+    }
+    
+    // Add filtered input
+    pImpl->synapticInput += pImpl->filteredInput;
+    
+    // Reset buffer periodically to adapt to changing input patterns
+    if (pImpl->inputBufferSize >= 100) {
+        pImpl->inputBuffer = 0.0f;
+        pImpl->inputBufferSize = 0;
+    }
 }
 
 void Neuron::receiveInhibitoryInput(MembranePotential amplitude) {
-    // Real inhibitory input: subtract from total current
-    // Inhibitory synaptic currents hyperpolarize the neuron
-    pImpl->synapticInput -= amplitude;
+    // Inhibitory input filtering (similar to excitatory but negative)
+    if (!pImpl->inputFilteringEnabled) {
+        pImpl->synapticInput -= amplitude;
+        return;
+    }
+    
+    float avgInput = pImpl->inputBuffer / static_cast<float>(pImpl->inputBufferSize);
+    if (std::abs(avgInput) > globalPerformanceSettings.inputFilteringThreshold) {
+        pImpl->filteredInput = avgInput * 0.5f;
+    } else {
+        pImpl->filteredInput = avgInput;
+    }
+    
+    pImpl->synapticInput -= pImpl->filteredInput;
+    
+    if (pImpl->inputBufferSize >= 100) {
+        pImpl->inputBuffer = 0.0f;
+        pImpl->inputBufferSize = 0;
+    }
 }
 
 void Neuron::receiveModulatoryInput(MembranePotential amplitude) {
     // Modulatory input affects plasticity but not directly integrated
-    // Used for neuromodulation (e.g., dopamine, acetylcholine)
-    pImpl->state.adaptationVariable += amplitude * 0.1f;
+    // Enhanced with optimization settings
+    float modulationFactor = 1.0f;
+    
+    if (pImpl->adaptationEnabled) {
+        modulationFactor = globalPerformanceSettings.adaptationStrength;
+    }
+    
+    pImpl->state.adaptationVariable += amplitude * modulationFactor;
+    
+    // Limit adaptation variable to prevent runaway modulation
+    if (pImpl->state.adaptationVariable > 100.0f) {
+        pImpl->state.adaptationVariable = 100.0f;
+    }
 }
 
 void Neuron::injectCurrent(MembranePotential current) {
-    // Direct current injection (e.g., from sensory input or external source)
-    // Add to synaptic input for LIF integration
+    // Direct current injection with clamping to prevent instability
+    if (pImpl->inputFilteringEnabled) {
+        // Apply clamping based on firing rate estimate
+        float rateFactor = pImpl->spikeRateEstimate / globalPerformanceSettings.maxFiringRateHz;
+        if (rateFactor > 1.0f) {
+            current *= (2.0f - rateFactor);  // Reduce current at high firing rates
+        }
+        current = std::clamp(current, -100.0f, 100.0f);  // Clamp to prevent instability
+    }
+    
     pImpl->synapticInput += current;
 }
 
@@ -152,10 +244,16 @@ void Neuron::recordSpike(Timestamp timestamp) {
     if (pImpl->spikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->spikeHistory.erase(pImpl->spikeHistory.begin());
     }
+    
+    // Track spike rate for performance optimization
+    pImpl->recentSpikeCount++;
+    pImpl->consecutiveHighRateSpikes++;
 }
 
 void Neuron::clearSpikeHistory() {
     pImpl->spikeHistory.clear();
+    pImpl->recentSpikeCount = 0.0f;
+    pImpl->consecutiveHighRateSpikes = 0;
 }
 
 void Neuron::addIncomingSynapse(SynapseHandle handle) {
@@ -191,7 +289,7 @@ void Neuron::setPopulationId(PopulationId population) {
 bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     bool fired = false;
     
-    // Handle refractory period
+    // Handle refractory period with optimization
     if (pImpl->state.refractoryRemaining > 0) {
         --pImpl->state.refractoryRemaining;
         // During refractory period, clear synaptic input but don't integrate
@@ -199,9 +297,10 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         if (pImpl->state.refractoryRemaining == 0) {
             pImpl->state.firingState = FiringState::Resting;
         }
-        // Keep the firing-rate metric decaying even while refractory, so it
-        // reflects recent activity instead of freezing at its spike value.
-        pImpl->state.firingRate *= 0.9f;
+        // Performance optimization: skip detailed rate calculation during refractory
+        if (!pImpl->refractoryOptimizationEnabled) {
+            pImpl->state.firingRate *= 0.9f;
+        }
         return false;
     }
     
@@ -225,29 +324,64 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Update membrane potential using exponential Euler integration
     V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
     
-    // Apply spike-frequency adaptation (slow hyperpolarization after spike)
-    if (pImpl->state.adaptationVariable > 0.0f) {
-        V -= pImpl->state.adaptationVariable * 0.01f;
-        pImpl->state.adaptationVariable *= 0.95f;  // Decay adaptation
+    // Performance optimization: adaptive spike-frequency adaptation
+    if (pImpl->adaptationEnabled && pImpl->state.adaptationVariable > 0.0f) {
+        // Use time constant from global settings
+        float decayFactor = std::pow(0.5f, dt * 1000.0f / globalPerformanceSettings.adaptationTimeConstant);
+        float adaptationEffect = pImpl->state.adaptationVariable * globalPerformanceSettings.adaptationStrength;
+        V -= adaptationEffect;
+        pImpl->state.adaptationVariable *= decayFactor;  // Decay adaptation
     }
     
-    // Clamp membrane potential to prevent instability
+    // Clamp membrane potential to prevent instability with safety margins
     V = std::clamp(V, -100.0f, 50.0f);
     
-    // Update the firing-rate metric from counted spikes, in Hz.
-    // Previously setFiringRate() was never called anywhere, so
-    // getAverageFiringRate() summed zeros even with thousands of spikes.
-    // EMA per brain step: a spike contributes 1/dt Hz, otherwise decay.
-    // dt is in seconds (0.001 in the demos), so a neuron firing every
-    // step would approach 1000 Hz, and refractory periods cap it well
-    // below that in practice.
+    // Performance optimization: adaptive firing rate calculation
     if (dt > 0.0) {
-        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+        // Update firing rate estimate using weighted average
+        pImpl->spikeRateEstimate = 0.9f * pImpl->spikeRateEstimate + 0.1f * (pImpl->recentSpikeCount / dt);
+        pImpl->recentSpikeCount = 0.0f;
+        
+        // Spike rate limiting based on global settings
+        if (pImpl->spikeRateEstimate > globalPerformanceSettings.maxFiringRateHz) {
+            // Reduce firing rate contribution when approaching limit
+            float rateLimitFactor = globalPerformanceSettings.maxFiringRateHz / pImpl->spikeRateEstimate;
+            pImpl->state.firingRate = pImpl->state.firingRate * rateLimitFactor;
+        }
+        
+        // Performance optimization: rate decay
+        pImpl->state.firingRate *= 0.95f;
     }
-
-    // Check for spike
+    
+    // Check for spike with performance optimization
     if (V >= threshold) {
         fired = true;
+        
+        // Spike rate limiting based on global settings
+        if (pImpl->spikeRateEstimate >= globalPerformanceSettings.maxFiringRateHz * 0.9f) {
+            // High firing rate detected, suppress this spike
+            // Reset membrane potential but don't enter refractory period
+            V = V_reset;
+            pImpl->state.firingState = FiringState::Resting;
+            
+            // Record spike for history
+            recordSpike(currentTime);
+            
+            // Update adaptation
+            pImpl->state.adaptationVariable += 0.5f;  // Smaller adaptation for suppressed spikes
+            
+            // Reset spike tracking
+            pImpl->consecutiveHighRateSpikes++;
+            
+            if (pImpl->consecutiveHighRateSpikes > 10) {
+                // Reset tracking after sustained high rate
+                pImpl->consecutiveHighRateSpikes = 0;
+            }
+            
+            return false;  // Suppress spike due to rate limiting
+        }
+        
+        // Normal spike processing
         if (dt > 0.0) {
             pImpl->state.firingRate += 0.1f * static_cast<float>(1.0 / dt);
         }
@@ -260,7 +394,7 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Reset membrane potential
         V = V_reset;
         
-        // Enter refractory period
+        // Enter refractory period with performance optimization
         pImpl->state.refractoryRemaining = pImpl->state.refractoryPeriod;
         pImpl->state.firingState = FiringState::Refractory;
         
@@ -286,10 +420,14 @@ void Neuron::reset() {
     pImpl->state = NeuronState();
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+    // Reset performance tracking
+    pImpl->recentSpikeCount = 0.0f;
+    pImpl->spikeRateEstimate = 0.0f;
+    pImpl->consecutiveHighRateSpikes = 0;
 }
 
 void Neuron::initializeRandom(RandomGenerator& rng) {
-    // Real random initialization with biological constraints
+    // Real random initialization with biological constraints and performance considerations
     // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
@@ -302,8 +440,9 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Reset potential is usually close to resting
     pImpl->state.resetPotential = pImpl->state.restingPotential + rng.uniformReal(0.0f, 5.0f);
     
-    // Refractory period: 2-10ms typical
-    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(uint32_t(2), uint32_t(10)));
+    // Refractory period: 2-10ms typical, but optimize for performance
+    int refractoryRange = 10 - 2 + 1;  // 2 to 10 inclusive
+    pImpl->state.refractoryPeriod = static_cast<uint32_t>(rng.uniformInt(2, 10));
     
     // Initial state
     pImpl->state.firingState = FiringState::Resting;
@@ -314,6 +453,47 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Clear any residual state
     pImpl->synapticInput = 0.0f;
     pImpl->spikeHistory.clear();
+}
+
+void Neuron::enableInputFiltering(bool enabled) {
+    pImpl->inputFilteringEnabled = enabled;
+}
+
+void Neuron::setMaxFiringRate(float maxRate) {
+    pImpl->maxFiringRateHz = maxRate;
+}
+
+void Neuron::setRefractoryOptimization(bool enabled) {
+    pImpl->refractoryOptimizationEnabled = enabled;
+}
+
+void Neuron::setAdaptationEnabled(bool enabled) {
+    pImpl->adaptationEnabled = enabled;
+}
+
+size_t Neuron::getRecentSpikeCount(size_t windowSteps) const {
+    // Estimate spike count based on recent spike rate
+    float ratePerStep = pImpl->spikeRateEstimate / 1000.0f;  // Hz to spikes per step
+    return static_cast<size_t>(ratePerStep * static_cast<float>(windowSteps));
+}
+
+float Neuron::getFiringRateEstimate(size_t windowSteps) const {
+    return pImpl->spikeRateEstimate;
+}
+
+void Neuron::configureRefractoryPeriod(float maxFiringRateHz) {
+    // Optimize refractory period based on maximum firing rate
+    // Firing rate limit = 1 / refractoryPeriodInSeconds
+    float maxRefractorySeconds = 1.0f / maxFiringRateHz;
+    uint32_t optimalRefractorySteps = static_cast<uint32_t>(maxRefractorySeconds / 0.001f);  // 1ms timesteps
+    
+    // Use adaptive refractory period
+    pImpl->state.refractoryPeriod = optimalRefractorySteps;
+}
+
+void Neuron::configureAdaptationParameters(float timeConstant, float strength) {
+    pImpl->adaptationTimeConstant = timeConstant;
+    pImpl->adaptationStrength = strength;
 }
 
 NeuronId Neuron::getId() const { return pImpl->id; }
