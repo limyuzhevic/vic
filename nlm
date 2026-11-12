@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""
+NLM (Neural Learning Machine) - Main Executable
+
+This is the main command-line interface for NLM operations.
+
+Usage:
+  nlm-utils [options]
+  nlm-utils <command> [options]
+
+Commands:
+  brain      Brain operations
+  config     Configuration management
+  world      World operations
+  agent      Agent operations
+  experiment Experiment management
+  viz        Visualization
+  batch      Batch processing
+  help       Show help
+
+Examples:
+  nlm-utils --help
+  nlm-utils brain create --neurons 1000
+  nlm-utils config presets
+  nlm-utils experiment create my_experiment
+"""
+
+import sys
+from pathlib import Path
+from nlm_utils import NLMCLI
+
+def main():
+    """Main entry point for NLM CLI."""
+    cli = NLMCLI()
+    cli.run(sys.argv[1:])
+
+if __name__ == "__main__":
+    main()

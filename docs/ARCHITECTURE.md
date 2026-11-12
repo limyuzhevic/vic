@@ -98,6 +98,18 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 ### 8. Prediction Layer (Phase 4)
 - **NeuralPrediction**: Temporal sequence learning
 - **ActionConsequencePredictor**: Action effect prediction
+
+### 9. Utility Layer (Phase 6 Enhancement)
+- **Python Utilities**: Advanced Python tools and analysis
+  - `pynlm.utils`: Core utilities for brain analysis
+  - `pynlm.viz`: Visualization tools and dashboards
+  - `pynlm.config`: Configuration management and parameter sweeps
+- **Command-Line Tools**: `nlm-utils` comprehensive utility program
+  - Brain operations: create, analyze, export, compare
+  - Configuration management: presets, save/load, validation
+  - Experiment management: run, track, analyze
+  - Visualization: dashboards, plots, analysis
+  - Batch processing: multiple brains, parameter sweeps
 - **PredictionErrorSignal**: Error computation for learning
 
 ### 9. Cognitive Layer (Phase 4)
@@ -107,6 +119,21 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 - **SocialLearning**: Observation and imitation
 
 ### 10. Sensory Layer
+
+### 11. Utility Layer (Phase 6 Enhancement)
+- **Python Utilities**: Advanced Python tools and analysis
+  - `pynlm.utils`: Core utilities for brain analysis
+  - `pynlm.viz`: Visualization tools and dashboards
+  - `pynlm.config`: Configuration management and parameter sweeps
+- **Command-Line Tools**: `nlm-utils` comprehensive utility program
+  - Brain operations: create, analyze, export, compare
+  - Configuration management: presets, save/load, validation
+  - Experiment management: run, track, analyze
+  - Visualization: dashboards, plots, analysis
+  - Batch processing: multiple brains, parameter sweeps
+  - Error handling: comprehensive exception management
+
+### 12. Visualization Interface
 - **SensoryInput**: Base class for sensory data
 - **Vision**: Visual input processing
 - **Audio**: Audio input processing

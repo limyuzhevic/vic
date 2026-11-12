@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""
+NLM (Neural Learning Machine) Utility Program
+
+A comprehensive command-line interface for NLM brain simulation and analysis.
+
+This program provides utilities for:
+- Brain creation and management
+- Configuration management
+- Experiment running and tracking
+- Visualization and analysis
+- Batch processing
+
+Usage:
+  nlm-utils <command> [options]
+  nlm-utils --help
+
+Available commands:
+  brain      Brain operations (create, analyze, save, load, export, compare)
+  config     Configuration management (presets, save/load, validation, compare)
+  world      World operations (create, configure, reset, analyze)
+  agent      Agent operations (create, initialize, process, decode, train)
+  experiment Experiment management (create, run, add-trial, summary, results)
+  viz        Visualization (dashboard, stats, network, development, spikes)
+  batch      Batch processing (create, process, analyze, export)
+  help       Show this help message
+"""
+
+import sys
+from pathlib import Path
+
+# Add the current directory to the Python path
+sys.path.insert(0, str(Path(__file__).parent))
+
+# Import the main CLI class
+from nlm_utils import NLMCLI
+
+def main():
+    """Main entry point for NLM CLI."""
+    cli = NLMCLI()
+    cli.run(sys.argv[1:])
+
+if __name__ == "__main__":
+    main()
