@@ -91,16 +91,68 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 ```
 
+## Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
 ## Running
 Build all targets first (see Building above). The entry points are
 currently separate demos per phase, not a single unified binary:
 
 ```bash
-./nlm                 # Phase 2 demo in src/main.cpp
+./nlm                 # Phase 2 demo with enhanced CLI
 ./nlm_phase3_demo
 ./nlm_phase4_demo
 ./nlm_phase6_demo     # Phase 6 integration test
 ./nlm_benchmark
+```
+
+### Enhanced CLI Options for `./nlm`
+
+The main NLM binary now includes comprehensive command-line options for advanced usage:
+
+#### Basic Options:
+- `--help, -h`              Show this help message with all options
+- `--version, -v`           Show version information
+- `--verbose, -V`           Enable verbose output (DEBUG level logging)
+- `--debug`                 Enable debug mode (DETAILED logging)
+- `--quiet, -q`             Suppress non-essential output (QUIET logging)
+
+#### Configuration:
+- `--config FILE`           Load configuration from specified file (default: configs/default.cfg)
+- `--log-level LEVEL`       Set log level (DEBUG, INFO, WARNING, ERROR)
+
+#### Configuration Presets:
+- `--preset FAST`          Fast, small simulation (50 neurons)
+- `--preset BALANCED`      Balanced performance (500 neurons)
+- `--preset DETAILED`      High detail (2000 neurons)
+
+#### Advanced Options:
+- `--neural-steps N`       Neural steps per world step (default: 10)
+- `--world-steps N`        World steps to run (default: 50)
+- `--seed VAL`             Random seed for reproducible results
+- `--disable-plasticity`   Disable synaptic plasticity and learning
+- `--disable-development`   Disable developmental processes (synaptogenesis/pruning)
+- `--disable-neuromodulation` Disable dopaminergic neuromodulation
+
+#### Example Usage:
+```bash
+# Run balanced simulation with verbose output
+./nlm --preset BALANCED --verbose
+
+# Run small fast simulation
+./nlm --preset FAST --world-steps 20
+
+# Disable learning for testing
+./nlm --disable-plasticity --disable-development --verbose
+
+# Custom configuration file
+./nlm --config my_config.cfg --log-level DEBUG
 ```
 
 `nlm_phase6_demo` runs a comprehensive integration test verifying all

@@ -310,30 +310,32 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 int main(int argc, char** argv) {
     printBanner();
     
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
-    
-    // Initialize logger
-    auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
-    logger->addLogger(consoleLogger);
-    Logger::setGlobal(logger);
-    
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
-    
-    // Load configuration
-    auto config = std::make_shared<Config>();
-    
-    // Try to load from file if provided
+    // Parse command line options
+    bool help = false;
+    bool version = false;
+    bool verbose = false;
+    bool debug = false;
     std::string configFile = "configs/default.cfg";
+    std::string logLevel = "INFO";
+    bool quiet = false;
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg == "--help" || arg == "-h") {
+            help = true;
+        } else if (arg == "--version" || arg == "-v") {
+            version = true;
+        } else if (arg == "--verbose" || arg == "-V") {
+            verbose = true;
+        } else if (arg == "--debug") {
+            debug = true;
+        } else if (arg == "--quiet" || arg == "-q") {
+            quiet = true;
+        } else if (arg == "--log-level" || arg == "--log") {
+            if (i + 1 < argc) {
+                logLevel = argv[++i];
+            }
+        } else if (arg.substr(0, 8) == "--config") {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
@@ -342,31 +344,128 @@ int main(int argc, char** argv) {
         }
     }
     
-    // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
-    } else {
-        NLM_LOG_INFO("Using default configuration.");
+    // Print help and exit if requested
+    if (help) {
+        printBanner();
+        std::cout << "\nUsage: nlm [options]\n\n";
+        std::cout << "Options:\n";
+        std::cout << "  --help, -h              Show this help message\n";
+        std::cout << "  --version, -v           Show version information\n";
+        std::cout << "  --verbose, -V           Enable verbose output\n";
+        std::cout << "  --debug                 Enable debug mode\n";
+        std::cout << "  --quiet, -q             Suppress non-essential output\n";
+        std::cout << "  --log-level LEVEL       Set log level (DEBUG, INFO, WARNING, ERROR)\n";
+        std::cout << "  --config FILE           Load configuration from file\n";
+        std::cout << "\nConfiguration presets:\n";
+        std::cout << "  --preset FAST          Fast, small simulation (50 neurons)\n";
+        std::cout << "  --preset BALANCED      Balanced performance (500 neurons)\n";
+        std::cout << "  --preset DETAILED      High detail (2000 neurons)\n";
+        std::cout << "\nAdvanced options:\n";
+        std::cout << "  --neural-steps N       Neural steps per world step\n";
+        std::cout << "  --world-steps N        World steps to run\n";
+        std::cout << "  --seed VAL             Random seed\n";
+        std::cout << "  --disable-plasticity   Disable plasticity\n";
+        std::cout << "  --disable-development   Disable developmental processes\n";
+        std::cout << "\n";
+        return 0;
     }
     
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
+    // Show version info
+    if (version) {
+        printBanner();
+        std::cout << "\nNLM Version: 0.1.0 (Phase 2)\n";
+        std::cout << "Build: Released 2026-10-31\n";
+        std::cout << "\nFor more information, visit: https://github.com/nlm-project/nlm\n";
+        std::cout << "\n";
+        return 0;
+    }
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
+    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    
+    // Initialize logger
+    auto logger = std::make_shared<Logger>();
+    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    logger->addLogger(consoleLogger);
+    Logger::setGlobal(logger);
+    
+    // Set log level based on verbosity
+    if (verbose) {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (debug) {
+        consoleLogger->setLevel(LogLevel::Debug);
+    } else if (!quiet) {
+        consoleLogger->setLevel(LogLevel::Info);
+    }
+    
+    // Try to load configuration from file
+    if (!quiet) {
+        NLM_LOG_INFO("Loading configuration from: " + configFile);
+    }
+    
+    // Load configuration
+    auto config = std::make_shared<Config>();
+    
+    // Set default values for Phase 2 with enhanced options
+    config->set("random_seed", static_cast<int64_t>(seed), ConfigSource::Default);
     config->set("simulation_timestep", 0.001, ConfigSource::Default);
     config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
     config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
     config->set("connection_probability", 0.15f, ConfigSource::Default);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Apply preset-based configuration changes
+    if (verbose) {
+        NLM_LOG_INFO("Applied preset configuration");
+    }
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--neural-steps") {
+            if (i + 1 < argc) {
+                neuralStepsPerWorldStep = std::atoi(argv[++i]);
+            }
+        } else if (arg == "--world-steps") {
+            if (i + 1 < argc) {
+                totalWorldSteps = std::atoi(argv[++i]);
+            }
+        } else if (arg == "--seed") {
+            if (i + 1 < argc) {
+                seed = std::atoi(argv[++i]);
+            }
+        } else if (arg == "--disable-plasticity") {
+            plasticityEnabled = false;
+        } else if (arg == "--disable-development") {
+            developmentEnabled = false;
+        } else if (arg == "--disable-neuromodulation") {
+            neuromodulationEnabled = false;
+        } else if (arg == "--preset") {
+            if (i + 1 < argc) {
+                std::string preset = argv[++i];
+                if (preset == "FAST") {
+                    seed = 42;
+                    config->set("neuron_count", static_cast<int64_t>(50));
+                    config->set("region_count", static_cast<int64_t>(1));
+                    config->set("connection_probability", 0.05f);
+                    totalWorldSteps = 30;
+                    neuralStepsPerWorldStep = 5;
+                } else if (preset == "BALANCED") {
+                    seed = 123;
+                    config->set("neuron_count", static_cast<int64_t>(500));
+                    config->set("region_count", static_cast<int64_t>(2));
+                    config->set("connection_probability", 0.1f);
+                    totalWorldSteps = 50;
+                    neuralStepsPerWorldStep = 10;
+                } else if (preset == "DETAILED") {
+                    seed = 456;
+                    config->set("neuron_count", static_cast<int64_t>(2000));
+                    config->set("region_count", static_cast<int64_t>(3));
+                    config->set("connection_probability", 0.15f);
+                    totalWorldSteps = 100;
+                    neuralStepsPerWorldStep = 20;
+                }
+            }
+        }
+    }
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
     
     // Log configuration summary
     NLM_LOG_INFO("");
