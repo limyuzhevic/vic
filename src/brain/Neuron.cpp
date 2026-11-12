@@ -267,7 +267,8 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         // Update adaptation for spike-frequency adaptation
         pImpl->state.adaptationVariable += 1.0f;
     } else {
-        pImpl->state.firingState = FiringState::Active;
+        // Neuron is not firing, keep resting state
+        // (firingState is already set to Resting in constructor)
     }
     
     // Clear synaptic input for next step
