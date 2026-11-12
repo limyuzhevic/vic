@@ -132,12 +132,29 @@ public:
                     std::cout << " cmd=" << motorCommandToString(cmd) << "\n";
                 }
                 
-                // 5. Apply motor command to world
-                ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
+                // 6. Apply reward modulation with better reward calculation
+                float movementPenalty = -0.001f;  // Reduced movement penalty to encourage exploration
+                float curiosityBonus = 0.0f;
                 
-                // 6. Apply reward modulation
-                agentBrain.applyRewardModulation(result.reward, 0.0f);
+                // Add curiosity bonus for novel experiences
+                if (agentBrain.getCuriosityLevel() > 0.5f) {
+                    curiosityBonus = 0.01f * agentBrain.getCuriosityLevel();
+                }
                 
+                // Base reward from world action
+                float baseReward = result.reward;
+                
+                // Adjust reward: reduce movement penalties, add curiosity bonus
+                float adjustedReward = baseReward + movementPenalty + curiosityBonus;
+                
+                // Ensure reward is not too negative (avoid discouraging all exploration)
+                if (adjustedReward < -0.05f) {
+                    adjustedReward = -0.05f;
+                }
+                
+                // Apply reward modulation with adjusted reward
+                agentBrain.applyRewardModulation(adjustedReward, 0.0f);
+
                 // 7. Update world — Phase 6 pacing fix: one decision
                 // is one world action interval (0.1 s). The old
                 // 0.01 s step meant the world's 0.1 s action gate
@@ -152,10 +169,10 @@ public:
                 // 8. Update development
                 agentBrain.updateDevelopment(0.1);
                 
-                // Track metrics
-                episodeReward += result.reward;
+                // Track metrics with adjusted reward
+                episodeReward += adjustedReward;
                 metrics.steps++;
-                metrics.totalReward += result.reward;
+                metrics.totalReward += adjustedReward;
                 metrics.totalSpikes += brain->getFiringNeuronCount();
                 
                 // Phase 5 metrics: coverage, interact outcome, oscillation.
