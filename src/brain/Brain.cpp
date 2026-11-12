@@ -118,29 +118,8 @@ struct Brain::Impl {
         hebbian = std::make_unique<Hebbian>();
         structuralPlasticity = std::make_unique<StructuralPlasticity>();
         
-        // ========== INITIALIZE INTEGRATED SYSTEMS ==========
-        
-        // Initialize memory systems
-        workingMemory = std::make_unique<NeuralWorkingMemory>();
-        episodicMemory = std::make_unique<NeuralEpisodicMemory>();
-        associativeMemory = std::make_unique<NeuralAssociativeMemory>();
-        
-        // Initialize prediction system
-        predictionSystem = std::make_unique<PredictionSystem>();
-        
-        // Initialize cognition systems
-        planner = std::make_unique<NeuralPlanner>();
-        conceptFormation = std::make_unique<ConceptFormation>();
-        attention = std::make_unique<AttentionalSelection>();
-        
-        // Initialize development system
-        developmentSystem = std::make_unique<DevelopmentSystem>();
-        
-        // Initialize neuromodulation systems
-        dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        // Initialize other integrated systems in Brain::initialize()
+        // (memory systems, prediction system, cognition systems, etc.)
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -188,7 +167,74 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
-
+    
+    bool Brain::validateConfiguration() const {
+    NLM_LOG_INFO("Validating configuration...");
+    
+    // Check required config parameters
+    auto validateParam = [this](const std::string& name, float min, float max, const std::string& description) {
+        auto valueOpt = pImpl->config->get<float>(name);
+        if (!valueOpt) {
+            NLM_LOG_WARNING("Missing configuration parameter: " + name);
+            return false;
+        }
+        float value = *valueOpt;
+        if (value < min || value > max) {
+            NLM_LOG_ERROR("Invalid configuration parameter: " + name + " = " + 
+                         std::to_string(value) + ". Must be between " + 
+                         std::to_string(min) + " and " + std::to_string(max) + 
+                         ". " + description);
+            return false;
+        }
+        NLM_LOG_INFO("  " + name + " = " + std::to_string(value));
+        return true;
+    };
+    
+    auto validateIntParam = [this](const std::string& name, int64_t min, int64_t max, const std::string& description) {
+        auto valueOpt = pImpl->config->get<int64_t>(name);
+        if (!valueOpt) {
+            NLM_LOG_WARNING("Missing configuration parameter: " + name);
+            return false;
+        }
+        int64_t value = *valueOpt;
+        if (value < min || value > max) {
+            NLM_LOG_ERROR("Invalid configuration parameter: " + name + " = " + 
+                         std::to_string(value) + ". Must be between " + 
+                         std::to_string(min) + " and " + std::to_string(max) + 
+                         ". " + description);
+            return false;
+        }
+        NLM_LOG_INFO("  " + name + " = " + std::to_string(value));
+        return true;
+    };
+    
+    bool allValid = true;
+    
+    // Validate neural parameters
+    allValid &= validateIntParam("neuron_count", 10, 10000, "Number of neurons in the network");
+    allValid &= validateIntParam("region_count", 1, 10, "Number of neural regions");
+    allValid &= validateParam("connection_probability", 0.0f, 1.0f, "Synaptic connection probability");
+    allValid &= validateParam("stdp_ltp_weight", 0.0f, 1.0f, "STDP long-term potentiation weight");
+    allValid &= validateParam("stdp_ltd_weight", 0.0f, 1.0f, "STDP long-term depression weight");
+    allValid &= validateParam("stdp_tau", 1.0f, 100.0f, "STDP time constant in milliseconds");
+    allValid &= validateParam("synaptogenesis_rate", 0.0f, 0.1f, "Structural plasticity synaptogenesis rate");
+    allValid &= validateParam("pruning_rate", 0.0f, 0.01f, "Structural plasticity pruning rate");
+    allValid &= validateParam("simulation_timestep", 0.0001f, 0.1f, "Simulation time step duration");
+    
+    // Validate integration intervals
+    allValid &= validateIntParam("replay_interval", 1, 10000, "Episodic memory replay interval");
+    allValid &= validateIntParam("consolidation_interval", 100, 100000, "Memory consolidation interval");
+    
+    if (!allValid) {
+        NLM_LOG_ERROR("Configuration validation failed with " + 
+                     std::to_string(static_cast<int>(!allValid)) + " errors");
+        return false;
+    }
+    
+    NLM_LOG_INFO("Configuration validation successful");
+    return true;
+}
+    
     // Re-initialising must rebuild, not append: a previous run left
     // reset()+initialize() reporting 1000 neurons for a 500-neuron brain.
     pImpl->regions.clear();
@@ -201,58 +247,88 @@ bool Brain::initialize() {
     pImpl->currentStep = 0;
     pImpl->currentTime = 0.0;
     
-    // Get configuration values
+    // Get configuration values with validation
     size_t neuronCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000));
     size_t regionCount = static_cast<size_t>(pImpl->config->getOr<int64_t>("region_count", 1));
     float connectionProbability = pImpl->config->getOr<float>("connection_probability", 0.1f);
+    
+    // Validate neuron count
+    if (neuronCount < 10) {
+        NLM_LOG_ERROR("Invalid neuron count: " + std::to_string(neuronCount) + ". Minimum is 10.");
+        return false;
+    }
+    
+    // Validate region count
+    if (regionCount < 1) {
+        NLM_LOG_ERROR("Invalid region count: " + std::to_string(regionCount) + ". Minimum is 1.");
+        return false;
+    }
+    
+    // Validate connection probability
+    if (connectionProbability < 0.0f || connectionProbability > 1.0f) {
+        NLM_LOG_ERROR("Invalid connection probability: " + std::to_string(connectionProbability) + ". Must be between 0.0 and 1.0.");
+        return false;
+    }
+    
+    // Calculate neurons per region
+    size_t neuronsPerRegion = neuronCount / regionCount;
+    if (neuronsPerRegion < 5) {
+        NLM_LOG_ERROR("Too few neurons per region: " + std::to_string(neuronsPerRegion) + ". Each region needs at least 5 neurons.");
+        return false;
+    }
     
     NLM_LOG_INFO("Configuration: " + std::to_string(neuronCount) + " neurons, " + 
                  std::to_string(regionCount) + " regions");
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
-        addRegion("Region_" + std::to_string(i + 1));
+        if (!addRegion("Region_" + std::to_string(i + 1))) {
+            NLM_LOG_ERROR("Failed to create region " + std::to_string(i + 1));
+            return false;
+        }
     }
     
     // Create neurons across regions
-    size_t neuronsPerRegion = neuronCount / regionCount;
     size_t nextNeuronIndex = 1;  // globally unique IDs across regions (see setNextNeuronIndex)
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            region->setNextNeuronIndex(nextNeuronIndex);
-            // Add populations. The old layout had no inhibitory neurons at
-            // all (Sensory/Internal/Motor are all treated as excitatory by
-            // initializeRandomConnectivity), so any input caused runaway
-            // excitation and every weight saturated. Split the internal
-            // population 80/20 into excitatory and inhibitory neurons.
-            auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
-            size_t internalCount = neuronsPerRegion / 2;
-            size_t internalExcitatory = internalCount * 4 / 5;
-            auto internalPopId = region->addPopulation(internalExcitatory, NeuronType::Internal);
-            auto inhibitoryPopId = region->addPopulation(internalCount - internalExcitatory, NeuronType::Inhibitory);
-            (void)internalPopId; (void)inhibitoryPopId;
-            auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
-            
-            // Collect sensory and motor neurons for I/O
-            auto* sensoryPop = region->getPopulation(sensoryPopId);
-            auto* motorPop = region->getPopulation(motorPopId);
-            if (sensoryPop) {
-                for (auto* neuron : sensoryPop->getNeurons()) {
-                    pImpl->sensoryNeurons.push_back(neuron);
-                }
-            }
-            if (motorPop) {
-                for (auto* neuron : motorPop->getNeurons()) {
-                    pImpl->motorNeurons.push_back(neuron);
-                }
-            }
-            
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) +
-                        ": " + std::to_string(region->getPopulationCount()) + " populations, " +
-                        std::to_string(region->getTotalNeuronCount()) + " neurons");
-            nextNeuronIndex += region->getTotalNeuronCount();
+        if (!region) {
+            NLM_LOG_ERROR("Failed to get region " + std::to_string(i + 1));
+            return false;
         }
+        region->setNextNeuronIndex(nextNeuronIndex);
+        
+        // Add populations. The old layout had no inhibitory neurons at
+        // all (Sensory/Internal/Motor are all treated as excitatory by
+        // initializeRandomConnectivity), so any input caused runaway
+        // excitation and every weight saturated. Split the internal
+        // population 80/20 into excitatory and inhibitory neurons.
+        auto sensoryPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Sensory);
+        size_t internalCount = neuronsPerRegion / 2;
+        size_t internalExcitatory = internalCount * 4 / 5;
+        auto internalPopId = region->addPopulation(internalExcitatory, NeuronType::Internal);
+        auto inhibitoryPopId = region->addPopulation(internalCount - internalExcitatory, NeuronType::Inhibitory);
+        (void)internalPopId; (void)inhibitoryPopId;
+        auto motorPopId = region->addPopulation(neuronsPerRegion / 4, NeuronType::Motor);
+        
+        // Collect sensory and motor neurons for I/O
+        auto* sensoryPop = region->getPopulation(sensoryPopId);
+        auto* motorPop = region->getPopulation(motorPopId);
+        if (sensoryPop) {
+            for (auto* neuron : sensoryPop->getNeurons()) {
+                pImpl->sensoryNeurons.push_back(neuron);
+            }
+        }
+        if (motorPop) {
+            for (auto* neuron : motorPop->getNeurons()) {
+                pImpl->motorNeurons.push_back(neuron);
+            }
+        }
+        
+        NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) +
+                     ": " + std::to_string(region->getPopulationCount()) + " populations, " +
+                     std::to_string(region->getTotalNeuronCount()) + " neurons");
+        nextNeuronIndex += region->getTotalNeuronCount();
     }
     
     // Build the neuron lookup used by synaptic delivery and injection.
@@ -261,14 +337,16 @@ bool Brain::initialize() {
             pImpl->neuronById[neuron->getId().index()] = neuron;
         }
     }
-
+    
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
         auto* region = getRegion(RegionId(i + 1));
-        if (region) {
-            // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+        if (!region) {
+            NLM_LOG_ERROR("Failed to get region during connectivity initialization");
+            return false;
         }
+        // Initialize random connectivity and synapse weights
+        region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
     }
     
     // ========== INITIALIZE ALL INTEGRATED SYSTEMS ==========

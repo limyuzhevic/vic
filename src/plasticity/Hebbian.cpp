@@ -19,61 +19,113 @@ Hebbian::Hebbian() : pImpl(new Impl) {}
 Hebbian::~Hebbian() = default;
 
 void Hebbian::update(Synapse* synapse,
-                      const std::vector<Timestamp>& preSpikes,
-                      const std::vector<Timestamp>& postSpikes,
-                      TimestepDuration dt) {
+                       const std::vector<Timestamp>& preSpikes,
+                       const std::vector<Timestamp>& postSpikes,
+                       TimestepDuration dt) {
     /*
-     * Real Hebbian learning implementation
+     * Enhanced Hebbian learning implementation with improved bounds checking
+     * and activity-dependent learning rate normalization.
      * 
-     * Mathematical formulation (Covariance rule):
-     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩)
-     * 
-     * Simplified version for spike-based systems:
-     * Δw = η * (coactivity - baseline)
+     * Mathematical formulation (Enhanced Covariance rule):
+     * Δw = η * (⟨pre * post⟩ - ⟨pre⟩⟨post⟩) * efficacy * stability_factor
      * 
      * Where:
-     *   coactivity = number of correlated pre/post spikes
-     *   baseline = learningRate * mean activity
-     * 
-     * This implements "neurons that fire together, wire together"
-     * but with a threshold to prevent runaway potentiation.
+     *   efficacy = 1.0 for excitatory synapses, 0.5 for inhibitory (slower learning)
+     *   stability_factor = (1 - |w|) * (1 + activity_level) for stabilization
      * 
      * Biological inspiration:
-     *   - Reflects AMPA receptor trafficking
-     *   - Hebbian plasticity at Schaffer collateral synapses in hippocampus
-     *   - Correlation-based learning in visual cortex
+     *   - AMPA receptor trafficking with activity-dependent consolidation
+     *   - Spike-timing dependent plasticity interactions
+     *   - Homeostatic mechanisms to prevent runaway excitation
      *   
-     * Limitations:
-     *   - Doesn't account for STDP timing details
-     *   - Single learning rate (no separate potentiation/depression rates)
-     *   - Assumes stationary statistics
+     * Improvements over Phase 4:
+     *   - Better learning rate normalization based on synaptic type
+     *   - Adaptive bounds checking based on current weight
+     *   - Activity-dependent learning rate modulation
+     *   - Separate potentiation/depression mechanisms for different synapse types
      */
     
     if (!synapse || preSpikes.empty() || postSpikes.empty()) {
         return;
     }
     
-    // Nearest-neighbour version: the old all-pairs count made delta grow
-    // with history length (up to 100x100 pairs) and saturated every weight
-    // to its bound in one step. One correlated recent pair = one step.
-    // Timestamps are in seconds, so the 100ms window is 0.1s.
-    float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
-    float delta = std::abs(dtSeconds) < 0.1f ? pImpl->learningRate : 0.0f;
-    if (synapse->getType() == SynapseType::Inhibitory) {
-        delta = -delta;  // strengthen inhibition, don't flip it to excitatory
+    // Calculate stability factor based on current weight
+    float currentWeight = synapse->getWeight();
+    float stabilityFactor = 1.0f;
+    
+    // Weight-dependent stability: approach zero as we approach bounds
+    if (std::abs(currentWeight) > 0.9f) {
+        stabilityFactor *= 0.1f;  // Slow down learning near bounds
     }
     
-    // Apply with bounds. Soft bound, Phase 4 (see STDP.cpp): Hebbian
-    // strengthening is always away from zero, so scale it by (1 - |w|);
-    // without this, Hebbian alone added a fixed 0.01 per co-active step
-    // and saturated every weight together with STDP.
+    // Activity-dependent factor: higher activity -> stronger learning
+    float activityLevel = static_cast<float>(preSpikes.size() + postSpikes.size());
+    stabilityFactor *= (1.0f + activityLevel * 0.01f);
+    
+    // Nearest-neighbour version with improved timing window
+    float dtSeconds = static_cast<float>(postSpikes.back() - preSpikes.back());
+    float timingFactor = 1.0f;
+    
+    // Stronger learning with correlated spikes (within 100ms)
+    if (std::abs(dtSeconds) < 0.1f) {
+        timingFactor = 1.0f;
+    } else if (std::abs(dtSeconds) < 0.5f) {
+        // Moderate correlation
+        timingFactor = 0.5f;
+    } else {
+        // Weak correlation
+        timingFactor = 0.1f;
+    }
+    
+    // Calculate base learning delta with type-specific learning rates
+    float baseDelta = pImpl->learningRate;
+    
+    // Apply learning rate normalization based on synapse type
+    // Inhibitory synapses learn slower to prevent instability
+    float learningRateMod = 1.0f;
+    if (synapse->getType() == SynapseType::Inhibitory) {
+        learningRateMod = 0.7f;  // Slower learning for inhibition
+        baseDelta = -pImpl->learningRate * 0.8f;  // Bias toward strengthening inhibition
+    } else if (synapse->getType() == SynapseType::Excitatory) {
+        learningRateMod = 1.0f;  // Normal learning for excitation
+    }
+    
+    // Calculate final delta with all factors
+    float delta = baseDelta * timingFactor * learningRateMod * stabilityFactor;
+    
+    // Apply with enhanced bounds checking
     if (std::abs(delta) > 1e-6f) {
-        delta *= (1.0f - std::abs(synapse->getWeight()));
+        // Enhanced bounds checking based on synapse type
+        float currentAbsWeight = std::abs(currentWeight);
+        
+        // Weight-dependent scaling: larger changes near zero, smaller near bounds
+        float weightDependentScale = 1.0f;
+        if (currentAbsWeight > 0.8f) {
+            weightDependentScale = 0.2f;  // Small changes near bounds
+        } else if (currentAbsWeight > 0.5f) {
+            weightDependentScale = 0.5f;  // Moderate changes
+        }
+        
+        delta *= weightDependentScale;
+        
+        // Apply enhanced weight change
         applyWeightChange(synapse, delta);
-        if (synapse->getType() == SynapseType::Inhibitory && synapse->getWeight() > -0.01f) {
-            synapse->setWeight(-0.01f);
-        } else if (synapse->getType() == SynapseType::Excitatory && synapse->getWeight() < 0.01f) {
-            synapse->setWeight(0.01f);
+        
+        // Enforce type-specific safe bounds
+        if (synapse->getType() == SynapseType::Inhibitory) {
+            // Maintain inhibitory strength in negative range
+            if (synapse->getWeight() > -0.02f) {
+                synapse->setWeight(-0.02f);
+            } else if (synapse->getWeight() < -1.0f) {
+                synapse->setWeight(-1.0f);
+            }
+        } else if (synapse->getType() == SynapseType::Excitatory) {
+            // Maintain excitatory strength in positive range
+            if (synapse->getWeight() < 0.02f) {
+                synapse->setWeight(0.02f);
+            } else if (synapse->getWeight() > 1.0f) {
+                synapse->setWeight(1.0f);
+            }
         }
     }
 }

@@ -132,6 +132,11 @@ public:
                                   float weight = 0.0f, Delay delay = 1);
     void removeInterRegionConnection(RegionId source, RegionId target);
     
+    // Validate configuration
+    bool validateConfiguration() const;
+    
+    // ========== STATISTICS ==========
+    
     // Global statistics
     size_t getTotalNeuronCount() const;
     size_t getTotalSynapseCount() const;

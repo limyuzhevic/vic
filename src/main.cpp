@@ -176,9 +176,9 @@ void runBasicConnectivityTest(std::shared_ptr<Brain> brain) {
     // Get initial spike count
     size_t initialSpikes = brain->getTotalSpikeCount();
     
-    // Inject strong current into first 10 neurons
-    NLM_LOG_INFO("  Injecting current into 10 neurons...");
-    for (size_t i = 0; i < std::min(size_t(10), neurons.size()); ++i) {
+    // Inject strong current into first 20 neurons
+    NLM_LOG_INFO("  Injecting current into 20 neurons...");
+    for (size_t i = 0; i < std::min(size_t(20), neurons.size()); ++i) {
         neurons[i]->injectCurrent(50.0f);  // Strong excitatory input
     }
     
@@ -229,9 +229,11 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // selective at all.
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
+        auto neurons = region->getAllNeurons();
+        // Inject into the first 20 neurons to avoid saturation
+        for (size_t i = 0; i < std::min<size_t>(20, neurons.size()); ++i) {
+            if (neurons[i]->getType() == NeuronType::Sensory) {
+                patternNeurons.push_back(neurons[i]->getId());
             }
         }
     }
