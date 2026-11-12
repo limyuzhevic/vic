@@ -1,0 +1,52 @@
+# NLM Configuration File (YAML Format)
+# NLM (熙然) - Neural Learning Machine Configuration
+# Supports Phase 2: Real Neural Computation
+
+nlm_version: "Phase 2"
+description: "NLM (熙然) - Neural Learning Machine Configuration"
+created: "2026-11-12"
+
+brain:
+  random_seed: 42
+  simulation_timestep: 0.001
+  neuron_count: 500
+  region_count: 1
+  connection_probability: 0.15
+
+plasticity:
+  stdp:
+    ltp_weight: 0.02
+    ltd_weight: 0.015
+    tau: 20.0
+  structural:
+    synaptogenesis_rate: 0.0001
+    pruning_rate: 0.00001
+
+development:
+  plasticity_multiplier: 1.0
+
+neuromodulation:
+  dopamine_effect: 1.0
+  norepinephrine_effect: 1.0
+  serotonin_effect: 1.0
+  curiosity_baseline: 0.1
+  novelty_sensitivity: 0.5
+
+testing:
+  test_parameters:
+    connectivity_current: 50.0
+    plasticity_current: 30.0
+    stdp_current: 60.0
+    plasticity_steps: 1000
+    stdp_trials: 50
+
+experiment_info:
+  phase: "2"
+  demo_type: "Real Neural Computation"
+  description: "LIF neurons, STDP, Hebbian plasticity, structural plasticity"
+  created_by: "NLM Developer"
+
+usage_notes:
+  - Values can be overridden via command line arguments
+  - JSON and YAML files are parsed automatically
+  - Example command: "nlm --config test.json --plasticity-current 40.0"

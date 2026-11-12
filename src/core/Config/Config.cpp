@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <iomanip>
+#include <ctime>
+#include <chrono>
 
 namespace nlm {
 
@@ -19,14 +22,97 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_WARNING("Cannot open config file: " + filepath);
         return false;
     }
     
+    // Check file extension to determine parser
+    std::string ext = filepath.substr(filepath.find_last_of('.') + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    bool success = false;
+    if (ext == "json") {
+        success = loadFromJSON(file);
+    } else if (ext == "yaml" || ext == "yml") {
+        success = loadFromYAML(file);
+    } else {
+        // Default to simple key=value format
+        success = loadFromSimpleFormat(file);
+    }
+    
+    if (!success) {
+        NLM_LOG_WARNING("Failed to parse config file: " + filepath);
+    } else {
+        NLM_LOG_INFO("Loaded configuration from: " + filepath);
+    }
+    
+    return success;
+}
+
+bool Config::loadFromJSON(std::ifstream& file) {
+    // Simple JSON parser - look for key: value patterns
+    std::string line;
+    while (std::getline(file, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '/') {
+            continue;
+        }
+        
+        // Remove trailing comma if present
+        if (!line.empty() && line.back() == ',') {
+            line.pop_back();
+        }
+        
+        // Parse key: value pairs
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos) {
+            std::string key = trim(line.substr(0, colonPos));
+            std::string value = trim(line.substr(colonPos + 1));
+            
+            // Remove quotes from value
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    return true;
+}
+
+bool Config::loadFromYAML(std::ifstream& file) {
+    // Simple YAML parser - key: value pairs with indentation
+    std::string line;
+    while (std::getline(file, line)) {
+        line = trim(line);
+        if (line.empty() || line[0] == '#' || line[0] == '-') {
+            continue;
+        }
+        
+        // Check if line has a colon (key: value)
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos) {
+            std::string key = trim(line.substr(0, colonPos));
+            std::string value = trim(line.substr(colonPos + 1));
+            
+            // Handle quoted values
+            if (value.size() >= 2 && 
+                ((value.front() == '"' && value.back() == '"') ||
+                 (value.front() == '\'' && value.back() == '\''))) {
+                value = value.substr(1, value.size() - 2);
+            }
+            
+            set(key, value, ConfigSource::File);
+        }
+    }
+    return true;
+}
+
+bool Config::loadFromSimpleFormat(std::ifstream& file) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -35,7 +121,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             continue;
         }
         
-        // Parse simple key=value pairs
+        // Parse key=value pairs
         size_t pos = line.find('=');
         if (pos != std::string::npos) {
             std::string key = trim(line.substr(0, pos));
@@ -49,9 +135,10 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid config line (no '='): " + line);
         }
     }
-    
     return true;
 }
 
@@ -81,15 +168,75 @@ bool Config::loadFromArgs(int argc, char** argv) {
 bool Config::saveToFile(const std::string& filepath) const {
     std::ofstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Cannot save config to file: " + filepath);
         return false;
     }
     
+    // Add header comment
+    file << "# NLM Configuration File" << "\n";
+    file << "# Generated on " << getCurrentTimestamp() << "\n";
+    file << "# Source: " << static_cast<int>(getSourceIdentifier()) << "\n\n";
+    
+    // Save all entries
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Format based on value type
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << arg << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (arg ? "true" : "false") << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i > 0) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << arg[i] << "\"";
+                    } else {
+                        file << arg[i];
+                    }
+                }
+                file << "]\n";
+            } else {
+                file << entry.key << " = " << arg << "\n";
+            }
+        }, entry.value);
+        
+        file << "# Source: " << static_cast<int>(entry.source) << "\n\n";
     }
     
+    NLM_LOG_INFO("Saved configuration to: " + filepath);
     return true;
+}
+
+std::string Config::getCurrentTimestamp() const {
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S");
+    return ss.str();
+}
+
+int Config::getSourceIdentifier() const {
+    if (pImpl->entries.empty()) return static_cast<int>(ConfigSource::Default);
+    
+    int fileSource = 0, cmdLineSource = 0, defaultSource = 0;
+    for (const auto& entry : pImpl->entries) {
+        switch (entry.source) {
+            case ConfigSource::File: fileSource++; break;
+            case ConfigSource::CommandLine: cmdLineSource++; break;
+            case ConfigSource::Default: defaultSource++; break;
+            case ConfigSource::Runtime: break;
+        }
+    }
+    
+    if (fileSource > 0) return static_cast<int>(ConfigSource::File);
+    if (cmdLineSource > 0) return static_cast<int>(ConfigSource::CommandLine);
+    return static_cast<int>(ConfigSource::Default);
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
@@ -184,6 +331,7 @@ std::string Config::trim(const std::string& str) {
     return str.substr(start, end - start + 1);
 }
 
+// Convert string to lowercase
 std::string Config::toLower(const std::string& str) {
     std::string result = str;
     std::transform(result.begin(), result.end(), result.begin(), ::tolower);

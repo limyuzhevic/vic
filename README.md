@@ -107,6 +107,203 @@ currently separate demos per phase, not a single unified binary:
 brain systems are connected. Phase 5 is wired as the `nlm_phase5`
 library in CMake; it does not yet have a standalone demo executable.
 
+## Enhanced Features (Phase 2 Improvements)
+
+The main executable now includes enhanced configuration capabilities:
+
+### Improved Configuration System
+- **Multi-format support**: JSON, YAML, and simple key=value formats
+- **Better error handling**: Informative error messages for missing/invalid configs
+- **Persistent storage**: Actual values saved in config files (not placeholders)
+- **Source tracking**: Configuration sources (file, command-line, defaults) tracked
+
+### Enhanced Command-Line Interface
+
+```bash
+nlm [options]
+
+Options:
+  --config <file>           Configuration file (default: configs/default.cfg)
+  --help                    Show this help message
+  --verbose                 Enable verbose logging (debug level)
+  --generate-config         Generate example configuration file
+  --output-config <file>    Save configuration to file
+
+Test customization:
+  --connectivity-current <float>  Current injection for Test 1 (default: 50.0)
+  --plasticity-current <float>    Current injection for Test 2 (default: 30.0)
+  --stdp-current <float>          Current injection for Test 3 (default: 60.0)
+  --plasticity-steps <int>        Steps for plasticity experiment (default: 1000)
+  --stdp-trials <int>             Trials for STDP test (default: 50)
+
+Example:
+  nlm --config myconfig.json --plasticity-current 40.0 --plasticity-steps 500
+  nlm --generate-config --output-config example_cfg.json
+  nlm --verbose --help
+```
+
+### Example Configuration Files
+
+Multiple configuration formats are available in the `configs/` directory:
+
+1. **`configs/default.cfg`** - Original simple key=value format
+2. **`configs/improved_cfg.cfg`** - Enhanced human-readable format
+3. **`configs/improved_cfg.json`** - JSON format with structured settings
+4. **`configs/improved_cfg.yaml`** - YAML format with indentation
+
+### Key Improvements
+
+1. **Config Parser**: Upgraded from simple key=value to JSON/YAML support
+2. **Command Line**: Better argument parsing with defaults and validation
+3. **Test Parameters**: Configurable injection currents and experiment steps
+4. **Logging**: Enhanced error messages and verbose mode
+5. **Thread Safety**: Fixed thread-safe timestamp generation in logger
+6. **Documentation**: Comprehensive help and example configs
+
+### Usage Examples
+
+```bash
+# Load specific config with custom test parameters
+./nlm --config configs/improved_cfg.json --plasticity-current 40.0 --plasticity-steps 500
+
+# Generate a custom configuration file
+./nlm --generate-config --output-config my_experiment.json
+
+# Run with verbose debugging output
+./nlm --verbose --connectivity-current 75.0
+
+# Use a different configuration format
+./nlm --config configs/improved_cfg.yaml --stdp-current 80.0 --stdp-trials 100
+```
+
+### Configuration File Formats
+
+#### Simple Format (`*.cfg`)
+```
+# Parameter key and value
+parameter_name = value
+
+# Comments start with #
+# Multiple formats supported:
+#   - key = value
+#   - key = "quoted value" 
+#   - key = [array_value1, array_value2]
+```
+
+#### JSON Format (`*.json`)
+```json
+{
+  "parameter_name": "value",
+  "array_parameter": [1, 2, 3],
+  "nested": {
+    "inner": "value"
+  }
+}
+```
+
+#### YAML Format (`*.yaml`)
+```yaml
+parameter_name: value
+array_parameter:
+  - item1
+  - item2
+nested:
+  inner: value
+```
+
+### Command-Line Argument Priority
+
+Configuration sources have priority order:
+1. **Command-line arguments** (highest priority)
+2. **Config file** (if exists)
+3. **Default values** (lowest priority)
+
+For example, if you specify `--plasticity-current 40.0` on command line,
+it will override the value in any config file.
+
+### Troubleshooting
+
+**Common Issues:**
+- **Config file not found**: Try different paths or use `--generate-config`
+- **Invalid JSON/YAML**: The parser uses basic parsing; complex structures may fail
+- **Permission issues**: Ensure write permissions for output configs
+- **Missing dependencies**: Check pybind11 for Python bindings
+
+**Debugging:**
+```bash
+# Enable verbose logging to see detailed output
+./nlm --verbose
+
+# Use specific config to test
+./nlm --config configs/improved_cfg.json --verbose
+
+# Show help for all options
+./nlm --help
+```
+
+### Future Improvements
+
+The configuration system is designed for easy extension:
+
+1. **Advanced JSON parsing**: Could implement full JSON library
+2. **Config validation**: Schema validation for parameter ranges
+3. **Configuration templates**: Save/load experiment configurations
+4. **Dynamic parameters**: Runtime modification of settings
+5. **Distributed configs**: Shared configuration files
+
+These improvements make NLM more accessible to users with different needs:
+- **Beginners**: Simple config files and help system
+- **Researchers**: Full format support and parameterization
+- **Developers**: Extensible configuration system for plugins
+
+## Phase Summary
+
+### Phase 1 (Complete)
+- Project skeleton
+- Core types and configuration
+- Neural interfaces
+
+### Phase 2 (Enhanced)
+- **Real LIF neuron dynamics implemented**
+- **Event-driven spike propagation with delays**
+- **STDP and Hebbian plasticity rules**
+- **Structural plasticity (synaptogenesis/pruning)**
+- **Learning experiment demonstrates measurable changes**
+- **Network shows activity-dependent synaptic modification**
+- **Enhanced configuration and command-line interface**
+- **Multiple configuration file formats support**
+- **Thread-safe logging implementation**
+
+### Phase 4 (Complete)
+- Neural prediction system
+- Working memory
+- Episodic-like memory
+- Concept formation
+- Neural attention (NOT Transformer)
+- Predictive planning
+- Self-model
+- Social learning
+- Continual learning
+
+### Phase 5 (Complete)
+- Performance optimizations
+- Memory pools and event queues
+- SIMD vectorization
+blay
+  - Parallel processing
+- Checkpoint system
+
+### Phase 6 (Complete - Final Integration)
+- All systems integrated into coherent brain loop
+- Memory systems connected to neural processing
+- Neuromodulation affects plasticity and dynamics
+- Prediction integrated with learning
+- Development affects plasticity rates
+- Checkpoint save/load working
+- Replay and consolidation functional
+- Phase 6 integration experiment created
+- Enhanced configuration capabilities added
+
 ## Project Structure
 
 ```
