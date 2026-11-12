@@ -188,6 +188,40 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    
+    // Validate configuration before initialization
+    auto errorHandler = Validation::ErrorHandler();
+    auto configValidator = Validation::ConfigurationValidator(pImpl->config);
+    
+    // Validate configuration
+    ErrorCode configValidationResult = configValidator.validateConfiguration();
+    if (configValidationResult != ErrorCode::Success) {
+        errorHandler.logErrors("Brain::initialize");
+        NLM_LOG_ERROR("Brain initialization failed: Invalid configuration");
+        return false;
+    }
+    
+    // Validate basic parameters
+    try {
+        Validation::validateNeuronCount(
+            static_cast<size_t>(pImpl->config->getOr<int64_t>("neuron_count", 1000)),
+            "Brain::initialize"
+        );
+        
+        Validation::validateConnectionProbability(
+            pImpl->config->getOr<float>("connection_probability", 0.1f)
+        );
+        
+        Validation::validateTimestep(
+            pImpl->timestep
+        );
+        
+    } catch (const ValidationError& e) {
+        errorHandler.recordError(ErrorCode::ValidationFailed, e.what(), "Brain::initialize");
+        errorHandler.logErrors("Brain::initialize");
+        NLM_LOG_ERROR("Brain initialization failed: " + std::string(e.what()));
+        return false;
+    }
 
     // Re-initialising must rebuild, not append: a previous run left
     // reset()+initialize() reporting 1000 neurons for a 500-neuron brain.

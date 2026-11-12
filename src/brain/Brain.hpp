@@ -3,6 +3,8 @@
 #include "../core/Types/Types.hpp"
 #include "../sensory/SensoryInput.hpp"
 #include "../motor/Action.hpp"
+#include "../core/Logger/Logger.hpp"
+#include "../core/Validation/Validation.hpp"  // Add validation module
 #include "NeuralRegion.hpp"
 #include "../dynamics/SpikeSystem.hpp"
 #include "../plasticity/STDP.hpp"

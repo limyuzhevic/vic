@@ -104,41 +104,57 @@ add_library(nlm_world STATIC
 target_include_directories(nlm_world PUBLIC src)
 target_link_libraries(nlm_world PUBLIC nlm_core nlm_agent)
 
-# Phase 3 experiments
+# Experiment base classes (new in Phase 6)
+add_library(nlm_experiment_base STATIC
+    src/core/Experiments/ExperimentBase.cpp
+    src/core/Experiments/ExperimentBase.cpp
+)
+target_include_directories(nlm_experiment_base PUBLIC src)
+target_link_libraries(nlm_experiment_base PUBLIC nlm_core nlm_agent nlm_world)
+
+# Experiment utilities library (new in Phase 6)
+add_library(nlm_experiment_utils STATIC
+    # Additional experiment utilities would be added here
+)
+target_include_directories(nlm_experiment_utils PUBLIC src)
+target_link_libraries(nlm_experiment_utils PUBLIC nlm_core)
+
+# Updated Phase 3 experiments library to include enhanced demo
 add_library(nlm_phase3 STATIC
     src/experiments/Phase3Experiment.cpp
+    src/experiments/Phase3EnhancedDemo.cpp
 )
 target_include_directories(nlm_phase3 PUBLIC src)
-target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase3 PUBLIC nlm_core nlm_agent nlm_world nlm_experiment_base)
 
-# Phase 4 experiments
+# Updated Phase 4 experiments
 add_library(nlm_phase4 STATIC
     src/experiments/Phase4Experiment.cpp
 )
 target_include_directories(nlm_phase4 PUBLIC src)
-target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase4 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 5 experiments
+# Updated Phase 5 experiments
 add_library(nlm_phase5 STATIC
     src/experiments/Phase5Experiment.cpp
 )
 target_include_directories(nlm_phase5 PUBLIC src)
-target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase5 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3)
 
-# Phase 6 experiments
+# Updated Phase 6 experiments
 add_library(nlm_phase6 STATIC
     src/experiments/Phase6IntegratedExperiment.cpp
 )
 target_include_directories(nlm_phase6 PUBLIC src)
-target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
+target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_experiment_base)
 
-# Main executable
-add_executable(nlm
-    src/main.cpp
+# Enhanced Phase 3 demo executable (new)
+add_executable(nlm_phase3_enhanced_demo
+    src/experiments/Phase3EnhancedDemo.cpp
 )
-target_link_libraries(nlm PUBLIC nlm_core)
+target_link_libraries(nlm_phase3_enhanced_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_experiment_base)
 
-# Phase 3 demo executable
+# Phase 3 demo executable (original)
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
 )
