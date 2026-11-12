@@ -201,23 +201,29 @@ public:
     std::vector<std::vector<float>> spreadActivation(const std::vector<float>& cuePattern,
                                                      size_t steps = 2) const;
 
-    // Clear associations
-    void clear();
-
-    // Get number of associations
-    size_t getAssociationCount() const { return associations_.size(); }
-
+// Restore working memory snapshot
+    void restoreSnapshot(const std::vector<NeuronId>& neurons,
+                         const std::vector<float>& activations,
+                         const std::vector<uint64_t>& timestamps);
+    
+    // Restore state from checkpoint data
+    void restoreState(const std::vector<uint8_t>& data);
+    
+    // Helper methods for Brain integration
+    void associateFromPattern(NeuronId neuron, const std::vector<float>& pattern);
+    void associateFromNeuronPair(NeuronId from, NeuronId to, float strength);
+    
 private:
     // Find pattern neuron or create one
     NeuronId findPatternNeuron(const std::vector<float>& pattern);
-
+    
     // Compute pattern similarity
     float computeSimilarity(const std::vector<float>& a,
-                            const std::vector<float>& b) const;
-
+                           const std::vector<float>& b) const;
+    
     struct Impl;
     std::unique_ptr<Impl> pImpl;
-
+    
     Brain* brain_;
     std::vector<std::pair<NeuronId, std::vector<float>>> patternNeurons_;
     std::vector<std::tuple<NeuronId, NeuronId, float>> associations_;

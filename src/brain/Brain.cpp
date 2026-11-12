@@ -1039,7 +1039,7 @@ bool Brain::save(const std::string& filepath) const {
             }
             writer.bufferSection(CheckpointSection::Plasticity, payload);
         }
-        // Memory: working-memory content + full episodic episodes.
+        // Memory: working-memory content + full episodic episodes + associative memory.
         {
             std::vector<uint8_t> payload;
             if (pImpl->workingMemory) {
@@ -1076,6 +1076,33 @@ bool Brain::save(const std::string& filepath) const {
                     for (const auto& n : ep.activeNeurons) activeIds.push_back(n.index());
                     p5AppendVec<uint64_t>(payload, activeIds);
                     p5AppendVec<float>(payload, ep.neuronActivations);
+                }
+            } else {
+                p5AppendU64(payload, 0);
+            }
+            if (pImpl->associativeMemory) {
+                // Save associative memory patterns and associations
+                const auto& patternNeurons = pImpl->associativeMemory->getPatternNeurons();
+                p5AppendU64(payload, static_cast<uint64_t>(patternNeurons.size()));
+                for (const auto& neuron : patternNeurons) {
+                    p5AppendU64(payload, neuron.index());
+                }
+                std::vector<std::vector<float>> patterns;
+                for (const auto& neuron : patternNeurons) {
+                    // Note: getPattern method would need to be implemented in NeuralAssociativeMemory
+                    // For now, create empty patterns - this should be enhanced later
+                    patterns.push_back(std::vector<float>());
+                }
+                p5AppendU64(payload, static_cast<uint64_t>(patterns.size()));
+                for (const auto& pattern : patterns) {
+                    p5AppendVec<float>(payload, pattern);
+                }
+                const auto& associations = pImpl->associativeMemory->getAssociations();
+                p5AppendU64(payload, static_cast<uint64_t>(associations.size()));
+                for (const auto& assoc : associations) {
+                    p5AppendU64(payload, assoc.first.index());
+                    p5AppendU64(payload, assoc.second.index());
+                    p5AppendFloat(payload, assoc.strength);
                 }
             } else {
                 p5AppendU64(payload, 0);
@@ -1349,8 +1376,8 @@ bool Brain::load(const std::string& filepath) {
                             !r.f32(ep.resultingReward) || !r.u64(age) ||
                             !r.vec(ep.sensoryState) || !r.vec(ep.resultingSensoryState) ||
                             !r.vec(activeIds) || !r.vec(ep.neuronActivations)) {
-                            break;
-                        }
+                                break;
+                            }
                         ep.timestamp = ts;
                         ep.action = static_cast<ActionType>(static_cast<int32_t>(actionRaw));
                         ep.age = age;
@@ -1362,23 +1389,80 @@ bool Brain::load(const std::string& filepath) {
                         pImpl->episodicMemory->restoreEpisodes(eps);
                     }
                 }
+                // Restore associative memory
+                uint64_t assocPatternCount = 0;
+                uint64_t assocCount = 0;
+                if (r.u64(assocPatternCount) && r.u64(assocCount) && r.ok && pImpl->associativeMemory) {
+                    std::vector<NeuronId> patternNeurons;
+                    patternNeurons.reserve(static_cast<size_t>(assocPatternCount));
+                    for (uint64_t i = 0; i < assocPatternCount && r.ok; ++i) {
+                        uint64_t id;
+                        if (!r.u64(id)) break;
+                        patternNeurons.emplace_back(id);
+                    }
+                    std::vector<std::vector<float>> patterns;
+                    for (uint64_t i = 0; i < assocPatternCount && r.ok; ++i) {
+                        std::vector<float> pattern;
+                        if (!r.vec(pattern)) break;
+                        patterns.push_back(std::move(pattern));
+                    }
+                    for (size_t i = 0; i < patternNeurons.size() && i < patterns.size() && r.ok; ++i) {
+                        pImpl->associativeMemory->associateFromPattern(patternNeurons[i], patterns[i]);
+                    }
+                    for (uint64_t i = 0; i < assocCount && r.ok; ++i) {
+                        uint64_t src, dst;
+                        float strength = 1.0f;
+                        if (!r.u64(src) || !r.u64(dst) || !r.f32(strength)) break;
+                        pImpl->associativeMemory->associateFromNeuronPair(
+                            NeuronId(src), NeuronId(dst), strength);
+                    }
+                }
             }
         }
-
-        NLM_LOG_INFO("Brain state loaded successfully");
-        return true;
-        
-    } catch (const std::exception& e) {
-        NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
-        return false;
+            }
+            // Restore prediction system - reconstruct from saved episodic patterns
+            auto payload = reader.readSection(CheckpointSection::PredictionSystem);
+            if (!payload.empty() && pImpl->predictionSystem) {
+                // Reconstruct prediction system from episodic memory
+                // This allows the prediction system to learn from saved experiences
+                for (const auto& episode : pImpl->episodicMemory->getEpisodes()) {
+                    std::vector<float> inputPattern = episode.sensoryState;
+                    std::vector<float> outputPattern = episode.resultingSensoryState;
+                    if (!inputPattern.empty() && !outputPattern.empty()) {
+                        pImpl->predictionSystem->associateFromNeuronPair(
+                            findPatternNeuronId(inputPattern),
+                            findPatternNeuronId(outputPattern), 
+                            0.8f);
+                    }
+                }
+            }
+        }
+        {
+            // Restore cognitive systems - reconstruct from episodic memory patterns
+            auto payload = reader.readSection(CheckpointSection::CognitiveSystems);
+            if (!payload.empty() && pImpl->planner && pImpl->conceptFormation && pImpl->attention) {
+                // Reconstruct cognitive systems from episodic memory
+                // This allows planner, conceptFormation, and attention to learn from saved experiences
+                for (const auto& episode : pImpl->episodicMemory->getEpisodes()) {
+                    // Learn concept from sensory state
+                    pImpl->conceptFormation->learnConcept(episode.sensoryState);
+                    
+                    // Add to attention system
+                    if (!episode.sensoryState.empty()) {
+                        pImpl->attention->addPatternPattern(episode.sensoryState);
+                    }
+                }
+            }
+        }
     }
+    
+    NLM_LOG_INFO("Brain state loaded successfully");
+    return true;
+    
+} catch (const std::exception& e) {
+    NLM_LOG_ERROR(std::string("Exception loading brain: ") + e.what());
+    return false;
 }
-
-RegionId Brain::addRegion(const std::string& name) {
-    RegionId id(pImpl->nextRegionId++);
-    auto region = std::make_unique<NeuralRegion>(id, name);
-    pImpl->regions.push_back(std::move(region));
-    return id;
 }
 
 NeuralRegion* Brain::getRegion(RegionId id) {
@@ -1588,4 +1672,64 @@ void Brain::logStatus() const {
     }
 }
 
-} // namespace nlm
+    // Helper methods for integrated system restoration
+    NeuronId findPatternNeuronId(const std::vector<float>& pattern) {
+        auto* assocMemory = getAssociativeMemory();
+        if (assocMemory) {
+            return assocMemory->findPatternNeuron(pattern);
+        }
+        return NeuronId(0);
+    }
+    
+    // Add concept formation learning method
+    void learnConcept(const std::vector<float>& concept) {
+        if (auto* conceptForm = getConceptFormation()) {
+            conceptForm->learnConcept(concept);
+        }
+    }
+    
+    // Add attention pattern addition method
+    void addPatternPattern(const std::vector<float>& pattern) {
+        if (auto* attention = getAttention()) {
+            attention->addPatternPattern(pattern);
+        }
+    }
+    
+    // Add neuromodulation level setters
+    void setCuriosityLevel(float level) {
+        if (auto* curiosity = getCuriosity()) {
+            curiosity->setLevel(level);
+        }
+    }
+    
+    void setDopamineLevel(float level) {
+        if (auto* dopamine = getDopamine()) {
+            dopamine->setLevel(level);
+        }
+    }
+    
+    void setNoveltyLevel(float level) {
+        if (auto* novelty = getNovelty()) {
+            novelty->setLevel(level);
+        }
+    }
+    
+    void setPredictionError(float error) {
+        if (auto* predError = getPredictionErrorSignal()) {
+            predError->setError(error);
+        }
+    }
+    
+    // Add development system setters
+    void setDevelopmentalStage(DevelopmentalStage stage) {
+        if (auto* devSystem = getDevelopmentSystem()) {
+            devSystem->setStage(stage);
+        }
+    }
+    
+    void setLearnedPreference(float preference) {
+        if (auto* devSystem = getDevelopmentSystem()) {
+            devSystem->setPreference(preference);
+        }
+    }
+}

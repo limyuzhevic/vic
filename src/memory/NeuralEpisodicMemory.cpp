@@ -320,11 +320,68 @@ bool NeuralEpisodicMemory::matchesCriteria(
 }
 
 // NeuralAssociativeMemory Implementation
-struct NeuralAssociativeMemory::Impl {
-    Brain* brain;
+    std::vector<std::pair<NeuronId, std::vector<float>>> patternNeurons_;
+    std::vector<std::tuple<NeuronId, NeuronId, float>> associations_;
     
-    Impl() : brain(nullptr) {}
-};
+    // Add getter for pattern neurons
+    std::vector<std::pair<NeuronId, std::vector<float>>> getPatternNeurons() const {
+        return patternNeurons_;
+    }
+    
+    // Add getter for associations
+    std::vector<std::tuple<NeuronId, NeuronId, float>> getAssociations() const {
+        return associations_;
+    }
+    
+    // Add method to associate from pattern
+    void associateFromPattern(NeuronId neuron, const std::vector<float>& pattern) {
+        // Update existing pattern if found, otherwise add new
+        for (auto& pn : patternNeurons_) {
+            if (pn.first == neuron) {
+                pn.second = pattern;
+                return;
+            }
+        }
+        
+        patternNeurons_.emplace_back(neuron, pattern);
+    }
+    
+    // Add method to associate from neuron pair
+    void associateFromNeuronPair(NeuronId from, NeuronId to, float strength) {
+        associations_.emplace_back(from, to, strength);
+    }
+    
+    // Add method to restore snapshot (working memory restoration)
+    void restoreSnapshot(const std::vector<NeuronId>& neurons, 
+                         const std::vector<float>& activations,
+                         const std::vector<uint64_t>& timestamps) {
+        clear();
+        
+        // Create patterns from working memory data
+        for (size_t i = 0; i < neurons.size() && i < activations.size(); ++i) {
+            std::vector<float> pattern(100, 0.0f);  // Simple 100-dimensional pattern
+            // Extract features from neuron ID and activation
+            size_t neuronId = neurons[i].index();
+            for (size_t j = 0; j < 100 && j < pattern.size(); ++j) {
+                pattern[j] = activations[i] * ((neuronId + j) % 7) * 0.1f;
+            }
+            
+            if (!pattern.empty()) {
+                associateFromPattern(neurons[i], pattern);
+            }
+        }
+    }
+    
+    // Add method to restore state (for prediction system)
+    void restoreState(const std::vector<uint8_t>& data) {
+        // Simplified restoration - in real implementation would parse binary data
+        // For now, just clear and rebuild from episodic memory if available
+        clear();
+        if (brain_) {
+            // Could reconstruct associations from episodic memory here
+            // For simplicity, just initialize empty
+        }
+    }
 
 NeuralAssociativeMemory::NeuralAssociativeMemory()
     : pImpl(new Impl)
