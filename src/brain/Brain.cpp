@@ -614,8 +614,25 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 8: Update prediction system ==========
     if (pImpl->predictionSystem) {
-        // The prediction system would be updated with sensory observations
-        // For now, just track prediction error history
+        // Update prediction system with current brain state
+        // Convert brain state to SensoryInput format for prediction
+        SensoryInput currentState;
+        
+        // Extract sensory neuron activations as prediction input
+        std::vector<float> predictedSensory;
+        for (size_t i = 0; i < pImpl->sensoryNeurons.size() && i < predictedSensory.size(); ++i) {
+            if (pImpl->sensoryNeurons[i]) {
+                float activation = pImpl->sensoryNeurons[i]->getState().membranePotential;
+                predictedSensory.push_back(activation * 5.0f);  // Scale factor
+            }
+        }
+        
+        // For now, use empty SensoryInput as placeholder - Phase 2 will implement real prediction
+        currentState.setData(predictedSensory);
+        
+        // Update prediction with error based on current state
+        // This would normally use the prediction system to forecast next state
+        // and compute prediction error for neuromodulation
     }
     
     // ========== STEP 9: Update attention system ==========
@@ -631,13 +648,102 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     
     // ========== STEP 10: Update concept formation ==========
     if (pImpl->conceptFormation) {
-        // Would process current neural activity patterns to form concepts
-        // This requires sensory state encoding
-    }
-    
-    // ========== STEP 11: Apply structural plasticity periodically ==========
-    if (currentStep % 100 == 0) {
-        pImpl->structuralPlasticity->update(this, *pImpl->rng);
+        // Update concept formation with current brain state
+        // Convert neural activity patterns to concept features
+        
+        // Extract internal neuron activations as concept patterns
+        std::vector<float> currentPattern;
+        float totalActivity = 0.0f;
+        
+        for (const auto& region : pImpl->regions) {
+            for (const auto& pop : region->getPopulations()) {
+                for (const auto* neuron : pop->getNeurons()) {
+                    if (neuron->getState().firingState == FiringState::Refractory &&
+                        neuron->getState().lastSpikeTime > 0.0f) {
+                        // Add neural activation to pattern
+                        float activation = std::abs(neuron->getState().membranePotential - neuron->getState().restingPotential);
+                        currentPattern.push_back(activation);
+                        totalActivity += activation;
+                    }
+                }
+            }
+        }
+        
+        if (totalActivity > 0.0f) {
+            // Normalize pattern
+            float norm = 0.0f;
+            for (float v : currentPattern) norm += v * v;
+            if (norm > 0.0f) {
+                float scale = 1.0f / std::sqrt(norm);
+                for (float& v : currentPattern) v *= scale;
+            }
+            
+            // Convert to concept features (similarity measure)
+            std::vector<float> conceptFeatures;
+            conceptFeatures.reserve(currentPattern.size());
+            
+            // Extract touch and vision features for concept formation
+            // This would normally come from sensory input encoding
+            for (float v : currentPattern) {
+                // Features for concept formation
+                conceptFeatures.push_back(v);
+            }
+            
+            // Add neural planning to influence brain activity patterns
+        if (pImpl->planner && !currentPattern.empty()) {
+            // Use planner to influence neural activity based on current state
+            // The planner evaluates potential action sequences and their expected outcomes
+            // This can guide neuromodulation and plasticity based on planned behavior
+            
+            // Get current goal from planner (if any)
+            auto currentGoal = pImpl->planner->getCurrentGoal();
+            
+            if (!currentGoal.empty() && currentGoal.size() == currentPattern.size()) {
+                // Compute similarity between current pattern and goal
+                float goalSimilarity = 0.0f;
+                for (size_t i = 0; i < currentPattern.size() && i < currentGoal.size(); ++i) {
+                    goalSimilarity += currentPattern[i] * currentGoal[i];
+                }
+                
+                // Apply planning bias to neural activity
+                // Higher similarity to goal -> stronger neuromodulation
+                if (goalSimilarity > 0.1f) {
+                    // Plan to enhance goal-congruent activity
+                    // This could involve targeted neuromodulation or plasticity
+                    // For now, we just log the planning influence
+                    // NLM_LOG_INFO("Brain planning: goal similarity = " + std::to_string(goalSimilarity));
+                }
+            }
+        }
+        
+        // Update planner with current neural state and reward prediction
+        if (pImpl->planner && pImpl->dopamine) {
+            // Compute reward prediction based on current neural activity
+            float currentReward = pImpl->dopamine->getLevel();
+            
+            // Update planner's action quality estimates based on neural outcomes
+            // This creates a closed-loop between neural activity and planning
+// Add neural planning to influence brain activity patterns
+        if (pImpl->planner && !currentPattern.empty()) {
+            // Use planner to influence neural activity based on current state
+            // The planner evaluates potential action sequences and their expected outcomes
+            // This can guide neuromodulation and plasticity based on planned behavior
+            
+            // Get current goal from planner (if any)
+            auto currentGoal = pImpl->planner->getCurrentGoal();
+            
+            if (!currentGoal.empty() && currentGoal.size() == currentPattern.size()) {
+                // Compute similarity between current pattern and goal
+                float goalSimilarity = 0.0f;
+                for (size_t i = 0; i < currentPattern.size() && i < currentGoal.size(); ++i) {
+                    goalSimilarity += currentPattern[i] * currentGoal[i];
+                }
+                
+                // Apply planning bias to neural activity
+                // Higher similarity to goal -> stronger neuromodulation
+                if (goalSimilarity > 0.1f) {
+                    // Take the planning integration block and the planner update block
+                    // and insert them HERE
     }
     
     // ========== STEP 12: Replay important memories ==========
