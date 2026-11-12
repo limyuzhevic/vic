@@ -81,7 +81,7 @@ print("Firing neurons:", brain.getFiringNeuronCount())
 | Your brain processes it | `agent.processSensoryInput(percept)` |
 | You decide to act | `action = agent.decodeMotorCommand()` |
 | You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+| Your brain learns from results | `agent.applyRewardModulation(reward, predicted_reward)` |
 
 ---
 

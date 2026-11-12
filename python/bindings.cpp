@@ -424,10 +424,205 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    // Config class Python bindings
+    py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(NLM configuration management)pbdoc")
+        .def(py::init<>())
+        .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
+             R"pbdoc(Load configuration from file (JSON/YAML or key=value format))pbdoc")
+        .def("loadFromArgs", &Config::loadFromArgs, py::arg("argc"), py::arg("argv"),
+             R"pbdoc(Load configuration from command line arguments))pbdoc")
+        .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
+             R"pbdoc(Save configuration to file (JSON format))pbdoc")
+        .def("get", [](const Config& self, const std::string& key) {
+            auto result = self.get<std::string>(key);
+            if (result) return py::cast(*result);
+            return py::none();
+        }, py::arg("key"),
+             R"pbdoc(Get configuration value as string))pbdoc")
+        .def("get", [](const Config& self, const std::string& key) {
+            auto result = self.get<int>(key);
+            if (result) return py::cast(*result);
+            return py::none();
+        }, py::arg("key"),
+             R"pbdoc(Get configuration value as int))pbdoc")
+        .def("get", [](const Config& self, const std::string& key) {
+            auto result = self.get<double>(key);
+            if (result) return py::cast(*result);
+            return py::none();
+        }, py::arg("key"),
+             R"pbdoc(Get configuration value as double))pbdoc")
+        .def("get", [](const Config& self, const std::string& key) {
+            auto result = self.get<bool>(key);
+            if (result) return py::cast(*result);
+            return py::none();
+        }, py::arg("key"),
+             R"pbdoc(Get configuration value as bool))pbdoc")
+        .def("getOr", [](const Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             R"pbdoc(Get configuration value with string default))pbdoc")
+        .def("getOr", [](const Config& self, const std::string& key, int defaultValue) {
+            return self.getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             R"pbdoc(Get configuration value with int default))pbdoc")
+        .def("getOr", [](const Config& self, const std::string& key, double defaultValue) {
+            return self.getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+             R"pbdoc(Get configuration value with double default))pbdoc")
+        .def("set", &Config::set, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             R"pbdoc(Set configuration value))pbdoc")
+        .def("set", [](Config& self, const std::string& key, int value, ConfigSource source) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             R"pbdoc(Set configuration value as int))pbdoc")
+        .def("set", [](Config& self, const std::string& key, double value, ConfigSource source) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             R"pbdoc(Set configuration value as double))pbdoc")
+        .def("set", [](Config& self, const std::string& key, bool value, ConfigSource source) {
+            self.set(key, value, source);
+        }, py::arg("key"), py::arg("value"), py::arg("source") = ConfigSource::Runtime,
+             R"pbdoc(Set configuration value as bool))pbdoc")
+        .def("has", &Config::has, py::arg("key"),
+             R"pbdoc(Check if configuration key exists))pbdoc")
+        .def("remove", &Config::remove, py::arg("key"),
+             R"pbdoc(Remove configuration key))pbdoc")
+        .def("clear", &Config::clear,
+             R"pbdoc(Clear all configuration values))pbdoc")
+        .def("getKeys", &Config::getKeys,
+             R"pbdoc(Get all configuration keys))pbdoc")
+        .def("summary", &Config::summary,
+             R"pbdoc(Get configuration summary))pbdoc")
+        .def("createDefaultConfig", []() -> std::shared_ptr<Config> {
+            return std::make_shared<Config>();
+        }, R"pbdoc(Create a default configuration))pbdoc");
+
+    m.add_object("ConfigSource", py::module_local().attr("ConfigSource"));
+    py::enum_<ConfigSource>(m, "ConfigSource")
+        .value("Default", ConfigSource::Default)
+        .value("File", ConfigSource::File)
+        .value("CommandLine", ConfigSource::CommandLine)
+        .value("Runtime", ConfigSource::Runtime)
+        .export_values();
+
+    // Convenience functions for creating common simulation scenarios
+    m.def("createBrainFromConfigFile", [](const std::string& filepath) -> std::shared_ptr<Brain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw py::value_error("Failed to load configuration from file: " + filepath);
+        }
+        return std::make_shared<Brain>(config);
+    }, py::arg("filepath"),
+         R"pbdoc(Create a brain from a configuration file))pbdoc");
+
+    m.def("createAgentFromConfigFile", [](const std::string& filepath, const std::string& worldFile = "") -> std::shared_ptr<AgentBrain> {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            throw py::value_error("Failed to load configuration from file: " + filepath);
+        }
+        auto brain = std::make_shared<Brain>(config);
+        auto agent = std::make_shared<AgentBrain>(brain);
+        return agent;
+    }, py::arg("filepath"), py::arg("worldFile") = "",
+         R"pbdoc(Create an agent brain from a configuration file))pbdoc");
+
+    m.def("runCompleteSimulation", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                     std::shared_ptr<AgentBrain> agent, int numSteps) {
+        if (!brain || !world || !agent) {
+            throw py::value_error("Brain, world, and agent must not be null");
+        }
+        brain->initialize();
+        agent->initialize(*world);
+        
+        for (int step = 0; step < numSteps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"), py::arg("numSteps"),
+         R"pbdoc(Run a complete simulation episode))pbdoc");
+
+    m.def("saveBrainWithTimestamp", [](std::shared_ptr<Brain> brain, const std::string& baseDir) {
+        if (!brain) {
+            throw py::value_error("Brain must not be null");
+        }
+        std::string timestamp = std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
+        std::string filepath = baseDir + "/nlm_brain_" + timestamp + ".chk";
+        bool success = brain->save(filepath);
+        if (!success) {
+            throw py::runtime_error("Failed to save brain state");
+        }
+        return filepath;
+    }, py::arg("brain"), py::arg("baseDir"),
+         R"pbdoc(Save brain state with timestamp in filename))pbdoc");
+
+    // Neural network utility functions
+    m.def("initializeRandomConnectivity", [](std::shared_ptr<Brain> brain, float connectionProbability = 0.1f) {
+        if (!brain) {
+            throw py::value_error("Brain must not be null");
+        }
+        brain->initialize();
+        // Re-initialize connectivity with random weights
+        auto config = brain->getConfig();
+        if (config) {
+            config->set("connection_probability", connectionProbability, ConfigSource::Runtime);
+        }
+    }, py::arg("brain"), py::arg("connectionProbability") = 0.1f,
+         R"pbdoc(Initialize brain with random connectivity))pbdoc");
+
+    // Simulation monitoring and statistics
+    m.def("getSimulationStats", [](std::shared_ptr<Brain> brain, std::shared_ptr<SimpleWorld> world, 
+                                 std::shared_ptr<AgentBrain> agent) {
+        if (!brain || !world || !agent) {
+            throw py::value_error("Brain, world, and agent must not be null");
+        }
+        py::dict stats;
+        stats["neurons"] = brain->getTotalNeuronCount();
+        stats["synapses"] = brain->getTotalSynapseCount();
+        stats["firing_neurons"] = brain->getFiringNeuronCount();
+        stats["total_spikes"] = brain->getTotalSpikeCount();
+        stats["avg_firing_rate"] = brain->getAverageFiringRate();
+        stats["world_width"] = world->getWidth();
+        stats["world_height"] = world->getHeight();
+        stats["simulation_time"] = world->getSimulationTime();
+        stats["curiosity_level"] = agent->getCuriosityLevel();
+        stats["novelty_level"] = agent->getNoveltyLevel();
+        stats["neuromodulation_level"] = agent->getNeuromodulationLevel();
+        stats["developmental_stage"] = static_cast<int>(agent->getDevelopmentalStage());
+        return stats;
+    }, py::arg("brain"), py::arg("world"), py::arg("agent"),
+         R"pbdoc(Get simulation statistics as dictionary))pbdoc");
+
+    // Error handling and validation
+    m.def("validateConfiguration", [](const std::string& filepath) {
+        auto config = std::make_shared<Config>();
+        if (!config->loadFromFile(filepath)) {
+            return py::make_tuple(false, "Failed to load configuration file");
+        }
+        
+        // Validate essential parameters
+        bool hasNeuronCount = config->has("neuron_count");
+        bool hasRegionCount = config->has("region_count");
+        bool hasConnectionProb = config->has("connection_probability");
+        
+        if (!hasNeuronCount || !hasRegionCount || !hasConnectionProb) {
+            return py::make_tuple(false, "Missing essential configuration parameters");
+        }
+        
+        // Check for reasonable values
+        auto neuronCount = config->getOr<int64_t>("neuron_count", -1);
+        auto regionCount = config->getOr<int64_t>("region_count", -1);
+        auto connectionProb = config->getOr<float>("connection_probability", -1.0f);
+        
+        if (neuronCount <= 0 || regionCount <= 0 || connectionProb <= 0.0f || connectionProb > 1.0f) {
+            return py::make_tuple(false, "Configuration parameters have invalid values");
+        }
+        
+        return py::make_tuple(true, "Configuration is valid");
+    }, py::arg("filepath"),
+         R"pbdoc(Validate configuration file and return (is_valid, message)))pbdoc");
 
 } // namespace nlm
