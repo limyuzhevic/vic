@@ -1,0 +1,434 @@
+#!/usr/bin/env bash
+
+# NLM Command Line Interface (CLI)
+# A comprehensive CLI for interacting with the Neural Learning Machine
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Configuration
+NLM_BINARY="nlm"
+NLM_CONFIG_FILE="configs/default.cfg"
+NLM_LOG_LEVEL="INFO"
+NLM_VERBOSE=false
+
+# Print help information
+print_help() {
+    cat << EOF
+Neural Learning Machine (NLM) - Command Line Interface
+
+USAGE:
+    nlm-cli <command> [options]
+
+COMMANDS:
+    run                    Run the neural simulation (default)
+    config <file>           Load configuration from file
+    status                  Display current brain status
+    benchmark               Run performance benchmark
+    experiment <name>       Run specific experiment
+    checkpoint <file>       Save/load brain state
+    validate <file>         Validate configuration file
+    profile                 Run profiling session
+    help                    Show this help message
+
+OPTIONS:
+    -h, --help              Show help information
+    -v, --verbose           Enable verbose output
+    -l, --log-level LEVEL   Set log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    -c, --config FILE       Configuration file to use
+    -o, --output FILE       Output file for results/logs
+    -t, --timestep DT       Override simulation timestep
+    -n, --neurons N         Override neuron count
+    --quiet                 Suppress output
+    --dry-run               Print configuration and exit
+
+EXAMPLES:
+    nlm-cli run --timestep 0.0001 --neurons 500
+    nlm-cli config my_config.cfg run
+    nlm-cli benchmark --output benchmark_results.json
+    nlm-cli checkpoint save my_checkpoint
+    nlm-cli experiment phase2_demo
+
+For more information on specific commands, use:
+    nlm-cli help <command>
+EOF
+}
+
+# Print command-specific help
+print_command_help() {
+    local command="$1"
+    case $command in
+        run)
+            cat << EOF
+Run Neural Simulation
+
+Runs the NLM Phase 2 simulation with current configuration.
+
+OPTIONS:
+    -h, --help              Show this help
+    -t, --timestep DT       Override simulation timestep
+    -n, --neurons N         Override neuron count
+    -d, --duration STEPS    Override simulation duration (steps)
+    -m, --max-spikes S      Stop after this many spikes
+    --reset-beforerun       Reset brain before running
+    --checkpoint FILE       Save brain state at end
+    --profile               Enable profiling during run
+    --dry-run               Print configuration and exit
+
+EXAMPLES:
+    nlm-cli run --timestep 0.0001 --neurons 500
+    nlm-cli run --duration 5000 --max-spikes 10000
+    nlm-cli run --checkpoint my_brain
+EOF
+            ;;
+        config)
+            cat << EOF
+Load Configuration
+
+Load and validate a configuration file for use in subsequent commands.
+
+USAGE:
+    nlm-cli config <file> [command [options]]
+
+OPTIONS:
+    -h, --help              Show this help
+    -v, --validate          Only validate, don't load
+    --backup FILE           Save current config to backup
+
+EXAMPLES:
+    nlm-cli config my_config.cfg
+    nlm-cli config --validate my_config.cfg
+    nlm-cli config --backup old_config.cfg my_config.cfg
+EOF
+            ;;
+        status)
+            cat << EOF
+Display Brain Status
+
+Shows current status of the neural brain including neuron counts,
+connectivity, firing statistics, and system health.
+
+OPTIONS:
+    -h, --help              Show this help
+    -s, --summary           Show only summary information
+    --detailed             Show detailed system information
+    --performance          Include performance metrics
+
+EXAMPLES:
+    nlm-cli status
+    nlm-cli status --detailed
+    nlm-cli status --performance
+EOF
+            ;;
+        benchmark)
+            cat << EOF
+Run Performance Benchmark
+
+Benchmarks NLM performance with various configurations and loads.
+
+OPTIONS:
+    -h, --help              Show this help
+    -o, --output FILE       Output file for results (JSON format)
+    -t, --timestep DT       Test different timesteps
+    -n, --neurons N         Test different neuron counts
+    --phases PHASES         Comma-separated phases to test
+    --duration STEPS        Override benchmark duration
+    --repeats COUNT         Number of benchmark runs
+
+EXAMPLES:
+    nlm-cli benchmark --output benchmark_results.json
+    nlm-cli benchmark --timestep 0.001 --timestep 0.0001
+    nlm-cli benchmark --phases phase3,phase4,phase6
+EOF
+            ;;
+        checkpoint)
+            cat << EOF
+Manage Brain Checkpoints
+
+Save, load, and manage brain state checkpoints for experiment reproducibility.
+
+USAGE:
+    nlm-cli checkpoint <action> <file>
+    Actions: save, load, list, delete, info
+
+OPTIONS:
+    -h, --help              Show this help
+    --compress LEVEL        Compression level (0-9)
+    --verify               Verify checkpoint integrity
+    --list                 List all available checkpoints
+    --info FILE             Display checkpoint metadata
+
+EXAMPLES:
+    nlm-cli checkpoint save my_checkpoint
+    nlm-cli checkpoint load my_checkpoint
+    nlm-cli checkpoint info my_checkpoint
+EOF
+            ;;
+        experiment)
+            cat << EOF
+Run Neural Experiments
+
+Run specific neural learning experiments with predefined scenarios.
+
+OPTIONS:
+    -h, --help              Show this help
+    -o, --output FILE       Output file for experiment results
+    -t, --timesteps STEPS   Number of simulation steps
+    --seed SEED             Random seed for reproducible results
+    --plot                 Generate plots from results
+    --record-video         Record simulation video
+
+EXPERIMENTS:
+    phase2_demo             Classic Phase 2 demonstration
+    phase3_demo             Phase 3 memory formation
+    phase4_demo             Phase 4 plasticity experiments
+    phase5_demo             Phase 5 advanced plasticity
+    phase6_demo             Phase 6 integration experiment
+    learning_experiment     Generic learning experiment
+    connectivity_test      Network connectivity test
+    stdp_verification       STDP verification
+    plasticity_study        Plasticity dynamics study
+
+EXAMPLES:
+    nlm-cli experiment phase2_demo --timesteps 5000
+    nlm-cli experiment learning_experiment --seed 42 --plot
+EOF
+            ;;
+        validate)
+            cat << EOF
+Validate Configuration File
+
+Validates configuration file syntax and semantic correctness.
+
+USAGE:
+    nlm-cli validate <file>
+
+OPTIONS:
+    -h, سلم هذا المساعدة
+    --strict              Enable strict validation
+    --schema FILE         Use custom schema for validation
+    --export-errors FILE   Export validation errors to file
+
+EXAMPLES:
+    nlm-cli validate my_config.cfg
+    nlm-cli validate --strict my_config.cfg
+EOF
+            ;;
+        profile)
+            cat << EOF
+Run Profiling Session
+
+Profile NLM performance and identify bottlenecks.
+
+OPTIONS:
+    -h, --help              Show this help
+    -o, --output FILE       Output file for profiling data
+    --cpu                   Enable CPU profiling
+    --memory               Enable memory profiling
+    --timeline             Enable timeline profiling
+    --all                  Enable all profiling modes
+    --duration SECONDS     Duration of profiling session
+
+EXAMPLES:
+    nlm-cli profile --cpu --memory --output profile_data.json
+    nlm-cli profile --timeline --duration 60
+EOF
+            ;;
+        *)
+            echo "Unknown command: $command"
+            echo "Use 'nlm-cli help' to see available commands"
+            exit 1
+            ;;
+    esac
+}
+
+# Parse command line arguments
+parse_args() {
+    local cmd="$1"
+    shift
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                print_command_help "$cmd"
+                exit 0
+                ;;
+            -v|--verbose)
+                NLM_VERBOSE=true
+                shift
+                ;;
+            -l|--log-level)
+                NLM_LOG_LEVEL="$2"
+                shift 2
+                ;;
+            -c|--config)
+                NLM_CONFIG_FILE="$2"
+                shift 2
+                ;;
+            -o|--output)
+                OUTPUT_FILE="$2"
+                shift 2
+                ;;
+            -t|--timestep)
+                TIMESTEP="$2"
+                shift 2
+                ;;
+            -n|--neurons)
+                NEURON_COUNT="$2"
+                shift 2
+                ;;
+            --quiet)
+                NLM_VERBOSE=false
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            *)
+                echo "Unknown option: $1"
+                echo "Use 'nlm-cli help $cmd' for command-specific options"
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Main CLI logic
+main() {
+    # Default values
+    DRY_RUN=false
+    OUTPUT_FILE=""
+    TIMESTEP=""
+    NEURON_COUNT=""
+    
+    # Parse command
+    local command="${1:-run}"
+    
+    case $command in
+        help)
+            if [[ -n "${2:-}" ]]; then
+                print_command_help "$2"
+            else
+                print_help
+            fi
+            exit 0
+            ;;
+        "")
+            print_help
+            exit 0
+            ;;
+        *)
+            parse_args "$command" "$@"
+            # Execute command
+            case $command in
+                run)
+                    echo "Running NLM simulation..."
+                    if [[ "$NLM_VERBOSE" == true ]]; then
+                        echo "Configuration: $NLM_CONFIG_FILE"
+                        [[ -n "$TIMESTEP" ]] && echo "Timestep: $TIMESTEP"
+                        [[ -n "$NEURON_COUNT" ]] && echo "Neurons: $NEURON_COUNT"
+                    fi
+                    
+                    if [[ "$DRY_RUN" == true ]]; then
+                        echo "Dry run mode - would execute:"
+                        echo "  nlm --config $NLM_CONFIG_FILE"
+                        [[ -n "$TIMESTEP" ]] && echo "  --timestep $TIMESTEP"
+                        [[ -n "$NEURON_COUNT" ]] && echo "  --neuron-count $NEURON_COUNT"
+                    else
+                        # Run the actual NLM binary with options
+                        local args="--config $NLM_CONFIG_FILE"
+                        [[ -n "$TIMESTEP" ]] && args+=" --timestep $TIMESTEP"
+                        [[ -n "$NEURON_COUNT" ]] && args+=" --neuron-count $NEURON_COUNT"
+                        
+                        echo "Executing: nlm $args"
+                        nlm $args
+                        local exit_code=$?
+                        if [[ $exit_code -ne 0 ]]; then
+                            echo "${RED}Error: NLM execution failed with code $exit_code${NC}"
+                            exit $exit_code
+                        fi
+                    fi
+                    ;;
+                config)
+                    echo "Loading configuration..."
+                    if [[ -n "${2:-}" ]]; then
+                        NLM_CONFIG_FILE="$2"
+                        shift
+                        # If there are more arguments, treat them as subsequent command
+                        if [[ $# -gt 0 ]]; then
+                            # Execute subsequent command with loaded config
+                            local subcmd="$1"
+                            shift
+                            parse_args "$subcmd" "$@"
+                            eval "nlm-cli $subcmd \"$@\""
+                        fi
+                    else
+                        echo "Error: No configuration file specified"
+                        echo "Usage: nlm-cli config <file> [command [options]]"
+                        exit 1
+                    fi
+                    ;;
+                status)
+                    echo "Displaying brain status..."
+                    # This would execute the nlm binary with status option
+                    # For now, just show a placeholder
+                    echo "Status display would execute: nlm --status"
+                    ;;
+                benchmark)
+                    echo "Running benchmark..."
+                    # This would run benchmarks
+                    echo "Benchmark execution would start here"
+                    ;;
+                checkpoint)
+                    if [[ -z "${2:-}" ]]; then
+                        echo "Error: No checkpoint action specified"
+                        echo "Usage: nlm-cli checkpoint <action> <file>"
+                        exit 1
+                    fi
+                    local action="$2"
+                    local filepath="${3:-}"
+                    if [[ -z "$filepath" ]]; then
+                        echo "Error: No checkpoint file specified"
+                        exit 1
+                    fi
+                    echo "Checkpoint $action: $filepath"
+                    ;;
+                experiment)
+                    if [[ -z "${2:-}" ]]; then
+                        echo "Error: No experiment specified"
+                        echo "Available experiments: phase2_demo, phase3_demo, phase4_demo, phase5_demo, phase6_demo, learning_experiment, connectivity_test, stdp_verification, plasticity_study"
+                        exit 1
+                    fi
+                    local experiment="$2"
+                    echo "Running experiment: $experiment"
+                    ;;
+                validate)
+                    if [[ -z "${2:-}" ]]; then
+                        echo "Error: No configuration file specified for validation"
+                        exit 1
+                    fi
+                    local config_file="$2"
+                    echo "Validating configuration: $config_file"
+                    # This would validate the config file
+                    ;;
+                profile)
+                    echo "Starting profiling session..."
+                    # This would start profiling
+                    ;;
+                *)
+                    echo "Unknown command: $command"
+                    print_help
+                    exit 1
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@"

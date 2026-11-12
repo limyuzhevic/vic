@@ -138,6 +138,9 @@ add_executable(nlm
 )
 target_link_libraries(nlm PUBLIC nlm_core)
 
+# Examples directory (for documentation and testing)
+add_subdirectory(examples)
+
 # Phase 3 demo executable
 add_executable(nlm_phase3_demo
     src/experiments/Phase3Demo.cpp
@@ -200,6 +203,9 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     target_include_directories(pynlm PRIVATE src)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
+
+# Examples for testing new refactored components
+add_subdirectory(examples)
 
 # Testing
 enable_testing()

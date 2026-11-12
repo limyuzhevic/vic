@@ -1,0 +1,512 @@
+#!/usr/bin/env bash
+
+# Configuration Schema Validator for NLM
+# Validates configuration files against schema and semantic rules
+
+# Color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Default configuration schema
+DEFAULT_SCHEMA="{
+    \"version\": \"1.0.0\",
+    \"description\": \"NLM Configuration Schema\",
+    \"required\": [\"random_seed\", \"simulation_timestep\", \"neuron_count\", \"region_count\", \"connection_probability\"],
+    \"properties\": {
+        \"random_seed\": {\"type\": \"integer\", \"min\": 0},
+        \"simulation_timestep\": {\"type\": \"number\", \"min\": 0.0001, \"max\": 1.0},
+        \"neuron_count\": {\"type\": \"integer\", \"min\": 1, \"max\": 100000},
+        \"region_count\": {\"type\": \"integer\", \"min\": 1, \"max\": 100},
+        \"connection_probability\": {\"type\": \"number\", \"min\": 0.0, \"max\": 1.0},
+        \"plasticity_learning_rate\": {\"type\": \"number\", \"min\": 0.0, \"max\": 1.0},
+        \"stdp_ltp_weight\": {\"type\": \"number\", \"min\": 0.0, \"max\": 1.0},
+        \"stdp_ltd_weight\": {\"type\": \"number\", \"min\": 0.0, \"max\": 1.0},
+        \"stdp_tau\": {\"type\": \"number\", \"min\": 0.1, \"max\": 100.0},
+        \"synaptogenesis_rate\": {\"type\": \"number\", \"min\": 0.0, \"max\": 1.0},
+        \"pruning_rate\": {\"type\": \"number\", \"min\": 0.0, \"max\": 1.0},
+        \"dopamine_baseline\": {\"type\": \"number\", \"min\": 0.0, \"max\": 1.0},
+        \"reward_discount_factor\": {\"type\": \"number\", \"min\": 0.0, \"max\": 1.0},
+        \"environment_name\": {\"type\": \"string\"},
+        \"environment_width\": {\"type\": \"integer\", \"min\": 1, \"max\": 1000},
+        \"environment_height\": {\"type\": \"integer\", \"min\": 1, \"max\": 1000},
+        \"log_level\": {\"type\": \"string\", \"enum\": [\"DEBUG\", \"INFO\", \"WARNING\", \"ERROR\", \"CRITICAL\"]},
+        \"log_to_file\": {\"type\": \"boolean\"},
+        \"log_filename\": {\"type\": \"string\"},
+        \"max_simulation_steps\": {\"type\": \"integer\", \"min\": 1},
+        \"simulation_time_limit\": {\"type\": \"number\", \"min\": 0.0},
+        \"visualization_enabled\": {\"type\": \"boolean\"},
+        \"visualization_update_rate\": {\"type\": \"number\", \"min\": 1.0, \"max\": 1000.0},
+        \"checkpoint_dir\": {\"type\": \"string\"},
+        \"replay_interval\": {\"type\": \"integer\", \"min\": 1},
+        \"consolidation_interval\": {\"type\": \"integer\", \"min\": 1}
+    },
+    \"additionalProperties\": false
+}"
+
+# Semantic validation rules
+SEMANTIC_RULES="{
+    \"incompatible_pairs\": [
+        [\"dopamine_baseline\", \"plasticity_learning_rate\"],
+        [\"visualization_enabled\", \"log_to_file\", {\"condition\": \"not (both true)\", \"message\": \"Visualization and file logging cannot both be enabled simultaneously due to memory constraints\"}]
+    ],
+    \"dependency_rules\": [
+        {\"required_if\": {\"plasticity_learning_rate\": \"stdp_ltp_weight\"}},
+        {\"required_if\": {\"stdp_ltp_weight\": \"stdp_tau\"}},
+        {\"range_constraint\": {\"min_neurons\": 10, \"max_neurons_per_region\": 1000}}
+    ]
+}"
+
+# Print validation help
+print_help() {
+    cat << EOF
+Configuration Schema Validator for NLM
+
+USAGE:
+    config-validator <file> [schema] [options]
+
+VALIDATE:
+    config-validator my_config.cfg
+    config-validator my_config.cfg --strict
+    config-validator my_config.cfg --schema my_schema.json --output errors.json
+
+RULES:
+    config-validator my_config.cfg --semantic
+    config-validator my_config.cfg --semantic --rules custom_rules.json
+
+SCHEMA VALIDATION:
+    config-validator my_config.cfg --schema-validate
+    config-validator my_config.cfg --schema-validate --schema-validate-only
+
+EXAMPLES:
+    config-validator configs/default.cfg
+    config-validator --strict --semantic --output validation_report.json my_config.cfg
+    config-validator --schema-validate --schema my_custom_schema.json configs/default.cfg
+EOF
+}
+
+# Load configuration file in NLM format
+load_nlm_config() {
+    local filepath="$1"
+    local config_file=""
+    
+    # Check if file exists
+    if [[ ! -f "$filepath" ]]; then
+        echo "${RED}Error: Configuration file not found: $filepath${NC}"
+        return 1
+    fi
+    
+    config_file="$filepath"
+    
+    # Convert NLM format to JSON-like format for validation
+    local json_output="${filepath}.tmp.json"
+    
+    echo "Converting NLM config to JSON format..."
+    > "$json_output"
+    
+    # Parse NLM config format
+    while IFS= read -r line; do
+        # Skip empty lines and comments
+        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "$line" || "$line" =~ ^[[:space:]]*// ]] && continue
+        
+        # Parse key = value format
+        if [[ "$line" =~ ^([[:space:]]*)([a-zA-Z0-9_]+)([[:space:]]*=[[:space:]]*)(.*)$ ]]; then
+            local indent="${BASH_REMATCH[1]}"
+            local key="${BASH_REMATCH[2]}"
+            local value="${BASH_REMATCH[4]}"
+            
+            # Remove quotes from string values
+            if [[ "$value" =~ ^".*"$ ]]; then
+                value="${value:1:-1}"
+            fi
+            
+            # Convert boolean values
+            if [[ "$value" == "true" ]]; then
+                value="true"
+            elif [[ "$value" == "false" ]]; then
+                value="false"
+            elif [[ "$value" =~ ^[0-9]+$ ]]; then
+                # Integer
+                echo "    \"$key\": ${value}," >> "$json_output"
+            elif [[ "$value" =~ ^[0-9]*\.[0-9]+$ ]]; then
+                # Float
+                echo "    \"$key\": ${value}," >> "$json_output"
+            else
+                # String
+                echo "    \"$key\": \"${value}\"," >> "$json_output"
+            fi
+        fi
+    done < "$config_file"
+    
+    # Remove trailing comma from last entry if file not empty
+    if [[ -s "$json_output" ]]; then
+        sed -i '$ s/,$//' "$json_output"
+    fi
+    
+    echo "Config converted to: $json_output"
+    echo "$json_output"
+}
+
+# Validate configuration against JSON schema
+validate_schema() {
+    local json_file="$1"
+    local schema_file="$2"
+    local strict_mode="$3"
+    local output_file="$4"
+    
+    echo "Validating schema..."
+    
+    # Check if jq is available
+    if ! command -v jq &> /dev/null; then
+        echo "${YELLOW}Warning: jq not found. Installing...${NC}"
+        # Try to install jq
+        if command -v apt-get &> /dev/null; then
+            apt-get update && apt-get install -y jq
+        elif command -v yum &> /dev/null; then
+            yum install -y jq
+        elif command -v brew &> /dev/null; then
+            brew install jq
+        else
+            echo "${RED}Error: jq is required for schema validation but not available. Please install jq manually.${NC}"
+            return 1
+        fi
+    fi
+    
+    # Create schema file if not provided
+    local schema_path="$schema_file"
+    if [[ -z "$schema_path" ]]; then
+        local schema_file_path="default_schema.json"
+        echo "$DEFAULT_SCHEMA" > "$schema_file_path"
+        schema_path="$schema_file_path"
+    fi
+    
+    # Validate using jq
+    local errors=$(jq -e --argfile schema "$schema_path" --argfile config "$json_file" '
+        ($schema * {required: [], additionalProperties: true}) as $schema
+        | $config as $config
+        | if $schema.required then
+            $schema.required | map(
+                select($config | has(.) | not) | . as $missing
+                | {error: "Missing required field", field: ., schema: $schema}
+            )
+        else [] end
+        | if $schema.properties then
+            $config | to_entries | map(
+                select($schema.properties | has(.key) | not) | . as $extra
+                | {error: "Additional property not allowed", field: .key, schema: $schema}
+            ) + (
+                $schema.properties | keys[] as $prop
+                | if $config | has($prop) then
+                    $config[$prop] as $value
+                    | $schema.properties[$prop] as $prop_schema
+                    | if $prop_schema.type == "integer" and ($value | type) != "number" then
+                        {error: "Field must be an integer", field: $prop, value: $value, type: $prop_schema.type}
+                    elif $prop_schema.type == "number" and ($value | type) != "number" then
+                        {error: "Field must be a number", field: $prop, value: $value, type: $prop_schema.type}
+                    elif $prop_schema.type == "string" and ($value | type) != "string" then
+                        {error: "Field must be a string", field: $prop, value: $value, type: $prop_schema.type}
+                    elif $prop_schema.type == "boolean" and ($value | type) != "boolean" then
+                        {error: "Field must be a boolean", field: $prop, value: $value, type: $prop_schema.type}
+                    elif $prop_schema.enum and ($value | index($prop_schema.enum) | not) then
+                        {error: "Field value not in allowed values", field: $prop, value: $value, allowed: $prop_schema.enum}
+                    elif $prop_schema.min and $value < $prop_schema.min then
+                        {error: "Field value below minimum", field: $prop, value: $value, min: $prop_schema.min}
+                    elif $prop_schema.max and $value > $prop_schema.max then
+                        {error: "Field value above maximum", field: $prop, value: $value, max: $prop_schema.max}
+                    else null
+                else [] end
+            )
+        else [] end
+        | if strict_mode then
+            ($config | keys_unsorted) as $keys
+            | ($schema.properties | keys_unsorted) as $allowed_keys
+            | if $keys - $allowed_keys | length > 0 then
+                ($keys - $allowed_keys | map({error: "Additional property not allowed in strict mode", field: .}) | .)
+            else [] end
+        else [] end
+        | if length > 0 then . else null end
+    " "$json_file" "$schema_path" 2>/dev/null)
+    
+    if [[ $? -ne 0 ]]; then
+        echo "${RED}Schema validation failed:${NC}"
+        echo "$errors"
+        return 1
+    fi
+    
+    if [[ -n "$errors" ]]; then
+        echo "${YELLOW}Schema validation found errors:${NC}"
+        echo "$errors"
+        
+        # Export errors to file if requested
+        if [[ -n "$output_file" ]]; then
+            echo "$errors" > "$output_file"
+            echo "Errors exported to: $output_file"
+        fi
+        
+        return 1
+    else
+        echo "${GREEN}✓ Schema validation passed${NC}"
+        return 0
+    fi
+}
+
+# Validate configuration against semantic rules
+validate_semantic() {
+    local json_file="$1"
+    local rules_file="$2"
+    local output_file="$3"
+    
+    echo "Validating semantic rules..."
+    
+    # Use jq to validate semantic rules
+    local semantic_errors=$(jq -e --argfile rules "$rules_file" '
+        # Load rules
+        $rules as $rules
+        
+        # Check incompatible pairs
+        $rules.incompatible_pairs as $incompatible_pairs
+        | if $incompatible_pairs then
+            $incompatible_pairs | map(
+                select(length > 1) | .[0] as $field1
+                | .[1] as $field2
+                | (.[2] // {}) as $condition
+                | ($field1, $field2) as $both_fields
+                | (
+                    if $condition.condition then
+                        if $condition.condition == "not (both true)" then
+                            ($both_fields | map($both_fields[.] == true) | all) and true
+                        else
+                            false
+                        end
+                    else
+                        ($both_fields | map($both_fields[.] == true) | all) and true
+                    end
+                ) as $is_both_true
+                | if $is_both_true then
+                    {error: "Incompatible fields", fields: [$field1, $field2], condition: $condition.condition or "both cannot be true"}
+                else
+                    null
+                end
+            ) | .[]? | select(. != null)
+        else
+            []
+        end
+        
+        # Check dependency rules
+        | $rules.dependency_rules as $dependency_rules
+        | if $dependency_rules then
+            $dependency_rules | map(
+                if .required_if then
+                    (to_entries | map(
+                        select(.key != "required_if") | . as $dep
+                        | ($dep.value, $dep.key) as $pair
+                        | if ($pair[0] | test("^required_if$"; "i")) then
+                            "required_if"
+                        else
+                            $pair
+                        end
+                    ) | {field: .[1], condition: .[0]})
+                elif .range_constraint then
+                    {constraint: "range_constraint", min_neurons: .range_constraint.min_neurons, max_neurons_per_region: .range_constraint.max_neurons_per_region}
+                else
+                    null
+                end
+            ) | .[]? | select(. != null)
+        else
+            []
+        end
+    ' "$json_file" "$rules_file" 2>/dev/null)
+    
+    if [[ $? -ne 0 ]]; then
+        echo "${RED}Semantic validation failed:${NC}"
+        echo "$semantic_errors"
+        return 1
+    fi
+    
+    if [[ -n "$semantic_errors" ]]; then
+        echo "${YELLOW}Semantic validation found errors:${NC}"
+        echo "$semantic_errors"
+        
+        # Export errors to file if requested
+        if [[ -n "$output_file" ]]; then
+            echo "$semantic_errors" > "$output_file"
+            echo "Errors exported to: $output_file"
+        fi
+        
+        return 1
+    else
+        echo "${GREEN}✓ Semantic validation passed${NC}"
+        return 0
+    fi
+}
+
+# Validate configuration file only (syntax, format, basic rules)
+validate_basic() {
+    local config_file="$1"
+    local output_file="$2"
+    
+    echo "Validating basic configuration..."
+    
+    local basic_errors=""
+    
+    # Check file readability
+    if [[ ! -r "$config_file" ]]; then
+        basic_errors+="${RED}Error: Cannot read configuration file: $config_file${NC}\n"
+    fi
+    
+    # Check for required sections (if file is not empty)
+    if [[ -s "$config_file" ]]; then
+        # Check for at least some key configuration entries
+        local key_count=$(grep -c "^[[:space:]]*[a-zA-Z0-9_]*[[:space:]]*=" "$config_file" || echo 0)
+        if [[ $key_count -lt 3 ]]; then
+            basic_errors+="${YELLOW}Warning: Configuration file appears to have few key-value pairs (${key_count} found)\n${NC}"
+        fi
+        
+        # Check for potentially problematic values
+        local neuron_count=$(grep -i "neuron_count" "$config_file" | grep -oE '[0-9]+' | head -1)
+        if [[ -n "$neuron_count" && $neuron_count -gt 1000000 ]]; then
+            basic_errors+="${YELLOW}Warning: Very high neuron count (${neuron_count}) may impact performance\n${NC}"
+        fi
+    fi
+    
+    if [[ -n "$basic_errors" ]]; then
+        echo -e "$basic_errors"
+        
+        # Export errors to file if requested
+        if [[ -n "$output_file" ]]; then
+            echo -e "$basic_errors" > "$output_file"
+            echo "Errors exported to: $output_file"
+        fi
+        
+        return 1
+    else
+        echo "${GREEN}✓ Basic validation passed${NC}"
+        return 0
+    fi
+}
+
+# Main validation function
+main() {
+    # Default values
+    STRICT_MODE=false
+    SEMANTIC_VALIDATION=false
+    SCHEMA_VALIDATE_ONLY=false
+    OUTPUT_FILE=""
+    RULES_FILE=""
+    SCHEMA_FILE=""
+    
+    # Parse arguments
+    local config_file="${1:-}"
+    local schema_file="${2:-}"
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --strict)
+                STRICT_MODE=true
+                shift
+                ;;
+            --semantic)
+                SEMANTIC_VALIDATION=true
+                shift
+                ;;
+            --schema-validate)
+                SCHEMA_VALIDATE_ONLY=true
+                shift
+                ;;
+            --schema)
+                SCHEMA_FILE="$2"
+                shift 2
+                ;;
+            --rules)
+                RULES_FILE="$2"
+                shift 2
+                ;;
+            --output)
+                OUTPUT_FILE="$2"
+                shift 2
+                ;;
+            --help|-h)
+                print_help
+                exit 0
+                ;;
+            *)
+                echo "Unknown option: $1"
+                print_help
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Check required arguments
+    if [[ -z "$config_file" ]]; then
+        echo "Error: Configuration file not specified"
+        print_help
+        exit 1
+    fi
+    
+    # Load configuration file
+    local json_file
+    json_file=$(load_nlm_config "$config_file") || {
+        echo "${RED}Error: Failed to load configuration file${NC}"
+        exit 1
+    }
+    
+    # Basic validation
+    if ! validate_basic "$json_file" "${OUTPUT_FILE}._basic_errors"; then
+        # Basic validation failed, but we'll continue with schema validation
+        echo "Basic validation failed, but continuing with schema validation..."
+    fi
+    
+    # Schema validation (unless only semantic requested)
+    if [[ "$SCHEMA_VALIDATE_ONLY" == true ]]; then
+        if ! validate_schema "$json_file" "$SCHEMA_FILE" "$STRICT_MODE" "${OUTPUT_FILE}._schema_errors"; then
+            echo "Schema validation failed!"
+            exit 1
+        fi
+    fi
+    
+    # Semantic validation (unless only schema validation requested)
+    if [[ "$SEMANTIC_VALIDATION" == true ]]; then
+        local rules_file="${RULES_FILE:-semantic_rules.json}"
+        if [[ -f "$rules_file" ]]; then
+            if ! validate_semantic "$json_file" "$rules_file" "${OUTPUT_FILE}._semantic_errors"; then
+                echo "Semantic validation failed!"
+                exit 1
+            fi
+        else
+            echo "Semantic rules file not found: $rules_file"
+            echo "Using default semantic rules..."
+            # Create default semantic rules file
+            echo "$SEMANTIC_RULES" > "semantic_rules.json"
+            if ! validate_semantic "$json_file" "semantic_rules.json" "${OUTPUT_FILE}._semantic_errors"; then
+                echo "Semantic validation failed with default rules!"
+                exit 1
+            fi
+        fi
+    fi
+    
+    # Clean up temporary file
+    rm -f "$json_file"
+    
+    echo "${GREEN}✓ Configuration validation completed successfully${NC}"
+    
+    # Export summary if output file specified
+    if [[ -n "$OUTPUT_FILE" ]]; then
+        {
+            echo "Validation completed at: $(date)"
+            echo "Configuration file: $config_file"
+            echo "Schema validation: $([ "$SCHEMA_VALIDATE_ONLY" = true ] && echo "YES" || echo "NO")"
+            echo "Semantic validation: $([ "$SEMANTIC_VALIDATION" = true ] && echo "YES" || echo "NO")"
+            echo "Strict mode: $([ "$STRICT_MODE" = true ] && echo "YES" || echo "NO")"
+        } > "$OUTPUT_FILE"
+        echo "Validation summary exported to: $OUTPUT_FILE"
+    fi
+    
+    return 0
+}
+
+# Execute main function with all arguments
+main "$@"
