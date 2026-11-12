@@ -86,7 +86,35 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Helper function to format ConfigValue as string
+        auto formatValue = [](const ConfigValue& val) -> std::string {
+            std::ostringstream oss;
+            std::visit([&oss](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    oss << "\"" << arg << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    oss << (arg ? "true" : "false");
+                } else if constexpr (std::is_arithmetic_v<T>) {
+                    oss << arg;
+                } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                     std::is_same_v<T, std::vector<double>> ||
+                                     std::is_same_v<T, std::vector<std::string>>) {
+                    oss << "[";
+                    for (size_t i = 0; i < arg.size(); ++i) {
+                        if (i) oss << ", ";
+                        oss << arg[i];
+                    }
+                    oss << "]";
+                } else {
+                    oss << "<???>";
+                }
+            }, val);
+            return oss.str();
+        };
+        
+        file << entry.key << " = " << formatValue(entry.value) << "\n";
     }
     
     return true;
