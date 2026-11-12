@@ -59,6 +59,8 @@ int main(int argc, char* argv[]) {
     config.enableCheckpointing = true;
     config.enableReplay = true;
     config.enableDevelopment = true;
+    config.enableRewardModulation = true;
+    config.enableCuriosity = true;
     
     auto result = experiment.run(config);
     

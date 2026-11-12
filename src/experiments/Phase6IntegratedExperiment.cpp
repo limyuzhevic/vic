@@ -51,10 +51,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     // Create agent
     AgentBrain agent(brain);
     agent.initialize(world);
-    agent.enableRewardModulation(true);
+    agent.enableRewardModulation(config.enableRewardModulation);
     agent.enableStructuralPlasticity(config.enableDevelopment);
     agent.enableDevelopment(config.enableDevelopment);
-    agent.enableCuriosity(true);
+    agent.enableCuriosity(config.enableCuriosity);
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     

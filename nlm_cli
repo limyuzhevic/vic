@@ -1,0 +1,420 @@
+#!/usr/bin/env bash
+
+# NLM Command Line Interface
+# Advanced features for users who want more control and automation
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Default configuration
+DEFAULT_NEURONS=500
+DEFAULT_STEPS=2000
+DEFAULT_WIDTH=16
+DEFAULT_HEIGHT=16
+DEFAULT_VISION=16
+DEFAULT_REWARD_MODULATION=true
+DEFAULT_CURiosity=true
+DEFAULT_CHECKPOINTING=true
+DEFAULT_DEVELOPMENT=true
+DEFAULT_REPLAY=true
+
+# Help message
+function show_help() {
+    cat << EOF
+NLM - Neural Learning Machine Command Line Interface
+
+USAGE:
+    ./nlm_cli [COMMAND] [OPTIONS]
+
+COMMANDS:
+    run        Run an NLM simulation with specified configuration
+    config      Manage configuration settings
+    info        Display system information and capabilities
+    benchmark   Run performance benchmarks
+    check       Check system status and validate installation
+
+EXAMPLES:
+    ./nlm_cli run --neurons 1000 --steps 5000 --width 32 --height 32
+    ./nlm_cli run --demo phase6 --checkpoint
+    ./nlm_cli config set default_neurons 2000
+    ./nlm_cli benchmark run
+
+For more detailed help, run ./nlm_cli COMMAND --help
+
+DEMOS AVAILAIBLE:
+    phase2     - Basic neural computation (Phase 2)
+    phase3     - World interaction loop (Phase 3)
+    phase4     - Advanced cognition and planning (Phase 4)
+    phase5     - Brain-personality and sandbox learning (Phase 5)
+    phase6     - Final integration with all systems (Phase 6)
+    phase6_text - Phase 6 with text-as-a-sense capabilities
+
+EOF
+}
+
+# Configuration management
+function config_menu() {
+    echo -e "${BLUE}=== NLM Configuration ===${NC}"
+    echo "1. View current configuration"
+    echo "2. Set default neurons"
+    echo "3. Set default simulation steps"
+    echo "4. Set world dimensions"
+    echo "5. Set vision parameters"
+    echo "6. Reset to defaults"
+    echo "7. Exit"
+    
+    read -p "Enter choice [1-7]: " choice
+    
+    case $choice in
+        1)
+            echo -e "${YELLOW}Current configuration:${NC}"
+            echo "  Default neurons: ${DEFAULT_NEURONS}"
+            echo "  Default steps: ${DEFAULT_STEPS}"
+            echo "  World width: ${DEFAULT_WIDTH}"
+            echo "  World height: ${DEFAULT_HEIGHT}"
+            echo "  Vision width: ${DEFAULT_VISION}"
+            echo "  Vision height: ${DEFAULT_VISION}"
+            echo "  Reward modulation: ${DEFAULT_REWARD_MODULATION}"
+            echo "  Curiosity: ${DEFAULT_CURiosity}"
+            echo "  Check pointing: ${DEFAULT_CHECKPOINTING}"
+            echo "  Development: ${DEFAULT_DEVELOPMENT}"
+            echo "  Replay: ${DEFAULT_REPLAY}"
+            ;;
+        2)
+            read -p "Enter default neurons: " DEFAULT_NEURONS
+            ;;
+        3)
+            read -p "Enter default simulation steps: " DEFAULT_STEPS
+            ;;
+        4)
+            read -p "Enter world width: " DEFAULT_WIDTH
+            read -p "Enter world height: " DEFAULT_HEIGHT
+            ;;
+        5)
+            read -p "Enter vision width/height: " DEFAULT_VISION
+            ;;
+        6)
+            DEFAULT_NEURONS=500
+            DEFAULT_STEPS=2000
+            DEFAULT_WIDTH=16
+            DEFAULT_HEIGHT=16
+            DEFAULT_VISION=16
+            DEFAULT_REWARD_MODULATION=true
+            DEFAULT_CURiosity=true
+            DEFAULT_CHECKPOINTING=true
+            DEFAULT_DEVELOPMENT=true
+            DEFAULT_REPLAY=true
+            echo -e "${GREEN}Configuration reset to defaults.${NC}"
+            ;;
+        7)
+            return
+            ;;
+        *)
+            echo -e "${RED}Invalid choice.${NC}"
+            ;;
+    esac
+    
+    config_menu
+}
+
+# Display system information
+function show_info() {
+    echo -e "${BLUE}=== NLM System Information ===${NC}"
+    echo "NLM Version: 0.1.0"
+    echo "Phase: 6 (Final Integration)"
+    echo "C++ Standard: C++20"
+    echo "Build Type: Release (default)"
+    
+    # Check if executables are available
+    echo -e "\n${YELLOW}Available Demos:${NC}"
+    for demo in nlm nlm_phase2 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_phase6_text_demo; do
+        if [ -f "./$demo" ]; then
+            echo -e "  ${GREEN}✓ $demo${NC}"
+        else
+            echo -e "  ${RED}✗ $demo (not built)${NC}"
+        fi
+    done
+    
+    echo -e "\n${YELLOW}Features:${NC}"
+    echo -e "  ${GREEN}✓ Real LIF neuron dynamics${NC}"
+    echo -e "  ${GREEN}✓ Event-driven spike propagation with delays${NC}"
+    echo -e "  ${GREEN}✓ STDP and Hebbian plasticity rules${NC}"
+    echo -e "  ${GREEN}✓ Structural plasticity (synaptogenesis/pruning)${NC}"
+    echo -e "  ${GREEN}✓ Working memory integration${NC}"
+    echo -e "  ${GREEN}✓ Episodic memory with replay${NC}"
+    echo -e "  ${GREEN}✓ Neuromodulation (dopamine, curiosity, novelty)${NC}"
+    echo -e "  ${GREEN}✓ Prediction system integration${NC}"
+    echo -e "  ${GREEN}✓ Cognitive planning and concept formation${NC}"
+    echo -e "  ${GREEN}✓ Developmental system${NC}"
+    echo -e "  ${GREEN}✓ Checkpoint save/load${NC}"
+    echo -e "  ${GREEN}✓ Reward-modulated learning${NC}"
+    echo -e "  ${GREEN}✓ Curiosity-driven exploration${NC}"
+}
+
+# Run NLM simulation
+function run_simulation() {
+    local demo=$1
+    local neurons=$DEFAULT_NEURONS
+    local steps=$DEFAULT_STEPS
+    local width=$DEFAULT_WIDTH
+    local height=$DEFAULT_HEIGHT
+    local vision=$DEFAULT_VISION
+    local reward_mod=$DEFAULT_REWARD_MODULATION
+    local curiosity=$DEFAULT_CURiosity
+    local checkpoint=$DEFAULT_CHECKPOINTING
+    local development=$DEFAULT_DEVELOPMENT
+    local replay=$DEFAULT_REPLAY
+    local checkpoint_path="./checkpoints"
+    local verbose=false
+    
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --neurons)
+                neurons=$2
+                shift 2
+                ;;
+            --steps)
+                steps=$2
+                shift 2
+                ;;
+            --width)
+                width=$2
+                shift 2
+                ;;
+            --height)
+                height=$2
+                shift 2
+                ;;
+            --vision)
+                vision=$2
+                shift 2
+                ;;
+            --reward-mod)
+                reward_mod=$2
+                shift 2
+                ;;
+            --curiosity)
+                curiosity=$2
+                shift 2
+                ;;
+            --checkpoint)
+                checkpoint=$2
+                shift 2
+                ;;
+            --development)
+                development=$2
+                shift 2
+                ;;
+            --replay)
+                replay=$2
+                shift 2
+                ;;
+            --checkpoint-path)
+                checkpoint_path=$2
+                shift 2
+                ;;
+            --verbose)
+                verbose=true
+                shift
+                ;;
+            --help)
+                show_help
+                return
+                ;;
+            *)
+                echo -e "${RED}Unknown option: $1${NC}"
+                show_help
+                return
+                ;;
+        esac
+    done
+    
+    # Convert boolean strings
+    local reward_mod_flag="false"
+    local curiosity_flag="false"
+    local checkpoint_flag="false"
+    local development_flag="false"
+    local replay_flag="false"
+    
+    if [[ $reward_mod == "true" ]]; then
+        reward_mod_flag="true"
+    fi
+    if [[ $curiosity == "true" ]]; then
+        curiosity_flag="true"
+    fi
+    if [[ $checkpoint == "true" ]]; then
+        checkpoint_flag="true"
+    fi
+    if [[ $development == "true" ]]; then
+        development_flag="true"
+    fi
+    if [[ $replay == "true" ]]; then
+        replay_flag="true"
+    fi
+    
+    echo -e "${BLUE}Running NLM ${demo} demo...${NC}"
+    echo "Configuration:"
+    echo "  Neurons: $neurons"
+    echo "  Steps: $steps"
+    echo "  World: ${width}x${height}"
+    echo "  Vision: ${vision}x${vision}"
+    echo "  Reward modulation: $reward_mod_flag"
+    echo "  Curiosity: $curiosity_flag"
+    echo "  Checkpointing: $checkpoint_flag"
+    echo "  Development: $development_flag"
+    echo "  Replay: $replay_flag"
+    
+    if [[ $verbose == true ]]; then
+        echo -e "${YELLOW}Verbose output enabled.${NC}"
+    fi
+    
+    # Run the demo with configuration
+    case $demo in
+        phase2)
+            ./nlm --neuron_count $neurons --region_count 1 --connection_probability 0.1 \
+                  --stdp_ltp_weight 0.01 --stdp_ltd_weight 0.012 \
+                  --synaptogenesis_rate 0.0001 --pruning_rate 0.00001
+            ;;
+        phase3)
+            ./nlm_phase3_demo --neurons $neurons --steps $steps
+            ;;
+        phase4)
+            ./nlm_phase4_demo --neurons $neurons --steps $steps
+            ;;
+        phase5)
+            ./nlm_phase5_demo
+            ;;
+        phase6)
+            # For Phase 6, we need to run the demo with config options
+            # Since the current demo doesn't accept command-line arguments,
+            # we'll run it as-is and rely on the enhanced Phase6IntegratedExperiment
+            echo -e "${YELLOW}Note: Phase 6 demo uses hardcoded configuration.${NC}"
+            echo -e "${YELLOW}Use ./nlm_phase6_demo directly for full control.${NC}"
+            ./nlm_phase6_demo
+            ;;
+        phase6_text)
+            ./nlm_phase6_text_demo
+            ;;
+        *)
+            echo -e "${RED}Unknown demo: $demo${NC}"
+            echo -e "${YELLOW}Available demos: phase2, phase3, phase4, phase5, phase6, phase6_text${NC}"
+            return
+            ;;
+    esac
+    
+    echo -e "${GREEN}Demo completed.${NC}"
+}
+
+# Run benchmarks
+function run_benchmarks() {
+    echo -e "${BLUE}Running NLM benchmarks...${NC}"
+    
+    # Run the built-in benchmark
+    if [ -f "./nlm_benchmark" ]; then
+        echo "Running nlm_benchmark..."
+        ./nlm_benchmark
+    else
+        echo -e "${RED}nlm_benchmark not found! Build the project first.${NC}"
+    fi
+    
+    # Additional benchmarks can be added here
+    echo "Benchmarks completed."
+}
+
+# Check system status
+function check_system() {
+    echo -e "${BLUE}=== NLM System Status Check ===${NC}"
+    
+    # Check if main nlm executable exists
+    if [ -f "./nlm" ]; then
+        echo -e "${GREEN}✓ Main NLM executable found${NC}"
+    else
+        echo -e "${RED}✗ Main NLM executable not found${NC}"
+    fi
+    
+    # Check if demos exist
+    local demos_found=0
+    for demo in nlm_phase2 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_phase6_text_demo; do
+        if [ -f "./$(basename $demo)" ]; then
+            ((demos_found++))
+        fi
+    done
+    
+    echo "Demos found: $demos_found/6"
+    
+    # Check for build directory
+    if [ -d "./build" ]; then
+        echo -e "${GREEN}✓ Build directory found${NC}"
+    else
+        echo -e "${YELLOW}⚠ Build directory not found${NC}"
+    fi
+    
+    # Check for source files
+    if [ -f "./src/main.cpp" ] && [ -f "./src/brain/Neuron.cpp" ]; then
+        echo -e "${GREEN}✓ Core source files found${NC}"
+    else
+        echo -e "${RED}✗ Core source files missing${NC}"
+    fi
+    
+    echo "\n${YELLOW}To build NLM, run:${NC}"
+    echo "  mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j4"
+    
+    echo "\n${YELLOW}To run demos after building:${NC}"
+    echo "  ./nlm              # Phase 2 demo"
+    echo "  ./nlm_phase3_demo  # Phase 3 demo"
+    echo "  ./nlm_phase4_demo  # Phase 4 demo"
+    echo "  ./nlm_phase5_demo  # Phase 5 demo"
+    echo "  ./nlm_phase6_demo  # Phase 6 demo"
+    echo "  ./nlm_phase6_text_demo  # Phase 6 text demo"
+}
+
+# Main CLI logic
+function main() {
+    if [[ $# -eq 0 ]]; then
+        show_help
+        return
+    fi
+    
+    local command=$1
+    shift
+    
+    case $command in
+        run)
+            local demo="phase6"  # Default demo
+            # Parse demo name if provided
+            if [[ $# -gt 0 && $1 != -* ]]; then
+                demo=$1
+                shift
+            fi
+            run_simulation "$demo" "$@"
+            ;;
+        config)
+            config_menu
+            ;;
+        info)
+            show_info
+            ;;
+        benchmark)
+            run_benchmarks
+            ;;
+        check)
+            check_system
+            ;;
+        help|--help|-h)
+            show_help
+            ;;
+        *)
+            echo -e "${RED}Unknown command: $command${NC}"
+            show_help
+            return
+            ;;
+    esac
+}
+
+# Execute main function with all arguments
+main "$@"

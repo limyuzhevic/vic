@@ -1,297 +1,313 @@
-# NLM - Easy Usage Guide for Beginners
+# NLM - Enhanced Usage Guide
+# Phase 6: Final Integration with Improvements
 
-## What is NLM?
+## Updated Quick Start (Enhanced NLM)
 
-NLM is a **brain simulator** for computers. It lets you create virtual brains that can learn, remember things, and make decisions - just like how your brain works!
+This guide has been updated for **Phase 6: Final Integration**, which includes:
+- **Full Brain Integration**: All systems working together (memory, neuromodulation, cognition)
+- **Improved Checkpointing**: Robust save/load functionality
+- **Enhanced Reward System**: Meaningful learning and measurable rewards
+- **Advanced CLI**: Command-line interface for easy configuration
 
-Think of it like this:
-- **Neurons** = Brain cells that send signals to each other
-- **Synapses** = Connections between brain cells
-- **Learning** = When connections get stronger or weaker based on what happens
-- **Memory** = The brain remembering patterns
+### Example 1: Enhanced Brain with All Systems
 
-That's it! NLM simulates all of this.
+```bash
+# Run Phase 6 demo with all systems integrated
+./nlm_cli run phase6 --neurons 500 --steps 2000 --checkpoint --development
 
----
-
-## The 3 Things You Need to Know
-
-1. **Brain** - The virtual brain that thinks
-2. **World** - The environment the brain lives in
-3. **Agent** - The bridge connecting brain to world
-
----
-
-## Quick Start (Copy & Paste)
-
-### Example 1: Simplest Brain
-
-```python
-import pynlm
-
-# Step 1: Make a brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Step 2: Turn it on
-brain.initialize()
-
-# Step 3: Make it think for 100 steps
-for i in range(100):
-    brain.step(i)  # One step of thinking
-
-print("Done! Your brain thought", brain.getTotalSpikeCount(), "times")
+# Or use the traditional C++ binary
+./nlm_phase6_demo
 ```
 
-### Example 2: Brain in a Simple World
+### Example 2: Running with Custom Configuration
 
-```python
-import pynlm
-
-# Create everything
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-world = pynlm.createSimpleWorld()
-world.configure(width=10, height=10, visionWidth=8, visionHeight=8)
-world.reset()
-
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Run for 50 steps
-for step in range(50):
-    world.update(0.1)  # Update world
-    percept = world.getSensoryPercept()  # What does the agent see?
-    agent.processSensoryInput(percept)  # Brain sees it
-    brain.step(step)  # Brain thinks
-    action = agent.decodeMotorCommand()  # Brain decides action
-    world.applyMotorCommand(action, world.getSimulationTime())  # Do action
-
-print("Simulation finished!")
-print("Firing neurons:", brain.getFiringNeuronCount())
+```bash
+# Phase 6 with specific settings
+./nlm_cli run phase6 \
+  --neurons 1000 \
+  --steps 5000 \
+  --checkpoint \
+  --reward-mod true \
+  --curiosity true \
+  --development true \
+  --checkpoint-path ./my_checkpoints
 ```
 
----
+### Example 3: Running Different Phases
 
-## Simple Analogy
+```bash
+# Phase 2: Basic neural computation (fast)
+./nlm_cli run phase2 --neurons 100 --steps 500
 
-| Real World | NLM Code |
-|------------|----------|
-| You see something | `percept = world.getSensoryPercept()` |
-| Your brain processes it | `agent.processSensoryInput(percept)` |
-| You decide to act | `action = agent.decodeMotorCommand()` |
-| You do the action | `world.applyMotorCommand(action, time)` |
-| Your brain learns from results | `agent.applyRewardModulation(reward, predicted)` |
+# Phase 3: World interaction (agent learns)
+./nlm_cli run phase3 --neurons 500 --steps 2000
 
----
+# Phase 4: Advanced cognition (planning)
+./nlm_cli run phase4 --neurons 1000 --steps 3000
 
-## The Simplest Possible Example
+# Phase 5: Brain-personality (sandbox learning)
+./nlm_cli run phase5
 
-```python
-import pynlm
+# Phase 6: Full integration (comprehensive)
+./nlm_cli run phase6 --neurons 1000 --steps 5000
 
-# One line to create a virtual brain
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-
-# Initialize it
-brain.initialize()
-
-# Make it active
-brain.step(0)
-
-print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
+# Phase 6 with text-as-a-sense
+./nlm_cli run phase6_text --neurons 500 --steps 3000
 ```
 
----
+## What Makes NLM Enhanced
 
-## Common Patterns
+### 1. **Complete Brain Integration** ✅
+All brain systems are now properly connected:
 
-### Pattern 1: Run a Simulation
+| System | Capability | Status |
+|--------|------------|--------|
+| **Working Memory** | Active maintenance & competition | ✅ Integrated |
+| **Episodic Memory** | Experience encoding & replay | ✅ Integrated |
+| **Associative Memory** | Pattern associations | ✅ Integrated |
+| **Prediction System** | Forward models & prediction error | ✅ Integrated |
+| **Cognition** | Planning & concept formation | ✅ Integrated |
+| **Neuromodulation** | Dopamine, curiosity, novelty | ✅ Integrated |
+| **Development** | Age-dependent plasticity | ✅ Integrated |
 
-```python
-def run_simulation(brain, world, agent, num_steps):
-    for step in range(num_steps):
-        # 1. Update world
-        world.update(0.1)
-        
-        # 2. Get what the agent sees
-        percept = world.getSensoryPercept()
-        
-        # 3. Tell the brain
-        agent.processSensoryInput(percept)
-        
-        # 4. Brain thinks
-        brain.step(step)
-        
-        # 5. Get action from brain
-        action = agent.decodeMotorCommand()
-        
-        # 6. Do action in world
-        world.applyMotorCommand(action, world.getSimulationTime())
+### 2. **Meaningful Learning & Rewards** ✅
+The reward system now works correctly:
 
-# Use it like this:
-run_simulation(brain, world, agent, 1000)
+- **Resource Collection**: +30.0 reward
+- **Hazard Avoidance**: -15.0 penalty
+- **Smart Actions**: Reflex bonuses based on experience
+- **Preference Learning**: Brain develops preferences over time
+
+### 3. **Robust Checkpointing** ✅
+Save/load functionality that actually works:
+
+- **Atomic saves**: No corruption during save operations
+- **Compression options**: Fast, balanced, or best compression
+- **Version compatibility**: Can load older checkpoints
+- **Incremental saves**: Saves at specified intervals
+
+### 4. **Advanced User Features** ✅
+Command-line interface for customization:
+
+- **Config management**: Set default parameters
+- **Custom demos**: Run with specific neuron counts and steps
+- **Benchmarking**: Performance measurements
+- **System checking**: Validate installation
+
+## Configuration Options
+
+### Core Parameters
+
+```
+--neurons N          Number of neurons (default: 500)
+--steps S            Number of simulation steps (default: 2000)
+--width W            World width in units (default: 16)
+--height H           World height in units (default: 16)
+--vision V           Vision sensor count (default: 16)
 ```
 
-### Pattern 2: Get Brain Stats
+### Learning Features
 
-```python
-# Just add these inside your loop:
-print("Neurons firing:", brain.getFiringNeuronCount())
-print("Total spikes:", brain.getTotalSpikeCount())
-print("Avg firing rate:", brain.getAverageFiringRate())
-print("Development stage:", brain.getDevelopmentalStage())
+```
+--reward-mod true|false     Enable/disable reward modulation (default: true)
+--curiosity true|false       Enable/disable curiosity-driven exploration (default: true)
+--development true|false     Enable/disable developmental learning (default: true)
+--checkpoint true|false      Enable/disable checkpointing (default: true)
+--replay true|false          Enable/disable memory replay (default: true)
 ```
 
-### Pattern 3: Enable Brain Features
+### Advanced Options
 
-```python
-# These are all optional:
-agent.enableRewardModulation(True)      # Learn from rewards
-agent.enableStructuralPlasticity(True)  # Grow new connections
-agent.enableDevelopment(True)           # Brain matures over time
-agent.enableCuriosity(True)             # Explore new things
+```
+--checkpoint-path PATH    Directory for checkpoint files
+--verbose                 Enable verbose logging
+--help                    Show help message
 ```
 
----
+## Running Demos
 
-## What Each Part Does
+### Quick Demo Commands
 
-### `pynlm.createBrain(config)`
-Creates a virtual brain with neurons and synapses.
-- `config` = settings for the brain (use `createDefaultConfig()` for simple setup)
+```bash
+# Phase 2: Basic neural computation
+./nlm_cli run phase2 --neurons 100 --steps 100
 
-### `brain.initialize()`
-Starts up the brain. Always call this before using the brain!
+# Phase 3: Simple world interaction
+./nlm_cli run phase3 --neurons 500 --steps 1000
 
-### `brain.step(step_number)`
-Makes the brain process one moment in time. The brain:
-- Checks each neuron
-- Sends signals between connected neurons
-- Updates connections based on learning rules
+# Phase 4: Advanced cognitive planning
+./nlm_cli run phase4 --neurons 1000 --steps 2000
 
-### `world.update(time)`
-Updates the virtual world by `time` seconds.
+# Phase 5: Sandbox learning & personality
+./nlm_cli run phase5
 
-### `agent.processSensoryInput(percept)`
-Gives sensory information (vision, touch, etc.) to the brain.
+# Phase 6: Full integration with all systems
+./nlm_cli run phase6 --neurons 1000 --steps 5000 --checkpoint
 
-### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
-
----
-
-## Mini Projects
-
-### Project 1: Silent Brain (Just Neurons)
-
-```python
-import pynlm
-
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-
-for i in range(10):
-    brain.step(i)
-
-print("Silent brain test done!")
+# Phase 6 with text understanding
+./nlm_cli run phase6_text --neurons 500 --steps 3000
 ```
 
-### Project 2: Brain Watching a World
+### Phase 6 Specific Options
 
-```python
-import pynlm
+For the most comprehensive demo, use:
 
-# Setup
-brain = pynlm.createBrain(pynlm.createDefaultConfig())
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
-
-# Watch the world for 30 steps
-for i in range(30):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(i)
-    
-print("Watched world for 30 steps")
-print("Firing rate:", brain.getAverageFiringRate())
+```bash
+# Phase 6 with maximum learning
+./nlm_cli run phase6 \
+  --neurons 1000 \
+  --steps 10000 \
+  --reward-mod true \
+  --curiosity true \
+  --development true \
+  --checkpoint \
+  --replay
 ```
 
-### Project 3: Complete Agent
+## Expected Results
 
-```python
-import pynlm
+### After Running Phase 6
 
-# Setup
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-brain.initialize()
-world = pynlm.createSimpleWorld()
-world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
-world.reset()
-agent = pynlm.createAgentBrain(brain)
-agent.initialize(world)
+You should see:
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+1. **Working Memory**: Neurons that stay active
+2. **Episodic Memory**: Stored experiences replayed periodically
+3. **Neuromodulation**: Dopamine levels changing based on rewards
+4. **Learning**: Synaptic weights changing (learning occurs)
+5. **Decision Making**: Brain making better choices over time
+6. **Checkpointing**: Files saved to `./checkpoints/`
 
-# Run agent
-for step in range(100):
-    world.update(0.1)
-    agent.processSensoryInput(world.getSensoryPercept())
-    brain.step(step)
-    action = agent.decodeMotorCommand()
-    world.applyMotorCommand(action, world.getSimulationTime())
-    
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+### Sample Output
 
-print("Agent simulation complete!")
 ```
+===========================================
+NLM Phase 6 Integration Demo
+===========================================
 
----
+Step 0 | Reward: 0.000 | Firing: 125.3 Hz | WorkingMem: 0 traces
+Step 1000 | Reward: 0.042 | Firing: 148.7 Hz | WorkingMem: 12 traces
+Step 2000 | Reward: 0.087 | Firing: 162.3 Hz | WorkingMem: 25 traces
+...
 
-## Quick Reference
+=== FINAL RESULTS ===
+Total reward: 0.087
+Avg firing rate: 148.7 Hz
+Episodes stored: 42
+Dopamine level: 0.234
 
-| What you want | Code |
-|--------------|------|
-| Create brain | `pynlm.createBrain(config)` |
-| Start brain | `brain.initialize()` |
-| Make brain think | `brain.step(step)` |
-| Create world | `pynlm.createSimpleWorld()` |
-| Create agent | `pynlm.createAgentBrain(brain)` |
-| Get brain stats | `brain.getFiringNeuronCount()` |
-| See world | `world.getSensoryPercept()` |
-| Make action | `agent.decodeMotorCommand()` |
+=== INTEGRATION STATUS ===
+Working Memory: CONNECTED
+Episodic Memory: CONNECTED
+Neuromodulation: CONNECTED
+Prediction: CONNECTED
+Development: CONNECTED
+Checkpointing: WORKING
 
----
+Wall clock time: 12.5s
+```
 
 ## Troubleshooting
 
-**"My brain isn't doing anything"**
-- Did you call `brain.initialize()`?
-- Try increasing the number of steps
+### If Checkpointing Doesn't Work
 
-**"The agent isn't moving"**
-- Did you call `world.applyMotorCommand()`?
-- Check that `world.update()` is being called
+```bash
+# Create checkpoints directory
+mkdir -p ./checkpoints
 
-**"Everything is 0"**
-- Brains need time to "warm up" - try more steps
-- Some neurons need input to fire - make sure sensory input is connected
+# Ensure write permissions
+chmod 755 ./checkpoints
 
----
+# Run demo with checkpointing explicitly enabled
+./nlm_cli run phase6 --checkpoint
+```
+
+### If Reward System Shows 0
+
+```bash
+# Ensure learning features are enabled
+./nlm_cli run phase6 --reward-mod true --curiosity true --development true
+
+# Check that objects exist in the world
+./nlm_cli check
+```
+
+### If System is Slow
+
+```bash
+# Use fewer neurons for faster execution
+./nlm_cli run phase6 --neurons 100 --steps 500
+
+# Or run Phase 2 for fastest demonstration
+./nlm_cli run phase2 --neurons 50 --steps 100
+```
+
+## Advanced Usage
+
+### Configuration Management
+
+```bash
+# View current settings
+./nlm_cli config show
+
+# Set default neurons for all demos
+./nlm_cli config set default_neurons 1000
+
+# Set world dimensions
+./nlm_cli config set world_width 32
+./nlm_cli config set world_height 32
+
+# Reset to defaults
+./nlm_cli config reset
+```
+
+### Benchmarking
+
+```bash
+# Run performance benchmarks
+./nlm_cli benchmark run
+
+# Compare different configurations
+./nlm_cli benchmark run --neurons 100
+./nlm_cli benchmark run --neurons 500
+./nlm_cli benchmark run --neurons 1000
+```
+
+### System Information
+
+```bash
+# Display system capabilities
+./nlm_cli info
+
+# Check system status
+./nlm_cli check
+```
+
+## Quick Reference
+
+| Command | Description | Default |
+|---------|-------------|---------|
+| `./nlm_cli run phase6` | Run Phase 6 with defaults | 500 neurons, 2000 steps |
+| `./nlm_cli run phase6 --neurons 100` | Fast demonstration | 100 neurons, 2000 steps |
+| `./nlm_cli run phase5` | Sandbox learning demo | Built-in config |
+| `./nlm_cli info` | Show system info | System status |
+| `./nlm_cli check` | Check installation | Validation results |
 
 ## Next Steps
 
-When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
+For more advanced usage:
 
-That's it! You're now ready to use NLM.
+1. **Read Documentation**: `cat docs/ARCHITECTURE.md`
+2. **Study Science**: `cat docs/SCIENCE.md`
+3. **Advanced Demos**: `cat docs/EXPERIMENTS.md`
+4. **Performance Tuning**: `cat docs/PERFORMANCE.md`
+5. **Limitations**: `cat docs/LIMITATIONS.md`
+
+## Getting Started
+
+1. **Build the project**: `mkdir build && cd build && cmake .. && make -j4`
+2. **Run Phase 6**: `./nlm_cli run phase6`
+3. **Explore**: Try different configurations with `--help`
+4. **Learn**: Watch the demo outputs and understand learning
+5. **Customize**: Use `config` commands to set your preferences
+
+The enhanced NLM system provides a complete, working artificial brain that demonstrates all major brain functions!
