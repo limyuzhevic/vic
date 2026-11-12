@@ -19,14 +19,183 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    // Try to parse as JSON first
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    if (parseJSON(content)) {
+        return true;
+    }
+    
+    // Try to parse as YAML
+    std::ifstream file2(filepath);
+    if (file2.is_open() && parseYAML(content)) {
+        return true;
+    }
+    
+    // Fall back to simple key=value format
+    std::ifstream file3(filepath);
+    return parseSimpleKeyValue(file3);
+}
+
+bool Config::parseJSON(const std::string& jsonStr) {
+    // Simple JSON parser for basic key-value pairs
+    // Supports: {"key": "value", "key2": 123, "key3": true}
+    size_t pos = 0;
+    while (pos < jsonStr.size()) {
+        // Find next " or {
+        size_t keyStart = jsonStr.find('"', pos);
+        if (keyStart == std::string::npos) {
+            break;
+        }
+        
+        size_t keyEnd = jsonStr.find('"', keyStart + 1);
+        if (keyEnd == std::string::npos) {
+            break;
+        }
+        
+        std::string key = jsonStr.substr(keyStart + 1, keyEnd - keyStart - 1);
+        
+        // Find ":"
+        size_t colonPos = jsonStr.find(':', keyEnd);
+        if (colonPos == std::string::npos) {
+            break;
+        }
+        
+        // Find value (skip whitespace)
+        size_t valueStart = jsonStr.find_first_not_of(" \t\n\r", colonPos + 1);
+        if (valueStart == std::string::npos) {
+            break;
+        }
+        
+        // Parse different value types
+        ConfigValue value;
+        if (jsonStr[valueStart] == '\"') {
+            // String value
+            size_t valueEnd = jsonStr.find('\"', valueStart + 1);
+            if (valueEnd == std::string::npos) {
+                break;
+            }
+            std::string strValue = jsonStr.substr(valueStart + 1, valueEnd - valueStart - 1);
+            value = strValue;
+            pos = valueEnd + 1;
+        } else if (jsonStr[valueStart] == 't' || jsonStr[valueStart] == 'f') {
+            // Boolean value
+            if (valueStart + 4 < jsonStr.size() && jsonStr.substr(valueStart, 5) == "true") {
+                value = true;
+                pos = valueStart + 4;
+            } else if (valueStart + 5 < jsonStr.size() && jsonStr.substr(valueStart, 6) == "false") {
+                value = false;
+                pos = valueStart + 5;
+            } else {
+                break;
+            }
+        } else if (isdigit(jsonStr[valueStart]) || (jsonStr[valueStart] == '-' && valueStart + 1 < jsonStr.size() && isdigit(jsonStr[valueStart + 1]))) {
+            // Numeric value
+            size_t valueEnd = valueStart;
+            while (valueEnd < jsonStr.size() && (isdigit(jsonStr[valueEnd]) || jsonStr[valueEnd] == '.' || jsonStr[valueEnd] == '-' || jsonStr[valueEnd] == 'e' || jsonStr[valueEnd] == 'E')) {
+                valueEnd++;
+            }
+            std::string numStr = jsonStr.substr(valueStart, valueEnd - valueStart);
+            
+            // Try to parse as int
+            try {
+                int intVal = std::stoi(numStr);
+                value = intVal;
+                pos = valueEnd;
+            } catch (...) {
+                // Try to parse as double
+                try {
+                    double doubleVal = std::stod(numStr);
+                    value = doubleVal;
+                    pos = valueEnd;
+                } catch (...) {
+                    break;
+                }
+            }
+        } else {
+            // Unknown value type, skip to next comma
+            size_t commaPos = jsonStr.find(',', valueStart);
+            if (commaPos == std::string::npos) {
+                break;
+            }
+            pos = commaPos + 1;
+            continue;
+        }
+        
+        // Skip whitespace and comma
+        while (pos < jsonStr.size() && (jsonStr[pos] == ' ' || jsonStr[pos] == '\t' || jsonStr[pos] == '\n' || jsonStr[pos] == '\r')) {
+            pos++;
+        }
+        if (pos < jsonStr.size() && jsonStr[pos] == ',') {
+            pos++;
+        }
+        
+        set(key, value, ConfigSource::File);
+    }
+    
+    return true;
+}
+
+bool Config::parseYAML(const std::string& yamlStr) {
+    // Simple YAML parser for basic key-value pairs
+    // Supports: key: value (with various value types)
+    std::istringstream stream(yamlStr);
+    std::string line;
+    
+    while (std::getline(stream, line)) {
+        // Skip empty lines and comments
+        line = trim(line);
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        
+        // Find ":" that separates key from value
+        size_t colonPos = line.find(':');
+        if (colonPos == std::string::npos) {
+            continue;
+        }
+        
+        std::string key = trim(line.substr(0, colonPos));
+        std::string value = trim(line.substr(colonPos + 1));
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '\"' && value.back() == '\"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        // Parse value
+        ConfigValue configValue;
+        if (value == "true" || value == "false") {
+            configValue = (value == "true");
+        } else if (isdigit(value[0]) || (value[0] == '-' && value.size() > 1 && isdigit(value[1]))) {
+            // Try to parse as int
+            try {
+                configValue = std::stoi(value);
+            } catch (...) {
+                // Try to parse as double
+                try {
+                    configValue = std::stod(value);
+                } catch (...) {
+                    continue;
+                }
+            }
+        } else {
+            configValue = value;
+        }
+        
+        set(key, configValue, ConfigSource::File);
+    }
+    
+    return true;
+}
+
+bool Config::parseSimpleKeyValue(std::ifstream& file) {
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -43,7 +212,7 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
@@ -79,14 +248,136 @@ bool Config::loadFromArgs(int argc, char** argv) {
 }
 
 bool Config::saveToFile(const std::string& filepath) const {
+    // Determine file format based on extension
+    std::string ext = filepath.substr(filepath.find_last_of('.') + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    
+    bool isJSON = (ext == "json");
+    bool isYAML = (ext == "yaml" || ext == "yml");
+    
     std::ofstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    if (isJSON) {
+        file << "{\n";
+        bool first = true;
+        for (const auto& entry : pImpl->entries) {
+            if (!first) {
+                file << ",\n";
+            } else {
+                first = false;
+            }
+            
+            file << "  \"" << entry.key << "\": ";
+            
+            // Format value based on type
+            std::visit([&](const auto& val) {
+                using T = std::decay_t<decltype(val)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << val << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (val ? "true" : "false");
+                } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                    file << val;
+                } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                    file << std::to_string(val);
+                } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                     std::is_same_v<T, std::vector<double>> ||
+                                     std::is_same_v<T, std::vector<std::string>>) {
+                    file << "[";
+                    for (size_t i = 0; i < val.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        if constexpr (std::is_same_v<T, std::vector<int>>) {
+                            file << val[i];
+                        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                            file << val[i];
+                        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                            file << "\"" << val[i] << "\"";
+                        }
+                    }
+                    file << "]";
+                } else {
+                    file << "null";
+                }
+            }, entry.value);
+        }
+        file << "\n}\n";
+    } else if (isYAML) {
+        for (const auto& entry : pImpl->entries) {
+            file << entry.key << ": ";
+            
+            // Format value based on type
+            std::visit([&](const auto& val) {
+                using T = std::decay_t<decltype(val)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << val << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (val ? "true" : "false");
+                } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                    file << val;
+                } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                    file << std::to_string(val);
+                } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                     std::is_same_v<T, std::vector<double>> ||
+                                     std::is_same_v<T, std::vector<std::string>>) {
+                    file << " [";
+                    for (size_t i = 0; i < val.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        if constexpr (std::is_same_v<T, std::vector<int>>) {
+                            file << val[i];
+                        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                            file << val[i];
+                        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                            file << "\"" << val[i] << "\"";
+                        }
+                    }
+                    file << "]";
+                } else {
+                    file << "null";
+                }
+            }, entry.value);
+            file << "\n";
+        }
+    } else {
+        // Default to simple key=value format
+        for (const auto& entry : pImpl->entries) {
+            file << "# " << entry.description << "\n";
+            file << entry.key << " = ";
+            
+            // Format value based on type
+            std::visit([&](const auto& val) {
+                using T = std::decay_t<decltype(val)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    file << "\"" << val << "\"";
+                } else if constexpr (std::is_same_v<T, bool>) {
+                    file << (val ? "true" : "false");
+                } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, int64_t>) {
+                    file << val;
+                } else if constexpr (std::is_same_v<T, double> || std::is_same_v<T, float>) {
+                    file << std::to_string(val);
+                } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                     std::is_same_v<T, std::vector<double>> ||
+                                     std::is_same_v<T, std::vector<std::string>>) {
+                    file << "[";
+                    for (size_t i = 0; i < val.size(); ++i) {
+                        if (i > 0) file << ", ";
+                        if constexpr (std::is_same_v<T, std::vector<int>>) {
+                            file << val[i];
+                        } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                            file << val[i];
+                        } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                            file << "\"" << val[i] << "\"";
+                        }
+                    }
+                    file << "]";
+                } else {
+                    file << "PLACEHOLDER_VALUE";
+                }
+            }, entry.value);
+            file << "\n";
+        }
     }
     
     return true;
