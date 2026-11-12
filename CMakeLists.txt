@@ -136,6 +136,18 @@ target_link_libraries(nlm_phase6 PUBLIC nlm_core nlm_agent nlm_world)
 add_executable(nlm
     src/main.cpp
 )
+
+# Enhanced CLI executable
+add_executable(nlm-cli
+    src/nlm_cli.cpp
+)
+target_link_libraries(nlm-cli PUBLIC nlm_core)
+
+# Demo executable with enhanced features
+add_executable(nlm_demo_enhanced
+    src/experiments/Phase6Demo.cpp
+)
+target_link_libraries(nlm_demo_enhanced PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 target_link_libraries(nlm PUBLIC nlm_core)
 
 # Phase 3 demo executable
