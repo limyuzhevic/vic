@@ -125,9 +125,9 @@ public:
     bool testNeuromodulationIntegration();
     
     /**
-     * Test checkpoint save/load
+     * Validate checkpoint save/load
      */
-    bool testCheckpointing();
+    bool validateCheckpoint(std::shared_ptr<Brain> originalBrain, std::shared_ptr<Brain> restoredBrain);
     
     /**
      * Test replay system

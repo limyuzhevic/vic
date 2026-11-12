@@ -65,6 +65,10 @@ public:
     // Save to file
     bool saveToFile(const std::string& filepath) const;
     
+        // Load from JSON/YAML content
+    void setFromJson(const std::string& jsonContent, ConfigSource source = ConfigSource::File);
+    void setFromYaml(const std::string& yamlContent, ConfigSource source = ConfigSource::File);
+    
     // Get values (defined here so templates instantiate in every TU)
 template<typename T>
     std::optional<T> get(const std::string& key) const;

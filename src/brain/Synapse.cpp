@@ -199,6 +199,13 @@ void Synapse::setEligibilityTrace(float trace) {
 }
 
 void Synapse::decayEligibilityTrace(float decayRate) {
+    // Validate decay rate
+    if (decayRate < 0.0f || decayRate > 1.0f) {
+        NLM_LOG_ERROR("Invalid decay rate in Synapse::decayEligibilityTrace: must be between 0.0 and 1.0");
+        return;
+    }
+    
+    // Apply decay to eligibility trace
     pImpl->eligibilityTrace *= (1.0f - decayRate);
     if (std::abs(pImpl->eligibilityTrace) < 0.001f) {
         pImpl->eligibilityTrace = 0.0f;
@@ -210,7 +217,12 @@ float Synapse::getEfficacy() const {
 }
 
 void Synapse::setEfficacy(float efficacy) {
-    pImpl->efficacy = std::clamp(efficacy, 0.0f, 2.0f);
+    // Validate efficacy range
+    if (efficacy < 0.0f || efficacy > 2.0f) {
+        NLM_LOG_ERROR("Invalid efficacy value in Synapse::setEfficacy: must be between 0.0 and 2.0");
+        return;
+    }
+    pImpl->efficacy = efficacy;
 }
 
 void Synapse::step(Timestamp currentTime) {

@@ -129,24 +129,35 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     NLM_LOG_INFO("Prediction: " + std::string(result.predictionIntegrated ? "YES" : "NO"));
     NLM_LOG_INFO("Development: " + std::string(result.developmentIntegrated ? "YES" : "NO"));
     
-    // Test checkpointing
+    // Test checkpointing with proper validation
     if (config.enableCheckpointing) {
-        NLM_LOG_INFO("Testing checkpoint save/load...");
-        if (brain->save(config.checkpointPath)) {
-            NLM_LOG_INFO("Checkpoint saved successfully");
-            
-            // Create new brain and load
-            auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
-                NLM_LOG_INFO("Checkpoint loaded successfully");
-                result.checkpointingWorks = true;
-            } else {
-                NLM_LOG_ERROR("Failed to load checkpoint");
-            }
-        } else {
+        NLM_LOG_INFO("Testing checkpoint save/load with validation...");
+        
+        // Save the checkpoint
+        if (!brain->save(config.checkpointPath)) {
             NLM_LOG_ERROR("Failed to save checkpoint");
+            continue; // Skip checkpoint test if save fails
+        }
+        NLM_LOG_INFO("Checkpoint saved successfully");
+        
+        // Create new brain and load
+        auto brain2 = std::make_shared<Brain>(cfg);
+        brain2->initialize();
+        
+        // Load the checkpoint
+        if (!brain2->load(config.checkpointPath)) {
+            NLM_LOG_ERROR("Failed to load checkpoint");
+            continue; // Skip validation if load fails
+        }
+        NLM_LOG_INFO("Checkpoint loaded successfully");
+        
+        // Validate that checkpoint worked properly
+        bool checkpointValid = validateCheckpoint(brain, brain2);
+        if (checkpointValid) {
+            NLM_LOG_INFO("✓ Checkpoint validation PASSED");
+            result.checkpointingWorks = true;
+        } else {
+            NLM_LOG_ERROR("✗ Checkpoint validation FAILED - state not properly restored");
         }
     }
     
@@ -363,24 +374,98 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     // Note: Due to the nature of neural simulation, exact state restoration
     // is complex. The load should restore the structure at minimum.
     
-    NLM_LOG_INFO("[PASS] Checkpoint save/load completed");
-    return true;
+    }
+
+// Helper function to get mean weight of a brain
+static double getMeanWeight(const std::shared_ptr<Brain>& brain) {
+    double sum = 0.0;
+    size_t count = 0;
+    for (const auto& region : brain->getRegions()) {
+        for (const auto& syn : region->getSynapses()) {
+            sum += syn->getWeight();
+            ++count;
+        }
+    }
+    return count > 0 ? sum / static_cast<double>(count) : 0.0;
 }
 
-bool Phase6IntegratedExperiment::testReplay() {
-    NLM_LOG_INFO("=== Testing Replay System ===");
+// Helper function to get first membrane potential
+static float getFirstMembranePotential(const std::shared_ptr<Brain>& brain) {
+    for (const auto& region : brain->getRegions()) {
+        for (const auto* neuron : region->getAllNeurons()) {
+            return neuron->getMembranePotential();
+        }
+    }
+    return 0.0f;
+}
+
+bool Phase6IntegratedExperiment::validateCheckpoint(std::shared_ptr<Brain> originalBrain, std::shared_ptr<Brain> restoredBrain) {
+    NLM_LOG_INFO("=== Validating Checkpoint Restore ===");
     
-    auto cfg = std::make_shared<Config>();
-    cfg->set("neuron_count", 100);
+    // Get original brain statistics
+    double originalMeanWeight = getMeanWeight(originalBrain);
+    float originalMembrane = getFirstMembranePotential(originalBrain);
+    size_t originalPending = originalBrain->getPendingSpikeEventCount();
     
-    auto brain = std::make_shared<Brain>(cfg);
-    brain->initialize();
+    // Get restored brain statistics
+    double restoredMeanWeight = getMeanWeight(restoredBrain);
+    float restoredMembrane = getFirstMembranePotential(restoredBrain);
+    size_t restoredPending = restoredBrain->getPendingSpikeEventCount();
     
-    auto* em = brain->getEpisodicMemory();
-    if (!em) {
-        NLM_LOG_ERROR("Episodic memory not available");
+    // Log statistics
+    NLM_LOG_INFO("Original brain - Mean weight: " + std::to_string(originalMeanWeight) +
+                ", Membrane: " + std::to_string(originalMembrane) +
+                ", Pending: " + std::to_string(originalPending));
+    NLM_LOG_INFO("Restored brain - Mean weight: " + std::to_string(restoredMeanWeight) +
+                ", Membrane: " + std::to_string(restoredMembrane) +
+                ", Pending: " + std::to_string(restoredPending));
+    
+    // Validation criteria
+    bool weightRestored = std::abs(originalMeanWeight - restoredMeanWeight) < 1e-6;
+    bool membraneRestored = std::abs(originalMembrane - restoredMembrane) < 1e-6;
+    bool pendingRestored = originalPending == restoredPending;
+    
+    NLM_LOG_INFO("Weight restoration: " + std::string(weightRestored ? "✓ PASS" : "✗ FAIL"));
+    NLM_LOG_INFO("Membrane restoration: " + std::string(membraneRestored ? "✓ PASS" : "✗ FAIL"));
+    NLM_LOG_INFO("Pending spikes restoration: " + std::string(pendingRestored ? "✓ PASS" : "✗ FAIL"));
+    
+    if (!weightRestored || !membraneRestored || !pendingRestored) {
+        NLM_LOG_ERROR("Checkpoint validation FAILED - state not properly restored");
         return false;
     }
+    
+    // Additional test: run identical steps and check firing rates stay close
+    NLM_LOG_INFO("Testing firing rate stability after restore...");
+    const size_t testSteps = 10;
+    
+    float originalRate = originalBrain->getAverageFiringRate();
+    float restoredRate = restoredBrain->getAverageFiringRate();
+    
+    // Run identical steps on both brains
+    for (size_t step = 0; step < testSteps; ++step) {
+        originalBrain->step(static_cast<SimulationStep>(step), static_cast<Timestamp>(step) * 0.001);
+        restoredBrain->step(static_cast<SimulationStep>(step), static_cast<Timestamp>(step) * 0.001);
+    }
+    
+    float finalOriginalRate = originalBrain->getAverageFiringRate();
+    float finalRestoredRate = restoredBrain->getAverageFiringRate();
+    
+    // Check that firing rates stay close
+    float denom = std::max(std::abs(finalOriginalRate), 1.0f);
+    bool ratesStable = std::abs(finalOriginalRate - finalRestoredRate) / denom < 0.25f;
+    
+    NLM_LOG_INFO("Original final firing rate: " + std::to_string(finalOriginalRate));
+    NLM_LOG_INFO("Restored final firing rate: " + std::to_string(finalRestoredRate));
+    NLM_LOG_INFO("Firing rate stability: " + std::string(ratesStable ? "✓ PASS" : "✗ FAIL"));
+    
+    if (!ratesStable) {
+        NLM_LOG_ERROR("Firing rates diverged after restore");
+        return false;
+    }
+    
+    NLM_LOG_INFO("✓ Checkpoint validation PASSED");
+    return true;
+}
     
     // Run some steps
     for (int i = 0; i < 200; ++i) {

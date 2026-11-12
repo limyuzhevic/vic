@@ -70,20 +70,36 @@ void NeuralWorkingMemory::store(const std::vector<float>& pattern, float strengt
 }
 
 void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
+    // Validate activation value
+    if (activation < 0.0f) {
+        NLM_LOG_ERROR("Invalid activation in NeuralWorkingMemory::storeToNeuron: activation cannot be negative");
+        return;
+    }
+    
     // Find or add this neuron to memory
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
-
+    
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
+        // Validate that idx is within bounds
+        if (idx >= memoryActivations_.size() || idx >= memoryTimestamps_.size()) {
+            NLM_LOG_ERROR("Index out of bounds in NeuralWorkingMemory::storeToNeuron");
+            return;
+        }
         memoryActivations_[idx] = activation;
         memoryTimestamps_[idx] = 0;
     } else if (memoryNeurons_.size() < capacity_) {
+        // Validate that we have space to add the neuron
         memoryNeurons_.push_back(neuron);
         memoryActivations_.push_back(activation);
         memoryTimestamps_.push_back(0);
         it = memoryNeurons_.end() - 1;
+    } else {
+        // Memory at capacity, cannot store new neuron
+        NLM_LOG_INFO("NeuralWorkingMemory at capacity, cannot store new neuron");
+        return;
     }
-
+    
     // Phase 6: activeTraces_ is the trace list getActiveTraces()
     // reports, and it was never populated — only cleared — so it
     // always read 0 even when memory held 50 neurons. A stored
@@ -92,6 +108,11 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // clear()/restoreSnapshot() reset the list with the content.
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
+        // Validate that idx is within bounds
+        if (idx >= memoryActivations_.size()) {
+            NLM_LOG_ERROR("Index out of bounds when processing active traces in NeuralWorkingMemory::storeToNeuron");
+            return;
+        }
         bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
         if (activation > 0.1f && !present) activeTraces_.push_back(idx);
         if (activation <= 0.1f && present) {
@@ -125,6 +146,11 @@ float NeuralWorkingMemory::getNeuronActivation(NeuronId neuron) const {
     auto it = std::find(memoryNeurons_.begin(), memoryNeurons_.end(), neuron);
     if (it != memoryNeurons_.end()) {
         size_t idx = std::distance(memoryNeurons_.begin(), it);
+        // Validate that idx is within bounds
+        if (idx >= memoryActivations_.size()) {
+            NLM_LOG_ERROR("Index out of bounds in NeuralWorkingMemory::getNeuronActivation");
+            return 0.0f;
+        }
         return memoryActivations_[idx];
     }
     return 0.0f;
@@ -322,21 +348,28 @@ std::vector<NeuronId> AttentionalSelection::processCompetition(const std::vector
         return competitors;
     }
     
-    // Competition: neurons inhibit each other based on relative activity
-    for (size_t i = 0; i < competitors.size(); ++i) {
-        for (size_t j = 0; j < competitors.size(); ++j) {
-            if (i == j) continue;
-            
-            float relativeActivity = activities[i] / (activities[j] + 0.001f);
-            
-            if (relativeActivity > 1.5f) {
-                // i is much stronger than j - apply inhibition to j
-                if (brain_) {
-                    brain_->injectCurrent(competitors[j], -globalInhibition * inhibitionStrength_);
-                }
-                pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);
-            }
+    // Optimized competition: find strongest neuron and apply inhibition
+    // This reduces O(n²) to O(n) complexity
+    size_t strongestNeuron = 0;
+    float maxActivity = activities[0];
+    
+    // Find neuron with maximum activity
+    for (size_t i = 1; i < competitors.size(); ++i) {
+        if (activities[i] > maxActivity) {
+            maxActivity = activities[i];
+            strongestNeuron = i;
         }
+    }
+    
+    // Apply inhibition from strongest neuron to others (biologically realistic)
+    for (size_t i = 0; i < competitors.size(); ++i) {
+        if (i == strongestNeuron) continue;
+        
+        // Apply strong inhibition from winner to all others
+        if (brain_) {
+            brain_->injectCurrent(competitors[i], -globalInhibition * inhibitionStrength_);
+        }
+        pImpl->inhibitionLevel.push_back(globalInhibition * inhibitionStrength_);
     }
     
     // Winners are neurons with above-threshold activity

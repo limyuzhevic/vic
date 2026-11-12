@@ -216,6 +216,24 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     float tau = Impl::TIME_CONSTANT;  // ms
     float C = Impl::MEMBRANE_CAPACITANCE;  // nF
     
+    // Validate input parameters
+    if (dt < 0.0f) {
+        NLM_LOG_ERROR("Invalid timestep in Neuron::stepLIF: dt cannot be negative");
+        return false;
+    }
+    if (C <= 0.0f) {
+        NLM_LOG_ERROR("Invalid membrane capacitance in Neuron::stepLIF: C must be positive");
+        return false;
+    }
+    if (tau <= 0.0f) {
+        NLM_LOG_ERROR("Invalid time constant in Neuron::stepLIF: tau must be positive");
+        return false;
+    }
+    
+    // LIF dynamics: Leaky Integrate-and-Fire
+    // dV/dt = (V_rest - V)/tau + I/C
+    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     

@@ -218,26 +218,83 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         }
     }
     
-    // Apply repeated input pattern to stimulate learning
+    // Apply repeated input pattern to stimulate learning with reduced, varied input
     NLM_LOG_INFO("");
-    NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
+    NLM_LOG_INFO("Applying varied input patterns (1000 steps)...");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // Create varied pattern: stimulate different neurons over time with moderate input
     std::vector<NeuronId> patternNeurons;
+    std::vector<NeuronId> allSensoryNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
+            if (neuron->getType() == NeuronType::Sensory) {
+                allSensoryNeurons.push_back(neuron->getId());
             }
         }
     }
+    
+    // Create a more diverse pattern by cycling through neurons
+    size_t patternLength = std::min<size_t>(50, allSensoryNeurons.size());
+    for (size_t i = 0; i < patternLength; ++i) {
+        patternNeurons.push_back(allSensoryNeurons[i]);
+    }
+    
+    // Also include some internal neurons for more realistic activity
+    std::vector<NeuronId> internalNeurons;
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (auto* neuron : region->getAllNeurons()) {
+            if (neuron->getType() == NeuronType::Internal) {
+                internalNeurons.push_back(neuron->getId());
+            }
+        }
+    }
+    
+    // Mix internal neurons into pattern (20% of pattern)
+    size_t internalCount = std::min<size_t>(internalNeurons.size() / 5, patternLength / 5);
+    for (size_t i = 0; i < internalCount; ++i) {
+        patternNeurons.push_back(internalNeurons[i]);
+    }
+    
+    NLM_LOG_INFO("  Pattern size: " + std::to_string(patternNeurons.size()) + 
+                " neurons (" + std::to_string(patternLength / 2) + " sensory, " + 
+                std::to_string(internalCount) + " internal)");
+    
+    // Add a baseline level of stimulation to prevent complete silence
+    std::vector<NeuronId> baselineNeurons;
+    if (auto* region = brain->getRegion(RegionId(1))) {
+        for (auto* neuron : region->getAllNeurons()) {
+            if (neuron->getType() == NeuronType::Inhibitory) {
+                baselineNeurons.push_back(neuron->getId());
+            }
+        }
+    }
+    
+    // Run the varied pattern experiment
     for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+        // Determine which neurons to stimulate this step (cycling pattern)
+        std::vector<NeuronId> neuronsToStimulate;
+        
+        // Add main pattern neurons (every 5 steps to create variation)
+        if (step % 5 == 0) {
+            for (NeuronId id : patternNeurons) {
+                neuronsToStimulate.push_back(id);
+            }
+        }
+        
+        // Add baseline inhibitory neurons occasionally (every 25 steps)
+        if (step % 25 == 0) {
+            for (NeuronId id : baselineNeurons) {
+                neuronsToStimulate.push_back(id);
+            }
+        }
+        
+        // Apply varied input: different strengths based on step
+        float baseCurrent = 15.0f;  // Reduced from 30.0f to prevent saturation
+        float currentMultiplier = 1.0f + 0.2f * std::sin(static_cast<float>(step) * 0.1f);
+        
+        for (NeuronId id : neuronsToStimulate) {
+            float current = baseCurrent * currentMultiplier;
+            brain->injectCurrent(id, current);
         }
         
         brain->step(step, step * 0.001);
@@ -246,7 +303,9 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                        " | Stimulated: " + std::to_string(neuronsToStimulate.size()) +
+                        " neurons");
         }
     }
     
