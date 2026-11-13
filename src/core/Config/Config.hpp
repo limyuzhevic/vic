@@ -11,6 +11,7 @@ namespace nlm {
 
 // Forward declarations
 class Config;
+class ConfigValidator;
 
 // Configuration value types
 using ConfigValue = std::variant<
@@ -66,12 +67,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -79,6 +80,18 @@ template<typename T>
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Validate configuration
+    std::vector<std::string> validate() const;
+    
+    // Apply default values for missing keys
+    void applyDefaults();
+    
+    // Get configuration documentation
+    static std::string getConfigDocumentation(const std::string& key = "");
+    
+    // Get all known configuration keys with descriptions
+    static std::vector<std::string> getAllConfigKeys();
     
     // Check existence
     bool has(const std::string& key) const;

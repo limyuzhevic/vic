@@ -23,6 +23,9 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , capacity_(100)
     , decayRate_(0.01f)
 {
+    // Initialize active traces vector for Phase 6
+    activeTraces_.clear();
+    activeTraces_.reserve(capacity_);
 }
 
 NeuralWorkingMemory::~NeuralWorkingMemory() = default;
@@ -172,6 +175,12 @@ void NeuralWorkingMemory::clear() {
 void NeuralWorkingMemory::strengthenMemory(float factor) {
     for (auto& activation : memoryActivations_) {
         activation = std::min(1.0f, activation * factor);
+    }
+    
+    // Update active traces after strengthening
+    activeTraces_.clear();
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) activeTraces_.push_back(i);
     }
 }
 
