@@ -7,6 +7,12 @@
 #include <optional>
 #include <algorithm>
 
+// nlohmann/json for JSON support
+#include <nlohmann/json.hpp>
+
+// yaml-cpp for YAML support
+#include <yaml-cpp/yaml.h>
+
 namespace nlm {
 
 // Forward declarations
@@ -56,22 +62,23 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+    // Load from file (auto-detect JSON/YAML/legacy)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
     bool loadFromArgs(int argc, char** argv);
     
-    // Save to file
+    // Save to file (legacy format, JSON, or YAML)
     bool saveToFile(const std::string& filepath) const;
+    bool saveToFile(const std::string& filepath, const std::string& format) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -79,6 +86,10 @@ template<typename T>
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Set values from JSON/YAML
+    void set(const std::string& key, const nlohmann::json& value);
+    void set(const std::string& key, const YAML::Node& value);
     
     // Check existence
     bool has(const std::string& key) const;
@@ -102,6 +113,9 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    
+    // JSON/YAML helpers
+    static std::string getStringValue(const ConfigValue& value);
 };
 
 } // namespace nlm

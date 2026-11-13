@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
+# Find Google Test
+find_package(GTest REQUIRED)
+
 # Test configuration
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
 
@@ -16,7 +19,7 @@ add_executable(nlm_test
     test_brain.cpp
 )
 
-target_link_libraries(nlm_test PRIVATE nlm_core nlm_agent)
+target_link_libraries(nlm_test PRIVATE nlm_core nlm_agent GTest::gtest GTest::gtest_main)
 target_compile_features(nlm_test PRIVATE cxx_std_20)
 
 # Enable testing

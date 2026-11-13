@@ -99,13 +99,14 @@ currently separate demos per phase, not a single unified binary:
 ./nlm                 # Phase 2 demo in src/main.cpp
 ./nlm_phase3_demo
 ./nlm_phase4_demo
+./nlm_phase5_demo     # Phase 5 demo (brain-personality)
 ./nlm_phase6_demo     # Phase 6 integration test
 ./nlm_benchmark
 ```
 
 `nlm_phase6_demo` runs a comprehensive integration test verifying all
-brain systems are connected. Phase 5 is wired as the `nlm_phase5`
-library in CMake; it does not yet have a standalone demo executable.
+brain systems are connected. The Phase 5 library (`nlm_phase5`) is used by
+the `nlm_phase5_demo` executable for performance and personality testing.
 
 ## Project Structure
 
