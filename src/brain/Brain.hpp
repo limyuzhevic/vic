@@ -202,8 +202,48 @@ public:
     float getLearnedPreference() const;
     void setLearnedPreference(float preference);
     
-    // Logging
-    void logStatus() const;
+    // ===== ADVANCED FEATURES =====
+    
+    // Performance profiling and metrics
+    struct PerformanceMetrics {
+        uint64_t totalSteps = 0;
+        uint64_t totalSpikes = 0;
+        uint64_t neuronUpdates = 0;
+        uint64_t synapseUpdates = 0;
+        double avgStepTime = 0.0;
+        double maxStepTime = 0.0;
+    };
+    
+    // Get performance metrics
+    PerformanceMetrics getPerformanceMetrics() const;
+    
+    // Enable/disable debug mode
+    struct DebugInfo {
+        bool enableSpikes = false;
+        bool enableConnections = false;
+        bool enableWeights = false;
+        std::vector<NeuronId> monitoredNeurons;
+        Timestamp debugStartTime = 0.0;
+        Timestamp debugEndTime = 0.0;
+        bool logToFile = false;
+        std::string debugFilePath;
+    };
+    
+    void enableDebugMode(const DebugInfo& debugConfig);
+    bool isDebugModeEnabled() const;
+    
+    // Batch operations for efficiency
+    void batchInjectCurrent(const std::vector<std::pair<NeuronId, MembranePotential>>& injections);
+    void batchSetWeights(const std::vector<std::pair<SynapseHandle, SynapticWeight>>& weightChanges);
+    
+    // Simulation control
+    void setSimulationSpeed(float speed); // 1.0 = real-time, 2.0 = 2x faster, 0.5 = 0.5x speed
+    float getSimulationSpeed() const;
+    
+    // ===== BACKWARD COMPATIBILITY =====
+    
+    // The original methods are preserved for backward compatibility
+    // New advanced features are built on top of existing functionality
     
 private:
     struct Impl;

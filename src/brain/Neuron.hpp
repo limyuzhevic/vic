@@ -142,17 +142,14 @@ public:
     void setPopulationId(PopulationId population);
     PopulationId getPopulationId() const;
     
-    // Update neuron for one simulation step
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    void step(Timestamp currentTime);
-    
     // Reset to initial state
     void reset();
     
-    // Initialize with random parameters
+    // Initialize with random parameters using biological constraints
     void initializeRandom(RandomGenerator& rng);
     
 private:
+    // Pimpl implementation details
     struct Impl;
     Impl* pImpl;
 };
