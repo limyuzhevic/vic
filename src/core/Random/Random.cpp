@@ -11,9 +11,9 @@ struct RandomGenerator::Impl {
     Impl(uint64_t seed) : gen(seed), currentSeed(seed) {}
 };
 
-RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(new Impl(seed)) {}
+RandomGenerator::RandomGenerator(uint64_t seed) : pImpl(std::make_unique<Impl>(seed)) {}
 
-RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
+RandomGenerator::RandomGenerator() : pImpl(std::make_unique<Impl>(std::random_device{}())) {}
 
 RandomGenerator::~RandomGenerator() = default;
 
@@ -23,9 +23,7 @@ RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
     if (this != &other) {
-        delete pImpl;
-        pImpl = other.pImpl;
-        other.pImpl = nullptr;
+        pImpl = std::move(other.pImpl);
     }
     return *this;
 }

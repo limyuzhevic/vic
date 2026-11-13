@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 # Test configuration
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/TestFramework)
 
 # Create test executable
 add_executable(nlm_test
@@ -22,3 +23,7 @@ target_compile_features(nlm_test PRIVATE cxx_std_20)
 # Enable testing
 enable_testing()
 add_test(NAME nlm_test COMMAND nlm_test)
+
+# Install test framework headers
+install(DIRECTORY TestFramework/ DESTINATION include/nlm_test)
+

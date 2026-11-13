@@ -24,11 +24,13 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return false;
+        NLM_THROW_CONFIG("Failed to open config file", filepath);
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        ++lineNumber;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -37,19 +39,39 @@ bool Config::loadFromFile(const std::string& filepath) {
         
         // Parse simple key=value pairs
         size_t pos = line.find('=');
-        if (pos != std::string::npos) {
-            std::string key = trim(line.substr(0, pos));
-            std::string value = trim(line.substr(pos + 1));
-            
-            // Remove quotes if present
+        if (pos == std::string::npos) {
+            NLM_THROW_CONFIG(std::string("Invalid config format: missing '=' in line") + std::to_string(lineNumber),
+                           "Line content: " + line);
+        }
+        
+        std::string key = trim(line.substr(0, pos));
+        std::string value = trim(line.substr(pos + 1));
+        
+        // Validate key (should not be empty and should not contain spaces)
+        if (key.empty() || key.find(' ') != std::string::npos) {
+            NLM_THROW_CONFIG(std::string("Invalid config key") + ": " + key,
+                           "Line " + std::to_string(lineNumber));
+        }
+        
+        // Validate value format (basic check for quotes and special characters)
+        if (value.empty() || (value.front() == '\'' && value.back() == '\'') || 
+            (value.front() == '\"' && value.back() == '\"')) {
+            // Remove quotes
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
-                 (value.front() == '\'' && value.back() == '\''))) {
+                ((value.front() == '\'' && value.back() == '\'') ||
+                 (value.front() == '\"' && value.back() == '\"'))) {
                 value = value.substr(1, value.size() - 2);
             }
-            
-            set(key, value, ConfigSource::File);
         }
+        
+        // Remove quotes if present
+        if (value.size() >= 2 && 
+            ((value.front() == '\"' && value.back() == '\"') ||
+             (value.front() == '\'' && value.back() == '\''))) {
+            value = value.substr(1, value.size() - 2);
+        }
+        
+        set(key, value, ConfigSource::File);
     }
     
     return true;
@@ -65,16 +87,37 @@ bool Config::loadFromArgs(int argc, char** argv) {
             if (pos != std::string::npos) {
                 std::string key = arg.substr(2, pos - 2);
                 std::string value = arg.substr(pos + 1);
+                
+                // Validate key format
+                if (key.empty() || key.find(' ') != std::string::npos) {
+                    NLM_THROW_CONFIG(std::string("Invalid command-line key") + ": " + key,
+                                   "Argument: " + arg);
+                }
+                
                 set(key, value, ConfigSource::CommandLine);
+            } else {
+                NLM_THROW_CONFIG(std::string("Invalid command-line argument format: missing '=' in --key=value format"),
+                               "Argument: " + arg);
             }
         }
         // Handle -key value format
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
             std::string value = argv[++i];
+            
+            // Validate key format
+            if (key.empty() || key.find(' ') != std::string::npos) {
+                NLM_THROW_CONFIG(std::string("Invalid command-line key") + ": " + key,
+                               "Argument: " + arg);
+            }
+            
             set(key, value, ConfigSource::CommandLine);
+        } else {
+            NLM_THROW_CONFIG(std::string("Invalid command-line argument format"),
+                           "Argument: " + arg);
         }
     }
+    
     return true;
 }
 
