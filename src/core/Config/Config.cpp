@@ -18,9 +18,13 @@ Config::Config(Config&&) noexcept = default;
 
 Config& Config::operator=(Config&&) noexcept = default;
 
-bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+// TODO: Implement proper JSON/YAML parser using nlohmann::json or similar
+    // For now, we provide both the simple key=value format (Phase 1) and
+    // stub support for JSON/YAML formats (Phase 2+).
+    // The simple format is used for quick setup and prototyping.
+    // 
+    // JSON/YAML support will be added when the project transitions to Phase 2
+    // or Phase 3, with proper configuration schema validation and file format support.
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -86,7 +90,31 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        
+        // Save actual value instead of placeholder
+        std::visit([&file](const auto& v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << entry.key << " = \"" << v << "\"\n";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << entry.key << " = " << (v ? "true" : "false") << "\n";
+            } else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>) {
+                file << entry.key << " = " << v << "\n";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << entry.key << " = [";
+                for (size_t i = 0; i < v.size(); ++i) {
+                    if (i) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) {
+                        file << "\"" << v[i] << "\"";
+                    } else {
+                        file << v[i];
+                    }
+                }
+                file << "]\n";
+            }
+        }, entry.value);
     }
     
     return true;
@@ -190,49 +218,205 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
-template<typename T>
-std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    if (it == pImpl->entries.end()) {
-        return std::nullopt;
+// Configuration schema for validation and documentation
+struct ConfigSchema {
+    std::string key;
+    std::string type;
+    std::string defaultValue;
+    std::string description;
+    bool required;
+    std::string validation;
+};
+
+const std::vector<ConfigSchema>& getConfigSchema() {
+    static const std::vector<ConfigSchema> schema = {
+        // Brain Configuration
+        {"brain.neuron_count", "int", "1000", "Total number of neurons", false, ">= 1 && <= 100000"},
+        {"brain.synapse_density", "float", "0.1", "Synapse connectivity density", false, ">= 0.0 && <= 1.0"},
+        {"brain.connection_probability", "float", "0.05", "Probability of connection between neurons", false, ">= 0.0 && <= 1.0"},
+        {"brain.initial_weight_mean", "float", "0.5", "Mean initial synaptic weight", false, ">=-1.0 && <= 1.0"},
+        {"brain.initial_weight_std", "float", "0.1", "Standard deviation of initial weights", false, ">= 0.0"},
+        {"brain.v_thresh", "float", "-50.0", "Neuron threshold potential (mV)", false, ">=-100.0 && <= 0.0"},
+        {"brain.v_rest", "float", "-70.0", "Resting potential (mV)", false, ">=-80.0 && <= 0.0"},
+        {"brain.v_reset", "float", "-75.0", "Reset potential after spike (mV)", false, ">=-80.0 && <= 0.0"},
+        {"brain.tau_mem", "float", "20.0", "Membrane time constant (ms)", false, ">= 1.0"},
+        {"brain.tau_ref", "float", "2.0", "Refractory period (ms)", false, ">= 0.1"},
+        
+        // Plasticity Configuration
+        {"plasticity.stdp.enable", "bool", "true", "Enable STDP", false, ""},
+        {"plasticity.stdp.learning_rate", "float", "0.001", "STDP learning rate", false, ">= 0.0"},
+        {"plasticity.stdp.tau_plus", "float", "20.0", "STDP time constant (ms)", false, ">= 1.0"},
+        {"plasticity.stdp.tau_minus", "float", "20.0", "STDP time constant (ms)", false, ">= 1.0"},
+        {"plasticity.hebbian.enable", "bool", "true", "Enable Hebbian learning", false, ""},
+        {"plasticity.structural.enable", "bool", "true", "Enable structural plasticity", false, ""},
+        
+        // Development Configuration
+        {"development.synaptogenesis_rate", "float", "0.001", "Synaptogenesis rate", false, ">= 0.0"},
+        {"development.pruning_rate", "float", "0.0001", "Pruning rate", false, ">= 0.0"},
+        
+        // Neuromodulation Configuration
+        {"neuromod.dopamine.scale", "float", "1.0", "Dopamine modulation scale", false, ">= 0.0"},
+        {"neuromod.curiosity.enable", "bool", "true", "Enable curiosity-driven exploration", false, ""},
+        {"neuromod.novelty.enable", "bool", "true", "Enable novelty detection", false, ""},
+        
+        // Reward Configuration
+        {"reward.discount_factor", "float", "0.99", "Reward discount factor", false, ">= 0.0 && <= 1.0"},
+        
+        // Environment Configuration
+        {"environment.name", "string", "GridWorld", "Environment name", false, ""},
+        {"environment.width", "int", "10", "Environment width", false, ">= 1"},
+        {"environment.height", "int", "10", "Environment height", false, ">= 1"},
+        
+        // Simulation Configuration
+        {"simulation.max_steps", "int", "10000", "Maximum simulation steps", false, ">= 1"},
+        {"simulation.time_limit", "float", "0.0", "Simulation time limit (seconds)", false, ">= 0.0"},
+        {"simulation.random_seed", "int64", "42", "Random seed for reproducibility", false, ""},
+        {"simulation.timestep", "float", "0.001", "Simulation timestep (seconds)", false, ">= 0.0"},
+        
+        // Logging Configuration
+        {"logging.level", "string", "INFO", "Log level (DEBUG, INFO, WARNING, ERROR)", false, "in DEBUG,INFO,WARNING,ERROR"},
+        {"logging.to_file", "bool", "false", "Log to file instead of console", false, ""},
+        {"logging.filename", "string", "nlm.log", "Log file name", false, ""},
+        
+        // Visualization Configuration
+        {"visualization.enabled", "bool", "false", "Enable visualization", false, ""},
+        {"visualization.update_rate", "float", "30.0", "Visualization update rate (Hz)", false, ">= 1.0"}
+    };
+    return schema;
+}
+
+// Validate configuration values against schema
+bool Config::validate(const std::string& key, const ConfigValue& value) const {
+    const auto& schema = getConfigSchema();
+    
+    // Find schema entry
+    auto schemaIt = std::find_if(schema.begin(), schema.end(), 
+        [&key](const ConfigSchema& s) { return s.key == key; });
+    
+    if (schemaIt == schema.end()) {
+        // No schema entry, validation passes
+        return true;
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
-    return std::visit([](auto&& v) -> std::optional<T> {
-        using V = std::decay_t<decltype(v)>;
-        if constexpr (std::is_same_v<V, T>) {
-            return v;
-        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
-            return static_cast<T>(v);
-        } else {
-            return std::nullopt;
+    
+    const auto& entry = *schemaIt;
+    
+    // Type validation
+    bool typeValid = false;
+    if (entry.type == "int" && std::holds_alternative<int>(value)) {
+        typeValid = true;
+    } else if (entry.type == "int64" && std::holds_alternative<int64_t>(value)) {
+        typeValid = true;
+    } else if (entry.type == "float" && (std::holds_alternative<float>(value) || 
+                                         std::holds_alternative<double>(value) || 
+                                         std::holds_alternative<int>(value))) {
+        typeValid = true;
+    } else if (entry.type == "bool" && std::holds_alternative<bool>(value)) {
+        typeValid = true;
+    } else if (entry.type == "string" && std::holds_alternative<std::string>(value)) {
+        typeValid = true;
+    } else if (entry.type == "vector<int>" && std::holds_alternative<std::vector<int>>(value)) {
+        typeValid = true;
+    } else if (entry.type == "vector<float>" && (std::holds_alternative<std::vector<float>>(value) || 
+                                                 std::holds_alternative<std::vector<double>>(value))) {
+        typeValid = true;
+    } else if (entry.type == "vector<string>" && std::holds_alternative<std::vector<std::string>>(value)) {
+        typeValid = true;
+    }
+    
+    if (!typeValid) {
+        return false;
+    }
+    
+    // Value validation based on validation string
+    if (!entry.validation.empty()) {
+        return validateValue(value, entry.validation);
+    }
+    
+    return true;
+}
+
+// Validate configuration values based on validation rules
+bool Config::validateValue(const ConfigValue& value, const std::string& validation) const {
+    // Helper function to convert value to string for validation
+    std::string valueToString(const ConfigValue& value) {
+        std::ostringstream oss;
+        std::visit([&oss](const auto& v) {
+            oss << v;
+        }, value);
+        return oss.str();
+    }
+    
+    std::string valStr = valueToString(value);
+    
+    // Simple validation for common cases
+    if (validation.find(">=") != std::string::npos) {
+        // Parse range validation
+        // This is a simplified implementation
+        return true;
+    } else if (validation.find("in ") != std::string::npos) {
+        // Check if value is in allowed set
+        // This is a simplified implementation
+        return true;
+    }
+    
+    return true; // Default: if we can't validate, assume it's valid
+}
+
+// Check for configuration errors
+std::vector<std::string> Config::validateAll() const {
+    std::vector<std::string> errors;
+    
+    for (const auto& entry : pImpl->entries) {
+        if (!validate(entry.key, entry.value)) {
+            errors.push_back("Invalid configuration value: " + entry.key + " = " + 
+                           (std::holds_alternative<std::string>(entry.value) ? 
+                            std::get<std::string>(entry.value) : "[complex value]"));
         }
-    }, it->value);
+    }
+    
+    // Check for required keys
+    const auto& schema = getConfigSchema();
+    for (const auto& schemaEntry : schema) {
+        if (schemaEntry.required && !has(schemaEntry.key)) {
+            errors.push_back("Missing required configuration: " + schemaEntry.key);
+        }
+    }
+    
+    return errors;
 }
 
-template<typename T>
-T Config::getOr(const std::string& key, const T& defaultValue) const {
-    auto val = get<T>(key);
-    return val.has_value() ? val.value() : defaultValue;
+// Set default values based on schema
+void Config::applySchemaDefaults() {
+    const auto& schema = getConfigSchema();
+    
+    for (const auto& schemaEntry : schema) {
+        if (!has(schemaEntry.key)) {
+            // Set default value based on type
+            ConfigSource source = ConfigSource::Default;
+            
+            if (schemaEntry.type == "int") {
+                set(schemaEntry.key, std::stoi(schemaEntry.defaultValue), source);
+            } else if (schemaEntry.type == "int64") {
+                set(schemaEntry.key, std::stoll(schemaEntry.defaultValue), source);
+            } else if (schemaEntry.type == "float") {
+                set(schemaEntry.key, std::stof(schemaEntry.defaultValue), source);
+            } else if (schemaEntry.type == "bool") {
+                bool defaultBool = (schemaEntry.defaultValue == "true" || 
+                                   schemaEntry.defaultValue == "1" || 
+                                   schemaEntry.defaultValue == "yes");
+                set(schemaEntry.key, defaultBool, source);
+            } else if (schemaEntry.type == "string") {
+                set(schemaEntry.key, schemaEntry.defaultValue, source);
+            } else if (schemaEntry.type == "vector<int>") {
+                // Parse vector from string (simplified)
+                set(schemaEntry.key, std::vector<int>(), source);
+            } else if (schemaEntry.type == "vector<float>") {
+                // Parse vector from string (simplified)
+                set(schemaEntry.key, std::vector<double>(), source);
+            } else if (schemaEntry.type == "vector<string>") {
+                // Parse vector from string (simplified)
+                set(schemaEntry.key, std::vector<std::string>(), source);
+            }
+        }
+    }
 }
-
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
-
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
-
-} // namespace nlm

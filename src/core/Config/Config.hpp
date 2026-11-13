@@ -44,6 +44,16 @@ struct ConfigEntry {
         : key(k), value(v), source(s), description(desc) {}
 };
 
+// Configuration schema for validation and documentation
+struct ConfigSchema {
+    std::string key;
+    std::string type;
+    std::string defaultValue;
+    std::string description;
+    bool required;
+    std::string validation;
+};
+
 // Main configuration class
 class Config {
 public:
@@ -71,7 +81,7 @@ template<typename T>
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +105,11 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration schema and validation methods
+    bool validate(const std::string& key, const ConfigValue& value) const;
+    std::vector<std::string> validateAll() const;
+    void applySchemaDefaults();
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +117,13 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool validateValue(const ConfigValue& value, const std::string& validation);
+    
+    // Configuration schema
+    static const std::vector<ConfigSchema>& getConfigSchema();
 };
+
+// Get configuration schema
+const std::vector<ConfigSchema>& getConfigSchema();
 
 } // namespace nlm
