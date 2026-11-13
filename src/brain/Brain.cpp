@@ -49,9 +49,10 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
-    std::unique_ptr<Curiosity> curiosity;
-    std::unique_ptr<PredictionError> predictionError;
-    std::unique_ptr<Novelty> novelty;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+    std::unique_ptr<NeuromodulationManager> neuromodulationManager;
     
     // Phase 2: Real neural computation components
     std::unique_ptr<SpikeSystem> spikeSystem;
@@ -138,9 +139,13 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
-        curiosity = std::make_unique<Curiosity>();
-        predictionError = std::make_unique<PredictionError>();
-        novelty = std::make_unique<Novelty>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        neuromodulationManager = std::make_unique<NeuromodulationManager>();
+        
+        // Set brain reference for neuromodulation manager
+        neuromodulationManager->initialize(this);
         
         // Configure STDP parameters
         float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
@@ -1527,18 +1532,62 @@ void Brain::setDevelopmentalStage(DevelopmentalStage stage) {
 
 // ========== NEUROMODULATION SYSTEMS ==========
 
-Dopamine* Brain::getDopamine() {
-    return pImpl->dopamine.get();
+// NeuromodulationManager interface
+NeuromodulationManager* Brain::getNeuromodulationManager() {
+    return pImpl->neuromodulationManager.get();
 }
 
+// Individual neuromodulators for backward compatibility
+Dopamine* Brain::getDopamine() {
+    return pImpl->neuromodulationManager ? 
+           pImpl->neuromodulationManager->getDopamine() : 
+           pImpl->dopamine.get();
+}
+
+Acetylcholine* Brain::getAcetylcholine() {
+    return pImpl->neuromodulationManager ? 
+           pImpl->neuromodulationManager->getAcetylcholine() : 
+           nullptr;
+}
+
+Norepinephrine* Brain::getNorepinephrine() {
+    return pImpl->neuromodulationManager ? 
+           pImpl->neuromodulationManager->getNorepinephrine() : 
+           nullptr;
+}
+
+Serotonin* Brain::getSerotonin() {
+    return pImpl->neuromodulationManager ? 
+           pImpl->neuromodulationManager->getSerotonin() : 
+           nullptr;
+}
+
+// Neuromodulation state
+float Brain::getNeuromodulationStrength() const {
+    return pImpl->neuromodulationManager ? 
+           pImpl->neuromodulationManager->getOverallNeuromodulationStrength() : 
+           0.0f;
+}
+
+bool Brain::getNeuromodulationActive() const {
+    return getDopamine() != nullptr || getAcetylcholine() != nullptr || 
+           getNorepinephrine() != nullptr || getSerotonin() != nullptr;
+}
+
+// Existing neuromodulators (Phase 6)
+// Note: getDopamine() is already defined in the NeuromodulationManager interface above
+
+// Curiosity - exploration motivation
 Curiosity* Brain::getCuriosity() {
     return pImpl->curiosity.get();
 }
 
+// Novelty - novelty detection
 Novelty* Brain::getNovelty() {
     return pImpl->novelty.get();
 }
 
+// Prediction error signal
 PredictionError* Brain::getPredictionErrorSignal() {
     return pImpl->predictionError.get();
 }
@@ -1572,8 +1621,13 @@ void Brain::logStatus() const {
     }
     
     // Neuromodulation status
-    if (pImpl->dopamine) {
-        NLM_LOG_INFO("Dopamine level: " + std::to_string(pImpl->dopamine->getLevel()));
+    if (pImpl->neuromodulationManager) {
+        NLM_LOG_INFO("Neuromodulation strength: " + std::to_string(pImpl->neuromodulationManager->getOverallNeuromodulationStrength()));
+        NLM_LOG_INFO("Neuromodulation active: " + std::to_string(getNeuromodulationActive()));
+        NLM_LOG_INFO("Dopamine level: " + std::to_string(getDopamine() ? getDopamine()->getLevel() : 0.0f));
+        NLM_LOG_INFO("Acetylcholine level: " + std::to_string(getAcetylcholine() ? getAcetylcholine()->getLevel() : 0.0f));
+        NLM_LOG_INFO("Norepinephrine level: " + std::to_string(getNorepinephrine() ? getNorepinephrine()->getLevel() : 0.0f));
+        NLM_LOG_INFO("Serotonin level: " + std::to_string(getSerotonin() ? getSerotonin()->getLevel() : 0.0f));
     }
     
     // Development status

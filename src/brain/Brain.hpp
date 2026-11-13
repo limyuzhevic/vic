@@ -172,10 +172,20 @@ public:
     DevelopmentalStage getDevelopmentalStage() const;
     void setDevelopmentalStage(DevelopmentalStage stage);
     
-    // ========== NEUROMODULATION SYSTEMS ==========
+// ========== NEUROMODULATION SYSTEMS ==========
     
-    // Dopamine - reward and reinforcement
+    // NeuromodulationManager: Coordinates all neuromodulators and their integration
+    NeuromodulationManager* getNeuromodulationManager();
+    
+    // Get individual neuromodulators for direct access (backward compatibility)
     Dopamine* getDopamine();
+    Acetylcholine* getAcetylcholine();
+    Norepinephrine* getNorepinephrine();
+    Serotonin* getSerotonin();
+    
+    // Get neuromodulation state
+    float getNeuromodulationStrength() const;
+    bool getNeuromodulationActive() const;
     
     // Curiosity - exploration motivation
     Curiosity* getCuriosity();
@@ -191,7 +201,7 @@ public:
     
     // Get random generator
     RandomGenerator* getRandomGenerator();
-
+    
     // Learned preference trait (Phase 5): a single scalar, -1..1,
     // updated only by sandbox reward through AgentBrain, saved in the
     // checkpoint (SimulationState section) and used as a small bias in
