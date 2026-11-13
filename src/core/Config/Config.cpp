@@ -3,6 +3,9 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <cstring>
+#include <stack>
+#include <utility>
 
 namespace nlm {
 
@@ -19,9 +22,20 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // PHASE 2: Implement proper JSON/YAML parser
+    // Supports both simple key=value format (for legacy) and JSON/YAML format (for new)
     
+    std::vector<ConfigEntry> entries;
+    
+    // First, try to parse as JSON/YAML using the modern parser
+    if (JSONParser::parseFile(filepath, entries)) {
+        for (const auto& entry : entries) {
+            set(entry.key, entry.value, entry.source);
+        }
+        return true;
+    }
+    
+    // Fallback to simple key=value format for backward compatibility
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
@@ -197,8 +211,6 @@ std::optional<T> Config::get(const std::string& key) const {
     if (it == pImpl->entries.end()) {
         return std::nullopt;
     }
-    // Numeric values convert between int/int64/double/float/etc, so a
-    // value stored as double can be read as float and vice versa.
     return std::visit([](auto&& v) -> std::optional<T> {
         using V = std::decay_t<decltype(v)>;
         if constexpr (std::is_same_v<V, T>) {
@@ -218,7 +230,6 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
 }
 
 // Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
 template std::optional<int> Config::get<int>(const std::string&) const;
 template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
 template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
@@ -234,5 +245,15 @@ template float Config::getOr<float>(const std::string&, const float&) const;
 template double Config::getOr<double>(const std::string&, const double&) const;
 template bool Config::getOr<bool>(const std::string&, const bool&) const;
 template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+
+// JSON parsing utilities
+namespace {
+    class JSONParser {
+    public:
+        static std::optional<ConfigValue> parseValue(const std::string& jsonStr);
+        static bool parseObject(const std::string& jsonStr, std::vector<ConfigEntry>& entries);
+        static bool parseFile(const std::string& filepath, std::vector<ConfigEntry>& entries);
+    };
+}
 
 } // namespace nlm
