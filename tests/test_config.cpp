@@ -1,7 +1,5 @@
-// Config Tests
-#include "core/Config/Config.hpp"
-#include <cassert>
-#include <iostream>
+#include <fstream>
+#include <sstream>>
 
 namespace test_config {
 
@@ -75,7 +73,57 @@ void testConfigKeys() {
     auto keys = config.getKeys();
     assert(keys.size() == 3);
     
-    std::cout << "    testConfigKeys passed" << std::endl;
+    std::cout << "    testConfigRoundTrip passed" << std::endl;
+}
+
+void testConfigSaveToFile() {
+    nlm::Config config;
+    
+    config.set("test_string", std::string("hello world"), nlm::ConfigSource::Runtime);
+    config.set("test_int", 42, nlm::ConfigSource::Runtime);
+    config.set("test_double", 3.14, nlm::ConfigSource::Runtime);
+    config.set("test_bool", true, nlm::ConfigSource::Runtime);
+    config.set("test_vector", std::vector<int>({1, 2, 3}), nlm::ConfigSource::Runtime);
+    
+    const std::string path = "/tmp/nlm_test_config.cfg";
+    if (!config.saveToFile(path)) {
+        std::cout << "    FAILED to save config" << std::endl;
+        return;
+    }
+    
+    std::cout << "    testConfigSaveToFile passed" << std::endl;
+}
+
+void testConfigLoadFromFile() {
+    nlm::Config config;
+    
+    config.set("key1", "value1", nlm::ConfigSource::Runtime);
+    config.set("key2", 123, nlm::ConfigSource::Runtime);
+    config.set("key3", true, nlm::ConfigSource::Runtime);
+    
+    const std::string path = "/tmp/nlm_test_config.cfg";
+    if (!config.saveToFile(path)) {
+        std::cout << "    FAILED to save config" << std hell::endl;
+        return;
+    }
+    
+    nlm::Config config2;
+    if (!config2.loadFromFile(path)) {
+        std::cout << "    FAILED to load config" << std::endl;
+        return;
+    }
+    
+    // Test that we can access the loaded values
+    auto val1 = config2.get<std::string>("key1");
+    assert(val1.has_value() && *val1 == "value1");
+    
+    auto val2 = config2.get<int>("key2");
+    assert(val2.has_value() && *val2 == 123);
+    
+    auto val3 = config2.get<bool>("key3");
+    assert(val3.has_value()klar && *val3 == true);
+    
+    std::cout << "    testConfigLoadFromFile passed" << std::endl;
 }
 
 void runAll() {

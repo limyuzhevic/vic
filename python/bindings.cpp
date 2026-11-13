@@ -145,21 +145,84 @@ PYBIND11_MODULE(pynlm, m) {
     py::class_<Config, std::shared_ptr<Config>>(m, "Config", R"pbdoc(Configuration class for NLM system)pbdoc")
         .def(py::init<>())
         .def("loadFromFile", &Config::loadFromFile, py::arg("filepath"),
-             "Load configuration from a JSON file")
-        // loadFromArgs takes (int, char**) in C++, which has no Python
-        // equivalent; bind it as a list of strings instead (Phase 5
-        // fix — the old binding did not compile).
+             "Load configuration from a file (key=value format)")
+        // Enhanced Python API: allow both list of strings and single string
         .def("loadFromArgs", [](Config& self, const std::vector<std::string>& args) {
             std::vector<char*> argv;
             argv.reserve(args.size());
             for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
             return self.loadFromArgs(static_cast<int>(argv.size()), argv.data());
         }, py::arg("args"),
-           "Load configuration from command line arguments")
+           "Load configuration from command line arguments (as list of strings)")
+        .def("loadFromArgs", [](Config& self, const std::string& args_string) {
+            // Parse simple --key=value string
+            std::istringstream stream(args_string);
+            std::vector<std::string> args;
+            std::string arg;
+            while (stream >> arg) {
+                args.push_back(arg);
+            }
+            return self.loadFromArgs(args);
+        }, py::arg("args"),
+           "Load configuration from command line string (e.g. \"--key1=value1 --key2=value2\")")
         .def("saveToFile", &Config::saveToFile, py::arg("filepath"),
-             "Save configuration to a JSON file")
+             "Save configuration to a file (key=value format)")
         .def("has", &Config::has, py::arg("key"),
              "Check if a configuration key exists")
+        .def("get", [](Config& self, const std::string& key) {
+            return self.template get<std::string>(key);
+        }, py::arg("key"),
+           "Get configuration value as string (returns None if not found or wrong type)")
+        .def("get", [](Config& self, const std::string& key) {
+            return self.template get<int>(key);
+        }, py::arg("key"),
+           "Get configuration value as int (returns None if not found or wrong type)")
+        .def("get", [](Config& self, const std::string& key) {
+            return self.template get<double>(key);
+        }, py::arg("key"),
+           "Get configuration value as float/double (returns None if not found or wrong type)")
+        .def("get", [](Config& self, const std::string& key) {
+            return self.template get<bool>(key);
+        }, py::arg("key"),
+           "Get configuration value as boolean (returns None if not found or wrong type)")
+        .def("get", [](Config& self, const std::string& key) {
+            return self.template get<std::vector<int>>(key);
+        }, py::arg("key"),
+           "Get configuration value as list of ints (returns None if not found or wrong type)")
+        .def("getOr", [](Config& self, const std::string& key, const std::string& defaultValue) {
+            return self.template getOr<std::string>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value or default (string)")
+        .def("getOr", [](Config& self, const std::string& key, int defaultValue) {
+            return self.template getOr<int>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value or default (int)")
+        .def("getOr", [](Config& self, const std::string& key, double defaultValue) {
+            return self.template getOr<double>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value or default (float)")
+        .def("getOr", [](Config& self, const std::string& key, bool defaultValue) {
+            return self.template getOr<bool>(key, defaultValue);
+        }, py::arg("key"), py::arg("defaultValue"),
+           "Get configuration value or default (boolean)")
+        .def("set", [](Config& self, const std::string& key, const std::string& value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (string)")
+        .def("set", [](Config& self, const std::string& key, int value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (int)")
+        .def("set", [](Config& self, const std::string& key, double value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (float)")
+        .def("set", [](Config& self, const std::string& key, bool value) {
+            self.set(key, value);
+        }, py::arg("key"), py::arg("value"),
+           "Set configuration value (boolean)")
+        .def("remove", &Config::remove, py::arg("key"),
+             "Remove configuration key")
         .def("getKeys", &Config::getKeys,
              "Get all configuration keys")
         .def("clear", &Config::clear,
@@ -169,6 +232,66 @@ PYBIND11_MODULE(pynlm, m) {
         .def("__repr__", [](const Config& cfg) {
             return "<Config: " + cfg.summary() + ">";
         });
+
+    // Add convenience methods for specific common config keys
+    // These are common NLM configuration options
+    .def("setNeuronCount", [](Config& self, int count) {
+        self.set("brain.neuron_count", count);
+    }, py::arg("count"),
+         "Set the number of neurons in the brain")
+    .def("setRegionCount", [](Config& self, int count) {
+        self.set("brain.region_count", count);
+    }, py::arg("count"),
+         "Set the number of brain regions")
+    .def("setConnectionProbability", [](Config& self, float prob) {
+        self.set("brain.connection_probability", prob);
+    }, py::arg("prob"),
+         "Set the probability of connections between neurons")
+    .def("setLearningRate", [](Config& self, float rate) {
+        self.set("plasticity.stdp.learning_rate", rate);
+    }, py::arg("rate"),
+         "Set the STDP learning rate")
+    .def("setSimulationTimestep", [](Config& self, double timestep) {
+        self.set("simulation_timestep", timestep);
+    }, py::arg("timestep"),
+         "Set the simulation timestep in seconds")
+    .def("setRandomSeed", [](Config& self, int64_t seed) {
+        self.set("random_seed", seed);
+    }, py::arg("seed"),
+         "Set the random seed for reproducible simulations")
+    .def("getNeuronCount", [](Config& self) {
+        auto val = self.template get<int64_t>("brain.neuron_count");
+        return val ? *val : 1000;
+    },
+         "Get the number of neurons in the brain (default: 1000)")
+    .def("getRegionCount", [](Config& self) {
+        auto val = self.template get<int64_t>("brain.region_count");
+        return val ? *val : 1;
+    },
+         "Get the number of brain regions (default: 1)")
+    .def("getConnectionProbability", [](Config& self) {
+        auto val = self.template get<float>("brain.connection_probability");
+        return val ? *val : 0.1f;
+    },
+         "Get the connection probability (default: 0.1)")
+    .def("getLearningRate", [](Config& self) {
+        auto val = self.template get<float>("plasticity.stdp.learning_rate");
+        return val ? *val : 0.001f;
+    },
+         "Get the STDP learning rate (default: 0.001)")
+    .def("getSimulationTimestep", [](Config& self) {
+        auto val = self.template get<double>("simulation_timestep");
+        return val ? *val : 0.001;
+    },
+         "Get the simulation timestep in seconds (default: 0.001)")
+    .def("getRandomSeed", [](Config& self) {
+        auto val = self.template get<int64_t>("random_seed");
+        return val ? *val : 42;
+    },
+         "Get the random seed (default: 42)")
+    .def("createBrain", []() -> std::shared_ptr<Brain> {
+        return std::make_shared<Brain>(std::make_shared<Config>());
+    }, "Create a brain with default configuration");
 
     py::class_<SensoryInput>(m, "SensoryInput", R"pbdoc(Base class for sensory input)pbdoc")
         .def("getType", &SensoryInput::getType, "Get the type of sensory input")
