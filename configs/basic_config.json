@@ -1,0 +1,36 @@
+{
+  "simulation": {
+    "random_seed": 42,
+    "simulation_timestep": 0.001,
+    "neuron_count": 500,
+    "region_count": 1,
+    "connection_probability": 0.15
+  },
+  "neural_dynamics": {
+    "lif_resting_potential": -70.0,
+    "lif_threshold": -55.0,
+    "lif_reset_potential": -70.0,
+    "lif_leak_conductance": 10.0,
+    "lif_refractory_period": 9
+  },
+  "plasticity": {
+    "stdp_ltp_weight": 0.02,
+    "stdp_ltd_weight": 0.015,
+    "stdp_tau": 20.0,
+    "hebbian_learning_rate": 0.01
+  },
+  "environment": {
+    "width": 16,
+    "height": 16,
+    "vision_width": 16,
+    "vision_height": 16,
+    "max_energy": 100,
+    "energy_decay_rate": 0.01
+  },
+  "agent": {
+    "enable_reward_modulation": true,
+    "enable_structural_plasticity": true,
+    "enable_development": true,
+    "enable_curiosity": true
+  }
+}

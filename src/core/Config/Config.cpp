@@ -19,16 +19,22 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
         return false;
     }
     
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    
+    // Try to parse as JSON first (starts with { or [)
+    if (!content.empty() && (content.find("{') != std::string::npos || content.find("['") != std::string::npos)) {
+        return loadFromJson(content);
+    }
+    
+    // Fall back to simple key=value format
+    std::istringstream stream(content);
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(stream, line)) {
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -53,6 +59,156 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+bool Config::loadFromJson(const std::string& jsonString) {
+    // Simple JSON parser implementation
+    // Supports basic structure: { "key": value, "nested": { "key2": value } }
+    // Value types: string (quoted), number (int/double), bool (true/false), array ([1,2,3])
+    
+    try {
+        // Find the outermost braces
+        if (jsonString.empty() || jsonString.front() != '{' || jsonString.back() != '}') {
+            return false;
+        }
+        
+        size_t pos = 1;  // Skip opening brace
+        while (pos < jsonString.size() - 1) {
+            // Skip whitespace
+            while (pos < jsonString.size() - 1 && std::isspace(jsonString[pos])) {
+                pos++;
+            }
+            
+            if (pos < jsonString.size() - 1 && jsonString[pos] == '"') {
+                // Parse key
+                size_t keyEnd = jsonString.find('"', pos + 1);
+                if (keyEnd == std::string::npos) return false;
+                
+                std::string key = jsonString.substr(pos + 1, keyEnd - pos - 1);
+                pos = keyEnd + 1;
+                
+                // Skip whitespace
+                while (pos < jsonString.size() - 1 && std::isspace(jsonString[pos])) {
+                    pos++;
+                }
+                
+                if (pos >= jsonString.size() - 1 || jsonString[pos] != ':') {
+                    return false;
+                }
+                
+                pos++;  // Skip colon
+                
+                // Skip whitespace
+                while (pos < jsonString.size() - 1 && std::isspace(jsonString[pos])) {
+                    pos++;
+                }
+                
+                // Parse value
+                if (pos < jsonString.size() - 1 && jsonString[pos] == '"') {
+                    // String value
+                    size_t valueEnd = jsonString.find('"', pos + 1);
+                    if (valueEnd == std::string::npos) return false;
+                    
+                    std::string value = jsonString.substr(pos + 1, valueEnd - pos - 1);
+                    set(key, value, ConfigSource::File);
+                    pos = valueEnd + 1;
+                } else if (pos < jsonString.size() - 1 && jsonString[pos] == '{') {
+                    // Object value - for now, skip nested objects
+                    size_t braceCount = 1;
+                    size_t objectEnd = pos;
+                    for (size_t i = pos + 1; i < jsonString.size(); ++i) {
+                        if (jsonString[i] == '{') braceCount++;
+                        else if (jsonString[i] == '}') braceCount--;
+                        if (braceCount == 0) {
+                            objectEnd = i;
+                            break;
+                        }
+                    }
+                    // Skip the entire object
+                    pos = objectEnd + 1;
+                } else if (pos < jsonString.size() - 1 && jsonString[pos] == '[') {
+                    // Array value - for now, skip arrays
+                    size_t bracketCount = 1;
+                    size_t arrayEnd = pos;
+                    for (size_t i = pos + 1; i < jsonString.size(); ++i) {
+                        if (jsonString[i] == '[') bracketCount++;
+                        else if (jsonString[i] == ']') bracketCount--;
+                        if (bracketCount == 0) {
+                            arrayEnd = i;
+                            break;
+                        }
+                    }
+                    // Skip the entire array
+                    pos = arrayEnd + 1;
+                } else {
+                    // Number or boolean value
+                    size_t valueEnd = pos;
+                    while (valueEnd < jsonString.size() - 1 && 
+                           (std::isdigit(jsonString[valueEnd]) || jsonString[valueEnd] == '.' || 
+                            jsonString[valueEnd] == '-' || jsonString[valueEnd] == '+' ||
+                            jsonString[valueEnd] == 't' || jsonString[valueEnd] == 'f')) {
+                        valueEnd++;
+                    }
+                    
+                    std::string valueStr = jsonString.substr(pos, valueEnd - pos);
+                    
+                    // Try to determine type
+                    try {
+                        // Try boolean
+                        if (valueStr == "true" || valueStr == "false") {
+                            set(key, valueStr == "true", ConfigSource::File);
+                        } else {
+                            // Try integer
+                            try {
+                                size_t intPos;
+                                long long intVal = std::stoll(valueStr, &intPos);
+                                if (intPos == valueStr.size()) {
+                                    set(key, intVal, ConfigSource::File);
+                                    pos = valueEnd;
+                                    continue;
+                                }
+                            } catch (...) {}
+                            
+                            // Try double
+                            try {
+                                size_t doublePos;
+                                double doubleVal = std::stod(valueStr, &doublePos);
+                                if (doublePos == valueStr.size()) {
+                                    set(key, doubleVal, ConfigSource::File);
+                                    pos = valueEnd;
+                                    continue;
+                                }
+                            } catch (...) {}
+                            
+                            // Fall back to string
+                            set(key, valueStr, ConfigSource::File);
+                        }
+                    } catch (...) {
+                        set(key, valueStr, ConfigSource::File);
+                    }
+                    
+                    pos = valueEnd;
+                }
+                
+                // Skip whitespace
+                while (pos < jsonString.size() - 1 && std::isspace(jsonString[pos])) {
+                    pos++;
+                }
+                
+                // Skip comma if present
+                if (pos < jsonString.size() - 1 && jsonString[pos] == ',') {
+                    pos++;
+                }
+            } else {
+                // Invalid JSON format
+                return false;
+            }
+        }
+        
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {
@@ -84,10 +240,45 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
-    for (const auto& entry : pImpl->entries) {
-        file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+    // Create JSON format for better compatibility with modern tools
+    file << "{\n";
+    for (size_t i = 0; i < pImpl->entries.size(); ++i) {
+        const auto& entry = pImpl->entries[i];
+        file << "  \"" << entry.key << "\": ";
+        
+        std::visit([&file](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                file << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                file << (arg ? "true" : "false");
+            } else if constexpr (std::is_arithmetic_v<T>) {
+                file << arg;
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                file << "[";
+                for (size_t j = 0; j < arg.size(); ++j) {
+                    if (j > 0) file << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+                        file << "\"" << arg[j] << "\"";
+                    } else {
+                        file << arg[j];
+                    }
+                }
+                file << "]";
+            } else {
+                file << "null";
+            }
+        }, entry.value);
+        
+        if (i < pImpl->entries.size() - 1) {
+            file << ",\n";
+        } else {
+            file << "\n";
+        }
     }
+    file << "}\n";
     
     return true;
 }
