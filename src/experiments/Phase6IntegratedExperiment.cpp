@@ -1,4 +1,4 @@
-#include "Phase6IntegratedExperiment.hpp"
+#include "../experiments/Phase6IntegratedExperiment.hpp"
 #include "../core/Config/Config.hpp"
 #include "../core/Logger/Logger.hpp"
 #include "../brain/Brain.hpp"
@@ -8,6 +8,7 @@
 #include "../memory/NeuralEpisodicMemory.hpp"
 #include <chrono>
 #include <cmath>
+#include <memory>
 
 namespace nlm {
 

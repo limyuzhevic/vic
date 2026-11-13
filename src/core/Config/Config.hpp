@@ -89,11 +89,21 @@ template<typename T>
     // Get all keys
     std::vector<std::string> getKeys() const;
     
-    // Clear all
-    void clear();
+    // Configuration categories for organization
+    static std::vector<std::string> getCategoryKeys() const;
+    static bool isAdvancedConfig(const std::string& key);
     
-    // Get configuration summary
-    std::string summary() const;
+    // Set multiple configuration values at once
+    void setBatch(const std::vector<std::pair<std::string, std::string>>& configs);
+    
+    // Get configuration as JSON-like string
+    std::string toJSON() const;
+    
+    // Merge with another config (overwrites existing values)
+    void merge(const Config& other);
+    
+    // Create a copy of current config
+    std::shared_ptr<Config> clone() const;
     
 private:
     struct Impl;

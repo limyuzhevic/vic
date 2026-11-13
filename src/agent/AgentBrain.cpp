@@ -855,31 +855,58 @@ MotorCommand AgentBrain::decodeFromMotorNeurons() {
 }
 
 MotorCommand AgentBrain::selectWithCuriosity(MotorCommand defaultCmd) {
-    // Exploration: occasionally choose random action, with probability
-    // proportional to curiosity. Phase 4: the old 0.5 hard gate meant
-    // exploration never fired once novelty fell below 0.25 (which was
-    // every step after step 0, given the novelty bug). Now a typical
-    // moving curiosity of ~0.14 gives ~4% random actions, a novel scene
-    // at curiosity ~0.85 gives ~25%, and a fully familiar, stationary
-    // scene (curiosity ~0) gives none — exploration scales with novelty
-    // instead of being on/off behind an unreachable threshold.
-    {
-        float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
-
-        float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
-        if (r < exploreChance) {
-            // Random motor command
-            int choice = brain_->getRandomGenerator()->uniformInt(uint32_t(0), uint32_t(7));
-            switch (choice) {
-                case 0: return MotorCommand::MoveForward;
-                case 1: return MotorCommand::MoveBackward;
-                case 2: return MotorCommand::TurnLeft;
-                case 3: return MotorCommand::TurnRight;
-                case 4: return MotorCommand::LookLeft;
-                case 5: return MotorCommand::LookRight;
-                case 6: return MotorCommand::Interact;
-                default: return MotorCommand::Wait;
-            }
+    // Enhanced curiosity-based exploration with adaptive strategies
+    // Phase 4: the old 0.5 hard gate meant exploration never fired once
+    // novelty fell below 0.25. Now exploration scales with novelty
+    // and includes multiple exploration strategies for better behavior.
+    
+    float exploreChance = curiosityLevel_ * 0.3f;  // Up to 30% random
+    
+    // Adaptive exploration: increase chance if stuck in same action
+    if (hasLastDecoded_ && defaultCmd == lastDecoded_) {
+        exploreChance *= 1.5f;  // Boost exploration when repeating actions
+    }
+    
+    // Diversity exploration: if low curiosity, try different actions occasionally
+    if (curiosityLevel_ < 0.3f && stepsSinceTurn_ > 20) {
+        exploreChance += 0.1f;  // Encourage turning after long time moving
+    }
+    
+    // Apply exploration bounds
+    exploreChance = std::clamp(exploreChance, 0.0f, 0.4f);
+    
+    float r = brain_->getRandomGenerator()->uniformReal(0.0f, 1.0f);
+    if (r < exploreChance) {
+        // Multi-strategy random selection:
+        // 1. Bias toward movement if stuck in one place for too long
+        // 2. Include LookLeft/LookRight when appropriate
+        // 3. Balance movement vs interaction
+        
+        int choice = brain_->getRandomGenerator()->uniformInt(uint32_t(0), uint32_t(7));
+        
+        // Adaptive weighting based on situation
+        if (stepsSinceTurn_ > 50 && repeatCount_ > 10) {
+            // Agent is stuck - encourage variety
+            std::vector<MotorCommand> options = {
+                MotorCommand::MoveForward, MotorCommand::MoveBackward,
+                MotorCommand::TurnLeft, MotorCommand::TurnRight, 
+                MotorCommand::Interact, MotorCommand::LookLeft, MotorCommand::LookRight
+            };
+            // Shuffle options for better variety
+            std::random_shuffle(options.begin(), options.end());
+            return options[0];
+        }
+        
+        // Normal random selection with enhanced Look commands
+        switch (choice) {
+            case 0: return MotorCommand::MoveForward;
+            case 1: return MotorCommand::MoveBackward;
+            case 2: return MotorCommand::TurnLeft;
+            case 3: return MotorCommand::TurnRight;
+            case 4: return MotorCommand::LookLeft;
+            case 5: return MotorCommand::LookRight;
+            case 6: return MotorCommand::Interact;
+            default: return MotorCommand::Wait;
         }
     }
     
