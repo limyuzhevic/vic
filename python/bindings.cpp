@@ -19,7 +19,7 @@
 namespace py = pybind11;
 namespace nlm {
 
-PYBIND11_MODULE(pynlm, m) {
+PYBIND11_MODULE(_pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------

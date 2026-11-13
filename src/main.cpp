@@ -307,10 +307,30 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     }
 }
 
-int main(int argc, char** argv) {
-    printBanner();
-    
-    std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+void printUsage() {
+    std::cout << "NLM Phase 2: Real Neural Computation\n" << std::endl;
+    std::cout << "Usage: nlm [options]\n" << std::endl;
+    std::cout << "\nOptions:\n" << std::endl;
+    std::cout << "  --help, -h                    Show this help message\n" << std::endl;
+    std::cout << "  --config <file>               Load configuration from file\n" << std::endl;
+    std::cout << "  --mode <mode>                 Run mode: basic|plasticity|stdp|all|custom\n" << std::endl;
+    std::cout << "  --steps <n>                   Number of simulation steps\n" << std::endl;
+    std::cout << "  --neurons <n>                 Number of neurons\n" << std::endl;
+    std::cout << "  --regions <n>                 Number of brain regions\n" << std::endl;
+    std::cout << "  --spikecount <n>               Number of spikes for spike system\n" << std::endl;
+    std::cout << "  --enable_plasticity <true|false> Enable plasticity\n" << std::endl;
+    std::cout << "  --enable_development <true|false> Enable development\n" << std::endl;
+    std::cout << "  --enable_curiosity <true|false> Enable curiosity\n" << std::endl;
+    std::cout << "  --enable_reward_modulation <true|false> Enable reward modulation\n" << std::endl;
+    std::cout << "  --test1, --test2, --test3         Run only specific test\n" << std::endl;
+    std::cout << "  --log_level <level>            Set log level: debug|info|warning|error|critical\n" << std::endl;
+    std::cout << "  --log_file <file>              Log output to file in addition to console\n" << std::endl;
+    std::cout << "\nExamples:\n" << std::endl;
+    std::cout << "  nlm --mode all --steps 5000 --neurons 200\n" << std::endl;
+    std::cout << "  nlm --test1 --neurons 100\n" << std::endl;
+    std::cout << "  nlm --mode plasticity --enable_development true\n" << std::endl;
+    std::cout << "  nlm --mode stdp --spikecount 10000 --neurons 50\n" << std::endl;
+}
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();

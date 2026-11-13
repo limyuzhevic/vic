@@ -17,22 +17,45 @@ namespace nlm {
 // Handles sensory transduction and motor decoding
 class AgentBrain {
 public:
+    /**
+     * @brief Constructor for AgentBrain
+     * @param brain Shared pointer to the NLM brain instance
+     */
     AgentBrain(std::shared_ptr<Brain> brain);
+    
+    /**
+     * @brief Destructor for AgentBrain
+     */
     ~AgentBrain();
     
-    // Initialize with world
+    /**
+     * @brief Initialize the agent with a world instance
+     * @param world The SimpleWorld instance to operate in
+     */
     void initialize(const SimpleWorld& world);
     
-    // Get sensory input size expected by brain
+    /**
+     * @brief Get the expected sensory input size from the brain
+     * @return Number of sensory input features expected by the brain
+     */
     size_t getSensoryInputSize() const;
     
-    // Get motor output size expected
+    /**
+     * @brief Get the expected motor output size for the world
+     * @return Number of motor output features expected by the world
+     */
     size_t getMotorOutputSize() const;
     
-    // Process sensory percept and inject into brain
+    /**
+     * @brief Process a sensory percept from the world and inject it into the brain
+     * @param percept The sensory percept containing vision, touch, internal, proprioception, and audio data
+     */
     void processSensoryInput(const SensoryPercept& percept);
     
-    // Decode brain motor activity into motor command
+    /**
+     * @brief Decode brain motor activity into a motor command for the world
+     * @return Motor command to execute in the world
+     */
     MotorCommand decodeMotorCommand();
 
     // Diagnostic: per motor group, in decode order. `activity` is mean
@@ -48,27 +71,53 @@ public:
         size_t size = 0;
         float firingRate = 0.0f;
     };
+    /**
+     * @brief Get activity information for each motor neuron group
+     * @return Vector of motor group activity information in decode order
+     */
     std::vector<MotorGroupActivity> getMotorGroupActivities() const;
     
-    // Apply neuromodulation based on reward
+    /**
+     * @brief Apply neuromodulation based on reward prediction
+     * @param reward The actual reward received
+     * @param predictedReward The predicted reward before taking action
+     */
     void applyRewardModulation(float reward, float predictedReward);
     
-    // Update development system
+    /**
+     * @brief Update the development system
+     * @param timestep Time step duration for development updates
+     */
     void updateDevelopment(double timestep);
     
-    // Get current developmental stage
+    /**
+     * @brief Get the current developmental stage of the agent
+     * @return Current developmental stage
+     */
     DevelopmentalStage getDevelopmentalStage() const;
     
-    // Get neuromodulation level
+    /**
+     * @brief Get the current neuromodulation level (dopamine)
+     * @return Current neuromodulation level
+     */
     float getNeuromodulationLevel() const;
     
-    // Get curiosity level
+    /**
+     * @brief Get the current curiosity level
+     * @return Current curiosity level
+     */
     float getCuriosityLevel() const;
     
-    // Get novelty level
+    /**
+     * @brief Get the current novelty level
+     * @return Current novelty level
+     */
     float getNoveltyLevel() const;
     
-    // Get prediction error
+    /**
+     * @brief Get the prediction error from the brain's prediction system
+     * @return Current prediction error
+     */
     float getPredictionError() const;
 
     // Thought trace (Phase 5): a one-line, human-readable record of the
@@ -77,63 +126,188 @@ public:
     // the outcome reward. The planner suggestion is advisory: the
     // brain's motor decode still decides the action, so a trace where
     // planned != acted is a real, reportable disagreement, not a script.
+    /**
+     * @brief Get a human-readable thought trace of the last loop cycle
+     * @return Thought trace string describing the loop
+     */
     std::string getThoughtTrace() const;
 
     // Learned preference trait, stored on the Brain so it survives a
     // checkpoint reload (see Brain::getLearnedPreference).
+    /**
+     * @brief Get the learned preference trait
+     * @return Current learned preference trait value
+     */
     float getLearnedPreference() const;
-
+    
     // Phase 5 diagnostic counters (see private section): how often the
     // vision-gated reflex bonus / hazard suppression / WTA pulse fired.
+    /**
+     * @brief Get the reflex bonus count (vision-gated reflex bonus)
+     * @return Number of times the vision-gated reflex bonus fired
+     */
     int getReflexBonusCount() const { return reflexBonusCount_; }
+    
+    /**
+     * @brief Get the reflex suppress count (hazard suppression)
+     * @return Number of times hazard suppression fired
+     */
     int getReflexSuppressCount() const { return reflexSuppressCount_; }
+    
+    /**
+     * @brief Get the WTA pulse count (winner-take-all pulse)
+     * @return Number of times the WTA pulse fired
+     */
     int getWtaPulseCount() const { return wtaPulseCount_; }
-
+    
     // Phase 6: text-as-a-sense. Encode a teacher word into the sparse
     // pattern of text-neuron indices it drives (see .cpp). The string
     // itself is never passed to the brain; only this pattern is
     // injected, so association must be learned by plasticity, not by
     // string matching in the decision logic.
+    /**
+     * @brief Encode text into a sparse pattern of text-neuron indices
+     * @param text The text string to encode
+     * @return Vector of neuron indices that encode the text
+     */
     static std::vector<size_t> encodeText(const std::string& text);
     // Internal (non-motor, non-sensory) firing rates, for the
     // text-association recall probe: a learned association means the
     // internal pattern evoked by text alone moves toward the pattern
     // evoked by the paired visual scene.
+    /**
+     * @brief Get internal firing rates (hidden layer neurons)
+     * @return Vector of internal firing rates
+     */
     std::vector<float> getInternalFiringRates() const;
     // Phase 6 thought/planning counters: how often the planner, a
     // learned concept, the self-model, or a social observation
     // actually changed the decoded action (not just advised it).
+    /**
+     * @brief Get the planner override count (how often planner overrode brain)
+     * @return Number of times the planner overrode the brain's decision
+     */
     int getPlannerOverrideCount() const { return plannerOverrideCount_; }
+    
+    /**
+     * @brief Get the planner agreement count (how often planner agreed with brain)
+     * @return Number of times the planner agreed with the brain's decision
+     */
     int getPlannerAgreementCount() const { return plannerAgreementCount_; }
+    
+    /**
+     * @brief Get the planner decision count (how often planner made decision)
+     * @return Number of times the planner made a decision
+     */
     int getPlannerDecisionCount() const { return plannerDecisionCount_; }
+    
+    /**
+     * @brief Get the concept bias count (how often concept influenced decision)
+     * @return Number of times concept biased the decision
+     */
     int getConceptBiasCount() const { return conceptBiasCount_; }
+    
+    /**
+     * @brief Get the self bias count (how often self-injected influenced decision)
+     * @return Number of times self-injected influenced the decision
+     */
     int getSelfBiasCount() const { return selfBiasCount_; }
+    
+    /**
+     * @brief Get the social bias count (how often social influenced decision)
+     * @return Number of times social influenced the decision
+     */
     int getSocialBiasCount() const { return socialBiasCount_; }
+    
     // Phase 6 wired systems, for demos/tests: concept count and the
     // self-model's mean confidence, plus social observation. A second
     // agent (teacher) is observed through observeOtherAgent; in a
     // single-agent world this stays at zero and social bias stays off.
+    /**
+     * @brief Get the number of concepts currently stored
+     * @return Number of concepts
+     */
     size_t getConceptCount() const;
-    float getSelfModelConfidence() const;
-    size_t getSocialObservationCount() const;
-    void observeOtherAgent(MotorCommand observed, const std::vector<float>& beforeVision,
-                           const std::vector<float>& afterVision);
     
-    // Reset agent for new episode
+    /**
+     * @brief Get the self-model's mean confidence
+     * @return Mean confidence of the self-model
+     */
+    float getSelfModelConfidence() const;
+    
+    /**
+     * @brief Get the social observation count
+     * @return Number of social observations
+     */
+    size_t getSocialObservationCount() const;
+    
+    /**
+     * @brief Observe another agent's actions to learn socially
+     * @param observed The motor command observed from another agent
+     * @param beforeVision Vision data before the observed action
+     * @param afterVision Vision data after the observed action
+     */
+    void observeOtherAgent(MotorCommand observed, const std::vector<float>& beforeVision,
+                           const std::            vector<float>& afterVision);
+    
+    /**
+     * @brief Reset the agent for a new episode
+     */
     void reset();
     
-    // Get brain pointer
+    /**
+     * @brief Get the brain pointer
+     * @return Pointer to the underlying brain instance
+     */
     Brain* getBrain() { return brain_.get(); }
     
     // Configuration
+    /**
+     * @brief Enable or disable reward modulation
+     * @param enable Whether to enable reward modulation
+     */
     void enableRewardModulation(bool enable) { rewardModulationEnabled_ = enable; }
+    
+    /**
+     * @brief Enable or disable structural plasticity
+     * @param enable Whether to enable structural plasticity
+     */
     void enableStructuralPlasticity(bool enable) { structuralPlasticityEnabled_ = enable; }
+    
+    /**
+     * @brief Enable or disable development
+     * @param enable Whether to enable development
+     */
     void enableDevelopment(bool enable) { developmentEnabled_ = enable; }
+    
+    /**
+     * @brief Enable or disable curiosity
+     * @param enable Whether to enable curiosity
+     */
     void enableCuriosity(bool enable) { curiosityEnabled_ = enable; }
     
+    /**
+     * @brief Check if reward modulation is enabled
+     * @return True if reward modulation is enabled
+     */
     bool isRewardModulationEnabled() const { return rewardModulationEnabled_; }
+    
+    /**
+     * @brief Check if structural plasticity is enabled
+     * @return True if structural plasticity is enabled
+     */
     bool isStructuralPlasticityEnabled() const { return structuralPlasticityEnabled_; }
-    bool isDevelopmentEnabled() const { return developmentEnabled_; }
+    
+    /**
+     * @brief Check if development is enabled
+     * @return True if development is enabled
+     */
+Busqueda bool isDevelopmentEnabled() const { return developmentEnabled_; }
+    
+    /**
+     * @brief Check if curiosity is enabled
+     * @return True if curiosity is enabled
+     */
     bool isCuriosityEnabled() const { return curiosityEnabled_; }
     
 private:

@@ -7,7 +7,7 @@
 namespace nlm {
 
 struct Config::Impl {
-    std::vector<ConfigEntry> entries;
+    std::map<std::string, ConfigEntry> entries;
 };
 
 Config::Config() : pImpl(std::make_unique<Impl>()) {}
@@ -19,11 +19,9 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
-    // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
-    
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
@@ -49,6 +47,8 @@ bool Config::loadFromFile(const std::string& filepath) {
             }
             
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Invalid config line (no '=' found): " + line);
         }
     }
     
@@ -86,22 +86,14 @@ bool Config::saveToFile(const std::string& filepath) const {
     
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = " << toConfigString(entry.value) << "\n";
     }
     
     return true;
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
-    
-    if (it != pImpl->entries.end()) {
-        it->value = value;
-        it->source = source;
-    } else {
-        pImpl->entries.emplace_back(key, value, source);
-    }
+    pImpl->entries[key] = ConfigEntry(key, value, source);
 }
 
 void Config::set(const std::string& key, const std::string& value, ConfigSource source) {
@@ -125,23 +117,18 @@ void Config::set(const std::string& key, bool value, ConfigSource source) {
 }
 
 bool Config::has(const std::string& key) const {
-    return std::any_of(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    return pImpl->entries.find(key) != pImpl->entries.end();
 }
 
 void Config::remove(const std::string& key) {
-    pImpl->entries.erase(
-        std::remove_if(pImpl->entries.begin(), pImpl->entries.end(),
-            [&key](const ConfigEntry& e) { return e.key == key; }),
-        pImpl->entries.end()
-    );
+    pImpl->entries.erase(key);
 }
 
 std::vector<std::string> Config::getKeys() const {
     std::vector<std::string> keys;
     keys.reserve(pImpl->entries.size());
-    for (const auto& entry : pImpl->entries) {
-        keys.push_back(entry.key);
+    for (const auto& pair : pImpl->entries) {
+        keys.push_back(pair.first);
     }
     return keys;
 }
@@ -153,7 +140,8 @@ void Config::clear() {
 std::string Config::summary() const {
     std::ostringstream oss;
     oss << "Configuration (" << pImpl->entries.size() << " entries):\n";
-    for (const auto& entry : pImpl->entries) {
+    for (const auto& pair : pImpl->entries) {
+        const auto& entry = pair.second;
         oss << "  " << entry.key << " = [";
         std::visit([&oss](auto&& arg) {
             using T = std::decay_t<decltype(arg)>;
@@ -190,10 +178,37 @@ std::string Config::toLower(const std::string& str) {
     return result;
 }
 
+std::string Config::toConfigString(const ConfigValue& value) const {
+    std::ostringstream oss;
+    std::visit([&oss](const auto& val) {
+        using T = std::decay_t<decltype(val)>;
+        if constexpr (std::is_same_v<T, std::string>) {
+            oss << "\"" << val << "\"";
+        } else if constexpr (std::is_same_v<T, bool>) {
+            oss << (val ? "true" : "false");
+        } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                             std::is_same_v<T, std::vector<double>> ||
+                             std::is_same_v<T, std::vector<std::string>>) {
+            oss << "[";
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (i) oss << ", ";
+                if constexpr (std::is_same_v<T, std::vector<std::string>) && !val.empty()) {
+                    oss << "\"" << val[i] << "\"";
+                } else {
+                    oss << val[i];
+                }
+            }
+            oss << "]";
+        } else {
+            oss << val;
+        }
+    }, value);
+    return oss.str();
+}
+
 template<typename T>
 std::optional<T> Config::get(const std::string& key) const {
-    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
-        [&key](const ConfigEntry& e) { return e.key == key; });
+    auto it = pImpl->entries.find(key);
     if (it == pImpl->entries.end()) {
         return std::nullopt;
     }
@@ -208,7 +223,7 @@ std::optional<T> Config::get(const std::string& key) const {
         } else {
             return std::nullopt;
         }
-    }, it->value);
+    }, it->second.value);
 }
 
 template<typename T>
