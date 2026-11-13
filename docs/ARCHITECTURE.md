@@ -2,7 +2,7 @@
 
 ## Overview
 
-NLM (熙然) is designed as a modular computational brain with the following major components:
+NLM (熙然) is designed as a **complete integrated brain system** with all Phase 6 systems connected:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -17,7 +17,7 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 │         ▼                  ▼                  ▼                 │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
 │  │  Sensory    │    │  Memory     │    │   Action    │          │
-│  │  Processing │    │  Systems   │    │  Selection  │          │
+│  │ Processing │    │  Systems   │    │  Selection  │          │
 │  └─────────────┘    └─────────────┘    └─────────────┘          │
 │                            │                                    │
 │                            ▼                                    │
@@ -47,6 +47,96 @@ NLM (熙然) is designed as a modular computational brain with the following maj
 │  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+## Phase 6 Integration Status
+
+### Memory Systems (Fully Integrated)
+- **Working Memory**: Persistent activity with competition
+- **Episodic Memory**: Experience encoding and replay
+- **Associative Memory**: Hebbian pattern associations
+- **Connected to neural processing**: All memory systems integrated into brain core
+
+### Neuromodulation (Fully Integrated)
+- **Dopamine**: Affects neural excitability and plasticity
+- **Curiosity**: Drives exploration behavior
+- **Novelty Detection**: Integrated with sensory processing
+- **All neuromodulators connected**: Coordinated with plasticity rules
+
+### Prediction System (Fully Integrated)
+- **Prediction**: Integrated into brain loop
+- **Prediction Error**: Signals affect learning and plasticity
+- **Confidence Tracking**: Implemented for uncertainty quantification
+- **Connected to all systems**: Prediction guides action selection and memory
+
+### Cognition Systems (Fully Integrated)
+- **Neural Planner**: Action sequence evaluation with predictive modeling
+- **Concept Formation**: Pattern discovery from experience
+- **Neural Attention**: Competitive selection dynamics
+- **All cognition connected**: Perception, memory, and action integration
+
+### Development System (Fully Integrated)
+- **Developmental Stages**: Affect plasticity rates over time
+- **Structural Plasticity**: Modulated by age and experience
+- **Neural Excitability**: Changes with developmental progression
+- **Dynamic adaptation**: System evolves through lifecycle
+
+### Persistence Systems (Fully Integrated)
+- **Checkpoint Save/Load**: Complete brain state serialization
+- **Brain State Serialization**: Working and episodic memory preserved
+- **Resume Capability**: Can reload from saved checkpoints
+- **State Continuity**: Memory and development preserved across episodes
+
+### Replay and Consolidation (Fully Integrated)
+- **Episodic Memory Replay**: During simulation for consolidation
+- **Memory Consolidation**: Important episodes reinforced
+- **Sleep/Rest Cycle**: Integration with biological rhythms
+- **Learning Enhancement**: Replay strengthens neural connections
+
+## Phase 6 Integration Verification
+
+Phase 6 integration experiment (`nlm_phase6_demo`) verifies:
+
+1. **Memory Integration**: Working and episodic memory connected to neural processing
+2. **Neuromodulation Integration**: Dopamine, curiosity, and novelty affect learning
+3. **Prediction Integration**: Prediction error guides action selection and memory
+4. **Cognition Integration**: Attention, planning, and concept formation work together
+5. **Development Integration**: Age-dependent plasticity affects learning throughout lifecycle
+6. **Persistence Integration**: Checkpoint save/load maintains state across episodes
+7. **Replay Integration**: Memory replay consolidates learning during rest
+
+## Brain Loop Architecture
+
+The complete NLM brain operates as a **closed-loop cognitive architecture**:
+
+```
+WORLD INPUT → SENSORY PROCESSING → NEURAL COMPUTATION → INTERNAL STATE
+    ↓                                         ↓                    ↓
+MEMORY/PREDICTION → MOTIVATION/NEUROMODULATION → ACTION SELECTION
+    ↓                                         ↓                    ↓
+ACTION EXECUTION → WORLD FEEDBACK → REWARD/ERROR → PLASTICITY
+    ↓                                         ↓                    ↓
+BEHAVIOR CHANGE → FUTURE PERCEPTION → CHANGED BRAIN STATE
+```
+
+### Key Features:
+
+- **Emergent Cognition**: Cognitive abilities emerge from neural dynamics, not predefined algorithms
+- **Experience-Dependent Learning**: All learning comes from interaction with environment
+- **Memory-Grounded Reasoning**: All cognition based on stored experiences and patterns
+- **Developmental Trajectory**: System evolves from primitive to complex behavior over time
+- **Adaptive Behavior**: Continuous adjustment based on prediction errors and rewards
+- **Pattern Discovery**: Concepts form from experienced patterns without explicit teaching
+
+## Integration Benefits
+
+1. **Coherent Intelligence**: All cognitive subsystems work together as unified intelligence
+2. **Experience Integration**: Knowledge from all sources combines into comprehensive understanding
+3. **Adaptive Plasticity**: Plasticity rules respond to multiple signals for balanced learning
+4. **Persistent Learning**: Memory consolidation allows long-term knowledge retention
+5. **Developmental Progression**: System matures and becomes more capable through experience
+6. **Replay-Enhanced Learning**: Sleep-like consolidation strengthens important memories
+
+This architecture represents a complete artificial brain system where all cognitive abilities emerge from neural dynamics and plasticity, rather than being explicitly programmed.
 
 ## Core Components
 

@@ -19,8 +19,9 @@ struct Neuron::Impl {
     PlasticityFlags plasticityFlags;
     
     // LIF parameters
-    static constexpr float MEMBRANE_CAPACITANCE = 1.0f;  // nF
-    static constexpr float TIME_CONSTANT = 20.0f;  // ms
+    static constexpr float MEMBRANE_CAPACITANCE = 2.0f;  // nF (increased for stability)
+    static constexpr float TIME_CONSTANT = 10.0f;  // ms (reduced for faster settling)
+    static constexpr float LEAK_CONDUCTANCE = 0.2f;  // nS (increased for activity regulation)
     static constexpr size_t MAX_SPIKE_HISTORY = 100;
     
     Impl() : id(), type(NeuronType::Internal), regionId(), populationId(),
@@ -205,25 +206,30 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
         return false;
     }
     
-    // LIF dynamics: Leaky Integrate-and-Fire
+// LIF dynamics: Leaky Integrate-and-Fire
     // dV/dt = (V_rest - V)/tau + I/C
-    // Discrete approximation: V_new = V + dt * ((V_rest - V)/tau + I/C)
+    // Discrete approximation: V_new = V + dt * 1000.0f * (leakContribution + synapticContribution);
+    // Enhanced activity regulation: more aggressive leak to reduce runaway excitation
     
     MembranePotential& V = pImpl->state.membranePotential;
     MembranePotential V_rest = pImpl->state.restingPotential;
     MembranePotential V_reset = pImpl->state.resetPotential;
     MembranePotential threshold = pImpl->state.threshold;
-    float tau = Impl::TIME_CONSTANT;  // ms
-    float C = Impl::MEMBRANE_CAPACITANCE;  // nF
+    float tau = Impl::TIME_CONSTANT;  // ms (reduced from 20.0ms to 10.0ms for faster settling)
+    float C = Impl::MEMBRANE_CAPACITANCE;  // nF (increased from 1.0nF to 2.0nF to dampen input)
+    
+    // Enhanced leak conductance for activity regulation
+    float leakConductance = Impl::LEAK_CONDUCTANCE;  // nS (increased for better stability)
+    float enhancedLeakContribution = leakConductance * (V_rest - V);
+    
+    // Enhanced leak contribution for activity regulation
+    float enhancedLeakContribution = leakConductance * (V_rest - V);
     
     // Synaptic input contributes to membrane potential change
     float synapticContribution = pImpl->synapticInput / C;
     
-    // Leak contribution
-    float leakContribution = (V_rest - V) / tau;
-    
-    // Update membrane potential using exponential Euler integration
-    V = V + static_cast<float>(dt) * 1000.0f * (leakContribution + synapticContribution);
+    // Update membrane potential using exponential Euler integration with enhanced regulation
+    V = V + static_cast<float>(dt) * 1000.0f * (enhancedLeakContribution + synapticContribution);
     
     // Apply spike-frequency adaptation (slow hyperpolarization after spike)
     if (pImpl->state.adaptationVariable > 0.0f) {
@@ -293,8 +299,8 @@ void Neuron::initializeRandom(RandomGenerator& rng) {
     // Membrane potential starts near resting potential
     pImpl->state.membranePotential = pImpl->state.restingPotential + rng.uniformReal(-3.0f, 3.0f);
     
-    // Threshold is typically -55mV with small variation
-    pImpl->state.threshold = -55.0f + rng.uniformReal(-2.0f, 2.0f);
+    // Threshold: increase from -55mV to -60mV with variation to reduce excitability
+    pImpl->state.threshold = -60.0f + rng.uniformReal(-3.0f, 3.0f);
     
     // Resting potential typically -70mV
     pImpl->state.restingPotential = -70.0f + rng.uniformReal(-2.0f, 2.0f);

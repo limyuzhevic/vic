@@ -401,9 +401,58 @@ void CheckpointWriter::abort() {
     }
 }
 
-bool CheckpointWriter::writeHeader() { return false; }
-bool CheckpointWriter::writeSectionHeader(const SectionHeader&) { return false; }
-bool CheckpointWriter::padToAlignment(size_t) { return true; }
+bool CheckpointWriter::writeHeader() {
+        if (!stream_.is_open()) return false;
+        
+        // Write magic and version
+        const uint32_t magic = 0x4E4C4D01;  // "NLM" + 1
+        const uint32_t version = 1;
+        stream_.write(reinterpret_cast<const char*>(&magic), sizeof(magic));
+        stream_.write(reinterpret_cast<const char*>(&version), sizeof(version));
+        
+        // Write header fields
+        stream_.write(reinterpret_cast<const char*>(&header_.neuronCount), sizeof(header_.neuronCount));
+        stream_.write(reinterpret_cast<const char*>(&header_.synapseCount), sizeof(header_.synapseCount));
+        stream_.write(reinterpret_cast<const char*>(&header_.regionCount), sizeof(header_.regionCount));
+        stream_.write(reinterpret_cast<const char*>(&header_.step), sizeof(header_.step));
+        stream_.write(reinterpret_cast<const char*>(&header_.simulationTime), sizeof(header_.simulationTime));
+        stream_.write(reinterpret_cast<const char*>(&header_.timestamp), sizeof(header_.timestamp));
+        stream_.write(reinterpret_cast<const char*>(&header_.totalSize), sizeof(header_.totalSize));
+        stream_.write(reinterpret_cast<const char*>(&header_.compressionLevel), sizeof(header_.compressionLevel));
+        
+        // Write checksum
+        stream_.write(reinterpret_cast<const char*>(&header_.checksum), sizeof(header_.checksum));
+        
+        bytesWritten_ += 4 * sizeof(uint32_t) + 5 * sizeof(uint64_t) + sizeof(double);
+        return !stream_.fail();
+    }
+    
+    bool CheckpointWriter::writeSectionHeader(const SectionHeader& section) {
+        if (!stream_.is_open()) return false;
+        
+        // Write section type and size
+        uint64_t type = static_cast<uint64_t>(section.type);
+        stream_.write(reinterpret_cast<const char*>(&type), sizeof(type));
+        stream_.write(reinterpret_cast<const char*>(&section.size), sizeof(section.size));
+        
+        bytesWritten_ += 2 * sizeof(uint64_t);
+        return !stream_.fail();
+    }
+    
+    bool CheckpointWriter::padToAlignment(size_t alignment) {
+        if (!stream_.is_open() || alignment == 0) return true;
+        
+        size_t currentPos = stream_.tellp();
+        size_t padding = (alignment - (currentPos % alignment)) % alignment;
+        
+        if (padding > 0) {
+            std::vector<uint8_t> paddingBytes(padding, 0);
+            stream_.write(reinterpret_cast<const char*>(paddingBytes.data()), padding);
+        }
+        
+        bytesWritten_ += padding;
+        return !stream_.fail();
+    }
 
 // ---------------- CheckpointManager ----------------
 

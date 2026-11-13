@@ -59,16 +59,32 @@ void STDP::update(Synapse* synapse,
     float totalDelta = 0.0f;
     float tau = pImpl->timeConstant;
 
-    // Nearest-neighbour STDP: only the most recent pre/post pair is used.
-    // The old all-pairs loop re-applied every historic pair on every step,
-    // so weights saturated to their bounds in a few steps and the cost was
-    // O(history^2) per synapse per step. Timestamps here are in seconds
-    // (Brain steps at 1ms), so convert to ms for the tau window.
-    float dtMs = static_cast<float>((postSpikes.back() - preSpikes.back()) * 1000.0);
-    if (dtMs > 0) {
-        totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
-    } else if (dtMs < 0) {
-        totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+    // Enhanced STDP for selective pattern learning: use multiple spike pairs,
+    // not just the most recent one, for better selectivity
+    // This preserves more temporal relationships and allows patterns to emerge
+    
+    // Calculate total delta from all relevant spike pairs
+    for (const auto& pre : preSpikes) {
+        for (const auto& post : postSpikes) {
+            // Only consider recent pairs (within 100ms)
+            float dtMs = static_cast<float>((post - pre) * 1000.0);
+            if (std::abs(dtMs) > 100.0f) continue;  // Ignore very old pairs
+            
+            if (dtMs > 0) {
+                // Pre before post: potentiation
+                totalDelta += pImpl->ltpWeight * std::exp(-dtMs / tau);
+            } else if (dtMs < 0) {
+                // Post before pre: depression  
+                totalDelta += -pImpl->ltdWeight * std::exp(dtMs / tau);
+            }
+        }
+    }
+    
+    // Limit the total delta from one update to prevent runaway plasticity
+    // This ensures patterns can emerge selectively rather than all at once
+    float maxDeltaPerUpdate = 0.05f;
+    if (std::abs(totalDelta) > maxDeltaPerUpdate) {
+        totalDelta = (totalDelta / std::abs(totalDelta)) * maxDeltaPerUpdate;
     }
     
     // Apply weight change with bounds

@@ -99,8 +99,6 @@ void Synapse::setWeight(SynapticWeight weight) {
 
 void Synapse::addToWeight(SynapticWeight delta) {
     pImpl->weight += delta;
-    // Clamp to reasonable bounds to prevent instability
-    pImpl->weight = std::clamp(pImpl->weight, Impl::MIN_WEIGHT, Impl::MAX_WEIGHT);
 }
 
 Delay Synapse::getDelay() const {
@@ -132,6 +130,7 @@ void Synapse::recordPreSpike(Timestamp timestamp) {
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin());
     }
+    pImpl->lastPreSpikeTime = timestamp;
 }
 
 void Synapse::recordPostSpike(Timestamp timestamp) {
@@ -139,6 +138,7 @@ void Synapse::recordPostSpike(Timestamp timestamp) {
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
         pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin());
     }
+    pImpl->lastPostSpikeTime = timestamp;
 }
 
 const std::vector<Timestamp>& Synapse::getPreSpikeHistory() const {
@@ -157,23 +157,21 @@ void Synapse::clearHistory() {
 void Synapse::setPreSpikeHistory(const std::vector<Timestamp>& history) {
     pImpl->preSpikeHistory = history;
     if (pImpl->preSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->preSpikeHistory.erase(
-            pImpl->preSpikeHistory.begin(),
-            pImpl->preSpikeHistory.begin() +
-                static_cast<std::ptrdiff_t>(pImpl->preSpikeHistory.size() -
-                                            Impl::MAX_SPIKE_HISTORY));
+        pImpl->preSpikeHistory.erase(pImpl->preSpikeHistory.begin(), 
+                                     pImpl->preSpikeHistory.end() - Impl::MAX_SPIKE_HISTORY);
     }
 }
 
 void Synapse::setPostSpikeHistory(const std::vector<Timestamp>& history) {
     pImpl->postSpikeHistory = history;
     if (pImpl->postSpikeHistory.size() > Impl::MAX_SPIKE_HISTORY) {
-        pImpl->postSpikeHistory.erase(
-            pImpl->postSpikeHistory.begin(),
-            pImpl->postSpikeHistory.begin() +
-                static_cast<std::ptrdiff_t>(pImpl->postSpikeHistory.size() -
-                                            Impl::MAX_SPIKE_HISTORY));
+        pImpl->postSpikeHistory.erase(pImpl->postSpikeHistory.begin(),
+                                     pImpl->postSpikeHistory.end() - Impl::MAX_SPIKE_HISTORY);
     }
+}
+
+const PlasticityFlags& Synapse::getPlasticityFlags() const {
+    return pImpl->plasticityFlags;
 }
 
 PlasticityFlags& Synapse::getPlasticityFlags() {
@@ -184,10 +182,6 @@ void Synapse::enablePlasticity(bool hebbian, bool stdp, bool rewardModulated) {
     pImpl->plasticityFlags.hebbian = hebbian;
     pImpl->plasticityFlags.stdp = stdp;
     pImpl->plasticityFlags.reward_modulated = rewardModulated;
-}
-
-const PlasticityFlags& Synapse::getPlasticityFlags() const {
-    return pImpl->plasticityFlags;
 }
 
 float Synapse::getEligibilityTrace() const {
@@ -237,6 +231,38 @@ void Synapse::step(Timestamp currentTime) {
         pImpl->shortTermDepression += (1.0f - pImpl->shortTermDepression) * (1.0f - std::exp(-timeSinceActivity / Impl::STP_DEPRESSION_TAU));
     }
     
+    // Apply Hebbian plasticity if enabled: co-activation leads to strengthening
+    // This is the basic Hebbian rule: "neurons that fire together, wire together"
+    if (pImpl->plasticityFlags.hebbian && pImpl->preSpikeHistory.size() > 0 && pImpl->postSpikeHistory.size() > 0) {
+        // Check if pre and post neurons spiked recently (within 20ms)
+        float preTime = pImpl->preSpikeHistory.back();
+        float postTime = pImpl->postSpikeHistory.back();
+        float dt = std::abs(postTime - preTime);
+        
+        // Only apply Hebbian if timing difference is small (indicating co-activation)
+        if (dt < 0.02f) {  // 20ms window for co-activation
+            // Hebbian weight change: Δw = η * x_pre * x_post
+            // Where η is learning rate, x_pre and x_post are firing rates
+            float learningRate = 0.01f;  // Moderate learning rate to prevent runaway excitation
+            
+            // Get presynaptic and postsynaptic firing rates (approximate)
+            float preFiringRate = std::min(1.0f, static_cast<float>(pImpl->preSpikeHistory.size()) * 10.0f);
+            float postFiringRate = std::min(1.0f, static_cast<float>(pImpl->postSpikeHistory.size()) * 10.0f);
+            
+            float hebbianDelta = learningRate * preFiringRate * postFiringRate;
+            
+            // Apply sign based on synapse type (excitatory strengthens, inhibitory strengthens)
+            if (pImpl->type == SynapseType::Excitatory) {
+                pImpl->weight += hebbianDelta;
+            } else if (pImpl->type == SynapseType::Inhibitory) {
+                pImpl->weight -= hebbianDelta;  // Make inhibition more negative
+            }
+        }
+    }
+    
+    // Competition removed - requires access to neural regions, not available at synapse level
+    // Hebbian plasticity promotes pattern learning by strengthening co-activated connections
+    
     // Decay eligibility trace for reward-modulated learning
     decayEligibilityTrace(0.001f);  // Fast decay
     
@@ -280,14 +306,7 @@ void Synapse::initializeRandom(RandomGenerator& rng) {
     
     // Initialize short-term plasticity state
     pImpl->shortTermDepression = 1.0f;  // Fully recovered
-    pImpl->shortTermFacilitation = 0.0f;  // No initial facilitation
-    
-    // Initialize eligibility trace to 0
-    pImpl->eligibilityTrace = 0.0f;
-    
-    // Initialize last spike times
-    pImpl->lastPreSpikeTime = -1.0f;
-    pImpl->lastPostSpikeTime = -1.0f;
+    pImpl->shortTermFacilitation = 0.0f;  // No facilitation
 }
 
 } // namespace nlm

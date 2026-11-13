@@ -317,7 +317,7 @@ bool Brain::initialize() {
         auto it = pImpl->neuronById.find(event.destination_neuron.index());
         if (it != pImpl->neuronById.end()) {
             Neuron* neuron = it->second;
-            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            MembranePotential synapticCurrent = event.weight * 5.0f;  // Reduced scale factor for better activity regulation
             if (event.is_excitatory) {
                 neuron->receiveExcitatoryInput(synapticCurrent);
             } else {
