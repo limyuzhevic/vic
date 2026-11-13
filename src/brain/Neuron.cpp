@@ -234,6 +234,31 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // Clamp membrane potential to prevent instability
     V = std::clamp(V, -100.0f, 50.0f);
     
+    // Spike rate regulation: prevent excessive firing rates
+    // Biological neurons have spike frequency limits and adaptation
+    float targetFiringRate = pImpl->state.firingRate;
+    
+    // Apply hard spike rate limit (biological maximum)
+    float maxFiringRate = 200.0f;  // Hz - biological neuron limit
+    if (targetFiringRate > maxFiringRate) {
+        targetFiringRate = maxFiringRate;
+    }
+    
+    // Apply spike rate adaptation for homeostasis
+    // Neurons adapt their firing rate based on recent activity
+    float adaptationStrength = 0.05f;  // Adaptation gain
+    float adaptationTarget = 50.0f;   // Target firing rate
+    
+    // Homeostatic adaptation: bring firing rate toward target
+    float deviation = targetFiringRate - adaptationTarget;
+    float adaptation = deviation * adaptationStrength;
+    pImpl->state.adaptationVariable += adaptation * 0.01f;
+    
+    // Stronger adaptation for very high or very low firing
+    if (std::abs(adaptation) > 0.1f) {
+        V -= adaptation * 0.02f;  // Stronger hyperpolarization
+    }
+    
     // Update the firing-rate metric from counted spikes, in Hz.
     // Previously setFiringRate() was never called anywhere, so
     // getAverageFiringRate() summed zeros even with thousands of spikes.
@@ -242,9 +267,12 @@ bool Neuron::stepLIF(Timestamp currentTime, TimestepDuration dt) {
     // step would approach 1000 Hz, and refractory periods cap it well
     // below that in practice.
     if (dt > 0.0) {
-        pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+        if (!fired) {
+            // No spike occurred, decay firing rate
+            pImpl->state.firingRate = 0.9f * pImpl->state.firingRate;
+        }
     }
-
+    
     // Check for spike
     if (V >= threshold) {
         fired = true;

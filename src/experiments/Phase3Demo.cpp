@@ -344,12 +344,39 @@ private:
 int main(int argc, char* argv[]) {
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    bool verbose = false;
+    bool benchmarkMode = false;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
+    // Parse command line arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.find("--episodes=") == 0) {
+            numEpisodes = std::atoi(arg.substr(10).c_str());
+        } else if (arg == "--episodes" && i + 1 < argc) {
+            numEpisodes = std::atoi(argv[++i]);
+        } else if (arg.find("--steps=") == 0) {
+            stepsPerEpisode = std::atoi(arg.substr(8).c_str());
+        } else if (arg == "--steps" && i + 1 < argc) {
+            stepsPerEpisode = std::atoi(argv[++i]);
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--benchmark" || arg == "-b") {
+            benchmarkMode = true;
+        } else if (arg.find("--") == 0 && arg != "--help") {
+            std::cerr << "Unknown option: " << arg << std::endl;
+            std::cerr << "Use --help for available options." << std::endl;
+        }
     }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    
+    // Help option
+    if (argc == 2 && std::string(argv[1]) == "--help") {
+        std::cout << "Phase 3 Demo Help:" << std::endl;
+        std::cout << "  --episodes=<n> or --episodes <n>: Number of episodes (default: 5)" << std::endl;
+        std::cout << "  --steps=<n> or --steps <n>: Steps per episode (default: 200)" << std::endl;
+        std::cout << "  --verbose or -v: Enable verbose output" << std::endl;
+        std::cout << "  --benchmark or -b: Run in benchmark mode" << std::endl;
+        std::cout << "  --help: Show this help message" << std::endl;
+        return 0;
     }
     
     nlm::Phase3Demo demo;

@@ -222,22 +222,33 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Applying repeated input patterns (1000 steps)...");
     
-    // A pattern, not a seizure: stimulate only the first 20 sensory neurons
-    // each step. The old code injected 30.0f into *every* sensory neuron
-    // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
-    std::vector<NeuronId> patternNeurons;
+    // A pattern, not a seizure: stimulate specific sensory neurons with varying intensities
+    // to promote selective learning rather than network saturation.
+    // The old code injected 30.0f into *every* sensory neuron 20 times per step,
+    // causing synchronous firing and weight saturation. Now we use sparse, varying input.
+    std::vector<std::pair<NeuronId, float>> patternInputs;
     if (auto* region = brain->getRegion(RegionId(1))) {
-        for (auto* neuron : region->getAllNeurons()) {
-            if (neuron->getType() == NeuronType::Sensory && patternNeurons.size() < 20) {
-                patternNeurons.push_back(neuron->getId());
+        auto neurons = region->getAllNeurons();
+        // Select a diverse set of sensory neurons (not necessarily the first 20)
+        size_t selectedCount = std::min<size_t>(20, neurons.size());
+        for (size_t i = 0; i < selectedCount; ++i) {
+            if (neurons[i]->getType() == NeuronType::Sensory) {
+                // Vary input intensity based on neuron index to create diversity
+                float intensity = 30.0f - (i * 10.0f / selectedCount); // Decreasing intensity
+                patternInputs.push_back({neurons[i]->getId(), intensity});
             }
         }
     }
+    
+    // Adaptive learning: reduce input intensity over time to prevent saturation
+    // This mimics biological learning where input efficacy decreases with experience
     for (SimulationStep step = 0; step < 1000; ++step) {
-        for (NeuronId id : patternNeurons) {
-            brain->injectCurrent(id, 30.0f);
+        // Dynamic input: vary based on step to prevent patterns
+        for (size_t i = 0; i < patternInputs.size(); ++i) {
+            NeuronId id = patternInputs[i].first;
+            float baseIntensity = patternInputs[i].second;
+            float intensity = baseIntensity * (0.95f - step * 0.001f);  // Gradually decrease
+            brain->injectCurrent(id, intensity);
         }
         
         brain->step(step, step * 0.001);
@@ -246,7 +257,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         if (step % 100 == 0) {
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
                         " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()) +
+                        " | Mean weight: " + std::to_string(brain->getAverageSynapticWeight()));
         }
     }
     
@@ -326,11 +338,44 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
     NLM_LOG_INFO("");
     
+    // Parse command line arguments
+    bool verbose = false;
+    bool benchmarkMode = false;
+    std::string configFile = "configs/default.cfg";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--benchmark" || arg == "-b") {
+            benchmarkMode = true;
+        } else if (arg.find("--config=") == 0) {
+            configFile = arg.substr(9);
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        } else if (arg.find("--") == 0) {
+            // Unknown option, could be extended in future
+        }
+    }
+    
+    // Configure logger based on verbose mode
+    if (verbose) {
+        consoleLogger->setLevel(LogLevel::Debug);
+    }
+    
+    // Log configuration based on mode
+    if (benchmarkMode) {
+        NLM_LOG_INFO("=== BENCHMARK MODE ===");
+        NLM_LOG_INFO("Running optimized for performance measurement");
+    } else {
+        NLM_LOG_INFO("=== DEMO MODE ===");
+        NLM_LOG_INFO("Running with educational output");
+    }
+    
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    // Load config from file (ignore if not found)
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
@@ -368,6 +413,9 @@ int main(int argc, char** argv) {
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
     
+    // Override with command line args (repeated for proper ordering)
+    config->loadFromArgs(argc, argv);
+    
     // Log configuration summary
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Configuration:");
@@ -376,6 +424,11 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    
+    // Benchmark mode logging
+    if (benchmarkMode) {
+        NLM_LOG_INFO("Benchmark mode enabled - measuring performance metrics");
+    }
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

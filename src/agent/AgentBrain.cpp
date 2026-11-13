@@ -963,12 +963,15 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
                 // 0.05 learning rate and a +-0.1 per-event cap keep a
                 // reward event meaningful without erasing all prior
                 // selectivity in one step (standard R-STDP scaling).
-                float delta = eligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
-                delta = std::clamp(delta, -0.1f, 0.1f);
+                // FIXED: Scale eligibility trace to prevent saturation
+                // and ensure selective learning rather than network-wide changes.
+                float scaledEligibility = eligibility * 0.1f;  // Reduce trace accumulation
+                float delta = scaledEligibility * dopamineLevel_ * plasticityModifier_ * 0.05f;
+                delta = std::clamp(delta, -0.05f, 0.05f);  // Reduced magnitude to prevent saturation
                 syn->addToWeight(delta);
                 
-                // Decay eligibility trace
-                syn->decayEligibilityTrace(0.1f);
+                // Stronger decay to prevent over-accumulation
+                syn->decayEligibilityTrace(0.2f);
             }
         }
     }
