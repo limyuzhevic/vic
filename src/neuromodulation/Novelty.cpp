@@ -81,4 +81,9 @@ void Novelty::clearHistory() {
     pImpl->history.clear();
 }
 
+void Novelty::reset() {
+    pImpl->level = pImpl->baseline;
+    clearHistory();
+}
+
 } // namespace nlm

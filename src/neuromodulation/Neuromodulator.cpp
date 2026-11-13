@@ -53,4 +53,9 @@ void Dopamine::signalRewardPredictionError(float error) {
     pImpl->level = std::max(0.0f, pImpl->level + error * pImpl->releaseRate);
 }
 
+void Dopamine::reset() {
+    // Reset dopamine level to baseline
+    pImpl->level = pImpl->baseline;
+}
+
 } // namespace nlm

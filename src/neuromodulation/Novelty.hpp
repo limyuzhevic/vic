@@ -34,6 +34,9 @@ public:
     const std::vector<float>& getHistory() const;
     void clearHistory();
     
+    // Reset novelty state
+    void reset();
+    
 private:
     struct Impl;
     Impl* pImpl;

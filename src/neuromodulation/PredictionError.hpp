@@ -31,6 +31,9 @@ public:
     // Get error magnitude for neuromodulation
     float getMagnitude() const;
     
+    // Reset prediction error state
+    void reset();
+    
 private:
     struct Impl;
     Impl* pImpl;
