@@ -137,9 +137,9 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
             
             // Create new brain and load
             auto brain2 = std::make_shared<Brain>(cfg);
-            brain2->initialize();
-            
-            if (brain2->load(config.checkpointPath)) {
+            if (!brain2->initialize()) {
+                NLM_LOG_ERROR("Failed to initialize brain for checkpoint loading");
+            } else if (brain2->load(config.checkpointPath)) {
                 NLM_LOG_INFO("Checkpoint loaded successfully");
                 result.checkpointingWorks = true;
             } else {
