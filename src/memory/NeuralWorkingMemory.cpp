@@ -22,6 +22,8 @@ NeuralWorkingMemory::NeuralWorkingMemory()
     , brain_(nullptr)
     , capacity_(100)
     , decayRate_(0.01f)
+    , activeTraces_()
+    , recurrentConnections_()
 {
 }
 
@@ -159,7 +161,9 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     
     // Run competition to select winners
     runCompetition();
-}
+    
+    // Update recurrent connections for maintenance
+    updateRecurrentConnections();
 
 void NeuralWorkingMemory::clear() {
     memoryNeurons_.clear();

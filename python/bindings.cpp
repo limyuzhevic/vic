@@ -359,7 +359,96 @@ PYBIND11_MODULE(pynlm, m) {
              py::return_value_policy::reference_internal,
              "Get the configuration")
         .def("logStatus", &Brain::logStatus,
-             "Log brain status");
+             "Log brain status")
+        
+        // Plasticity system access
+        .def("getSTDP", &Brain::getSTDP,
+             py::return_value_policy::reference_internal,
+             "Get STDP plasticity system")
+        .def("getHebbian", &Brain::getHebbian,
+             py::return_value_policy::reference_internal,
+             "Get Hebbian plasticity system")
+        .def("getStructuralPlasticity", &Brain::getStructuralPlasticity,
+             py::return_value_policy::reference_internal,
+             "Get structural plasticity system")
+        
+        // Memory systems access
+        .def("getWorkingMemory", &Brain::getWorkingMemory,
+             py::return_value_policy::reference_internal,
+             "Get working memory system")
+        .def("getEpisodicMemory", &Brain::getEpisodicMemory,
+             py::return_value_policy::reference_internal,
+             "Get episodic memory system")
+        .def("getAssociativeMemory", &Brain::getAssociativeMemory,
+             py::return_value_policy::reference_internal,
+             "Get associative memory system")
+        
+        // Prediction system access
+        .def("getPredictionSystem", &Brain::getPredictionSystem,
+             py::return_value_policy::reference_internal,
+             "Get prediction system")
+        
+        // Cognition systems access
+        .def("getPlanner", &Brain::getPlanner,
+             py::return_value_policy::reference_internal,
+             "Get neural planner")
+        .def("getConceptFormation", &Brain::getConceptFormation,
+             py::return_value_policy::reference_internal,
+             "Get concept formation system")
+        .def("getAttention", &Brain::getAttention,
+             py::return_value_policy::reference_internal,
+             "Get attentional selection system")
+        
+        // Development system access
+        .def("getDevelopmentSystem", &Brain::getDevelopmentSystem,
+             py::return_value_policy::reference_internal,
+             "Get development system")
+        
+        // Neuromodulation systems access
+        .def("getDopamine", &Brain::getDopamine,
+             py::return_value_policy::reference_internal,
+             "Get dopamine system")
+        .def("getCuriosity", &Brain::getCuriosity,
+             py::return_value_policy::reference_internal,
+             "Get curiosity system")
+        .def("getNovelty", &Brain::getNovelty,
+             py::return_value_policy::reference_internal,
+             "Get novelty system")
+        .def("getPredictionErrorSignal", &Brain::getPredictionErrorSignal,
+             py::return_value_policy::reference_internal,
+             "Get prediction error system")
+        
+        // Random generator access
+        .def("getRandomGenerator", &Brain::getRandomGenerator,
+             py::return_value_policy::reference_internal,
+             "Get random generator")
+        
+        // Learned preference trait
+        .def("getLearnedPreference", &Brain::getLearnedPreference,
+             "Get learned preference trait (personality)")
+        .def("setLearnedPreference", &Brain::setLearnedPreference,
+             py::arg("preference"), "Set learned preference trait")
+        
+        // Inter-region connection management
+        .def("addInterRegionConnection", &Brain::addInterRegionConnection,
+             py::arg("source"), py::arg("target"),
+             py::arg("weight") = 0.0f, py::arg("delay") = 1,
+             "Add inter-region connection")
+        .def("removeInterRegionConnection", &Brain::removeInterRegionConnection,
+             py::arg("source"), py::arg("target"),
+             "Remove inter-region connection")
+        
+        // Neuromodulation
+        .def("applyNeuromodulation", &Brain::applyNeuromodulation,
+             py::arg("signal"), "Apply neuromodulatory signal")
+        
+        // Plasticity updates
+        .def("updatePlasticity", &Brain::updatePlasticity,
+             "Update plasticity rules")
+        
+        // Development
+        .def("develop", &Brain::develop,
+             "Apply developmental changes");
 
     py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
         .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
@@ -395,18 +484,26 @@ PYBIND11_MODULE(pynlm, m) {
         .def("getBrain", &AgentBrain::getBrain,
              py::return_value_policy::reference_internal,
              "Get the underlying brain")
+        
+        // Subsystem enable/disable
         .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
-             py::arg("enable"))
+             py::arg("enable"), "Enable/disable reward modulation")
         .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
-             py::arg("enable"))
+             py::arg("enable"), "Enable/disable structural plasticity")
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
-             py::arg("enable"))
+             py::arg("enable"), "Enable/disable development")
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
-             py::arg("enable"))
-        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
-        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled)
-        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
-        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
+             py::arg("enable"), "Enable/disable curiosity")
+        
+        // Subsystem status checks
+        .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled,
+             "Check if reward modulation is enabled")
+        .def("isStructuralPlasticityEnabled", &AgentBrain::isStructuralPlasticityEnabled,
+             "Check if structural plasticity is enabled")
+        .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled,
+             "Check if development is enabled")
+        .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled,
+             "Check if curiosity is enabled");
 
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
@@ -424,10 +521,63 @@ PYBIND11_MODULE(pynlm, m) {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
 
-    m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
-    m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);
-    m.attr("INVALID_REGION_ID") = py::cast(INVALID_REGION_ID);
-    m.attr("INVALID_POPULATION_ID") = py::cast(INVALID_POPULATION_ID);
-}
+    m.def("runSimulation", [](std::shared_ptr<Config> config, size_t steps) {
+        auto brain = pynlm::createBrain(config);
+        brain->initialize();
+        
+        for (size_t step = 0; step < steps; ++step) {
+            brain->step(step);
+        }
+        
+        return brain;
+    }, py::arg("config"), py::arg("steps"), 
+       "Run a simple simulation for the specified number of steps");
+    
+    m.def("runAgentSimulation", [](std::shared_ptr<Config> config, std::shared_ptr<SimpleWorld> world, size_t steps) {
+        auto brain = pynlm::createBrain(config);
+        auto agent = pynlm::createAgentBrain(brain);
+        
+        agent->initialize(*world);
+        
+        for (size_t step = 0; step < steps; ++step) {
+            world->update(0.1);
+            auto percept = world->getSensoryPercept();
+            agent->processSensoryInput(percept);
+            brain->step(step);
+            auto action = agent->decodeMotorCommand();
+            world->applyMotorCommand(action, world->getSimulationTime());
+        }
+        
+        return brain;
+    }, py::arg("config"), py::arg("world"), py::arg("steps"),
+       "Run an agent simulation with world interaction");
+    
+    m.def("createSimpleEnvironment", []() {
+        auto world = pynlm::createSimpleWorld();
+        world->configure(20, 20, 8, 8);
+        world->reset();
+        return world;
+    }, "Create a simple world environment with default settings");
+    
+    m.def("exportBrainToFile", [](std::shared_ptr<Brain> brain, const std::string& filepath) {
+        return brain->save(filepath);
+    }, py::arg("brain"), py::arg("filepath"),
+       "Save brain state to file");
+    
+    m.def("importBrainFromFile", [](const std::string& filepath) {
+        auto config = pynlm::createDefaultConfig();
+        auto brain = pynlm::createBrain(config);
+        brain->initialize();
+        brain->load(filepath);
+        return brain;
+    }, py::arg("filepath"),
+       "Load brain state from file and return the brain");
+    
+    m.def("benchmark", &pynlm_benchmark,
+         "Run performance benchmark (C++ function)");
+    
+    m.def("getDefaultConfig", []() -> std::shared_ptr<Config> {
+        return pynlm::createDefaultConfig();
+    }, "Get a default configuration for convenience");
 
 } // namespace nlm

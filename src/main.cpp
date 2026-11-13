@@ -28,24 +28,47 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printUsage() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+NLM — Neural Learning Machine
+
+Usage: nlm [OPTIONS]
+
+Options:
+  --help                    Show this help message
+  --config <file>           Load configuration from file
+  --config-key <key>=<value> Set configuration key/value
+  --neuron-count <count>    Set number of neurons (default: 1000)
+  --region-count <count>    Set number of regions (default: 1)
+  --steps <count>           Run this many simulation steps (default: 1000)
+  --save <file>             Save brain state to file after simulation
+  --load <file>             Load brain state from file and continue
+  --seed <seed>             Set random seed
+  --verbose                 Enable verbose logging
+  --quiet                   Disable non-error logging
+  --benchmark               Run performance benchmark
+  --dump-config             Print current configuration and exit
+
+Examples:
+  nlm --neuron-count 5000 --steps 5000
+  nlm --config myconfig.cfg --save brain_state.bin
+  nlm --load brain_state.bin --steps 1000
+  nlm --benchmark
+
+For more detailed usage, see easy_usage.md and HOW_TO_USE.md
+
+)" << std::endl;
+}
+
+void dumpConfig(const std::shared_ptr<Config>& config) {
+    std::cout << "Current configuration:" << std::endl;
+    auto keys = config->getKeys();
+    for (const auto& key : keys) {
+        auto opt = config->get<decltype(config->get<int64_t>(key))>(key);
+        if (opt.has_value()) {
+            std::cout << "  " << key << " = " << opt.value() << std::endl;
+        }
+    }
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
