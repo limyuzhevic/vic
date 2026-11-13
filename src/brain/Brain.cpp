@@ -7,6 +7,11 @@
 #include "../motor/Action.hpp"
 #include "../development/DevelopmentSystem.hpp"
 #include "../neuromodulation/Neuromodulator.hpp"
+#include "../neuromodulation/Dopamine.hpp"
+#include "../neuromodulation/Acetylcholine.hpp"
+#include "../neuromodulation/Norepinephrine.hpp"
+#include "../neuromodulation/Serotonin.hpp"
+#include "../neuromodulation/Reward.hpp"
 #include "../neuromodulation/Curiosity.hpp"
 #include "../neuromodulation/Novelty.hpp"
 #include "../neuromodulation/PredictionError.hpp"
@@ -49,6 +54,10 @@ struct Brain::Impl {
     
     // ========== NEUROMODULATION SYSTEMS ==========
     std::unique_ptr<Dopamine> dopamine;
+    std::unique_ptr<Acetylcholine> acetylcholine;
+    std::unique_ptr<Norepinephrine> norepinephrine;
+    std::unique_ptr<Serotonin> serotonin;
+    std::unique_ptr<Reward> reward;
     std::unique_ptr<Curiosity> curiosity;
     std::unique_ptr<PredictionError> predictionError;
     std::unique_ptr<Novelty> novelty;
@@ -138,31 +147,41 @@ struct Brain::Impl {
         
         // Initialize neuromodulation systems
         dopamine = std::make_unique<Dopamine>();
+        acetylcholine = std::make_unique<Acetylcholine>();
+        norepinephrine = std::make_unique<Norepinephrine>();
+        serotonin = std::make_unique<Serotonin>();
+        reward = std::make_unique<Reward>();
         curiosity = std::make_unique<Curiosity>();
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
+        // Configure neuromodulation systems
+        float dopamineLevel = config->getOr<float>("neuromod.dopamine.scale", 1.0f);
+        dopamine->setLevel(dopamineLevel);
         
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
+        float acetylcholineLevel = config->getOr<float>("neuromod.acetylcholine.scale", 1.0f);
+        acetylcholine->setLevel(acetylcholineLevel);
         
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
+        float norepinephrineLevel = config->getOr<float>("neuromod.norepinephrine.scale", 1.0f);
+        norepinephrine->setLevel(norepinephrineLevel);
         
-        // Get integration intervals from config
-        replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
-        consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
+        float serotoninLevel = config->getOr<float>("neuromod.serotonin.scale", 1.0f);
+        serotonin->setLevel(serotoninLevel);
         
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
+        // Configure curiosity
+        bool curiosityEnabled = config->getOr<bool>("neuromod.curiosity.enable", true);
+        if (curiosityEnabled) {
+            curiosity->enable(true);
+        }
+        
+        // Configure novelty detection
+        bool noveltyEnabled = config->getOr<bool>("neuromod.novelty.enable", true);
+        if (noveltyEnabled) {
+            novelty->enable(true);
+        }
+        
+        // Set reward to use brain's environment (will be set when environment is available)
+        // reward->setEnvironment(/* will be set later */);
     }
     
     DevelopmentalStage developmentalStage;
@@ -468,11 +487,6 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // AgentBrain/Neuron instead. This block is intentionally empty
     // so the experiment and its result stay in the record.
 
-    // ========== STEP 4: Update working memory ==========
-    if (pImpl->workingMemory) {
-        pImpl->workingMemory->update(pImpl->timestep);
-    }
-    
     // ========== STEP 5: Apply neuromodulation effects ==========
     // Update novelty detection
     if (pImpl->novelty) {
@@ -482,6 +496,66 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // Update curiosity
     if (pImpl->curiosity) {
         pImpl->curiosity->update(pImpl->novelty ? pImpl->novelty->getLevel() : 0.0f, pImpl->predictionError ? pImpl->predictionError->getError() : 0.0f, pImpl->timestep);
+    }
+    
+    // Update acetylcholine (attention)
+    if (pImpl->acetylcholine) {
+        pImpl->acetylcholine->update(pImpl->timestep);
+        // Apply acetylcholine effects on neural excitability
+        float acetylcholineLevel = pImpl->acetylcholine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Acetylcholine enhances signal-to-noise ratio
+                    float attentionMod = acetylcholineLevel * 0.3f;
+                    if (attentionMod > 0.0f) {
+                        neuron->injectCurrent(attentionMod * 0.5f);  // Subtle effect
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update norepinephrine (arousal)
+    if (pImpl->norepinephrine) {
+        pImpl->norepinephrine->update(pImpl->timestep);
+        // Apply norepinephrine effects on neural excitability
+        float norepinephrineLevel = pImpl->norepinephrine->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Norepinephrine increases alertness and signal detection
+                    float arousalMod = norepinephrineLevel * 0.4f;
+                    if (arousalMod > 0.0f) {
+                        neuron->injectCurrent(arousalMod * 0.8f);  // Stronger effect than ACh
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update serotonin (mood regulation)
+    if (pImpl->serotonin) {
+        pImpl->serotonin->update(pImpl->timestep);
+        // Apply serotonin effects on neural excitability
+        float serotoninLevel = pImpl->serotonin->getLevel();
+        for (auto& region : pImpl->regions) {
+            for (auto& pop : region->getPopulations()) {
+                for (auto* neuron : pop->getNeurons()) {
+                    // Serotonin modulates emotional and motivational aspects
+                    float moodMod = serotoninLevel * 0.2f;
+                    if (moodMod > 0.0f) {
+                        neuron->injectCurrent(moodMod * 0.3f);  // Subtler effect
+                    }
+                }
+            }
+        }
+    }
+    
+    // Update reward system
+    if (pImpl->reward) {
+        // Reward system will be used by environment to compute rewards
+        // This can be connected to external environment rewards
     }
     
     // Update dopamine (reward prediction error)
@@ -511,6 +585,17 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     float plasticityMod = 1.0f;
     if (pImpl->dopamine) {
         plasticityMod = pImpl->dopamine->getPlasticityFactor();
+    }
+    
+    // Modulate plasticity with other neuromodulators
+    if (pImpl->acetylcholine) {
+        plasticityMod *= pImpl->acetylcholine->getPlasticityFactor();
+    }
+    if (pImpl->norepinephrine) {
+        plasticityMod *= pImpl->norepinephrine->getPlasticityFactor();
+    }
+    if (pImpl->serotonin) {
+        plasticityMod *= pImpl->serotonin->getPlasticityFactor();
     }
     
     for (auto& region : pImpl->regions) {

@@ -48,8 +48,11 @@ add_library(nlm_core STATIC
     src/development/Synaptogenesis.cpp
     src/development/Pruning.cpp
     src/development/Maturation.cpp
-    # Neuromodulation
     src/neuromodulation/Neuromodulator.cpp
+    src/neuromodulation/Dopamine.cpp
+    src/neuromodulation/Acetylcholine.cpp
+    src/neuromodulation/Norepinephrine.cpp
+    src/neuromodulation/Serotonin.cpp
     src/neuromodulation/Reward.cpp
     src/neuromodulation/PredictionError.cpp
     src/neuromodulation/Novelty.cpp
