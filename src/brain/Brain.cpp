@@ -725,6 +725,8 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
         it->second->injectCurrent(current);
         return;
     }
+    // Performance fix: linear search should only be a fallback for corrupted IDs
+    // In practice, neuronById should always be properly populated
     for (auto& region : pImpl->regions) {
         auto neurons = region->getAllNeurons();
         for (auto* n : neurons) {
@@ -734,6 +736,8 @@ void Brain::injectCurrent(NeuronId neuron, MembranePotential current) {
             }
         }
     }
+    // Log debug warning for missing neuron ID (only in debug builds)
+    NLM_LOG_WARN("Neuron " + std::to_string(neuron.index()) + " not found in lookup table");
 }
 
 void Brain::injectCurrentToNeurons(NeuronType type, MembranePotential current) {

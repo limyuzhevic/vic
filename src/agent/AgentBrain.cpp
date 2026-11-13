@@ -1056,6 +1056,22 @@ const char* phase5CmdName(MotorCommand cmd) {
 }
 }  // namespace
 
+namespace {
+    // Motor command name helper - extracted from AgentBrain.cpp
+    const char* phase5CmdName(MotorCommand cmd) {
+        switch (cmd) {
+            case MotorCommand::MoveForward: return "MoveForward";
+            case MotorCommand::MoveBackward: return "MoveBackward";
+            case MotorCommand::TurnLeft: return "TurnLeft";
+            case MotorCommand::TurnRight: return "TurnRight";
+            case MotorCommand::LookLeft: return "LookLeft";
+            case MotorCommand::LookRight: return "LookRight";
+            case MotorCommand::Interact: return "Interact";
+            default: return "Wait";
+        }
+    }
+}  // namespace
+
 std::string AgentBrain::getThoughtTrace() const {
     std::string out = "perceived=[" + thoughtPercept_ + "] -> planned=[";
     out += hasThoughtPlanned_ ? phase5CmdName(thoughtPlanned_) : "none";

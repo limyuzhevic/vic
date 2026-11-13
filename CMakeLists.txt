@@ -164,14 +164,11 @@ add_executable(nlm_phase6_demo
 )
 target_link_libraries(nlm_phase6_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase6)
 
-# Phase 6 text/thought demo (new in Phase 6): text-as-a-sense
-# association probe, concept/social probes, and a sandbox run with
-# a teacher, planner overrides, and a checkpoint round-trip. The old
-# nlm_phase6_demo integration demo is left unchanged.
-add_executable(nlm_phase6_text_demo
-    src/experiments/Phase6TextDemo.cpp
+# Unified demo executable (new: demonstrates all major usage patterns)
+add_executable(nlm_demo
+    src/nlm_demo.cpp
 )
-target_link_libraries(nlm_phase6_text_demo PUBLIC nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase5 nlm_phase6)
+target_link_libraries(nlm_demo PUBLIC nlm_core nlm_agent nlm_world)
 
 # Benchmark executable
 add_executable(nlm_benchmark
@@ -205,8 +202,10 @@ endif()
 enable_testing()
 add_subdirectory(tests)
 
-# Install targets (future)
-install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
+# Install all examples (add new ones to the list)
+install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 
+        nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark 
+        nlm_clean_example nlm_demo
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
