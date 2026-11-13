@@ -1,12 +1,44 @@
-#pragma once
+// ===== CONSTANTS AND CONFIGURATION =====
+
+// Synaptic weight bounds
+static constexpr float SYNAPSE_MIN_WEIGHT = -1.0f;
+static constexpr float SYNAPSE_MAX_WEIGHT = 1.0f;
+
+// Short-term plasticity parameters
+static constexpr float STP_FACILITATION_TAU = 100.0f;  // ms
+static constexpr float STP_DEPRESSION_TAU = 200.0f;    // ms
+static constexpr float STP_U_MAX = 1.0f;                // Max utilization
+
+// Spike history limits
+static constexpr size_t MAX_SPIKE_HISTORY = 100;
+
+// ===== FORWARD DECLARATIONS AND INCLUDES =====
 
 #include "../core/Types/Types.hpp"
 #include <vector>
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
-// Forward declaration
-class Neuron;
+// ===== HELPER FUNCTIONS =====
+
+// Clamps a weight between min and max
+inline float clampWeight(float weight) {
+    return std::max(SYNAPSE_MIN_WEIGHT, std::min(weight, SYNAPSE_MAX_WEIGHT));
+}
+
+// Calculates exponential decay
+inline float exponentialDecay(float value, float timeConstant, float deltaTime) {
+    return value * std::exp(-deltaTime / timeConstant);
+}
+
+// Checks if weight change is significant
+inline bool isSignificantChange(float delta, float threshold = 0.01f) {
+    return std::abs(delta) >= threshold;
+}
+
+// ===== SYNAPSE CLASS =====
 
 // Synapse representing a connection between neurons
 // Implements real synaptic transmission with delays and short-term plasticity
@@ -51,7 +83,7 @@ public:
     // Activity history for plasticity
     void recordPreSpike(Timestamp timestamp);
     void recordPostSpike(Timestamp timestamp);
-    const std::vector<Timestamp>& getPreSpikeHistory() const;
+    const std gắn<>(Timestamp>& getPreSpikeHistory() const;
     const std::vector<Timestamp>& getPostSpikeHistory() const;
     void clearHistory();
     // Phase 5 checkpoint support: restore histories recorded by

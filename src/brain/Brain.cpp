@@ -371,12 +371,28 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->totalSpikesThisStep = 0;
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
-    pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    if (pImpl->spikeSystem) {
+        pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
+    } else {
+        NLM_LOG_WARNING("Spike system not initialized, skipping delayed spike processing");
+    }
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
     for (auto& region : pImpl->regions) {
+        if (!region) {
+            NLM_LOG_WARNING("Null region encountered, skipping neuron updates");
+            continue;
+        }
         for (auto& pop : region->getPopulations()) {
+            if (!pop) {
+                NLM_LOG_WARNING("Null population encountered, skipping neuron updates");
+                continue;
+            }
             for (auto* neuron : pop->getNeurons()) {
+                if (!neuron) {
+                    NLM_LOG_WARNING("Null neuron encountered, skipping LIF update");
+                    continue;
+                }
                 neuron->stepLIF(currentTime, pImpl->timestep);
             }
         }

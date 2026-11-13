@@ -48,6 +48,226 @@ void printBanner() {
     )" << std::endl;
 }
 
+void printAdvancedUsage() {
+    std::cout << R"(
+Advanced NLM Command Line Options:
+
+Configuration File:
+  --config=file.cfg      Load configuration from file
+  --config file.cfg      Same as above
+
+Basic Settings:
+  --random_seed=N        Set random seed for reproducibility
+  --neuron_count=N       Number of neurons in the brain
+  --region_count=N        Number of brain regions
+  --connection_probability=N  Probability of synapse formation (0.0-1.0)
+  --simulation_timestep=N  Simulation timestep in seconds
+
+Phase 2 - Neural Dynamics:
+  --stdp_ltp_weight=N     STDP LTP weight factor
+  --stdp_ltd_weight=N     STDP LTD weight factor  
+  --stdp_tau=N            STDP time constant (ms)
+
+Phase 3 - World Integration:
+  --world_size=N          Size of the simulation world
+  --world_type=TYPE       World type: simple, complex, custom
+  --reward_range=N        Reward value range [-N, N]
+
+Phase 4 - Memory and Cognition:
+  --working_memory_capacity=N  Working memory capacity
+  --episodic_memory_episodes=N  Number of episodic memory slots
+  --concept_learning_rate=N  Concept formation learning rate
+  --attention_strength=N     Attention modulation strength
+
+Phase 5 - Performance:
+  --checkpoint_interval=N    Save checkpoint every N steps
+  --checkpoint_compressions=N  Checkpoint compression levels (0-9)
+  --enable_vectorization      Enable SIMD vectorization
+  --enable_parallel           Enable parallel processing
+
+Phase 6 - Development:
+  --developmental_stage=STAGE  Stage: initial, critical, maturation, adult
+  --plasticity_decay=N         Developmental plasticity decay rate
+  --structural_plasticity      Enable structural plasticity
+
+Neuromodulation:
+  --dopamine_level=N       Base dopamine level
+  --curiosity_gain=N        Curiosity modulation gain
+  --novelty_threshold=N      Novelty detection threshold
+
+Advanced Learning:
+  --hebbian_learning_rate=N   Hebbian learning rate
+  --stdp_learning_rate=N     STDP learning rate
+  --reward_modulated_learning  Enable reward-modulated plasticity
+  --eligibility_trace_decay=N Decay rate for eligibility traces
+
+Runtime Control:
+  --steps=N                 Number of simulation steps to run
+  --log_level=LEVEL         Logging level: debug, info, warning, error, critical
+  --log_file=FILE           Write logs to file in addition to console
+  --benchmark               Run benchmark mode (disables learning)
+  --profile                  Enable performance profiling
+  --dry_run                 Parse arguments but don't run simulation
+
+Scenario Loading:
+  --scenario=FILE          Load pre-configured scenario
+  --scenario_seed=N         Random seed for scenario
+
+Experimental Features:
+  --experiment=NAME         Run specific experiment: plasticity, memory, learning, integration
+  --experiment_config=FILE   Load experiment-specific configuration
+
+Neural Analysis:
+  --analyze_connectivity      Analyze brain connectivity patterns
+  --analyze_firing_patterns    Analyze neural firing statistics
+  --analyze_plasticity_effects  Analyze synaptic plasticity effects
+  --analyze_memory_performance  Analyze memory system performance
+
+Visualization:
+  --visualization_mode=MODE  Visualization mode: none, basic, detailed, interactive
+  --visualization_file=FILE   Save visualization data to file
+  --visualization_interval=N  Visualization update interval (steps)
+
+Debug and Testing:
+  --test_suite=NAME         Run specific test suite: all, neuron, synapse, stdp, brain
+  --test_seed=N             Random seed for deterministic tests
+  --validate_configuration   Validate configuration before running
+  --debug_mode              Enable debug mode with additional output
+  --debug_file=FILE         Write debug information to file
+
+--- Examples ---
+
+Basic run:
+  ./nlm --steps=1000 --log_level=info
+
+Advanced plasticity study:
+  ./nlm --experiment=plasticity --plasticity_decay=0.01 --plasticity_sensitivity=2.0 --steps=5000
+
+Memory system test:
+  ./nlm --experiment=memory --working_memory_capacity=500 --episodic_memory_episodes=1000 --steps=2000
+
+Development study:
+  ./nlm --experiment=development --developmental_stage=critical --plasticity_decay=0.05 --steps=10000
+
+High-performance run:
+  ./nlm --enable_vectorization --enable_parallel --checkpoint_interval=100 --log_level=warning
+
+Scenario replay:
+  ./nlm --scenario=brain_development.json --scenario_seed=12345 --steps=50000
+
+--- Configuration File Format ---
+
+Example config file (JSON format):
+{
+  "version": "1.0",
+  "description": "Advanced NLM configuration",
+  
+  "brain": {
+    "neuron_count": 1000,
+    "region_count": 2,
+    "connection_probability": 0.15
+  },
+  
+  "plasticity": {
+    "stdp": {
+      "ltp_weight": 0.02,
+      "ltd_weight": 0.015,
+      "tau": 20.0
+    },
+    "hebbian": {
+      "learning_rate": 0.001,
+      "weight_bound": 0.5
+    },
+    "structural": {
+      "synaptogenesis_rate": 0.0001,
+      "pruning_rate": 0.00001
+    }
+  },
+  
+  "memory": {
+    "working_memory": {
+      "capacity": 500,
+      "decay_rate": 0.01
+    },
+    "episodic_memory": {
+      "max_episodes": 1000,
+      "replay_interval": 100
+    }
+  },
+  
+  "neuromodulation": {
+    "dopamine": {
+      "base_level": 0.1,
+      "plasticity_factor": 1.0
+    },
+    "curiosity": {
+      "gain": 0.5,
+      "threshold": 0.01
+    },
+    "novelty": {
+      "detection_threshold": 0.05,
+      "decay_rate": 0.1
+    }
+  },
+  
+  "development": {
+    "stage": "critical",
+    "plasticity_decay": 0.05,
+    "structural_enabled": true
+  },
+  
+  "world": {
+    "size": 100,
+    "type": "simple",
+    "reward_range": 1.0
+  },
+  
+  "advanced": {
+    "vectorization": true,
+    "parallel": true,
+    "checkpoint_interval": 100,
+    "checkpoint_compressions": 5
+  }
+}
+
+--- Experimental Features ---
+
+The following experiments are available:
+
+- plasticity: Study synaptic plasticity under different conditions
+- memory: Test memory system capacity and performance
+- learning: Analyze learning dynamics and patterns
+- development: Study developmental changes over time
+- integration: Test Phase 6 integration with all systems
+- benchmark: Performance benchmark mode
+
+Each experiment can be configured with specific parameters and run with custom settings.
+
+--- Neural Analysis ---
+
+Available analysis tools:
+
+- connectivity: Network topology and connection patterns
+- firing_patterns: Statistical analysis of neural activity
+- plasticity_effects: Synaptic weight changes over time
+- memory_performance: Working and episodic memory metrics
+
+These analyses can help understand the brain's organization and function.
+
+--- Performance Optimization ---
+
+Advanced options for performance:
+
+- Vectorization: Uses SIMD instructions for parallel computation
+- Parallel processing: Distributes work across CPU cores
+- Checkpointing: Saves and restores brain state
+- Compression: Reduces checkpoint file sizes
+- Caching: Stores frequently accessed data
+
+Use these options for large-scale simulations or long-running experiments.
+";) << std::endl;
+}
+
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
@@ -58,7 +278,7 @@ struct LearningExperiment {
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
-        : brain(b), seed(s), initialSynapseCount(0) {}
+        : brain(b), seed(s), initialSynapseCount(0), finalWeights(), mostActiveNeurons() {}
     
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
@@ -279,22 +499,22 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse before: " + std::to_string(beforeWeight) +
                  " (pre=" + std::to_string(syn->getSourceNeuron().index()) +
                  ", post=" + std::to_string(syn->getDestinationNeuron().index()) + ")");
-
+    
     NLM_LOG_INFO("");
     NLM_LOG_INFO("  Creating correlated pre->post activity (potentiation)...");
-
+    
     for (int trial = 0; trial < 50; ++trial) {
         brain->injectCurrent(syn->getSourceNeuron(), 60.0f);
         brain->step(trial * 2, trial * 2 * 0.001);
         brain->injectCurrent(syn->getDestinationNeuron(), 60.0f);
         brain->step(trial * 2 + 1, (trial * 2 + 1) * 0.001);
     }
-
+    
     float delta = syn->getWeight() - beforeWeight;
     NLM_LOG_INFO("  After correlated activity:");
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
-
+    
     float totalDelta = delta;
     
     NLM_LOG_INFO("");
@@ -311,6 +531,19 @@ int main(int argc, char** argv) {
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
+    
+    // Check for help flag
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printAdvancedUsage();
+            return 0;
+        }
+        if (arg == "--advanced-help") {
+            printAdvancedUsage();
+            return 0;
+        }
+    }
     
     // Initialize logger
     auto logger = std::make_shared<Logger>();
@@ -387,7 +620,7 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("");
     NLM_LOG_INFO("Initializing NLM Brain...");
     auto brain = std::make_shared<Brain>(config);
-    
+
     if (!brain->initialize()) {
         NLM_LOG_ERROR("Failed to initialize brain!");
         return 1;

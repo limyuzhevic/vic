@@ -1,14 +1,49 @@
-#pragma once
+// ===== CONSTANTS AND CONFIGURATION =====
+
+// Simulation constants
+static constexpr float DEFAULT_MEMBRANE_CAPACITANCE = 1.0f;  // nF
+static constexpr float DEFAULT_TIME_CONSTANT = 20.0f;       // ms
+static constexpr size_t MAX_SPIKE_HISTORY = 100;
+static constexpr float DEFAULT_RESTING_POTENTIAL = -70.0f;   // mV
+static constexpr float DEFAULT_THRESHOLD = -55.0f;          // mV
+static constexpr float DEFAULT_RESET_POTENTIAL = -70.0f;    // mV
+static constexpr float DEFAULT_LEAK_CONDUCTANCE = 10.0f;     // nS
+static constexpr uint32_t DEFAULT_REFECTORY_PERIOD = 9;     // Phase 6: updated from 5 to 9
+static constexpr float DEFAULT_ADAPTATION_DECAY = 0.95f;     // Adaptation decay rate
+
+// Logging thresholds
+static constexpr float LOG_WARNING_THRESHOLD = 0.001f;      // Log warning when changes exceed this
+static constexpr float SYNAPSE_STRENGTH_CAP = 1.0f;          // Maximum synapse weight
+
+// ===== FORWARD DECLARATIONS AND INCLUDES =====
 
 #include "../core/Types/Types.hpp"
+#include "../core/Logger/Logger.hpp"
 #include <vector>
 #include <array>
+#include <algorithm>
+#include <cmath>
 
 namespace nlm {
 
-// Forward declarations
-class Synapse;
-class RandomGenerator;
+// ===== HELPER FUNCTIONS =====
+
+// Clamps a value between min and max
+inline float clamp(float value, float min, float max) {
+    return std::max(min, std::min(value, max));
+}
+
+// Calculates exponential decay
+inline float exponentialDecay(float value, float timeConstant, float deltaTime) {
+    return value * std::exp(-deltaTime / timeConstant);
+}
+
+// Checks if a value is approximately equal to another (with tolerance)
+inline bool approximatelyEqual(float a, float b, float tolerance = 0.001f) {
+    return std::abs(a - b) < tolerance;
+}
+
+// ===== NEURON STATE STRUCTURE =====
 
 // Neuron state structure for efficient storage
 struct NeuronState {
@@ -26,11 +61,11 @@ struct NeuronState {
     float lastSpikeTime;                   // Timestamp of last spike (-1 if none)
     
     NeuronState()
-        : membranePotential(-70.0f)
-        , restingPotential(-70.0f)
-        , threshold(-55.0f)
-        , resetPotential(-70.0f)
-        , leakConductance(10.0f)
+        : membranePotential(DEFAULT_RESTING_POTENTIAL)
+        , restingPotential(DEFAULT_RESTING_POTENTIAL)
+        , threshold(DEFAULT_THRESHOLD)
+        , resetPotential(DEFAULT_RESET_POTENTIAL)
+        , leakConductance(DEFAULT_LEAK_CONDUCTANCE)
         , synapseConductance(0.0f)
         , firingRate(0.0f)
         , firingState(FiringState::Resting)
@@ -44,7 +79,7 @@ struct NeuronState {
         // scaling was tried and reverted: -30% drive silenced
         // the network entirely, 0 Hz, because this is a
         // threshold system with no gentle middle ground).
-        , refractoryPeriod(9)
+        , refractoryPeriod(DEFAULT_REFECTORY_PERIOD)
         , adaptationVariable(0.0f)
         , lastSpikeTime(-1.0f) {}
 };
