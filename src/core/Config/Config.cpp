@@ -68,11 +68,17 @@ bool Config::loadFromArgs(int argc, char** argv) {
                 set(key, value, ConfigSource::CommandLine);
             }
         }
-        // Handle -key value format
+        // Handle -key value format (key=value is handled above)
         else if (arg[0] == '-' && i + 1 < argc) {
             std::string key = arg.substr(1);
-            std::string value = argv[++i];
-            set(key, value, ConfigSource::CommandLine);
+            // Check if next argument is also a flag (starts with -)
+            if (argv[i + 1][0] != '-') {
+                std::string value = argv[++i];
+                set(key, value, ConfigSource::CommandLine);
+            } else {
+                // Skip the next argument as it's also a flag
+                ++i;
+            }
         }
     }
     return true;

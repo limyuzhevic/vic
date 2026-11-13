@@ -15,7 +15,7 @@ namespace nlm {
 // It was deleted; its only functionality (flattening a percept to
 // floats) already exists as SensoryPercept::getAllSignals(), which is
 // what the live AgentBrain/SimpleWorld loop uses. Novelty::detectNovelty
-// and Reward::computeReward take an Observation by forward declaration
+// and reward computation take an Observation by forward declaration
 // but are placeholders that never inspect it, and no caller uses them.
 class Observation {
 public:

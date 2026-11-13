@@ -225,8 +225,8 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
     // A pattern, not a seizure: stimulate only the first 20 sensory neurons
     // each step. The old code injected 30.0f into *every* sensory neuron
     // 20 times per step (600.0f), so the whole network fired synchronously
-    // and every weight saturated to 1.0 - learning was measurable but not
-    // selective at all.
+    // and every weight saturated. Split the internal population 80/20 into
+    // excitatory and inhibitory neurons.
     std::vector<NeuronId> patternNeurons;
     if (auto* region = brain->getRegion(RegionId(1))) {
         for (auto* neuron : region->getAllNeurons()) {
@@ -335,8 +335,10 @@ int main(int argc, char** argv) {
         std::string arg(argv[i]);
         if (arg.substr(0, 7) == "--config") {
             if (arg.find('=') != std::string::npos) {
+                // Handle --config=file.cfg format
                 configFile = arg.substr(arg.find('=') + 1);
-            } else if (i + 1 < argc) {
+            } else if (i + 1 < argc && argv[i + 1][0] != '-') {
+                // Handle --config file.cfg format
                 configFile = argv[++i];
             }
         }
