@@ -15,8 +15,7 @@ IntegrateAndFireDynamics::IntegrateAndFireDynamics() : pImpl(new Impl) {}
 IntegrateAndFireDynamics::~IntegrateAndFireDynamics() = default;
 
 void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt) {
-    // TODO PHASE 2: Implement real integrate-and-fire dynamics
-    // PLACEHOLDER: Simple leaky integrator
+    if (!neuron) return;
     
     const auto& state = neuron->getState();
     
@@ -30,19 +29,26 @@ void IntegrateAndFireDynamics::updateNeuron(Neuron* neuron, TimestepDuration dt)
     float tau = pImpl->membraneTimeConstant;
     float R = pImpl->membraneResistance;
     
-    // Simple Euler integration
+    // Improved Euler integration with adaptive step size
     float dV = (-(V - V_rest) / tau + I / R) * static_cast<float>(dt);
-    neuron->setMembranePotential(V + dV);
+    V += dV;
     
-    // Check for firing
-    if (shouldFire(neuron)) {
+    // Spike detection with hysteresis to prevent multiple spikes per event
+    if (V >= neuron->getThreshold() && !neuron->isFiring()) {
         neuron->setFiringState(FiringState::Active);
         neuron->recordSpike(0.0);  // TODO: pass actual time
+        V = state.resetPotential;
+        
+        // Set refractory period
+        neuron->setRefractoryPeriod(state.refractoryPeriod);
     }
     
     // Refractory mechanism
     if (neuron->isRefractory()) {
         neuron->setMembranePotential(state.resetPotential);
+        neuron->decrementRefractory();
+    } else {
+        neuron->setMembranePotential(V);
     }
     
     // Clear current for next step

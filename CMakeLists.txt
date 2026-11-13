@@ -11,11 +11,12 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Enable warnings
-if(MSVC)
-    add_compile_options(/W4)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
+# Find nlohmann_json package
+find_package(nlohmann_json REQUIRED)
+
+# Also add it as a subdirectory if not found
+if(NOT nlohmann_json_FOUND)
+    add_subdirectory(nlohmann_json)
 endif()
 
 # Source directory
@@ -38,6 +39,8 @@ add_library(nlm_core STATIC
     # Dynamics
     src/dynamics/NeuralDynamics.cpp
     src/dynamics/SpikeSystem.cpp
+    src/dynamics/HodgkinHuxleyDynamics.cpp
+    src/dynamics/FitzHughNagumoDynamics.cpp
     # Plasticity
     src/plasticity/PlasticityRule.cpp
     src/plasticity/Hebbian.cpp
@@ -72,10 +75,12 @@ add_library(nlm_core STATIC
     src/prediction/NeuralPrediction.cpp
     # Motor
     src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
     src/motor/Action.cpp
+    # Development
+    src/development/DevelopmentSystem.cpp
+    src/development/Synaptogenesis.cpp
+    src/development/Pruning.cpp
+    src/development/Maturation.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp

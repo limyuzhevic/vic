@@ -1,8 +1,8 @@
-#pragma once
-
-#include "../core/Types/Types.hpp"
 #include "../brain/Neuron.hpp"
 #include "../brain/Synapse.hpp"
+#include "../core/Types/Types.hpp"
+#include <cmath>
+#include <algorithm>
 
 namespace nlm {
 
@@ -56,24 +56,54 @@ private:
 // TODO PHASE 2: Implement Hodgkin-Huxley
 class HodgkinHuxleyDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement HH dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    HodgkinHuxleyDynamics();
+    ~HodgkinHuxleyDynamics() override;
+    
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // HH parameters
+    void setCapacitance(float capacitance);
+    float getCapacitance() const;
+    void setMembraneResistance(float resistance);
+    float getMembraneResistance() const;
+    void setLeakConductance(float conductance);
+    float getLeakConductance() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 // FitzHugh-Nagumo dynamics (simplified兴奋性模型)
 // TODO PHASE 2: Implement FHN dynamics
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:
-    // PLACEHOLDER - Phase 2 will implement FHN dynamics
-    void updateNeuron(Neuron* neuron, TimestepDuration dt) override {}
-    void updateSynapse(Synapse* synapse, TimestepDuration dt) override {}
-    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override {}
-    bool shouldFire(const Neuron* neuron) const override { return false; }
-    void reset() override {}
+    FitzHughNagumoDynamics();
+    ~FitzHughNagumoDynamics() override;
+    
+    void updateNeuron(Neuron* neuron, TimestepDuration dt) override;
+    void updateSynapse(Synapse* synapse, TimestepDuration dt) override;
+    void applySpikeInput(Neuron* neuron, const Synapse* synapse) override;
+    bool shouldFire(const Neuron* neuron) const override;
+    void reset() override;
+    
+    // FHN parameters
+    void setTimeConstant(float tau);
+    float getTimeConstant() const;
+    void setThreshold(float threshold);
+    float getThreshold() const;
+    void setResetValue(float resetValue);
+    float getResetValue() const;
+    void setConductance(float g);
+    float getConductance() const;
+    
+private:
+    struct Impl;
+    Impl* pImpl;
 };
 
 } // namespace nlm
