@@ -9,6 +9,15 @@
 
 namespace nlm {
 
+// Python-specific exception classes
+class ConfigurationException {
+public:
+    explicit ConfigurationException(const std::string& message) : message_("NLM Configuration: " + message) {}
+    const char* what() const noexcept { return message_.c_str(); }
+private:
+    std::string message_;
+};
+
 // Forward declarations
 class Config;
 
@@ -94,6 +103,18 @@ template<typename T>
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Validation
+    bool validate() const;
+    
+    // JSON/YAML support
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool saveToJSON(const std::string& filepath) const;
+    bool saveToYAML(const std::string& filepath) const;
+    
+    // Python-specific methods
+    py::dict toPythonDict() const;
     
 private:
     struct Impl;

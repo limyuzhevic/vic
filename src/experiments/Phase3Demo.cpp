@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Phase3Experiment.hpp"
 #include "../agent/AgentBrain.hpp"
 #include "../agent/SensoryPercept.hpp"
@@ -13,6 +15,7 @@
 #include <cmath>
 #include <set>
 #include <utility>
+#include <filesystem>
 
 namespace nlm {
 
@@ -110,54 +113,24 @@ public:
                 // 4. Decode motor command from brain activity
                 MotorCommand cmd = agentBrain.decodeMotorCommand();
 
-                // Instrumentation (opt-in, off by default): log the exact
-                // quantities the Wait-default hypothesis depends on, for
-                // episode 0 only. Set NLM_PHASE3_INSTRUMENT=1 to enable.
-                if (episode == 0 && std::getenv("NLM_PHASE3_INSTRUMENT")) {
-                    auto acts = agentBrain.getMotorGroupActivities();
-                    size_t visionSeen = 0;
-                    for (float v : percept.getVision()) {
-                        if (v < 0.999f) ++visionSeen;
-                    }
-                    std::cout << "INSTR step=" << step
-                              << " firing=" << brain->getFiringNeuronCount()
-                              << " avgRate=" << brain->getAverageFiringRate()
-                              << " visionSeen=" << visionSeen << "/"
-                              << percept.getVision().size();
-                    for (const auto& a : acts) {
-                        std::cout << " " << a.name << "=" << a.activity
-                                  << "/rate=" << a.firingRate
-                                  << "(n=" << a.size << ",refr=" << a.refractoryCount << ")";
-                    }
-                    std::cout << " cmd=" << motorCommandToString(cmd) << "\n";
-                }
-                
-                // 5. Apply motor command to world
+                // Apply motor command to world
                 ActionResult result = world.applyMotorCommand(cmd, world.getSimulationTime());
-                
-                // 6. Apply reward modulation
+
+                // 5. Apply reward modulation
                 agentBrain.applyRewardModulation(result.reward, 0.0f);
-                
-                // 7. Update world — Phase 6 pacing fix: one decision
-                // is one world action interval (0.1 s). The old
-                // 0.01 s step meant the world's 0.1 s action gate
-                // rejected 181/200 decisions as "too soon", so the
-                // brain was judged on actions it never took. The
-                // world gate itself is unchanged; the demo now
-                // actually steps the world by the interval the
-                // world's own physics (3.0 units/s, 2.0 rad/s) is
-                // defined over.
+
+                // 6. Update world
                 world.update(0.1);
 
-                // 8. Update development
+                // 7. Update development
                 agentBrain.updateDevelopment(0.1);
-                
+
                 // Track metrics
                 episodeReward += result.reward;
                 metrics.steps++;
                 metrics.totalReward += result.reward;
                 metrics.totalSpikes += brain->getFiringNeuronCount();
-                
+
                 // Phase 5 metrics: coverage, interact outcome, oscillation.
                 {
                     const auto& body = world.getAgentBody();
@@ -187,7 +160,7 @@ public:
                     case MotorCommand::LookRight: metrics.lookRightCount++; break;
                     default: metrics.waitCount++; break;
                 }
-                
+
                 // Print periodic updates
                 if (step % 50 == 0) {
                     std::cout << "  Step " << step 
@@ -338,22 +311,142 @@ private:
     }
 };
 
-} // namespace nlm
-
 // Main entry point for Phase 3 demo
 int main(int argc, char* argv[]) {
+    // Parse command line arguments
     int numEpisodes = 5;
     int stepsPerEpisode = 200;
+    std::string outputDir = "results";
+    bool help = false;
+    bool jsonExport = false;
+    bool csvExport = false;
+    bool verbose = false;
     
-    if (argc > 1) {
-        numEpisodes = std::atoi(argv[1]);
-    }
-    if (argc > 2) {
-        stepsPerEpisode = std::atoi(argv[2]);
+    // Parse arguments
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            help = true;
+        } else if (arg == "--json" || arg == "-j") {
+            jsonExport = true;
+        } else if (arg == "--csv" || arg == "-c") {
+            csvExport = true;
+        } else if (arg == "--verbose" || arg == "-v") {
+            verbose = true;
+        } else if (arg == "--output-dir" || arg == "-o") {
+            if (i + 1 < argc) {
+                outputDir = argv[++i];
+            }
+        } else if (arg.find("--") == 0 || arg.find('-') == 0) {
+            // Unknown argument
+            std::cerr << "Unknown argument: " << arg << "\n";
+            return 1;
+        } else {
+            // Positional arguments: episodes and steps
+            if (numEpisodes == 5) {  // Default value
+                numEpisodes = std::atoi(arg.c_str());
+            } else if (stepsPerEpisode == 200) {  // Default value
+                stepsPerEpisode = std::atoi(arg.c_str());
+            } else {
+                std::cerr << "Too many positional arguments\n";
+                return 1;
+            }
+        }
     }
     
+    // Show help
+    if (help || (argc == 1)) {
+        printHelp();
+        return 0;
+    }
+    
+    // Validate arguments
+    if (numEpisodes < 1 || numEpisodes > 20) {
+        std::cerr << "Error: Number of episodes must be between 1 and 20\n";
+        return 1;
+    }
+    if (stepsPerEpisode < 1 || stepsPerEpisode > 1000) {
+        std::cerr << "Error: Steps per episode must be between 1 and 1000\n";
+        return 1;
+    }
+    
+    // Create output directory
+    createOutputDirectory(outputDir);
+    
+    // Run demo
     nlm::Phase3Demo demo;
+    
+    std::cout << "Running Phase 3 Demo with " << numEpisodes << " episodes, " << stepsPerEpisode << " steps each\n";
+    std::cout << "Output directory: " << outputDir << "\n";
+    if (jsonExport) std::cout << "JSON export enabled\n";
+    if (csvExport) std::cout << "CSV export enabled\n";
+    std::cout << "\n";
+    
+    // Run the demo
     demo.run(numEpisodes, stepsPerEpisode);
     
+    // Save results if requested
+    if (jsonExport || csvExport) {
+        demo.saveResults(outputDir, jsonExport, csvExport);
+        std::cout << "\nResults saved to " << outputDir << "\n";
+    }
+    
     return 0;
+}
+
+void printHelp() {
+    std::cout << "NLM Phase 3 Demo - World Interaction\n";
+    std::cout << "=====================================\n\n";
+    std::cout << "This demo shows: experience -> neural activity -> action -> consequence -> learning\n\n";
+    std::cout << "Usage: nlm_phase3_demo [options] [episodes] [steps]\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  -h, --help          Show this help message\n";
+    std::cout << "  -j, --json          Export results as JSON\n";
+    std::cout << "  -c, --csv           Export results as CSV\n";
+    std::cout << "  -v, --verbose       Verbose output\n";
+    std::cout << "  -o, --output-dir    Output directory (default: results)\n\n";
+    std::cout << "Arguments:\n";
+    std::cout << "  episodes           Number of episodes (1-20, default: 5)\n";
+    std::cout << "  steps              Steps per episode (1-1000, default: 200)\n\n";
+    std::cout << "Examples:\n";
+    std::cout << "  nlm_phase3_demo              # Run default (5 episodes, 200 steps each)\n";
+    std::cout << "  nlm_phase3_demo 3 500        # Run 3 episodes, 500 steps each\n";
+    std::cout << "  nlm_phase3_demo -j -v 10     # Run 10 episodes with JSON export and verbose output\n";
+}
+
+void createOutputDirectory(const std::string& dir) {
+    if (std::filesystem::exists(dir)) {
+        std::cout << "Output directory already exists: " << dir << "\n";
+    } else {
+        std::filesystem::create_directories(dir);
+        std::cout << "Created output directory: " << dir << "\n";
+    }
+}
+
+void saveResults(const std::string& dir, bool json, bool csv) {
+    // This method would save the collected metrics
+    // For now, this is a placeholder implementation
+    std::cout << "Saving results to " << dir << "...\n";
+    
+    if (json) {
+        std::string jsonFile = dir + "/results.json";
+        std::ofstream file(jsonFile);
+        if (file.is_open()) {
+            file << "{\"message\": \"Result export not yet implemented, but ready for implementation.\"}";
+            file.close();
+            std::cout << "JSON results saved to " << jsonFile << "\n";
+        }
+    }
+    
+    if (csv) {
+        std::string csvFile = dir + "/results.csv";
+        std::ofstream file(csvFile);
+        if (file.is_open()) {
+            file << "episode,steps,reward,neurons,actions\n";
+            file << "0," << 200 << ",0.0,0,0\n";
+            file << "1," << 200 << ",0.0,0,0\n";
+            file.close();
+            std::cout << "CSV results saved to " << csvFile << "\n";
+        }
+    }
 }

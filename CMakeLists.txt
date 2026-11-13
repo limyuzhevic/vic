@@ -18,10 +18,17 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Source directory
-set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    # Source directory
+    set(NLM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 
-# Core library
+    # Config module with JSON/YAML support
+    set(NLM_CONFIG_SOURCES
+        src/core/Config/Config.cpp
+        src/core/Config/ConfigJSON.cpp
+        src/core/Config/ConfigYAML.cpp
+    )
+
+    # Core library
 add_library(nlm_core STATIC
     # Core
     src/core/Types/Types.cpp

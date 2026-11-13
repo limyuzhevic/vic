@@ -1,23 +1,37 @@
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
-#include <pybind11/functional.h>
-#include <pybind11/chrono.h>
-#include <memory>
-#include <string>
-#include <vector>
-
-#include "../src/brain/Brain.hpp"
-#include "../src/core/Config/Config.hpp"
-#include "../src/core/Types/Types.hpp"
-#include "../src/agent/AgentBrain.hpp"
-#include "../src/world/SimpleWorld.hpp"
-#include "../src/sensory/SensoryInput.hpp"
-#include "../src/motor/Action.hpp"
-#include "../src/agent/AgentBody.hpp"
-#include "../src/agent/SensoryPercept.hpp"
-
-namespace py = pybind11;
 namespace nlm {
+
+// Custom exception classes for Python bindings
+class NLMException : public std::runtime_error {
+public:
+    NLMException(const std::string& message) : std::runtime_error("NLM: " + message) {}
+};
+
+class ConfigurationException : public NLMException {
+public:
+    ConfigurationException(const std::string& message) : NLMException("Configuration: " + message) {}
+};
+
+class SimulationException : public NLMException {
+public:
+    SimulationException(const std::string& message) : NLMException("Simulation: " + message) {}
+};
+
+class WorldException : public NLMException {
+public:
+    WorldException(const std::string& message) : NLMException("World: " + message) {}
+};
+
+class SensoryException : public NLMException {
+public:
+    SensoryException(const std::string& message) : NLMException("Sensory: " + message) {}
+};
+
+class MotorException : public NLMException {
+public:
+    MotorException(const std::string& message) : NLMException("Motor: " + message) {}
+};
+
+} // namespace nlm
 
 PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
@@ -28,6 +42,14 @@ PYBIND11_MODULE(pynlm, m) {
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
+
+    // Python-specific exception classes for better error handling
+    py::register_exception<NLMException>(m, "NLMException");
+    py::register_exception<ConfigurationException>(m, "ConfigurationException");
+    py::register_exception<SimulationException>(m, "SimulationException");
+    py::register_exception<WorldException>(m, "WorldException");
+    py::register_exception<SensoryException>(m, "SensoryException");
+    py::register_exception<MotorException>(m, "MotorException");
 
     py::class_<NeuronId>(m, "NeuronId", R"pbdoc(Unique identifier for a neuron)pbdoc")
         .def(py::init<>())
