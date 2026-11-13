@@ -869,6 +869,16 @@ void Brain::reset() {
     NLM_LOG_INFO("NLM Brain reset complete");
 }
 
+// Log developmental stage with detailed information
+void Brain::logDevelopmentalStatus() const {
+    if (!pImpl) return;
+    NLM_LOG_INFO("Developmental Stage: " + getDevelopmentalStageString(pImpl->developmentalStage));
+    NLM_LOG_INFO("  Steps since last episode: " + std::to_string(pImpl->stepsSinceLastEpisode));
+    NLM_LOG_INFO("  Current neuron count: " + std::to_string(getTotalNeuronCount()));
+    NLM_LOG_INFO("  Current synapse count: " + std::to_string(getTotalSynapseCount()));
+    NLM_LOG_INFO("  Total spike count: " + std::to_string(pImpl->totalSpikesTotal));
+}
+
 namespace {
 // Phase 5 checkpoint payload helpers for the extra sections. Format is
 // deliberately simple and self-describing per value: a uint64 count

@@ -1,5 +1,4 @@
-/**
- * Phase 6 Demo - Integration Test
+// Phase 6 Demo - Integration Test
  * 
  * This demo runs the Phase 6 integration experiment to verify
  * that all brain systems are properly connected.
@@ -8,15 +7,66 @@
 #include "experiments/Phase6IntegratedExperiment.hpp"
 #include "core/Logger/Logger.hpp"
 #include <iostream>
+#include <string>
 
 using namespace nlm;
 
+// Improved Phase 6 Demo with better argument parsing and validation
 int main(int argc, char* argv[]) {
     std::cout << "=== NLM Phase 6 Integration Demo ===" << std::endl;
     std::cout << "Testing the integrated artificial brain..." << std::endl << std::endl;
     
-    // Initialize logging
+    // Parse command line arguments
+    std::string configFile = "";
+    size_t neuronCount = 500;
+    size_t maxSteps = 2000;
+    bool enableCheckpointing = true;
+    bool enableReplay = true;
+    bool enableDevelopment = true;
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help") {
+            std::cout << "Usage: nlm_phase6_demo [options]" << std::endl;
+            std::cout << "Options:" << std::endl;
+            std::cout << "  --neuron-count N     Number of neurons (default: 500)" << std::endl;
+            std::cout << "  --max-steps S        Maximum simulation steps (default: 2000)" << std::endl;
+            std::cout << "  --no-checkpoint       Disable checkpointing" << std::endl;
+            std::cout << "  --no-replay           Disable replay" << std::endl;
+            std::cout << "  --no-development      Disable development" << std::endl;
+            std::cout << "  --config file         Load configuration from file" << std::endl;
+            std::cout << "  --help                Show this help message" << std::endl;
+            return 0;
+        } else if (arg == "--no-checkpoint") {
+            enableCheckpointing = false;
+        } else if (arg == "--no-replay") {
+            enableReplay = false;
+        } else if (arg == "--no-development") {
+            enableDevelopment = false;
+        } else if (arg.find("--neuron-count=") == 0) {
+            neuronCount = std::stoul(arg.substr(14));
+        } else if (arg.find("--max-steps=") == 0) {
+            maxSteps = std::stoul(arg.substr(11));
+        } else if (arg.find("--config=") == 0) {
+            configFile = arg.substr(9);
+        } else if (arg == "--config" && i + 1 < argc) {
+            configFile = argv[++i];
+        }
+    }
+    
+    // Initialize logging with better level control
     Logger::getGlobal().setLevel(LogLevel::Info);
+    
+    std::cout << "=== Configuration ===" << std::endl;
+    std::cout << "  Neuron count: " << neuronCount << std::endl;
+    std::cout << "  Max steps: " << maxSteps << std::endl;
+    std::cout << "  Checkpointing: " << (enableCheckpointing ? "Enabled" : "Disabled") << std::endl;
+    std::cout << "  Replay: " << (enableReplay ? "Enabled" : "Disabled") << std::endl;
+    std::cout << "  Development: " << (enableDevelopment ? "Enabled" : "Disabled") << std::endl;
+    if (!configFile.empty()) {
+        std::cout << "  Config file: " << configFile << std::endl;
+    }
+    std::cout << std::endl;
     
     // Create experiment
     Phase6IntegratedExperiment experiment;
@@ -51,14 +101,14 @@ int main(int argc, char* argv[]) {
     experiment.testReplay();
     std::cout << std::endl;
     
-    // Run full experiment with smaller settings for demo
+    // Run full experiment with configurable settings
     std::cout << "--- Full Integration Experiment ---" << std::endl;
     Phase6Config config;
-    config.neuronCount = 500;
-    config.maxSteps = 2000;
-    config.enableCheckpointing = true;
-    config.enableReplay = true;
-    config.enableDevelopment = true;
+    config.neuronCount = neuronCount;
+    config.maxSteps = maxSteps;
+    config.enableCheckpointing = enableCheckpointing;
+    config.enableReplay = enableReplay;
+    config.enableDevelopment = enableDevelopment;
     
     auto result = experiment.run(config);
     
@@ -81,5 +131,13 @@ int main(int argc, char* argv[]) {
     
     std::cout << "Wall clock time: " << result.totalWallClockTime << "s" << std::endl;
     
+    // Return appropriate exit code based on results
+    if (!result.memoryWorkingMemoryIntegrated || !result.memoryEpisodicMemoryIntegrated || 
+        !result.neuromodulationIntegrated || !result.checkpointingWorks) {
+        std::cerr << "ERROR: Some system integrations failed!" << std::endl;
+        return 1;
+    }
+    
+    std::cout << "=== SUCCESS === All brain systems integrated and functioning!" << std::endl;
     return 0;
 }
