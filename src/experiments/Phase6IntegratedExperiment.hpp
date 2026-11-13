@@ -105,6 +105,16 @@ public:
     ~Phase6IntegratedExperiment();
     
     /**
+     * Initialize debugging and analysis tools
+     */
+    void initializeDebuggingTools();
+    
+    /**
+     * Cleanup debugging and analysis tools
+     */
+    void cleanupDebuggingTools();
+
+    /**
      * Run the complete integration test
      */
     Phase6IntegrationResult run(const Phase6Config& config);
@@ -132,7 +142,33 @@ public:
     /**
      * Test replay system
      */
-    bool testReplay();
+    bool testReplay(Phase6IntegrationResult& result);
+    
+    /**
+     * Generate debugging report
+     */
+    std::string generateDebugReport() const;
+    
+    /**
+     * Generate metrics report
+     */
+    std::string generateMetricsReport() const;
+    
+    /**
+     * Generate visualization data
+     */
+    std::string generateVisualizationData() const;
+    
+    /**
+     * Get execution trace
+     */
+    std::string getExecutionTrace() const;
+
+private:
+    std::unique_ptr<class DebugLogger> debugLogger_;
+    std::unique_ptr<class MetricsCollector> metricsCollector_;
+    std::unique_ptr<class ExecutionTracer> executionTracer_;
+    std::unique_ptr<class VisualizationTools> visualizationTools_;
 };
 
 } // namespace nlm

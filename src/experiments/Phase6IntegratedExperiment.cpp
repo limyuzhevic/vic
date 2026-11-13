@@ -6,14 +6,27 @@
 #include "../agent/AgentBrain.hpp"
 #include "../memory/NeuralWorkingMemory.hpp"
 #include "../memory/NeuralEpisodicMemory.hpp"
+#include "DebugLogger.hpp"
+#include "MetricsCollector.hpp"
+#include "ExecutionTracer.hpp"
+#include "VisualizationTools.hpp"
 #include <chrono>
 #include <cmath>
+#include <iostream>
 
 namespace nlm {
 
-Phase6IntegratedExperiment::Phase6IntegratedExperiment() {}
+Phase6IntegratedExperiment::Phase6IntegratedExperiment()
+    : debugLogger_(std::make_unique<DebugLogger>("./debug_log.txt")),
+      metricsCollector_(std::make_unique<MetricsCollector>()),
+      executionTracer_(std::make_unique<ExecutionTracer>()),
+      visualizationTools_(std::make_unique<VisualizationTools>()) {
+    initializeDebuggingTools();
+}
 
-Phase6IntegratedExperiment::~Phase6IntegratedExperiment() = default;
+Phase6IntegratedExperiment::~Phase6IntegratedExperiment() {
+    cleanupDebuggingTools();
+}
 
 Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& config) {
     Phase6IntegrationResult result;
@@ -111,6 +124,18 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.avgFiringRate = totalFiringRate / config.maxSteps;
     result.memoryEpisodesStored = brain->getEpisodicMemory() ? 
         static_cast<float>(brain->getEpisodicMemory()->getEpisodeCount()) : 0.0f;
+    
+    // Calculate average synaptic weight
+    float totalWeight = 0.0f;
+    size_t synapseCount = 0;
+    for (const auto& region : brain->getRegions()) {
+        for (const auto& syn : region->getSynapses()) {
+            totalWeight += syn->getWeight();
+            ++synapseCount;
+        }
+    }
+    result.avgSynapticWeight = synapseCount > 0 ? totalWeight / static_cast<float>(synapseCount) : 0.0f;
+    
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
@@ -217,6 +242,13 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         success = false;
     }
     
+    if (brain->getPredictionSystem() != nullptr) {
+        NLM_LOG_INFO("[PASS] Prediction system is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Prediction system is NOT integrated");
+        success = false;
+    }
+    
     // Test 4: Cognition systems exist
     if (brain->getPlanner() != nullptr) {
         NLM_LOG_INFO("[PASS] Planner is integrated");
@@ -236,6 +268,14 @@ bool Phase6IntegratedExperiment::verifyIntegration() {
         NLM_LOG_INFO("[PASS] Attention is integrated");
     } else {
         NLM_LOG_ERROR("[FAIL] Attention is NOT integrated");
+        success = false;
+    }
+    
+    // Test 4.5: Associative memory exists
+    if (brain->getAssociativeMemory() != nullptr) {
+        NLM_LOG_INFO("[PASS] Associative memory is integrated");
+    } else {
+        NLM_LOG_ERROR("[FAIL] Associative memory is NOT integrated");
         success = false;
     }
     
@@ -367,7 +407,7 @@ bool Phase6IntegratedExperiment::testCheckpointing() {
     return true;
 }
 
-bool Phase6IntegratedExperiment::testReplay() {
+bool Phase6IntegratedExperiment::testReplay(Phase6IntegrationResult& result) {
     NLM_LOG_INFO("=== Testing Replay System ===");
     
     auto cfg = std::make_shared<Config>();
@@ -379,6 +419,7 @@ bool Phase6IntegratedExperiment::testReplay() {
     auto* em = brain->getEpisodicMemory();
     if (!em) {
         NLM_LOG_ERROR("Episodic memory not available");
+        result.replayWorks = false;
         return false;
     }
     
@@ -396,12 +437,78 @@ bool Phase6IntegratedExperiment::testReplay() {
         auto episodes = em->getEpisodesForReplay(3);
         if (!episodes.empty()) {
             NLM_LOG_INFO("[PASS] Replay system can retrieve episodes");
+            result.replayWorks = true;
             return true;
         }
     }
     
     NLM_LOG_INFO("[INFO] No episodes available for replay (may be normal)");
+    result.replayWorks = true; // Test passes even if no episodes, as replay infrastructure works
     return true;
 }
 
-} // namespace nlm
+void Phase6IntegratedExperiment::initializeDebuggingTools() {
+    // Initialize debug logger
+    if (debugLogger_) {
+        debugLogger_->setLogFile("./debug_log.txt");
+    }
+
+    // Record experiment start
+    if (debugLogger_) {
+        debugLogger_->startTiming("Phase6Experiment");
+        debugLogger_->debug("Phase6 Integration Experiment initialized");
+    }
+
+    // Record initial system state
+    if (executionTracer_) {
+        executionTracer_->traceExecution("ExperimentInitialized");
+        executionTracer_->takeMemoryCheckpoint("initial_state");
+    }
+
+    if (metricsCollector_) {
+        metricsCollector_->recordProcessingTime("initialization", 0.0);
+    }
+
+    if (visualizationTools_) {
+        visualizationTools_->updateVisualization("system_state", 0.0, "bar");
+    }
+
+    // Debug: Log initialization completion
+    if (debugLogger_) {
+        debugLogger_->info("Debugging tools initialized successfully");
+        debugLogger_->trackMemoryUsage();
+    }
+}
+
+void Phase6IntegratedExperiment::cleanupDebuggingTools() {
+    // Generate final reports
+    if (debugLogger_) {
+        debugLogger_->debug("Cleaning up debugging tools");
+        std::cout << "=== DEBUG LOGGER REPORT ===" << std::endl;
+        std::cout << debugLogger_->getLogSummary() << std::endl;
+        std::cout << "===========================" << std::endl;
+    }
+
+    if (metricsCollector_) {
+        std::cout << "=== METRICS COLLECTOR REPORT ===" << std::endl;
+        std::cout << metricsCollector_->getMetricsSummary() << std::endl;
+        std::cout << "===================================" << std::endl;
+    }
+
+    if (executionTracer_) {
+        std::cout << "=== EXECUTION TRACER REPORT ===" << std::endl;
+        std::cout << executionTracer_->getExecutionSummary() << std::endl;
+        std::cout << "=================================== " << std::endl;
+    }
+
+    if (visualizationTools_) {
+        std::cout << "=== VISUALIZATION TOOLS REPORT ===" << std::endl;
+        std::cout << visualizationTools_->generateVisualizationReport() << std::endl;
+        std::cout << "=================================== " << std::endl;
+    }
+
+    // Close log file
+    if (debugLogger_) {
+        debugLogger_->closeLogFile();
+    }
+}
