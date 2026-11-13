@@ -77,6 +77,13 @@ struct LearningExperiment {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
             NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+            NLM_LOG_INFO("  Weight distribution - min/max:");
+            if (initialWeights.size() > 1) {
+                float min_weight = *std::min_element(initialWeights.begin(), initialWeights.end());
+                float max_weight = *std::max_element(initialWeights.begin(), initialWeights.end());
+                NLM_LOG_INFO("    Min: " + std::to_string(min_weight));
+                NLM_LOG_INFO("    Max: " + std::to_string(max_weight));
+            }
         }
     }
     
@@ -235,6 +242,9 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
             }
         }
     }
+    
+    NLM_LOG_INFO("  Selected " + std::to_string(patternNeurons.size()) + " neurons for stimulation pattern");
+    
     for (SimulationStep step = 0; step < 1000; ++step) {
         for (NeuronId id : patternNeurons) {
             brain->injectCurrent(id, 30.0f);
@@ -244,9 +254,11 @@ void runPlasticityExperiment(std::shared_ptr<Brain> brain) {
         
         // Log progress every 100 steps
         if (step % 100 == 0) {
+            size_t currentSpikes = brain->getTotalSpikeCount();
+            size_t firingNeurons = brain->getFiringNeuronCount();
             NLM_LOG_INFO("  Step " + std::to_string(step) + 
-                        " | Spikes: " + std::to_string(brain->getTotalSpikeCount()) +
-                        " | Firing: " + std::to_string(brain->getFiringNeuronCount()));
+                        " | Spikes: " + std::to_string(currentSpikes) +
+                        " | Firing: " + std::to_string(firingNeurons));
         }
     }
     
@@ -349,24 +361,30 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Using default configuration.");
     }
     
-    // Override with command line args
+    // Enhanced command-line argument parsing
     config->loadFromArgs(argc, argv);
     
-    // Set default values for Phase 2
-    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
-    config->set("simulation_timestep", 0.001, ConfigSource::Default);
-    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::Default);  // Smaller for faster test
-    config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
-    config->set("connection_probability", 0.15f, ConfigSource::Default);
+    // Override with command line args for Phase 2
+    config->set("random_seed", static_cast<int64_t>(42), ConfigSource::CommandLine);
+    config->set("simulation_timestep", 0.001, ConfigSource::CommandLine);
+    config->set("neuron_count", static_cast<int64_t>(500), ConfigSource::CommandLine);
+    config->set("region_count", static_cast<int64_t>(1), ConfigSource::CommandLine);
+    config->set("connection_probability", 0.15f, ConfigSource::CommandLine);
     
-    // STDP parameters
-    config->set("stdp_ltp_weight", 0.02f, ConfigSource::Default);
-    config->set("stdp_ltd_weight", 0.015f, ConfigSource::Default);
-    config->set("stdp_tau", 20.0f, ConfigSource::Default);
+    // Enhanced STDP parameters
+    config->set("stdp_ltp_weight", 0.02f, ConfigSource::CommandLine);
+    config->set("stdp_ltd_weight", 0.015f, ConfigSource::CommandLine);
+    config->set("stdp_tau", 20.0f, ConfigSource::CommandLine);
     
-    // Structural plasticity parameters
-    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
-    config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    // Enhanced structural plasticity parameters
+    config->set("synaptogenesis_rate", 0.0001f, ConfigSource::CommandLine);
+    config->set("pruning_rate", 0.00001f, ConfigSource::CommandLine);
+    
+    // Additional useful configuration parameters for Phase 2
+    config->set("max_steps", static_cast<int64_t>(5000), ConfigSource::CommandLine);
+    config->set("v_gain", 1.0f, ConfigSource::CommandLine);
+    config->set("w_gain", 1.0f, ConfigSource::CommandLine);
+    config->set("b_gain", 1.0f, ConfigSource::CommandLine);
     
     // Log configuration summary
     NLM_LOG_INFO("");
@@ -376,6 +394,10 @@ int main(int argc, char** argv) {
     NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
     NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
     NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("  stdp_ltp_weight: " + std::to_string(config->getOr<float>("stdp_ltp_weight", 0.02f)));
+    NLM_LOG_INFO("  stdp_ltd_weight: " + std::to_string(config->getOr<float>("stdp_ltd_weight", 0.015f)));
+    NLM_LOG_INFO("  synaptogenesis_rate: " + std::to_string(config->getOr<float>("synaptogenesis_rate", 0.0001f)));
+    NLM_LOG_INFO("  pruning_rate: " + std::to_string(config->getOr<float>("pruning_rate", 0.00001f)));
     NLM_LOG_INFO("");
     
     // Initialize simulation clock

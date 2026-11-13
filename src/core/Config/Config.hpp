@@ -66,19 +66,30 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
-    // Set values
+    
+    // Set values with enhanced type support
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, int64_t value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Enhanced set methods for common types used in NLM
+    void set(const std::string& key, float value, ConfigSource source = ConfigSource::Runtime);
+    void set(const std::string& key, const std::vector<float>& value, ConfigSource source = ConfigSource::Runtime);
+    
+    // Configuration validation methods
+    bool validateConfig() const;
+    std::string getValidationErrors() const;
+    
+    // Environment-based configuration
+    void loadFromEnvironment(const std::string& prefix = "NLM_");
     
     // Check existence
     bool has(const std::string& key) const;
@@ -95,6 +106,15 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Configuration schema validation
+    bool validateKey(const std::string& key, const ConfigValue& value) const;
+    
+    // Get default configuration
+    static std::shared_ptr<Config> getDefaults();
+    
+    // Merge configuration
+    void merge(const Config& other, ConfigSource source = ConfigSource::CommandLine);
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -102,6 +122,8 @@ private:
     // Internal helpers
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
+    static bool isValidKey(const std::string& key);
+    static ConfigSource sourceFromString(const std::string& sourceStr);
 };
 
 } // namespace nlm
