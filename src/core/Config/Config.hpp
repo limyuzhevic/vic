@@ -66,12 +66,12 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
-
+    
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
-
+    
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, const std::string& value, ConfigSource source = ConfigSource::Runtime);
@@ -95,6 +95,47 @@ template<typename T>
     // Get configuration summary
     std::string summary() const;
     
+    // Enhanced file loading with format detection
+    bool loadFromJSON(const std::string& filepath);
+    bool loadFromYAML(const std::string& filepath);
+    bool loadFromSimpleFormat(const std::string& filepath);
+    
+    // File operations helper
+    static std::string getFileExtension(const std::string& filepath);
+    static bool isJSON(const std::string& filepath);
+    static bool isYAML(const std::string& filepath);
+    
+    // Configuration validation
+    bool validate() const;
+    
+    // Export configuration for other systems
+    std::string exportToJSON() const;
+    std::string exportToYAML() const;
+    
+    // Merge another configuration into this one (runtime overrides)
+    void merge(const Config& other);
+    
+    // Compare two configurations and return differences
+    std::vector<std::string> compare(const Config& other) const;
+    
+    // Get statistics about configuration keys (value types, sources)
+    std::string getKeyStats() const;
+    
+    // Get validation errors if any
+    std::vector<std::string> getValidationErrors() const;
+    
+    // Export configuration for a specific version/format
+    std::string exportForVersion(const std::string& version, const std::string& format = "json") const;
+    
+    // Import configuration from a specific version/format
+    bool importFromVersion(const std::string& data, const std::string& version = "latest", const std::string& format = "json");
+    
+    // Helper: Get config source for a key
+    ConfigSource getConfigSource(const std::string& key) const;
+    
+    // Helper: Get timestamp
+    std::string getTimestamp() const;
+    
 private:
     struct Impl;
     std::unique_ptr<Impl> pImpl;
@@ -103,5 +144,9 @@ private:
     static std::string trim(const std::string& str);
     static std::string toLower(const std::string& str);
 };
+
+// For accessing ConfigSource values in Python bindings
+const char* configSourceToString(ConfigSource source);
+ConfigSource stringToConfigSource(const std::string& sourceStr);
 
 } // namespace nlm
