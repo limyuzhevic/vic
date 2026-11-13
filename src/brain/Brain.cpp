@@ -94,7 +94,7 @@ struct Brain::Impl {
         : config(cfg)
         , rng(nullptr)
         , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
+        , nextRegionId(0)
         , timestep(0.001)
         , currentStep(0)
         , currentTime(0.0)
@@ -195,7 +195,7 @@ bool Brain::initialize() {
     pImpl->sensoryNeurons.clear();
     pImpl->motorNeurons.clear();
     pImpl->neuronById.clear();
-    pImpl->nextRegionId = RegionId(1);
+    pImpl->nextRegionId = RegionId(0);
     pImpl->totalSpikesTotal = 0;
     pImpl->totalSpikesThisStep = 0;
     pImpl->currentStep = 0;
@@ -211,14 +211,14 @@ bool Brain::initialize() {
     
     // Create regions
     for (size_t i = 0; i < regionCount; ++i) {
-        addRegion("Region_" + std::to_string(i + 1));
+        addRegion("Region_" + std::to_string(i));
     }
-    
+
     // Create neurons across regions
     size_t neuronsPerRegion = neuronCount / regionCount;
     size_t nextNeuronIndex = 1;  // globally unique IDs across regions (see setNextNeuronIndex)
     for (size_t i = 0; i < regionCount; ++i) {
-        auto* region = getRegion(RegionId(i + 1));
+        auto* region = getRegion(RegionId(i));
         if (region) {
             region->setNextNeuronIndex(nextNeuronIndex);
             // Add populations. The old layout had no inhibitory neurons at
@@ -248,7 +248,7 @@ bool Brain::initialize() {
                 }
             }
             
-            NLM_LOG_INFO("Created populations in region " + std::to_string(i + 1) +
+            NLM_LOG_INFO("Created populations in region " + std::to_string(i) +
                         ": " + std::to_string(region->getPopulationCount()) + " populations, " +
                         std::to_string(region->getTotalNeuronCount()) + " neurons");
             nextNeuronIndex += region->getTotalNeuronCount();
@@ -264,7 +264,7 @@ bool Brain::initialize() {
 
     // Initialize connectivity with random weights
     for (size_t i = 0; i < regionCount; ++i) {
-        auto* region = getRegion(RegionId(i + 1));
+        auto* region = getRegion(RegionId(i));
         if (region) {
             // Initialize random connectivity and synapse weights
             region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
