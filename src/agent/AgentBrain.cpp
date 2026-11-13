@@ -14,6 +14,7 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityLevel_(0.0f)
     , predictionError_(0.0f)
     , expectedReward_(0.0f)
+    , predictedReward_(0.0f)
     , developmentalAge_(0.0)
     , plasticityModifier_(1.0f)
     , rewardModulationEnabled_(true)
@@ -936,11 +937,19 @@ void AgentBrain::applyRewardModulation(float reward, float predictedReward) {
         }
     }
     
-    // Compute prediction error
-    predictionError_ = reward - predictedReward;
+    // Compute prediction error using internal predicted reward
+    float actualPrediction = predictedReward_;
+    predictionError_ = reward - actualPrediction;
     
-    // Update expected reward (exponential moving average)
+    // Update expected reward (exponential moving average of actual rewards)
     expectedReward_ = 0.95f * expectedReward_ + 0.05f * reward;
+    
+    // Update predicted reward (smoothing actual predictions towards received rewards)
+    // This improves future predictions based on experience
+    predictedReward_ = 0.8f * predictedReward_ + 0.2f * reward;
+    
+    // Clamp predicted reward to reasonable range
+    predictedReward_ = std::clamp(predictedReward_, -1.0f, 1.0f);
     
     // Dopamine-like signal (based on prediction error)
     dopamineLevel_ = predictionError_;
@@ -1076,6 +1085,7 @@ void AgentBrain::reset() {
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;
     expectedReward_ = 0.0f;
+    predictedReward_ = 0.0f;
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
     

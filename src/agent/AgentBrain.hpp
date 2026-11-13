@@ -169,6 +169,7 @@ private:
     float curiosityLevel_;
     float predictionError_;
     float expectedReward_;
+    float predictedReward_;
     
     // Development state
     double developmentalAge_;

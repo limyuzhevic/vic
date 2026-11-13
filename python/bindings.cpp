@@ -374,9 +374,9 @@ PYBIND11_MODULE(pynlm, m) {
              "Process sensory percept and inject into brain")
         .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
              "Decode brain motor activity into motor command")
-        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
-             py::arg("reward"), py::arg("predictedReward"),
-             "Apply reward-based neuromodulation")
+.def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+              py::arg("reward"), py::arg("predictedReward"),
+              "Apply reward-based neuromodulation")
         .def("updateDevelopment", &AgentBrain::updateDevelopment,
              py::arg("timestep"),
              "Update development system")
