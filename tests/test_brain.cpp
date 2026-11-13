@@ -1,4 +1,5 @@
 // Brain Tests
+// Phase 2: Real Neural Computation Tests
 #include "brain/Brain.hpp"
 #include "agent/AgentBrain.hpp"
 #include "cognition/ConceptFormation.hpp"
@@ -11,6 +12,12 @@
 
 namespace test_brain {
 
+/**
+ * @brief Test basic brain creation with valid configuration
+ * 
+ * Verifies that a Brain object can be created with a valid configuration
+ * and that it properly initializes with the expected parameters.
+ */
 void testBrainCreation() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
@@ -18,9 +25,20 @@ void testBrainCreation() {
     
     nlm::Brain brain(config);
     
+    // Verify brain is properly constructed
+    assert(brain.getConfig() != nullptr);
+    assert(brain.getConfig()->get<int64_t>("neuron_count") == 100);
+    assert(brain.getConfig()->get<int64_t>("region_count") == 1);
+    
     std::cout << "    testBrainCreation passed" << std::endl;
 }
 
+/**
+ * @brief Test brain initialization with various configurations
+ * 
+ * Tests brain initialization with different neuron counts and region
+ * configurations to ensure proper setup of neural components.
+ */
 void testBrainInitialization() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
@@ -33,13 +51,25 @@ void testBrainInitialization() {
     assert(success);
     
     // Verify brain initialized with expected properties
+    assert(brain.isInitialized());  // New method from Brain.hpp
     assert(brain.getRegionCount() == 2);
     assert(brain.getTotalNeuronCount() == 100);
     assert(brain.getTotalSynapseCount() > 0);
     
+    // Verify subsystems are properly initialized
+    assert(brain.getSpikeSystem() != nullptr);
+    assert(brain.getSTDP() != nullptr);
+    assert(brain.getWorkingMemory() != nullptr);
+    
     std::cout << "    testBrainInitialization passed" << std::endl;
 }
 
+/**
+ * @brief Test basic brain simulation step
+ * 
+ * Runs multiple simulation steps to verify that the brain
+ * processes inputs and updates its state correctly.
+ */
 void testBrainStep() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
@@ -48,17 +78,33 @@ void testBrainStep() {
     nlm::Brain brain(config);
     brain.initialize();
     
+    // Record initial state
+    size_t initialSpikeCount = brain.getTotalSpikeCount();
+    size_t initialPendingCount = brain.getPendingSpikeEventCount();
+    
     // Run a few steps
     for (nlm::SimulationStep step = 0; step < 10; ++step) {
         brain.step(step);
     }
     
-    // Just verify it doesn't crash
+    // Verify brain state changes appropriately
     assert(brain.getTotalNeuronCount() == 100);
+    assert(brain.getTotalSynapseCount() >= 0);
+    
+    // Spike counts should generally increase or stay the same
+    assert(brain.getTotalSpikeCount() >= initialSpikeCount);
+    assert(brain.getPendingSpikeEventCount() >= initialPendingCount);
     
     std::cout << "    testBrainStep passed" << std::endl;
 }
 
+/**
+ * @brief Test brain reset functionality
+ * 
+ * Tests that brain.reset() properly restores the brain to
+ * its initial state, clearing any accumulated state from
+ * previous operations.
+ */
 void testBrainReset() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
@@ -67,15 +113,32 @@ void testBrainReset() {
     nlm::Brain brain(config);
     brain.initialize();
     
+    // Record state before reset
+    size_t neuronsBefore = brain.getTotalNeuronCount();
+    
     brain.step(0);
+    
+    // Reset brain
     brain.reset();
     
     // Verify reset worked
     assert(brain.getTotalNeuronCount() == 50);
+    assert(brain.getTotalSynapseCount() >= 0);
+    
+    // Brain should be ready to initialize again
+    bool reinitializeSuccess = brain.initialize();
+    assert(reinitializeSuccess);
+    assert(brain.isInitialized());
     
     std::cout << "    testBrainReset passed" << std::endl;
 }
 
+/**
+ * @brief Test brain region management
+ * 
+ * Tests adding and accessing brain regions, ensuring proper
+ * region creation and management functionality.
+ */
 void testBrainRegions() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
@@ -87,14 +150,26 @@ void testBrainRegions() {
     auto regionIds = brain.getRegionIds();
     assert(regionIds.size() == 3);
     
+    // Verify all regions are accessible and non-null
     for (auto rid : regionIds) {
         auto* region = brain.getRegion(rid);
         assert(region != nullptr);
+        assert(region->getId() == rid);
     }
+    
+    // Verify getRegions() returns the same regions
+    const auto& regions = brain.getRegions();
+    assert(regions.size() == 3);
     
     std::cout << "    testBrainRegions passed" << std::endl;
 }
 
+/**
+ * @brief Test brain action production
+ * 
+ * Tests that the brain can produce motor actions based on
+ * neural activity, with proper error handling for edge cases.
+ */
 void testBrainActionProduction() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
@@ -106,9 +181,25 @@ void testBrainActionProduction() {
     auto action = brain.produceAction();
     assert(action != nullptr);
     
+    // Action should have valid components
+    assert(action->getType() != nlm::ActionType::Invalid);
+    assert(action->getTimestamp() > 0);
+    
+    // Test with no active neurons (should still return an action, but potentially Wait)
+    brain.reset();
+    brain.initialize();
+    auto action2 = brain.produceAction();
+    assert(action2 != nullptr);
+    
     std::cout << "    testBrainActionProduction passed" << std::endl;
 }
 
+/**
+ * @brief Test brain status and statistics
+ * 
+ * Tests that all brain statistics and status methods return
+ * valid values and handle edge cases properly.
+ */
 void testBrainStatus() {
     auto config = std::make_shared<nlm::Config>();
     config->set("neuron_count", static_cast<int64_t>(100), nlm::ConfigSource::Default);
@@ -117,15 +208,33 @@ void testBrainStatus() {
     nlm::Brain brain(config);
     brain.initialize();
     
-    // Verify statistics are accessible
+    // Verify statistics are accessible and in valid ranges
     assert(brain.getTotalNeuronCount() > 0);
     assert(brain.getTotalSynapseCount() >= 0);
+    assert(brain.getActiveNeuronCount() >= 0);
     assert(brain.getFiringNeuronCount() >= 0);
     assert(brain.getAverageFiringRate() >= 0.0f);
+    assert(brain.getTotalSpikeCount() >= 0);
+    assert(brain.getPendingSpikeEventCount() >= 0);
+    
+    // Verify E/I ratio is valid
+    float eiRatio = brain.getExcitationInhibitionRatio();
+    assert(eiRatio >= 0.0f);  // Should be non-negative
+    
+    // Test status logging doesn't crash
+    brain.logStatus();
     
     std::cout << "    testBrainStatus passed" << std::endl;
 }
 
+/**
+ * @brief Test brain checkpoint round-trip functionality
+ * 
+ * Tests that brain.save() and brain.load() properly preserve
+ * neural state, weights, membrane potentials, and spike histories.
+ * This is a critical test for long-running simulations and
+ * checkpoint/restore functionality.
+ */
 void testBrainCheckpointRoundTrip() {
     // Phase 4: save -> load must restore weights, membrane potentials,
     // firing rates and pending delayed spikes, and a load into a
@@ -135,7 +244,7 @@ void testBrainCheckpointRoundTrip() {
     config->set("region_count", static_cast<int64_t>(1), nlm::ConfigSource::Default);
     config->set("connection_probability", 0.1, nlm::ConfigSource::Default);
     config->set("random_seed", static_cast<int64_t>(42), nlm::ConfigSource::Default);
-
+    
     nlm::Brain brain1(config);
     brain1.initialize();
     // Drive the brain so there is real state to restore (weights move,
@@ -144,10 +253,10 @@ void testBrainCheckpointRoundTrip() {
     for (nlm::SimulationStep step = 0; step < 60; ++step) {
         brain1.step(step);
     }
-
+    
     const std::string path = "/tmp/nlm_test_checkpoint.bin";
     if (!brain1.save(path)) throw std::runtime_error("checkpoint save failed");
-
+    
     auto meanWeight = [](nlm::Brain& b) {
         double sum = 0.0;
         size_t count = 0;
@@ -167,11 +276,11 @@ void testBrainCheckpointRoundTrip() {
         }
         return 0.0f;
     };
-
+    
     double savedMeanWeight = meanWeight(brain1);
     float savedMembrane = firstMembrane(brain1);
     size_t savedPending = brain1.getPendingSpikeEventCount();
-
+    
     nlm::Brain brain2(config);
     brain2.initialize();
     if (!brain2.load(path)) throw std::runtime_error("checkpoint load failed");
@@ -179,7 +288,7 @@ void testBrainCheckpointRoundTrip() {
     if (std::abs(firstMembrane(brain2) - savedMembrane) >= 1e-6) throw std::runtime_error("membrane not restored");
     // Pending delayed spikes round-trip (in-flight synaptic input).
     if (brain2.getPendingSpikeEventCount() != savedPending) throw std::runtime_error("pending spikes not restored");
-
+    
     // Continue both brains with identical steps: firing rates should
     // stay close (they are not bit-identical: per-synapse spike
     // histories and RNG state are not part of the checkpoint, see the
@@ -192,7 +301,7 @@ void testBrainCheckpointRoundTrip() {
     float rate2 = brain2.getAverageFiringRate();
     float denom = std::max(std::abs(rate1), 1.0f);
     if (std::abs(rate1 - rate2) / denom >= 0.25f) throw std::runtime_error("continued firing rates diverged");
-
+    
     // Mismatched structure must fail, not silently misalign.
     auto smallConfig = std::make_shared<nlm::Config>();
     smallConfig->set("neuron_count", static_cast<int64_t>(50), nlm::ConfigSource::Default);
@@ -200,12 +309,21 @@ void testBrainCheckpointRoundTrip() {
     nlm::Brain smallBrain(smallConfig);
     smallBrain.initialize();
     if (smallBrain.load(path)) throw std::runtime_error("mismatched-structure load should fail");
-
+    
     std::cout << "    testBrainCheckpointRoundTrip passed (meanWeight="
               << savedMeanWeight << ", pending=" << savedPending
               << ", rates " << rate1 << " vs " << rate2 << ")" << std::endl;
 }
 
+/**
+ * @brief Test Phase 6 text encoding functionality
+ * 
+ * Tests the deterministic and case-insensitive text encoding
+ * system used for Phase 6 associative learning. This ensures
+ * that different words encode to different patterns and that
+ * the same word always encodes to the same pattern regardless
+ * of case.
+ */
 void testPhase6TextEncoding() {
     // Phase 6: the text encoder must be deterministic, and
     // different words must give different patterns — otherwise
@@ -222,6 +340,14 @@ void testPhase6TextEncoding() {
     std::cout << "    testPhase6TextEncoding passed" << std::endl;
 }
 
+/**
+ * @brief Test Phase 6 concept similarity computation
+ * 
+ * Tests the magnitude-aware concept similarity system that
+ * separates resource and hazard scenes while maintaining
+ * high similarity for identical scenes. This ensures proper
+ * concept formation for Phase 6 learning.
+ */
 void testPhase6ConceptSimilarity() {
     // Phase 6: cosine alone scores a bright scene and a dark
     // scene as identical (same direction, different magnitude),
@@ -239,6 +365,13 @@ void testPhase6ConceptSimilarity() {
     std::cout << "    testPhase6ConceptSimilarity passed (same=" << same << ", diff=" << diff << ")" << std::endl;
 }
 
+/**
+ * @brief Test Phase 6 working memory traces
+ * 
+ * Tests that the working memory system properly stores and
+ * maintains traces of neuronal activity. This ensures that
+ * episodic memory functionality works correctly for Phase 6.
+ */
 void testPhase6WorkingMemoryTraces() {
     // Phase 6: getActiveTraces() was always 0 because
     // storeToNeuron never populated the trace list. A stored

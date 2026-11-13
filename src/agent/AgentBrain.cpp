@@ -22,6 +22,54 @@ AgentBrain::AgentBrain(std::shared_ptr<Brain> brain)
     , curiosityEnabled_(true)
     , sensoryNoveltyDecay_(0.99f)
 {
+    // Initialize motor and sensory neuron groups from brain regions
+    // This setup occurs once during construction and ensures the agent
+    // knows which neurons control which actions/senses before
+    // the simulation begins.
+    if (brain_) {
+        for (const auto& region : brain_->getRegions()) {
+            for (auto& pop : region->getPopulations()) {
+                NeuronType type = pop->getNeuronType();
+                
+                if (type == NeuronType::Motor) {
+                    for (Neuron* n : pop->getNeurons()) {
+                        // Distribute motor neurons to different action groups
+                        // using modulo to ensure balanced distribution
+                        size_t idx = motorForward_.size() + motorBackward_.size() + 
+                                    motorTurnLeft_.size() + motorTurnRight_.size() +
+                                    motorInteract_.size() + motorWait_.size();
+                        
+                        switch (idx % 6) {
+                            case 0: motorForward_.push_back(n); break;
+                            case 1: motorBackward_.push_back(n); break;
+                            case 2: motorTurnLeft_.push_back(n); break;
+                            case 3: motorTurnRight_.push_back(n); break;
+                            case 4: motorInteract_.push_back(n); break;
+                            case 5: motorWait_.push_back(n); break;
+                        }
+                    }
+                } else if (type == NeuronType::Internal) {
+                    for (Neuron* n : pop->getNeurons()) {
+                        internalNeurons_.push_back(n);
+                    }
+                } else if (type == NeuronType::Sensory) {
+                    for (Neuron* n : pop->getNeurons()) {
+                        // Distribute sensory neurons evenly across modalities
+                        size_t idx = sensoryVision_.size() + sensoryTouch_.size() +
+                                    sensoryInternal_.size() + sensoryProprioception_.size();
+                        
+                        switch (idx % 4) {
+                            case 0: sensoryVision_.push_back(n); break;
+                            case 1: sensoryTouch_.push_back(n); break;
+                            case 2: sensoryInternal_.push_back(n); break;
+                            case 3: sensoryProprioception_.push_back(n); break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
     // Initialize motor and sensory neuron groups
     if (brain_) {
         for (const auto& region : brain_->getRegions()) {
@@ -1057,6 +1105,8 @@ const char* phase5CmdName(MotorCommand cmd) {
 }  // namespace
 
 std::string AgentBrain::getThoughtTrace() const {
+    // Build thought trace in a structured way for better readability and maintainability
+    // Format: perceived=[thoughtPercept] -> planned=[plannedAction] -> acted=[actedAction] -> outcome=[reward] novelty=[novelty] curiosity=[curiosity]
     std::string out = "perceived=[" + thoughtPercept_ + "] -> planned=[";
     out += hasThoughtPlanned_ ? phase5CmdName(thoughtPlanned_) : "none";
     out += "] -> acted=[" + std::string(phase5CmdName(lastDecoded_)) + "] -> outcome=[";
@@ -1071,27 +1121,37 @@ float AgentBrain::getLearnedPreference() const {
 }
 
 void AgentBrain::reset() {
+    // Reset all neuromodulation signals to baseline
+    // This prepares the agent for a fresh episode with clean learning state
     dopamineLevel_ = 0.0f;
     noveltyLevel_ = 0.0f;
     curiosityLevel_ = 0.0f;
     predictionError_ = 0.0f;
     expectedReward_ = 0.0f;
+
+    // Reset development state
     developmentalAge_ = 0.0;
     plasticityModifier_ = 1.0f;
-    
-    // Clear the visual prediction (a new episode's first scene is
-    // novel again) and the touch state.
+
+    // Clear sensory prediction (a new episode's first scene is novel again)
+    // and reset touch state
     predictedVision_.clear();
     maxTouch_ = 0.0f;
     forwardTouch_ = 0.0f;
     forwardObjectVision_ = 1.0f;
     lastVision_.clear();
+
+    // Reset motor decoding state
     lastWinnerGroup_ = -1;
     lastWinnerMargin_ = 0.0f;
     consecutiveWinnerCount_ = 0;
     reflexBonusCount_ = 0;
     reflexSuppressCount_ = 0;
     wtaPulseCount_ = 0;
+    lastDecoded_ = MotorCommand::Wait;
+    hasLastDecoded_ = false;
+
+    // Reset cognitive and social state
     plannerOverrideCount_ = 0;
     plannerAgreementCount_ = 0;
     plannerDecisionCount_ = 0;
@@ -1100,9 +1160,12 @@ void AgentBrain::reset() {
     socialBiasCount_ = 0;
     lastTouch_.clear();
     lastText_.clear();
+
+    // Reset action diversity counters
     stepsSinceTurn_ = 0;
     repeatCount_ = 0;
-    hasLastDecoded_ = false;
+
+    // Reset thought trace state
     hasThoughtPlanned_ = false;
     hasThoughtOutcome_ = false;
 }

@@ -23,8 +23,118 @@ PYBIND11_MODULE(pynlm, m) {
     m.doc() = R"pbdoc(
         NLM (Neural Learning Machine) Python Bindings
         ---------------------------------------------
-        A Python binding for the NLM C++ neural simulation framework.
-        Provides classes for Brain, Config, AgentBrain, SimpleWorld, SensoryInput, and Action.
+        
+        **NLM (熙然, meaning "serene flow")** is an experimental computational brain
+        project. The long-term goal is to create a neural system that begins in a
+        primitive developmental state and acquires increasingly complex abilities
+        through interaction with an environment.
+        
+        This Python binding provides access to the NLM C++ neural simulation framework,
+        enabling users to:
+        
+        - Create and simulate spiking neural networks
+        - Use advanced brain-inspired learning mechanisms (STDP, Hebbian, structural plasticity)
+        - Integrate with world simulation for embodied agents
+        - Apply neuromodulation for curiosity, reward, and novelty-driven learning
+        - Implement developmental processes that change with agent age
+        - Use checkpointing to save and restore brain states
+        
+        Key Classes:
+        - **Brain**: Central neural simulation engine with spiking neurons and plasticity
+        - **Config**: Configuration system for neural parameters and simulation settings
+        - **AgentBrain**: Interface layer connecting brain to world perception/action
+        - **SimpleWorld**: 2D environment for agent-world interaction
+        - **SensoryInput**: Base class for all sensory modalities (vision, audio, internal signals)
+        - **Action**: Motor output representation with type and parameters
+        - **ActionResult**: Results from world interactions including rewards
+        - **AgentBody**: Physical state of the agent (position, velocity, energy, health)
+        
+        Key Enumerations:
+        - **NeuronType**: Types of neurons (Excitatory, Inhibitory, Sensory, Motor, etc.)
+        - **ActionType**: High-level action categories for planning
+        - **MotorCommand**: Low-level motor commands for immediate action
+        - **WorldObjectType**: Types of objects in the world environment
+        - **DevelopmentalStage**: Stages of agent development (Initial, CriticalPeriod, etc.)
+        
+        Usage Examples:
+        
+        ```python
+        import pynlm
+        
+        # Create a default configuration
+        config = pynlm.createDefaultConfig()
+        
+        # Create and initialize the brain
+        brain = pynlm.createBrain(config)
+        brain.initialize()
+        
+        print(f"Total neurons: {brain.getTotalNeuronCount()}")
+        print(f"Total synapses: {brain.getTotalSynapseCount()}")
+        
+        # Create agent interface and world
+        agent = pynlm.createAgentBrain(brain)
+        world = pynlm.createSimpleWorld()
+        
+        # Configure world for agent navigation
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        world.setAgentStart(10.0, 10.0)
+        
+        # Initialize agent with world
+        agent.initialize(world)
+        
+        # Enable learning subsystems
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
+        
+        # Run simulation loop
+        for step in range(1000):
+            # Update world
+            world.update(timestep=0.1)
+            
+            # Get sensory input from world
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input in brain
+            agent.processSensoryInput(percept)
+            
+            # Run brain step
+            brain.step(step)
+            
+            # Decode motor command from brain activity
+            motor_cmd = agent.decodeMotorCommand()
+            
+            # Apply motor command to world
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+            
+            # Apply reward modulation
+            reward = 0.0  # Calculate from world state if needed
+            agent.applyRewardModulation(reward, 0.0)
+            
+            # Update development
+            agent.updateDevelopment(0.1)
+            
+            # Print progress
+            if step % 100 == 0:
+                print(f"Step {step}:")
+                print(f"  Firing neurons: {brain.getFiringNeuronCount()}")
+                print(f"  Curiosity: {agent.getCuriosityLevel():.3f}")
+                print(f"  Novelty: {agent.getNoveltyLevel():.3f}")
+                print(f"  Dev Stage: {agent.getDevelopmentalStage()}")
+        ```
+        
+        **Important Notes:**
+        
+        1. **Initialization**: Always call `initialize()` after creating objects
+        2. **Simulation Loop**: Call `step()` each simulation step
+        3. **Error Handling**: Methods return nullptr on error (check for null pointers)
+        4. **Memory Management**: Use shared_ptr for Python bindings
+        5. **Performance**: Large simulations may require optimized hardware
+        
+        For detailed documentation on each class and method, refer to the
+        C++ source headers in `src/` directory.
     )pbdoc";
 
     py::register_exception<std::runtime_error>(m, "RuntimeError");
