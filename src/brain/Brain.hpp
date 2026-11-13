@@ -202,12 +202,51 @@ public:
     float getLearnedPreference() const;
     void setLearnedPreference(float preference);
     
-    // Logging
-    void logStatus() const;
-    
-private:
-    struct Impl;
-    Impl* pImpl;
-};
+    // Internal step phase execution methods (called by step() for modularity)
+    void executeNeuralDynamics();
+    void executePlasticityPhase();
+    void executeMemorySystemsPhase();
+    void executeCognitionPhase();
+    void executeNeuromodulationPhase();
+    void executeDevelopmentPhase();
+    void executeCheckpointPhase();
+    void collectStatistics();
 
 } // namespace nlm
+
+// Brain statistics structure for advanced analysis
+struct BrainStats {
+    // Simulation state
+    SimulationStep currentStep;
+    Timestamp currentTime;
+    DevelopmentalStage developmentalStage;
+    float learnedPreference;
+    
+    // Neural architecture
+    size_t totalNeurons;
+    size_t totalSynapses;
+    size_t activeNeurons;
+    size_t firingNeurons;
+    
+    // Activity statistics
+    size_t totalSpikes;
+    size_t pendingSpikes;
+    float averageFiringRate;
+    float excitationInhibitionRatio;
+    
+    // Memory system statistics
+    size_t workingMemoryTraces;
+    size_t episodicMemoryEpisodes;
+    
+    // Neuromodulation statistics
+    float dopamineLevel;
+    float curiosityLevel;
+    float noveltyLevel;
+    
+    // Default constructor
+    BrainStats() : currentStep(0), currentTime(0.0), developmentalStage(DevelopmentalStage::Initial),
+                  learnedPreference(0.0f), totalNeurons(0), totalSynapses(0), activeNeurons(0),
+                  firingNeurons(0), totalSpikes(0), pendingSpikes(0), averageFiringRate(0.0f),
+                  excitationInhibitionRatio(0.0f), workingMemoryTraces(0), episodicMemoryEpisodes(0),
+                  dopamineLevel(0.0f), curiosityLevel(0.0f), noveltyLevel(0.0f) {}
+};
