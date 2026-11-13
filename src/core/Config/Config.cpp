@@ -24,11 +24,14 @@ bool Config::loadFromFile(const std::string& filepath) {
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
+        NLM_LOG_ERROR("Failed to open config file: " + filepath);
         return false;
     }
     
     std::string line;
+    int lineNumber = 0;
     while (std::getline(file, line)) {
+        lineNumber++;
         // Skip empty lines and comments
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == '/') {
@@ -43,13 +46,27 @@ bool Config::loadFromFile(const std::string& filepath) {
             
             // Remove quotes if present
             if (value.size() >= 2 && 
-                ((value.front() == '"' && value.back() == '"') ||
+                ((value.front() == '\"' && value.back() == '\"') ||
                  (value.front() == '\'' && value.back() == '\''))) {
                 value = value.substr(1, value.size() - 2);
             }
             
+            // Check for duplicate keys
+            if (has(key)) {
+                NLM_LOG_WARNING("Duplicate config key \\\"" + key + "\\\" found in config file " + 
+                              filepath + " at line " + std::to_string(lineNumber) +
+                              ". Using most recent value.");
+            }
+            
             set(key, value, ConfigSource::File);
+        } else {
+            NLM_LOG_WARNING("Malformed config line in " + filepath + 
+                          " at line " + std::to_string(lineNumber) + ": " + line);
         }
+    }
+    
+    if (lineNumber == 0) {
+        NLM_LOG_WARNING("Empty config file: " + filepath);
     }
     
     return true;
