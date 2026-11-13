@@ -81,6 +81,9 @@ public:
     // Initialize with brain reference
     void initialize(Brain* brain);
 
+    // Process neural activity patterns for concept discovery
+    void processNeuralPattern(const std::vector<float>& pattern);
+
     // Present a new experience to the concept formation system
     // Returns concept ID if this experience belongs to an existing concept,
     // or 0 if it's too early to tell, or new concept ID if novel

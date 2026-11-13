@@ -558,4 +558,24 @@ void TemporalRelation::clear() {
     sequences_.clear();
 }
 
+void ConceptFormation::processNeuralPattern(const std::vector<float>& pattern) {
+    if (pattern.empty()) return;
+    
+    // Convert neural pattern to features for concept formation
+    std::vector<float> features;
+    features.reserve(pattern.size());
+    
+    for (float value : pattern) {
+        // Encode basic features from neural pattern
+        features.push_back(value);
+    }
+    
+    // Present to concept formation system
+    presentExperience(pattern, features, 0.0f, 0);
+}
+
+void TemporalRelation::clear() {
+    sequences_.clear();
+}
+
 } // namespace nlm

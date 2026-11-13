@@ -19,7 +19,10 @@ public:
     // TODO PHASE 2: Implement real prediction
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
-    // Update predictions based on actual observation
+    // Update predictions based on current step/time for predictive coding
+    void updatePredictions(SimulationStep currentStep, Timestamp currentTime);
+    
+    // Update predictions based on predicted vs actual observation (legacy)
     void updatePredictions(const SensoryInput& predicted, const SensoryInput& actual);
     
     // Get prediction error
