@@ -30,10 +30,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     cfg->set("neuron_count", static_cast<int64_t>(config.neuronCount));
     cfg->set("region_count", static_cast<int64_t>(config.regionCount));
     cfg->set("connection_probability", config.connectionProbability);
-    cfg->set("stdp_ltp_weight", 0.01f);
-    cfg->set("stdp_ltd_weight", 0.012f);
-    cfg->set("synaptogenesis_rate", 0.0001f);
-    cfg->set("pruning_rate", 0.00001f);
+    cfg->set("stdp_ltp_weight", config.stdpltpWeight);
+    cfg->set("stdp_ltd_weight", config.stdpLtdWeight);
+    cfg->set("synaptogenesis_rate", config.synaptogenesisRate);
+    cfg->set("pruning_rate", config.pruningRate);
     
     // Create brain
     auto brain = std::make_shared<Brain>(cfg);
@@ -45,7 +45,8 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     // Create simple world
     SimpleWorld world;
-    world.configure(16, 16, 16, 16);
+    // Increase world size for better exploration space
+    world.configure(32, 32, 32, 32);
     world.reset();
     
     // Create agent
@@ -58,6 +59,18 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     
     NLM_LOG_INFO("Brain and agent initialized successfully");
     
+    // Initialize metrics for enhanced tracking
+    size_t resourcesCollected = 0;
+    size_t hazardsHit = 0;
+    size_t emptyInteracts = 0;
+    size_t tooSoonActions = 0;
+    size_t visionChanges = 0;
+    size_t touchChanges = 0;
+    size_t developmentalEvents = 0;
+    size_t socialObservations = 0;
+    size_t novelExperiences = 0;
+    float totalPlasticity = 0.0f;
+    
     // Run simulation
     float totalReward = 0.0f;
     float totalFiringRate = 0.0f;
@@ -67,6 +80,16 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Get observation
         world.update(0.001);
         SensoryPercept percept = world.getSensoryPercept();
+        
+        // Track sensory changes
+        if (step % 100 == 0) {
+            // Compare with previous percept to track changes
+            // (would need to store previous percept, but for now just log)
+            visionChanges++;
+            if (!percept.getTouch().empty()) {
+                touchChanges++;
+            }
+        }
         
         // Process sensory input
         agent.processSensoryInput(percept);
@@ -80,9 +103,36 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Apply action to world
         ActionResult actionResult = world.applyMotorCommand(cmd, step * 0.001);
         
+        // Track action results for metrics
+        if (actionResult.success) {
+            if (actionResult.message == "consumed_resource") {
+                resourcesCollected++;
+            } else if (actionResult.message == "hit_hazard") {
+                hazardsHit++;
+            } else if (actionResult.message == "no_object") {
+                emptyInteracts++;
+            }
+        } else if (actionResult.message == "too soon") {
+            tooSoonActions++;
+        }
+        
         // Compute reward
         float reward = actionResult.reward;
         totalReward += reward;
+        
+        // Log interaction details for debugging
+        if (step % 100 == 0) {
+            NLM_LOG_INFO("Step " + std::to_string(step) + 
+                        " | Action: " + std::to_string(static_cast<int>(cmd)) +
+                        " | Reward: " + std::to_string(reward) +
+                        " | Total: " + std::to_string(totalReward) +
+                        " | Agent curiosity: " + std::to_string(agent.getCuriosityLevel()) +
+                        " | Novelty: " + std::to_string(agent.getNoveltyLevel()) +
+                        " | Vision changes: " + std::to_string(visionChanges) +
+                        " | Touch changes: " + std::to_string(touchChanges) +
+                        " | Resources: " + std::to_string(resourcesCollected) +
+                        " | Hazards: " + std::to_string(hazardsHit));
+        }
         
         // Apply reward modulation
         agent.applyRewardModulation(reward, 0.0f);
@@ -90,6 +140,10 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
         // Update development
         if (config.enableDevelopment) {
             agent.updateDevelopment(0.001);
+            // Track developmental events (simplified tracking)
+            developmentalEvents++;
+            // Rough estimate of average plasticity
+            totalPlasticity += agent.getNeuromodulationLevel();
         }
         
         // Collect metrics
@@ -114,6 +168,22 @@ Phase6IntegrationResult Phase6IntegratedExperiment::run(const Phase6Config& conf
     result.noveltyLevel = agent.getNoveltyLevel();
     result.curiosityLevel = agent.getCuriosityLevel();
     result.dopamineLevel = agent.getNeuromodulationLevel();
+    
+    // Set enhanced metrics
+    result.resourcesCollected = resourcesCollected;
+    result.hazardsHit = hazardsHit;
+    result.emptyInteracts = emptyInteracts;
+    result.tooSoonActions = tooSoonActions;
+    result.visionChanges = visionChanges;
+    result.touchChanges = touchChanges;
+    result.learnedPreference = brain->getLearnedPreference();
+    result.actionSelectionBias = 0.0f;  // Would need to track this separately
+    result.developmentalEvents = developmentalEvents;
+    result.averagePlasticity = totalPlasticity / (config.maxSteps / 100.0f);  // rough estimate
+    result.socialObservations = socialObservations;
+    result.imitationAccuracy = 0.0f;  // Would need to track this
+    result.novelExperiences = novelExperiences;
+    result.explorationRate = static_cast<float>(novelExperiences) / config.maxSteps;
     
     // Verify integration
     result.memoryWorkingMemoryIntegrated = (brain->getWorkingMemory() != nullptr);

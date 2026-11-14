@@ -55,6 +55,9 @@ struct LearningExperiment {
     size_t initialSynapseCount;
     std::vector<float> initialWeights;
     std::vector<float> finalWeights;
+    std::vector<float> weightChanges;  // Per-synapse change tracking
+    std::vector<float> initialWeightsAll;  // Weights from all regions for better analysis
+    std::vector<float> finalWeightsAll;    // Weights from all regions for better analysis
     std::vector<NeuronId> mostActiveNeurons;
     
     LearningExperiment(std::shared_ptr<Brain> b, uint64_t s) 
@@ -63,31 +66,60 @@ struct LearningExperiment {
     void recordInitialState() {
         initialSynapseCount = brain->getTotalSynapseCount();
         initialWeights.clear();
+        initialWeightsAll.clear();
         
-        // Record initial weights from first region
+        // Record initial weights from first region (for backward compatibility)
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
                 initialWeights.push_back(syn->getWeight());
             }
         }
         
+        // Record initial weights from ALL regions for better analysis
+        for (const auto& region : brain->getRegions()) {
+            for (const auto& syn : region->getSynapses()) {
+                initialWeightsAll.push_back(syn->getWeight());
+            }
+        }
+        
         NLM_LOG_INFO("Initial state recorded:");
         NLM_LOG_INFO("  Synapses: " + std::to_string(initialSynapseCount));
+        NLM_LOG_INFO("  Synapses (all regions): " + std::to_string(initialWeightsAll.size()));
         if (!initialWeights.empty()) {
             float sum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
             float mean = sum / initialWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+            NLM_LOG_INFO("  Mean weight (first region): " + std::to_string(mean));
+        }
+        if (!initialWeightsAll.empty()) {
+            float sum = std::accumulate(initialWeightsAll.begin(), initialWeightsAll.end(), 0.0f);
+            float mean = sum / initialWeightsAll.size();
+            NLM_LOG_INFO("  Mean weight (all regions): " + std::to_string(mean));
         }
     }
     
     void recordFinalState() {
         finalWeights.clear();
+        finalWeightsAll.clear();
+        weightChanges.clear();
         
-        // Record final weights from first region
+        // Record final weights from first region (for backward compatibility)
         if (auto* region = brain->getRegion(RegionId(1))) {
             for (const auto& syn : region->getSynapses()) {
                 finalWeights.push_back(syn->getWeight());
             }
+        }
+        
+        // Record final weights from ALL regions for better analysis
+        for (const auto& region : brain->getRegions()) {
+            for (const auto& syn : region->getSynapses()) {
+                finalWeightsAll.push_back(syn->getWeight());
+            }
+        }
+        
+        // Compute per-synapse changes (only for synapses present in both measurements)
+        size_t minSize = std::min(initialWeightsAll.size(), finalWeightsAll.size());
+        for (size_t i = 0; i < minSize; ++i) {
+            weightChanges.push_back(finalWeightsAll[i] - initialWeightsAll[i]);
         }
         
         mostActiveNeurons = brain->getSpikeSystem()->getMostActiveNeurons(10);
@@ -97,7 +129,16 @@ struct LearningExperiment {
         if (!finalWeights.empty()) {
             float sum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
             float mean = sum / finalWeights.size();
-            NLM_LOG_INFO("  Mean weight: " + std::to_string(mean));
+            NLM_LOG_INFO("  Mean weight (first region): " + std::to_string(mean));
+        }
+        if (!finalWeightsAll.empty()) {
+            float sum = std::accumulate(finalWeightsAll.begin(), finalWeightsAll.end(), 0.0f);
+            float mean = sum / finalWeightsAll.size();
+            NLM_LOG_INFO("  Mean weight (all regions): " + std::to_string(mean));
+        }
+        if (!weightChanges.empty()) {
+            float sum = std::accumulate(weightChanges.begin(), weightChanges.end(), 0.0f);
+            NLM_LOG_INFO("  Total synaptic change: " + std::to_string(sum));
         }
     }
     
@@ -111,21 +152,71 @@ struct LearningExperiment {
             return;
         }
         
-        // Compute weight changes
+        // Compute weight changes for first region (backward compatibility)
         float initialSum = std::accumulate(initialWeights.begin(), initialWeights.end(), 0.0f);
         float finalSum = std::accumulate(finalWeights.begin(), finalWeights.end(), 0.0f);
         float initialMean = initialSum / initialWeights.size();
         float finalMean = finalSum / finalWeights.size();
         
         NLM_LOG_INFO("Weight Statistics:");
-        NLM_LOG_INFO("  Initial mean weight: " + std::to_string(initialMean));
-        NLM_LOG_INFO("  Final mean weight: " + std::to_string(finalMean));
-        NLM_LOG_INFO("  Change: " + std::to_string(finalMean - initialMean));
+        NLM_LOG_INFO("  Initial mean weight (first region): " + std::to_string(initialMean));
+        NLM_LOG_INFO("  Final mean weight (first region): " + std::to_string(finalMean));
+        NLM_LOG_INFO("  Change (first region): " + std::to_string(finalMean - initialMean));
         
-        // Count synapses that changed significantly
-        size_t strengthened = 0;
-        size_t weakened = 0;
-        size_t unchanged = 0;
+        // Compute weight changes for ALL regions (new enhanced analysis)
+        if (!initialWeightsAll.empty() && !finalWeightsAll.empty()) {
+            float initialSumAll = std::accumulate(initialWeightsAll.begin(), initialWeightsAll.end(), 0.0f);
+            float finalSumAll = std::accumulate(finalWeightsAll.begin(), finalWeightsAll.end(), 0.0f);
+            float initialMeanAll = initialSumAll / initialWeightsAll.size();
+            float finalMeanAll = finalSumAll / finalWeightsAll.size();
+            
+            NLM_LOG_INFO("Weight Statistics (all regions):");
+            NLM_LOG_INFO("    Initial mean weight: " + std::to_string(initialMeanAll));
+            NLM_LOG_INFO("    Final mean weight: " + std::to_string(finalMeanAll));
+            NLM_LOG_INFO("    Change: " + std::to_string(finalMeanAll - initialMeanAll));
+            
+            // Enhanced synaptic change analysis
+            if (!weightChanges.empty()) {
+                float totalChange = std::accumulate(weightChanges.begin(), weightChanges.end(), 0.0f);
+                float maxPositive = 0.0f, maxNegative = 0.0f;
+                size_t totalChanged = 0;
+                
+                for (float change : weightChanges) {
+                    if (change > 0.01f) {
+                        ++totalChanged;
+                        if (change > maxPositive) maxPositive = change;
+                    } else if (change < -0.01f) {
+                        ++totalChanged;
+                        if (change < maxNegative) maxNegative = change;
+                    }
+                }
+                
+                NLM_LOG_INFO("Enhanced Synaptic Analysis (all regions):");
+                NLM_LOG_INFO("      Total synapses analyzed: " + std::to_string(weightChanges.size()));
+                NLM_LOG_INFO("      Total synaptic change: " + std::to_string(totalChange));
+                NLM_LOG_INFO("      Max positive change: " + std::to_string(maxPositive));
+                NLM_LOG_INFO("      Max negative change: " + std::to_string(maxNegative));
+                NLM_LOG_INFO("      Synaptically changed: " + std::to_string(totalChanged));
+                
+                // Distribution analysis
+                size_t strengthened = 0, weakened = 0, unchanged = 0;
+                for (float change : weightChanges) {
+                    if (change > 0.01f) ++strengthened;
+                    else if (change < -0.01f) ++weakened;
+                    else ++unchanged;
+                }
+                
+                NLM_LOG_INFO("      Distribution:");
+                NLM_LOG_INFO("        Strengthened (> 0.01): " + std::to_string(strengthened));
+                NLM_LOG_INFO("        Weakened (< -0.01): " + std::to_string(weakened));
+                NLM_LOG_INFO("        Unchanged: " + std::to_string(unchanged));
+            }
+        }
+        
+        // Original first-region analysis (backward compatibility)
+        NLM_LOG_INFO("");
+        NLM_LOG_INFO("Synaptic Changes (first region):");
+        size_t strengthened = 0, weakened = 0, unchanged = 0;
         
         size_t minSize = std::min(initialWeights.size(), finalWeights.size());
         for (size_t i = 0; i < minSize; ++i) {
@@ -135,8 +226,6 @@ struct LearningExperiment {
             else ++unchanged;
         }
         
-        NLM_LOG_INFO("");
-        NLM_LOG_INFO("Synaptic Changes:");
         NLM_LOG_INFO("  Strengthened: " + std::to_string(strengthened));
         NLM_LOG_INFO("  Weakened: " + std::to_string(weakened));
         NLM_LOG_INFO("  Unchanged: " + std::to_string(unchanged));

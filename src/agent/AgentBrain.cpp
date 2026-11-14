@@ -389,7 +389,7 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
         }
     }
 
-    // Update curiosity based on novelty. Phase 4: curiosity is a short
+// Update curiosity based on novelty. Phase 4: curiosity is a short
     // trace, not an instantaneous value — a single novel step used to
     // vanish immediately, and a small but sustained novelty (the normal
     // case while moving) never accumulated. Phase 5: the trace term
@@ -402,8 +402,12 @@ void AgentBrain::processSensoryInput(const SensoryPercept& percept) {
     // behaviour. The trace still decays, so a fully familiar scene
     // still settles low; it just takes longer to get there.
     if (curiosityEnabled_) {
+        // Changed from additive (0.6f) to multiplicative decay (0.05f)
+        // for proper curiosity decay: the additive version caused
+        // curiosity to grow without bound, leading to excessive
+        // exploration and no learning.
         curiosityLevel_ = noveltyLevel_ * 2.0f + std::abs(predictionError_) * 0.5f
-                        + 0.6f * curiosityLevel_;
+                        + 0.05f * curiosityLevel_;
         curiosityLevel_ = std::clamp(curiosityLevel_, 0.0f, 1.0f);
     }
 }

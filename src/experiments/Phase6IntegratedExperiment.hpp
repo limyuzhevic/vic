@@ -47,10 +47,31 @@ struct Phase6IntegrationResult {
     float curiosityLevel;
     float dopamineLevel;
     
-    // Timestamps
-    time_t startTime;
-    time_t endTime;
-    double totalWallClockTime;
+    // Interacting with the world
+    size_t resourcesCollected;
+    size_t hazardsHit;
+    size_t emptyInteracts;
+    size_t tooSoonActions;
+    
+    // Sensory feedback
+    size_t visionChanges;
+    size_t touchChanges;
+    
+    // Learned preferences
+    float learnedPreference;
+    float actionSelectionBias;
+    
+    // Development tracking
+    size_t developmentalEvents;
+    float averagePlasticity;
+    
+    // Social learning
+    size_t socialObservations;
+    float imitationAccuracy;
+    
+    // Exploration metrics
+    size_t novelExperiences;
+    float explorationRate;
     
     Phase6IntegrationResult()
         : memoryWorkingMemoryIntegrated(false)
@@ -67,6 +88,20 @@ struct Phase6IntegrationResult {
         , noveltyLevel(0.0f)
         , curiosityLevel(0.0f)
         , dopamineLevel(0.0f)
+        , resourcesCollected(0)
+        , hazardsHit(0)
+        , emptyInteracts(0)
+        , tooSoonActions(0)
+        , visionChanges(0)
+        , touchChanges(0)
+        , learnedPreference(0.0f)
+        , actionSelectionBias(0.0f)
+        , developmentalEvents(0)
+        , averagePlasticity(0.0f)
+        , socialObservations(0)
+        , imitationAccuracy(0.0f)
+        , novelExperiences(0)
+        , explorationRate(0.0f)
         , startTime(0)
         , endTime(0)
         , totalWallClockTime(0.0) {}
@@ -85,6 +120,14 @@ struct Phase6Config {
     bool enableDevelopment;
     std::string checkpointPath;
     
+    // Additional configuration options for tuning
+    float stdpLtpWeight;
+    float stdpLtdWeight;
+    float synaptogenesisRate;
+    float pruningRate;
+    float curiosityDecay;
+    float noveltySensitivity;
+    
     Phase6Config()
         : maxSteps(10000)
         , neuronCount(1000)
@@ -93,7 +136,13 @@ struct Phase6Config {
         , enableCheckpointing(true)
         , enableReplay(true)
         , enableDevelopment(true)
-        , checkpointPath("./checkpoint_test.bin") {}
+        , checkpointPath("./checkpoint_test.bin")
+        , stdpLtpWeight(0.01f)
+        , stdpLtdWeight(0.012f)
+        , synaptogenesisRate(0.0001f)
+        , pruningRate(0.00001f)
+        , curiosityDecay(0.95f)
+        , noveltySensitivity(2.0f) {}
 };
 
 /**
