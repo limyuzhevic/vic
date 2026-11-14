@@ -5,9 +5,9 @@
 NLM is a brain-inspired spiking neural network simulator written in C++20. It implements Leaky Integrate-and-Fire (LIF) neurons with event-driven spike propagation, synaptic delays, and multiple plasticity mechanisms including STDP, Hebbian learning, and structural plasticity.
 
 This document covers:
-1. Building the C++ project from source
-2. Installing the Python library
-3. Using the NLM Python API
+1. Building the C++ project from source (NEW unified CLI)
+2. Using the new unified command-line interface
+3. Using the NLM Python API (improved)
 
 ---
 
@@ -46,12 +46,14 @@ After successful compilation, you will have:
 
 | Target | Type | Description |
 |--------|------|-------------|
-| `nlm` | Executable | Main simulation executable |
+| `nlm` | Executable | **NEW: Main unified CLI interface** |
 | `nlm_core` | Static Library | Core brain components |
 | `nlm_agent` | Static Library | Agent system |
 | `nlm_world` | Static Library | World simulation |
 | `nlm_phase3_demo` | Executable | Phase 3 demonstration |
 | `nlm_phase4_demo` | Executable | Phase 4 demonstration |
+| `nlm_phase5_demo` | Executable | Phase 5 demonstration |
+| `nlm_phase6_demo` | Executable | Phase 6 integration test |
 | `nlm_test` | Executable | Unit test suite |
 
 ### Build Options
@@ -70,56 +72,135 @@ make install
 
 ---
 
-## Part 2: Installing the Python Library
+## Part 2: Using the NEW Unified Command-Line Interface
 
-### From Source (Recommended for Development)
+### Overview
 
-```bash
-# Install build dependencies (use a venv on PEP 668 systems, where
-# system pip refuses to install packages)
-pip install pybind11 scikit-build-core pytest numpy
+The main `nlm` executable now provides a unified command-line interface for all experimental phases. This replaces the older phase-specific demos and provides consistent argument parsing across all phases.
 
-# Build and install
-pip install .
-
-# Or install in development mode
-pip install -e .
-```
-
-> Phase 5 note: `pip install .` now genuinely builds `pynlm` (verified:
-> fresh venv, `pip install .`, then `import pynlm` and the easy_usage
-> Example 1 flow run). Previously the root CMakeLists never built the
-> module, so `pip install .` succeeded yet `import pynlm` failed. A
-> plain C++ `cmake` build still does NOT include pynlm unless you pass
-> `-DNLM_BUILD_PYTHON_BINDINGS=ON` (and have pybind11 installed); the
-> standalone `cmake -S python -B build` route also still works.
-
-### Using pyproject.toml (Modern Python Packaging)
+### Basic Usage
 
 ```bash
-# Install with scikit-build-core (used automatically by pip)
-pip install .
+# Run Phase 2 (default) - Real Neural Computation
+nlm
 
-# Build only (without installing)
-pip install build
-python -m build
+# Run Phase 3 - World Interaction
+nlm --phase=3
 
-# Install specific build from wheel
-pip install dist/*.whl
+# Run Phase 4 - Emerging Cognition
+nlm --phase=4
+
+# Run Phase 6 - Integration Test
+nlm --phase=6
+
+# Show help information
+nlm --help
+
+# Show version information
+nlm --version
 ```
 
-### Verifying Installation
+### Common Options
 
-```python
-import pynlm
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--help` | `-h` | Show help message |
+| `--version` | `-v` | Show version information |
+| `--verbose` | `-V` | Enable verbose output |
+| `--debug` | `-d` | Enable debug mode |
+| `--phase` | `-p` | Select phase (1, 2, 3, 4, 5, 6, benchmark, all) |
+| `--config` | `-c` | Load configuration from file |
+| `--log-level` | `-l` | Set log level (debug, info, warn, error) |
 
-# Check version
-print(pynlm.__version__)
+### Phase-Specific Arguments
 
-# Create a simple brain
-config = pynlm.createDefaultConfig()
-brain = pynlm.createBrain(config)
-print(f"Neurons: {brain.getTotalNeuronCount()}")
+#### Phase 3: World Interaction
+
+```bash
+# Run with custom episode and step counts
+nlm --phase=3 10 500  # 10 episodes, 500 steps each
+nlm --phase=3 --episodes=20 --steps-per-episode=300
+```
+
+#### Phase 4: Emerging Cognition
+
+```bash
+# Run with custom trial count
+nlm --phase=4 100  # 100 trials
+nlm --phase=4 --trials=200
+```
+
+#### Configuration Files
+
+Create a configuration file `my_config.cfg`:
+
+```
+# NLM Configuration File
+neuron_count = 1000
+region_count = 2
+connection_probability = 0.1
+random_seed = 42
+simulation_timestep = 0.001
+stdp_ltp_weight = 0.01
+stdp_ltd_weight = 0.012
+```
+
+Load the configuration:
+
+```bash
+nlm --config=my_config.cfg
+```
+
+### Advanced Usage
+
+#### Running Multiple Phases
+
+```bash
+# Run all phases
+nlm --phase=all
+
+# Run Phase 2 and Phase 3 sequentially
+nlm --phase=2
+nlm --phase=3 5 200
+```
+
+#### Performance Monitoring
+
+```bash
+# Enable verbose output
+nlm --verbose
+
+# Enable debug mode
+nlm --debug
+
+# Enable both
+nlm --verbose --debug
+```
+
+#### Log Level Control
+
+```bash
+# Set log level
+nlm --log-level=debug
+nlm --log-level=info
+nlm --log-level=warn
+nlm --log-level=error
+```
+
+### Command-Line Reference
+
+```bash
+# Basic usage
+nlm [OPTIONS] [ARGUMENTS]
+
+# Examples
+nlm                                    # Default Phase 2
+nlm --phase=3 10 500                   # Phase 3 with custom args
+nlm --phase=4 --trials=200             # Phase 4 with custom trials
+nlm --config=my_config.cfg             # Load configuration
+nlm --help                             # Show help
+nlm --version                          # Show version
+nlm --verbose --debug                  # Enable verbose and debug
 ```
 
 ---
@@ -229,7 +310,7 @@ def run_agent_simulation(num_steps=1000):
     # 7. Run simulation loop
     for step in range(num_steps):
         # Update world
-        world.update(timestep=0.1)
+        world.update(0.1)
         
         # Get sensory input from world
         percept = world.getSensoryPercept()
@@ -295,10 +376,6 @@ brain.getExcitationInhibitionRatio()  # E/I balance
 # State
 brain.save("checkpoint.bin")       # Save state
 brain.load("checkpoint.bin")       # Load state
-
-# Regions
-region_id = brain.addRegion("cortex")
-region = brain.getRegion(region_id)
 ```
 
 #### Config Class
@@ -540,3 +617,12 @@ pip install --force-reinstall .
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture overview
 - [SCIENCE.md](docs/SCIENCE.md) - Scientific background
 - [EXPERIMENTS.md](docs/EXPERIMENTS.md) - Experiment descriptions
+- [PERFORMANCE.md](docs/PERFORMANCE.md) - Performance analysis
+
+## License
+
+MIT
+
+## Authors
+
+Research project — See docs for scientific background.
