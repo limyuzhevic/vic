@@ -46,6 +46,11 @@ public:
     // Parameters
     void setMembraneTimeConstant(float tau);
     float getMembraneTimeConstant() const;
+    void setMembraneResistance(float R);
+    float getMembraneResistance() const;
+    
+    // Configuration
+    void configure(const std::shared_ptr<Config>& config);
     
 private:
     struct Impl;
@@ -64,7 +69,7 @@ public:
     void reset() override {}
 };
 
-// FitzHugh-Nagumo dynamics (simplified兴奋性模型)
+// FitzHugh-Nagumo dynamics (simplified excitation model)
 // TODO PHASE 2: Implement FHN dynamics
 class FitzHughNagumoDynamics : public NeuralDynamics {
 public:

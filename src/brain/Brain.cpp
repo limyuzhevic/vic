@@ -188,6 +188,12 @@ Brain& Brain::operator=(Brain&& other) noexcept {
 
 bool Brain::initialize() {
     NLM_LOG_INFO("Initializing NLM Brain (Phase 6: Integrated Artificial Brain)...");
+    
+    // Validate configuration
+    if (!pImpl->config) {
+        NLM_LOG_ERROR("Configuration is not set");
+        return false;
+    }
 
     // Re-initialising must rebuild, not append: a previous run left
     // reset()+initialize() reporting 1000 neurons for a 500-neuron brain.
@@ -371,6 +377,10 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     pImpl->totalSpikesThisStep = 0;
     
     // ========== STEP 1: Process pending delayed spikes (deliver synaptic input) ==========
+    if (!pImpl->spikeSystem) {
+        NLM_LOG_ERROR("Spike system is not initialized");
+        return;
+    }
     pImpl->spikeSystem->processDelayedSpikes(currentStep, currentTime);
     
     // ========== STEP 2: Update all neurons (LIF dynamics) ==========
@@ -680,9 +690,13 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     }
     
     // ========== STEP 14: Periodic memory consolidation ==========
-    if (currentStep % pImpl->consolidationInterval == 0 && pImpl->episodicMemory) {
-        // Consolidate important memories, remove weak ones
-        pImpl->episodicMemory->consolidate(0.3f);
+    if (currentStep % pImpl->consolidationInterval == 0) {
+        if (!pImpl->episodicMemory) {
+            NLM_LOG_WARNING("Episodic memory is not initialized");
+        } else {
+            // Consolidate important memories, remove weak ones
+            pImpl->episodicMemory->consolidate(0.3f);
+        }
     }
     
     // ========== STEP 15: Checkpoint management ==========

@@ -157,8 +157,18 @@ void NeuralWorkingMemory::update(TimestepDuration dt) {
     // Decay weak traces
     decayWeakTraces();
     
-    // Run competition to select winners
+    // Run competition to select winners and update active traces
     runCompetition();
+    
+    // After competition, rebuild active traces to ensure consistency
+    // between memory content and active trace list
+    std::vector<size_t> newActiveTraces;
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) {
+            newActiveTraces.push_back(i);
+        }
+    }
+    activeTraces_ = newActiveTraces;
 }
 
 void NeuralWorkingMemory::clear() {
