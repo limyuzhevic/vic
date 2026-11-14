@@ -55,6 +55,7 @@ cmake.args = [
 
 [tool.scikit-build.cmake.define]
 NLM_SOURCE_DIR = "src"
+NLM_BUILD_PYTHON_BINDINGS = "ON"  # Ensure CMake builds Python module
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

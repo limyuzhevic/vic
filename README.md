@@ -84,10 +84,40 @@ Phase 6 focuses on integrating all existing systems into a coherent artificial b
 
 ## Building
 
+### C++ Development
+
 ```bash
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+```
+
+### Python Package (pip install)
+
+```bash
+pip install .
+# or for development:
+pip install -e .
+```
+
+### Build Options
+
+To disable Python bindings in CMake builds (useful for pure C++ development):
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_BUILD_PYTHON_BINDINGS=OFF
+make -j4
+```
+
+To enable Python bindings explicitly in CMake builds:
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DNLM_BUILD_PYTHON_BINDINGS=ON
 make -j4
 ```
 
