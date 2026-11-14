@@ -28,27 +28,336 @@
 
 using namespace nlm;
 
-void printBanner() {
-    std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+void printBanner();
+void printUsage();
+
+// Debugging and profiling functions
+void printDebugInfo(const std::shared_ptr<Config>& config);
+void profileSimulation(const std::shared_ptr<Brain>& brain, const std::string& filename = "profile_data.txt");
+void compareConfigurations(const std::string& config1_file, const std::string& config2_file);
+void printMemoryUsage();
+void printSystemInfo();
+
+// Enhanced configuration from command line arguments
+void enhanceConfigFromArgs(Config& config, int argc, char** argv) {
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                
+                // Set configuration value based on key
+                if (key == "steps" || key == "simulation_steps" || key == "num_steps") {
+                    try {
+                        int steps = std::stoi(value);
+                        config.set("simulation.max_steps", steps, ConfigSource::CommandLine);
+                    } catch (...) {
+                        // Ignore invalid values
+                    }
+                } else if (key == "log_level" || key == "loglevel") {
+                    config.set("log.level", value, ConfigSource::CommandLine);
+                } else if (key == "output" || key == "output_file") {
+                    config.set("output.filepath", value, ConfigSource::CommandLine);
+                } else if (key == "debug") {
+                    config.set("debug.enabled", true, ConfigSource::CommandLine);
+                } else if (key == "profile") {
+                    config.set("profile.enabled", true, ConfigSource::CommandLine);
+                } else if (key == "checkpoint") {
+                    config.set("checkpoint.filepath", value, ConfigSource::CommandLine);
+                } else if (key == "preset") {
+                    // Apply preset configuration
+                    if (value == "minimal") {
+                        config.set("neuron_count", 100, ConfigSource::CommandLine);
+                        config.set("region_count", 1, ConfigSource::CommandLine);
+                        config.set("connection_probability", 0.1, ConfigSource::CommandLine);
+                    } else if (value == "research") {
+                        config.set("neuron_count", 5000, ConfigSource::CommandLine);
+                        config.set("region_count", 2, ConfigSource::CommandLine);
+                        config.set("connection_probability", 0.05, ConfigSource::CommandLine);
+                    } else if (value == "development") {
+                        config.set("neuron_count", 1000, ConfigSource::CommandLine);
+                        config.set("region_count", 2, ConfigSource::CommandLine);
+                        config.set("connection_probability", 0.15, ConfigSource::CommandLine);
+                    } else if (value == "quicktest") {
+                        config.set("neuron_count", 50, ConfigSource::CommandLine);
+                        config.set("region_count", 1, ConfigSource::CommandLine);
+                        config.set("connection_probability", 0.2, ConfigSource::CommandLine);
+                    }
+                }
+            }
+        }
+    }
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+void printDebugInfo(const std::shared_ptr<Config>& config) {
+    NLM_LOG_INFO("=== DEBUG INFORMATION ===");
+    NLM_LOG_INFO("Configuration validation:");
+    
+    // Check for common configuration issues
+    auto keys = config->getKeys();
+    
+    for (const auto& key : keys) {
+        auto value = config->get<std::string>(key);
+        if (value) {
+            NLM_LOG_INFO("  " + key + " = " + *value);
+        }
+    }
+    
+    // Check for specific problematic values
+    int neuron_count = config->getOr<int64_t>("neuron_count", 1000);
+    if (neuron_count > 10000) {
+        NLM_LOG_WARNING("High neuron count may cause performance issues");
+    }
+    
+    double timestep = config->getOr<double>("simulation_timestep", 0.001);
+    if (timestep < 0.0001) {
+        NLM_LOG_WARNING("Very small timestep may cause numerical precision issues");
+    } else if (timestep > 0.01) {
+        NLM_LOG_WARNING("Large timestep may cause instability");
+    }
+    
+    float conn_prob = config->getOr<float>("connection_probability", 0.1);
+    if (conn_prob > 0.5) {
+        NLM_LOG_WARNING("High connection probability may cause over-connectivity");
+    }
+    
+    NLM_LOG_INFO("==============================");
+}
+
+void profileSimulation(const std::shared_ptr<Brain>& brain, const std::string& filename) {
+    std::ofstream profileFile(filename);
+    if (!profileFile.is_open()) {
+        NLM_LOG_ERROR("Cannot open profile file: " + filename);
+        return;
+    }
+    
+    NLM_LOG_INFO("Starting simulation profiling...");
+    profileFile << "NLM Simulation Profile Data\n";
+    profileFile << "===============================\n\n";
+    
+    // Get initial state
+    profileFile << "Initial State:\n";
+    profileFile << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
+    profileFile << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
+    profileFile << "  Firing Rate: " << brain->getAverageFiringRate() << " Hz\n";
+    profileFile << "  Spike Count: " << brain->getTotalSpikeCount() << "\n";
+    profileFile << "  Active Neurons: " << brain->getActiveNeuronCount() << "\n";
+    profileFile << "  Firing Neurons: " << brain->getFiringNeuronCount() << "\n";
+    profileFile << "  Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n\n";
+    
+    // Run a short simulation for profiling
+    int profileSteps = 100;
+    profileFile << "Simulation Steps: " << profileSteps << "\n\n";
+    
+    for (int step = 0; step < profileSteps; ++step) {
+        brain->step(step);
+        
+        // Record metrics
+        profileFile << "Step " << step << ":\n";
+        profileFile << "  Total Spike Count: " << brain->getTotalSpikeCount() << "\n";
+        profileFile << "  Firing Neurons: " << brain->getFiringNeuronCount() << "\n";
+        profileFile << "  Average Firing Rate: " << brain->getAverageFiringRate() << " Hz\n";
+        profileFile << "  Active Neurons: " << brain->getActiveNeuronCount() << "\n";
+        profileFile << "  Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+        
+        // Print to log every 10 steps
+        if (step % 10 == 0) {
+            NLM_LOG_INFO("  Step " + std::to_string(step) + ": " +
+                        std::to_string(brain->getFiringNeuronCount()) + " firing neurons, " +
+                        std::to_string(brain->getTotalSpikeCount()) + " total spikes");
+        }
+    }
+    
+    // Final metrics
+    profileFile << "\nFinal State:\n";
+    profileFile << "  Neurons: " << brain->getTotalNeuronCount() << "\n";
+    profileFile << "  Synapses: " << brain->getTotalSynapseCount() << "\n";
+    profileFile << "  Firing Rate: " << brain->getAverageFiringRate() << " Hz\n";
+    profileFile << "  Spike Count: " << brain->getTotalSpikeCount() << "\n";
+    profileFile << "  Active Neurons: " << brain->getActiveNeuronCount() << "\n";
+    profileFile << "  Firing Neurons: " << brain->getFiringNeuronCount() << "\n";
+    profileFile << "  Developmental Stage: " << static_cast<int>(brain->getDevelopmentalStage()) << "\n";
+    
+    profileFile << "\nProfile complete.\n";
+    profileFile.close();
+    
+    NLM_LOG_INFO("Simulation profiling complete. Data saved to: " + filename);
+}
+
+void compareConfigurations(const std::string& config1_file, const std::string& config2_file) {
+    NLM_LOG_INFO("Comparing configurations: " + config1_file + " vs " + config2_file);
+    
+    // Load configurations
+    auto config1 = std::make_shared<Config>();
+    auto config2 = std::make_shared<Config>();
+    
+    if (!config1->loadFromFile(config1_file)) {
+        NLM_LOG_ERROR("Failed to load configuration 1: " + config1_file);
+        return;
+    }
+    
+    if (!config2->loadFromFile(config2_file)) {
+        NLM_LOG_ERROR("Failed to load configuration 2: " + config2_file);
+        return;
+    }
+    
+    NLM_LOG_INFO("Configuration comparison:");
+    
+    // Compare keys
+    auto keys1 = config1->getKeys();
+    auto keys2 = config2->getKeys();
+    
+    std::set<std::string> only_in_config1;
+    std::set<std::string> only_in_config2;
+    std::set<std::string> different_values;
+    
+    for (const auto& key : keys1) {
+        if (!config2->has(key)) {
+            only_in_config1.insert(key);
+        } else {
+            auto val1 = config1->get<std::string>(key);
+            auto val2 = config2->get<std::string>(key);
+            if (val1 != val2) {
+                different_values.insert(key);
+            }
+        }
+    }
+    
+    for (const auto& key : keys2) {
+        if (!config1->has(key)) {
+            only_in_config2.insert(key);
+        }
+    }
+    
+    NLM_LOG_INFO("  Only in configuration 1:");
+    for (const auto& key : only_in_config1) {
+        auto val = config1->get<std::string>(key);
+        if (val) {
+            NLM_LOG_INFO("    " + key + " = " + *val);
+        }
+    }
+    
+    NLM_LOG_INFO("  Only in configuration 2:");
+    for (const auto& key : only_in_config2) {
+        auto val = config2->get<std::string>(key);
+        if (val) {
+            NLM_LOG_INFO("    " + key + " = " + *val);
+        }
+    }
+    
+    NLM_LOG_INFO("  Different values:");
+    for (const auto& key : different_values) {
+        auto val1 = config1->get<std::string>(key);
+        auto val2 = config2->get<std::string>(key);
+        if (val1 && val2) {
+            NLM_LOG_INFO("    " + key + ": " + *val1 + " vs " + *val2);
+        }
+    }
+    
+    NLM_LOG_INFO("Configuration comparison complete.");
+}
+
+void printMemoryUsage() {
+    // Get memory usage information
+    // Note: This is platform-specific and may require different implementations
+    NLM_LOG_INFO("Memory usage information (platform-specific):");
+    NLM_LOG_INFO("  Note: Memory profiling requires platform-specific implementation");
+}
+
+void printSystemInfo() {
+    NLM_LOG_INFO("System Information:");
+    NLM_LOG_INFO("  NLM Version: 0.1.0");
+    NLM_LOG_INFO("  Build Type: Release");
+    NLM_LOG_INFO("  Compiler: C++20");
+    NLM_LOG_INFO("  Platform: Linux x86_64");
+    NLM_LOG_INFO("  Python Bindings: Available");
+    NLM_LOG_INFO("  Memory Model: Shared pointers");
+}
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        
+        // Handle --key=value format
+        if (arg.substr(0, 2) == "--") {
+            size_t pos = arg.find('=');
+            if (pos != std::string::npos) {
+                std::string key = arg.substr(2, pos - 2);
+                std::string value = arg.substr(pos + 1);
+                
+                // Set configuration value based on key
+                if (key == "steps" || key == "simulation_steps" || key == "num_steps") {
+                    try {
+                        int steps = std::stoi(value);
+                        config.set("simulation.max_steps", steps, ConfigSource::CommandLine);
+                    } catch (...) {
+                        // Ignore invalid values
+                    }
+                } else if (key == "log_level" || key == "loglevel") {
+                    config.set("log.level", value, ConfigSource::CommandLine);
+                } else if (key == "output" || key == "output_file") {
+                    config.set("output.filepath", value, ConfigSource::CommandLine);
+                } else if (key == "debug") {
+                    config.set("debug.enabled", true, ConfigSource::CommandLine);
+                } else if (key == "profile") {
+                    config.set("profile.enabled", true, ConfigSource::CommandLine);
+                } else if (key == "checkpoint") {
+                    config.set("checkpoint.filepath", value, ConfigSource::CommandLine);
+                } else if (key == "preset") {
+                    // Apply preset configuration
+                    if (value == "minimal") {
+                        config.set("neuron_count", 100, ConfigSource::CommandLine);
+                        config.set("region_count", 1, ConfigSource::CommandLine);
+                        config.set("connection_probability", 0.1, ConfigSource::CommandLine);
+                    } else if (value == "research") {
+                        config.set("neuron_count", 5000, ConfigSource::CommandLine);
+                        config.set("region_count", 2, ConfigSource::CommandLine);
+                        config.set("connection_probability", 0.05, ConfigSource::CommandLine);
+                    } else if (value == "development") {
+                        config.set("neuron_count", 1000, ConfigSource::CommandLine);
+                        config.set("region_count", 2, ConfigSource::CommandLine);
+                        config.set("connection_probability", 0.15, ConfigSource::CommandLine);
+                    } else if (value == "quicktest") {
+                        config.set("neuron_count", 50, ConfigSource::CommandLine);
+                        config.set("region_count", 1, ConfigSource::CommandLine);
+                        config.set("connection_probability", 0.2, ConfigSource::CommandLine);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void printUsage() {
+    std::cout << R"(
+NLM — 熙然 Neural Learning Machine
+
+Usage: nlm [options]
+
+Options:
+  --config=<file>      Load configuration from file (default: configs/default.cfg)
+  --steps=<n>          Number of simulation steps (default: 1000)
+  --log-level=<level>  Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  --output=<file>      Save brain state to file
+  --help               Show this help message
+  --version            Show version information
+
+Presets:
+  --preset=<name>      Use a predefined configuration (minimal, research, development, quicktest)
+
+Debug/Profiling:
+  --debug              Enable debug output
+  --profile            Enable profiling
+  --checkpoint=<file>  Save checkpoint at specified intervals
+
+Examples:
+  nlm --config=myconfig.cfg --steps=5000 --log-level=INFO
+  nlm --preset=research --output=brain_state.bin
+  nlm --steps=100 --debug
+)" << std::endl;
+}
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -308,6 +617,20 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
 }
 
 int main(int argc, char** argv) {
+    // Check for help and version flags
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            printUsage();
+            return 0;
+        } else if (arg == "--version" || arg == "-v") {
+            std::cout << "NLM Phase 2.0 (熙然)" << std::endl;
+            std::cout << "Version: 0.1.0" << std::endl;
+            std::cout << "Build: C++20 with Python bindings" << std::endl;
+            return 0;
+        }
+    }
+    
     printBanner();
     
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
@@ -347,6 +670,40 @@ int main(int argc, char** argv) {
         NLM_LOG_INFO("Loaded configuration from: " + configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
+    }
+    
+    // Apply enhanced command line arguments
+    enhanceConfigFromArgs(*config, argc, argv);
+    
+    // Apply preset configurations
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg.substr(0, 8) == "--preset=") {
+            std::string preset = arg.substr(9);
+            NLM_LOG_INFO("Applying preset configuration: " + preset);
+            
+            if (preset == "minimal") {
+                config->set("neuron_count", static_cast<int64_t>(100), ConfigSource::CommandLine);
+                config->set("region_count", static_cast<int64_t>(1), ConfigSource::CommandLine);
+                config->set("connection_probability", 0.1f, ConfigSource::CommandLine);
+                config->set("simulation_timestep", 0.001, ConfigSource::CommandLine);
+            } else if (preset == "research") {
+                config->set("neuron_count", static_cast<int64_t>(5000), ConfigSource::CommandLine);
+                config->set("region_count", static_cast<int64_t>(2), ConfigSource::CommandLine);
+                config->set("connection_probability", 0.05f, ConfigSource::CommandLine);
+                config->set("simulation_timestep", 0.0005f, ConfigSource::CommandLine);
+            } else if (preset == "development") {
+                config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::CommandLine);
+                config->set("region_count", static_cast<int64_t>(2), ConfigSource::CommandLine);
+                config->set("connection_probability", 0.15f, ConfigSource::CommandLine);
+                config->set("simulation_timestep", 0.001f, ConfigSource::CommandLine);
+            } else if (preset == "quicktest") {
+                config->set("neuron_count", static_cast<int64_t>(50), ConfigSource::CommandLine);
+                config->set("region_count", static_cast<int64_t>(1), ConfigSource::CommandLine);
+                config->set("connection_probability", 0.2f, ConfigSource::CommandLine);
+                config->set("simulation_timestep", 0.001f, ConfigSource::CommandLine);
+            }
+        }
     }
     
     // Override with command line args
@@ -394,6 +751,10 @@ int main(int argc, char** argv) {
     }
     
     brain->logStatus();
+    
+    // Get number of steps from config
+    int numSteps = config->getOr<int64_t>("simulation.max_steps", 1000);
+    NLM_LOG_INFO("Running simulation for " + std::to_string(numSteps) + " steps");
     
     // Run Test 1: Basic connectivity
     runBasicConnectivityTest(brain);

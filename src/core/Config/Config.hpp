@@ -56,7 +56,7 @@ public:
     Config(Config&&) noexcept;
     Config& operator=(Config&&) noexcept;
     
-    // Load from file (JSON format)
+// Load from file (JSON format)
     bool loadFromFile(const std::string& filepath);
     
     // Load from command line arguments
@@ -66,11 +66,14 @@ public:
     bool saveToFile(const std::string& filepath) const;
     
     // Get values (defined here so templates instantiate in every TU)
-template<typename T>
+    template<typename T>
     std::optional<T> get(const std::string& key) const;
 
     template<typename T>
     T getOr(const std::string& key, const T& defaultValue) const;
+    
+    // Internal helper for JSON parsing
+    bool parseJsonFile(const std::string& filepath);
 
     // Set values
     void set(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
@@ -94,6 +97,11 @@ template<typename T>
     
     // Get configuration summary
     std::string summary() const;
+    
+    // Configuration validation
+    bool validateKey(const std::string& key) const;
+    bool validateValue(const std::string& key, const ConfigValue& value) const;
+    void setWithValidation(const std::string& key, const ConfigValue& value, ConfigSource source = ConfigSource::Runtime);
     
 private:
     struct Impl;
