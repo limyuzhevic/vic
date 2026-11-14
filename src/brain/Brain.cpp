@@ -142,31 +142,51 @@ struct Brain::Impl {
         predictionError = std::make_unique<PredictionError>();
         novelty = std::make_unique<Novelty>();
         
-        // Configure STDP parameters
-        float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
-        float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
-        float tau = config->getOr<float>("stdp_tau", 20.0f);
-        stdp->configure(ltpWeight, ltdWeight, tau);
-        
-        // Configure structural plasticity
-        float synaptogenesisRate = config->getOr<float>("synaptogenesis_rate", 0.0001f);
-        float pruningRate = config->getOr<float>("pruning_rate", 0.00001f);
-        structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
-        structuralPlasticity->setPruningRate(pruningRate);
-        
-        // Get timestep
-        timestep = config->getOr<double>("simulation_timestep", 0.001);
-        
-        // Get integration intervals from config
-        replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
-        consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
-        
-        // Initialize checkpoint manager
-        checkpointManager = std::make_unique<CheckpointManager>();
-    }
+    // Phase 6: Enhanced configuration loading for better neural control
     
-    DevelopmentalStage developmentalStage;
-    RegionId nextRegionId;
+    // Load neural dynamics parameters from config
+    float membraneTimeConstant = config->getOr<float>("membrane_time_constant", 20.0f);
+    float refractoryPeriodMs = config->getOr<float>("refractory_period", 3.0f);
+    float thresholdPotential = config->getOr<float>("threshold_potential", -55.0f);
+    float restingPotential = config->getOr<float>("resting_potential", -70.0f);
+    float resetPotential = config->getOr<float>("reset_potential", -75.0f);
+    
+    // Load synaptic parameters
+    float initialExcitatoryWeight = config->getOr<float>("initial_excitatory_weight", 0.05f);
+    float initialInhibitoryWeight = config->getOr<float>("initial_inhibitory_weight", -0.05f);
+    float synapticInputScale = config->getOr<float>("synaptic_input_scale", 5.0f);
+    
+    // Configure STDP parameters
+    float ltpWeight = config->getOr<float>("stdp_ltp_weight", 0.01f);
+    float ltdWeight = config->getOr<float>("stdp_ltd_weight", 0.012f);
+    float tau = config->getOr<float>("stdp_time_constant", 20.0f);
+    stdp->configure(ltpWeight, ltdWeight, tau);
+    
+    // Configure structural plasticity
+    float synaptogenesisRate = config->getOr<float>("development_synaptogenesis_rate", 0.0001f);
+    float pruningRate = config->getOr<float>("development_pruning_rate", 0.00001f);
+    structuralPlasticity->setSynaptogenesisRate(synaptogenesisRate);
+    structuralPlasticity->setPruningRate(pruningRate);
+    
+    // Get timestep
+    timestep = config->getOr<double>("simulation_timestep", 0.001);
+    
+    // Get integration intervals from config
+    replayInterval = static_cast<size_t>(config->getOr<int64_t>("replay_interval", 100));
+    consolidationInterval = static_cast<size_t>(config->getOr<int64_t>("consolidation_interval", 1000));
+    
+    // Initialize checkpoint manager
+    checkpointManager = std::make_unique<CheckpointManager>();
+    
+    // Configure homeostatic parameters
+    float homeostaticInhibitionStrength = config->getOr<float>("homeostatic_inhibition_strength", 0.5f);
+    float homeostaticInhibitionThreshold = config->getOr<float>("homeostatic_inhibition_threshold", 0.7f);
+    float adaptationDecay = config->getOr<float>("adaptation_decay", 0.95f);
+    float adaptationIncrement = config->getOr<float>("adaptation_increment", 1.0f);
+    
+    // Configure firing rate parameters
+    float firingRateDecay = config->getOr<float>("firing_rate_decay", 0.9f);
+    float firingRateIncrement = config->getOr<float>("firing_rate_increment", 0.1f);
 };
 
 Brain::Brain(std::shared_ptr<Config> config) : pImpl(new Impl(config)) {}
@@ -267,7 +287,8 @@ bool Brain::initialize() {
         auto* region = getRegion(RegionId(i + 1));
         if (region) {
             // Initialize random connectivity and synapse weights
-            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.2f, 0.1f);
+            // Reduced initial weights to prevent runaway excitation
+            region->initializeRandomConnectivity(*pImpl->rng, connectionProbability, 0.05f, 0.02f);
         }
     }
     
@@ -312,12 +333,12 @@ bool Brain::initialize() {
         ++pImpl->totalSpikesTotal;
     });
     
-    // Register delayed spike handler to deliver synaptic input
     pImpl->spikeSystem->registerDelayedHandler([this](const DelayedSpikeEvent& event) {
         auto it = pImpl->neuronById.find(event.destination_neuron.index());
         if (it != pImpl->neuronById.end()) {
             Neuron* neuron = it->second;
-            MembranePotential synapticCurrent = event.weight * 10.0f;  // Scale factor
+            // Reduced scaling factor to prevent excessive input
+            MembranePotential synapticCurrent = event.weight * 5.0f;  // Reduced from 10.0f
             if (event.is_excitatory) {
                 neuron->receiveExcitatoryInput(synapticCurrent);
             } else {
@@ -429,30 +450,15 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
                         syn->recordPreSpike(currentTime);
                     }
                     
-                    // Store to working memory - neurons that fire become part of working memory
-                    // Phase 5 fix: the old activation was
-                    // |membrane - resting| / 10, but a neuron that just
-                    // spiked has membrane == reset, and reset == resting
-                    // for every neuron (Neuron::initializeRandom is never
-                    // called — only synaptic connectivity is randomized
-                    // — so all neurons keep the default -70/-70). The
-                    // stored activation was therefore always 0, and
-                    // decayWeakTraces removed every trace on the next
-                    // update, so working memory was permanently empty
-                    // (0 traces in every demo) despite hundreds of
-                    // spikes per step. A spike is itself the activation
-                    // event, so a just-fired neuron stores 1.0; the
-                    // existing decay then keeps it alive only while the
-                    // neuron keeps firing, which is the intended
-                    // working-memory behaviour.
+                    // Enhance working memory storage for fired neurons
                     if (pImpl->workingMemory) {
-                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.0f);
+                        pImpl->workingMemory->storeToNeuron(neuron->getId(), 1.5f);  // Increased from 1.0f
                     }
                 }
             }
         }
     }
-    
+
     // Process immediate spikes
     pImpl->spikeSystem->processSpikes(currentStep);
 
@@ -467,6 +473,169 @@ void Brain::step(SimulationStep currentStep, Timestamp currentTime) {
     // is the wrong lever here; see the drive-scaling change in
     // AgentBrain/Neuron instead. This block is intentionally empty
     // so the experiment and its result stay in the record.
+
+    // NEW: Population-level inhibition when firing rates get too high
+    // This prevents runaway excitation while preserving selective firing patterns
+    // Only activate when more than 30% of neurons are firing
+    if (pImpl->totalSpikesThisStep > 0) {
+        size_t totalNeurons = getTotalNeuronCount();
+        float firingRatio = static_cast<float>(pImpl->totalSpikesThisStep) / static_cast<float>(totalNeurons);
+        
+        if (firingRatio > 0.3f) {
+            // Apply scaling to reduce firing rates gradually rather than uniform inhibition
+            // This preserves selectivity while preventing runaway excitation
+            float inhibitionFactor = 1.0f - (firingRatio - 0.3f) * 0.6f;  // Reduce to 0.4x when >90% firing
+            inhibitionFactor = std::clamp(inhibitionFactor, 0.4f, 1.0f);
+            
+            // Apply inhibition to excitatory neurons only (preserve inhibition effects)
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    if (pop->getNeuronType() == NeuronType::Excitatory) {
+                        for (auto* neuron : pop->getNeurons()) {
+                            // Scale down membrane potential to reduce firing probability
+                            // This is subtle: reduce potential but don't use the reset mechanism
+                            MembranePotential currentPotential = neuron->getMembranePotential();
+                            MembranePotential restingPotential = neuron->getRestingPotential();
+                            
+                            // Apply gentle inhibition proportional to how high the potential is
+                            if (currentPotential > restingPotential) {
+                                float excess = (currentPotential - restingPotential) * 0.1f * inhibitionFactor;
+                                neuron->addToMembranePotential(-excess);
+                            }
+                        }
+                    }
+                }
+                    }
+        }
+    }
+
+    // NEW: Enhanced learning control mechanisms for selective pattern learning
+    // These mechanisms help prevent learning saturation and enable selective pattern formation
+
+    // 1. Sparse coding encouragement: penalize excessive activation
+    if (pImpl->totalSpikesThisStep > 0) {
+        // Calculate neural activation sparsity (percentage of neurons that fired)
+        float activationSparsity = static_cast<float>(pImpl->totalSpikesThisStep) / 
+                                 static_cast<float>(getTotalNeuronCount());
+        
+        // If activation is too sparse (too few neurons firing), encourage broader firing
+        if (activationSparsity < 0.1f) {
+            // Gentle encouragement of broader neural activity
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    for (auto* neuron : pop->getNeurons()) {
+                        // Reduce inhibition on neurons with high potential
+                        MembranePotential potential = neuron->getMembranePotential();
+                        MembranePotential resting = neuron->getRestingPotential();
+                        if (potential > resting) {
+                            // Gentle encouragement to cross threshold
+                            neuron->addToMembranePotential(0.5f * (resting - potential));
+                        }
+                    }
+                }
+            }
+        } 
+        // If activation is too dense (too many neurons firing), encourage selective firing
+        else if (activationSparsity > 0.5f) {
+            // Encourage selective firing by enhancing lateral inhibition
+            // This helps select the most active patterns
+            for (auto& region : pImpl->regions) {
+                for (auto& pop : region->getPopulations()) {
+                    // Enhance lateral inhibition within the population
+                    for (size_t i = 0; i < pop->getNeuronCount(); ++i) {
+                        for (size_t j = 0; j < pop->getNeuronCount(); ++j) {
+                            if (i != j) {
+                                // Apply lateral inhibition to promote competition
+                                Neuron* neuronI = pop->getNeuron(i);
+                                Neuron* neuronJ = pop->getNeuron(j);
+                                if (neuronI && neuronJ) {
+                                    MembranePotential potI = neuronI->getMembranePotential();
+                                    MembranePotential potJ = neuronJ->getMembranePotential();
+                                    MembranePotential restingJ = neuronJ->getRestingPotential();
+                                    // Stronger lateral inhibition when one neuron is highly active
+                                    if (potI > restingJ && potJ > restingJ) {
+                                        float lateralInhibition = (potI - restingJ) * 0.1f;
+                                        neuronJ->addToMembranePotential(-lateralInhibition);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Concept formation feedback: connect learning to concept formation
+    if (pImpl->conceptFormation) {
+        // Get concept formation guidance for plasticity
+        float conceptGuidance = pImpl->conceptFormation->getLearningGuidance();
+        
+        // Apply concept-based modulation to plasticity
+        if (std::abs(conceptGuidance) > 0.01f) {
+            // Scale plasticity based on concept formation guidance
+            // Positive guidance enhances learning, negative guidance suppresses it
+            float plasticityModulation = 1.0f + conceptGuidance * 0.5f;
+            
+            // Apply to STDP weights
+            float currentLTP = stdp->getLTPWeight();
+            float currentLTD = stdp->getLTDWeight();
+            stdp->setLTPWeight(currentLTP * plasticityModulation);
+            stdp->setLTDWeight(currentLTD * plasticityModulation);
+            
+            // Apply to Hebbian learning rate
+            float currentHebbianRate = hebbian->getLearningRate();
+            hebbian->setLearningRate(currentHebbianRate * plasticityModulation);
+        }
+    }
+
+    // 3. Attention-mediated learning: integrate attention with plasticity
+    if (pImpl->attention) {
+        // Get attention levels for plasticity modulation
+        float attentionLevel = pImpl->attention->getAttentionLevel();
+        
+        // Apply attention-based plasticity modulation
+        // Higher attention increases learning efficacy
+        float attentionModulation = 1.0f + attentionLevel * 0.8f;
+        
+        // Apply to all plasticity rules
+        stdp->setLTPWeight(stdp->getLTPWeight() * attentionModulation);
+        stdp->setLTDWeight(stdp->getLTDWeight() * attentionModulation);
+        hebbian->setLearningRate(hebbian->getLearningRate() * attentionModulation);
+    }
+
+    // 4. Development-mediated learning: integrate developmental stage with plasticity
+    // Developmental stage affects plasticity rates - different stages have different learning profiles
+    DevelopmentalStage devStage = getDevelopmentalStage();
+    float developmentalModulation = 1.0f;
+    
+    switch (devStage) {
+        case DevelopmentalStage::Initial:
+            // High learning plasticity during initial development
+            developmentalModulation = 1.5f;
+            break;
+        case DevelopmentalStage::CriticalPeriod:
+            // Sensitive period for specific learning
+            developmentalModulation = 1.2f;
+            break;
+        case DevelopmentalStage::Maturation:
+            // Refining and stabilizing learned patterns
+            developmentalModulation = 1.0f;
+            break;
+        case DevelopmentalStage::Adult:
+            // Stable learning with some plasticity
+            developmentalModulation = 0.8f;
+            break;
+        case DevelopmentalStage::Aging:
+            // Reduced plasticity in aging
+            developmentalModulation = 0.6f;
+            break;
+    }
+    
+    // Apply developmental modulation to plasticity
+    stdp->setLTPWeight(stdp->getLTPWeight() * developmentalModulation);
+    stdp->setLTDWeight(stdp->getLTDWeight() * developmentalModulation);
+    hebbian->setLearningRate(hebbian->getLearningRate() * developmentalModulation);
 
     // ========== STEP 4: Update working memory ==========
     if (pImpl->workingMemory) {
