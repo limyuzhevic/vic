@@ -90,14 +90,12 @@ void NeuralWorkingMemory::storeToNeuron(NeuronId neuron, float activation) {
     // neuron is an active trace; decayWeakTraces() below removes
     // it again when its activation falls below threshold, and
     // clear()/restoreSnapshot() reset the list with the content.
-    if (it != memoryNeurons_.end()) {
-        size_t idx = std::distance(memoryNeurons_.begin(), it);
-        bool present = std::find(activeTraces_.begin(), activeTraces_.end(), idx) != activeTraces_.end();
-        if (activation > 0.1f && !present) activeTraces_.push_back(idx);
-        if (activation <= 0.1f && present) {
-            activeTraces_.erase(std::remove(activeTraces_.begin(), activeTraces_.end(), idx),
-                                activeTraces_.end());
-        }
+    // Rebuild activeTraces_ from current memory state when storing
+    // to ensure consistency (indices may become stale when neurons
+    // are removed later during decay).
+    activeTraces_.clear();
+    for (size_t i = 0; i < memoryActivations_.size(); ++i) {
+        if (memoryActivations_[i] > 0.1f) activeTraces_.push_back(i);
     }
     
     // Inject current to maintain activation
