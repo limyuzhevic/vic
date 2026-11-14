@@ -1,8 +1,12 @@
-#include "Config.hpp"
-#include <fstream>
-#include <sstream>
+#include <nlohmann/json.hpp>
+#include <yaml-cpp/yaml.h>
+#include <chrono>
+#include <ctime>
+#include <chrono>
+#include <vector>
 #include <algorithm>
-#include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 namespace nlm {
 
@@ -84,9 +88,43 @@ bool Config::saveToFile(const std::string& filepath) const {
         return false;
     }
     
+        // Helper function to format ConfigValue for file output
+    auto formatValue = [](const ConfigValue& value) {
+        std::ostringstream oss;
+        std::visit([&oss](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, std::string>) {
+                oss << "\"" << arg << "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<int>> ||
+                                 std::is_same_v<T, std::vector<double>> ||
+                                 std::is_same_v<T, std::vector<std::string>>) {
+                oss << "[";
+                for (size_t i = 0; i < arg.size(); ++i) {
+                    if (i) oss << ", ";
+                    if constexpr (std::is_same_v<T, std::vector<std::string>) && 
+                                 std::is_same_v<decltype(arg[0]), std::string>) {
+                        oss << "\"" << arg[i] << "\"";
+                    } else {
+                        oss << arg[i];
+                    }
+                }
+                oss << "]";
+            } else {
+                oss << arg;
+            }
+        }, value);
+        return oss.str();
+    };
+    
+        oss << arg;
+            }
+        }, value);
+        return oss.str();
+    };
+    
     for (const auto& entry : pImpl->entries) {
         file << "# " << entry.description << "\n";
-        file << entry.key << " = " << "PLACEHOLDER_VALUE\n";
+        file << entry.key << " = " << formatValue(entry.value) << "\n";
     }
     
     return true;

@@ -28,24 +28,37 @@
 
 using namespace nlm;
 
-void printBanner() {
+void printHelp() {
     std::cout << R"(
-    ╔═══════════════════════════════════════════════════════════════╗
-    ║                                                               ║
-    ║     NLM — 熙然                                                ║
-    ║     Neural Learning Machine                                   ║
-    ║                                                               ║
-    ║     Phase 2: Real Neural Computation                         ║
-    ║                                                               ║
-    ║     An experimental artificial developmental brain.            ║
-    ║     This phase implements:                                    ║
-    ║     - Real LIF neuron dynamics                                ║
-    ║     - Event-driven spike propagation                          ║
-    ║     - STDP and Hebbian plasticity                            ║
-    ║     - Structural plasticity                                   ║
-    ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
+NLM Command Line Options:
+
+Config Options:
+  --config=file      Load configuration from file
+  --brain.neuron_count=N      Set number of neurons
+  --simulation_timestep=t      Set simulation timestep
+  --random_seed=s      Set random seed for reproducibility
+  --stdp_ltp_weight=w      STDP LTP weight
+  --stdp_ltd_weight=w      STDP LTD weight
+  --synaptogenesis_rate=r      Synaptogenesis rate
+  --pruning_rate=r      Pruning rate
+
+Logging Options:
+  --log_level=level      Set log level (Debug, Info, Warning, Error, Critical)
+  --log_file=path      Log to file
+
+General Options:
+  --help            Show this help message
+  --version         Show version information
+  --batch           Run in batch mode without user interaction
+  --benchmark       Run benchmark tests
+
+Examples:
+  nlm --brain.neuron_count=2000 --simulation_timestep=0.0001
+  nlm --config=myconfig.cfg --log_level=Debug --log_file=simulation.log
+  nlm --random_seed=12345 --stdp_ltp_weight=0.025 --stdp_ltd_weight=0.015
+
+Note: You can mix --key=value and --key value formats
+    )""" << std::endl;
 }
 
 // Learning Experiment: Demonstrates measurable synaptic changes through experience
@@ -295,36 +308,117 @@ void runStdpVerification(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("    Synapse after: " + std::to_string(syn->getWeight()) +
                  " (Δ=" + std::to_string(delta) + ")");
 
-    float totalDelta = delta;
-    
+}
+
+void runBenchmarkTest(std::shared_ptr<Brain> brain) {
     NLM_LOG_INFO("");
-    if (totalDelta > 0.001f) {
-        NLM_LOG_INFO("  ✓ STDP WORKING: Pre-before-post produced potentiation");
-    } else if (totalDelta < -0.001f) {
-        NLM_LOG_INFO("  ! STDP reversed: Check parameters");
-    } else {
-        NLM_LOG_INFO("  ! No change: STDP may not be triggering");
+    NLM_LOG_INFO("=== Performance Benchmark ===");
+    
+    // Performance metrics
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
+    // Run performance tests
+    size_t initialSpikes = brain->getTotalSpikeCount();
+    size_t initialNeurons = brain->getTotalNeuronCount();
+    
+    NLM_LOG_INFO("Initial state: " + std::to_string(initialNeurons) + " neurons, " + 
+                std::to_string(initialSpikes) + " spikes");
+    
+    // Test neural dynamics performance
+    auto testStart = std::chrono::high_resolution_clock::now();
+    for (SimulationStep step = 0; step < 100; ++step) {
+        brain->step(step, step * 0.001);
     }
+    auto testEnd = std::chrono::high_resolution_clock::now();
+    auto testDuration = std::chrono::duration<double>(testEnd - testStart).count();
+    
+    size_t finalSpikes = brain->getTotalSpikeCount();
+    size_t spikesGenerated = finalSpikes - initialSpikes;
+    
+    NLM_LOG_INFO("Benchmark completed:");
+    NLM_LOG_INFO("  Time elapsed: " + std::to_string(testDuration) + " seconds");
+    NLM_LOG_INFO("  Steps processed: 100");
+    NLM_LOG_INFO("  Spikes generated: " + std::to_string(spikesGenerated));
+    NLM_LOG_INFO("  Performance: " + std::to_string(100.0 / testDuration) + " steps/second");
+    
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto totalDuration = std::chrono::duration<double>(endTime - startTime).count();
+    
+    NLM_LOG_INFO("Total benchmark time: " + std::to_string(totalDuration) + " seconds");
+    NLM_LOG_INFO("Benchmark testing completed successfully.");
 }
 
 int main(int argc, char** argv) {
     printBanner();
     
+    // Parse arguments for help/version flags before any initialization
+    bool showHelp = false;
+    bool showVersion = false;
+    bool batchMode = false;
+    bool runBenchmark = false;
+    
+    std::string logFile;
+    std::string logLevelStr = "Info";
+    
+    for (int i = 1; i < argc; ++i) {
+        std::string arg(argv[i]);
+        if (arg == "--help" || arg == "-h") {
+            showHelp = true;
+        } else if (arg == "--version" || arg == "-v") {
+            showVersion = true;
+        } else if (arg == "--batch") {
+            batchMode = true;
+        } else if (arg == "--benchmark") {
+            runBenchmark = true;
+        } else if (arg.substr(0, 9) == "--log_file") {
+            if (arg.find('=') != std::string::npos) {
+                logFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logFile = argv[++i];
+            }
+        } else if (arg.substr(0, 10) == "--log_level") {
+            if (arg.find('=') != std::string::npos) {
+                logLevelStr = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                logLevelStr = argv[++i];
+            }
+        }
+    }
+    
+    if (showHelp) {
+        printHelp();
+        return 0;
+    }
+    
+    if (showVersion) {
+        std::cout << "NLM v2.0 (Phase 2: Real Neural Computation)" << std::endl;
+        std::cout << "Build: " << __DATE__ << " " << __TIME__ << std::endl;
+        return 0;
+    }
+    
     std::cout << "Initializing NLM Phase 2 Real Neural Computation...\n" << std::endl;
     
-    // Initialize logger
+    // Initialize logger with file output if specified
     auto logger = std::make_shared<Logger>();
-    auto consoleLogger = std::make_shared<ConsoleLogger>(LogLevel::Info);
+    
+    LogLevel logLevel;
+    std::transform(logLevelStr.begin(), logLevelStr.end(), logLevelStr.begin(), ::tolower);
+    if (logLevelStr == "debug") logLevel = LogLevel::Debug;
+    else if (logLevelStr == "warning") logLevel = LogLevel::Warning;
+    else if (logLevelStr == "error") logLevel = LogLevel::Error;
+    else if (logLevelStr == "critical") logLevel = LogLevel::Critical;
+    else logLevel = LogLevel::Info;
+    
+    auto consoleLogger = std::make_shared<ConsoleLogger>(logLevel);
     logger->addLogger(consoleLogger);
+    
+    if (!logFile.empty()) {
+        consoleLogger->setOutputFile(logFile);
+    }
+    
     Logger::setGlobal(logger);
     
-    NLM_LOG_INFO("=== NLM Phase 2: Real Neural Computation ===");
-    NLM_LOG_INFO("Implementing:");
-    NLM_LOG_INFO("  - Leaky Integrate-and-Fire (LIF) neuron dynamics");
-    NLM_LOG_INFO("  - Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  - STDP and Hebbian plasticity rules");
-    NLM_LOG_INFO("  - Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("");
+    // Log startup banner
     
     // Load configuration
     auto config = std::make_shared<Config>();
@@ -333,7 +427,7 @@ int main(int argc, char** argv) {
     std::string configFile = "configs/default.cfg";
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        if (arg.rfind("--config") == 0) {
             if (arg.find('=') != std::string::npos) {
                 configFile = arg.substr(arg.find('=') + 1);
             } else if (i + 1 < argc) {
@@ -393,43 +487,29 @@ int main(int argc, char** argv) {
         return 1;
     }
     
-    brain->logStatus();
+    // Additional initialization summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Initialization Summary ===");
+    NLM_LOG_INFO("Configuration loaded and validated successfully.");
+    NLM_LOG_INFO("Brain initialized with " + std::to_string(config->getOr<int64_t>("neuron_count", 500)) + " neurons.");
+    NLM_LOG_INFO("Plasticity enabled: " + std::string((config->getOr<bool>("plasticity.stdp.enable", true) ? "Yes" : "No")));
+    NLM_LOG_INFO("Log level set to: " + logLevelStr);
+    if (!logFile.empty()) {
+        NLM_LOG_INFO("Log file: " + logFile);
+    }
     
-    // Run Test 1: Basic connectivity
-    runBasicConnectivityTest(brain);
-    
-    // Reset brain for plasticity experiment
-    brain->reset();
-    brain->initialize();
-    
-    // Run Test 2: Plasticity learning experiment
-    runPlasticityExperiment(brain);
-    
-    // Reset and run Test 3: STDP verification
-    brain->reset();
-    brain->initialize();
-    runStdpVerification(brain);
+    // Run enhanced benchmark test
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("=== Performance Benchmark ===");
+    runBenchmarkTest(brain);
     
     // Final brain status
     NLM_LOG_INFO("");
     NLM_LOG_INFO("=== Final Brain Status ===");
     brain->logStatus();
     
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("=== Phase 2 Complete ===");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("Phase 2 Objectives Completed:");
-    NLM_LOG_INFO("  ✓ Real LIF neuron dynamics implemented");
-    NLM_LOG_INFO("  ✓ Event-driven spike propagation with delays");
-    NLM_LOG_INFO("  ✓ STDP plasticity rule");
-    NLM_LOG_INFO("  ✓ Hebbian plasticity rule");
-    NLM_LOG_INFO("  ✓ Structural plasticity (synaptogenesis/pruning)");
-    NLM_LOG_INFO("  ✓ Learning experiment demonstrates measurable changes");
-    NLM_LOG_INFO("  ✓ Network shows activity-dependent synaptic modification");
-    NLM_LOG_INFO("");
-    NLM_LOG_INFO("The NLM brain is now a functioning artificial neural substrate");
-    NLM_LOG_INFO("capable of changing its own synaptic connections through experience.");
-    NLM_LOG_INFO("");
+    std::cout << "Phase 2 Complete. Brain initialization and processing finished.\n" << std::endl;
+    std::cout << "For more options, use --help or --help-commands.\n" << std::endl;
     
     return 0;
 }

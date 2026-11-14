@@ -17,8 +17,11 @@ RandomGenerator::RandomGenerator() : pImpl(new Impl(std::random_device{}())) {}
 
 RandomGenerator::~RandomGenerator() = default;
 
-RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(other.pImpl) {
-    other.pImpl = nullptr;
+RandomGenerator::RandomGenerator(RandomGenerator&& other) noexcept : pImpl(nullptr) {
+    if (other.pImpl) {
+        pImpl = other.pImpl;
+        other.pImpl = nullptr;
+    }
 }
 
 RandomGenerator& RandomGenerator::operator=(RandomGenerator&& other) noexcept {
@@ -101,17 +104,26 @@ float RandomGenerator::normal(float mean, float stddev) {
     return dist(pImpl->gen);
 }
 
-bool RandomGenerator::bernoulli(double p) {
+    // Validate parameters
+    if (p == 0.0 || p >= 1.0) {
+        throw std::invalid_argument("p must be > 0 and < 1 for bernoulli distribution");
+    }
     std::bernoulli_distribution dist(p);
     return dist(pImpl->gen);
 }
 
 uint32_t RandomGenerator::poisson(double lambda) {
+    if (lambda < 0.0) {
+        throw std::invalid_argument("lambda must be >= 0 for poisson distribution");
+    }
     std::poisson_distribution<uint32_t> dist(lambda);
     return dist(pImpl->gen);
 }
 
 double RandomGenerator::exponential(double lambda) {
+    if (lambda <= 0.0) {
+        throw std::invalid_argument("lambda must be > 0 for exponential distribution");
+    }
     std::exponential_distribution<double> dist(lambda);
     return dist(pImpl->gen);
 }

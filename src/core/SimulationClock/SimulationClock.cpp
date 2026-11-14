@@ -66,6 +66,9 @@ TimestepDuration SimulationClock::getTimestep() const {
 
 void SimulationClock::setTimestep(TimestepDuration dt) {
     pImpl->timestep = dt;
+    if (pImpl->step != 0) {
+        pImpl->time = pImpl->step * pImpl->timestep;
+    }
 }
 
 bool SimulationClock::isFirstStep() const {
@@ -81,6 +84,7 @@ Timestamp SimulationClock::stepToTime(SimulationStep step) const {
 }
 
 SimulationStep SimulationClock::timeToStep(Timestamp time) const {
+    if (pImpl->timestep == 0.0) return 0;
     return static_cast<SimulationStep>(time / pImpl->timestep);
 }
 
