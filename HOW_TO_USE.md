@@ -148,6 +148,111 @@ print(f"Total neurons: {brain.getTotalNeuronCount()}")
 print(f"Total synapses: {brain.getTotalSynapseCount()}")
 ```
 
+### Advanced Usage (Phase 5+ Features)
+
+#### Context Manager for Automatic Resource Management (NEW!)
+
+```python
+import pynlm
+
+# Create advanced configuration with Phase 5+ features
+config = pynlm.createAdvancedConfig()
+
+# Use context manager for automatic cleanup and initialization
+with pynlm.createBrainWithCleanup(config) as brain:
+    # Brain is automatically initialized
+    # All resources are automatically cleaned up when context exits
+    for step in range(1000):
+        brain.step(step)
+        if step % 100 == 0:
+            print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+# Brain is automatically reset here - no manual cleanup needed!
+print("Context exited - resources automatically cleaned up")
+```
+
+#### Event Callback System (NEW!)
+
+```python
+import pynlm
+
+# Create event callback system for custom event handling
+callbacks = pynlm.createEventCallbackSystem()
+
+# Define custom event handlers
+def on_spike(event):
+    """Handle spike events from the neural network"""
+    print(f"Neuron {event.neuron_id} spiked at time {event.timestamp}")
+
+def on_step(step, time):
+    """Handle simulation step events"""
+    print(f"Simulation step {step} at {time}ms")
+
+def on_error(error):
+    """Handle error events"""
+    print(f"ERROR: {error}")
+
+# Register callbacks
+callbacks.registerSpikeCallback(on_spike)
+callbacks.registerStepCallback(on_step)
+callbacks.registerErrorCallback(on_error)
+
+# Use callbacks with brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation - callbacks will be triggered
+for step in range(100):
+    brain.step(step)
+
+# Check callback statistics
+print(f"Callback system stats:")
+print(f"  Spike callbacks: {callbacks.getSpikeCallbackCount()}")
+print(f"  Step callbacks: {callbacks.getStepCallbackCount()}")
+print(f"  Error callbacks: {callbacks.getErrorCallbackCount()}")
+```
+
+#### Advanced Configuration (NEW!)
+
+```python
+import pynlm
+
+# Create advanced configuration optimized for complex simulations
+config = pynlm.createAdvancedConfig()
+
+# Access and modify advanced configuration parameters
+print("Learning rate:", config.get("plasticity.stdp.learning_rate"))
+print("Neuron count:", config.get("brain.neuron_count"))
+print("Curiosity enabled:", config.get("neuromodulation.curiosity.enable"))
+
+# Modify configuration
+config.set("brain.neuron_count", 5000)
+config.set("plasticity.stdp.learning_rate", 0.002)
+
+print("Updated configuration successful!")
+```
+
+#### Save Configuration to JSON (NEW!)
+
+```python
+import pynlm
+
+# Create configuration
+config = pynlm.createAdvancedConfig()
+
+# Save configuration to JSON file
+pynlm.saveConfigToJSON(config, "advanced_config.json")
+
+print("Configuration saved to advanced_config.json")
+print("You can now edit this JSON file and reload it:")
+
+# Load configuration from JSON
+import json
+with open("advanced_config.json", "r") as f:
+    loaded_config = json.load(f)
+    print(f"Loaded configuration with {len(loaded_config)} parameters")
+```
+
 #### Running a Simulation
 
 ```python
@@ -503,6 +608,186 @@ for _ in range(500):
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(0)
     world.applyMotorCommand(agent.decodeMotorCommand(), world.getSimulationTime())
+```
+
+### Advanced Usage with New Features
+
+#### Context Manager for Automatic Resource Management (NEW!)
+
+```python
+import pynlm
+
+# Create advanced configuration with Phase 5+ features
+config = pynlm.createAdvancedConfig()
+
+# Use context manager for automatic cleanup and initialization
+with pynlm.createBrainWithCleanup(config) as brain:
+    # Brain is automatically initialized
+    # All resources are automatically cleaned up when context exits
+    for step in range(1000):
+        brain.step(step)
+        if step % 100 == 0:
+            print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+
+# Brain is automatically reset here - no manual cleanup needed!
+print("Context exited - resources automatically cleaned up")
+```
+
+#### Event Callback System (NEW!)
+
+```python
+import pynlm
+
+# Create event callback system for custom event handling
+callbacks = pynlm.createEventCallbackSystem()
+
+# Define custom event handlers
+def on_spike(event):
+    """Handle spike events from the neural network"""
+    print(f"Neuron {event.neuron_id} spiked at time {event.timestamp}")
+
+def on_step(step, time):
+    """Handle simulation step events"""
+    print(f"Simulation step {step} at {time}ms")
+
+def on_error(error):
+    """Handle error events"""
+    print(f"ERROR: {error}")
+
+# Register callbacks
+callbacks.registerSpikeCallback(on_spike)
+callbacks.registerStepCallback(on_step)
+callbacks.registerErrorCallback(on_error)
+
+# Use callbacks with brain
+brain = pynlm.createBrain(pynlm.createDefaultConfig())
+brain.initialize()
+
+# Run simulation - callbacks will be triggered
+for step in range(100):
+    brain.step(step)
+
+# Check callback statistics
+print(f"Callback system stats:")
+print(f"  Spike callbacks: {callbacks.getSpikeCallbackCount()}")
+print(f"  Step callbacks: {callbacks.getStepCallbackCount()}")
+print(f"  Error callbacks: {callbacks.getErrorCallbackCount()}")
+```
+
+#### Advanced Configuration and JSON Support (NEW!)
+
+```python
+import pynlm
+
+# Create advanced configuration optimized for complex simulations
+config = pynlm.createAdvancedConfig()
+
+# Access and modify advanced configuration parameters
+print("Learning rate:", config.get("plasticity.stdp.learning_rate"))
+print("Neuron count:", config.get("brain.neuron_count"))
+print("Curiosity enabled:", config.get("neuromodulation.curiosity.enable"))
+
+# Modify configuration
+config.set("brain.neuron_count", 5000)
+config.set("plasticity.stdp.learning_rate", 0.002)
+
+print("Updated configuration successful!")
+
+# Save configuration to JSON file
+pynlm.saveConfigToJSON(config, "advanced_config.json")
+
+print("Configuration saved to advanced_config.json")
+print("You can now edit this JSON file and reload it using a JSON parser.")
+```
+
+#### Complete Agent Example with Advanced Features (NEW!)
+
+```python
+import pynlm
+
+def run_advanced_agent_simulation(num_steps=1000):
+    """Run a complete agent simulation with all advanced features."""
+    
+    # 1. Create advanced configuration
+    config = pynlm.createAdvancedConfig()
+    
+    # 2. Create brain and initialize with context manager
+    with pynlm.createBrainWithCleanup(config) as brain:
+        # 3. Create agent brain interface
+        agent = pynlm.createAgentBrain(brain)
+        
+        # 4. Create and configure world
+        world = pynlm.createSimpleWorld()
+        world.configure(width=20, height=20, visionWidth=8, visionHeight=8)
+        world.reset()
+        world.setAgentStart(10.0, 10.0)
+        
+        # 5. Initialize agent with world
+        agent.initialize(world)
+        
+        # 6. Create and configure event callbacks
+        callbacks = pynlm.createEventCallbackSystem()
+        
+        def on_step_with_progress(step, time):
+            """Callback to monitor simulation progress"""
+            if step % 100 == 0:
+                print(f"Progress: Step {step}, "
+                      f"{brain.getFiringNeuronCount()} neurons firing, "
+                      f"Curiosity: {agent.getCuriosityLevel():.3f}")
+        
+        def on_spike_with_stats(event):
+            """Callback to monitor neural activity"""
+            pass  # Can implement spike statistics here
+        
+        def on_simulation_error(error):
+            """Callback to handle errors gracefully"""
+            print(f"Simulation error: {error}")
+            # Can implement error recovery here
+        
+        callbacks.registerStepCallback(on_step_with_progress)
+        callbacks.registerSpikeCallback(on_spike_with_stats)
+        callbacks.registerErrorCallback(on_simulation_error)
+        
+        # 7. Enable all subsystems
+        agent.enableRewardModulation(True)
+        agent.enableStructuralPlasticity(True)
+        agent.enableDevelopment(True)
+        agent.enableCuriosity(True)
+        
+        # 8. Run simulation loop with advanced features
+        for step in range(num_steps):
+            # Update world
+            world.update(timestep=0.1)
+            
+            # Get sensory input from world
+            percept = world.getSensoryPercept()
+            
+            # Process sensory input in brain
+            agent.processSensoryInput(percept)
+            
+            # Run brain step
+            brain.step(step)
+            
+            # Decode motor command from brain activity
+            motor_cmd = agent.decodeMotorCommand()
+            
+            # Apply motor command to world
+            world.applyMotorCommand(motor_cmd, world.getSimulationTime())
+            
+            # Print detailed progress every 500 steps
+            if step % 500 == 0:
+                print(f"Advanced simulation progress:")
+                print(f"  Step: {step}/{num_steps}")
+                print(f"  Neurons firing: {brain.getFiringNeuronCount()}")
+                print(f"  Total spikes: {brain.getTotalSpikeCount()}")
+                print(f"  Curiosity level: {agent.getCuriosityLevel():.3f}")
+                print(f"  Novelty level: {agent.getNoveltyLevel():.3f}")
+                print(f"  Developmental stage: {brain.getDevelopmentalStage()}")
+
+# Run the advanced simulation
+print("Starting advanced agent simulation with all features...")
+run_advanced_agent_simulation(2000)
+print("Advanced simulation complete!")
 ```
 
 ---

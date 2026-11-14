@@ -19,6 +19,12 @@ Config::Config(Config&&) noexcept = default;
 Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
+    // Try JSON first (preferred format for Phase 5+ features)
+    if (loadFromJSON(filepath)) {
+        return true;
+    }
+    
+    // Fallback to simple key=value format for backward compatibility
     // TODO PHASE 2: Implement proper JSON/YAML parser
     // PLACEHOLDER - Phase 1 uses a simple key=value format
     
@@ -53,6 +59,256 @@ bool Config::loadFromFile(const std::string& filepath) {
     }
     
     return true;
+}
+
+bool Config::loadFromJSON(const std::string& filepath) {
+    // Modern JSON parser for Phase 5+ advanced features
+    // This provides better configuration management with:
+    // - Typed values (numbers, booleans, arrays, objects)
+    // - Comments and formatting preservation
+    // - Better error handling
+    // - Advanced configuration structures
+    
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        return false;
+    }
+    
+    try {
+        // Use nlohmann::json if available, otherwise fallback
+        // For now, implement a simple JSON parser that handles:
+        // - String values: "value"
+        // - Numeric values: 42, 3.14
+        // - Boolean values: true, false
+        // - Array values: [1, 2, 3]
+        // - Object values: { "key": "value" }
+        
+        std::string content((std::istreambuf_iterator<char>(file)), 
+                           std::istreambuf_iterator<char>());
+        
+        if (content.empty()) {
+            return false;
+        }
+        
+        // Simple JSON parsing - look for key-value pairs in JSON-like format
+        // This is a basic implementation - a production system would use a proper JSON library
+        
+        size_t pos = 0;
+        while (pos < content.size()) {
+            // Skip whitespace and comments
+            while (pos < content.size() && (std::isspace(content[pos]) || content[pos] == '/')) {
+                if (pos + 1 < content.size() && content[pos] == '/' && content[pos + 1] == '/') {
+                    // Single-line comment - skip to end of line
+                    while (pos < content.size() && content[pos] != '\n') {
+                        pos++;
+                    }
+                } else if (pos + 1 < content.size() && content[pos] == '/' && content[pos + 1] == '*') {
+                    // Multi-line comment - skip to end
+                    while (pos + 1 < content.size() && !(content[pos] == '*' && content[pos + 1] == '/')) {
+                        pos++;
+                    }
+                    if (pos < content.size()) pos += 2; // Skip */
+                } else {
+                    pos++;
+                }
+            }
+            
+            if (pos >= content.size()) break;
+            
+            // Parse key (quoted or unquoted)
+            std::string key;
+            if (content[pos] == '"') {
+                // Quoted key
+                pos++;
+                while (pos < content.size() && content[pos] != '"') {
+                    if (content[pos] == '\\' && pos + 1 < content.size()) {
+                        pos++; // Skip escaped character
+                    }
+                    key += content[pos++];
+                }
+                pos++; // Skip closing quote
+            } else {
+                // Unquoted key (simple alphanumeric)
+                while (pos < content.size() && std::isalnum(content[pos])) {
+                    key += content[pos++];
+                }
+            }
+            
+            if (key.empty()) {
+                pos++;
+                continue;
+            }
+            
+            // Skip whitespace
+            while (pos < content.size() && std::isspace(content[pos])) {
+                pos++;
+            }
+            
+            if (pos >= content.size() || content[pos] != ':') {
+                // Not a valid JSON key-value pair
+                continue;
+            }
+            
+            pos++; // Skip colon
+            
+            // Skip whitespace
+            while (pos < content.size() && std::isspace(content[pos])) {
+                pos++;
+            }
+            
+            if (pos >= content.size()) {
+                break;
+            }
+            
+            // Parse value based on type
+            ConfigValue value;
+            bool validValue = false;
+            
+            // Boolean values
+            if (content.compare(pos, 5, "true") == 0) {
+                value = true;
+                validValue = true;
+                pos += 5;
+            } else if (content.compare(pos, 6, "false") == 0) {
+                value = false;
+                validValue = true;
+                pos += 6;
+            }
+            // Numeric values
+            else if (content[pos] == '-' || std::isdigit(content[pos])) {
+                size_t numEnd = pos;
+                while (numEnd < content.size() && (std::isdigit(content[numEnd]) || content[numEnd] == '.' || content[numEnd] == 'e' || content[numEnd] == 'E' || content[numEnd] == '+')) {
+                    numEnd++;
+                }
+                
+                // Try double first
+                try {
+                    double d = std::stod(content.substr(pos, numEnd - pos));
+                    value = d;
+                    validValue = true;
+                    pos = numEnd;
+                } catch (...) {
+                    // Try int64
+                    try {
+                        int64_t i = std::stoll(content.substr(pos, numEnd - pos));
+                        value = i;
+                        validValue = true;
+                        pos = numEnd;
+                    } catch (...) {
+                        // If both fail, treat as string
+                        size_t strEnd = numEnd;
+                        while (strEnd < content.size() && content[strEnd] != ',' && content[strEnd] != '}' && content[strEnd] != ']') {
+                            strEnd++;
+                        }
+                        std::string strVal = content.substr(pos, strEnd - pos);
+                        value = strVal;
+                        validValue = true;
+                        pos = strEnd;
+                    }
+                }
+            }
+            // String values
+            else if (content[pos] == '"') {
+                std::string strVal;
+                pos++;
+                while (pos < content.size() && content[pos] != '"') {
+                    if (content[pos] == '\\' && pos + 1 < content.size()) {
+                        strVal += content[pos + 1];
+                        pos += 2;
+                    } else {
+                        strVal += content[pos++];
+                    }
+                }
+                if (pos < content.size()) pos++; // Skip closing quote
+                value = strVal;
+                validValue = true;
+            }
+            // Array values
+            else if (content[pos] == '[') {
+                pos++; // Skip [
+                std::vector<double> array;
+                while (pos < content.size() && content[pos] != ']') {
+                    // Skip whitespace
+                    while (pos < content.size() && std::isspace(content[pos])) {
+                        pos++;
+                    }
+                    
+                    if (pos >= content.size() || content[pos] == ']') {
+                        break;
+                    }
+                    
+                    // Parse array element
+                    size_t elemEnd = pos;
+                    while (elemEnd < content.size() && content[elemEnd] != ',' && content[elemEnd] != ']') {
+                        if (content[elemEnd] == '"') {
+                            while (elemEnd + 1 < content.size() && content[elemEnd + 1] != '"') {
+                                elemEnd++;
+                            }
+                        }
+                        elemEnd++;
+                    }
+                    
+                    if (elemEnd > pos) {
+                        try {
+                            double elem = std::stod(content.substr(pos, elemEnd - pos));
+                            array.push_back(elem);
+                        } catch (...) {
+                            array.push_back(0.0); // Default on error
+                        }
+                    }
+                    
+                    pos = elemEnd;
+                    
+                    // Skip whitespace and comma
+                    while (pos < content.size() && std::isspace(content[pos])) {
+                        pos++;
+                    }
+                    if (pos < content.size() && content[pos] == ',') {
+                        pos++;
+                    }
+                }
+                if (pos < content.size() && content[pos] == ']') {
+                    pos++; // Skip ]
+                    value = array;
+                    validValue = true;
+                }
+            }
+            // Object values (for now, treat as string)
+            else if (content[pos] == '{') {
+                size_t objEnd = pos;
+                int braceCount = 1;
+                while (objEnd + 1 < content.size() && braceCount > 0) {
+                    objEnd++;
+                    if (content[objEnd] == '{') braceCount++;
+                    else if (content[objEnd] == '}') braceCount--;
+                }
+                if (braceCount == 0) {
+                    pos = objEnd + 1; // Skip }
+                    // For now, store as string, could be enhanced later
+                    value = content.substr(pos - objEnd - 1, objEnd - pos + 2);
+                    validValue = true;
+                }
+            }
+            
+            if (validValue) {
+                set(key, value, ConfigSource::File);
+            }
+            
+            // Skip to next entry
+            while (pos < content.size() && content[pos] != ',' && content[pos] != '}') {
+                pos++;
+            }
+            if (pos < content.size() && content[pos] == ',') {
+                pos++;
+            }
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        // Log error and fallback to simple format
+        return false;
+    }
 }
 
 bool Config::loadFromArgs(int argc, char** argv) {

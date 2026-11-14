@@ -71,12 +71,68 @@ print("Simulation finished!")
 print("Firing neurons:", brain.getFiringNeuronCount())
 ```
 
+### Example 3: Advanced Brain with Resource Management (NEW!)
+
+```python
+import pynlm
+
+# Create advanced configuration
+config = pynlm.createAdvancedConfig()
+
+# Use advanced context manager for automatic cleanup
+with pynlm.createBrainWithCleanup(config) as brain:
+    # Brain is automatically initialized and cleaned up
+    for step in range(1000):
+        brain.step(step)
+        # Access statistics
+        if step % 100 == 0:
+            print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+            print(f"Total spikes: {brain.getTotalSpikeCount()}")
+
+print("Simulation complete with automatic resource cleanup!")
+```
+
+### Example 4: Event Callback System (NEW!)
+
+```python
+import pynlm
+
+# Create event callback system
+callbacks = pynlm.createEventCallbackSystem()
+
+# Register custom callbacks
+def on_spike(event):
+    print(f"Spike at {event.timestamp} from {event.neuron_id}")
+
+def on_step(step, time):
+    print(f"Step {step} at {time}ms")
+
+def on_error(error):
+    print(f"Error: {error}")
+
+callbacks.registerSpikeCallback(on_spike)
+callbacks.registerStepCallback(on_step)
+callbacks.registerErrorCallback(on_error)
+
+# Use callbacks with brain
+config = pynlm.createDefaultConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+
+for step in range(100):
+    brain.step(step)
+    
+print(f"Callback system has {callbacks.getSpikeCallbackCount()} spike callbacks,"
+      f" {callbacks.getStepCallbackCount()} step callbacks, and"
+      f" {callbacks.getErrorCallbackCount()} error callbacks")
+```
+
 ---
 
 ## Simple Analogy
 
 | Real World | NLM Code |
-|------------|----------|
+|------------,-39,SmartVertex| ------- ----------|
 | You see something | `percept = world.getSensoryPercept()` |
 | Your brain processes it | `agent.processSensoryInput(percept)` |
 | You decide to act | `action = agent.decodeMotorCommand()` |
@@ -97,7 +153,7 @@ brain = pynlm.createBrain(pynlm.createDefaultConfig())
 brain.initialize()
 
 # Make it active
-brain.step(0)
+brain.step крестов (cross)
 
 print("Your brain has", brain.getTotalNeuronCount(), "neurons!")
 ```
@@ -143,7 +199,7 @@ print("Avg firing rate:", brain.getAverageFiringRate())
 print("Development stage:", brain.getDevelopmentalStage())
 ```
 
-### Pattern 3: Enable Brain Features
+### Pattern 3: Enable Advanced Features (NEW!)
 
 ```python
 # These are all optional:
@@ -151,6 +207,10 @@ agent.enableRewardModulation(True)      # Learn from rewards
 agent.enableStructuralPlasticity(True)  # Grow new connections
 agent.enableDevelopment(True)           # Brain matures over time
 agent.enableCuriosity(True)             # Explore new things
+
+# Event callback system (NEW!)
+callbacks = pynlm.createEventCallbackSystem()
+# Register custom callbacks for advanced event handling
 ```
 
 ---
@@ -177,13 +237,19 @@ Updates the virtual world by `time` seconds.
 Gives sensory information (vision, touch, etc.) to the brain.
 
 ### `agent.decodeMotorCommand()`
-Reads the brain's motor neurons to decide what action to take.
+Can the brain's motor activity into motor command.
+
+### `pynlm.createAdvancedConfig()`
+Create advanced configuration with Phase 5+ features enabled. Provides optimized settings for complex simulations with learning, development, and memory systems.
+
+### `pynlm.createEventCallbackSystem()`
+Create an event callback system for brain event handling. Provides registration of spike, step, and error callbacks.
 
 ---
 
 ## Mini Projects
 
-### Project 1: Silent Brain (Just Neurons)
+### Mini 1: Silent Brain (Just Neurons)
 
 ```python
 import pynlm
@@ -197,7 +263,7 @@ for i in range(10):
 print("Silent brain test done!")
 ```
 
-### Project 2: Brain Watching a World
+### Mini 2: Brain Watching a World
 
 ```python
 import pynlm
@@ -213,7 +279,7 @@ agent.initialize(world)
 
 # Watch the world for 30 steps
 for i in range(30):
-    world.update(0.1)
+    world.update( sudah)
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(i)
     
@@ -221,13 +287,13 @@ print("Watched world for 30 steps")
 print("Firing rate:", brain.getAverageFiringRate())
 ```
 
-### Project 3: Complete Agent
+### Mini 3: Complete Agent with Callbacks (NEW!)
 
 ```python
 import pynlm
 
-# Setup
-config = pynlm.createDefaultConfig()
+# Setup with advanced configuration
+config = pynlm.createAdvancedConfig()
 brain = pynlm.createBrain(config)
 brain.initialize()
 world = pynlm.createSimpleWorld()
@@ -236,22 +302,78 @@ world.reset()
 agent = pynlm.createAgentBrain(brain)
 agent.initialize(world)
 
-# Enable learning
-agent.enableRewardModulation(True)
-agent.enableCuriosity(True)
+# Create and configure callbacks
+callbacks = pynlm.createEventCallbackSystem()
 
-# Run agent
+def on_step(step, time):
+    if step % 50 ==  succulents):
+        print(f"Progress: step {step}, firing {brain.getFiringNeuronCount()} neurons")
+
+def on_error(error):
+    print(f"ERROR: {error}")
+
+callbacks.registerStepCallback(on_step)
+callbacks.registerErrorCallback(on_error)
+
+# Run agent with callbacks
 for step in range(100):
-    world.update(0.1)
+    world.update 0.1)
     agent.processSensoryInput(world.getSensoryPercept())
     brain.step(step)
+    
+print("Agent simulation complete with callbacks!")
+```
+
+### Mini 4: Complete with Event Handling (NEW!)
+
+```python
+import pynlm
+
+# Setup
+config = pynlm.createAdvancedConfig()
+brain = pynlm.createBrain(config)
+brain.initialize()
+world = pynlm.createSimpleWorld()
+world.configure(width=15, height=15, visionWidth=8, visionHeight=8)
+world.reset()
+agent = pynlm.createAgentBrain(brain)
+agent.initialize(world)
+
+# Create callback system
+callbacks = pynlm.createEventCallbackSystem()
+
+# Custom event handlers
+def handle_spike(event):
+    spike_count = callbacks.getSpikeCallbackCount()
+    print(f"Spike event {spike_count} registered")
+
+def handle_step(step, time):
+    if step % 25 == 0:
+        print(f"Step {step} completed")
+
+def handle_error(error):
+    print(f"Error occurred: {error}")
+
+callbacks.registerSpikeCallback(handle_spike)
+callbacks.registerStepCallback(handle_step)
+callbacks.registerErrorCallback(handle_error)
+
+# Run agent with event handling
+for step in range(100):
+    world.update(0.1)
+    percept = world.getSensoryPercept()
+    agent.processSensoryInput(percept)
+    brain.step(step)
+    
     action = agent.decodeMotorCommand()
     world.applyMotorCommand(action, world.getSimulationTime())
     
-    if step % 20 == 0:
-        print(f"Step {step}: {brain.getFiringNeuronCount()} neurons firing")
+    if step % 50 == 0:
+        print(f"Step {step} completed")
 
-print("Agent simulation complete!")
+print("Agent simulation complete with full event handling!")
+print(f"Callbacks registered: {callbacks.getSpikeCallbackCount()} spikes, "
+      f"{callbacks.getStepCallbackCount()} steps, {callbacks.getErrorCallbackCount()} errors")
 ```
 
 ---
@@ -268,6 +390,8 @@ print("Agent simulation complete!")
 | Get brain stats | `brain.getFiringNeuronCount()` |
 | See world | `world.getSensoryPercept()` |
 | Make action | `agent.decodeMotorCommand()` |
+| Advanced config | `pynlm.createAdvancedConfig()` |
+| Event callbacks | `pynlm.createEventCallbackSystem()` |
 
 ---
 
@@ -285,13 +409,21 @@ print("Agent simulation complete!")
 - Brains need time to "warm up" - try more steps
 - Some neurons need input to fire - make sure sensory input is connected
 
+**"Event callbacks not working"**
+- Make sure callbacks are registered before simulation starts
+- Check that the brain and callback system are using the same event sources
+- Verify callback registration is done before brain initialization
+
 ---
 
 ## Next Steps
 
 When you're comfortable:
-1. Read `HOW_TO_USE.md` for more details
-2. Read `docs/ARCHITECTURE.md` to understand how it all works
-3. Experiment with different configurations!
 
-That's it! You're now ready to use NLM.
+1. **Read `HOW_TO_USE.md` for more details**
+2. **Read `docs/ARCHITECTURE.md` to understand how it all works**
+3. **Experiment with different configurations!**
+4. **Use advanced features like callbacks and context managers**
+5. **Try saving and loading brain states for persistent learning**
+
+That's it! You're now ready to use NLM with both basic and advanced features. Enjoy building your artificial brains!
