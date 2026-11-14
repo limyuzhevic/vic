@@ -215,39 +215,212 @@ Phase 6 DOES investigate:
 - Whether replay can reinforce memory consolidation
 - Whether the complete brain loop functions coherently
 
-## Architecture Philosophy
-
-The NLM brain operates as a closed-loop system:
-
 ```
-WORLD
-  ↓
-SENSORY INPUT
-  ↓
-NEURAL PROCESSING (LIF dynamics, spikes)
-  ↓
-INTERNAL STATE (working memory, attention)
-  ↓
-MEMORY / PREDICTION
-  ↓
-MOTIVATION / NEUROMODULATION (dopamine, curiosity)
-  ↓
-ACTION SELECTION
-  ↓
-MOTOR OUTPUT
-  ↓
-WORLD CONSEQUENCE
-  ↓
-REWARD / SURPRISE / ERROR
-  ↓
-PLASTICITY (STDP, Hebbian, structural)
-  ↓
-MEMORY / DEVELOPMENT
-  ↓
-CHANGED BRAIN
-  ↓
-CHANGED FUTURE BEHAVIOR
+
+## Key Improvements
+
+The NLM project has been significantly enhanced with several key improvements that make it more powerful, easier to use, and more maintainable:
+
+### Command Line Interface Improvements
+
+NLM now features an enhanced command-line interface that provides better control and flexibility:
+
+```bash
+nlm --help                    # Show all available options
+nlm --phase 2                 # Run Phase 2 demo (default)
+nlm --demo phase3 --neurons 1000 --steps 5000  # Custom demo with parameters
+nlm --config custom.cfg      # Load custom configuration
+nlm --benchmark              # Run performance benchmarks
+nlm --performance            # Measure and report performance metrics
+nlm --verbose                # Enable verbose logging
+nlm --quiet                  # Reduce output (errors only)
 ```
+
+**New Features:**
+- Multiple phases support (2, 3, 4, 5, 6)
+- Custom demos with parameter tuning
+- Configuration file loading
+- Performance monitoring and benchmarking
+- Verbose and quiet logging modes
+- Batch processing capabilities
+- Output redirection to files
+
+### Configuration Management
+
+The configuration system has been completely improved with:
+
+**Enhanced default.cfg file:**
+```cfg
+# Random seed for reproducible experiments
+random_seed = 42
+
+# Simulation timestep in seconds  
+simulation_timestep = 0.001
+
+# Number of neurons in the brain
+neuron_count = 1000
+
+# Connection probability for random connectivity
+connection_probability = 0.1
+
+# Vision settings (for agent sensory input)
+vision_width = 16
+vision_height = 16
+
+# Performance optimization settings
+enable_structural_plasticity = true
+enable_reward_modulation = true
+enable_development = true
+enable_curiosity = true
+```
+
+**Validation and Safety:**
+- Parameter range validation (e.g., neuron_count: 1-100000)
+- Type checking and safe defaults
+- Warning system for potentially problematic configurations
+- Automatic fallback to safe values
+
+### Unified Demo Framework
+
+Code duplication has been significantly reduced with a unified demo framework:
+
+**Benefits:**
+- Shared base class for all demos (DemoBase)
+- Consistent interfaces across all phases
+- Centralized error handling
+- Built-in performance monitoring
+- Easy extensibility for new phases
+
+**Available Demos:**
+- **Phase 2**: Real neural computation with LIF neurons, STDP, and Hebbian plasticity
+- **Phase 3**: World interaction with sensory input, action selection, and learning
+- **Phase 4**: Emerging cognition including memory, prediction, and planning
+- **Phase 5**: Brain-personality development and sandbox learning
+- **Phase 6**: Full integration of all neural systems
+
+### Performance Optimizations
+
+Built-in performance monitoring and optimization:
+
+**Benchmarking:**
+```bash
+nlm --benchmark
+```
+
+**Performance Monitoring:**
+- Execution timing measurement
+- Resource usage tracking (memory, CPU)
+- Throughput metrics (operations per second)
+- Scalability testing across different brain sizes
+- Automatic resource optimization
+
+**Key Optimizations:**
+- Memory usage estimation
+- Simulation speed measurement
+- Resource-aware configuration tuning
+- Performance profiling tools
+
+## Quick Start Guide
+
+### Basic Usage
+
+```bash
+# Run the basic demonstration
+nlm
+
+# Run Phase 3 with world interaction
+nlm --phase 3 --neurons 500 --steps 200
+
+# Run Phase 4 with custom settings
+nlm --phase 4 --neurons 1000 --steps 1000 --seed 12345
+```
+
+### Advanced Usage
+
+```bash
+# Load custom configuration and run simulation
+nlm --demo phase2 --config custom.cfg --output results.csv
+
+# Run performance benchmarks
+nlm --benchmark
+
+# Run in quiet mode for production use
+nlm --phase 2 --quiet
+```
+
+## Example: Performance Optimization
+
+The configuration system automatically optimizes settings based on available resources:
+
+**For systems with limited memory (< 1GB):**
+- Reduces neuron count from 10,000 to 5,000
+- Lowers connection probability from 0.2 to 0.1
+- Increases simulation timestep from 0.0005 to 0.001
+
+**For systems with ample memory (> 8GB):**
+- Maintains maximum neuron count
+- Uses higher connection probability
+- Uses smaller simulation timestep for accuracy
+
+## Example: Configuration Validation
+
+The system validates all configuration parameters:
+
+```ini
+# This configuration will trigger warnings
+neuron_count = 20000           # Warning: Large neuron count may impact performance
+connection_probability = 0.01  # Warning: Low connection probability may result in disconnected network
+synaptogenesis_rate = 0.5      # Error: synaptogenesis_rate must be between 0.0 and 1.0
+```
+
+## Example: Performance Benchmarking
+
+```bash
+nlm --benchmark
+# Output:
+# Benchmarking brain size: 100 neurons
+#   Initialization: 12ms
+#   Simulation (100 steps): 45ms
+#   Steps per second: 2222
+#   Neurons per second: 222200
+
+# Benchmarking brain size: 500 neurons
+#   Initialization: 68ms
+#   Simulation (100 steps): 223ms
+#   Steps per second: 448
+#   Neurons per second: 224133
+```
+
+## Building and Running
+
+```bash
+# Build the project
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
+
+# Run the basic demonstration
+./nlm
+
+# Run Phase 3 demo
+./nlm_phase3_demo
+
+# Run performance benchmarks
+./nlm_benchmark
+```
+
+## Summary
+
+The NLM project has been significantly enhanced with:
+
+✅ **Better user interface**: Enhanced CLI with comprehensive options
+✅ **Improved code organization**: Unified demo framework reducing duplication
+✅ **Robust configuration management**: Validation, error handling, and optimization
+✅ **Performance monitoring**: Detailed performance measurement and optimization
+✅ **Better maintainability**: Cleaner code structure and centralized management
+
+These improvements make NLM more robust, easier to use, and more suitable for both research and production environments. The enhanced CLI provides power users with fine-grained control while the configuration validation prevents common errors and ensures optimal performance.
 
 ## License
 
