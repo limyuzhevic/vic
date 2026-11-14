@@ -6,6 +6,8 @@
 #include <variant>
 #include <optional>
 #include <algorithm>
+#include <stdexcept>
+#include "../Errors/Errors.hpp"
 
 namespace nlm {
 
@@ -32,6 +34,25 @@ enum class ConfigSource {
     Runtime
 };
 
+// Configuration validation exception
+class ConfigValidationError : public ConfigError {
+public:
+    ConfigValidationError(const std::string& key, const std::string& message)
+        : ConfigError("validation", "Parameter \"" + key + "\": " + message) {}
+};
+
+// Configuration validation result
+struct ConfigValidationResult {
+    bool valid;
+    std::string errorMessage;
+    
+    ConfigValidationResult(bool v = true, const std::string& msg = "") 
+        : valid(v), errorMessage(msg) {}
+};
+
+// Parameter validation function signatures
+using ParamValidator = std::function<ConfigValidationResult(const std::string&, const ConfigValue&)>;
+
 // Configuration entry
 struct ConfigEntry {
     std::string key;
@@ -42,6 +63,20 @@ struct ConfigEntry {
     ConfigEntry() : key(), value(), source(ConfigSource::Default), description() {}
     ConfigEntry(const std::string& k, const ConfigValue& v, ConfigSource s, const std::string& desc = "")
         : key(k), value(v), source(s), description(desc) {}
+};
+
+// Parameter specification for validation
+struct ParameterSpec {
+    std::string key;
+    std::string type;
+    std::string description;
+    std::optional<double> minValue;
+    std::optional<double> maxValue;
+    std::optional<std::vector<std::string>> allowedStrings;
+    ParamValidator customValidator;
+    
+    ParameterSpec(const std::string& k, const std::string& t, const std::string& desc = "")
+        : key(k), type(t), description(desc) {}
 };
 
 // Main configuration class
@@ -80,14 +115,18 @@ template<typename T>
     void set(const std::string& key, double value, ConfigSource source = ConfigSource::Runtime);
     void set(const std::string& key, bool value, ConfigSource source = ConfigSource::Runtime);
     
-    // Check existence
-    bool has(const std::string& key) const;
+    // Parameter validation and checking
+    bool validateParameter(const std::string& key, const ConfigValue& value) const;
+    static ConfigValidationResult validateValue(const std::string& key, const ConfigValue& value, const ParameterSpec& spec);
     
-    // Remove key
-    void remove(const std::string& key);
+    // Get parameter specifications for validation
+    static std::vector<ParameterSpec> getParameterSpecs();
     
-    // Get all keys
-    std::vector<std::string> getKeys() const;
+    // Check if parameter is valid
+    static bool isValidParameter(const std::string& key);
+    
+    // Initialize default parameter specifications
+    static void initializeParameterSpecs();
     
     // Clear all
     void clear();

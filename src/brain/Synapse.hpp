@@ -77,6 +77,15 @@ public:
     
     // Update synapse for one simulation step
     // TODO PHASE 2: Implement real synaptic dynamics
+    // Acceptance criteria:
+    // 1. Implement synaptic transmission with weight dynamics
+    // 2. Support spike-timing dependent plasticity (STDP)
+    // 3. Implement synaptic depression and potentiation
+    // 4. Support synaptic delay and transmission timing
+    // 5. Maintain synaptic history for learning
+    // 6. Support bidirectional connections
+    // 7. Implement synaptic scaling for stability
+    // 8. Provide plasticity rule application
     void step(Timestamp currentTime);
     
     // Reset to initial state

@@ -14,6 +14,15 @@ public:
     
     // Update synaptic weights based on pre/post synaptic activity
     // TODO PHASE 2: Implement real plasticity
+    // Acceptance criteria:
+    // 1. Implement Spike-Timing Dependent Plasticity (STDP)
+    // 2. Support long-term potentiation (LTP) and depression (LTD)
+    // 3. Implement synaptic scaling for homeostatic stability
+    // 4. Support both symmetric and asymmetric STDP rules
+    // 5. Implement learning rate modulation
+    // 6. Support neuromodulation of plasticity (dopamine, serotonin)
+    // 7. Implement constraint enforcement (weight bounds)
+    // 8. Provide plasticity rule logging and debugging
     virtual void update(Synapse* synapse, 
                         const std::vector<Timestamp>& preSpikes,
                         const std::vector<Timestamp>& postSpikes,

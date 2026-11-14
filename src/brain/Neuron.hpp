@@ -144,6 +144,15 @@ public:
     
     // Update neuron for one simulation step
     // TODO PHASE 2: Implement real integrate-and-fire dynamics
+    // Acceptance criteria:
+    // 1. Implement Leaky Integrate-and-Fire (LIF) neuron model
+    // 2. Support membrane potential dynamics: dV/dt = (-V + I)/tau
+    // 3. Support refractory period after spike
+    // 4. Generate spike output when threshold is reached
+    // 5. Support synaptic current integration
+    // 6. Maintain spike times history for plasticity
+    // 7. Support multiple conductance types (excitatory/inhibitory)
+    // 8. Provide reset behavior after spike
     void step(Timestamp currentTime);
     
     // Reset to initial state

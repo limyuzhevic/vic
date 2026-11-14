@@ -3,14 +3,23 @@
 #include <sstream>
 #include <algorithm>
 #include <filesystem>
+#include <functional>
+#include <regex>
+#include <unordered_map>
+#include "../Errors/Errors.hpp"
 
 namespace nlm {
+
+// Static parameter specifications storage
+static std::vector<ParameterSpec> g_parameterSpecs;
 
 struct Config::Impl {
     std::vector<ConfigEntry> entries;
 };
 
-Config::Config() : pImpl(std::make_unique<Impl>()) {}
+Config::Config() : pImpl(std::make_unique<Impl>()) {
+    initializeParameterSpecs();
+}
 
 Config::~Config() = default;
 
@@ -20,7 +29,15 @@ Config& Config::operator=(Config&&) noexcept = default;
 
 bool Config::loadFromFile(const std::string& filepath) {
     // TODO PHASE 2: Implement proper JSON/YAML parser
-    // PLACEHOLDER - Phase 1 uses a simple key=value format
+    // Acceptance criteria:
+    // 1. Support JSON format for configuration files
+    // 2. Support YAML format for configuration files
+    // 3. Parse nested object structures and arrays
+    // 4. Maintain backward compatibility with simple key=value format
+    // 5. Implement validation of parsed configuration values
+    // 6. Support comment syntax in JSON/YAML files
+    // 7. Handle file not found and parsing errors gracefully
+    // 8. Provide detailed error messages for malformed configuration files
     
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -93,6 +110,19 @@ bool Config::saveToFile(const std::string& filepath) const {
 }
 
 void Config::set(const std::string& key, const ConfigValue& value, ConfigSource source) {
+    // Validate parameter before setting
+    if (!validateParameter(key, value)) {
+        // Find error message by validating again and getting the error
+        auto it = std::find_if(g_parameterSpecs.begin(), g_parameterSpecs.end(),
+            [&key](const ParameterSpec& spec) { return spec.key == key; });
+        if (it != g_parameterSpecs.end()) {
+            ConfigValidationResult result = validateValue(key, value, *it);
+            if (!result.valid) {
+                throw ConfigError("validation", "Parameter \"" + key + "\": " + result.errorMessage);
+            }
+        }
+    }
+    
     auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
         [&key](const ConfigEntry& e) { return e.key == key; });
     
@@ -217,22 +247,246 @@ T Config::getOr(const std::string& key, const T& defaultValue) const {
     return val.has_value() ? val.value() : defaultValue;
 }
 
-// Explicit template instantiations
-// (uint64_t and size_t are the same type on this platform, so only one is listed)
-template std::optional<int> Config::get<int>(const std::string&) const;
-template std::optional<int64_t> Config::get<int64_t>(const std::string&) const;
-template std::optional<uint64_t> Config::get<uint64_t>(const std::string&) const;
-template std::optional<float> Config::get<float>(const std::string&) const;
-template std::optional<double> Config::get<double>(const std::string&) const;
-template std::optional<bool> Config::get<bool>(const std::string&) const;
-template std::optional<std::string> Config::get<std::string>(const std::string&) const;
+template<typename T>
+std::optional<T> Config::get(const std::string& key) const {
+    auto it = std::find_if(pImpl->entries.begin(), pImpl->entries.end(),
+        [&key](const ConfigEntry& e) { return e.key == key; });
+    if (it == pImpl->entries.end()) {
+        return std::nullopt;
+    }
+    // Numeric values convert between int/int64/double/float/etc, so a
+    // value stored as double can be read as float and vice versa.
+    return std::visit([](auto&& v) -> std::optional<T> {
+        using V = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<V, T>) {
+            return v;
+        } else if constexpr (std::is_arithmetic_v<V> && std::is_arithmetic_v<T>) {
+            return static_cast<T>(v);
+        } else {
+            return std::nullopt;
+        }
+    }, it->value);
+}
 
-template int Config::getOr<int>(const std::string&, const int&) const;
-template int64_t Config::getOr<int64_t>(const std::string&, const int64_t&) const;
-template uint64_t Config::getOr<uint64_t>(const std::string&, const uint64_t&) const;
-template float Config::getOr<float>(const std::string&, const float&) const;
-template double Config::getOr<double>(const std::string&, const double&) const;
-template bool Config::getOr<bool>(const std::string&, const bool&) const;
-template std::string Config::getOr<std::string>(const std::string&, const std::string&) const;
+template<typename T>
+T Config::getOr(const std::string& key, const T& defaultValue) const {
+    auto val = get<T>(key);
+    return val.has_value() ? val.value() : defaultValue;
+}
 
-} // namespace nlm
+// Validation function implementations
+ConfigValidationResult Config::validateValue(const std::string& key, const ConfigValue& value, const ParameterSpec& spec) {
+    // Type validation
+    bool typeMatches = false;
+    if (spec.type == "int" || spec.type == "integer") {
+        typeMatches = std::holds_alternative<int>(value) || std::holds_alternative<int64_t>(value);
+    } else if (spec.type == "double" || spec.type == "float" || spec.type == "number") {
+        typeMatches = std::holds_alternative<double>(value) || 
+                     std::holds_alternative<int>(value) || 
+                     std::holds_alternative<int64_t>(value);
+    } else if (spec.type == "bool" || spec.type == "boolean") {
+        typeMatches = std::holds_alternative<bool>(value);
+    } else if (spec.type == "string") {
+        typeMatches = std::holds_alternative<std::string>(value);
+    } else if (spec.type == "vector") {
+        typeMatches = std::holds_alternative<std::vector<int>>(value) ||
+                     std::holds_alternative<std::vector<double>>(value) ||
+                     std::holds_alternative<std::vector<std::string>>(value);
+    }
+
+    if (!typeMatches) {
+        return ConfigValidationResult(false, "Type mismatch: expected " + spec.type + " but got " + 
+            (std::holds_alternative<int>(value) ? "int" :
+             std::holds_alternative<int64_t>(value) ? "int64_t" :
+             std::holds_alternative<double>(value) ? "double" :
+             std::holds_alternative<bool>(value) ? "bool" :
+             std::holds_alternative<std::string>(value) ? "string" :
+             std::holds_alternative<std::vector<int>>(value) ? "vector<int>" :
+             std::holds_alternative<std::vector<double>>(value) ? "vector<double>" :
+             std::holds_alternative<std::vector<std::string>>(value) ? "vector<string>" : "unknown"));
+    }
+
+    // Range validation for numeric types
+    if (spec.type == "int" || spec.type == "integer" || spec.type == "double" || spec.type == "float" || spec.type == "number") {
+        double numericValue = 0.0;
+        if (std::holds_alternative<int>(value)) {
+            numericValue = static_cast<double>(std::get<int>(value));
+        } else if (std::holds_alternative<int64_t>(value)) {
+            numericValue = static_cast<double>(std::get<int64_t>(value));
+        } else if (std::holds_alternative<double>(value)) {
+            numericValue = std::get<double>(value);
+        }
+
+        if (spec.minValue.has_value() && numericValue < spec.minValue.value()) {
+            return ConfigValidationResult(false, "Value " + std::to_string(numericValue) + " is less than minimum " + 
+                std::to_string(spec.minValue.value()) + " for key \"" + spec.key + "\"");
+        }
+
+        if (spec.maxValue.has_value() && numericValue > spec.maxValue.value()) {
+            return ConfigValidationResult(false, "Value " + std::to_string(numericValue) + " exceeds maximum " + 
+                std::to_string(spec.maxValue.value()) + " for key \"" + spec.key + "\"");
+        }
+    }
+
+    // String validation
+    if (spec.type == "string" && !spec.allowedStrings.empty()) {
+        if (std::holds_alternative<std::string>(value)) {
+            const std::string& strValue = std::get<std::string>(value);
+            bool found = false;
+            for (const auto& allowed : spec.allowedStrings) {
+                if (strValue == allowed) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                std::string allowedStr = "";
+                for (size_t i = 0; i < spec.allowedStrings.size(); ++i) {
+                    if (i > 0) allowedStr += ", ";
+                    allowedStr += "\"" + spec.allowedStrings[i] + "\"";
+                }
+                return ConfigValidationResult(false, "Value \"" + strValue + "\" is not allowed for key \"" + 
+                    spec.key + "\". Allowed values: " + allowedStr);
+            }
+        }
+    }
+
+    // Custom validator
+    if (spec.customValidator) {
+        ConfigValidationResult customResult = spec.customValidator(spec.key, value);
+        if (!customResult.valid) {
+            return customResult;
+        }
+    }
+
+    return ConfigValidationResult(true);
+}
+
+bool Config::validateParameter(const std::string& key, const ConfigValue& value) const {
+    // Find parameter specification
+    auto it = std::find_if(g_parameterSpecs.begin(), g_parameterSpecs.end(),
+        [&key](const ParameterSpec& spec) { return spec.key == key; });
+
+    if (it != g_parameterSpecs.end()) {
+        ConfigValidationResult result = validateValue(key, value, *it);
+        return result.valid;
+    }
+
+    // No specific validation for unknown parameters (allow them)
+    return true;
+}
+
+// Static member function implementations
+std::vector<ParameterSpec>& Config::getParameterSpecs() {
+    return g_parameterSpecs;
+}
+
+bool Config::isValidParameter(const std::string& key) {
+    auto it = std::find_if(g_parameterSpecs.begin(), g_parameterSpecs.end(),
+        [&key](const ParameterSpec& spec) { return spec.key == key; });
+    return it != g_parameterSpecs.end();
+}
+
+std::vector<std::string> Config::getAllowedKeys() {
+    std::vector<std::string> keys;
+    for (const auto& spec : g_parameterSpecs) {
+        keys.push_back(spec.key);
+    }
+    return keys;
+}
+
+void Config::setParameterSpec(const ParameterSpec& spec) {
+    // Check if spec already exists, replace it
+    auto it = std::find_if(g_parameterSpecs.begin(), g_parameterSpecs.end(),
+        [&spec](const ParameterSpec& existing) { return existing.key == spec.key; });
+    
+    if (it != g_parameterSpecs.end()) {
+        *it = spec;
+    } else {
+        g_parameterSpecs.push_back(spec);
+    }
+}
+
+void Config::clearParameterSpecs() {
+    g_parameterSpecs.clear();
+}
+
+void Config::initializeParameterSpecs() {
+    // Clear existing specs
+    clearParameterSpecs();
+    
+    // Initialize with default parameter specifications based on typical usage
+    
+    // Integer/Count parameters
+    setParameterSpec(ParameterSpec("random_seed", "integer", "Random seed for reproducible experiments")
+        .minValue = 0);
+    
+    setParameterSpec(ParameterSpec("neuron_count", "integer", "Number of neurons in the brain")
+        .minValue = 1);
+    
+    setParameterSpec(ParameterSpec("region_count", "integer", "Number of brain regions")
+        .minValue = 1);
+    
+    setParameterSpec(ParameterSpec("max_simulation_steps", "integer", "Maximum simulation steps")
+        .minValue = 0);
+    
+    // Float parameters
+    setParameterSpec(ParameterSpec("simulation_timestep", "double", "Simulation timestep in seconds")
+        .minValue = 0.0
+        .maxValue = 1.0);
+    
+    setParameterSpec(ParameterSpec("connection_probability", "double", "Connection probability for random connectivity")
+        .minValue = 0.0
+        .maxValue = 1.0);
+    
+    setParameterSpec(ParameterSpec("plasticity_learning_rate", "double", "Plasticity learning rate")
+        .minValue = 0.0
+        .maxValue = 1.0);
+    
+    setParameterSpec(ParameterSpec("stdp_ltp_weight", "double", "STDP LTP weight")
+        .minValue = 0.0);
+    
+    setParameterSpec(ParameterSpec("stdp_ltd_weight", "double", "STDP LTD weight")
+        .minValue = 0.0);
+    
+    setParameterSpec(ParameterSpec("stdp_time_constant", "double", "STDP time constant")
+        .minValue = 0.0);
+    
+    setParameterSpec(ParameterSpec("development_synaptogenesis_rate", "double", "Development synaptogenesis rate")
+        .minValue = 0.0);
+    
+    setParameterSpec(ParameterSpec("development_pruning_rate", "double", "Development pruning rate")
+        .minValue = 0.0);
+    
+    setParameterSpec(ParameterSpec("dopamine_baseline", "double", "Neuromodulation dopamine baseline")
+        .minValue = 0.0
+        .maxValue = 1.0);
+    
+    setParameterSpec(ParameterSpec("reward_discount_factor", "double", "Reward discount factor")
+        .minValue = 0.0
+        .maxValue = 1.0);
+    
+    setParameterSpec(ParameterSpec("environment_width", "integer", "Environment width in grid cells")
+        .minValue = 1);
+    
+    setParameterSpec(ParameterSpec("environment_height", "integer", "Environment height in grid cells")
+        .minValue = 1);
+    
+    setParameterSpec(ParameterSpec("visualization_update_rate", "double", "Visualization update rate (Hz)")
+        .minValue = 0.0);
+    
+    // String parameters
+    setParameterSpec(ParameterSpec("environment_name", "string", "Environment name")
+        .allowedStrings = {"GridWorld", "Continuous", "Custom"});
+    
+    setParameterSpec(ParameterSpec("log_level", "string", "Logging level")
+        .allowedStrings = {"DEBUG", "INFO", "WARN", "ERROR"});
+    
+    // Boolean parameters
+    setParameterSpec(ParameterSpec("log_to_file", "bool", "Enable logging to file");
+    
+    setParameterSpec(ParameterSpec("visualization_enabled", "bool", "Enable visualization");
+    
+    setParameterSpec(ParameterSpec("simulation_time_limit", "double", "Simulation time limit in seconds")
+        .minValue = 0.0);
+}

@@ -17,6 +17,15 @@ public:
     
     // Store item
     // TODO PHASE 2: Implement real storage
+    // Acceptance criteria:
+    // 1. Implement capacity-limited storage
+    // 2. Support item aging and decay
+    // 3. Implement neural representation storage
+    // 4. Support spike-based memory encoding
+    // 5. Provide temporal memory patterns
+    // 6. Implement memory consolidation mechanisms
+    // 7. Support memory retrieval and replay
+    // 8. Provide memory interference and overlap management
     void store(NeuronId neuron, float value);
     
     // Retrieve item

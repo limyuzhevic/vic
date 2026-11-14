@@ -22,6 +22,15 @@ public:
     
     // Apply neuromodulatory effect to plasticity
     // TODO PHASE 2: Implement real modulation
+    // Acceptance criteria:
+    // 1. Implement dopamine modulation of plasticity
+    // 2. Implement serotonin modulation of learning rates
+    // 3. Support norepinephrine for attention/arousal
+    // 4. Implement acetylcholine for memory modulation
+    // 5. Support contextual neuromodulation
+    // 6. Implement neuromodulatory dynamics (release, uptake, metabolism)
+    // 7. Provide neuromodulatory signaling pathways
+    // 8. Implement neuromodulator-neuron interactions
     virtual float getPlasticityFactor() const = 0;
     
     // Update neuromodulator state

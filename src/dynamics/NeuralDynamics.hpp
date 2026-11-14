@@ -15,11 +15,35 @@ public:
     
     // Update neuron state for one step
     // TODO PHASE 2: Implement real dynamics
+    // Acceptance criteria:
+    // 1. Implement Leaky Integrate-and-Fire (LIF) model
+    // 2. Support Hodgkin-Huxley ion channel dynamics
+    // 3. Implement FitzHugh-Nagumo (FHN) model
+    // 4. Support conductance-based synaptic models
+    // 5. Implement ion channel kinetics and gating variables
+    // 6. Support action potential generation and propagation
+    // 7. Implement noise and stochastic dynamics
+    // 8. Provide numerical integration stability
     virtual void updateNeuron(Neuron* neuron, TimestepDuration dt) = 0;
     
     // Update synapse state for one step
     // TODO PHASE 2: Implement real synaptic dynamics
+    // Acceptance criteria:
+    // 1. Implement synaptic transmission with delay
+    // 2. Support synaptic depression/facilitation
+    // 3. Implement short-term plasticity mechanisms
+    // 4. Support neurotransmitter dynamics
+    // 5. Implement synaptic clearance and recovery
+    // 6. Provide synaptic state continuity
+    // 7. Implement synaptic noise
+    // 8. Support multiple synapse types
     virtual void updateSynapse(Synapse* synapse, TimestepDuration dt) = 0;
+    
+    // Apply synaptic input from spike
+    virtual void applySpikeInput(Neuron* neuron, const Synapse* synapse) = 0;
+    
+    // Check if neuron should fire
+    virtual bool shouldFire(const Neuron* neuron) const = 0;
     
     // Apply synaptic input from spike
     virtual void applySpikeInput(Neuron* neuron, const Synapse* synapse) = 0;

@@ -17,6 +17,15 @@ public:
     
     // Make prediction for next timestep
     // TODO PHASE 2: Implement real prediction
+    // Acceptance criteria:
+    // 1. Implement forward models of sensory processing
+    // 2. Support predictive coding (top-down predictions, bottom-up errors)
+    // 3. Implement temporal prediction (short-term forecasting)
+    // 4. Support expectation-driven perception
+    // 5. Apply prediction error minimization
+    // 6. Implement hierarchical predictive models
+    // 7. Support Bayesian inference in prediction
+    // 8. Provide prediction confidence and uncertainty
     std::unique_ptr<SensoryInput> predictNextState(const SensoryInput& currentState);
     
     // Update predictions based on actual observation

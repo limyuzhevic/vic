@@ -16,6 +16,15 @@ public:
     
     // Select action based on neural activity
     // TODO PHASE 2: Implement real action selection
+    // Acceptance criteria:
+    // 1. Implement value-based action selection
+    // 2. Support reinforcement learning (Q-learning, actor-critic)
+    // 3. Implement exploration strategies (random, contextual)
+    // 4. Apply motor cortex output decoding
+    // 5. Support action preference and inhibition
+    // 6. Implement action execution and feedback
+    // 7. Provide action history and temporal structure
+    // 8. Support multimodal action integration
     std::unique_ptr<Action> selectAction(const class NeuralRegion& motorRegion);
     
     // Get available actions
