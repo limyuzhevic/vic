@@ -72,10 +72,8 @@ add_library(nlm_core STATIC
     src/prediction/NeuralPrediction.cpp
     # Motor
     src/motor/MotorSystem.cpp
-    # Environment
-    src/environment/Environment.cpp
-    src/environment/Observation.cpp
-    src/motor/Action.cpp
+    # Core utilities (conversions, common patterns)
+    src/utils/ActionConversion.cpp
     # Experiments
     src/experiments/Experiment.cpp
     src/experiments/ExperimentRunner.cpp
@@ -201,9 +199,37 @@ if(NLM_BUILD_PYTHON_BINDINGS)
     install(TARGETS pynlm LIBRARY DESTINATION .)
 endif()
 
-# Testing
-enable_testing()
-add_subdirectory(tests)
+# Test executables
+    add_executable(test_types
+        tests/test_types.cpp
+    )
+    target_link_libraries(test_types PUBLIC nlm_core)
+
+    add_executable(test_brain
+        tests/test_brain.cpp
+    )
+    target_link_libraries(test_brain PUBLIC nlm_core nlm_agent)
+
+    add_executable(test_neuron
+        tests/test_neuron.cpp
+    )
+    target_link_libraries(test_neuron PUBLIC nlm_core)
+
+    add_executable(test_stdp
+        tests/test_stdp.cpp
+    )
+    target_link_libraries(test_stdp PUBLIC nlm_core)
+
+    add_executable(test_random
+        tests/test_random.cpp
+    )
+    target_link_libraries(test_random PUBLIC nlm_core)
+
+    # Action conversion test executable
+    add_executable(test_action_conversion
+        tests/test_action_conversion.cpp
+    )
+    target_link_libraries(test_action_conversion PUBLIC nlm_core)
 
 # Install targets (future)
 install(TARGETS nlm nlm_core nlm_agent nlm_world nlm_phase3 nlm_phase4 nlm_phase5 nlm_phase6 nlm_phase3_demo nlm_phase4_demo nlm_phase5_demo nlm_phase6_demo nlm_benchmark
