@@ -44,11 +44,49 @@ void printBanner() {
     ║     - STDP and Hebbian plasticity                            ║
     ║     - Structural plasticity                                   ║
     ║                                                               ║
-    ╚═══════════════════════════════════════════════════════════════╝
-    )" << std::endl;
 }
 
-// Learning Experiment: Demonstrates measurable synaptic changes through experience
+void printUsageAndExit() {
+    std::cout << R"(
+=== NLM Command Line Usage ===
+
+USAGE:
+    nlm [OPTIONS] [--CONFIG=value] [--key=value]...
+
+OPTIONS:
+    -h, --help              Show this help message and exit
+    -v, --verbose          Enable verbose logging
+    --benchmark, --perf    Run performance benchmarks
+    -o, --output <file>    Save output to file
+    -s, --steps <number>   Number of simulation steps (default: 1000)
+    --log-file, --log <file>  Log output to file
+    --save-config          Save current configuration to "last_config.cfg"
+
+CONFIGURATION:
+    --config <file>        Configuration file (default: configs/default.cfg)
+    --config=value         Alternative way to specify config file
+
+DIRECT CONFIGURATION:
+    --neuron_count <n>     Number of neurons (default: 500)
+    --region_count <n>     Number of regions (default: 1)
+    --connection_probability <f>  Connectivity probability (default: 0.15)
+    --random_seed <n>      Random seed (default: 42)
+    --simulation_timestep <f>  Simulation timestep (default: 0.001)
+    --stdp_ltp_weight <f>  STDP LTP weight (default: 0.02)
+    --stdp_ltd_weight <f>  STDP LTD weight (default: 0.015)
+    --stdp_tau <f>         STDP time constant (default: 20.0)
+    --synaptogenesis_rate <f> Structural plasticity synaptogenesis rate (default: 0.0001f)
+    --pruning_rate <f>     Structural plasticity pruning rate (default: 0.00001f)
+
+EXAMPLES:
+    nlm --verbose --steps 5000
+    nlm --config my_config.cfg --neuron_count 2000 --benchmark
+    nlm --neuron_count=1000 --region_count=2 --random_seed=123
+    nlm --help
+
+The program will display simulation results and progress information based on the verbosity level.
+)" << std::endl;
+}
 struct LearningExperiment {
     std::shared_ptr<Brain> brain;
     uint64_t seed;
@@ -329,28 +367,105 @@ int main(int argc, char** argv) {
     // Load configuration
     auto config = std::make_shared<Config>();
     
-    // Try to load from file if provided
-    std::string configFile = "configs/default.cfg";
+    // Print help message
+    if (argc == 1 || (argc == 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h"))) {
+        printUsageAndExit();
+        return 0;
+    }
+    
+    // Initialize command line argument parser
+    struct CommandLineArgs {
+        std::string configFile = "configs/default.cfg";
+        bool verbose = false;
+        bool benchmark = false;
+        bool saveConfig = false;
+        std::string outputFile;
+        size_t steps = 1000;
+        std::string logFile;
+    };
+    
+    CommandLineArgs args;
+    
+    // Enhanced command line argument parsing
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
-        if (arg.substr(0, 7) == "--config") {
+        
+        if (arg == "--help" || arg == "-h") {
+            printUsageAndExit();
+            return 0;
+        } else if (arg == "--verbose" || arg == "-v") {
+            args.verbose = true;
+        } else if (arg == "--benchmark" || arg == "--perf") {
+            args.benchmark = true;
+        } else if (arg == "--save-config") {
+            args.saveConfig = true;
+        } else if (arg == "--output" || arg == "-o") {
+            if (i + 1 < argc) {
+                args.outputFile = argv[++i];
+            }
+        } else if (arg == "--steps" || arg == "--steps=" || arg == "-s") {
             if (arg.find('=') != std::string::npos) {
-                configFile = arg.substr(arg.find('=') + 1);
+                args.steps = static_cast<size_t>(std::stoul(arg.substr(arg.find('=') + 1)));
             } else if (i + 1 < argc) {
-                configFile = argv[++i];
+                args.steps = static_cast<size_t>(std::stoul(argv[++i]));
+            }
+        } else if (arg == "--log-file" || arg == "--log") {
+            if (i + 1 < argc) {
+                args.logFile = argv[++i];
+            }
+        } else if (arg.substr(0, 7) == "--config") {
+            if (arg.find('=') != std::string::npos) {
+                args.configFile = arg.substr(arg.find('=') + 1);
+            } else if (i + 1 < argc) {
+                args.configFile = argv[++i];
+            }
+        } else if (arg.find('=') != std::string::npos && arg.substr(0, 1) != "-") {
+            // Handle key=value arguments for direct config overrides
+            size_t pos = arg.find('=');
+            std::string key = arg.substr(0, pos);
+            std::string value = arg.substr(pos + 1);
+            // Try to parse as number
+            bool isInt = true;
+            bool isFloat = true;
+            try {
+                size_t posEnd;
+                size_t intValue = std::stoul(value, &posEnd);
+                if (posEnd == value.size()) {
+                    config->set(key, static_cast<int64_t>(intValue), ConfigSource::CommandLine);
+                    isInt = false;
+                }
+            } catch (...) {}
+            
+            if (isInt) {
+                try {
+                    size_t posEnd;
+                    float floatValue = std::stof(value, &posEnd);
+                    if (posEnd == value.size()) {
+                        config->set(key, floatValue, ConfigSource::CommandLine);
+                        isFloat = false;
+                    }
+                } catch (...) {}
+            }
+            
+            if (isInt && isFloat) {
+                // Try boolean
+                if (value == "true" || value == "false") {
+                    bool boolValue = (value == "true");
+                    config->set(key, boolValue, ConfigSource::CommandLine);
+                } else {
+                    // Treat as string
+                    config->set(key, value, ConfigSource::CommandLine);
+                }
             }
         }
     }
     
     // Load config from file (ignore if not found)
-    if (config->loadFromFile(configFile)) {
-        NLM_LOG_INFO("Loaded configuration from: " + configFile);
+    if (config->loadFromFile(args.configFile)) {
+        NLM_LOG_INFO("Loaded configuration from: " + args.configFile);
     } else {
         NLM_LOG_INFO("Using default configuration.");
     }
-    
-    // Override with command line args
-    config->loadFromArgs(argc, argv);
     
     // Set default values for Phase 2
     config->set("random_seed", static_cast<int64_t>(42), ConfigSource::Default);
@@ -367,6 +482,34 @@ int main(int argc, char** argv) {
     // Structural plasticity parameters
     config->set("synaptogenesis_rate", 0.0001f, ConfigSource::Default);
     config->set("pruning_rate", 0.00001f, ConfigSource::Default);
+    
+    // Set additional options from command line
+    if (args.verbose) {
+        config->set("verbose_logging", true, ConfigSource::CommandLine);
+    }
+    if (args.benchmark) {
+        config->set("benchmark_mode", true, ConfigSource::CommandLine);
+    }
+    if (args.steps > 0) {
+        config->set("simulation_steps", static_cast<int64_t>(args.steps), ConfigSource::CommandLine);
+    }
+    if (!args.logFile.empty()) {
+        config->set("log_file", args.logFile, ConfigSource::CommandLine);
+    }
+    if (args.saveConfig) {
+        config->saveToFile("last_config.cfg");
+        NLM_LOG_INFO("Configuration saved to: last_config.cfg");
+    }
+    
+    // Log configuration summary
+    NLM_LOG_INFO("");
+    NLM_LOG_INFO("Configuration:");
+    NLM_LOG_INFO("  random_seed: " + std::to_string(config->getOr<int64_t>("random_seed", 42)));
+    NLM_LOG_INFO("  simulation_timestep: " + std::to_string(config->getOr<double>("simulation_timestep", 0.001)) + "s");
+    NLM_LOG_INFO("  neuron_count: " + std::to_string(config->getOr<int64_t>("neuron_count", 500)));
+    NLM_LOG_INFO("  region_count: " + std::to_string(config->getOr<int64_t>("region_count", 1)));
+    NLM_LOG_INFO("  connection_probability: " + std::to_string(config->getOr<float>("connection_probability", 0.15f)));
+    NLM_LOG_INFO("");
     
     // Log configuration summary
     NLM_LOG_INFO("");

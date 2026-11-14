@@ -293,7 +293,10 @@ PYBIND11_MODULE(pynlm, m) {
         .def("setEnergyDecayRate", &SimpleWorld::setEnergyDecayRate, py::arg("r"))
         .def("getSimulationTime", &SimpleWorld::getSimulationTime)
         .def("setRandomSeed", &SimpleWorld::setRandomSeed, py::arg("seed"))
-        .def("getRandomSeed", &SimpleWorld::getRandomSeed);
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("getConfig", &SimpleWorld::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get world configuration details");
 
     py::class_<Brain, std::shared_ptr<Brain>>(m, "Brain", R"pbdoc(Central neural simulation brain class)pbdoc")
         .def(py::init<std::shared_ptr<Config>>(), py::arg("config"))
@@ -401,6 +404,52 @@ PYBIND11_MODULE(pynlm, m) {
              py::arg("enable"))
         .def("enableDevelopment", &AgentBrain::enableDevelopment,
              py::arg("enable"))
+        .def("getRandomSeed", &SimpleWorld::getRandomSeed)
+        .def("getConfig", &SimpleWorld::getConfig,
+             py::return_value_policy::reference_internal,
+             "Get world configuration details");
+
+    // AgentBrain convenience methods for easier API usage
+    py::class_<AgentBrain, std::shared_ptr<AgentBrain>>(m, "AgentBrain", R"pbdoc(Agent brain interface connecting NLM brain to world)pbdoc")
+        .def(py::init<std::shared_ptr<Brain>>(), py::arg("brain"))
+        .def("initialize", &AgentBrain::initialize, py::arg("world"),
+             "Initialize with world")
+        .def("getSensoryInputSize", &AgentBrain::getSensoryInputSize,
+             "Get expected sensory input size")
+        .def("getMotorOutputSize", &AgentBrain::getMotorOutputSize,
+             "Get expected motor output size")
+        .def("processSensoryInput", &AgentBrain::processSensoryInput,
+             py::arg("percept"),
+             "Process sensory percept and inject into brain")
+        .def("decodeMotorCommand", &AgentBrain::decodeMotorCommand,
+             "Decode brain motor activity into motor command")
+        .def("applyRewardModulation", &AgentBrain::applyRewardModulation,
+             py::arg("reward"), py::arg("predictedReward"),
+             "Apply reward-based neuromodulation")
+        .def("updateDevelopment", &AgentBrain::updateDevelopment,
+             py::arg("timestep"),
+             "Update development system")
+        .def("getDevelopmentalStage", &AgentBrain::getDevelopmentalStage,
+             "Get current developmental stage")
+        .def("getNeuromodulationLevel", &AgentBrain::getNeuromodulationLevel,
+             "Get current neuromodulation level")
+        .def("getCuriosityLevel", &AgentBrain::getCuriosityLevel,
+             "Get curiosity level")
+        .def("getNoveltyLevel", &AgentBrain::getNoveltyLevel,
+             "Get novelty level")
+        .def("getPredictionError", &AgentBrain::getPredictionError,
+             "Get prediction error")
+        .def("reset", &AgentBrain::reset,
+             "Reset agent for new episode")
+        .def("getBrain", &AgentBrain::getBrain,
+             py::return_value_policy::reference_internal,
+             "Get the underlying brain")
+        .def("enableRewardModulation", &AgentBrain::enableRewardModulation,
+             py::arg("enable"))
+        .def("enableStructuralPlasticity", &AgentBrain::enableStructuralPlasticity,
+             py::arg("enable"))
+        .def("enableDevelopment", &AgentBrain::enableDevelopment,
+             py::arg("enable"))
         .def("enableCuriosity", &AgentBrain::enableCuriosity,
              py::arg("enable"))
         .def("isRewardModulationEnabled", &AgentBrain::isRewardModulationEnabled)
@@ -408,6 +457,7 @@ PYBIND11_MODULE(pynlm, m) {
         .def("isDevelopmentEnabled", &AgentBrain::isDevelopmentEnabled)
         .def("isCuriosityEnabled", &AgentBrain::isCuriosityEnabled);
 
+    // Convenience helper functions for easy setup
     m.def("createDefaultConfig", []() -> std::shared_ptr<Config> {
         return std::make_shared<Config>();
     }, "Create a default configuration");
@@ -423,6 +473,53 @@ PYBIND11_MODULE(pynlm, m) {
     m.def("createAgentBrain", [](std::shared_ptr<Brain> brain) -> std::shared_ptr<AgentBrain> {
         return std::make_shared<AgentBrain>(brain);
     }, py::arg("brain"), "Create a new agent brain interface");
+
+    // Helper functions for common scenarios
+    m.def("createExperimentSetup", []() {
+        auto config = std::make_shared<Config>();
+        config->set("neuron_count", static_cast<int64_t>(1000), ConfigSource::Default);
+        config->set("region_count", static_cast<int64_t>(1), ConfigSource::Default);
+        config->set("connection_probability", 0.1f, ConfigSource::Default);
+        
+        auto brain = std::make_shared<Brain>(config);
+        brain->initialize();
+        
+        auto world = std::make_shared<SimpleWorld>();
+        world->configure(16, 16, 8, 8);
+        world->reset();
+        world->setAgentStart(8.0, 8.0);
+        
+        auto agent = std::make_shared<AgentBrain>(brain);
+        agent->initialize(*world);
+        
+        return std::make_tuple(config, brain, world, agent);
+    }, "Create a complete experiment setup with default configuration");
+
+    // Error handling and validation utilities
+    m.def("validateConfig", [](const std::shared_ptr<Config>& config) {
+        if (!config) {
+            throw std::runtime_error("Configuration is null");
+        }
+        std::string errors;
+        if (!config->has("neuron_count")) {
+            errors += "Missing required key 'neuron_count'. ";
+        }
+        if (!config->has("region_count")) {
+            errors += "Missing required key 'region_count'. ";
+        }
+        if (!errors.empty()) {
+            throw std::runtime_error("Invalid configuration: " + errors);
+        }
+        return true;
+    }, py::arg("config"), "Validate configuration and throw error if invalid");
+
+    m.def("safeStep", [](std::shared_ptr<Brain>& brain, SimulationStep step) {
+        if (!brain) {
+            throw std::runtime_error("Brain is null");
+        }
+        brain->step(step);
+        return brain->getTotalSpikeCount();
+    }, py::arg("brain"), py::arg("step"), "Safely perform a simulation step");
 
     m.attr("INVALID_NEURON_ID") = py::cast(INVALID_NEURON_ID);
     m.attr("INVALID_SYNAPSE_ID") = py::cast(INVALID_SYNAPSE_ID);

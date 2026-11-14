@@ -73,6 +73,9 @@ struct Brain::Impl {
     // simulation state so a reloaded brain keeps what it learned.
     float learnedPreference = 0.0f;
     
+    // Random generator seed
+    uint64_t rngSeed;
+    
     // Sensory neurons for input injection
     std::vector<Neuron*> sensoryNeurons;
     std::vector<Neuron*> motorNeurons;
@@ -93,8 +96,28 @@ struct Brain::Impl {
     Impl(std::shared_ptr<Config> cfg)
         : config(cfg)
         , rng(nullptr)
-        , developmentalStage(DevelopmentalStage::Initial)
-        , nextRegionId(1)
+        , rngSeed(42)  // Temporary seed, will be set from config below
+        , regions()
+        , interRegionConnections()
+        , workingMemory(nullptr)
+        , episodicMemory(nullptr)
+        , associativeMemory(nullptr)
+        , predictionSystem(nullptr)
+        , planner(nullptr)
+        , conceptFormation(nullptr)
+        , attention(nullptr)
+        , developmentSystem(nullptr)
+        , dopamine(nullptr)
+        , curiosity(nullptr)
+        , predictionError(nullptr)
+        , novelty(nullptr)
+        , spikeSystem(nullptr)
+        , stdp(nullptr)
+        , hebbian(nullptr)
+        , structuralPlasticity(nullptr)
+        , sensoryNeurons()
+        , motorNeurons()
+        , neuronById()
         , timestep(0.001)
         , currentStep(0)
         , currentTime(0.0)
@@ -104,13 +127,17 @@ struct Brain::Impl {
         , stepsSinceLastEpisode(0)
         , replayInterval(100)      // Replay every 100 steps
         , consolidationInterval(1000)  // Consolidate every 1000 steps
+        , learnedPreference(0.0f)
+        , checkpointManager(nullptr)
+        , spikeHandlersRegistered(false)
+        , developmentalStage(DevelopmentalStage::Initial)
+        , nextRegionId(1)
     {
         // Initialize random generator with seed from config
-        uint64_t seed = 42;  // Default seed
         if (auto seedOpt = config->get<int64_t>("random_seed")) {
-            seed = *seedOpt;
+            rngSeed = *seedOpt;
         }
-        rng = std::make_unique<RandomGenerator>(seed);
+        rng = std::make_unique<RandomGenerator>(rngSeed);
         
         // Initialize plasticity systems
         spikeSystem = std::make_unique<SpikeSystem>();
